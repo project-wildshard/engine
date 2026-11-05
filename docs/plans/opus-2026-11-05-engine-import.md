@@ -11,12 +11,12 @@ Live cross-repo status: `docs/multi-repo/STATE.md` there.
 
 From `Raynos/project-wildshard-singleplayer@727236c625` (paths may move before the import; re-check them then):
 
-- `src/engine/ and src/game/, re-sorted into shared/client/server/cook by the P1 E2 ownership map`
-- `the headless host (src/sdk/headless.ts and the tick worker files)`
-- `the cook (scripts/app-build/spawnParts.ts and the pack builder)`
-- `the app shell (src/*.ts, index.html, vite.config.ts)`
+- src/engine/ and src/game/, re-sorted into shared/client/server/cook by the P1 E2 ownership map
+- the headless host (src/sdk/headless.ts and the tick worker files)
+- the cook (scripts/app-build/spawnParts.ts and the pack builder)
+- the app shell (src/*.ts, index.html, vite.config.ts)
 - `src/commons/`
-- `shared assets (public/assets/{gpu,tex,music,sfx,hdri,models,baked}) and highway/centre art`
+- shared assets (public/assets/{gpu,tex,music,sfx,hdri,models,baked}) and highway/centre art
 
 ## Before the import
 
