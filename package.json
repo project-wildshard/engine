@@ -12,7 +12,7 @@
   },
   "packageManager": "pnpm@10.21.0",
   "scripts": {
-    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "pnpm:devPreinstall": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "dev": "node src/tools/build-web.ts --dev",
     "build": "node src/tools/build-web.ts",
     "typecheck": "tsc -p src/tsconfig.json && tsc -p src/client/tsconfig.json",

@@ -7,7 +7,8 @@ here; what the repo does is `docs/prd.md`, how it is built `docs/design.md`.
 
 Run from the repo root.
 
-- `pnpm install`: installs deps and points `core.hooksPath` at `.githooks/`.
+- `pnpm install`: installs deps and points `core.hooksPath` at `.githooks/`,
+  through `pnpm:devPreinstall`. Never use `prepare` here (`../leftover/docs/repo-kit.md`).
 - `pnpm check`: typecheck + lint + format:check + unit tests + the side rule + asks. The pre-push hook runs it.
 - `pnpm test`: `node:test` on `src/**/*.test.ts`, run as .ts by Node's type stripping.
 - `pnpm test:hooks`: the `.githooks/` suite (CI, and pre-commit when hooks change).
