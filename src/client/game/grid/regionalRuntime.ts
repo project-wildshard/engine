@@ -388,8 +388,9 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
                 if (preparing) { weapons.enabled = false; weapons.visible = false; weapons.stowed = true; }
                 // J130: a cell's pack and gear are the server's, and its lines reach whichever cell the page has entered.
                 const progress = new Progress(request.cell.instance), inventory = new Inventory(request.cell.instance), owned = new Owned(request.cell.instance, readOnlySave(ownedSave));
-                inventory.writes = false; wirePage.hold({ shard: request.cell.slug, inventory, gear: owned }, owner);
+                inventory.writes = false;
                 const skins = new SkinLocker(request.cell.instance, skinRows, request.admitted.source.migrations);
+                wirePage.hold({ shard: request.cell.slug, inventory, gear: owned, finishes: skins }, owner);
                 // SF57: the page's maps reach this resident's hooks through owner facades, so what its play registers on
                 // them after an await (a quest card, its places, its marks) ends with the resident, not the page. (Not the
                 // HUD or menu: other services key on their identity, e.g. bag tabs by menu.)

@@ -19,3 +19,7 @@ engine's lifted layout.
 Port cb6b6f06f7 (test(riding): prove offer, breaking and call) in source
 order. Keep the behavior and repoint the retained files and imports to
 engine's lifted layout.
+
+Port 40e08ff28d (fix: isolate Pine rewards by player) in source order.
+Keep the behavior and repoint the retained files and imports to engine's
+lifted layout.

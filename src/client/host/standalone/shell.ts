@@ -68,8 +68,28 @@ function applyWrite(storage: SaveStorage, key: string, value: string | null): bo
   try { if (value === null) storage.removeItem(key); else storage.setItem(key, value); return true; } catch { return false; }
 }
 
+const SaveDocument = v.object({ keys: v.record(v.string(), v.unknown()), reset: v.optional(v.number()) });
+/** Apply only entries the worker changed since its last document. The page owns discovery and cosmetic wear;
+ * a server pack/pending-drop write must leave those newer entries standing. Resets still replace the document. */
+function changedEntries(before: string | null, after: string | null, current: string | null): string | null {
+  if (after === null || current === null || before === current) return after;
+  try {
+    const base = v.parse(SaveDocument, JSON.parse(before ?? '{"keys":{}}'));
+    const next = v.parse(SaveDocument, JSON.parse(after)), live = v.parse(SaveDocument, JSON.parse(current));
+    if (base.reset !== next.reset) return after;
+    if (base.reset !== live.reset) return current;
+    const keys = { ...live.keys };
+    for (const key of new Set([...Object.keys(base.keys), ...Object.keys(next.keys)])) {
+      if (JSON.stringify(base.keys[key]) === JSON.stringify(next.keys[key])) continue;
+      if (Object.hasOwn(next.keys, key)) keys[key] = next.keys[key]; else delete keys[key];
+    }
+    return JSON.stringify({ ...live, keys });
+  } catch { return after; }
+}
+
 /** Run the page half over the two ports. `startStandalone` is this over a real worker; a Node test passes a MessageChannel. */
 export function connectStandalone(config: StandaloneConfig, control: MessagePort, game: MessagePort, end: () => void, harness?: MessagePort): StandaloneShell {
+  const documents = saveDocuments(config.storage, config.savePrefix), workerDocuments = new Map(Object.entries(documents));
   const transport = new WorkerLoopback(game), client = new NetClient(transport);
   transport.onClose(reason => { if (reason === 'reload') config.refused?.(); });
   const post = (message: ShellMessage): void => { control.postMessage(v.parse(ShellMessageSchema, message), []); };
@@ -82,7 +102,9 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
     post(send(id));
   });
   const write = async (seq: number, key: string, value: string | null): Promise<void> => {
-    post({ kind: 'written', seq, ok: await (config.write?.(key, value) ?? applyWrite(config.storage, key, value)) });
+    const merged = changedEntries(workerDocuments.get(key) ?? null, value, config.storage.getItem(key));
+    if (value === null) workerDocuments.delete(key); else workerDocuments.set(key, value);
+    post({ kind: 'written', seq, ok: await (config.write?.(key, merged) ?? applyWrite(config.storage, key, merged)) });
   };
   control.onmessage = (event: MessageEvent<unknown>): void => {
     const message = v.parse(ServerMessageSchema, event.data);
@@ -95,7 +117,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
   const visibility = (): void => { if (!held) post({ kind: document.visibilityState === 'hidden' ? 'pause' : 'resume' }); };
   const scope = new Scope('standalone.shell');
   if (typeof document !== 'undefined') scope.listen(document, 'visibilitychange', visibility);
-  post({ kind: 'boot', slug: config.slug, base: config.base, build: config.serverBuild ?? config.build, savePrefix: config.savePrefix, saves: saveDocuments(config.storage, config.savePrefix), ...(config.lone === true ? { lone: true } : {}) });
+  post({ kind: 'boot', slug: config.slug, base: config.base, build: config.serverBuild ?? config.build, savePrefix: config.savePrefix, saves: documents, ...(config.lone === true ? { lone: true } : {}) });
   return { client, transport, booted: bootPromise,
     ready: () => { post({ kind: 'ready' }); }, pause: () => { post({ kind: 'pause' }); }, resume: () => { post({ kind: 'resume' }); },
     hold: on => { held = on; post({ kind: on ? 'pause' : 'resume' }); },

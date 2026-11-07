@@ -70,6 +70,7 @@
  "test/physics-open-plots-headless.test.ts",
  "test/pine-door-continuation.test.ts",
  "test/pine-king-room.test.ts",
+ "test/pine-rewards.test.ts",
  "test/quest-players-driftwood.test.ts",
  "test/quest-view-port.test.ts",
  "test/ratchet-paths.test.ts",

@@ -219,7 +219,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     ['ammo', { capacity: (kind: string, n: number) => need(quiver ?? undefined, 'ammunition').room(kind, n),
       addBolts: (n: number) => { bolts?.addBolts(n); },
       grant: (kind: string, n: number) => { need(quiver ?? undefined, 'ammunition').add(kind, n); } }]]));
-  const trader = traderFor(pack, skin => skin === rows.trade?.finish && state.rewardOwned || finishes.has(skin), skin => { finishes.add(skin); const saved = skinSave.read(ports.source.identity.slug); skinSave.write({ ...saved, owned: [...new Set([...saved.owned, skin])] }, ports.source.identity.slug); }, ammunition, launcher?.kind === 'bolt' ? launcher.item : null);
+  const trader = traderFor(pack, skin => skin === rows.trade?.finish && state.rewardOwned || finishes.has(skin), skin => { finishes.add(skin); }, ammunition, launcher?.kind === 'bolt' ? launcher.item : null);
   const initialTrader = trader?.snapshot();
   const steps = rows.effects === undefined ? null : new QuestStepRunner(ports.steps);
   if (steps !== null) books.claim(steps.writes);

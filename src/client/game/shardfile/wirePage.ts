@@ -156,8 +156,8 @@ export class WirePage {
       if (journal !== undefined) for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.journal) && name.endsWith('.taken')) {
         const id = name.slice(OWNED_ROW.journal.length, -'.taken'.length); journal.mirrorKills(id, value - 1, (owned.get(`${OWNED_ROW.journal}${id}.best`) ?? 1) - 1);
       }
-      drops?.(owned);
       if (finishes !== undefined) for (const [name] of owned) if (name.startsWith(OWNED_ROW.finish)) finishes.own(name.slice(OWNED_ROW.finish.length));
+      drops?.(owned);
       if (board !== undefined && contracts !== null) board.mirror(contracts);
       if (said !== undefined) for (const channel of news) said(channel);
     }

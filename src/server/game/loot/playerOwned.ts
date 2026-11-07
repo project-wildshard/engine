@@ -1,3 +1,6 @@
+import * as v from 'valibot';
+import { landedBy } from '@wildshard/engine/combat/damageBook';
+import { questBooks } from '@wildshard/engine/quest/players';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { LedgerFiling } from '@wildshard/engine/net/ledgerBook';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
@@ -11,6 +14,13 @@ import { isCosmetic, isOwnedId, Owned } from '../../../shared/game/loot/Owned';
 import { Purse } from '../../../shared/game/loot/Purse';
 import { OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
 import { inventorySave, skinSave, compendiumSave, finishPickupSave, saveSlug } from '../../../shared/game/saves';
+
+const finite = v.pipe(v.number(), v.finite());
+const CreatureRewards = v.record(v.string(), v.strictObject({
+  finishes: v.array(v.string()), pending: v.record(v.string(), v.strictObject({ x: finite, y: finite, z: finite })),
+  journal: v.record(v.string(), v.strictObject({ s: finite, n: finite, t: finite, b: finite })),
+}));
+const REWARDS = 'owned.creature-rewards';
 
 /** A pack keeps what the server hands it: a slot limit is the giver's to check. */
 const KEEPS_ALL = { has: (): boolean => true, keeps: (): boolean => true, slots: () => Number.MAX_SAFE_INTEGER };
@@ -50,45 +60,66 @@ export class PlayerOwned {
   }
   /** Death rewards belong to the server, including a drop no page has drawn yet. */
   creatures(host: SimHost, source: Shardfile): void {
-    const pickups = source.items.pickups ?? {}, slot = this.slot, pending = finishPickupSave.read(slot);
+    const pickups = source.items.pickups ?? {}, slot = this.slot, lead = questBooks(host).lead.player;
+    // The continuation owns each seat. Old saves have no row: only the lead inherits the page's legacy progress.
+    const rewards = v.parse(CreatureRewards, host.slots.questState[REWARDS] ?? {});
+    host.slots.questState[REWARDS] = rewards;
+    const seat = (player: string): v.InferOutput<typeof CreatureRewards>[string] => {
+      rewards[player] ??= player === lead
+        ? { finishes: skinSave.read(slot).owned, pending: finishPickupSave.read(slot), journal: compendiumSave.read(slot) }
+        : { finishes: [], pending: {}, journal: {} };
+      return rewards[player];
+    };
+    const legacy = seat(lead);
+    // Confirmed page progress can be newer than the last periodic continuation (e.g. a tab closed after a claim).
+    legacy.finishes = [...new Set([...legacy.finishes, ...skinSave.read(slot).owned])];
+    for (const [id, saved] of Object.entries(compendiumSave.read(slot))) {
+      const stats = legacy.journal[id];
+      legacy.journal[id] = stats === undefined ? saved : { s: Math.max(stats.s, saved.s), n: Math.max(stats.n, saved.n),
+        t: Math.max(stats.t, saved.t), b: Math.max(stats.b, saved.b) };
+    }
+    for (const id of legacy.finishes) delete legacy.pending[id];
     for (const id of Object.keys(pickups)) this.finishIds.add(id);
     const journals = source.rows.compendiums.flatMap(row => 'kind' in row ? row.entries : []);
-    const journal = compendiumSave.read(slot), deaths = new Set<string>();
-    const owns = (id: string): boolean => skinSave.read(slot).owned.includes(id);
-    const grant = (id: string): void => { const saved = skinSave.read(slot); if (!saved.owned.includes(id)) skinSave.write({ ...saved, owned: [...saved.owned, id] }, slot); };
+    const deaths = new Set<string>();
     for (const id of Object.keys(pickups)) actRoutes(host).claims.set(`finish.claim.${id}`, player => {
-      const at = pending[id], feet = host.players.get(player)?.position;
+      const state = seat(player), at = state.pending[id], feet = host.players.get(player)?.position;
       if (at === undefined || feet === undefined || Math.hypot(feet.x - at.x, feet.z - at.z) > 4 || Math.abs(feet.y - at.y) > 6) return;
-      grant(id); delete pending[id]; finishPickupSave.write(pending, slot);
+      if (!state.finishes.includes(id)) state.finishes.push(id);
+      delete state.pending[id];
+      if (player === lead) finishPickupSave.write(state.pending, slot);
     });
-    host.events.on('actor.died', ({ actor }) => {
+    host.events.on('actor.died', ({ actor, req }) => {
       const body = host.entities.get(actor.id);
       if (body === undefined || deaths.has(actor.id)) return;
       deaths.add(actor.id);
+      const player = landedBy(req, host.players);
+      if (player === null) return;
+      const { journal, pending, finishes } = seat(player);
       const matched = journals.filter(entry => entry.match?.kind === body.kind && (entry.match.variants === undefined || entry.match.variants.includes(body.variant)));
       const mass = matched.find(entry => entry.massKg !== undefined)?.massKg ?? 0;
       for (const entry of matched) {
         const stats = journal[entry.id] ?? { s: 0, n: 0, t: 0, b: 0 };
         journal[entry.id] = { ...stats, s: 3, t: stats.t + 1, b: Math.max(stats.b, Math.round(mass * body.scale * body.scale * body.scale)) };
       }
-      if (matched.length > 0) compendiumSave.write(journal, slot);
       if ([...encounterRows(host).values()].some(read => { const row = read(); return row.kind === 'elite' && row.body === actor.id; })) return;
       for (const [id, row] of Object.entries(pickups)) {
         const death = row.death;
-        if (death === undefined || death.kind !== body.kind || death.variant !== undefined && death.variant !== body.variant || owns(id) || pending[id] !== undefined) continue;
+        if (death === undefined || death.kind !== body.kind || death.variant !== undefined && death.variant !== body.variant || finishes.includes(id) || pending[id] !== undefined) continue;
         const at = { x: body.position.x, y: body.position.y, z: body.position.z }, toward = death.towardPlayer;
         if (toward !== undefined) {
-          const player = host.nearestPlayer(body.position).position, distance = Math.hypot(at.x - player.x, at.z - player.z), ratio = distance > toward.epsilon ? Math.min(1, toward.distance / distance) : 0;
-          at.x = player.x + (at.x - player.x) * ratio; at.z = player.z + (at.z - player.z) * ratio;
+          const feet = host.players.get(player)?.position ?? body.position, distance = Math.hypot(at.x - feet.x, at.z - feet.z), ratio = distance > toward.epsilon ? Math.min(1, toward.distance / distance) : 0;
+          at.x = feet.x + (at.x - feet.x) * ratio; at.z = feet.z + (at.z - feet.z) * ratio;
         }
         if (death.floor !== 'source') at.y = Math.max(at.y, host.groundHeightAt(at.x, at.z));
-        pending[id] = at; finishPickupSave.write(pending, slot);
+        pending[id] = at; if (player === lead) finishPickupSave.write(pending, slot);
       }
     }, host.scope);
     host.onStep('owned.creatures', () => { for (const id of deaths) if (host.entities.get(id)?.alive === true) deaths.delete(id); });
-    publishOwned(host, 'creature-rewards', (_player, out) => {
-      for (const id of skinSave.read(slot).owned) if (this.finishIds.has(id)) out.set(`${OWNED_ROW.finish}${id}`, 1);
-      for (const [id, at] of Object.entries(pending)) if (!owns(id)) {
+    publishOwned(host, 'creature-rewards', (player, out) => {
+      const { finishes, pending, journal } = seat(player);
+      for (const id of finishes) if (this.finishIds.has(id)) out.set(`${OWNED_ROW.finish}${id}`, 1);
+      for (const [id, at] of Object.entries(pending)) if (!finishes.includes(id)) {
         out.set(`${OWNED_ROW.drop}${id}`, 1);
         out.set(`${OWNED_ROW.drop}${id}.x`, at.x); out.set(`${OWNED_ROW.drop}${id}.y`, at.y); out.set(`${OWNED_ROW.drop}${id}.z`, at.z);
       }

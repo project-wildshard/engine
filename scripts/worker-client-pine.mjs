@@ -4,7 +4,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { execFileSync } from 'node:child_process';
 // The same native continuation a saved worker writes, with only the starting payment supplied by the fixture.
-const paidSave = () => JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
+export const paidSave = () => JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
   import { readFileSync } from 'node:fs';
   import { resolve } from 'node:path';
   import { readBuiltShardfile } from './scripts/built-product.mjs';
@@ -45,7 +45,8 @@ export async function pineEconomy(browser, phone, base, step) {
   try {
     await page.goto(new URL('/?chunk=pine-hollow&mute=1&nolock=1', base).href, { waitUntil: 'load' }); await enter();
     await step('Pine: purchase pitch, select with B on the server', async () => {
-      const accepted = await buy('pitch-bolts'); await page.waitForTimeout(600); await page.keyboard.press('KeyB'); await page.waitForTimeout(600);
+      const accepted = await buy('pitch-bolts'); await page.waitForTimeout(600); await page.keyboard.press('KeyB');
+      await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__workerClient().owned['ammo|pitch'] === 1, undefined, { timeout: 3000 });
       const r = await read(); return { ok: accepted && r.selected === 'pitch' && r.pitch === 10 && r.owned['ammo|pitch'] === 1 && r.resin === 27, ...r };
     });
     await step('Pine: a finish trade grants usable ownership', async () => {
