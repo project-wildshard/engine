@@ -15,3 +15,6 @@ Driftwood product instead of importing shard author source.
 Browser fixture writers now seed epoch 1 alongside the updated readers.
 The standalone real-IDB proof has an explicit .proof.mjs name, keeping its
 node:test runner out of Vitest discovery and all commit/push test hooks.
+
+The final outer-edge check runs the real page-to-worker reward reconciliation
+against old-epoch reward documents: no reward or finish is copied.

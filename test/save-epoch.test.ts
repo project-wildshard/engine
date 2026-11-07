@@ -43,3 +43,12 @@ test('blocked storage never reloads or prevents memory play', () => {
   purse.write(4, 'driftwood');
   expect(purse.read('driftwood')).toBe(4);
 });
+
+test('worker reward reconciliation cannot see the previous epoch', async () => {
+  const { syncPageRewards } = await import('../src/shared/game/saves');
+  const page = new MemoryStorage(), worker = new MemoryStorage();
+  page.setItem(`${old}pine-hollow`, JSON.stringify({ keys: { compendium: { v: 1, data: { 'ghost-stag': { s: 99, n: 99, t: 99, b: 999 } } }, skins: { v: 1, data: { owned: ['ghost-stag'], worn: {} } } } }));
+  installAppIdentity(identity);
+  await syncPageRewards({ storage: worker, write: async (key, value) => { worker.setItem(key, value); return true; } }, page, next);
+  expect(worker.length).toBe(0);
+});
