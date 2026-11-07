@@ -28,8 +28,8 @@ function fixture(run: (root: string, git: (...args: string[]) => string, commit:
     git('config', 'core.hooksPath', join(root, '.git/hooks'));
     writeFileSync(join(root, 'selected'), 'old\n');
     writeFileSync(join(root, 'foreign'), 'old\n');
-    const initial = commit('selected', 'foreign');
-    expect(initial.status, initial.stdout + initial.stderr).toBe(0);
+    git('add', '--', 'selected', 'foreign');
+    git('commit', '-qm', 'fixture');
     writeFileSync(join(root, 'foreign'), 'foreign stage\n');
     git('add', '--', 'foreign');
     run(root, git, commit);

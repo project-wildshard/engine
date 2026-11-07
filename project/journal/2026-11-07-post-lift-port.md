@@ -62,3 +62,12 @@ Keep those two commit-entry checks as outer-edge integration tests.
 They run the actual shell entry and installed hooks in disposable main
 repositories, and pass in 1.13 seconds. The existing pre-commit suite
 also passes all 18 checks; full typecheck and lint pass afterward.
+
+The first full push gate passed 1,085 files and 5,574 tests, but caught
+the wrapper simplification dropping candidate-patch source generation.
+Restore that behavior and preserve loose outputs and peer stages. Run
+the real installed hooks against the candidate in the main checkout;
+remove the detached view and alternate pre-commit dispatcher. Verify
+unchanged hook files, named stages and working inputs under the lock.
+The candidate-generation regression and both boundary checks now pass
+together: three tests in 1.65 seconds. No hook is disabled or skipped.
