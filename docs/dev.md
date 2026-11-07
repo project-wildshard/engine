@@ -22,6 +22,20 @@ Run from the repo root.
 
 ## Layout
 
+## Progress epochs
+
+`AppIdentity.saveEpoch` isolates a progress generation. `savePrefix` must be
+a sibling of the previous prefix, and `serverSaveDatabase()` selects a
+separate IndexedDB database. `previousSavePrefix` carries only settings,
+graphics and device preferences on first boot; `identityPrefix` keeps the
+device identity stable. Completion never reloads the page. Imports must
+match the active epoch before any write or server stop. Keep the root
+`save-epoch.json` equal to the application identity; the builder checks it
+and publishes it in `version.json`. Snapshot format versions are separate.
+
+Run the real storage boundary proof explicitly:
+`scripts/browser-lane.sh node --test test/save-epoch-browser.test.mjs`.
+
 The root stays thin: README.md and AGENTS.md (humans only), CLAUDE.md
 (`@AGENTS.md`), package.json, pnpm-lock.yaml, .npmrc, .gitignore,
 .editorconfig, `docs/`, `project/`, `src/` and the dot dirs. Scratch
