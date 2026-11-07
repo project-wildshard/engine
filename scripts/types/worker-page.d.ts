@@ -23,6 +23,12 @@ export type WorkerWindow = typeof window & {
       'pine.quest': { shop: () => { open: () => void; close: () => void; o: { goods: { id: string }[] }; onBuy: (good: { id: string }) => boolean } };
     };
   };
+  __deathProof: {
+    events: { own: boolean; checkpoint: boolean | undefined; cause: { kind: string } | null }[];
+    shown: boolean; dark: boolean; earlyMove: boolean;
+    start: { x: number; z: number } | null;
+    end: { x: number; z: number } | null;
+  };
   __workerClient: () => WorkerClientReport;
   __workerClientHits: (by: number) => void;
   __pineGrid: PineShard;

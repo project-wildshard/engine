@@ -13,6 +13,7 @@ import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
 import { countedWait } from '@wildshard/engine/boot/waits';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import type { NetClient } from '@wildshard/engine/net/client';
+import type { DeathCause } from '@wildshard/engine/combat/pipeline';
 import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
 import type { PredictedRow } from '@wildshard/engine/net/predictionWorld';
 import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
@@ -67,8 +68,8 @@ export interface WorkerClientPorts {
   readonly weapons: NetWeapons;
   /** The page's health: the server's word from now on, and nothing on the page can touch it. */
   readonly health: { readonly attributes: { health: number; incomingCap?: number } };
-  /** This player fell: what a page plays. The server puts them back. */
-  readonly died: () => void;
+  /** Deliver this owner's settled lifecycle. Resume the authoritative pose when the existing fade reaches dark. */
+  readonly died: (event: { readonly checkpoint: boolean; readonly cause?: DeathCause }, resume: () => void) => void;
   /** The page's own shard's item rows: a ranged row names the server's slot for it. */
   readonly items: readonly WorkerItemRow[];
   /** A creature kind's body measures, where a page knows them: what a row with no body here stands as in the predicted world. */
@@ -297,8 +298,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
   scope.onDispose(client.onCombat(event => {
     if (event.kind === 'hit' && event.confirmFor !== 0) { report.hits++; if (event.killed) report.kills++; }
-    if (event.kind === 'died' && event.id === client.welcome?.handle) { report.falls++; ports.died(); }
     if (event.kind === 'reward') report.paid += event.coins;
+  }));
+  scope.onDispose(client.onPlayerDied(event => {
+    report.falls++; net.holdRespawn(); ports.died(event, () => { net.resumeRespawn(); });
   }));
   // Only the server decides a death: the page takes no damage, and its own 0 would start a second one, so it stops at 1.
   const { attributes } = ports.health, cap = attributes.incomingCap;

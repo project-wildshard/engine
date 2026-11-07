@@ -74,6 +74,7 @@ export class NetPlayer implements PlayerLink {
   private readonly client: NetClient;
   private readonly player: Player;
   private seen: DecodedFrame | null = null;
+  private respawnHeld = false;
   private pressed = false;
   private gust = false;
   private pressStarted = false;
@@ -123,10 +124,14 @@ export class NetPlayer implements PlayerLink {
   get heldSlot(): number { return this.held; }
   /** The server has put this body somewhere: a frame has been heard. */
   get joined(): boolean { return this.seen !== null; }
+  /** A death's authoritative pose is already reset on the server. Keep this page at the death until its overlay is dark. */
+  holdRespawn(): void { this.respawnHeld = true; }
+  /** Adopt the newest server pose under the dark, dropping commands from before the death. */
+  resumeRespawn(): void { this.respawnHeld = false; this.seen = null; }
 
   /** A fixed step. False, with nothing sent, before the first frame or when a full ring says the server stopped answering. */
   step(input: PlayerWireInput): boolean {
-    if (this.seen === null || this.predictor.full) return false;
+    if (this.respawnHeld || this.seen === null || this.predictor.full) return false;
     const armed = this.armed(input), seq = this.seq = this.client.command(this.hooked(armed));
     this.hookLocked = false; this.hookTarget = undefined; this.hookFired = false;
     this.frameSteps++;
@@ -151,7 +156,7 @@ export class NetPlayer implements PlayerLink {
   reconcile(): void {
     this.frameSteps = 0;
     const frame = this.client.latest;
-    if (frame === null || frame === this.seen || !this.inCell(frame.cell)) return;
+    if (this.respawnHeld || frame === null || frame === this.seen || !this.inCell(frame.cell)) return;
     const first = this.seen === null, { seat } = this;
     this.seen = frame;
     this.world.frame(frame.tick, frame.lastSeq);

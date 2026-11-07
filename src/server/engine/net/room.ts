@@ -14,7 +14,7 @@ import { CommandQueue, type CommandTurn } from './commandQueue';
 import { encodeFrame, FRAME_RING, WorldFrameRing, type WorldFrame } from '../../../shared/engine/net/frame';
 import { NetHandles } from './handles';
 import { GUEST, NetIdentitySchema, type NetIdentity } from '../../../shared/engine/net/identity';
-import { decodeAct, decodeHello, encodeEvents, encodeWelcome, messageId, MSG_ACT, MSG_CMDS, MSG_HELLO, type InitialBits, type NetDied, type NetView, type NetEvent, type NetHit, type NetReward } from '../../../shared/engine/net/messages';
+import { decodeAct, decodeHello, encodeEvents, encodeWelcome, messageId, MSG_ACT, MSG_CMDS, MSG_HELLO, type InitialBits, type NetDied, type NetPlayerDied, type NetView, type NetEvent, type NetHit, type NetReward } from '../../../shared/engine/net/messages';
 import { NET_CLASSES, NET_SCHEMA_HASH } from '../../../shared/engine/net/netSchemas';
 import type { NetClass, NetRefs } from '../../../shared/engine/net/schema';
 import { LedgerBook, type LedgerFiling } from './ledgerBook';
@@ -99,7 +99,7 @@ function freshViews(rows: readonly RoomCombat[]): readonly RoomCombat[] {
   for (const [index, row] of rows.entries()) if (row.kind === 'view') last.set(key(row), index);
   return last.size === 0 ? rows : rows.filter((row, index) => row.kind !== 'view' || last.get(key(row)) === index);
 }
-type RoomCombat = NetView | NetDied | (NetHit & { readonly landedBy: string | null; readonly seen?: readonly [number, number, number] }) | (NetReward & { readonly owner: string });
+type RoomCombat = NetView | NetDied | NetPlayerDied | (NetHit & { readonly landedBy: string | null; readonly seen?: readonly [number, number, number] }) | (NetReward & { readonly owner: string });
 interface RoomClient {
   readonly id: number; readonly transport: Transport; readonly queue: CommandQueue; readonly player: NetPlayer;
   /** Who it said it is at `hello` (J111). A hand-off keeps it. */
@@ -229,6 +229,7 @@ export class NetRoom {
       const { refs } = this.handles;
       if (row.kind === 'view') { this.combat.push(row); continue; }
       if (row.kind === 'reward') { const { player, ...reward } = row; this.combat.push({ ...reward, body: refs(row.body), owner: player }); continue; }
+      if (row.kind === 'player-died') { const id = refs(row.id); if (id !== 0) this.combat.push({ ...row, id }); continue; }
       if (row.kind === 'hit') { const target = refs(row.target); if (target !== 0) { const { by, seq, ...hit } = row; this.combat.push({ ...hit, target, confirmFor: seq, landedBy: by }); } }
       else { const id = refs(row.id); if (id !== 0) this.combat.push({ ...row, id, by: row.by === null ? 0 : refs(row.by) }); }
     }
@@ -396,6 +397,7 @@ export class NetRoom {
       if (row.kind === 'view') { events.push(row); continue; }
       if (row.kind === 'reward') { if (row.owner === client.player.id) { const { owner: _owner, ...reward } = row; events.push(reward); } continue; }
       if (row.kind === 'died') { if (row.id === own || client.known.has(row.id)) events.push(row); continue; }
+      if (row.kind === 'player-died') { if (row.id === own) events.push(row); continue; }
       const { landedBy, seen, ...hit } = row, owned = landedBy === client.player.id;
       if (row.target !== own && !owned && !client.known.has(row.target)) continue;
       // the shooter's spark goes where it saw the body, everyone else's where the body is (J47, J50)

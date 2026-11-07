@@ -91,3 +91,7 @@ engine's lifted layout.
 Port 23a5c1072e (fix(saves): carry rewards across browsers) in source
 order. Keep the behavior and repoint the retained files and imports to
 engine's lifted layout.
+
+Port 8d70f3877c (fix(death): restore the worker death screen) in source
+order. Keep the behavior and repoint the retained files and imports to
+engine's lifted layout.

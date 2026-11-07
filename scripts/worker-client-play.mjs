@@ -65,6 +65,7 @@ export async function play(browser, phone, base, only = '') {
 
 
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }
+  if (runs('death')) { const { driftwoodDeath } = await import('./worker-client-death.mjs'); await driftwoodDeath(browser, phone, base, step); }
 
   // Traversal: the page asks, and the server carries. Each stands at its prompt by the harness's move, presses, and reads the owner block's lead.
   const prompted = (page, id) => page.evaluate(wanted => { const near = window.__wildshard.world.interactables.find(prompt => prompt.wireId === wanted); return near === undefined ? null : { x: near.position.x, y: near.position.y, z: near.position.z }; }, id);

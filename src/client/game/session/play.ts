@@ -126,7 +126,7 @@ const GRID_SPAWN_SETTLE_MS = 3000;
 /** …or for the player to move this far from where control began (m): a walk or a ride opens it at once */
 const GRID_SPAWN_SETTLE_METRES = 2;
 
-async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promise<{ grid: DeclarationGridSession | null; gridLive: LiveGridSession | null; leakPhysics: Physics; perf: Perf; audio: Audio; music: Music; playerHealth: PlayerHealth; exploring: () => boolean; hands: Hands; windupWarn: WindupWarn<Animal> | null; resuming: boolean; continuingGridEntry: boolean; arrival: TitleArrival | null; menuFirst: boolean; enter: () => void; getPlayground: () => Playground | null; minimap: Minimap; startExplore: (() => void) | undefined; animals: RowBodies; getArena: () => TrainingArena | null; prepareArena: () => Promise<TrainingArena>; swimArms: SwimArms | undefined; crossbow: Weapon; rifle: Weapon | null; longbow: Weapon | null; weapons: EquipmentService; enteredEquipment: EnteredEquipment | undefined; lockSys: LockOnSystem; touchControls: TouchControls; hud: HUD; world: World & { chunk: ShardManifest; }; game: Game; sky: SkyRig; player: Player; forest: Forest; params: URLSearchParams; chunk: ShardManifest; registry: WorldRegistry; fragileBoot: boolean; failGpuBoot: (reason: string, stack?: string) => void; onBootContextLost: (event: Event) => void; nolock: boolean; viewer: () => THREE.Vector3; edgeDressing: { boundary: Boundary; water: Water | null; streams: null; horizon: Horizon; horizonReady: Promise<void>; }; boundary: Boundary; water: Water | null; horizon: Horizon; interactables: Interactable[]; props: null; prepareAudio: () => { audio: Audio; music: Music; }; disableBootGpuGuard: () => void; level: LevelContext | undefined; loading: Loading; audioProfile: LevelAudioProfile | undefined; files: Readonly<Record<"sky" | "baked" | "terrain" | "trees" | "physics" | "cabins" | "props" | "art" | "music" | "sfx", readonly string[]>>; plan: Plan<"audio" | "sky" | "terrain" | "physics" | "cabins" | "props" | "renderer" | "cards" | "forest" | "edge" | "grass" | "animals" | "weapon" | "assembly" | "menu" | "shaders" | "firstFrame">; step: StepRunner; menuLoad: Preload<void> | null; audioLoad: Preload<AudioBanks> | null; deferredAudio: (Preload<void> & { readonly style: ReturnType<typeof getMusicStyle>; decode: () => Promise<AudioBanks>; }) | null; fieldModels: Promise<(ctx: FieldModelsContext) => void> | null; manifest: ShardManifest; slug: string; stage: LoadStage; boot: StagedBoot; session: SessionState; kit: KitPorts; product: ShardProduct; }> {
+async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promise<{ grid: DeclarationGridSession | null; gridLive: LiveGridSession | null; leakPhysics: Physics; perf: Perf; audio: Audio; music: Music; playerHealth: PlayerHealth; serverDied: (event: { checkpoint: boolean; cause?: DeathCause }, resume: () => void) => void; exploring: () => boolean; hands: Hands; windupWarn: WindupWarn<Animal> | null; resuming: boolean; continuingGridEntry: boolean; arrival: TitleArrival | null; menuFirst: boolean; enter: () => void; getPlayground: () => Playground | null; minimap: Minimap; startExplore: (() => void) | undefined; animals: RowBodies; getArena: () => TrainingArena | null; prepareArena: () => Promise<TrainingArena>; swimArms: SwimArms | undefined; crossbow: Weapon; rifle: Weapon | null; longbow: Weapon | null; weapons: EquipmentService; enteredEquipment: EnteredEquipment | undefined; lockSys: LockOnSystem; touchControls: TouchControls; hud: HUD; world: World & { chunk: ShardManifest; }; game: Game; sky: SkyRig; player: Player; forest: Forest; params: URLSearchParams; chunk: ShardManifest; registry: WorldRegistry; fragileBoot: boolean; failGpuBoot: (reason: string, stack?: string) => void; onBootContextLost: (event: Event) => void; nolock: boolean; viewer: () => THREE.Vector3; edgeDressing: { boundary: Boundary; water: Water | null; streams: null; horizon: Horizon; horizonReady: Promise<void>; }; boundary: Boundary; water: Water | null; horizon: Horizon; interactables: Interactable[]; props: null; prepareAudio: () => { audio: Audio; music: Music; }; disableBootGpuGuard: () => void; level: LevelContext | undefined; loading: Loading; audioProfile: LevelAudioProfile | undefined; files: Readonly<Record<"sky" | "baked" | "terrain" | "trees" | "physics" | "cabins" | "props" | "art" | "music" | "sfx", readonly string[]>>; plan: Plan<"audio" | "sky" | "terrain" | "physics" | "cabins" | "props" | "renderer" | "cards" | "forest" | "edge" | "grass" | "animals" | "weapon" | "assembly" | "menu" | "shaders" | "firstFrame">; step: StepRunner; menuLoad: Preload<void> | null; audioLoad: Preload<AudioBanks> | null; deferredAudio: (Preload<void> & { readonly style: ReturnType<typeof getMusicStyle>; decode: () => Promise<AudioBanks>; }) | null; fieldModels: Promise<(ctx: FieldModelsContext) => void> | null; manifest: ShardManifest; slug: string; stage: LoadStage; boot: StagedBoot; session: SessionState; kit: KitPorts; product: ShardProduct; }> {
   const { manifest, boot, session, kit, files, step, menuLoad, world, game, sky, player, params, chunk, registry, nolock, viewer, boundary, horizon, prepareAudio, animals, getArena, prepareArena, swimArms, crossbow, rifle, longbow, weapons, lockSys, touchControls, hud } = ctx;
   const leakPhysics = world.physics; // The borrowed page world outlives temporary active frames.
   // G628 M4: a shard page's Developer warning chip; a grid page's resident over-limit is a line of its memory strip instead,
@@ -454,12 +454,20 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
       lastPlace.observe({ x: p.x, y: floor ?? p.y, z: p.z, grounded });
     }, 'last place');
   }
+  let serverRespawn: (() => void) | null = null;
+  const serverDied = (event: { checkpoint: boolean; cause?: DeathCause }, resume: () => void): void => {
+    serverRespawn = resume;
+    app.events.emit('player.died', { actor: playerHealth, checkpoint: event.checkpoint, ...(event.cause === undefined ? {} : { cause: event.cause }) });
+  };
   const die = (by: DeathCause | undefined): void => {
     const stand = gridLive !== null && !gridLive.ownsHomeRecovery() ? null : lastPlace?.stand ?? null;
     music.sting('death');
     player.carried = true; weapons.setEnabled(false); // frozen: the fixed step leaves the body alone, no swing / shot
     deathFade.play(deathCause(by ?? null), respawnWhere(chunk, stand !== null && stand.id !== 'pier' ? placeName(stand.label) : null, app.levelRegistrations.findText('respawn.default', game.levelScope)), {
-      dark: () => { if (stand !== null && stand.id !== 'pier') player.spawn(stand.x, stand.z, stand.yaw, stand.y); else toSpawn(); }, // the pier IS the spawn (E308: half way down it, facing the island)
+      dark: () => {
+        if (serverRespawn !== null) { serverRespawn(); serverRespawn = null; }
+        else if (stand !== null && stand.id !== 'pier') player.spawn(stand.x, stand.z, stand.yaw, stand.y); else toSpawn();
+      }, // a server owns its return; a local player uses the last place (the pier is the spawn)
       done: () => { player.carried = false; weapons.setEnabled(!player.swimming); },
     });
   };
@@ -469,6 +477,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     died: (cause, checkpoint) => {
       audio.death(); hud.damageFlash();
       if (!checkpoint || (gridLive?.spawn() ?? null) !== null) die(cause);
+      else { serverRespawn?.(); serverRespawn = null; }
     },
   });
   // ── first-time control hints (E308, src/client/engine/ui/FirstHints.ts: every shard's one system; after main's onJump / onDodge, which
@@ -785,7 +794,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   app.ui.bind(game.levelScope, () => hud.promptText);
   boot.runtime.play = { animals, weapons, primary: crossbow, rifle, secondary: longbow, inventory, owned, progress, hud, menu, fullMap, audio, music, skins, wearSkin, touchUi, nolock, disposeRifleDrop: () => { boot.runtime.hooks.disposeRifleDrop?.(); }, cues: combatCues, firstHints, minimap, bodyShadow };
   const getPlayground = (): Playground | null => playground;
-  return { ...ctx, grid, gridLive, leakPhysics, perf, audio, music, playerHealth, exploring, hands, windupWarn, resuming, continuingGridEntry, arrival, menuFirst, enter, getPlayground, minimap, startExplore };
+  return { ...ctx, grid, gridLive, leakPhysics, perf, audio, music, playerHealth, serverDied, exploring, hands, windupWarn, resuming, continuingGridEntry, arrival, menuFirst, enter, getPlayground, minimap, startExplore };
 }
 
 export const playStage: typeof buildPlay = buildPlay;

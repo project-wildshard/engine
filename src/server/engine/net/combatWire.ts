@@ -1,8 +1,9 @@
 // P1-E3.2 (J33, J47, E5-REPLICATION §4.3): what the server settled, as events for the wire. The pipeline's own `damage.dealt`
-// and `actor.died` are the only source, so a hit reaches a client exactly when it reached the sim.
+// and `actor.died` settle hits/ragdolls; health's `player.died` supplies the resolved checkpoint and cause.
 import type { SimHost } from '../sim';
 import { landedBy } from '../combat/damageBook';
 import type { NetView } from '../../../shared/engine/net/messages';
+import type { DeathCause } from '../../../shared/engine/combat/pipeline';
 
 /** A settled hit or death in world terms, before the room turns ids into a client's handles. */
 export type CombatEvent =
@@ -15,6 +16,7 @@ export type CombatEvent =
   | { readonly kind: 'died'; readonly tick: number; readonly id: string; readonly by: string | null;
     readonly dir: readonly [number, number, number]; readonly impulse: number }
   | { readonly kind: 'reward'; readonly tick: number; readonly player: string; readonly coins: number; readonly body: string }
+  | { readonly kind: 'player-died'; readonly tick: number; readonly id: string; readonly checkpoint: boolean; readonly cause?: DeathCause }
   | NetView;
 
 
@@ -34,6 +36,9 @@ export class CombatWire {
       this.rows.push({ kind: 'died', tick: host.state.tick, id: actor.id, by, dir: [d.x, d.y, d.z], impulse: req.amount });
     }, host.scope);
     host.events.on('reward.granted', ({ player, coins, body }) => { this.rows.push({ kind: 'reward', tick: host.state.tick, player, coins, body }); }, host.scope);
+    host.events.on('player.died', ({ actor, checkpoint, cause }) => {
+      this.rows.push({ kind: 'player-died', tick: host.state.tick, id: actor.id, checkpoint, ...(cause === undefined ? {} : { cause: { ...cause } }) });
+    }, host.scope);
   }
   /** Everything settled since the last call, in the order it happened. */
   drain(): readonly CombatEvent[] {

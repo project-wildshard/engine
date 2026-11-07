@@ -5,6 +5,7 @@ import type { NetIdentity } from './identity';
 import { readChat, writeChat, type NetChat } from './chatWire';
 import { readLedger, writeLedger, type NetLedger } from './ledgerWire';
 import type { QuestProgress } from '../quest/progress';
+import type { DeathCause } from '../combat/pipeline';
 
 export const MSG_HELLO = 1;
 export const MSG_CMDS = 2;
@@ -61,6 +62,8 @@ export type NetVector = readonly [number, number, number];
 export interface NetHit { readonly kind: 'hit'; readonly tick: number; readonly target: number; readonly amount: number; readonly at: NetVector; readonly head: boolean; readonly killed: boolean; readonly confirmFor: number }
 /** An entity died (J33): `by` is the killer's handle or 0; each client throws its own ragdoll along `dir` from `impulse`. */
 export interface NetDied { readonly kind: 'died'; readonly tick: number; readonly id: number; readonly by: number; readonly dir: NetVector; readonly impulse: number }
+/** The owner's settled health lifecycle, after its checkpoint answered; creature ragdolls use `died` separately. */
+export interface NetPlayerDied { readonly kind: 'player-died'; readonly tick: number; readonly id: number; readonly checkpoint: boolean; readonly cause?: DeathCause }
 /** J105: this client's own roll on a body paid out. Goes to its owner and nobody else. */
 export interface NetReward { readonly kind: 'reward'; readonly tick: number; readonly coins: number; readonly body: number }
 /** A fight told its views something: a tell, a ring, a glow. A client's room draws them in order, and nothing here decides. */
@@ -79,13 +82,13 @@ interface NetRideChange<Kind extends string> { readonly kind: Kind; readonly tic
 export type NetRide = NetRideChange<'mount'> | NetRideChange<'dismount'>;
 /** One line of what this client's own player holds in this world, a purse's coins or a pack's count, as it changed. 0 is gone. */
 export interface NetOwned { readonly kind: 'owned'; readonly tick: number; readonly name: string; readonly value: number }
-export type NetEvent = NetSpawn | NetDespawn | NetCombatEvent | NetView | NetQuest | NetPhase | NetTravel | NetLedger | NetChat | NetRide | NetOwned;
+export type NetEvent = NetSpawn | NetDespawn | NetCombatEvent | NetPlayerDied | NetView | NetQuest | NetPhase | NetTravel | NetLedger | NetChat | NetRide | NetOwned;
 /** The events' and commands' wire form, in NET_SCHEMA_HASH: a change here must refuse a stale client like a field table's does (J54). */
-export const NET_EVENT_FORMS = 'view:s,u8,f32n;hit:h16,f32,p48,b,b,u16;died:h16,h16,d24,f32;quest:s,b,b,s,u16;phase:s,b;reward:u32,h16;travel:u16,u16;ledger:u32,u32,s,u2,s,f32,b;chat:u32,u32,b,h16,s,s;buttons:u8,b,u8;lockTarget:h16;hookTarget:u16;ride:u8;fresh:b;mount:h16,h16,u16;dismount:h16,h16,u16;rideWords:b,u8,f32;climate:b,s,f32;buy:u16;board:b,u16;wear:s;pose:s;owned:s,f32';
+export const NET_EVENT_FORMS = 'view:s,u8,f32n;hit:h16,f32,p48,b,b,u16;died:h16,h16,d24,f32;player-died:h16,b,b,?s,?s,b,?s;quest:s,b,b,s,u16;phase:s,b;reward:u32,h16;travel:u16,u16;ledger:u32,u32,s,u2,s,f32,b;chat:u32,u32,b,h16,s,s;buttons:u8,b,u8;lockTarget:h16;hookTarget:u16;ride:u8;fresh:b;mount:h16,h16,u16;dismount:h16,h16,u16;rideWords:b,u8,f32;climate:b,s,f32;buy:u16;board:b,u16;wear:s;pose:s;owned:s,f32';
 /** The spawn's column widths, which only the receiver's class table knows. */
 export type InitialBits = (cls: number) => { readonly bits: readonly number[]; readonly text: number } | undefined;
 
-const EVENT_SPAWN = 1, EVENT_DESPAWN = 2, EVENT_HIT = 3, EVENT_DIED = 4, EVENT_QUEST = 5, EVENT_PHASE = 6, EVENT_REWARD = 7, EVENT_TRAVEL = 8, EVENT_LEDGER = 9, EVENT_CHAT = 10, EVENT_MOUNT = 11, EVENT_DISMOUNT = 12, EVENT_OWNED = 13, EVENT_VIEW = 14;
+const EVENT_SPAWN = 1, EVENT_DESPAWN = 2, EVENT_HIT = 3, EVENT_DIED = 4, EVENT_QUEST = 5, EVENT_PHASE = 6, EVENT_REWARD = 7, EVENT_TRAVEL = 8, EVENT_LEDGER = 9, EVENT_CHAT = 10, EVENT_MOUNT = 11, EVENT_DISMOUNT = 12, EVENT_OWNED = 13, EVENT_VIEW = 14, EVENT_PLAYER_DIED = 15;
 /** Cell-local metres, as a field table declares them (§3.5). */
 const METRES = 260, METRE_TOP = 0xffff, UNIT_TOP = 0xff;
 const clampTo = (value: number, limit: number): number => Math.max(-limit, Math.min(limit, value));
@@ -114,6 +117,11 @@ export function encodeEvents(writer: BitWriter, tick: number, events: readonly N
   for (const event of events) {
     if (event.kind === 'despawn') { writer.write(EVENT_DESPAWN, 8); writer.write(event.handle, 16); continue; }
     if (event.kind === 'hit' || event.kind === 'died' || event.kind === 'reward') { writeCombat(writer, event); continue; }
+    if (event.kind === 'player-died') {
+      writer.write(EVENT_PLAYER_DIED, 8); writer.write(event.tick, 32); writer.write(event.id, 16); writer.writeBool(event.checkpoint); writer.writeBool(event.cause !== undefined);
+      if (event.cause !== undefined) { writer.writeText(event.cause.kind); writer.writeText(event.cause.label); writer.writeBool(event.cause.text !== undefined); if (event.cause.text !== undefined) writer.writeText(event.cause.text); }
+      continue;
+    }
     if (event.kind === 'ledger') { writer.write(EVENT_LEDGER, 8); writeLedger(writer, event); continue; }
     if (event.kind === 'chat') { writer.write(EVENT_CHAT, 8); writeChat(writer, event); continue; }
     if (event.kind === 'mount' || event.kind === 'dismount') { writer.write(event.kind === 'mount' ? EVENT_MOUNT : EVENT_DISMOUNT, 8); writer.write(event.tick, 32); writer.write(event.rider, 16); writer.write(event.mount, 16); writer.write(event.seq, 16); continue; }
@@ -137,6 +145,12 @@ export function decodeEvents(bytes: Uint8Array, bits: InitialBits): { readonly t
       if (kind === EVENT_DESPAWN) { events.push({ kind: 'despawn', handle: reader.read(16) }); continue; }
       if (kind === EVENT_HIT) { events.push(readHit(reader)); continue; }
       if (kind === EVENT_DIED) { events.push(readDied(reader)); continue; }
+      if (kind === EVENT_PLAYER_DIED) {
+        const at = reader.read(32), id = reader.read(16), checkpoint = reader.readBool();
+        let cause: DeathCause | undefined;
+        if (reader.readBool()) { const name = reader.readText(), label = reader.readText(); cause = { kind: name, label, ...(reader.readBool() ? { text: reader.readText() } : {}) }; }
+        events.push({ kind: 'player-died', tick: at, id, checkpoint, ...(cause === undefined ? {} : { cause }) }); continue;
+      }
       if (kind === EVENT_REWARD) { events.push({ kind: 'reward', tick: reader.read(32), coins: reader.read(32), body: reader.read(16) }); continue; }
       if (kind === EVENT_LEDGER) { events.push(readLedger(reader)); continue; }
       if (kind === EVENT_CHAT) { events.push(readChat(reader)); continue; }

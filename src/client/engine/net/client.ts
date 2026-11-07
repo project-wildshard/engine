@@ -12,7 +12,7 @@ import { encodeCommands, seqAfter } from '../../../shared/engine/net/command';
 import { GUEST, type NetIdentity } from '../../../shared/engine/net/identity';
 import type { NetLedger } from '../../../shared/engine/net/ledgerWire';
 import { decodeFrame, FRAME_RING, NO_BASELINE, type DecodedFrame, type FrameTable } from '../../../shared/engine/net/frame';
-import { decodeEvents, decodeWelcome, encodeAct, encodeHello, messageId, MSG_EVENTS, MSG_FRAME, MSG_WELCOME, type InitialBits, type NetView, type NetCombatEvent, type NetRide, type NetTravel, type NetWelcome } from '../../../shared/engine/net/messages';
+import { decodeEvents, decodeWelcome, encodeAct, encodeHello, messageId, MSG_EVENTS, MSG_FRAME, MSG_WELCOME, type InitialBits, type NetView, type NetCombatEvent, type NetPlayerDied, type NetRide, type NetTravel, type NetWelcome } from '../../../shared/engine/net/messages';
 import { FLAG_CLASS, NET_CLASSES, NET_SCHEMA_HASH, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetClass, NetValue } from '../../../shared/engine/net/schema';
@@ -60,6 +60,8 @@ export class NetClient {
   private readonly frames = new Map<number, DecodedFrame>();
   private readonly listeners = new Set<(frame: DecodedFrame) => void>();
   private readonly fights = new Set<(event: NetCombatEvent) => void>();
+  private readonly deaths = new Set<(event: NetPlayerDied) => void>();
+  private deathTick = -1;
   private readonly fightViews = new Set<(view: NetView) => void>();
   private readonly travels = new Set<(event: NetTravel) => void>();
   private readonly rides = new Set<(event: NetRide) => void>();
@@ -101,6 +103,8 @@ export class NetClient {
   onView(listener: (view: NetView) => void): () => void { this.fightViews.add(listener); return () => { this.fightViews.delete(listener); }; }
   /** Call for every settled hit and death (P1-E3.2); returns the unsubscribe. */
   onCombat(listener: (event: NetCombatEvent) => void): () => void { this.fights.add(listener); return () => { this.fights.delete(listener); }; }
+  /** Own-player health death once per tick, at receipt before an owner frame can move the page. */
+  onPlayerDied(listener: (event: NetPlayerDied) => void): () => void { this.deaths.add(listener); return () => { this.deaths.delete(listener); }; }
   /** Call when anyone it can see gets on or off a ride; returns the unsubscribe. */
   onRide(listener: (event: NetRide) => void): () => void { this.rides.add(listener); return () => { this.rides.delete(listener); }; }
   /** Call when this client's player crosses, before the new cell's `welcome`; returns the unsubscribe. */
@@ -158,7 +162,7 @@ export class NetClient {
   /** Send a non-movement action on the reliable channel. */
   act(act: NetRoomAct): void { this.transport.send('reliable', encodeAct(this.writer, act)); }
   /** Stop listening; the transport stays with its owner. */
-  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.fights.clear(); this.travels.clear(); }
+  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); }
 
   private receive(bytes: Uint8Array): void {
     const arrived = this.now(); // here, never in a render frame: at 24.3 frames/s that stamp would be 41 ms of false jitter
@@ -173,6 +177,12 @@ export class NetClient {
     const decoded = decodeEvents(bytes, initialBits);
     if (decoded === null) { this.dropped++; return; }
     for (const event of decoded.events) {
+      if (event.kind === 'player-died') {
+        if (event.id !== this.welcome?.handle || event.tick <= this.deathTick) continue;
+        this.deathTick = event.tick;
+        for (const listener of this.deaths) listener(event);
+        continue;
+      }
       if (event.kind === 'hit' || event.kind === 'died' || event.kind === 'reward') { for (const listener of this.fights) listener(event); this.delivery.receive(event); continue; }
       if (event.kind === 'view') { for (const listener of this.fightViews) listener(event); continue; }
       if (event.kind === 'quest') { this.quests.set(event.quest, event); continue; }
@@ -201,7 +211,7 @@ export class NetClient {
     }
   }
   /** Everything it holds named the cell it left. Commands stand: the player's own stream goes on. */
-  private left(): void { this.welcome = null; this.latest = null; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entities.clear(); this.ids.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
+  private left(): void { this.welcome = null; this.latest = null; this.deathTick = -1; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entities.clear(); this.ids.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
   private receipt(event: NetLedger): void {
     if (event.serial <= this.ledgerSerial || this.granted.has(event.id)) return;
     this.ledgerSerial = event.serial; this.granted.add(event.id);
