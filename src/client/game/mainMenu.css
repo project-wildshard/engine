@@ -39,6 +39,8 @@
 .ws-main .ws-main-icon svg { width: 96px; height: 72px; }
 .ws-main .ws-main-card b { font-family: var(--ws-display); font-weight: 700; font-size: 22px; line-height: 1.12; letter-spacing: 0.14em; text-indent: 0.14em; text-align: center; text-transform: uppercase; color: #bdeeff; }
 .ws-main .ws-main-grid b { max-width: 9em; }
+/* G61 E1: SHARD SELECT's small amber tag, hung on the card's top right corner so it clears the icon and the name at phone width */
+.ws-main .ws-main-card-exp { position: absolute; top: -8px; right: -5px; padding: 3px 7px; font-style: normal; font-family: var(--ws-mono); font-size: 9px; line-height: 1; letter-spacing: 0.16em; color: var(--ws-amber); background: #140d02; border: 1px solid var(--ws-amber); }
 .ws-main .ws-main-card:hover, .ws-main .ws-main-card:focus-visible { outline: none; background: rgba(14, 34, 52, 0.9); border-color: var(--ws-cyan); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 28px rgba(143, 227, 255, 0.3); }
 .ws-main .ws-main-card:active, .ws-main .ws-main-card[aria-busy="true"] { background: rgba(22, 48, 70, 0.92); }
 .ws-main .ws-main-settings { min-width: 150px; min-height: 44px; box-sizing: border-box; touch-action: manipulation; padding: 10px 22px; appearance: none; -webkit-appearance: none; background: rgba(9, 22, 36, 0.86); border: 1px solid var(--ws-cyan-line); outline: 1px solid rgba(143, 227, 255, 0.18); outline-offset: 3px; font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.24em; text-indent: 0.24em; text-transform: uppercase; color: var(--ws-cyan); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }

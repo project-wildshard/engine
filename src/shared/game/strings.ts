@@ -18,6 +18,8 @@ export const GAME_STRINGS = {
     label: 'Main menu',
     shardSelect: 'SHARD SELECT',
     infinite: 'INFINITE WILDSHARD',
+    /** G61 E1: the amber tag on the Infinite Wildshard card's corner */
+    experimental: 'EXPERIMENTAL',
     settings: 'SETTINGS',
     back: 'BACK',
     /** E483 (E140 again): the compact Developer switch beside SETTINGS, the same switch as Settings ▸ Developer */

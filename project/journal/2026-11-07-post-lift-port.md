@@ -95,3 +95,7 @@ engine's lifted layout.
 Port 8d70f3877c (fix(death): restore the worker death screen) in source
 order. Keep the behavior and repoint the retained files and imports to
 engine's lifted layout.
+
+Port 5f70a2dfe4 (feat(menu): tag Infinite Wildshard experimental) in
+source order. Keep the behavior and repoint the retained files and
+imports to engine's lifted layout.

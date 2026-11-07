@@ -103,7 +103,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     <div class="ws-main-foot">
       <div class="ws-main-cards${grid ? '' : ' one'}" role="group" aria-label="${s.label}">
         <button class="ws-main-card ws-main-select" type="button"><span class="ws-main-icon">${CARDS_ICON}</span><b>${s.shardSelect}</b></button>
-        ${grid ? `<button class="ws-main-card ws-main-grid" type="button"><span class="ws-main-icon">${GRID_ICON}</span><b>${s.infinite}</b></button>` : ''}
+        ${grid ? `<button class="ws-main-card ws-main-grid" type="button"><span class="ws-main-icon">${GRID_ICON}</span><b>${s.infinite}</b> <i class="ws-main-card-exp">${s.experimental}</i></button>` : ''}
       </div>
       <div class="ws-main-row">
         <button class="ws-main-settings" type="button">${s.settings}</button>
