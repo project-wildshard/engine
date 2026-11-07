@@ -24,3 +24,12 @@ The named proofs passed 131 cases in 40 Ring 1 files and 18 cases in
 three Ring 2 files. None skipped; the longest measured case was
 5.854 seconds. The ABI2 browser flow also refuses rewritten page
 counts over unchanged executable bytes. Static checks passed.
+
+The longest native wire case spent 3.764 seconds stepping a fixed
+8,000-tick Aqbars tape. It now stops after the first complete public
+ring-and-clear cycle and a growl. The check is stricter about the
+clear arriving after the ring, and leaves more of the ten-second
+budget for slower CI machines.
+
+That four-case Ring 1 wire file and typechecking pass again. Aqbars
+now completes in 0.575 seconds on this Mac instead of 3.764 seconds.

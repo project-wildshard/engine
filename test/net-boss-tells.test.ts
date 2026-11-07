@@ -23,11 +23,13 @@ async function residentOn(slug: string): Promise<TrustedHeadlessResident> {
   return createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) });
 }
 /** Step, taking what the host told its views as a room would. */
-function hear(live: TrustedHeadlessResident, ticks: number, each?: () => void): Map<string, (readonly number[])[]> {
+function hear(live: TrustedHeadlessResident, ticks: number, each?: () => void,
+  done?: (heard: ReadonlyMap<string, (readonly number[])[]>) => boolean): Map<string, (readonly number[])[]> {
   const heard = new Map<string, (readonly number[])[]>();
   for (let tick = 0; tick < ticks; tick++) {
     each?.(); live.step([]);
     for (const { name, args } of shardRows(live.host).calls.splice(0)) { const row = heard.get(name) ?? []; row.push(args); heard.set(name, row); }
+    if (done?.(heard) === true) break;
   }
   return heard;
 }
@@ -75,10 +77,14 @@ test('a Nalati kernel says its ground ring and its moments', { timeout: 10_000 }
       const body = [...host.entities.values()].find(entry => entry.variant === id && entry.alive);
       if (body !== undefined) { const x = body.position.x + 9; lead.position.set(x, host.groundHeightAt(x, body.position.z) + 0.1, body.position.z); lead.motor.resetAt(lead.position); }
     };
-    const heard = hear(live, 8000, near);
+    const heard = hear(live, 8000, near, words => {
+      const rings = words.get(word) ?? [], painted = rings.findIndex(args => args.length === 5);
+      return painted >= 0 && rings.slice(painted + 1).some(args => args.length === 0)
+        && (words.get(eliteMomentWord(id))?.length ?? 0) > 0;
+    });
     const rings = heard.get(word) ?? [], moments = heard.get(eliteMomentWord(id)) ?? [];
     expect(rings.filter(args => args.length === 5).length, 'the pounce paints its ring').toBeGreaterThan(0);
-    expect(rings.some(args => args.length === 0), 'and takes it off').toBe(true);
+    expect(rings.slice(rings.findIndex(args => args.length === 5) + 1).some(args => args.length === 0), 'and takes it off after showing it').toBe(true);
     for (const args of moments) { expect(args).toHaveLength(4); expect(ELITE_MOMENTS[args[0] ?? -1]).toBeDefined(); }
     expect(moments.length, 'its growl').toBeGreaterThan(0);
   } finally { live.dispose(); }
