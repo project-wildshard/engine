@@ -1,0 +1,311 @@
+// J178, J182: the one world's door. One process, a fixed table of cell workers, and one address. Sockets, caps, saves and the grace stay on
+// the main thread, out of every tick; each cell runs on the worker the table gives it, and never moves. If a worker fails the process ends
+// and systemd starts it again (Q77). `NetRoom` does not change: it hears the same `hello` the door read, once the client has loaded.
+// oxlint-disable-next-line import/no-nodejs-modules -- The server's own door.
+import type { IncomingMessage } from 'node:http';
+// oxlint-disable-next-line import/no-nodejs-modules -- The server's own door.
+import type { Duplex } from 'node:stream';
+// oxlint-disable-next-line import/no-nodejs-modules -- Canonical network identity at the trusted proxy boundary.
+import { isIP } from 'node:net';
+import * as v from 'valibot';
+import { WebSocketServer, type WebSocket } from 'ws';
+import { Scope } from '@wildshard/engine/app/scope';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { cleanName } from '@wildshard/engine/net/chatFilter';
+import { NetIdentitySchema } from '@wildshard/engine/net/identity';
+import { decodeHello, messageId, MSG_HELLO } from '@wildshard/engine/net/messages';
+import { NET_SCHEMA_HASH } from '@wildshard/engine/net/netSchemas';
+import { encodeCountdown } from '@wildshard/engine/net/socketFrames';
+import type { ChatReport } from '@wildshard/engine/net/chat';
+import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading } from './cellProtocol';
+import { bodyId } from './seats';
+import type { PlayerDoc } from './playerDoc';
+import { pumpSocket } from './socketPump';
+import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
+import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
+import { workerTable } from './workerTable';
+
+/** J174: what a deploy gives everyone before they move together. */
+export const GRACE_MS = 60_000;
+/** E7.7: what one address may hold and open. */
+const SOCKETS_PER_IP = 4, CONNECTS_PER_MINUTE = 10, MINUTE_MS = 60_000;
+const MAX_TRACKED_IPS = 4096;
+/** A hello's and a load's wait (E7.7). */
+const HELLO_MS = 5000, READY_MS = 120_000;
+/** How long a stop gives each worker, and then the save queue. */
+const DRAIN_MS = 10_000;
+/** J177: one address, and no slug on it. */
+const WORLD_PATH = /^\/(?:\?.*)?$/u;
+
+/** IPv6 privacy addresses share their household /64; mapped IPv4 keeps its IPv4 bucket. */
+function connectionKey(address: string): string {
+  if (isIP(address) === 4) return address;
+  if (isIP(address) !== 6) return 'unknown';
+  let source = address.split('%')[0] ?? address;
+  if (source.includes('.')) {
+    const colon = source.lastIndexOf(':'), octets = source.slice(colon + 1).split('.').map(Number);
+    source = `${source.slice(0, colon)}:${((octets[0] ?? 0) * 256 + (octets[1] ?? 0)).toString(16)}:${((octets[2] ?? 0) * 256 + (octets[3] ?? 0)).toString(16)}`;
+  }
+  const [left = '', right] = source.split('::'), head = left === '' ? [] : left.split(':'), tail = right === undefined || right === '' ? [] : right.split(':');
+  const words = (right === undefined ? head : [...head, ...Array.from({ length: 8 - head.length - tail.length }, () => '0'), ...tail]).map(word => Number.parseInt(word, 16));
+  if (words.slice(0, 5).every(word => word === 0) && words[5] === 65535) return `${(words[6] ?? 0) >> 8}.${(words[6] ?? 0) & 255}.${(words[7] ?? 0) >> 8}.${(words[7] ?? 0) & 255}`;
+  return `${words.slice(0, 4).map(word => word.toString(16)).join(':')}/64`;
+}
+
+/** What the door holds of one worker. */
+export interface WorkerLink {
+  send: (order: CellOrder, transfer?: readonly Transferable[]) => void;
+  /** The worker's news, and an end nobody asked for. */
+  listen: (news: (row: WorkerNews) => void, ended: (reason: string) => void) => void;
+  stop: () => void;
+}
+/** What a read of a player's save answers. */
+export interface SavedPlayer { readonly doc: PlayerDoc | null; readonly seq: number; readonly recovery?: readonly SaveReceipt[]; readonly previous?: SavedCheckpoint }
+/** Where a player's save lives. */
+export interface PlayerSaves {
+  /** The cell this player last stood in, this epoch. */
+  where: (device: string) => Promise<string | null>;
+  read: (device: string, shard: string) => Promise<SavedPlayer>;
+  /** Promote a previous copy only after a room imports it, and only while its sequence is unchanged. */
+  recover?: (device: string, shard: string, seq: number) => Promise<void>;
+  write: (write: SaveWrite) => void;
+  report: (report: ChatReport, shard: string) => boolean;
+  /** Wait for what is on its way, at most `ms`. */
+  drain: (ms: number) => Promise<boolean>;
+  /** How writes are going: E7.8's numbers. */
+  stats?: () => Readonly<Record<string, number>>;
+}
+/** How the world is built. */
+export interface WorldOptions {
+  readonly build: string;
+  /** The cells it opens, fixed at startup. A player with no save lands in the first. */
+  readonly cells: readonly string[];
+  /** C4's key. */
+  readonly secret: string;
+  /** J182, J185: workers, and the most players the grid holds, a held body counted, in every cell together. Startup settings. */
+  readonly workers: number; readonly seats: number;
+  /** Start one worker on one row of the table. */
+  readonly boot: (slugs: readonly string[]) => WorkerLink;
+  readonly saves: PlayerSaves;
+  readonly log: (line: Record<string, unknown>) => void;
+  /** A worker failed: nothing here can go on, and the process should end (Q77). */
+  readonly crashed: (error: unknown) => void;
+  /** The grace ran out: stop, and let systemd start what is on disk. */
+  readonly restart: () => void;
+  /** One worker's 10 s reading, for what leaves the box (E7.8a). */
+  readonly reading?: (index: number, reading: WorkerReading) => void;
+  /** A proof's overrides. */
+  readonly helloMs?: number; readonly readyMs?: number; readonly connectsPerMinute?: number; readonly socketsPerIp?: number; readonly graceMs?: number;
+  /** Monotonic connection-budget clock, overridable by local boundary tests. */
+  readonly now?: () => number;
+}
+interface PendingSeat { readonly end: SocketTransport }
+interface ConnectAttempt { readonly at: number }
+/** Every reason a socket was turned away, counted: the row E7.7 asks for. */
+export type Refusals = Record<string, number>;
+
+/** The one world's door. */
+export class World {
+  readonly refusals: Refusals = {};
+  private readonly options: WorldOptions;
+  private readonly now: () => number;
+  private readonly server: WebSocketServer;
+  private readonly scope = new Scope('dedicated.world');
+  /** The static table: which worker each cell is on (J182). */
+  private readonly links = new Map<string, WorkerLink>();
+  private readonly workers: WorkerLink[] = [];
+  private readonly sockets = new Map<string, number>();
+  private readonly connects = new Map<string, ConnectAttempt[]>();
+  private readonly ends = new Set<SocketTransport>();
+  /** Clients loading: each holds a seat, and has no body yet. */
+  private readonly pending = new Map<string, PendingSeat>();
+  /** Who has a body, by link or by hold, and in which cell. */
+  private readonly seated = new Map<string, string>();
+  private readonly finds = new Map<number, (found: { held: boolean; spawn: ResumeAt }) => void>();
+  private readonly drains = new Map<number, () => void>();
+  private asked = 0;
+  private draining = false;
+  private grace: { readonly endsAt: number; readonly build: string } | null = null;
+  private constructor(options: WorldOptions) {
+    this.options = options;
+    this.now = options.now ?? diagnosticNow;
+    this.server = new WebSocketServer({ noServer: true, ...SOCKET_SERVER_OPTIONS });
+    this.scope.interval(MINUTE_MS, () => { this.sweepConnects(this.now()); });
+  }
+  /** Start every worker on its row and wait for all of them. Nothing changes after this. */
+  static async open(options: WorldOptions): Promise<World> {
+    const world = new World(options);
+    await Promise.all(workerTable(options.cells, options.workers).map(slugs => world.bootWorker(slugs)));
+    return world;
+  }
+  private bootWorker(slugs: readonly string[]): Promise<void> {
+    const link = this.options.boot(slugs), index = this.workers.push(link) - 1;
+    for (const slug of slugs) this.links.set(slug, link);
+    return new Promise((resolve, reject) => {
+      const ended = (reason: string): void => { this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason)); this.options.crashed(new Error(reason)); };
+      link.listen(news => { if (news.kind === 'booted') { this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); } else if (news.kind === 'failed') ended(news.reason); else this.heard(index, news); }, ended);
+    });
+  }
+  private heard(index: number, news: WorkerNews): void {
+    if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
+    else if (news.kind === 'left') this.seated.delete(news.device);
+    else if (news.kind === 'refused') this.refuse(news.reason);
+    else if (news.kind === 'recovered') void this.recover(news.device, news.slug, news.seq);
+    else if (news.kind === 'save') this.options.saves.write(news.write);
+    else if (news.kind === 'report') { if (!this.options.saves.report(news.report, news.slug)) this.refuse('report-backlog'); }
+    else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
+    else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
+    else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
+  }
+  private refuse(reason: string): void { this.refusals[reason] = (this.refusals[reason] ?? 0) + 1; }
+  private async recover(device: string, slug: string, seq: number): Promise<void> {
+    try { await this.options.saves.recover?.(device, slug, seq); }
+    catch (error) { this.options.log({ at: 'save.recovery', error: String(error) }); }
+  }
+  /** An upgrade. There is one address, and nothing else gets a socket. */
+  upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    socket.on('error', () => { socket.destroy(); });
+    if (!WORLD_PATH.test(request.url ?? '')) { this.refuse('wrong-address'); socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
+    if (this.draining) { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
+    const ip = World.address(request);
+    const attempt = this.attempt(ip);
+    if (attempt === null) { this.refuse('connections'); socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
+    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, ip, attempt); });
+  }
+  /** The address behind the tunnel or the proxy, which alone may say who it is forwarding. */
+  private static address(request: IncomingMessage): string {
+    const peer = request.socket.remoteAddress ?? '', { 'cf-connecting-ip': tunnel, 'x-forwarded-for': forwarded } = request.headers;
+    if (peer !== '127.0.0.1' && peer !== '::1' && peer !== '::ffff:127.0.0.1') return connectionKey(peer);
+    if (typeof tunnel === 'string') return connectionKey(tunnel);
+    return connectionKey((typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : undefined) ?? peer);
+  }
+  /** Actual retained limiter state, also recorded in the worker operational log. */
+  get connectionStats(): { readonly addresses: number; readonly attempts: number } {
+    this.sweepConnects(this.now());
+    return { addresses: this.connects.size, attempts: [...this.connects.values()].reduce((sum, times) => sum + times.length, 0) };
+  }
+  private attempt(ip: string): ConnectAttempt | null {
+    const now = this.now(), recent = (this.connects.get(ip) ?? []).filter(row => now - row.at < MINUTE_MS);
+    if (recent.length >= (this.options.connectsPerMinute ?? CONNECTS_PER_MINUTE)) return null;
+    if (!this.connects.has(ip) && this.connects.size >= MAX_TRACKED_IPS) {
+      const oldest = this.connects.keys().next().value;
+      if (oldest !== undefined) this.connects.delete(oldest);
+    }
+    const attempt = { at: now }; recent.push(attempt); this.connects.set(ip, recent);
+    return (this.sockets.get(ip) ?? 0) >= (this.options.socketsPerIp ?? SOCKETS_PER_IP) ? null : attempt;
+  }
+  private sweepConnects(now: number): void {
+    for (const [ip, times] of this.connects) if (now - (times.at(-1)?.at ?? -Infinity) >= MINUTE_MS) this.connects.delete(ip);
+  }
+  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt): void {
+    const end = new SocketTransport(socket);
+    this.sockets.set(ip, (this.sockets.get(ip) ?? 0) + 1); this.ends.add(end);
+    end.onClose(reason => {
+      if (reason === 'retry') { const kept = (this.connects.get(ip) ?? []).filter(row => row !== attempt); if (kept.length === 0) this.connects.delete(ip); else this.connects.set(ip, kept); }
+      this.ends.delete(end); const left = (this.sockets.get(ip) ?? 1) - 1; if (left === 0) this.sockets.delete(ip); else this.sockets.set(ip, left);
+    });
+    const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
+    const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes); });
+    end.onClose(() => { off(); this.scope.cancelTimer(timer); });
+  }
+  private async joining(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
+    try { await this.hello(end, bytes); }
+    catch (error) { if (!end.isOpen) return; this.options.log({ at: 'world.join', error: String(error) }); this.refuse('join-failed'); end.close(error instanceof SaveQuarantinedError ? 'refused' : 'retry'); }
+  }
+  /** Everyone in the grid or on their way: the cap counts all of them, whichever cell they stand in (J182). */
+  private get taken(): number { return this.seated.size + this.pending.size; }
+  private link(slug: string): WorkerLink {
+    const link = this.links.get(slug);
+    if (link === undefined) throw new Error(`No worker has ${slug}`);
+    return link;
+  }
+  /** Ask a cell, waking it if it sleeps, whether this device holds a seat there and where a stranger stands. */
+  private async ask(slug: string, device: string, end: SocketTransport): Promise<{ held: boolean; spawn: ResumeAt }> {
+    const id = ++this.asked, scope = new Scope('dedicated.find');
+    try {
+      return await new Promise((resolve, reject) => {
+        this.finds.set(id, resolve);
+        scope.timeout(this.options.helloMs ?? HELLO_MS, () => { reject(new Error('Worker lookup timed out')); });
+        scope.onDispose(end.onClose(() => { reject(new Error('Admission closed')); }));
+        if (end.isOpen) this.link(slug).send({ kind: 'find', id, slug, device });
+      });
+    } finally { this.finds.delete(id); scope.dispose(); }
+  }
+  /** The join: check, find where they stand, let them load, seat them. */
+  private async hello(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
+    const view = new Uint8Array(bytes);
+    if (messageId(view) !== MSG_HELLO) { this.refuse('not-hello'); end.close('refused'); return; }
+    const hello = decodeHello(view);
+    if (hello === null || hello.schemaHash !== NET_SCHEMA_HASH || hello.build !== this.options.build) { this.refuse('stale-build'); end.close('reload'); return; }
+    const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
+    if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
+    const device = said.output.player, name = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
+    if (holding !== undefined) {
+      const found = await this.ask(holding, device, end);
+      if (!end.isOpen || this.draining) return;
+      if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
+    }
+    if (!end.isOpen || this.draining) return;
+    this.pending.get(device)?.end.close('replaced');
+    if (this.taken >= this.options.seats) { this.refuse('full'); end.close('full'); return; }
+    this.pending.set(device, { end });
+    end.onClose(() => { if (this.pending.get(device)?.end === end) this.pending.delete(device); });
+    const last = await saves.where(device);
+    if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
+    const slug = this.cellFor(last), saved = await saves.read(device, slug);
+    if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
+    const { spawn } = await this.ask(slug, device, end);
+    if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
+    end.control('resume', new TextEncoder().encode(JSON.stringify({ shard: slug, at: saved.doc?.at ?? spawn })).buffer);
+    this.sayCountdown(end);
+    await new Promise<void>(resolve => {
+      const timer = this.scope.timeout(this.options.readyMs ?? READY_MS, () => { this.refuse('ready-timeout'); end.close('refused'); resolve(); });
+      const off = end.onControl(control => { if (control === 'ready') { off(); this.scope.cancelTimer(timer); resolve(); } });
+      end.onClose(() => { off(); this.scope.cancelTimer(timer); resolve(); });
+    });
+    if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
+    this.pending.delete(device);
+    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) }, bytes);
+  }
+  private cellFor(last: string | null): string {
+    const first = this.options.cells[0];
+    if (first === undefined) throw new Error('A world has at least one cell');
+    return last !== null && this.links.has(last) ? last : first;
+  }
+  private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer): void {
+    if (!end.isOpen || this.draining) return;
+    const { port1, port2 } = new MessageChannel();
+    this.seated.set(entry.device, slug);
+    pumpSocket(end, port1);
+    this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
+  }
+  private sayCountdown(end: SocketTransport): void {
+    if (this.grace === null) return;
+    end.control('countdown', encodeCountdown(Math.max(0, Math.ceil((this.grace.endsAt - diagnosticNow()) / 1000)), this.grace.build));
+  }
+  /** J174: `build` is due. Everyone hears the countdown and plays on while it preloads; at zero everyone is saved and sent `restart`. */
+  beginGrace(build: string): void {
+    if (this.grace !== null || this.draining) return;
+    const ms = this.options.graceMs ?? GRACE_MS;
+    this.grace = { endsAt: diagnosticNow() + ms, build };
+    this.options.log({ at: 'grace', build, ms });
+    for (const end of this.ends) this.sayCountdown(end);
+    this.scope.timeout(ms, () => { this.options.restart(); });
+  }
+  /** What `/health` says: no player data. */
+  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number } {
+    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size };
+  }
+  /** Stop: everyone is saved and told `restart`, and the queue gets its time. */
+  async drain(): Promise<boolean> {
+    this.draining = true;
+    for (const { end } of this.pending.values()) end.close('restart');
+    await Promise.all(this.workers.map((link, index) => new Promise<void>(resolve => {
+      const timer = this.scope.timeout(DRAIN_MS, resolve);
+      this.drains.set(index, () => { this.scope.cancelTimer(timer); resolve(); });
+      link.send({ kind: 'drain' });
+    })));
+    return this.options.saves.drain(DRAIN_MS);
+  }
+  dispose(): void { this.scope.dispose(); for (const link of this.workers) link.stop(); this.links.clear(); this.server.close(); }
+}

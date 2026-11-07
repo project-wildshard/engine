@@ -1,0 +1,273 @@
+// E7.3: one cell of the world (J178). C5: no road and no crossing yet. C3: the first human takes the host's own seat, and a vacant lead
+// seat is refilled first. C6: every solid stays in memory. It holds no socket: a seat's `Transport` comes from the world's door.
+import type { ChatReports } from '@wildshard/engine/net/chat';
+import { LedgerBook, type LedgerFiling } from '@wildshard/engine/net/ledgerBook';
+import { NetRoom, type NetTickInput } from '@wildshard/engine/net/room';
+import { SimNetWorld } from '@wildshard/engine/net/simWorld';
+import type { Transport } from '@wildshard/engine/net/transport';
+import { saves } from '@wildshard/engine/saves/runtime';
+import type { SimHost } from '@wildshard/engine/sim';
+import { actRoutes } from '@wildshard/engine/sim/actRoutes';
+import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
+import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
+import type { HeadlessRuntimeInput } from '../headlessRuntime';
+import { LEAD_SEAT, openCellWorld, type CellWorld } from '../standalone/cellWorld';
+import type { FallFloor } from '../standalone/fallFloor';
+import { ledgerFilings } from '../standalone/ledgerFilings';
+import { questBooks } from '@wildshard/engine/quest/players';
+import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
+import { exportPlayer, importPlayer, parseDoc, PLAYER_DOC_VERSION, type PlayerDoc } from './playerDoc';
+import { PlayerStore, recoverPlayer } from './playerStore';
+import { ShopGate } from './shopGate';
+import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
+import { LEFT } from './socketPump';
+
+/** A fresh seat's step aside from the spawn, in metres, in turn. */
+const SPAWN_ASIDE: readonly number[] = [0, 1, -1, 0.5, -0.5];
+/** How often a seat's clean checkpoints are looked for, in ticks. */
+const CHECK_TICKS = 30;
+/** E7.4: a change waits this long for more of its kind, and a seated player writes this often whatever happens. */
+const DEBOUNCE_MS = 1000, EVERY_MS = 60_000;
+
+/** A player who holds a seat, with or without a live link. */
+interface Seat {
+  readonly device: string; readonly name: string; readonly body: string; readonly store: PlayerStore; readonly fall: FallFloor;
+  transport: Transport | null;
+  /** When an open hold ends, or null while the link stands. */
+  holdEnds: number | null;
+  /** The last `seq` written: a read seeds it, so a restart's writes land on what is there (E7.4). */
+  seq: number;
+  /** The last receipt in a write. */
+  receipted: number;
+  /** When a change first waited for a checkpoint, and when one last went. */
+  dirtyAt: number | null; savedAt: number;
+  /** What a checkpoint watches: the stand they go back to, and their quest book. */
+  stand: unknown; version: number;
+}
+/** How a room is built. */
+export interface DedicatedRoomOptions {
+  readonly slug: string; readonly build: string;
+  /** Stamped on every grant id, so a restarted room can't repeat one (E7.4). */
+  readonly bootId: string;
+  readonly input: HeadlessRuntimeInput;
+  readonly now: () => number;
+  readonly post: (news: RoomNews) => void;
+  readonly reports?: ChatReports;
+  /** A proof's override of `HOLD_MS`. */
+  readonly holdMs?: number;
+}
+
+/** How `loot/personal` marks what a player has been paid. */
+const LOOT_ROW = 'loot:';
+/** A fact's entity with the seat taken out of it: a player who comes back to another seat is the same player, and the same fact (E7.4). */
+const portableEntity = (entity: string, body: string): string => entity === body ? 'player' : entity.startsWith(`${body}:`) ? entity.slice(body.length + 1) : entity;
+
+/** One cell's room. */
+export class DedicatedRoom {
+  readonly net: NetRoom;
+  readonly host: SimHost;
+  readonly cell: CellWorld;
+  readonly book: LedgerBook = new LedgerBook();
+  readonly sim: SimNetWorld;
+  /** Seats by device: J111's id is the only name a returning player has. */
+  private readonly seats: Map<string, Seat>;
+  private readonly bodies: Map<string, Seat>;
+  private readonly options: DedicatedRoomOptions;
+  private readonly shop: ShopGate;
+  /** The lead's seat as nobody has used it: what clears it for the next player. */
+  private readonly blank: PlayerDoc;
+  private constructor(options: DedicatedRoomOptions, cell: CellWorld, seats: Map<string, Seat>, bodies: Map<string, Seat>) {
+    this.options = options; this.cell = cell; this.host = cell.host; this.seats = seats; this.bodies = bodies;
+    this.sim = new SimNetWorld(this.host, 1, () => this.filings());
+    this.sim.identified = (body, identity): void => {
+      const seat = bodies.get(body);
+      if (seat === undefined || seat.device !== identity.player) throw new Error('Seat identity mismatch');
+      actRoutes(this.host).identities.set(body, seat.device);
+    };
+    this.net = new NetRoom({ world: this.sim, build: options.build, book: this.book, step: inputs => { this.step(inputs); }, ...(options.reports === undefined ? {} : { reports: options.reports }) });
+    this.net.open();
+    this.parkLead();
+    this.shop = new ShopGate(this.host);
+    // E7.7: a room shares one sky, and no client's word moves it.
+    actRoutes(this.host).climate = null;
+    actRoutes(this.host).time = null;
+    delete actRoutes(this.host).day;
+    this.blank = exportPlayer(this.host, this.lead, { store: {}, ledger: { serial: 0, rows: [] } });
+  }
+  /** Open the shard's world, with nobody in it. */
+  static async boot(options: DedicatedRoomOptions): Promise<DedicatedRoom> {
+    const { input, slug } = options, seats = new Map<string, Seat>(), bodies = new Map<string, Seat>();
+    const seated = (body: string): Seat => {
+      const seat = bodies.get(body);
+      if (seat === undefined) throw new Error(`No seat for ${body}`);
+      return seat;
+    };
+    const cell = await openCellWorld({ instance: slug }, input, undefined, { saves, lone: true, wholeSolids: true, pageless: true,
+      owned: body => seated(body).store.slots,
+      profiles: {
+        read: identity => seats.get(identity)?.store.rewards.read(slug).players[identity] ?? null,
+        write: (identity, state) => {
+          const seat = seats.get(identity); if (seat === undefined) return false;
+          return seat.store.rewards.write({ legacyOwner: null, players: { [identity]: state } }, slug);
+        },
+      },
+      facts: (name, entity, body, source) => {
+        const seat = bodies.get(body);
+        return seat === undefined ? null : seat.store.facts(source, slug)(name, portableEntity(entity, body));
+      } });
+    return new DedicatedRoom(options, cell, seats, bodies);
+  }
+  /** Where a new client should load, what a player with no save stands on. */
+  get spawn(): ResumeAt { const { at, yaw } = this.host.level.player; return { x: at.x, y: at.y, z: at.z, yaw }; }
+  /** Seats taken, by link or by hold. */
+  get taken(): number { return this.seats.size; }
+  /** Seats whose link is down and whose hold is open. */
+  get holding(): number { let held = 0; for (const seat of this.seats.values()) if (seat.transport === null) held++; return held; }
+  /** Whether this device already holds a seat here. */
+  holds(device: string): boolean { return this.seats.has(device); }
+  /** The body a device stands in. */
+  bodyOf(device: string): PlayerSim | undefined { const seat = this.seats.get(device); return seat === undefined ? undefined : this.host.players.get(seat.body); }
+
+  private get lead(): PlayerSim {
+    const seat = this.host.players.get(LEAD_SEAT);
+    if (seat === undefined) throw new Error('A room has no lead seat');
+    return seat;
+  }
+  /** The lead's body leaves the world, and its seat stays for the systems bound to it. `removePlayer` refuses it. */
+  /** Seats taken since this world began. */
+  private joined = 0;
+  private parkLead(): void { const { lead } = this; lead.motor.setEnabled(false); this.host.parked.add(lead.id); }
+  private unparkLead(): void { const { lead } = this; this.host.parked.delete(lead.id); lead.motor.setEnabled(true); }
+
+  /** Take a seat the door cleared, or give back the one this device holds. The room hears the `hello` the door read, and answers `welcome` as it would on any link. */
+  seat(entry: SeatEntry, transport: Transport, hello: () => void): void {
+    const held = this.seats.get(entry.device);
+    if (held !== undefined) { this.rejoin(held, transport, hello); return; }
+    if (entry.held === true) { transport.close('stalled'); return; } // its hold ended on the way here, and its save is what it comes back to
+    const lead = !this.bodies.has(LEAD_SEAT), body = lead ? LEAD_SEAT : entry.body, { spawn, host, book } = this, now = this.options.now();
+    let doc = entry.doc;
+    try { if (doc !== null) {
+      if (parseDoc(doc, PLAYER_DOC_VERSION, this.options.slug) === null) throw new Error('Invalid player document');
+      const bounds = this.options.input.shard.manifest?.bounds, reach = host.level.ground.size / 2, slack = 64;
+      if (doc.at.x < (bounds?.x0 ?? -reach) - slack || doc.at.x > (bounds?.x1 ?? reach) + slack || doc.at.z < (bounds?.z0 ?? -reach) - slack || doc.at.z > (bounds?.z1 ?? reach) + slack) throw new Error('Player position is outside the world');
+      doc = recoverPlayer(doc, entry.recovery ?? [], this.options.input, this.options.slug);
+    } }
+    catch (error) { this.refused(entry, transport, hello, `recovery: ${String(error)}`); return; }
+    const store = new PlayerStore(doc?.store ?? {}, () => { const own = this.seats.get(entry.device); if (own !== undefined) this.dirty(own); });
+    const seat: Seat = { device: entry.device, name: entry.name, body, store, fall: this.cell.fallFloor(), transport, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
+    this.seats.set(entry.device, seat); this.bodies.set(body, seat);
+    if (lead) this.unparkLead();
+    // Two who join together would otherwise stand inside each other.
+    const aside = SPAWN_ASIDE[(this.joined++) % SPAWN_ASIDE.length] ?? 0, stand = { ...spawn, x: spawn.x + aside };
+    const player = lead ? this.lead : host.addPlayer(body, doc?.at ?? stand, doc?.at.yaw ?? spawn.yaw);
+    player.netName = entry.name;
+    if (lead) player.resetPose(stand, spawn.yaw);
+    book.seat(body, doc?.ledger ?? { serial: 0, rows: [] });
+    try { if (doc !== null) importPlayer(this.host, player, doc); }
+    catch (error) {
+      // No save or live link is installed on a failed continuation. Keep the durable copies intact.
+      this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.seat(body, { serial: 0, rows: [] });
+      if (lead) this.clearLead(); else host.removePlayer(body);
+      this.refused(entry, transport, hello, `doc: ${String(error)}`);
+      return;
+    }
+    this.settle(seat);
+    this.link(seat, transport, hello);
+    this.options.post({ kind: 'seated', device: entry.device, body, seats: this.seats.size });
+  }
+  private refused(entry: SeatEntry, transport: Transport, hello: () => void, reason: string): void {
+    const { previous, ...current } = entry;
+    if (previous !== undefined) {
+      this.seat({ ...current, doc: previous.doc, recovery: previous.recovery }, transport, hello);
+      if (this.seats.has(entry.device)) this.options.post({ kind: 'recovered', device: entry.device, seq: entry.seq });
+      return;
+    }
+    this.options.post({ kind: 'refused', device: entry.device, reason }); transport.close('refused');
+    this.options.post({ kind: 'left', device: entry.device, seats: this.seats.size });
+  }
+  /** What a checkpoint compares against is as it stands now. */
+  private settle(seat: Seat): void {
+    seat.stand = this.host.respawn.stand(seat.body); seat.version = questBooks(this.host).of(seat.body).version;
+  }
+  private dirty(seat: Seat): void { seat.dirtyAt ??= this.options.now(); }
+  /** Write this player's doc, and the receipts it has not yet carried. */
+  private write(seat: Seat, reason: string): void {
+    const player = this.host.players.get(seat.body), { options, book } = this;
+    if (player === undefined) return;
+    const ledger = book.rowOf(seat.body), receipts = ledger.rows.filter(row => row.serial > seat.receipted).map(row => ({ serial: row.serial, factId: row.id, grant: row.grant, name: row.name, amount: row.amount }));
+    seat.receipted = ledger.serial; seat.seq++; seat.dirtyAt = null; seat.savedAt = options.now();
+    options.post({ kind: 'save', write: { player: seat.device, name: seat.name, shard: options.slug, build: options.build, saveVersion: PLAYER_DOC_VERSION, seq: seat.seq, reason, receipts, doc: exportPlayer(this.host, player, { store: seat.store.documents(), ledger }) } });
+  }
+  private rejoin(seat: Seat, transport: Transport, hello: () => void): void {
+    const old = seat.transport;
+    seat.transport = transport; seat.holdEnds = null;
+    old?.close('replaced');
+    this.link(seat, transport, hello);
+    this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size });
+  }
+  private link(seat: Seat, transport: Transport, hello: () => void): void {
+    this.net.join(transport, this.sim.playerOf(seat.body));
+    transport.onClose(reason => { this.closed(seat, transport, reason); });
+    hello();
+  }
+  private closed(seat: Seat, transport: Transport, reason: string): void {
+    if (seat.transport !== transport) return; // a newer link has this seat
+    seat.transport = null;
+    if (reason === LEFT) { this.leave(seat, 'leave'); return; }
+    const silent = 'silentMs' in transport && typeof transport.silentMs === 'number' ? transport.silentMs : 0;
+    seat.holdEnds = this.options.now() + (this.options.holdMs ?? HOLD_MS) - silent;
+  }
+  /** The player is gone: their body goes, or the lead's seat goes back to waiting. */
+  private leave(seat: Seat, reason: string): void {
+    mountedPlayerOf(this.host, seat.body)?.dismount();
+    this.write(seat, reason);
+    actRoutes(this.host).identities.delete(seat.body);
+    this.seats.delete(seat.device); this.bodies.delete(seat.body); this.cell.owned.drop(seat.body); this.book.seat(seat.body, { serial: 0, rows: [] });
+    if (seat.body === LEAD_SEAT) this.clearLead(); else this.host.removePlayer(seat.body);
+    this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });
+  }
+  /** The seat goes back to how boot left it, and what it was paid goes with who earned it: the next player's bounty is their own (J105). */
+  private clearLead(): void {
+    actRoutes(this.host).identities.delete(LEAD_SEAT);
+    const { ledgerDedupe } = this.host.slots, paid = `${LOOT_ROW}${LEAD_SEAT}:`;
+    ledgerDedupe.splice(0, ledgerDedupe.length, ...ledgerDedupe.filter(row => !row.startsWith(paid)));
+    importPlayer(this.host, this.lead, this.blank); this.parkLead();
+  }
+  private step(inputs: readonly NetTickInput[]): void {
+    const { host, cell } = this, routes = actRoutes(host);
+    const accepted = inputs.map(input => ({ ...input, acts: input.acts.filter(act => { if (act.kind !== 'climate') return true; routes.refused++; return false; }) }));
+    this.shop.step(accepted);
+    netWorldInput(routes, accepted); netBuys(routes, accepted);
+    cell.step(accepted);
+    // The page used to catch a fall, on its own body. The server's world has nothing below it, so it would fall for ever.
+    for (const seat of this.seats.values()) {
+      const player = host.players.get(seat.body);
+      if (player !== undefined) seat.fall.step(player, () => { host.combat.fall(player.health, player.position, { kind: 'out-of-world', label: '' }); });
+    }
+  }
+  private filings(): readonly LedgerFiling[] {
+    const { host, cell, bodies } = this, filings = ledgerFilings(host, LEAD_SEAT, cell.effects(), cell.fact, this.options.bootId).filter(filing => bodies.has(filing.player));
+    for (const filing of filings) { cell.owned.of(filing.player).file(filing); const seat = bodies.get(filing.player); if (seat !== undefined) this.dirty(seat); }
+    return filings;
+  }
+  /** One fixed tick: holds that ran out, then the world. */
+  tick(): void {
+    if (this.host.state.tick % CHECK_TICKS === 0) this.check(this.options.now());
+    this.net.tick();
+  }
+  /** Holds that ran out, and checkpoints that are due (E7.4). */
+  private check(now: number): void {
+    const books = questBooks(this.host), { respawn } = this.host;
+    for (const seat of this.seats.values()) {
+      if (seat.holdEnds !== null && now >= seat.holdEnds) { this.leave(seat, 'hold'); continue; }
+      const stand = respawn.stand(seat.body), { version } = books.of(seat.body);
+      if (stand !== seat.stand || version !== seat.version) { seat.stand = stand; seat.version = version; this.dirty(seat); }
+      if ((seat.dirtyAt !== null && now - seat.dirtyAt >= DEBOUNCE_MS) || now - seat.savedAt >= EVERY_MS) this.write(seat, 'checkpoint');
+    }
+  }
+  /** Everyone goes, as at SIGTERM: their last checkpoint now, and a close that says a restart is why. */
+  drain(): void {
+    for (const seat of this.seats.values()) { this.write(seat, 'restart'); seat.holdEnds = null; const { transport } = seat; seat.transport = null; transport?.close('restart'); }
+  }
+  dispose(): void { this.net.dispose(); this.cell.dispose(); }
+}
