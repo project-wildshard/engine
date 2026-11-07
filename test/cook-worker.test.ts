@@ -98,11 +98,11 @@ describe('the cook worker', () => {
     expect(await folderStore(join(scratch, 'other')).has(indexKey('b3', hash))).toBe(false);
   }, 60_000);
 
-  const job = (name: string, text: string, limits: Partial<JobLauncher['limits']> = {}): ReturnType<typeof runJob> => {
+  const job = (name: string, text: string, limits: Partial<JobLauncher['limits']> = {}, wrap: readonly string[] = []): ReturnType<typeof runJob> => {
     const work = join(mkdtempSync(join(scratch, 'limit-')), 'job'), script = join(work, name);
     mkdirSync(work);
     writeFileSync(script, text);
-    return runJob(launcher(script, limits), join(work, 'x.tar'), join(work, 'out'));
+    return runJob({...launcher(script, limits), wrap}, join(work, 'x.tar'), join(work, 'out'));
   };
 
   it('kills a job past its clock', async () => {
@@ -116,7 +116,9 @@ describe('the cook worker', () => {
   }, 30_000);
 
   it('reports a crash as a failure of that job alone', async () => {
-    const outcome = await job('crash.mjs', 'process.abort();');
+    // A real SIGABRT, but no core: under `ulimit -c unlimited` this one line wrote 6.5 GB to /cores on every run.
+    // The service sets LimitCORE=0 (scripts/cook-worker.service), so only this test needs the wrap.
+    const outcome = await job('crash.mjs', 'process.abort();', {}, ['sh', '-c', 'ulimit -c 0; exec "$@"', 'sh']);
     expect(outcome.kind).toBe('killed');
   }, 30_000);
 
