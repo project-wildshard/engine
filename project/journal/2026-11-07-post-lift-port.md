@@ -57,3 +57,8 @@ under the real checkout's lock and let Git run the installed hooks.
 Keep foreign stages intact and add new paths with intent-to-add. Two
 fixture checks prove selected-path isolation and hook rejection without
 moving HEAD. The wrapper adds no bypass or alternate hook dispatcher.
+
+Keep those two commit-entry checks as outer-edge integration tests.
+They run the actual shell entry and installed hooks in disposable main
+repositories, and pass in 1.13 seconds. The existing pre-commit suite
+also passes all 18 checks; full typecheck and lint pass afterward.
