@@ -39,7 +39,24 @@ function carry(storage: SaveStorage | null, scope: 'device' | 'session', mapping
 }
 /** Only named gameplay keys reset; pre-boot, diagnostic, per-tab and OTA keys survive. */
 export function resetLegacy(local: SaveStorage | null, session: SaveStorage | null): void {
-  if (local?.getItem(`${appIdentity().savePrefix}global`) !== null) return;
+  if (local === null) return;
+  const app = appIdentity();
+  if (local.getItem(`${app.savePrefix}global`) !== null) return;
+  if ((app.saveEpoch ?? 0) > 0) {
+    // Completion is the global document, written last. Failed writes retry on
+    // the next boot, without a reload; successful boots never wipe again.
+    const copy = (scope: string, allowed: readonly string[]): void => {
+      let keys: Record<string, unknown> = {};
+      try {
+        const raw: unknown = JSON.parse(local.getItem(`${app.previousSavePrefix ?? ''}${scope}`) ?? '{}');
+        if (typeof raw === 'object' && raw !== null && 'keys' in raw && typeof raw.keys === 'object' && raw.keys !== null) keys = Object.fromEntries(Object.entries(raw.keys).filter(([key]) => allowed.includes(key)));
+      } catch { /* A malformed old document has no preferences to carry. */ }
+      local.setItem(`${app.savePrefix}${scope}`, JSON.stringify({ keys }));
+    };
+    copy('device', ['devMode', 'debug.open', 'ui.fold', 'perf.probe', 'perf.rec', 'perf.lap', 'ktx2set', 'boot.times', 'boot.trace', 'boot.reports', 'err.queue', 'storage.persisted']);
+    copy('global', ['settings', 'gfx']);
+    return;
+  }
   carry(local, 'device', LEGACY_DEVICE); carry(session, 'session', LEGACY_SESSION);
   const deleted: string[] = [];
   for (let i = 0; i < local.length; i++) { const key = local.key(i); if (key && LEGACY_GAME_KEYS.some((old) => key === old || key.startsWith(`${old}:`))) deleted.push(key); }

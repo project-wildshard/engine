@@ -76,7 +76,7 @@ export async function pineEconomy(browser, phone, base, step) {
         await page.waitForTimeout(200);
       }
       await page.waitForTimeout(600);
-      const out = await page.evaluate(() => { const r = (/** @type {WorkerWindow} */ (window)).__workerClient(), doc = JSON.parse(localStorage.getItem('wildshard.save.v2.pine-hollow') ?? '{}'); return { kills: r.kills, hits: r.hits, held: r.held, lines: r.owned, journal: doc.keys?.compendium?.data, enabled: (/** @type {WorkerWindow} */ (window)).__wildshard.world.weapons.enabled, prompt: (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables.some(row => row.label === 'Take the Ghost Stag crossbow') }; });
+      const out = await page.evaluate(() => { const r = (/** @type {WorkerWindow} */ (window)).__workerClient(), doc = JSON.parse(localStorage.getItem('wildshard.save.v2@1.pine-hollow') ?? '{}'); return { kills: r.kills, hits: r.hits, held: r.held, lines: r.owned, journal: doc.keys?.compendium?.data, enabled: (/** @type {WorkerWindow} */ (window)).__wildshard.world.weapons.enabled, prompt: (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables.some(row => row.label === 'Take the Ghost Stag crossbow') }; });
       return { ok: out.kills === 1 && out.prompt && out.journal?.['ghost-stag']?.t === 3 && out.journal?.['ghost-stag']?.b === 271, ...out, scale: seed.target.scale };
     });
     await step('Pine: the special shot spends pitch and the crossbow reloads', async () => {
@@ -87,7 +87,7 @@ export async function pineEconomy(browser, phone, base, step) {
     await step('Pine: saves retain the unclaimed drop, journal and finish purchases', async () => {
       await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave()); await page.reload({ waitUntil: 'load' }); await enter();
       await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard.world.interactables.some(row => row.label === 'Take the Ghost Stag crossbow' && row.radius > 0), undefined, { timeout: 4000 });
-      const r = await read(), out = await page.evaluate(() => ({ journal: JSON.parse(localStorage.getItem('wildshard.save.v2.pine-hollow') ?? '{}').keys?.compendium?.data, legacy: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('scarback-furnace') }));
+      const r = await read(), out = await page.evaluate(() => ({ journal: JSON.parse(localStorage.getItem('wildshard.save.v2@1.pine-hollow') ?? '{}').keys?.compendium?.data, legacy: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('scarback-furnace') }));
       return { ok: r.finish && r.pitch === 9 && r.selected === 'pitch' && r.owned['finish-drop.ghost-stag'] === 1 && out.journal?.['ghost-stag']?.t === 3 && out.legacy, ...r, ...out };
     });
     await step('Pine: a distant claim grants nothing', async () => {
@@ -102,12 +102,12 @@ export async function pineEconomy(browser, phone, base, step) {
       await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), undefined, { timeout: 3000 });
       await page.evaluate(() => { (/** @type {WorkerWindow} */ (window)).__wildshard.world.weapons.interact('finish.claim.ghost-stag'); }); await page.waitForTimeout(400);
       await page.waitForFunction(() => { const { owned } = (/** @type {WorkerWindow} */ (window)).__workerClient(); return owned['finish.ghost-stag'] === 1 && owned['finish-drop.ghost-stag'] === undefined; }, undefined, { timeout: 3000 });
-      const out = await page.evaluate(() => ({ owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, taken: JSON.parse(localStorage.getItem('wildshard.save.v2.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
+      const out = await page.evaluate(() => ({ owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, taken: JSON.parse(localStorage.getItem('wildshard.save.v2@1.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
       return { ok: out.owned['finish.ghost-stag'] === 1 && out.owned['finish-drop.ghost-stag'] === undefined && out.taken === 3, ...out };
     });
     await step('Pine: the claimed finish and totals survive another reload', async () => {
       await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__workerClientSave()); await page.reload({ waitUntil: 'load' }); await enter();
-      const out = await page.evaluate(() => ({ finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, taken: JSON.parse(localStorage.getItem('wildshard.save.v2.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
+      const out = await page.evaluate(() => ({ finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, taken: JSON.parse(localStorage.getItem('wildshard.save.v2@1.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
       return { ok: out.finish && out.owned['finish-drop.ghost-stag'] === undefined && out.taken === 3 && errors.length === 0, ...out, errors };
     });
   } finally { await context.close(); }

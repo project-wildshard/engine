@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import { installedIdentity } from '../app/identity';
 import type { SaveStorage } from '../saves/store';
 
 // P1-E5.2c (J111): who a client says it is, for the first playtest: a device id and a typed Name, no accounts. `player` is
@@ -26,7 +27,8 @@ function stored(raw: string | null): NetIdentity | null {
 }
 /** This device's identity, minted once and kept in the page's storage. A Name typed later replaces the Name, never the id. */
 export function deviceIdentity(storage: SaveStorage, prefix: string, name?: string): NetIdentity {
-  const key = deviceKey(prefix), held = stored(storage.getItem(key)), typed = name?.slice(0, MAX_NAME_LENGTH) ?? '';
+  const app = installedIdentity(), stable = app?.savePrefix === prefix ? app.identityPrefix ?? prefix : prefix;
+  const key = deviceKey(stable), held = stored(storage.getItem(key)), typed = name?.slice(0, MAX_NAME_LENGTH) ?? '';
   const identity: NetIdentity = { player: held?.player ?? `device:${crypto.randomUUID()}`, name: typed === '' ? held?.name ?? GUEST.name : typed };
   if (held?.player !== identity.player || held.name !== identity.name) storage.setItem(key, JSON.stringify(identity));
   return identity;

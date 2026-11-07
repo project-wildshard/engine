@@ -1,13 +1,18 @@
 // J130: where a server's saves live on a page. A session outgrows localStorage at its first cell, so the server's documents
 // are in IndexedDB; this file is also what Settings reaches for them, because New Game and export must see what the server saw.
 import type { ImportReport, SaveStorage } from '../../../shared/engine/saves/store';
-import { installedIdentity } from '../../../shared/engine/app/identity';
+import { installedIdentity, saveEpoch } from '../../../shared/engine/app/identity';
 import { deviceIdentity } from '../../../shared/engine/net/identity';
 
 /** A server's saves on a page: the same documents localStorage would hold. */
-export interface IndexedSaves { readonly storage: SaveStorage; readonly write: (key: string, value: string | null) => Promise<boolean> }
+export interface IndexedSaves { readonly storage: SaveStorage; readonly write: (key: string, value: string | null) => Promise<boolean>; readonly close?: () => void }
 /** The database the page's server keeps its saves in. */
 export const SERVER_SAVES = 'wildshard-saves';
+/** Cached older builds cannot enumerate the current epoch's database. */
+export function serverSaveDatabase(prefix: string | undefined = installedIdentity()?.savePrefix): string {
+  const epoch = saveEpoch(prefix);
+  return epoch === 0 ? SERVER_SAVES : `${SERVER_SAVES}@${epoch}`;
+}
 /** The database an earlier row kept them in, apart from the real saves. Nothing reads it now. */
 const RETIRED_SAVES = 'wildshard-worker-saves';
 const SAVES = 'saves';
@@ -43,7 +48,18 @@ export async function openIndexedSaves(name: string): Promise<IndexedSaves> {
     transaction.oncomplete = (): void => { resolve(true); };
     transaction.onerror = transaction.onabort = (): void => { resolve(false); };
   });
-  return { write, storage: { get length() { return documents.size; }, key: index => [...documents.keys()][index] ?? null, getItem: key => documents.get(key) ?? null,
+  const app = installedIdentity();
+  if (name === serverSaveDatabase() && saveEpoch() > 0 && app?.identityPrefix !== undefined) {
+    const key = `device:${app.identityPrefix}identity`;
+    if (!documents.has(key)) {
+      const previous = await openIndexedSaves(SERVER_SAVES);
+      try {
+        const identity = previous.storage.getItem(key);
+        if (identity !== null && !await write(key, identity)) throw new Error('Device identity carry failed');
+      } finally { previous.close?.(); }
+    }
+  }
+  return { write, close: () => database.close(), storage: { get length() { return documents.size; }, key: index => [...documents.keys()][index] ?? null, getItem: key => documents.get(key) ?? null,
     setItem: (key, value) => { void write(key, value); }, removeItem: key => { void write(key, null); } } };
 }
 
@@ -85,12 +101,12 @@ export async function forgetServerInstance({ storage, write }: IndexedSaves, pre
 
 /** Every server document, as a page's export writes its own. A save file is one file, whichever store it came from. */
 export async function exportServerSaves(prefix: string, format: string): Promise<string> {
-  const { storage } = await openIndexedSaves(SERVER_SAVES), docs: Record<string, unknown> = {};
+  const { storage } = await openIndexedSaves(serverSaveDatabase(prefix)), docs: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(saveDocuments(storage, prefix))) {
     const scope = key.slice(prefix.length);
     if (scope !== 'device' && scope !== 'session' && !scope.includes('.corrupt.')) docs[scope] = JSON.parse(value); // as a page's export leaves them out
   }
-  return JSON.stringify({ format, version: 2, server: true, exported: new Date().toISOString(), docs }, null, 2);
+  return JSON.stringify({ format, version: 2, saveEpoch: saveEpoch(prefix), server: true, exported: new Date().toISOString(), docs }, null, 2);
 }
 let stopServer: () => void = () => undefined;
 /** The running server, which would write over an import at its next save. */
@@ -110,7 +126,7 @@ async function importPageFile(json: string, prefix: string, page: PageSaves): Pr
   const scopes = [...new Set(report.imported.map(identity => identity.slice(0, identity.indexOf('/'))))];
   if (scopes.length === 0 || storage === null) return report;
   stopServer();
-  const saves = await openIndexedSaves(SERVER_SAVES);
+  const saves = await openIndexedSaves(serverSaveDatabase(prefix));
   for (const scope of scopes) {
     const doc = storage.getItem(`${prefix}${scope}`);
     if (doc === null || !await saves.write(`${prefix}${scope}`, doc) || !await forgetServerInstance(saves, prefix, scope)) return { imported: [], skipped: [...report.skipped, { key: scope, reason: 'Storage unavailable or full' }] };
@@ -122,9 +138,10 @@ async function importPageFile(json: string, prefix: string, page: PageSaves): Pr
 export async function importServerSaves(json: string, prefix: string, format: string, page: PageSaves): Promise<ImportReport> {
   const value: unknown = JSON.parse(json);
   if (!isRecord(value) || value['format'] !== format || !isRecord(value['docs'])) return { imported: [], skipped: [{ key: '*', reason: 'Unknown save format' }] };
+  if ((value['saveEpoch'] ?? 0) !== saveEpoch(prefix)) return { imported: [], skipped: [{ key: '*', reason: 'Save belongs to another progress epoch' }] };
   if (value['server'] !== true) return importPageFile(json, prefix, page);
   stopServer();
-  const saves = await openIndexedSaves(SERVER_SAVES), rows = Object.entries(value['docs']);
+  const saves = await openIndexedSaves(serverSaveDatabase(prefix)), rows = Object.entries(value['docs']);
   const app = installedIdentity(), rebind = app?.savePrefix === prefix ? app.importPlayerDocument : undefined;
   const player = rebind === undefined ? null : deviceIdentity(saves.storage, prefix).player;
   const wrote = await Promise.all(rows.map(async ([scope, doc]) => saves.write(`${prefix}${scope}`, JSON.stringify(rebind === undefined || player === null ? doc : await rebind(doc, player)))));

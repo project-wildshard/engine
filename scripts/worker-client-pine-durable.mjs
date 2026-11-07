@@ -31,16 +31,16 @@ async function scenario(claim) {
   };
   const stores = () => page.evaluate(async () => {
     const database = await /** @type {Promise<IDBDatabase>} */ (new Promise((resolve, reject) => {
-      const open = indexedDB.open('wildshard-saves'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(new Error(open.error?.message ?? 'IndexedDB open failed'));
+      const open = indexedDB.open('wildshard-saves@1'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(new Error(open.error?.message ?? 'IndexedDB open failed'));
     }));
     /** @param {string} key @returns {Promise<import('./types/worker-page').WorkerSaveDocument>} */
     const get = key => new Promise((resolve, reject) => {
-      const read = database.transaction('saves').objectStore('saves').get(`wildshard.save.v2.${key}`);
+      const read = database.transaction('saves').objectStore('saves').get(`wildshard.save.v2@1.${key}`);
       read.onsuccess = () => resolve(JSON.parse(read.result ?? '{"keys":{}}')); read.onerror = () => reject(new Error(read.error?.message ?? 'IndexedDB read failed'));
     });
     try {
       const server = await get('pine-hollow'), worlds = await Promise.all(['standalone-lone-pine-hollow', 'standalonealt-lone-pine-hollow'].map(get));
-      const local = JSON.parse(localStorage.getItem('wildshard.save.v2.pine-hollow') ?? '{"keys":{}}');
+      const local = JSON.parse(localStorage.getItem('wildshard.save.v2@1.pine-hollow') ?? '{"keys":{}}');
       return { localTaken: local.keys.compendium?.data?.['ghost-stag']?.t,
         rewards: Object.values(server.keys['creature-rewards']?.data?.players ?? {}).map(row => ({ taken: row.journal['ghost-stag']?.t, owned: row.finishes.includes('ghost-stag'), pending: row.pending['ghost-stag'] !== undefined })),
         ticks: worlds.map(row => row.keys.continuation?.data?.tick ?? -1) };
@@ -88,7 +88,7 @@ async function scenario(claim) {
       await worker.evaluate(() => { setTimeout(() => { self.close(); }, 0); });
       await page.waitForTimeout(150);
       await page.goto(url, { waitUntil: 'load' }); await enter();
-      const shown = await page.evaluate(() => ({ owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), taken: JSON.parse(localStorage.getItem('wildshard.save.v2.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
+      const shown = await page.evaluate(() => ({ owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned, finish: (/** @type {WorkerWindow} */ (window)).__wildshard.shard.play.skins.has('ghost-stag'), taken: JSON.parse(localStorage.getItem('wildshard.save.v2@1.pine-hollow') ?? '{}').keys?.compendium?.data?.['ghost-stag']?.t }));
       return { ok: shown.taken === 2 && shown.owned['journal.ghost-stag.taken'] === 3 && (claim ? shown.finish && shown.owned['finish-drop.ghost-stag'] === undefined : shown.owned['finish-drop.ghost-stag'] === 1), ...shown };
     });
     await step(`${label}: no page errors`, () => ({ ok: errors.length === 0, errors }));

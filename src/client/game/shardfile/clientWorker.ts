@@ -6,7 +6,7 @@ import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
 import type { Vector3 } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
-import { importPageSaves, openIndexedSaves, SERVER_SAVES, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
+import { importPageSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import { syncPageRewards } from '../../../shared/game/saves';
 import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
@@ -206,7 +206,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const { startStandalone } = await import(/* @vite-ignore */ `${root}/shell.js`) as ShellModule;
   // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
   await closing; // a world a session just left may still be saving into what this one reads
-  const saves = await openIndexedSaves(SERVER_SAVES), { savePrefix } = appIdentity();
+  const saves = await openIndexedSaves(serverSaveDatabase()), { savePrefix } = appIdentity();
   const page = saveEnvironment().storage('shard');
   if (page !== null) { await importPageSaves(saves, page, savePrefix); await syncPageRewards(saves, page, savePrefix); }
   // DL21: the card counts what the server has read. DL25: it reads what this page holds first.

@@ -22,7 +22,7 @@ await saveFixture(context, { scope: 'standalone-pine-hollow', key: 'continuation
 await saveFixture(context, { scope: 'pine-hollow', key: 'finish-pickups', once: 'pine-grid-drop', data: { 'ghost-stag': { x: seed.target.x, y: seed.target.y, z: seed.target.z } } });
 await context.addInitScript(() => {
   // The title's one-shot grid intent, for a Pine home rather than the catalogue's default home.
-  const key = 'wildshard.save.v2.device', doc = JSON.parse(localStorage.getItem(key) ?? '{"keys":{}}');
+  const key = 'wildshard.save.v2@1.device', doc = JSON.parse(localStorage.getItem(key) ?? '{"keys":{}}');
   doc.keys['gridIntent.once'] = { v: 1, data: { instance: 'pine-hollow', slug: 'pine-hollow', at: Date.now() } };
   localStorage.setItem(key, JSON.stringify(doc));
 });

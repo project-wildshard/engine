@@ -1,0 +1,45 @@
+import { afterEach, expect, test } from 'vitest';
+import * as v from 'valibot';
+import { installAppIdentity } from '../src/shared/engine/app/identity';
+import { WILDSHARD_IDENTITY } from '../src/client/game/identity';
+import { SaveStore } from '../src/shared/engine/saves/store';
+import { deviceIdentity } from '../src/shared/engine/net/identity';
+import { MemoryStorage } from './setup';
+
+const old = 'wildshard.save.v2.', next = 'wildshard.save.v2@1.';
+const identity = { ...WILDSHARD_IDENTITY, savePrefix: next, previousSavePrefix: old, identityPrefix: old, saveEpoch: 1 };
+afterEach(() => installAppIdentity(WILDSHARD_IDENTITY));
+test('epoch boot carries preferences once, isolates progress and keeps device identity', () => {
+  const local = new MemoryStorage();
+  local.setItem(`${old}global`, JSON.stringify({ keys: { settings: { v: 1, data: { music: false } }, gfx: { v: 1, data: { quality: 'low' } }, hints: { v: 1, data: ['done'] } } }));
+  local.setItem(`${old}device`, JSON.stringify({ keys: { ktx2set: { v: 1, data: { pine: true } }, 'grid.last-played': { v: 1, data: 'ember-forge' } } }));
+  local.setItem(`${old}driftwood`, '{"keys":{"purse":{"v":1,"data":99}}}');
+  const player = deviceIdentity(local, old).player;
+  installAppIdentity(identity);
+  const boot = () => new SaveStore({ local, session: new MemoryStorage() });
+  const first = boot();
+  const settings = first.define({ key: 'settings', scope: 'global', version: 1, schema: v.object({ music: v.boolean() }), initial: () => ({ music: true }) });
+  expect(settings.read()).toEqual({ music: false });
+  expect(local.getItem(`${next}global`)).not.toContain('hints');
+  expect(local.getItem(`${next}device`)).toContain('ktx2set');
+  expect(local.getItem(`${next}device`)).not.toContain('grid.last-played');
+  expect(first.exportAll()).not.toContain('purse');
+  expect(deviceIdentity(local, next).player).toBe(player);
+  settings.write({ music: true });
+  expect(boot().exportAll()).toContain('true');
+  const legacyFile = JSON.stringify({ format: identity.saveFormat, version: 2, docs: { global: { keys: { settings: { v: 1, data: { music: false } } } } } });
+  expect(first.importAll(legacyFile).imported).toEqual([]);
+  expect(settings.read()).toEqual({ music: true });
+  const exported: unknown = JSON.parse(first.exportAll());
+  expect(exported).toHaveProperty('saveEpoch', 1);
+});
+test('blocked storage never reloads or prevents memory play', () => {
+  installAppIdentity(identity);
+  const local = new MemoryStorage();
+  local.setItem = () => { throw new Error('denied'); };
+  const saves = new SaveStore({ local, session: new MemoryStorage() });
+  const purse = saves.define({ key: 'purse', scope: 'shard', version: 1, schema: v.number(), initial: () => 0 });
+  expect(purse.read('driftwood')).toBe(0);
+  purse.write(4, 'driftwood');
+  expect(purse.read('driftwood')).toBe(4);
+});

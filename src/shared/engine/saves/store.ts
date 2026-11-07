@@ -1,4 +1,4 @@
-import { appIdentity, installedIdentity } from '../app/identity';
+import { appIdentity, installedIdentity, saveEpoch } from '../app/identity';
 import * as v from 'valibot';
 import { resetLegacy } from './legacy';
 import { saveEnvironment } from './environment';
@@ -362,13 +362,14 @@ export class SaveStore {
       if (scope === 'device' || scope === 'session' || scope.includes('.corrupt.')) continue;
       docs[scope] = this.savedDoc('global', name);
     }
-    return JSON.stringify({ format: appIdentity().saveFormat, version: 2, build: this.options.build ?? '', exported: this.at(), docs }, null, 2);
+    return JSON.stringify({ format: appIdentity().saveFormat, version: 2, saveEpoch: saveEpoch(), build: this.options.build ?? '', exported: this.at(), docs }, null, 2);
   }
   importAll(json: string): ImportReport {
     const report: ImportReport = { imported: [], skipped: [] };
     let value: unknown;
     try { value = JSON.parse(json); } catch { return { imported: [], skipped: [{ key: '*', reason: 'Invalid JSON' }] }; }
     if (!object(value) || value['format'] !== appIdentity().saveFormat || value['version'] !== 2 || !object(value['docs'])) return { imported: [], skipped: [{ key: '*', reason: 'Unknown save format' }] };
+    if ((value['saveEpoch'] ?? 0) !== saveEpoch()) return { imported: [], skipped: [{ key: '*', reason: 'Save belongs to another progress epoch' }] };
     for (const [scope, savedDoc] of Object.entries(value['docs'])) {
       if (scope === 'device' || scope === 'session' || (scope !== 'global' && scope !== 'profile' && !shardNamespace(scope)) || !doc(savedDoc)) { report.skipped.push({ key: scope, reason: 'Invalid or private scope' }); continue; }
       const kind = scope === 'global' || scope === 'profile' ? scope : 'shard';

@@ -17,6 +17,12 @@ export interface AppIdentity {
   readonly tagline: string;
   /** every save key's prefix (`<prefix>global`, `<prefix><namespace>`) and a save export's format tag */
   readonly savePrefix: string;
+  /** Progress epoch: imports from another epoch cannot restore wiped progress. */
+  readonly saveEpoch?: number;
+  /** Previous namespace, used only to carry preferences at first boot. */
+  readonly previousSavePrefix?: string;
+  /** Stable device identity namespace, independent of progress wipes. */
+  readonly identityPrefix?: string;
   readonly saveFormat: string;
   /** a downloaded file's name prefix (`<slug>-save-<date>.json`) */
   readonly fileSlug: string;
@@ -50,3 +56,9 @@ export function currentProbe(): EngineProbe | undefined { return probe; }
 export function setCurrentProbe(value: EngineProbe | undefined): void { probe = value; if (value !== undefined) read()?.exposeProbe(value); }
 /** the harness pins, or undefined before an identity is installed (a bare engine test) */
 export function harnessPins(): HarnessPins | undefined { return read()?.harness(); }
+
+/** Other applications' stores retain epoch zero. */
+export function saveEpoch(prefix: string | undefined = installedIdentity()?.savePrefix): number {
+  const app = installedIdentity();
+  return app?.savePrefix === prefix ? app?.saveEpoch ?? 0 : 0;
+}

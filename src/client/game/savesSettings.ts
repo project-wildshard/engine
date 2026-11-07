@@ -12,7 +12,7 @@ import { exitSessionToTitle } from './session/exitToTitle';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { markReload } from '@wildshard/engine/boot/lastEnd';
 import { isDev } from '@wildshard/engine/core/devMode';
-import { forgetServerInstance, openIndexedSaves, SERVER_SAVES } from '@wildshard/engine/saves/indexed';
+import { forgetServerInstance, openIndexedSaves, serverSaveDatabase } from '@wildshard/engine/saves/indexed';
 import { SaveStore } from '@wildshard/engine/saves/store';
 import type { GameMenu } from '@wildshard/engine/ui/Menu';
 import { mountUi } from '@wildshard/engine/ui/ownership';
@@ -111,7 +111,7 @@ const reset = (instance: LocalSaveInstance): boolean => { try { return resetNewG
 /** J130: a page on a server has a second copy, and the server would reopen it. Stop the server first: it saves as a page hides. */
 async function resetServerCopy(instance: LocalSaveInstance): Promise<void> {
   wirePage.stop();
-  const saves = await openIndexedSaves(SERVER_SAVES), { savePrefix } = appIdentity();
+  const saves = await openIndexedSaves(serverSaveDatabase()), { savePrefix } = appIdentity();
   resetNewGame(new SaveStore({ local: saves.storage, session: saves.storage }), instance);
   await saves.write(`${savePrefix}${instance.id}`, saves.storage.getItem(`${savePrefix}${instance.id}`)); // answers when that reset is durable
   await forgetServerInstance(saves, savePrefix, instance.id);

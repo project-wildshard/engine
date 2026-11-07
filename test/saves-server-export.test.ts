@@ -24,7 +24,7 @@ function fakeIndexedDb(): { rows: Map<string, string>; api: unknown } {
     setTimeout(() => { row.oncomplete?.(); }, 0); return row;
   };
   return { rows, api: { deleteDatabase: () => undefined, open: () => {
-    const request = done(() => ({ transaction, objectStoreNames: { contains: () => true } }));
+    const request = done(() => ({ transaction, close: () => undefined, objectStoreNames: { contains: () => true } }));
     return Object.assign(request, { onupgradeneeded: null });
   } } };
 }

@@ -191,7 +191,7 @@ export function bootTemplateRoadPlans(state) {
 
 /** Read actual durable storage, never the save service's retryable in-memory fallback.
  * @param {string} instance */
-export function bootTemplateCheckpoint(instance, raw = localStorage.getItem(`wildshard.save.v2.${instance}`)) {
+export function bootTemplateCheckpoint(instance, raw = localStorage.getItem(`wildshard.save.v2@1.${instance}`)) {
   if (raw === null) throw new Error('Template crossing has no durable checkpoint');
   const document = JSON.parse(raw), served = document?.keys?.continuation;
   if (served !== undefined) { // A server's own document: src/server/host/standalone/continuation.ts.
@@ -213,9 +213,9 @@ export function bootTemplateCheckpoint(instance, raw = localStorage.getItem(`wil
  * (`saveLocation`, on any checkpoint inside the cell), so it answers only when no server wrote.
  * @param {string} instance @returns {Promise<string | null>} */
 export async function bootStoredSave(instance) {
-  const prefix = 'wildshard.save.v2.', page = localStorage.getItem(`${prefix}${instance}`);
-  if (!(await indexedDB.databases()).some(row => row.name === 'wildshard-saves')) return page;
-  const opening = indexedDB.open('wildshard-saves');
+  const prefix = 'wildshard.save.v2@1.', page = localStorage.getItem(`${prefix}${instance}`);
+  if (!(await indexedDB.databases()).some(row => row.name === 'wildshard-saves@1')) return page;
+  const opening = indexedDB.open('wildshard-saves@1');
   /** @type {IDBDatabase} */ const database = await new Promise((resolve, reject) => { opening.onsuccess = () => { resolve(opening.result); }; opening.onerror = () => { reject(opening.error ?? new Error('Save storage refused')); }; });
   try {
     if (!database.objectStoreNames.contains('saves')) return page;

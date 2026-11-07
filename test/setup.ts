@@ -1,6 +1,8 @@
 import { beforeEach, vi } from 'vitest';
 import { ENGINE_CONTENT_STRINGS } from '../src/client/game/engineStrings';
 import { installEngineStrings } from '../src/shared/engine/strings';
+import { installAppIdentity } from '../src/shared/engine/app/identity';
+import { WILDSHARD_IDENTITY } from '../src/client/game/identity';
 
 /** Browser globals and strings only; content installs belong to explicit world fixtures. */
 export class MemoryStorage {
@@ -18,5 +20,8 @@ vi.stubGlobal('localStorage', new MemoryStorage());
 vi.stubGlobal('location', new URL('http://localhost:5173/'));
 // Identity/save/frame hosts are the environment, not world content.
 await import('../src/client/app/identity');
+// Historical fixtures explicitly exercise epoch zero. Epoch tests install the
+// release identity themselves; production always installs it from app/identity.
+installAppIdentity({ ...WILDSHARD_IDENTITY, saveEpoch: 0, savePrefix: 'wildshard.save.v2.' });
 
 beforeEach(() => { localStorage.clear(); });
