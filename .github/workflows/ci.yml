@@ -15,7 +15,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,6 +36,8 @@ jobs:
           git config --global url."$base".insteadOf "git@github.com:project-wildshard/"
           git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm pins
+      - run: pnpm gen:inputs
       - run: pnpm check
       - run: pnpm test:hooks
 

@@ -63,7 +63,7 @@
     "@gltf-transform/core": "4.5.0",
     "@gltf-transform/extensions": "4.5.0",
     "@jridgewell/trace-mapping": "0.3.31",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.65.0",
     "@types/node": "24.13.6",
     "@types/three": "0.186.0",
     "@typescript/typescript6": "6.0.2",
