@@ -1,0 +1,57 @@
+{
+  "id": "tool.fei-zhua",
+  "course": {
+    "name": "Nine Dragon Stack",
+    "mode": {
+      "id": "grapple",
+      "minRange": 2.5,
+      "maxRange": 38,
+      "zipSpeed": 22,
+      "fireTime": 0.27,
+      "biteTime": 0.1,
+      "reelTime": 0.48,
+      "windowX": 0.52,
+      "windowY": 0.68
+    },
+    "clearance": {
+      "axis": "z",
+      "plane": 11.2,
+      "min": -28,
+      "max": 0,
+      "base": 125,
+      "top": 128.2,
+      "ceiling": 136,
+      "owners": [
+        "nds-floors",
+        "nds-grapple-guard"
+      ]
+    }
+  },
+  "cues": {
+    "fire": "grapple.fire",
+    "bite": "grapple.bite",
+    "zip": "grapple.zip",
+    "reel": "grapple.reel",
+    "dock": "grapple.dock"
+  },
+  "looks": {
+    "muzzle": "nine-grapple-muzzle",
+    "bite": "nine-grapple-bite",
+    "dock": "nine-grapple-dock",
+    "sparks": "nine-grapple-sparks",
+    "ribbon": "nine-filament"
+  },
+  "fact": {
+    "name": "nine-dragon-stack.well",
+    "entity": "well",
+    "source": "fei-zhua.crossing"
+  },
+  "headless": {
+    "step": "nine-dragon-stack.fei-zhua",
+    "lock": "nine-dragon-stack.fei-zhua.lock",
+    "aim": "nine-dragon-stack.fei-zhua.aim",
+    "eye": 1.68,
+    "aspect": 0.459954233409611,
+    "portraitFov": 78
+  }
+}

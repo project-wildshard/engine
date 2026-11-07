@@ -1,0 +1,109 @@
+{
+  "pouch": {
+    "kinds": [
+      "iron",
+      "pitch",
+      "broadhead"
+    ],
+    "fallback": "iron",
+    "capacity": 30
+  },
+  "persistence": {
+    "key": "loadout",
+    "version": 1,
+    "state": "pine.loadout",
+    "firearm": "rounds",
+    "bow": "arrows",
+    "interval": 2
+  },
+  "launcher": {
+    "item": "weapon.crossbow",
+    "slot": "crossbow"
+  },
+  "firearm": {
+    "slot": "rifle",
+    "owned": "lever-rifle",
+    "ammo": "cartridge"
+  },
+  "bow": {
+    "slot": "bow",
+    "owned": "warden-longbow",
+    "legacyItem": "warden-longbow",
+    "ammo": "arrow",
+    "grantToast": "The Warden's Longbow · hold FIRE to draw, let go at full draw"
+  },
+  "tints": {
+    "pitch": {
+      "color": 10119734,
+      "roughness": 0.55
+    },
+    "broadhead": {
+      "color": 13159636,
+      "roughness": 0.8
+    }
+  },
+  "parked": {
+    "name": "pine-loadout-parked",
+    "y": -500,
+    "materialPrefix": "xbow-bolt-"
+  },
+  "audio": {
+    "echoVoice": "pine.leverEcho",
+    "impactVoice": "pine.boltImpact-rock",
+    "impact": "boltImpact-rock",
+    "prewarm": [
+      "leverShot",
+      "leverEcho",
+      "leverCycle",
+      "leverDry",
+      "leverRoundIn",
+      "longbowDraw",
+      "longbowLoose",
+      "boltImpact-rock"
+    ],
+    "cycleCue": "cue.lever.cycle",
+    "roundCue": "cue.lever.round",
+    "owner": "ports",
+    "surfaces": [
+      "rock",
+      "stone"
+    ],
+    "probe": 0.4
+  },
+  "input": {
+    "id": "crossbow.bolts",
+    "action": "bolt.cycle",
+    "key": "KeyB",
+    "label": "Bolts",
+    "icon": "<svg viewBox=\"0 0 24 24\"><path d=\"M5 19 19 5m-6 0h6v6M5 14v5h5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"/></svg>"
+  },
+  "text": {
+    "selected": "{name} loaded · {count}",
+    "spent": "{name} spent · iron bolts loaded",
+    "recovered": "Arrow recovered",
+    "broken": "Arrow broke"
+  },
+  "debug": {
+    "loadout": "loadout",
+    "firearm": "lever",
+    "bow": "longbow"
+  },
+  "development": {
+    "firearm": [
+      "lever",
+      "rifle"
+    ],
+    "bow": [
+      "longbow",
+      "bow"
+    ],
+    "launcher": [
+      "crossbow"
+    ],
+    "ammunition": [
+      "pitch",
+      "broadhead"
+    ],
+    "grant": 10
+  }
+}

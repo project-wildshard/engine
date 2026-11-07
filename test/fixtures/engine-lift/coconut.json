@@ -1,0 +1,10 @@
+{
+  "count": 16, "clocks": "f32", "initial": 1,
+  "restSpeed": 0.15, "restTime": 4, "maxAge": 16, "inclusive": false,
+  "landing": { "impact": 1.5, "timeout": 3, "wet": true, "clearDistance": 0.8 },
+  "body": { "radius": 0.13, "material": "wood", "group": "DEBRIS", "density": 650,
+    "friction": 0.7, "restitution": 0.35, "angularDamping": 3, "ccd": true, "expendable": true },
+  "contact": { "radius": 0.45, "height": 1.75, "horizontalBounce": -0.2, "up": 1.5 },
+  "float": { "level": 0, "buoyancy": 1.6, "drag": 1.5, "waves": true },
+  "spin": { "phase": [0, 6.28], "x": [-7, 7], "y": [-3, 3], "z": [-7, 7] }
+}

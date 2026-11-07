@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "modules": {},
+  "constants": {
+    "eliteEntry": {
+      "kind": "elite.construct",
+      "owner": "nalati.elites",
+      "file": "sim/headless-assembly.json",
+      "admission": "actors/wildlife.json",
+      "fight": "nalati.qara-charge",
+      "models": "nalati.trophies",
+      "program": "elite.rules",
+      "weather": "nalati.weather",
+      "night": "nalati.night",
+      "ledges": {
+        "part": "crags",
+        "anchor": "ledges"
+      }
+    },
+    "timedEntry": {
+      "kind": "timed.encounters",
+      "owner": "nalati.night",
+      "file": "combat/timed-encounters.json",
+      "draws": "shapes",
+      "species": "nalati.species",
+      "guest": "balbal",
+      "weather": "nalati.weather",
+      "sites": "balbals",
+      "figures": {
+        "rider": "ghost-rider",
+        "captain": "ghost-captain",
+        "storm": "rider"
+      }
+    },
+    "nativeTaming": {
+      "step": "nalati.taming",
+      "herds": "nalati.herds",
+      "roster": "nalati.mounts",
+      "kinds": [
+        "horse",
+        "argymaq"
+      ],
+      "binding": {
+        "upgradeKind": "argymaq",
+        "bonds": [
+          "1",
+          "argymaq"
+        ],
+        "names": [
+          "Tulpar",
+          "Argymaq"
+        ],
+        "offset": [
+          2.6,
+          3.5
+        ],
+        "fields": {
+          "upgraded": "argymaq",
+          "horseUpgraded": "horseArgymaq",
+          "candidateUpgraded": "argymaq"
+        },
+        "labels": {
+          "mount": "Mount the stallion",
+          "breaking": "Break the stallion",
+          "trust": "The herd saw you drive the wolves off \u00b7 TRUST +30",
+          "start": "HOLD ON \u2014 lean against him (A / D, LEAN L / LEAN R)",
+          "thrown": "Thrown! TRUST \u221240 \u2014 find him again when the herd settles",
+          "bonded": [
+            "TULPAR is yours \u00b7 he waits at the camp's hitching rail \u00b7 whistle (X / HORSE) to call him",
+            "ARGYMAQ is yours \u2014 he takes Tulpar's place at the camp's rail \u00b7 whistle (X / HORSE) to call him"
+          ]
+        }
+      },
+      "inputs": {
+        "offer": "nalati.taming.offer",
+        "lean": "nalati.taming.lean",
+        "pitch": "nalati.look.pitch",
+        "mount": "nalati.taming.mount"
+      },
+      "rail": {
+        "x": 71,
+        "z": 215
+      },
+      "eye": 1.68,
+      "impactRange": 4.5,
+      "scareRange": 25,
+      "scareSeconds": 4,
+      "thrownLabel": "Thrown from the saddle",
+      "presentation": {
+        "alive": "horsealive",
+        "smooth": [
+          {
+            "source": "rear",
+            "target": "horserear",
+            "rate": 3.5,
+            "low": 0,
+            "high": 1
+          },
+          {
+            "source": "buck",
+            "target": "horsebuck",
+            "rate": 5,
+            "low": 0,
+            "high": 1
+          },
+          {
+            "source": "headUp",
+            "target": "horseheadUp",
+            "rate": 3,
+            "low": 0,
+            "high": 1
+          },
+          {
+            "source": "pin",
+            "target": "horsepin",
+            "rate": 6,
+            "low": 0,
+            "high": 1
+          },
+          {
+            "source": "turnLead",
+            "target": "horseturnLead",
+            "rate": 3.2,
+            "low": -1,
+            "high": 1
+          }
+        ],
+        "decay": [
+          {
+            "source": "kick",
+            "target": "posekick",
+            "rate": 1.8
+          },
+          {
+            "source": "stamp",
+            "target": "posestamp",
+            "rate": 2.5
+          },
+          {
+            "source": "toss",
+            "target": "posetoss",
+            "rate": 2
+          }
+        ],
+        "graze": {
+          "target": "horsegraze",
+          "rate": 2.2,
+          "speed": 0.3
+        },
+        "base": {
+          "bone": "body",
+          "target": "horsebaseZ"
+        },
+        "wind": {
+          "x": "horseWindX",
+          "z": "horseWindZ",
+          "strength": "horseWindStrength"
+        }
+      }
+    },
+    "nativeWeather": {
+      "step": "nalati.weather",
+      "scareRadius": 60,
+      "windReference": 10,
+      "light": {
+        "base": 0.4,
+        "storm": 0.6,
+        "ramps": [
+          [
+            -14,
+            -2,
+            0.3
+          ],
+          [
+            -2,
+            10,
+            0.3
+          ]
+        ]
+      },
+      "hit": {
+        "ask": "weather.damage",
+        "tags": [
+          "env.lightning",
+          "feel.jolt",
+          "cover.checked"
+        ],
+        "cause": {
+          "kind": "env.lightning",
+          "label": "Struck by lightning",
+          "text": "Struck by lightning"
+        },
+        "toast": "Struck by lightning \u2014 get low in a storm"
+      }
+    },
+    "nativeBake": {
+      "label": "Nalati",
+      "resolution": 256,
+      "size": 500,
+      "parked": false,
+      "rig": "segments",
+      "provenance": "piece",
+      "shapes": [
+        1,
+        2,
+        6,
+        9
+      ]
+    }
+  },
+  "prepare": [],
+  "install": [],
+  "level": {
+    "ground": {
+      "size": {
+        "$ref": [
+          "constants",
+          "nativeBake",
+          "size"
+        ]
+      },
+      "height": 0
+    },
+    "speed": {
+      "$call": [
+        {
+          "$ref": [
+            "@wildshard/engine/core/noise",
+            "clamp"
+          ]
+        },
+        {
+          "$ref": [
+            "shard",
+            "authorCaps",
+            "speed"
+          ]
+        },
+        0,
+        5
+      ]
+    },
+    "lift": 0.1
+  },
+  "ports": {
+    "ground": false,
+    "heightAt": {
+      "$ref": [
+        "heightAt"
+      ]
+    }
+  },
+  "entries": {
+    "$fn": {
+      "$call": [
+        {
+          "$ref": [
+            "@wildshard/engine/game/plugin/mover",
+            "proveTerrainEntries"
+          ]
+        },
+        {
+          "$ref": [
+            "args",
+            0,
+            "physics"
+          ]
+        },
+        {
+          "$ref": [
+            "shard",
+            "entryways"
+          ]
+        },
+        {
+          "$ref": [
+            "heightAt"
+          ]
+        },
+        {
+          "lanes": 23,
+          "walk": 40,
+          "start": 249,
+          "maxTicks": 800
+        }
+      ]
+    }
+  }
+}

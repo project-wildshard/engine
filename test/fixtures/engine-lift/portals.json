@@ -1,0 +1,21 @@
+{
+  "director": "nine.portal-ride",
+  "trigger": {
+    "front": 0.6,
+    "back": 0.6,
+    "half": 1,
+    "feet": 0.15,
+    "reach": 1.25
+  },
+  "fade": {
+    "out": 0.28,
+    "hold": 0.12,
+    "in": 0.4
+  },
+  "landings": [
+    {
+      "node": "portal.square.arrival",
+      "fact": "nine-dragon-stack.lantern-square"
+    }
+  ]
+}

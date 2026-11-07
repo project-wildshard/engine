@@ -1,0 +1,11 @@
+{
+  "bosses": {
+    "key": "pine.bosses"
+  },
+  "elites": {
+    "key": "pine.elites"
+  },
+  "nonnegative": false,
+  "legacyNamespace": "instance",
+  "refuseWrites": false
+}

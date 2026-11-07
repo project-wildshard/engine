@@ -1,0 +1,21 @@
+{
+  "step": "driftwood.kills",
+  "prefix": "driftwood.",
+  "runner": {
+    "version": 1,
+    "guards": [],
+    "steps": [
+      {
+        "id": "hold-key",
+        "kind": "kill",
+        "target": "sailor",
+        "effects": [
+          {
+            "kind": "flag",
+            "flag": "dead:sailor"
+          }
+        ]
+      }
+    ]
+  }
+}

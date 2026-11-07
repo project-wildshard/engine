@@ -1,0 +1,1134 @@
+{
+  "SIGNAL_MELEE_HOST": {
+    "step": "item.weapon.sunscar-whip",
+    "input": {
+      "attack": 0,
+      "scripts": [],
+      "world": {
+        "light": 0,
+        "heavy": 1
+      }
+    },
+    "held": {
+      "action": 1,
+      "mode": "replace",
+      "continuation": {
+        "kind": "step",
+        "id": "sunscar.whip-input"
+      }
+    },
+    "eye": 1.68,
+    "mode": "timed",
+    "pitchLimit": null,
+    "zeroAim": "retain",
+    "body": "volumes",
+    "liveTargetsOnly": false,
+    "commandsAfterCool": false,
+    "actions": [
+      {
+        "action": 0,
+        "move": 0,
+        "aim": "selected",
+        "hook": null
+      },
+      {
+        "action": 1,
+        "move": 1,
+        "aim": "selected",
+        "hook": null
+      }
+    ],
+    "continuation": {
+      "encoding": "json",
+      "fields": [
+        {
+          "key": "version",
+          "source": "constant",
+          "constant": 2
+        },
+        {
+          "key": "cooldown",
+          "source": "primary"
+        },
+        {
+          "key": "crackT",
+          "source": "time"
+        },
+        {
+          "key": "heavy",
+          "source": "heavy"
+        },
+        {
+          "key": "landed",
+          "source": "landed",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "key": "target",
+          "source": "target"
+        },
+        {
+          "key": "world",
+          "source": "world"
+        },
+        {
+          "key": "dir",
+          "source": "direction"
+        }
+      ]
+    }
+  },
+  "WHIP_CONTACT_MOVES": [
+    {
+      "lane": "primary",
+      "heavy": false,
+      "cooldown": 0.45,
+      "shape": "lane",
+      "reach": 7,
+      "size": 0.9,
+      "height": 0.9,
+      "allowance": 0.7,
+      "lands": [
+        0.12
+      ],
+      "show": 0.42,
+      "reports": true,
+      "hits": [
+        {
+          "source": "owner",
+          "damage": 18,
+          "tags": [
+            "actor.player",
+            "weapon.sunscar-whip",
+            "dmg.melee"
+          ],
+          "moveId": "sunscar.whip.crack",
+          "copyVectors": false,
+          "copyTags": false,
+          "reactions": []
+        }
+      ]
+    },
+    {
+      "lane": "primary",
+      "heavy": true,
+      "cooldown": 0.9,
+      "shape": "lane",
+      "reach": 8,
+      "size": 0.9,
+      "height": 0.9,
+      "allowance": 0.7,
+      "lands": [
+        0.12,
+        0.32
+      ],
+      "show": 0.62,
+      "reports": true,
+      "hits": [
+        {
+          "source": "owner",
+          "damage": 16,
+          "tags": [
+            "actor.player",
+            "weapon.sunscar-whip",
+            "dmg.melee"
+          ],
+          "moveId": "sunscar.whip.double.1",
+          "copyVectors": false,
+          "copyTags": false,
+          "reactions": [
+            {
+              "when": "survived",
+              "kind": "impulse",
+              "direction": "aim-backward",
+              "speed": 16,
+              "lift": 0,
+              "maxHealth": 40
+            }
+          ]
+        },
+        {
+          "source": "owner",
+          "damage": 16,
+          "tags": [
+            "actor.player",
+            "weapon.sunscar-whip",
+            "dmg.melee"
+          ],
+          "moveId": "sunscar.whip.double.2",
+          "copyVectors": false,
+          "copyTags": false,
+          "reactions": [
+            {
+              "when": "survived",
+              "kind": "stagger",
+              "strength": 0.8,
+              "aboveHealth": 40
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "DRIFTWOOD_FEATS": [
+    {
+      "id": "castaway",
+      "name": "Message in a Bottle",
+      "goal": "Talk to the castaway",
+      "count": 1,
+      "event": "talked",
+      "title": "Honorary Castaway",
+      "icon": "rope"
+    },
+    {
+      "id": "shards",
+      "name": "Shardkeeper",
+      "goal": "Find the 3 glyph shards",
+      "count": 3,
+      "event": "shard",
+      "title": "Keeper of the Ring",
+      "icon": "poi"
+    },
+    {
+      "id": "quest",
+      "name": "The Sealed Ring",
+      "goal": "Open the Ring Shrine",
+      "count": 1,
+      "event": "quest",
+      "title": "Ringbearer",
+      "icon": "laurel"
+    },
+    {
+      "id": "glass",
+      "name": "Beachcomber",
+      "goal": "Find all 15 sea glass",
+      "count": 15,
+      "event": "glass",
+      "title": "Sea Glass Hoarder",
+      "icon": "seaglass"
+    },
+    {
+      "id": "treasure",
+      "name": "Pearl Diver",
+      "goal": "Dive for the treasure",
+      "count": 1,
+      "event": "treasure",
+      "title": "Held Breath Champion",
+      "icon": "coin"
+    },
+    {
+      "id": "vista",
+      "name": "Take a Seat",
+      "goal": "Sit on the vista bench",
+      "count": 1,
+      "event": "vista",
+      "title": "Professional Sitter",
+      "icon": "check"
+    },
+    {
+      "id": "zipline",
+      "name": "Zip It",
+      "goal": "Ride the zipline down",
+      "count": 1,
+      "event": "zipline",
+      "title": "Line Rider",
+      "icon": "rope"
+    },
+    {
+      "id": "sailor",
+      "name": "Shore Leave",
+      "goal": "Beat the drowned sailor",
+      "count": 1,
+      "kind": "sailor",
+      "title": "Deckhand's Nightmare",
+      "icon": "sword"
+    },
+    {
+      "id": "crab10",
+      "name": "Crab Rave",
+      "goal": "Kill 10 reef crabs",
+      "count": 10,
+      "kind": "crab",
+      "title": "Crabby",
+      "icon": "claw"
+    },
+    {
+      "id": "monkey6",
+      "name": "Barrel of Monkeys",
+      "goal": "Kill 6 coconut monkeys",
+      "count": 6,
+      "kind": "monkey",
+      "title": "Monkey Business",
+      "icon": "coconut"
+    }
+  ],
+  "pineSpots": {
+    "version": 1,
+    "rows": [
+      {
+        "id": "dam-log-a",
+        "kind": "lever",
+        "x": -141.77385432556537,
+        "y": -2.4873700635507197,
+        "z": 66.89102465043308,
+        "yaw": -1.1722738811284765,
+        "prompt": {
+          "x": -141.77385432556537,
+          "y": -1.8873700635507196,
+          "z": 66.89102465043308
+        }
+      },
+      {
+        "id": "dam-log-b",
+        "kind": "lever",
+        "x": -133.29480887429514,
+        "y": -2.944221568840147,
+        "z": 63.320900249898266,
+        "yaw": -4.31386653471827,
+        "prompt": {
+          "x": -133.29480887429514,
+          "y": -2.344221568840147,
+          "z": 63.320900249898266
+        }
+      },
+      {
+        "id": "dam-sluice",
+        "kind": "door",
+        "x": -138,
+        "y": -3.83754115371704,
+        "z": 64,
+        "yaw": -2.743070207923373,
+        "prompt": {
+          "x": -138,
+          "y": -2.7375411537170398,
+          "z": 64
+        }
+      },
+      {
+        "id": "pond-glass",
+        "kind": "pickup",
+        "x": -143.7286914633582,
+        "y": -3.1125513535443474,
+        "z": 60.44442773696736,
+        "yaw": 0,
+        "prompt": {
+          "x": -143.7286914633582,
+          "y": -2.5125513535443473,
+          "z": 60.44442773696736
+        }
+      },
+      {
+        "id": "ridge-flint",
+        "kind": "pickup",
+        "x": 37.123987156872936,
+        "y": 58.55688247680664,
+        "z": 215.28419347108786,
+        "yaw": 0,
+        "prompt": {
+          "x": 37.123987156872936,
+          "y": 59.15688247680664,
+          "z": 215.28419347108786
+        }
+      },
+      {
+        "id": "lookout-bench",
+        "kind": "bench",
+        "x": 33.693029075305134,
+        "y": 57.45688247680664,
+        "z": 217.21836684556197,
+        "yaw": -0.6219217252267542,
+        "prompt": {
+          "x": 33.693029075305134,
+          "y": 58.05688247680664,
+          "z": 217.21836684556197
+        }
+      },
+      {
+        "id": "resin-1",
+        "kind": "pickup",
+        "x": 8,
+        "y": 0.25005055183593505,
+        "z": -205,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-2",
+        "kind": "pickup",
+        "x": -14,
+        "y": 2.8727034826278683,
+        "z": -165,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-3",
+        "kind": "pickup",
+        "x": -22,
+        "y": 2.1107016692161564,
+        "z": -120,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-4",
+        "kind": "pickup",
+        "x": -38.86832461473876,
+        "y": 3.7624200599652013,
+        "z": -64.38440197884232,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-5",
+        "kind": "pickup",
+        "x": -32,
+        "y": 4.731763622665407,
+        "z": -26,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-6",
+        "kind": "pickup",
+        "x": 12,
+        "y": -0.4816949979066859,
+        "z": -20,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-7",
+        "kind": "pickup",
+        "x": 40,
+        "y": -1.4417632894515984,
+        "z": 8,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-8",
+        "kind": "pickup",
+        "x": 70,
+        "y": -1.1387679963111883,
+        "z": 24,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-9",
+        "kind": "pickup",
+        "x": 99.94909670100473,
+        "y": 1.804093553586581,
+        "z": 4.064943693434623,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-10",
+        "kind": "pickup",
+        "x": 132.92036079925276,
+        "y": 2.9085035446882204,
+        "z": 27.18949245053791,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-11",
+        "kind": "pickup",
+        "x": 176,
+        "y": 3.7417875519752504,
+        "z": -12,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-12",
+        "kind": "pickup",
+        "x": 129.16268356661854,
+        "y": 8.395679030505597,
+        "z": -66.02133709903448,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-13",
+        "kind": "pickup",
+        "x": 174.11628291859097,
+        "y": 5.764548826854314,
+        "z": -78.18962887141528,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-14",
+        "kind": "pickup",
+        "x": 117.30215129308566,
+        "y": 5.039585834485292,
+        "z": -124.9090957545983,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-15",
+        "kind": "pickup",
+        "x": 186,
+        "y": 4.717566917419435,
+        "z": 40,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-16",
+        "kind": "pickup",
+        "x": -16.76242165777218,
+        "y": 1.1667727207052685,
+        "z": 52.094685759136304,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-17",
+        "kind": "pickup",
+        "x": 14,
+        "y": 2.389223980903618,
+        "z": 100,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-18",
+        "kind": "pickup",
+        "x": -11.030316725902493,
+        "y": 5.325847717581684,
+        "z": 145.41569913074258,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-19",
+        "kind": "pickup",
+        "x": -40,
+        "y": 2.018460872650145,
+        "z": 78,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-20",
+        "kind": "pickup",
+        "x": -76,
+        "y": 1.3884593111991939,
+        "z": 142,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-21",
+        "kind": "pickup",
+        "x": 56,
+        "y": 1.558180357456206,
+        "z": 104,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-22",
+        "kind": "pickup",
+        "x": 96,
+        "y": 4.593814874076845,
+        "z": 136,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-23",
+        "kind": "pickup",
+        "x": 138,
+        "y": -0.033118730072676406,
+        "z": 118,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-24",
+        "kind": "pickup",
+        "x": 122,
+        "y": 11.704351737976083,
+        "z": 170,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-25",
+        "kind": "pickup",
+        "x": 88,
+        "y": 33.33916844177247,
+        "z": 190,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-26",
+        "kind": "pickup",
+        "x": -82,
+        "y": 2.9405711292266834,
+        "z": -8,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-27",
+        "kind": "pickup",
+        "x": -128,
+        "y": 1.3256539193153405,
+        "z": -32,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-28",
+        "kind": "pickup",
+        "x": -142,
+        "y": -1.348424257659913,
+        "z": -96,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-29",
+        "kind": "pickup",
+        "x": -75.5213637788845,
+        "y": 2.485614628898127,
+        "z": -147.8600406582075,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "resin-30",
+        "kind": "pickup",
+        "x": -178.93940063664107,
+        "y": 1.6420399600522206,
+        "z": 21.077829648417403,
+        "yaw": 0,
+        "prompt": null
+      },
+      {
+        "id": "token-1",
+        "kind": "pickup",
+        "x": 38.34816683406442,
+        "y": 57.50688247680664,
+        "z": 210.72416231791013,
+        "yaw": 0,
+        "prompt": {
+          "x": 38.34816683406442,
+          "y": 58.10688247680664,
+          "z": 210.72416231791013
+        }
+      },
+      {
+        "id": "token-2",
+        "kind": "pickup",
+        "x": 112,
+        "y": 6.703578663432566,
+        "z": -86,
+        "yaw": 0,
+        "prompt": {
+          "x": 112,
+          "y": 7.303578663432566,
+          "z": -86
+        }
+      },
+      {
+        "id": "token-3",
+        "kind": "pickup",
+        "x": -92.5,
+        "y": -1.8635381066799168,
+        "z": 119,
+        "yaw": 0,
+        "prompt": {
+          "x": -92.5,
+          "y": -1.263538106679917,
+          "z": 119
+        }
+      },
+      {
+        "id": "token-4",
+        "kind": "pickup",
+        "x": 150,
+        "y": 3.756601572036743,
+        "z": -51.8,
+        "yaw": 0,
+        "prompt": {
+          "x": 150,
+          "y": 4.356601572036743,
+          "z": -51.8
+        }
+      },
+      {
+        "id": "token-5",
+        "kind": "pickup",
+        "x": -80.5,
+        "y": 2.764581025588507,
+        "z": 151,
+        "yaw": 0,
+        "prompt": {
+          "x": -80.5,
+          "y": 3.364581025588507,
+          "z": 151
+        }
+      },
+      {
+        "id": "token-6",
+        "kind": "pickup",
+        "x": 118,
+        "y": 4.657740592956543,
+        "z": 135.5,
+        "yaw": 0,
+        "prompt": {
+          "x": 118,
+          "y": 5.257740592956543,
+          "z": 135.5
+        }
+      },
+      {
+        "id": "token-7",
+        "kind": "pickup",
+        "x": -115.4,
+        "y": 0.10497304951025438,
+        "z": -152.2,
+        "yaw": 0,
+        "prompt": {
+          "x": -115.4,
+          "y": 0.7049730495102544,
+          "z": -152.2
+        }
+      },
+      {
+        "id": "token-8",
+        "kind": "pickup",
+        "x": -146.8,
+        "y": -3.8958780962829636,
+        "z": -1.6,
+        "yaw": 0,
+        "prompt": {
+          "x": -146.8,
+          "y": -3.2958780962829635,
+          "z": -1.6
+        }
+      }
+    ],
+    "people": [
+      {
+        "kind": "ranger",
+        "prompt": {
+          "x": -8.295184161424638,
+          "y": 5.193097448348999,
+          "z": -35.86951230216323,
+          "radius": 3.2
+        },
+        "at": {
+          "x": -8.295184161424638,
+          "y": 5.193097448348999,
+          "z": -35.86951230216323
+        }
+      },
+      {
+        "kind": "miller",
+        "prompt": {
+          "x": -142,
+          "y": 1.2001866388046742,
+          "z": -167.7,
+          "radius": 3.2
+        },
+        "at": {
+          "x": -142,
+          "y": 1.2001866388046742,
+          "z": -167.7
+        }
+      },
+      {
+        "kind": "trader",
+        "prompt": {
+          "x": -128.10209064993094,
+          "y": 0.9999999940395354,
+          "z": -118.4698970951361,
+          "radius": 3.2
+        },
+        "at": {
+          "x": -126.44467302210077,
+          "y": 1.4199998931884767,
+          "z": -119.67632438550956
+        }
+      }
+    ],
+    "board": {
+      "x": -169.46519305281055,
+      "y": 0.8999999940395356,
+      "z": -113.73844011138304,
+      "radius": 2.8
+    },
+    "talk": {
+      "x": -8.295184161424638,
+      "y": 5.193097448348999,
+      "z": -35.86951230216323,
+      "radius": 3.2
+    },
+    "lanterns": {
+      "pond": {
+        "x": -63.2,
+        "y": -0.868336029329299,
+        "z": 103.5,
+        "radius": 2.8
+      },
+      "ridge": {
+        "x": 42.180403588380074,
+        "y": 47.300875604253356,
+        "z": 214.6021723048586,
+        "radius": 2.8
+      },
+      "den": {
+        "x": 194.41385642862627,
+        "y": 10.126247322154622,
+        "z": 199.2221825406948,
+        "radius": 2.8
+      }
+    },
+    "zip": {
+      "prompt": {
+        "x": 35.30017813219133,
+        "y": 58.55688247680664,
+        "z": 209.75732992640994,
+        "radius": 2.3
+      },
+      "top": {
+        "x": 35.235078423557965,
+        "y": 60.75688247680664,
+        "z": 209.36266294282015
+      },
+      "bottom": {
+        "x": 4.26853629811263,
+        "y": 6.584259714990854,
+        "z": 21.62800130730782
+      },
+      "landing": {
+        "x": 4,
+        "y": 3.2842597149908546,
+        "z": 20
+      }
+    },
+    "rifle": {
+      "x": -13.139577422657654,
+      "y": 5.093097448348999,
+      "z": -36.01734305173898,
+      "radius": 1.8
+    }
+  },
+  "ANTLER_KING_FIGHT": {
+    "kind": "roaming",
+    "decision": {
+      "mode": "king.mode",
+      "request": "king.request",
+      "rings": "king.rings",
+      "adds": "king.adds",
+      "lane": "king.lane",
+      "phase": "king.phase",
+      "fight": "king.fighting",
+      "modeT": "king.mode-t",
+      "strikeCd": "king.strike-cd",
+      "burstCd": "king.burst-cd",
+      "summonCd": "king.summon-cd",
+      "chain": "king.chain",
+      "modes": [
+        "dormant",
+        "intro",
+        "dead",
+        "stalk",
+        "sweep",
+        "stomp",
+        "waves",
+        "open",
+        "call",
+        "stalk3"
+      ]
+    },
+    "origin": {
+      "x": 150,
+      "z": -30,
+      "r": 30,
+      "blend": 42,
+      "clear": 38
+    },
+    "phases": [
+      {
+        "at": 1,
+        "beginMode": "stalk",
+        "chaseSpeed": 2.3,
+        "recoverySeconds": 3.2,
+        "burstCooldown": 9,
+        "summons": false,
+        "rings": 1,
+        "darkness": false
+      },
+      {
+        "at": 0.6,
+        "beginMode": "stalk",
+        "chaseSpeed": 2.8,
+        "recoverySeconds": 2.6,
+        "burstCooldown": 7.5,
+        "summons": true,
+        "rings": 2,
+        "darkness": false,
+        "enter": {
+          "mode": "stalk",
+          "drop": true,
+          "summonDelay": 1.2
+        }
+      },
+      {
+        "at": 0.3,
+        "beginMode": "stalk3",
+        "chaseSpeed": 2.3,
+        "recoverySeconds": 3.2,
+        "burstCooldown": 9,
+        "summons": true,
+        "rings": 2,
+        "darkness": true,
+        "enter": {
+          "mode": "stalk3",
+          "resetChain": true,
+          "roar": true
+        }
+      }
+    ],
+    "modes": {
+      "dormant": {
+        "kind": "idle",
+        "damage": 0.01
+      },
+      "intro": {
+        "kind": "intro",
+        "damage": 0.25
+      },
+      "dead": {
+        "kind": "dead",
+        "damage": 0.25
+      },
+      "stalk": {
+        "kind": "pursue",
+        "damage": 0.25
+      },
+      "sweep": {
+        "kind": "strike",
+        "damage": 0.25
+      },
+      "stomp": {
+        "kind": "burst",
+        "damage": 0.25
+      },
+      "waves": {
+        "kind": "wait-rings",
+        "damage": 0.25
+      },
+      "open": {
+        "kind": "recover",
+        "damage": 0.25
+      },
+      "call": {
+        "kind": "summon",
+        "damage": 0.25
+      },
+      "stalk3": {
+        "kind": "lanes",
+        "damage": 0.25
+      }
+    },
+    "names": {
+      "idle": "dormant",
+      "intro": "intro",
+      "dead": "dead",
+      "pursue": "stalk",
+      "strike": "sweep",
+      "burst": "stomp",
+      "wait": "waves",
+      "recover": "open",
+      "summon": "call"
+    },
+    "arena": {
+      "entry": 22,
+      "wall": 27.5,
+      "fog": 31,
+      "leash": 24,
+      "wallPad": 1,
+      "clampPad": 1.2,
+      "shoveBase": 4,
+      "shoveGain": 8,
+      "shoveDistance": 2,
+      "shoveSpan": 2,
+      "epsilon": 0.001
+    },
+    "seal": {
+      "inSeconds": 2,
+      "outSeconds": 2.5,
+      "darkIn": 2.5,
+      "darkOut": 2
+    },
+    "opening": {
+      "mode": "open",
+      "lanesMode": "stalk3",
+      "inRate": 4,
+      "outRate": 2.5,
+      "inactiveRate": 2
+    },
+    "damage": {
+      "invulnerable": 0.01,
+      "weakOpen": 3,
+      "weakClosed": 0.6,
+      "opening": 0.5
+    },
+    "initial": {
+      "strikeCd": 2,
+      "burstCd": 4,
+      "summonCd": 0
+    },
+    "recoveryTurn": 0.8,
+    "reset": {
+      "glow": 0.15,
+      "strikeCd": 2,
+      "burstCd": 3,
+      "summonCd": 0,
+      "herd": -1
+    },
+    "intro": {
+      "short": 1.4,
+      "long": 4.2,
+      "glowStart": 0.2,
+      "glowEnd": 0.75,
+      "lookEnd": 0.5,
+      "roarAt": 0.6,
+      "crossingStep": 0.03333333333333333,
+      "absentHeight": 4
+    },
+    "begin": {
+      "glow": 1,
+      "summonDelay": 1.5
+    },
+    "victoryGlow": 0.25,
+    "points": {
+      "rewardZ": 4,
+      "rewardY": 0.2,
+      "respawnZ": 26,
+      "respawnYaw": 0
+    },
+    "strike": {
+      "id": "sweep",
+      "clip": {
+        "duration": 0.9,
+        "hitPhase": 1
+      },
+      "action": "sweep",
+      "reach": 7.1,
+      "chaseNear": 6.39,
+      "chaseTurn": 1.4,
+      "turn": 1.2,
+      "radius": 6.72,
+      "cooldown": 5,
+      "tell": [
+        0.3,
+        0.6,
+        0.75,
+        0.25,
+        24
+      ],
+      "trauma": 0.15,
+      "contactTrauma": 0.45
+    },
+    "burst": {
+      "clip": {
+        "duration": 1,
+        "hitPhase": 1
+      },
+      "action": "strike",
+      "after": 1,
+      "turn": 1.2,
+      "radius": 4.4,
+      "tell": [
+        0.4,
+        0.5,
+        0.7,
+        0.3,
+        26
+      ],
+      "trauma": 0.3
+    },
+    "rings": {
+      "gap": 0.8,
+      "speed": 10.5,
+      "trauma": 0.4,
+      "strike": "roots"
+    },
+    "summon": {
+      "clip": {
+        "duration": 1.6,
+        "hitPhase": 1
+      },
+      "action": "roar",
+      "count": 2,
+      "limit": 3,
+      "cooldown": 20,
+      "turn": 1
+    },
+    "lanes": {
+      "stop": 18,
+      "speed": 2.4,
+      "turn": 1.6,
+      "burstRange": 14,
+      "after": 1.2,
+      "tell": 1.1,
+      "action": "brace",
+      "batch": 3,
+      "rest": -1.5,
+      "chainRest": 0.4,
+      "soundTicks": 1.5,
+      "trauma": 0.6
+    },
+    "adds": {
+      "kinds": [
+        "elk",
+        "boar"
+      ],
+      "radius": 27,
+      "far": 8,
+      "near": 4.5,
+      "fast": 4.8,
+      "slow": 0.8,
+      "turn": 2.5,
+      "chargeRange": 11,
+      "rate": 0.9,
+      "tell": 0.7,
+      "trauma": 0.3,
+      "leashPad": 1
+    },
+    "hazards": {
+      "count": 3,
+      "angleStart": 1,
+      "angleStep": 2.1,
+      "angleOffset": 0.35,
+      "radius": 10,
+      "radiusStep": 2.5,
+      "fallSeconds": 0.75,
+      "every": 0.8,
+      "damage": 9,
+      "strike": "lantern",
+      "fromPhase": 1
+    },
+    "sounds": {
+      "intro": "king_bells",
+      "roar": "king_roar",
+      "burst": "king_stomp",
+      "add": "thrall_call",
+      "charge": "thrall_groan"
+    }
+  }
+}

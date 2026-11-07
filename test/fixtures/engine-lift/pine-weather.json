@@ -1,0 +1,420 @@
+{
+  "soak": 50,
+  "dry": 150,
+  "initial": {
+    "overcast": 0,
+    "rain": 0,
+    "wet": 0,
+    "wind": 0,
+    "fog": 0
+  },
+  "salt": 15994,
+  "states": [
+    "clear",
+    "overcast",
+    "rain",
+    "clearing"
+  ],
+  "next": {
+    "clear": "overcast",
+    "overcast": "rain",
+    "rain": "clearing",
+    "clearing": "clear"
+  },
+  "length": {
+    "clear": [
+      900,
+      1500
+    ],
+    "overcast": [
+      75,
+      105
+    ],
+    "rain": [
+      180,
+      360
+    ],
+    "clearing": [
+      70,
+      100
+    ]
+  },
+  "firstLength": {
+    "clear": [
+      420,
+      720
+    ]
+  },
+  "sampleFixed": true,
+  "zeroOutputs": true,
+  "forceHold": true,
+  "forceAt": 0.5,
+  "modes": {
+    "live": "none",
+    "rain": {
+      "hold": "rain",
+      "at": 0.5
+    },
+    "clear": {
+      "hold": "clear",
+      "dry": true
+    },
+    "fog": {
+      "hold": "clear",
+      "dry": true
+    }
+  },
+  "forceWet": [
+    "if",
+    "state.rain",
+    [
+      "ss",
+      0,
+      50,
+      "t"
+    ],
+    [
+      "if",
+      "state.clearing",
+      1,
+      0
+    ]
+  ],
+  "values": [
+    [
+      "dry",
+      [
+        "or",
+        "mode.clear",
+        "mode.fog"
+      ]
+    ],
+    [
+      "overcast",
+      [
+        "if",
+        "dry",
+        0,
+        [
+          "if",
+          "state.overcast",
+          [
+            "ss",
+            0,
+            1,
+            "u"
+          ],
+          [
+            "if",
+            "state.rain",
+            1,
+            [
+              "if",
+              "state.clearing",
+              [
+                "-",
+                1,
+                [
+                  "ss",
+                  0,
+                  1,
+                  "u"
+                ]
+              ],
+              0
+            ]
+          ]
+        ]
+      ]
+    ],
+    [
+      "rain",
+      [
+        "if",
+        "dry",
+        0,
+        [
+          "if",
+          "state.overcast",
+          [
+            "*",
+            0.22,
+            [
+              "ss",
+              0.75,
+              1,
+              "u"
+            ]
+          ],
+          [
+            "if",
+            "state.rain",
+            [
+              "*",
+              [
+                "lerp",
+                0.22,
+                1,
+                [
+                  "ss",
+                  0,
+                  40,
+                  "t"
+                ]
+              ],
+              [
+                "lerp",
+                1,
+                0.7,
+                [
+                  "ss",
+                  0.8,
+                  1,
+                  "u"
+                ]
+              ]
+            ],
+            [
+              "if",
+              "state.clearing",
+              [
+                "*",
+                0.7,
+                [
+                  "-",
+                  1,
+                  [
+                    "ss",
+                    0,
+                    0.55,
+                    "u"
+                  ]
+                ]
+              ],
+              0
+            ]
+          ]
+        ]
+      ]
+    ],
+    [
+      "wind",
+      [
+        "if",
+        "dry",
+        0,
+        [
+          "if",
+          "state.overcast",
+          [
+            "*",
+            0.35,
+            [
+              "ss",
+              0,
+              1,
+              "u"
+            ]
+          ],
+          [
+            "if",
+            "state.rain",
+            [
+              "lerp",
+              0.35,
+              0.6,
+              [
+                "ss",
+                0,
+                30,
+                "t"
+              ]
+            ],
+            [
+              "if",
+              "state.clearing",
+              [
+                "*",
+                0.6,
+                [
+                  "-",
+                  1,
+                  [
+                    "ss",
+                    0,
+                    1,
+                    "u"
+                  ]
+                ]
+              ],
+              0
+            ]
+          ]
+        ]
+      ]
+    ],
+    [
+      "q",
+      [
+        "%",
+        [
+          "+",
+          [
+            "%",
+            "clock",
+            1
+          ],
+          1
+        ],
+        1
+      ]
+    ],
+    [
+      "dawn",
+      [
+        "if",
+        [
+          "not",
+          [
+            "lt",
+            "q",
+            0.5
+          ]
+        ],
+        [
+          "ss",
+          0.93,
+          0.965,
+          "q"
+        ],
+        [
+          "-",
+          1,
+          [
+            "ss",
+            0.05,
+            0.14,
+            "q"
+          ]
+        ]
+      ]
+    ]
+  ],
+  "outputs": {
+    "overcast": "overcast",
+    "rain": "rain",
+    "wind": "wind",
+    "wet": [
+      "if",
+      "dry",
+      0,
+      [
+        "if",
+        [
+          "gt",
+          "rain",
+          0.05
+        ],
+        [
+          "min",
+          1,
+          [
+            "+",
+            "prev.wet",
+            [
+              "/",
+              [
+                "*",
+                "dt",
+                "rain"
+              ],
+              50
+            ]
+          ]
+        ],
+        [
+          "if",
+          "state.clearing",
+          "prev.wet",
+          [
+            "max",
+            0,
+            [
+              "-",
+              "prev.wet",
+              [
+                "/",
+                "dt",
+                150
+              ]
+            ]
+          ]
+        ]
+      ]
+    ],
+    "fog": [
+      "if",
+      "mode.fog",
+      1,
+      [
+        "if",
+        "mode.clear",
+        0,
+        [
+          "*",
+          "dawn",
+          [
+            "-",
+            1,
+            [
+              "*",
+              0.6,
+              "overcast"
+            ]
+          ]
+        ]
+      ]
+    ]
+  },
+  "wetProjectile": {
+    "gravity": 0.2,
+    "drag": 0.9
+  },
+  "air": {
+    "step": "pine.air",
+    "system": "pine.weather",
+    "tick": "weather",
+    "field": {
+      "x": -0.55,
+      "z": 0.83,
+      "frontLength": 150,
+      "frontSpeed": 11,
+      "secondaryLength": 91.5
+    },
+    "base": 1.2,
+    "scale": 7
+  },
+  "registers": {
+    "boost": 0
+  },
+  "actions": {
+    "step": [
+      {
+        "target": "boost",
+        "value": "output.wind"
+      }
+    ]
+  },
+  "page": {
+    "id": "shard.pine.weather.state",
+    "tick": "weather",
+    "after": [
+      "audio"
+    ],
+    "before": [
+      "world.life",
+      "first hints",
+      "main.frame"
+    ]
+  }
+}

@@ -1,0 +1,702 @@
+{
+  "states": [
+    "clear",
+    "building",
+    "gust",
+    "storm",
+    "clearing",
+    "after"
+  ],
+  "next": {
+    "clear": "building",
+    "building": "gust",
+    "gust": "storm",
+    "storm": "clearing",
+    "clearing": "after",
+    "after": "clear"
+  },
+  "length": {
+    "clear": [
+      1200,
+      1800
+    ],
+    "building": [
+      90,
+      90
+    ],
+    "gust": [
+      20,
+      20
+    ],
+    "storm": [
+      120,
+      180
+    ],
+    "clearing": [
+      60,
+      60
+    ],
+    "after": [
+      180,
+      180
+    ]
+  },
+  "firstLength": {
+    "clear": [
+      720,
+      1080
+    ]
+  },
+  "soak": 30,
+  "dry": 90,
+  "holdPolicy": "first",
+  "tickHeld": true,
+  "modes": {
+    "live": "none",
+    "clear": {
+      "hold": "clear"
+    },
+    "storm": {
+      "hold": "storm"
+    }
+  },
+  "initial": {
+    "overcast": 0,
+    "rain": 0,
+    "wet": 0,
+    "wind": 0,
+    "fog": 0,
+    "front": 0,
+    "rainbow": 0
+  },
+  "salt": 22435,
+  "forceWet": [
+    "if",
+    "state.storm",
+    [
+      "max",
+      "prev.wet",
+      [
+        "ss",
+        0,
+        40,
+        "t"
+      ]
+    ],
+    [
+      "if",
+      [
+        "or",
+        "state.clearing",
+        "state.after"
+      ],
+      1,
+      "prev.wet"
+    ]
+  ],
+  "values": [
+    [
+      "front",
+      [
+        "if",
+        "state.building",
+        [
+          "lerp",
+          0,
+          0.55,
+          [
+            "ss",
+            0,
+            1,
+            "u"
+          ]
+        ],
+        [
+          "if",
+          "state.gust",
+          [
+            "lerp",
+            0.55,
+            1,
+            [
+              "ss",
+              0,
+              1,
+              "u"
+            ]
+          ],
+          [
+            "if",
+            "state.storm",
+            1,
+            [
+              "if",
+              "state.clearing",
+              [
+                "lerp",
+                1,
+                1.5,
+                [
+                  "ss",
+                  0,
+                  1,
+                  "u"
+                ]
+              ],
+              [
+                "if",
+                "state.after",
+                1.5,
+                0
+              ]
+            ]
+          ]
+        ]
+      ]
+    ],
+    [
+      "overcast",
+      [
+        "if",
+        "state.building",
+        [
+          "*",
+          0.35,
+          [
+            "ss",
+            0.35,
+            1,
+            "u"
+          ]
+        ],
+        [
+          "if",
+          "state.gust",
+          [
+            "lerp",
+            0.35,
+            0.88,
+            [
+              "ss",
+              0,
+              0.8,
+              "u"
+            ]
+          ],
+          [
+            "if",
+            "state.storm",
+            [
+              "lerp",
+              0.88,
+              1,
+              [
+                "ss",
+                0,
+                10,
+                "t"
+              ]
+            ],
+            [
+              "if",
+              "state.clearing",
+              [
+                "lerp",
+                1,
+                0.2,
+                [
+                  "ss",
+                  0,
+                  1,
+                  "u"
+                ]
+              ],
+              [
+                "if",
+                "state.after",
+                [
+                  "*",
+                  0.2,
+                  [
+                    "-",
+                    1,
+                    [
+                      "ss",
+                      0,
+                      0.5,
+                      "u"
+                    ]
+                  ]
+                ],
+                0
+              ]
+            ]
+          ]
+        ]
+      ]
+    ],
+    [
+      "rain",
+      [
+        "if",
+        "state.gust",
+        [
+          "*",
+          0.35,
+          [
+            "ss",
+            0.45,
+            1,
+            "u"
+          ]
+        ],
+        [
+          "if",
+          "state.storm",
+          [
+            "*",
+            [
+              "lerp",
+              0.35,
+              1,
+              [
+                "ss",
+                0,
+                15,
+                "t"
+              ]
+            ],
+            [
+              "lerp",
+              1,
+              0.8,
+              [
+                "ss",
+                0.85,
+                1,
+                "u"
+              ]
+            ]
+          ],
+          [
+            "if",
+            "state.clearing",
+            [
+              "*",
+              0.8,
+              [
+                "-",
+                1,
+                [
+                  "ss",
+                  0,
+                  0.8,
+                  "u"
+                ]
+              ]
+            ],
+            0
+          ]
+        ]
+      ]
+    ]
+  ],
+  "outputs": {
+    "overcast": "overcast",
+    "rain": "rain",
+    "wet": [
+      "if",
+      [
+        "or",
+        "state.storm",
+        "state.gust"
+      ],
+      [
+        "min",
+        1,
+        [
+          "+",
+          "prev.wet",
+          [
+            "/",
+            [
+              "*",
+              "dt",
+              "rain"
+            ],
+            30
+          ]
+        ]
+      ],
+      [
+        "if",
+        "state.clearing",
+        [
+          "max",
+          "prev.wet",
+          0.9
+        ],
+        [
+          "if",
+          "state.after",
+          [
+            "min",
+            "prev.wet",
+            [
+              "-",
+              1,
+              [
+                "*",
+                0.4,
+                [
+                  "ss",
+                  0.3,
+                  1,
+                  "u"
+                ]
+              ]
+            ]
+          ],
+          [
+            "max",
+            0,
+            [
+              "-",
+              "prev.wet",
+              [
+                "/",
+                "dt",
+                90
+              ]
+            ]
+          ]
+        ]
+      ]
+    ],
+    "wind": 0,
+    "fog": 0,
+    "front": "front",
+    "rainbow": [
+      "if",
+      "state.after",
+      [
+        "*",
+        [
+          "ss",
+          0,
+          0.08,
+          "u"
+        ],
+        [
+          "-",
+          1,
+          [
+            "ss",
+            0.75,
+            1,
+            "u"
+          ]
+        ]
+      ],
+      0
+    ]
+  },
+  "registers": {
+    "nextBolt": 0,
+    "nextGust": 0,
+    "windTarget": 5,
+    "windSpeed": -1,
+    "windGustiness": 0.6,
+    "armed": 0,
+    "ready": 0,
+    "flash": 0,
+    "pendingT": 0,
+    "land": 0,
+    "arm": 0,
+    "cx": 0,
+    "cz": 0,
+    "cradius": 0,
+    "sx": 0,
+    "sy": 0,
+    "sz": 0,
+    "skind": 0,
+    "low": 0,
+    "lowFor": 0,
+    "asked": -1,
+    "stormFrom": 0.7853981633974483
+  },
+  "actions": {
+    "enter": [
+      {
+        "target": "nextBolt",
+        "value": {
+          "range": [
+            [
+              "if",
+              "state.storm",
+              2,
+              6
+            ],
+            [
+              "if",
+              "state.storm",
+              5,
+              14
+            ]
+          ]
+        }
+      },
+      {
+        "target": "nextGust",
+        "value": 0
+      },
+      {
+        "target": "armed",
+        "value": 0
+      }
+    ],
+    "force": [
+      {
+        "target": "nextBolt",
+        "value": [
+          "if",
+          "state.storm",
+          2.5,
+          4
+        ]
+      }
+    ],
+    "tick": [
+      {
+        "target": "nextGust",
+        "value": [
+          "-",
+          "register.nextGust",
+          "dt"
+        ],
+        "when": "state.storm"
+      },
+      {
+        "target": "ready",
+        "value": [
+          "and",
+          "state.storm",
+          [
+            "not",
+            [
+              "gt",
+              "register.nextGust",
+              0
+            ]
+          ]
+        ]
+      },
+      {
+        "target": "nextGust",
+        "value": {
+          "range": [
+            3,
+            7
+          ]
+        },
+        "when": "register.ready"
+      },
+      {
+        "target": "windTarget",
+        "value": {
+          "range": [
+            18,
+            24
+          ]
+        },
+        "when": "register.ready"
+      },
+      {
+        "target": "windSpeed",
+        "value": [
+          "if",
+          "state.building",
+          [
+            "lerp",
+            7,
+            12,
+            [
+              "ss",
+              0,
+              1,
+              "u"
+            ]
+          ],
+          [
+            "if",
+            "state.gust",
+            [
+              "lerp",
+              14,
+              18,
+              [
+                "ss",
+                0,
+                0.4,
+                "u"
+              ]
+            ],
+            [
+              "if",
+              "state.storm",
+              "register.windTarget",
+              [
+                "if",
+                "state.clearing",
+                [
+                  "lerp",
+                  12,
+                  6,
+                  [
+                    "ss",
+                    0,
+                    1,
+                    "u"
+                  ]
+                ],
+                [
+                  "if",
+                  "state.after",
+                  [
+                    "lerp",
+                    5,
+                    3.5,
+                    "u"
+                  ],
+                  -1
+                ]
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "target": "windGustiness",
+        "value": [
+          "if",
+          "state.building",
+          0.7,
+          [
+            "if",
+            "state.gust",
+            0.95,
+            [
+              "if",
+              "state.storm",
+              0.9,
+              [
+                "if",
+                "state.clearing",
+                0.7,
+                [
+                  "if",
+                  "state.after",
+                  0.5,
+                  0.6
+                ]
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "target": "flash",
+        "value": [
+          "max",
+          0,
+          [
+            "-",
+            "register.flash",
+            [
+              "*",
+              "dt",
+              4.5
+            ]
+          ]
+        ]
+      }
+    ],
+    "lightning": [
+      {
+        "target": "ready",
+        "value": 0
+      },
+      {
+        "target": "nextBolt",
+        "value": [
+          "-",
+          "register.nextBolt",
+          "dt"
+        ],
+        "when": [
+          "and",
+          [
+            "not",
+            "state.clear"
+          ],
+          [
+            "not",
+            "state.after"
+          ]
+        ]
+      },
+      {
+        "target": "ready",
+        "value": [
+          "and",
+          [
+            "not",
+            "state.clear"
+          ],
+          [
+            "not",
+            "state.after"
+          ],
+          [
+            "not",
+            [
+              "gt",
+              "register.nextBolt",
+              0
+            ]
+          ]
+        ]
+      },
+      {
+        "target": "nextBolt",
+        "value": {
+          "range": [
+            [
+              "if",
+              "state.storm",
+              6,
+              [
+                "if",
+                "state.gust",
+                4,
+                7
+              ]
+            ],
+            [
+              "if",
+              "state.storm",
+              15,
+              [
+                "if",
+                "state.gust",
+                8,
+                16
+              ]
+            ]
+          ]
+        },
+        "when": "register.ready"
+      }
+    ]
+  }
+}

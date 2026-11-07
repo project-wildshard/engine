@@ -1,0 +1,122 @@
+{
+  "at": {
+    "x": -69,
+    "y": 2,
+    "z": 119
+  },
+  "boxes": [],
+  "carry": {
+    "arrival": {
+      "flag": "secret:islet",
+      "hint": "The islet. Nobody has stood here in a long time"
+    },
+    "landings": [
+      [
+        -65.2,
+        2,
+        120.4
+      ],
+      [
+        -89.8,
+        2,
+        118.6
+      ]
+    ],
+    "prompts": [
+      {
+        "at": [
+          -69,
+          -2.2,
+          119
+        ],
+        "label": "Paddle to the islet",
+        "radius": 2.6
+      },
+      {
+        "at": [
+          -89.8,
+          -1.7607266034669844,
+          118.6
+        ],
+        "label": "Paddle back to the shore",
+        "radius": 2.4
+      }
+    ],
+    "seat": -0.45,
+    "surface": {
+      "bankRamp": 8,
+      "bob": [
+        1.9,
+        0.03
+      ],
+      "level": -2.98,
+      "pitch": [
+        1.3,
+        0.02
+      ],
+      "roll": [
+        2.1,
+        0.035,
+        1
+      ]
+    },
+    "yaw": 3.141592653589793
+  },
+  "driver": {
+    "dwell": 1,
+    "ease": "smoothstep",
+    "gate": false,
+    "kind": "winch",
+    "mode": "ride",
+    "return": "command",
+    "snap": 0
+  },
+  "enabled": false,
+  "entity": 2001,
+  "euler": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "execution": "native",
+  "id": "pine.canoe",
+  "input": [
+    -69,
+    2,
+    119,
+    -87.6,
+    2,
+    118.4,
+    9,
+    0,
+    1
+  ],
+  "kind": "channel",
+  "module": "f8f90ba2e03401910448a2af1e8b02420bc7b2e1003076bc6241d9cb0c688a22",
+  "track": {
+    "clip": "canoe",
+    "duration": 9,
+    "loop": "once",
+    "position": [
+      [
+        -69,
+        2,
+        119
+      ],
+      [
+        -87.6,
+        2,
+        118.4
+      ]
+    ],
+    "speed": 1,
+    "times": [
+      0,
+      9
+    ]
+  },
+  "trigger": {
+    "kind": "interact",
+    "permission": 0
+  }
+}

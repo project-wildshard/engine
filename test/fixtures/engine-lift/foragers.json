@@ -1,0 +1,7 @@
+{"id":"marmot","count":256,"place":{"kind":"colonies","size":[3,5],"radius":[0.5,5],"home":0.4,"timer":[1,6]},
+ "policy":{"scare":[21,27],"crouched":13.2,"alertMargin":0,"releaseMargin":0,"alertPause":[1,1],"grazePause":[2,6],"settlePause":[2,5],"turn":[0,0],
+ "grazing":{"gait":"walk","speed":0.35,"wander":[0.5,3]},
+ "escape":{"to":"home","speed":3.5,"reach":0.3,"hide":[10,18],"emerge":25,"sink":5},
+ "ground":null,
+ "sentry":{"chance":0.3,"duration":[4,9],"sight":1.6667,"alarm":true},
+ "posture":{"graze":[0,6,0,0,0,0],"alert":[1,6,0,0,0,0],"flee":[0,6,0,0,0,0],"sentry":[1,6,0,0,0,0],"hide":[0,6,0,0,0,0]}}}
