@@ -20,7 +20,7 @@ test('smoke road entries follow the observed lattice without changing local entr
 
 const cells = [{ instance: 'home', slug: 'driftwood-isle', cell: [0, 0] as const },
   { instance: 'template-2', slug: '_template', cell: [1, 1] as const }];
-const key = 'wildshard.save.v2.template-2';
+const key = 'wildshard.save.v2@1.template-2';
 afterEach(() => { localStorage.removeItem(key); });
 
 test('the short Template roundtrip enters from the road and returns by held input without a second pose', () => {
@@ -63,13 +63,13 @@ function serverRows(rows: Readonly<Record<string, string>>) {
   };
   const database = { objectStoreNames: { contains: (name: string) => name === 'saves' }, close: () => undefined,
     transaction: () => ({ objectStore: () => ({ get: (name: string) => answer(rows[name]) }) }) };
-  vi.stubGlobal('indexedDB', { databases: () => Promise.resolve([{ name: 'wildshard-saves' }]), open: () => answer(database) });
+  vi.stubGlobal('indexedDB', { databases: () => Promise.resolve([{ name: 'wildshard-saves@1' }]), open: () => answer(database) });
 }
 
 test("a page's location document never hides the server's checkpoint", async () => {
   const served = (tick: number): string => JSON.stringify({ keys: { continuation: { v: 1, data: { tick, snapshot: '{"version":4}' } } } });
   localStorage.setItem(key, JSON.stringify({ keys: { 'platform.grid-position': { v: 1, data: { instance: 'template-2' } } } }));
-  serverRows({ 'wildshard.save.v2.standalone-template-2': served(40), 'wildshard.save.v2.standalonealt-template-2': served(60) });
+  serverRows({ 'wildshard.save.v2@1.standalone-template-2': served(40), 'wildshard.save.v2@1.standalonealt-template-2': served(60) });
   try {
     expect(bootTemplateCheckpoint('template-2', await bootStoredSave('template-2'))).toMatchObject({ mode: 'exact', revision: 60 });
     serverRows({}); // No server wrote yet: the page's document answers, and is no checkpoint.

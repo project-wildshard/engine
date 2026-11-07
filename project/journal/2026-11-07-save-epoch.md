@@ -18,3 +18,7 @@ node:test runner out of Vitest discovery and all commit/push test hooks.
 
 The final outer-edge check runs the real page-to-worker reward reconciliation
 against old-epoch reward documents: no reward or finish is copied.
+
+The full push hook exposed three checkpoint fixture readers using the old
+namespace. Those proofs now seed the release epoch. The other full-run
+failures were the fixture-writer and discovery fixes already committed.
