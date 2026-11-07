@@ -20,7 +20,7 @@ const REFILL_LIMIT = 256;
 /** Timers tick once a second; nothing here needs a frame's precision. */
 const REFILL_CHECK = 1;
 
-interface RefillPlayer { readonly position: { readonly x: number; readonly z: number } }
+interface RefillPlayer { readonly id?: string; readonly position: { readonly x: number; readonly z: number } }
 interface RefillPoint { readonly x: number; readonly z: number }
 
 /** How many of `players` stand within `radius` m of (x, z). */
@@ -33,9 +33,9 @@ export function playersNear(players: Iterable<RefillPlayer>, x: number, z: numbe
 /** The J109 rate: a timer runs at the speed of the players near it, and never slower than one player's. */
 export function refillRate(near: number): number { return Math.max(1, near); }
 
-/** The rate at (x, z) in a room. One player is always exactly 1: their timers are today's timers, wherever they stand. */
-export function roomRefillRate(players: { readonly size: number; values: () => Iterable<RefillPlayer> }, x: number, z: number): number {
-  return players.size <= 1 ? 1 : refillRate(playersNear(players.values(), x, z));
+/** The rate at (x, z) in a room. One player is always exactly 1: their timers are today's timers, wherever they stand. A parked seat is nobody (J109). */
+export function roomRefillRate(players: { readonly size: number; values: () => Iterable<RefillPlayer> }, x: number, z: number, parked: ReadonlySet<string> = new Set()): number {
+  return players.size <= 1 ? 1 : refillRate(playersNear([...players.values()].filter(player => player.id === undefined || !parked.has(player.id)), x, z));
 }
 
 /** The player nearest (x, z), or `fallback` in an empty room. */

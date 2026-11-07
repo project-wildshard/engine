@@ -12,9 +12,10 @@ const fits = (text: string): string => new TextEncoder().encode(text).length <= 
 export interface LedgerFiling extends LedgerGrant { readonly player: string }
 interface Book { serial: number; readonly rows: NetLedger[]; readonly ids: Set<string> }
 const natural = v.pipe(v.number(), v.integer(), v.minValue(0));
-const Row: v.GenericSchema<NetLedger> = v.strictObject({ kind: v.literal('ledger'), tick: natural, serial: natural, id: v.string(), grant: v.picklist(['fact', 'coins', 'item']), name: v.string(), amount: v.pipe(v.number(), v.finite()), pending: v.boolean() });
+/** Complete ledger events, shared by room continuation and dedicated document admission. */
+export const LedgerRowSchema: v.GenericSchema<NetLedger> = v.strictObject({ kind: v.literal('ledger'), tick: natural, serial: natural, id: v.string(), grant: v.picklist(['fact', 'coins', 'item']), name: v.string(), amount: v.pipe(v.number(), v.finite()), pending: v.boolean() });
 /** A book's saved form: it goes with the continuation, beside the sim and not in it. */
-export const LedgerBookSchema: v.GenericSchema<LedgerBookSave> = v.record(v.string(), v.strictObject({ serial: natural, rows: v.array(Row) }));
+export const LedgerBookSchema: v.GenericSchema<LedgerBookSave> = v.record(v.string(), v.strictObject({ serial: natural, rows: v.array(LedgerRowSchema) }));
 /** Every player's serial and the receipts still kept. */
 export type LedgerBookSave = Readonly<Record<string, { readonly serial: number; readonly rows: readonly NetLedger[] }>>;
 
@@ -45,6 +46,13 @@ export class LedgerBook {
     this.books.clear();
     for (const [player, book] of Object.entries(saved)) this.books.set(player, { serial: book.serial, rows: book.rows.slice(), ids: new Set(book.rows.map(row => row.id)) });
   }
+  /** One player's serial and kept receipts: what goes in their own save. */
+  rowOf(player: string): LedgerBookSave[string] {
+    const book = this.books.get(player);
+    return { serial: book?.serial ?? 0, rows: book?.rows.slice() ?? [] };
+  }
+  /** Seat a player's book as it was saved: their serial goes on from there, so a client that remembers a higher one still hears what comes next (E7.4). */
+  seat(player: string, saved: LedgerBookSave[string]): void { this.books.set(player, { serial: saved.serial, rows: saved.rows.slice(), ids: new Set(saved.rows.map(row => row.id)) }); }
   private of(player: string): Book {
     let book = this.books.get(player);
     if (book === undefined) { book = { serial: 0, rows: [], ids: new Set() }; this.books.set(player, book); }

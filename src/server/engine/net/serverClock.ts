@@ -15,6 +15,8 @@ export class ServerClock {
   private timer: (() => void) | null = null;
   private last = 0;
   private backlog = 0;
+  /** Backlogs let go: stalls too long to catch up on. */
+  drops = 0;
   constructor(ports: ServerClockPorts) { this.ports = ports; }
   /** True while ticking. */
   get running(): boolean { return this.timer !== null; }
@@ -35,7 +37,7 @@ export class ServerClock {
     this.backlog += (now - this.last) / 1000; this.last = now;
     let steps = 0;
     while (this.backlog >= FIXED_STEP && steps < MAX_FIXED_STEPS) { this.backlog -= FIXED_STEP; steps++; this.ports.step(); }
-    if (steps === MAX_FIXED_STEPS && this.backlog >= FIXED_STEP) this.backlog %= FIXED_STEP;
+    if (steps === MAX_FIXED_STEPS && this.backlog >= FIXED_STEP) { this.backlog %= FIXED_STEP; this.drops++; }
     if (this.timer !== null) this.schedule(Math.max(0, FIXED_STEP - this.backlog));
   }
 }

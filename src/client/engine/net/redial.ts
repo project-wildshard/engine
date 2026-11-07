@@ -1,0 +1,142 @@
+import { Scope } from '../../../shared/engine/app/scope';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
+import { Rng } from '../../../shared/engine/core/rng';
+import type { Transport } from '../../../shared/engine/net/transport';
+import type { NetClient } from './client';
+
+/** What the player is told. `full` waits for a seat. `ended` is a word no redial can answer: a stale build, another tab. */
+export type LinkState = 'live' | 'reconnecting' | 'resuming' | 'lost' | 'full' | 'ended';
+
+/** No frame for this long: say so. The predictor's ring is full by then, so the player holds still. */
+const STRIP_MS = 1000;
+/** No frame for this long: the socket is dead, whatever it says. A dial that has shown no frame in this time goes the same way. */
+const DROP_MS = 3000;
+/** J114's hold is over by now, so what comes back is a resume and not the same body. */
+const RESUMING_MS = 35_000;
+/** The dial carries on this long, and then asks. */
+const GIVE_UP_MS = 120_000;
+/** The waits between dials, then the last for ever, each ±20%. */
+const DIAL_WAITS_MS = [250, 500, 1000, 2000, 4000], DIAL_JITTER = 0.2;
+const WATCH_MS = 100;
+/** Words from a server that a redial would only hear again. */
+const FINAL = new Set(['reload', 'refused', 'replaced']);
+/** J178: the world is full, and a seat frees when someone leaves: this long between tries, for as long as the player waits. */
+const FULL_RETRY_MS = 30_000;
+
+/** Jitter is for the server's sake and no sim's: any seed that differs between phones will do. */
+function jitterFrom(now: number): () => number { const rng = new Rng(Math.floor(now * 1000)); return () => rng.next(); }
+
+/** How a link is watched. */
+export interface RedialOptions {
+  readonly client: NetClient;
+  /** The link the client stands on now. */
+  readonly transport: Transport;
+  /** Open a new link. */
+  readonly dial: () => Transport;
+  /** The link changed state. */
+  readonly onState: (state: LinkState, reason?: string) => void;
+  readonly now?: () => number;
+  readonly random?: () => number;
+}
+
+/**
+ * E7.1: one client's link, kept up. It watches for frames, and a link that stops carrying them is closed and dialled again on a
+ * backoff, with `NetClient.rejoin` on each new link (C2). Nothing is watched before the first frame: a page still loading has none.
+ */
+export class Redial {
+  private readonly options: RedialOptions;
+  private readonly scope = new Scope('net.redial');
+  private readonly now: () => number;
+  private readonly random: () => number;
+  private readonly offFrame: () => void;
+  private transport: Transport;
+  private offClose: () => void;
+  private state: LinkState = 'live';
+  /** up: frames are expected. down: dialling. stopped: waiting for `retry`, or finished. */
+  private phase: 'up' | 'down' | 'stopped' = 'up';
+  private heardAt: number | null = null;
+  private lostAt = 0;
+  private dials = 0;
+  private dialAt = 0;
+  private dialled: number | null = null;
+  private waitingForSeat = false;
+  constructor(options: RedialOptions) {
+    this.options = options; this.transport = options.transport; this.now = options.now ?? diagnosticNow; this.random = options.random ?? jitterFrom(this.now());
+    this.offFrame = options.client.onFrame(() => { this.heard(); });
+    this.offClose = this.watchClose(options.transport);
+    this.scope.interval(WATCH_MS, () => { this.watch(); });
+  }
+  /** The state the player has been told. */
+  get told(): LinkState { return this.state; }
+  /** Dials made so far. */
+  get attempts(): number { return this.dials; }
+  /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once. */
+  check(): void {
+    const now = this.now();
+    if (this.phase === 'up' && this.heardAt !== null && now - this.heardAt >= STRIP_MS) this.lose(now);
+    if (this.phase === 'down') this.dialAt = now;
+  }
+  /** The player asked to try again, after `lost`. */
+  retry(): void {
+    if (this.state !== 'lost') return;
+    const now = this.now();
+    this.phase = 'down'; this.lostAt = now; this.dialAt = now; this.dials = 0; this.show('reconnecting');
+  }
+  dispose(): void { this.scope.dispose(); this.offFrame(); this.offClose(); }
+
+  private heard(): void {
+    const now = this.now(), wasDown = this.phase === 'down';
+    this.heardAt = now;
+    if (wasDown) { this.phase = 'up'; this.dialled = null; this.dials = 0; this.waitingForSeat = false; }
+    this.show('live');
+  }
+  private watch(): void {
+    const now = this.now();
+    if (this.phase === 'up') {
+      if (this.heardAt === null) return;
+      const silent = now - this.heardAt;
+      if (silent >= DROP_MS) this.lose(now); else if (silent >= STRIP_MS) this.show('reconnecting');
+    } else if (this.phase === 'down') this.redial(now);
+  }
+  private redial(now: number): void {
+    if (this.waitingForSeat) { if (this.dialled === null && now >= this.dialAt) this.dial(now); else if (this.dialled !== null && now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
+    const out = now - this.lostAt;
+    if (out >= GIVE_UP_MS) { this.stop(); this.show('lost'); return; }
+    if (out >= RESUMING_MS) this.show('resuming');
+    if (this.dialled !== null) { if (now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
+    if (now >= this.dialAt) this.dial(now);
+  }
+  private dial(now: number): void {
+    const transport = this.options.dial();
+    this.offClose(); this.transport = transport; this.dialled = now; this.dials++;
+    this.offClose = this.watchClose(transport);
+    this.options.client.rejoin(transport);
+  }
+  private failedDial(now: number): void {
+    const wait = this.waitingForSeat ? FULL_RETRY_MS : DIAL_WAITS_MS[Math.min(this.dials, DIAL_WAITS_MS.length - 1)] ?? 0;
+    this.dialled = null; this.dialAt = now + wait * (1 + (this.random() * 2 - 1) * DIAL_JITTER);
+  }
+  private watchClose(transport: Transport): () => void {
+    return transport.onClose(reason => { if (transport === this.transport) this.closed(reason); });
+  }
+  private closed(reason: string): void {
+    const now = this.now();
+    if (FINAL.has(reason)) { this.stop(); this.show('ended', reason); return; }
+    if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }
+    if (this.phase === 'up') this.lose(now, false);
+    else if (this.phase === 'down') this.failedDial(now);
+  }
+  /** The link is gone or no use: from now it is dialled, and a player's 35 s count from the last frame. */
+  private lose(now: number, close = true): void {
+    this.phase = 'down'; this.lostAt = this.heardAt ?? now; this.dialled = null; this.dialAt = now + (DIAL_WAITS_MS[0] ?? 0) * (1 + (this.random() * 2 - 1) * DIAL_JITTER);
+    this.show(now - this.lostAt >= RESUMING_MS ? 'resuming' : 'reconnecting');
+    if (close) this.drop();
+  }
+  private drop(): void { this.offClose(); this.transport.close('stalled'); }
+  private stop(): void { this.phase = 'stopped'; this.dialled = null; this.offClose(); }
+  private show(state: LinkState, reason?: string): void {
+    if (state === this.state) return;
+    this.state = state;
+    this.options.onState(state, reason);
+  }
+}

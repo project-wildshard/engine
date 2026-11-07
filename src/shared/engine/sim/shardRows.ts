@@ -18,11 +18,25 @@ export interface ShardRows {
   readonly world: Map<string, () => readonly StateNetRow[]>;
   /** What a fight told its views since a room last took them. */
   readonly calls: FightViewCall[];
+  /** The looks that stay on screen once said, by name. */
+  readonly standing: Map<string, StandingLook>;
 }
 /** The view call a body's pose input goes by: this, its id, a dot and the input. */
 export const NET_POSE = 'pose.';
 /** One call a fight made on its views. */
 export interface FightViewCall { readonly name: string; readonly args: readonly number[] }
+
+/**
+ * A look that stays on screen once said, so a client that arrives later must be told it (E7.3, FLIP-6). A look said every tick while
+ * it lasts reaches a newcomer by itself, and a one-shot cue must never replay, so neither is declared.
+ */
+export interface StandingLook {
+  readonly name: string;
+  /** Its first argument names a slot, and each slot stands alone. */
+  readonly slotted?: true;
+  /** The calls that take it down. */
+  readonly endedBy?: readonly string[];
+}
 
 /** The row a day clock publishes: its phase of the day, 0 to 1. */
 export const DAY_ROW = 'day.phase';
@@ -36,11 +50,11 @@ export function publishDay(host: RowHost, clock: { readonly phase: number }): vo
 /** A tick's worth of a fight's looks, many times over: a host no room drains stops here. */
 const MAX_VIEW_CALLS = 256;
 const books = new WeakMap<object, ShardRows>();
-const NO_ROWS: ShardRows = { owned: new Map<string, OwnedRead>(), bodies: new Map<string, () => ScriptNetView>(), state: null, world: new Map<string, () => readonly StateNetRow[]>(), calls: [] };
+const NO_ROWS: ShardRows = { owned: new Map<string, OwnedRead>(), bodies: new Map<string, () => ScriptNetView>(), state: null, world: new Map<string, () => readonly StateNetRow[]>(), calls: [], standing: new Map<string, StandingLook>() };
 interface RowHost { readonly scope: { readonly onDispose: (run: () => void) => unknown } }
 function bookOf(host: RowHost): ShardRows {
   let book = books.get(host);
-  if (book === undefined) { const fresh: ShardRows = { owned: new Map<string, OwnedRead>(), bodies: new Map<string, () => ScriptNetView>(), state: null, world: new Map<string, () => readonly StateNetRow[]>(), calls: [] }; book = fresh; books.set(host, fresh); host.scope.onDispose(() => { fresh.owned.clear(); fresh.bodies.clear(); fresh.state = null; fresh.world.clear(); }); }
+  if (book === undefined) { const fresh: ShardRows = { owned: new Map<string, OwnedRead>(), bodies: new Map<string, () => ScriptNetView>(), state: null, world: new Map<string, () => readonly StateNetRow[]>(), calls: [], standing: new Map<string, StandingLook>() }; book = fresh; books.set(host, fresh); host.scope.onDispose(() => { fresh.owned.clear(); fresh.bodies.clear(); fresh.state = null; fresh.world.clear(); }); }
   return book;
 }
 /** Publish a script body under its stable id for the host's lifetime. */
@@ -70,6 +84,11 @@ export const eliteWindWord = (id: string): string => `elite.wind:${id}`;
 export function sayFightView(host: RowHost, name: string, args: readonly number[]): void {
   const { calls } = bookOf(host);
   if (calls.length < MAX_VIEW_CALLS) calls.push({ name, args });
+}
+/** Declare a fight's standing looks for the host's lifetime. */
+export function declareStandingLooks(host: RowHost, looks: readonly StandingLook[]): void {
+  const { standing } = bookOf(host);
+  for (const look of looks) standing.set(look.name, look);
 }
 /** Publish a world system's own `state` rows for the host's lifetime. */
 export function publishWorldState(host: RowHost, id: string, read: () => readonly StateNetRow[]): void {

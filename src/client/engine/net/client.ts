@@ -56,7 +56,7 @@ export class NetClient {
   /** Events and field changes, when the screen reaches them (P1-E5.3-F4). Step it with `present`. */
   readonly delivery: NetDelivery = new NetDelivery(this.interpolator, handle => this.entities.get(handle)?.cls.cls);
   private readonly now: () => number;
-  private readonly transport: Transport;
+  private transport: Transport;
   private readonly writer = new BitWriter(1024);
   private readonly frames = new Map<number, DecodedFrame>();
   private readonly listeners = new Set<(frame: DecodedFrame) => void>();
@@ -86,18 +86,36 @@ export class NetClient {
   private unacked: NetCommand[] = [];
   private fresh = 0;
   private seq = 0;
-  private readonly off: (() => void)[];
+  private off: (() => void)[];
+  private said: { readonly build: string; readonly identity: NetIdentity } = { build: '', identity: GUEST };
+  private readonly rejoins = new Set<() => void>();
   constructor(transport: Transport, now: () => number = diagnosticNow) {
     installPortableMath();
     this.transport = transport; this.now = now;
     this.table = { ownerClass: PLAYER_CLASS, classOf: handle => this.entities.get(handle)?.cls, baseline: tick => this.frames.get(tick) ?? null };
-    this.off = [transport.onMessage((_channel, bytes) => { this.receive(new Uint8Array(bytes)); }), transport.onClose(reason => { this.closed = reason; })];
+    this.off = this.listen(transport);
   }
   /** Begin the handshake. `build` is this client's engine build id; `identity` is who it says it is (J111). */
   hello(build = '', identity: NetIdentity = GUEST, ledger = 0): void {
-    this.ledgerSerial = ledger;
+    this.ledgerSerial = ledger; this.said = { build, identity };
     this.transport.send('reliable', encodeHello(this.writer, { schemaHash: NET_SCHEMA_HASH, build, ...identity, ledger }));
   }
+  /**
+   * The link died and `transport` is its replacement (E7.1, C2): a fresh `hello` on it. What was held named the old link, so it
+   * goes as a crossing's does, and what this client has heard of the ledger stays, so no receipt comes twice. A server always
+   * gives a new link a new command queue, so `seq` starts over: an old `seq` read against a new queue's 0 may look acked.
+   */
+  rejoin(transport: Transport): void {
+    for (const off of this.off) off();
+    const { ledgerSerial, said } = this;
+    this.left();
+    this.unacked = []; this.fresh = 0; this.seq = 0; this.closed = null;
+    this.transport = transport; this.off = this.listen(transport);
+    for (const listener of this.rejoins) listener();
+    this.hello(said.build, said.identity, ledgerSerial);
+  }
+  /** Call when a new link replaces the old one, before its `hello`; returns the unsubscribe. */
+  onRejoin(listener: () => void): () => void { this.rejoins.add(listener); return () => { this.rejoins.delete(listener); }; }
   /** Call for every frame decoded; returns the unsubscribe. */
   onFrame(listener: (frame: DecodedFrame) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   /** Call for every look a fight tells its views; returns the unsubscribe. */
@@ -163,7 +181,11 @@ export class NetClient {
   /** Send a non-movement action on the reliable channel. */
   act(act: NetRoomAct): void { this.transport.send('reliable', encodeAct(this.writer, act)); }
   /** Stop listening; the transport stays with its owner. */
-  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); }
+  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); this.rejoins.clear(); }
+
+  private listen(transport: Transport): (() => void)[] {
+    return [transport.onMessage((_channel, bytes) => { this.receive(new Uint8Array(bytes)); }), transport.onClose(reason => { this.closed = reason; })];
+  }
 
   private receive(bytes: Uint8Array): void {
     const arrived = this.now(); // here, never in a render frame: at 24.3 frames/s that stamp would be 41 ms of false jitter

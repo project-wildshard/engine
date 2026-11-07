@@ -10,7 +10,7 @@ import type { LedgerFiling } from './ledgerBook';
 import { questBooks, type QuestProgressRead } from '../../../shared/engine/quest/players';
 import { encounterRows } from '../../../shared/engine/sim/encounterRows';
 import { ANIMAL_CLASS, ENCOUNTER_CLASS, FLAG_CLASS, PLAYER_CLASS, SCRIPT_CLASS, STATE_CLASS } from '../../../shared/engine/net/netSchemas';
-import { NET_POSE, shardRows, type FightViewCall } from '../../../shared/engine/sim/shardRows';
+import { NET_POSE, shardRows, type FightViewCall, type StandingLook } from '../../../shared/engine/sim/shardRows';
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetRefs } from '../../../shared/engine/net/schema';
 import type { NetPlayer, NetTickInput, NetVisitor, NetWorld } from './room';
@@ -28,7 +28,11 @@ export class SimNetWorld implements NetWorld {
   private readonly host: SimHost;
   private readonly pose: AnimalPoseSample = emptyPose();
   /** What this room last said of each body's pose inputs. */
-  private readonly poses = new Map<string, number>();
+  private readonly poses = new Map<string, Map<string, number>>();
+  /** How many values `poses` holds. */
+  private posesHeld = 0;
+  /** The standing looks now up, newest last. */
+  private readonly up = new Map<string, FightViewCall>();
   private readonly wire: CombatWire;
   private readonly frame: number;
   private readonly filings: (() => readonly LedgerFiling[]) | undefined;
@@ -63,15 +67,29 @@ export class SimNetWorld implements NetWorld {
   tick(): number { return this.host.state.tick; }
   cell(): number { return this.frame; }
   combat(): readonly CombatEvent[] {
-    const { calls } = shardRows(this.host), settled = this.wire.drain(), { tick } = this.host.state;
+    const { calls, standing } = shardRows(this.host), settled = this.wire.drain(), { tick } = this.host.state;
+    if (standing.size > 0) for (const call of calls) this.heardLook(call, standing);
     this.sayPoses(calls);
     return calls.length === 0 ? settled : [...settled, ...calls.splice(0).map(({ name, args }) => ({ kind: 'view' as const, tick, name, args }))];
+  }
+  /** What a newcomer missed of a body: each value `sayPoses` has said of it. A value never said is not the room's to recall. */
+  recall(id: string, out: FightViewCall[]): void {
+    for (const [name, value] of this.poses.get(id) ?? []) out.push({ name: `${NET_POSE}${id}.${name}`, args: [value] });
+  }
+  /** Every standing look now up, oldest first. */
+  standing(out: FightViewCall[]): void { out.push(...this.up.values()); }
+  private heardLook(call: FightViewCall, standing: ReadonlyMap<string, StandingLook>): void {
+    for (const look of standing.values()) if (look.endedBy?.includes(call.name) === true) for (const key of this.up.keys()) if (key === look.name || key.startsWith(`${look.name}#`)) this.up.delete(key);
+    const look = standing.get(call.name);
+    if (look === undefined) return;
+    const key = look.slotted === true ? `${call.name}#${String(call.args[0])}` : call.name;
+    this.up.delete(key); this.up.set(key, call);
   }
   /** What a client's pose programs read of a body near a player, as it changes. A brain's memory is the same record, and no client's. */
   private sayPoses(calls: FightViewCall[]): void {
     const { host, poses } = this, { poseInputs } = actRoutes(host);
     if (poseInputs.size === 0) return;
-    if (poses.size > POSE_MEMORY) poses.clear();
+    if (this.posesHeld > POSE_MEMORY) { poses.clear(); this.posesHeld = 0; }
     for (const [id, sim] of host.entities) {
       let near = false;
       for (const player of host.players.values()) if (Math.hypot(player.position.x - sim.position.x, player.position.z - sim.position.z) < POSE_REACH) { near = true; break; }
@@ -79,9 +97,12 @@ export class SimNetWorld implements NetWorld {
       for (const name of poseInputs) {
         const value = sim.mem[name];
         if (value === undefined) continue;
-        const key = `${id}\0${name}`, was = poses.get(key);
+        let held = poses.get(id);
+        if (held === undefined) { held = new Map(); poses.set(id, held); }
+        const was = held.get(name);
         if (was === value || (was !== undefined && Math.abs(value - was) < POSE_STEP && value !== 0 && value !== 1)) continue;
-        poses.set(key, value); calls.push({ name: `${NET_POSE}${id}.${name}`, args: [value] });
+        if (was === undefined) this.posesHeld++;
+        held.set(name, value); calls.push({ name: `${NET_POSE}${id}.${name}`, args: [value] });
       }
     }
   }

@@ -17,6 +17,7 @@ import { GUEST, NetIdentitySchema, type NetIdentity } from '../../../shared/engi
 import { decodeAct, decodeHello, encodeEvents, encodeWelcome, messageId, MSG_ACT, MSG_CMDS, MSG_HELLO, type InitialBits, type NetDied, type NetPlayerDied, type NetView, type NetEvent, type NetHit, type NetReward } from '../../../shared/engine/net/messages';
 import { NET_CLASSES, NET_SCHEMA_HASH } from '../../../shared/engine/net/netSchemas';
 import type { NetClass, NetRefs } from '../../../shared/engine/net/schema';
+import type { FightViewCall } from '../../../shared/engine/sim/shardRows';
 import { LedgerBook, type LedgerFiling } from './ledgerBook';
 import { framesBetween, rowDue } from './tiers';
 import type { NetChannel, Transport } from '../../../shared/engine/net/transport';
@@ -30,6 +31,8 @@ const RIDE_WORDS = 64;
 const ACTS_PER_TICK = 2, MAX_QUEUED_ACTS = 16;
 /** How long an act waits for its command: J50's rewind cap. A press is judged where its player stood when they pressed, so it waits for the server to take that command, as a blow reads that tick's bodies; a client that never sends it gets the present. */
 const ACT_WAIT_TICKS = 12;
+/** Recalled rows a frame carries: a join beside a crowd of posed bodies spreads over frames. One body's rows are never split. */
+const RECALL_ROWS = 256;
 /** Past a hello's three full texts: no message is longer, so no bigger one is read. */
 export const MAX_CLIENT_MESSAGE_BYTES = 1024;
 /**
@@ -68,6 +71,10 @@ export interface NetWorld {
   commanded?: (inputs: readonly NetTickInput[]) => void;
   /** Inputs the tick found no use for since the last call. A world that uses every input leaves it out. */
   refused?: () => number;
+  /** What a client that arrives later has missed of a body (FLIP-6): values said once and remembered. A world with none leaves it out. */
+  recall?: (id: string, out: FightViewCall[]) => void;
+  /** The looks standing on screen now, which a client that arrives later must be told. A world with none leaves it out. */
+  standing?: (out: FightViewCall[]) => void;
   /** The player a client owns unless it joins as another. */
   readonly player: NetPlayer;
 }
@@ -90,6 +97,8 @@ export interface NetRoomOptions {
 
 /** An act and the tick it stops waiting for its command. */
 interface HeldAct { readonly act: NetTickAct; readonly until: number }
+/** A view call as a line that compares equal when it says the same thing. */
+const callLine = (call: FightViewCall): string => `${call.name}\0${call.args.join(',')}`;
 /** What a client held at a frame. `due` are the rows this frame may send; `rows` is the world frame each held row came from. */
 interface ClientView { tick: number; readonly visible: Set<number>; readonly due: Set<number>; readonly rows: Map<number, number> }
 /** A settled event in handles, kept until the next frame. */
@@ -111,6 +120,12 @@ interface RoomClient {
   /** waiting: said hello before the room opened. live: welcomed. */
   state: 'new' | 'waiting' | 'live';
   ack: number; readonly acts: HeldAct[]; readonly known: Set<number>;
+  /** Bodies this client has heard spawn and not yet been told what it missed of; each is sent a frame at a time. */
+  readonly owed: number[];
+  /** It has yet to be told the looks standing when it arrived. */
+  newcomer: boolean;
+  /** The looks it has heard live while bodies are still owed, so a recall doesn't repeat one. */
+  readonly said: Set<string>;
   /** The quest rows this client holds, and the book version they came from. */
   questVersion: number; readonly quests: Map<string, string>; readonly phased: Set<string>;
   /** The lines of what its player holds that this client has been told. */
@@ -139,6 +154,7 @@ export class NetRoom {
   private readonly writer = new BitWriter(4096);
   private readonly rideOut = new Float64Array(RIDE_WORDS);
   private readonly held = new Map<string, number>();
+  private readonly calls: FightViewCall[] = [];
   private readonly world: NetWorld;
   private readonly step: NetRoomOptions['step'];
   private readonly build: string;
@@ -161,7 +177,7 @@ export class NetRoom {
   /** Connect a client that owns `player`. It waits for its `hello`, and past that for `open`. Returns its id. */
   join(transport: Transport, player: NetPlayer = this.world.player, queue: CommandQueue = new CommandQueue()): number {
     const id = ++this.clientIds, owner = new Float64Array(player.cls.owner.length);
-    const client: RoomClient = { id, transport, player, queue, identity: GUEST, credit: MAX_CLIENT_MESSAGES, ledgerSeen: 0, state: 'new', ack: -1, acts: [], known: new Set(), questVersion: -1, quests: new Map(), phased: new Set(), owned: new Map(), rides: new Map(), owner,
+    const client: RoomClient = { id, transport, player, queue, identity: GUEST, credit: MAX_CLIENT_MESSAGES, ledgerSeen: 0, state: 'new', ack: -1, acts: [], known: new Set(), owed: [], newcomer: true, said: new Set(), questVersion: -1, quests: new Map(), phased: new Set(), owned: new Map(), rides: new Map(), owner,
       views: Array.from({ length: FRAME_RING }, () => ({ tick: -1, visible: new Set<number>(), due: new Set<number>(), rows: new Map<number, number>() })), nextView: 0, dispose: () => undefined };
     const off = transport.onMessage((channel, bytes) => { this.receive(client, channel, bytes); });
     const closed = transport.onClose(() => { this.remove(client); });
@@ -331,7 +347,8 @@ export class NetRoom {
     } });
     const retired = handles.sweep(serial), combat = freshViews(this.combat.splice(0)), lines = this.chat.drain(), riders = new Map<number, number>();
     for (const [rider, mount] of this.world.riders?.() ?? []) riders.set(handles.refs(rider), handles.refs(mount));
-    for (const client of this.clients) if (client.state === 'live') this.send(client, frame, retired, combat, lines, riders);
+    // On a copy: a send may close a client that has stalled (E7.1), and the next in line must not lose this frame's events for it.
+    for (const client of this.clients.slice()) if (client.state === 'live') this.send(client, frame, retired, combat, lines, riders);
   }
   /** Every entity in range of this client, itself excluded: its own state is the owner block. */
   private view(client: RoomClient, frame: WorldFrame, own: number): ClientView {
@@ -382,15 +399,30 @@ export class NetRoom {
     for (const [name, value] of held) if (client.owned.get(name) !== value) { client.owned.set(name, value); events.push({ kind: 'owned', tick, name, value }); }
     for (const name of client.owned.keys()) if (!held.has(name)) { client.owned.delete(name); events.push({ kind: 'owned', tick, name, value: 0 }); }
   }
+  /** What this client arrived too late to hear: to it alone, right after the spawns, so `combat`'s fresher rows land on top. What it has heard meanwhile goes once. */
+  private recalled(client: RoomClient, tick: number, combat: readonly RoomCombat[], events: NetEvent[]): void {
+    const { calls } = this, { owed, said } = client;
+    if (!client.newcomer && owed.length === 0) return;
+    for (const row of combat) if (row.kind === 'view') said.add(callLine(row));
+    calls.length = 0;
+    if (client.newcomer) { client.newcomer = false; this.world.standing?.(calls); }
+    while (owed.length > 0 && calls.length < RECALL_ROWS) {
+      const id = this.handles.row(owed.shift() ?? 0)?.id;
+      if (id !== undefined) this.world.recall?.(id, calls);
+    }
+    for (const call of calls) if (!said.has(callLine(call))) events.push({ kind: 'view', tick, name: call.name, args: call.args });
+    if (owed.length === 0) said.clear();
+  }
   private send(client: RoomClient, frame: WorldFrame, retired: readonly number[], combat: readonly RoomCombat[], lines: readonly ChatLine[], riders: ReadonlyMap<number, number>): void {
     const { handles, writer, world } = this, own = handles.refs(client.player.id), view = this.view(client, frame, own), events: NetEvent[] = [];
     for (const handle of view.visible) {
       if (client.known.has(handle)) continue;
       const row = handles.row(handle);
       if (row === undefined) continue;
-      client.known.add(handle);
+      client.known.add(handle); client.owed.push(handle);
       events.push({ kind: 'spawn', handle, cls: row.cls.id, id: row.id, initial: row.initial, text: row.text });
     }
+    this.recalled(client, frame.tick, combat, events);
     this.rideEvents(client, own, riders, frame.tick, events);
     // Spawns, then what happened, then who left: a body's last hit and its death arrive before its despawn.
     for (const row of combat) {

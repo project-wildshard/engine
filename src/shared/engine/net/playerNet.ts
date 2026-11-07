@@ -21,6 +21,7 @@ export const PLAYER_NET: NetSchema<PlayerSim> = netSchema<PlayerSim>({
     y: { ...metres, send: 'others', read: player => player.position.y },
     z: { ...metres, send: 'others', read: player => player.position.z },
     yaw: { kind: 'angle', bits: 10, send: 'others', read: player => player.yaw },
+    name: { kind: 'text', send: 'initial', read: player => player.netName },
     board: { kind: 'bool', read: player => player.board.on },
     swim: { kind: 'bool', read: player => player.swim.on },
     hp: { kind: 'u16', read: player => Math.ceil(player.health.attributes.health) },

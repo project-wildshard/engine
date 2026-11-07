@@ -113,7 +113,9 @@ export class NetPlayer implements PlayerLink {
     }),
     client.onRide(event => { if (event.rider === client.welcome?.handle) this.heard.push(event); }),
     // A crossing is a snap (§5.2): nothing is sent until the next world's first frame seats this body there, in its coordinates.
-    client.onTravel(() => { this.seen = null; })];
+    client.onTravel(() => { this.seen = null; }),
+    // A new link is a new command stream: every saved move named the old one, and `adopt` lets them go on the first frame.
+    client.onRejoin(() => { this.seen = null; this.seq = 0; this.heard.length = 0; this.attacks.clear(); })];
   }
   /** Draw this player's attacks on `weapons`: they stop settling their own contact and take the server's word. */
   bindWeapons(weapons: NetWeapons, slots: ReadonlyMap<string, number>): void { this.weapons = weapons; this.slots = slots; weapons.bindWire(this.wire); }

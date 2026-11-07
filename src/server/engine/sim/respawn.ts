@@ -6,6 +6,8 @@ export const FALL_FADE = 1.8;
 /** One player's record. A save holds a player only once they have one. */
 export type RespawnRow = readonly [id: string, last: LastPlaceSaved, fade: number, falls: number];
 
+/** A record's fields. */
+export interface RespawnRowFields { readonly id: string; readonly last: LastPlaceSaved; readonly fade: number; readonly falls: number }
 interface Seat { readonly last: LastPlace; fade: number; falls: number; health: PlayerHealth | null }
 
 /**
@@ -50,6 +52,18 @@ export class RespawnBook {
   }
   /** Drop the records of players who left. */
   keep(present: ReadonlyMap<string, unknown>): void { for (const id of this.seats.keys()) if (!present.has(id)) this.seats.delete(id); }
+  /** One player's record as a save holds it, under any seat's name; null if they have none. */
+  rowOf(id: string): Omit<RespawnRowFields, 'id'> | null {
+    const seat = this.seats.get(id);
+    return seat === undefined ? null : { last: seat.last.saved(), fade: seat.fade, falls: seat.falls };
+  }
+  /** Put a saved record on a seat, or clear the seat. */
+  seatRow(id: string, row: Omit<RespawnRowFields, 'id'> | null): void {
+    this.seats.delete(id);
+    if (row === null) return;
+    const seat = this.seat(id);
+    seat.last.load(row.last); seat.fade = row.fade; seat.falls = row.falls;
+  }
   rows(): readonly RespawnRow[] {
     return [...this.seats].filter(([, seat]) => seat.falls > 0 || seat.last.saved().inside !== null || seat.last.stand !== null).map(([id, seat]) => [id, seat.last.saved(), seat.fade, seat.falls]);
   }

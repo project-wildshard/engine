@@ -19,6 +19,8 @@ export class AttackPrediction {
     this.waiting.push(seq);
     if (this.waiting.length > MOST_WAITING) this.waiting.shift();
   }
+  /** The link these starts went out on is gone, and nobody will answer them. */
+  clear(): void { this.waiting.length = 0; }
   /** Starts still unanswered. */
   get pending(): number { return this.waiting.length; }
   /** A `hit` confirmed `seq`, and every start before it. */

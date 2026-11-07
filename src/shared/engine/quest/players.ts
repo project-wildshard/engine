@@ -50,6 +50,8 @@ export class QuestBook {
     return { player: this.player, flags: this.flags.own.sort((a, b) => a.localeCompare(b)), quests: this.quests.map(quest => quest.snapshot()),
       parts: Object.fromEntries([...this.parts].map(([id, part]) => [id, part.read()])) };
   }
+  /** Each part's text, as `restore` reads them. */
+  exported(): Record<string, string> { return Object.fromEntries([...this.parts].map(([id, part]) => [id, part.read()])); }
   restore(saved: QuestBookSaved): void {
     if (saved.quests.length !== this.quests.length || Object.keys(saved.parts).some(id => !this.parts.has(id))) throw new RangeError('Snapshot quest book does not match');
     this.flags.restore(saved.flags);
@@ -115,6 +117,18 @@ export class QuestBooks {
     if (!this.host.players.has(id)) return null;
     const book = this.of(id), { flags } = book;
     return book.version === since ? null : { version: book.version, rows: book.quests.map(quest => quest.progress()), flags: [...new Set([...this.shown, ...this.claimed])].filter(flag => flags.has(flag)) };
+  }
+  /** One player's book as any seat can read it back (E7.4): what a player carries out of a room, whichever seat they held. */
+  exportOf(id: string): QuestBookSaved {
+    const book = this.of(id), own = book.flags instanceof PlayerFlags ? book.flags.own : book.flags.all.filter(flag => this.personal(flag));
+    return { player: id, flags: own.sort((a, b) => a.localeCompare(b)), quests: book.quests.map(quest => quest.snapshot()), parts: book.exported() };
+  }
+  /** Put an exported book on this player's seat. The lead's flags are the world's too, and those stay; a saved flag is theirs wherever they sit. */
+  importOf(id: string, saved: QuestBookSaved): void {
+    const book = this.of(id);
+    this.claim(saved.flags);
+    this.restoring = true;
+    try { book.restore(book === this.lead ? { ...saved, flags: [...book.flags.all.filter(flag => !this.personal(flag)), ...saved.flags] } : saved); } finally { this.restoring = false; }
   }
   /** Every other player's book, or undefined: a one-player save never holds this. */
   save(): QuestBookSaved[] | undefined {
