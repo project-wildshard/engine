@@ -108,3 +108,14 @@ The candidate-source and commit-boundary checks pass five tests across
 three files. Type the death proof's observed fields and retain the
 actual boolean checkpoint contract. Keep wrapper timing comments in
 step with its direct installed-hook execution.
+
+Runner CI reproduced three 30-second native-proof timeouts. Pine's
+later grid case then observed four journal units instead of two after
+the timed-out contribution case. Bound the check job's outer Vitest
+pool to the two workers used locally; native proofs also own workers.
+Register each Pine server before awaiting its boot, close it at test
+teardown and restore the inherited save environment. Late failed cases
+cannot retain an active server for the following case. Keep every
+assertion and existing timeout. All 18 targeted Pine, native-observation,
+practice and worker-policy tests pass in 17.08 seconds; types and lint
+also pass. Release waits for the repaired SHA's CI.

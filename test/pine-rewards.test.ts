@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the shipped Pine product and worker bridge.
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
-import { beforeAll, expect, test } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, test } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -34,6 +34,13 @@ class PageStorage implements SaveStorage {
   removeItem(key: string): void { this.items.delete(key); }
 }
 let input: HeadlessRuntimeInput, rosterStep: string;
+const opened = new Set<() => void>();
+let inheritedEnvironment: ReturnType<typeof saveEnvironment> | undefined;
+beforeEach(() => { inheritedEnvironment = saveEnvironment(); });
+afterEach(() => {
+  for (const close of [...opened]) close();
+  if (inheritedEnvironment !== undefined) installSaveEnvironment(inheritedEnvironment);
+});
 beforeAll(async () => {
   const directory = process.env['PINE_PROOF_PRODUCT'] ?? builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing Pine output');
@@ -47,9 +54,11 @@ async function boot(storage: PageStorage, lone?: true, identity?: string, refuse
   const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input), strips: bakedGridCollision,
     onSaveRefused: refused ?? (error => { throw error; }), proof: { booted: value => { grid = value; } } });
   const shell = connectStandalone({ slug: 'pine-hollow', base: '/shards/pine-hollow/', build: 'test', savePrefix: PREFIX, storage, ...(identity === undefined ? {} : { identity: { player: identity, name: identity } }), ...(lone === undefined ? {} : { lone }) }, control.port2, game.port2, () => { server.dispose(); });
+  const close = () => { if (opened.delete(close)) shell.dispose(); };
+  opened.add(close);
   const booted = await shell.booted;
   if (grid === undefined) throw new Error('No worker world');
-  return { shell, grid, booted };
+  return { shell, grid, booted, close };
 }
 function onPage<T>(storage: PageStorage, run: () => T): T {
   const worker = saveEnvironment();
@@ -76,14 +85,14 @@ test('a malformed historical reward book falls back before the player is welcome
     first.grid.host.slots.questState['owned.creature-rewards'] = { 'actor.player': 1 };
     first.grid.tick(); first.grid.tick();
     expect((await first.shell.save()).ok).toBe(true);
-  } finally { first.shell.dispose(); }
+  } finally { first.close(); }
   const rejected: unknown[] = [], again = await boot(worker, true, undefined, error => { rejected.push(error); });
   try {
     expect(rejected, 'an invalid historical row must be refused during world loading').toHaveLength(1);
     await turn(); again.grid.open(); again.grid.tick(); again.grid.tick(); await turn();
     expect(again.booted.restored).toBe(true);
     expect(again.shell.client.closed).toBeNull();
-  } finally { again.shell.dispose(); }
+  } finally { again.close(); }
 });
 
 test('a historical seat-keyed continuation migrates only its local lead to a device profile', async () => {
@@ -94,7 +103,7 @@ test('a historical seat-keyed continuation migrates only its local lead to a dev
     // The previous release kept this book in the world; no new player record has been published yet.
     first.grid.host.slots.questState['owned.creature-rewards'] = { 'actor.player': historical, 'seat-b': historical };
     expect((await first.shell.save()).ok).toBe(true);
-  } finally { first.shell.dispose(); }
+  } finally { first.close(); }
   const again = await boot(worker, true, 'device-a'), link = directLoopback(), bot = new NetClient(link.client);
   try {
     await turn(); again.grid.open(); again.grid.tick(); again.grid.tick(); await turn();
@@ -107,7 +116,7 @@ test('a historical seat-keyed continuation migrates only its local lead to a dev
     bot.hello('test', { player: 'device-b', name: 'B' }); link.pump(); again.grid.tick(); again.grid.tick(); link.pump();
     expect(bot.owned.has('finish.ghost-stag'), 'an old seat row cannot prove the current occupant owned it').toBe(false);
     expect(bot.owned.has('journal.ghost-stag.taken')).toBe(false);
-  } finally { bot.dispose(); again.shell.dispose(); }
+  } finally { bot.dispose(); again.close(); }
 });
 
 test('device rewards survive an empty world and follow the owner into another seat', async () => {
@@ -118,7 +127,7 @@ test('device rewards survive an empty world and follow the owner into another se
     await turn(); first.grid.open(); first.grid.tick(); first.grid.tick(); await turn();
     expect(first.shell.client.owned.get('finish.ghost-stag')).toBe(1);
     expect(first.shell.client.owned.get('journal.ghost-stag.taken')).toBe(9);
-  } finally { first.shell.dispose(); }
+  } finally { first.close(); }
   // No continuation was saved: E7 also opens empty worlds, and its lead seat can be reused.
   const next = await boot(worker, true, 'device-b'), link = directLoopback(), returning = new NetClient(link.client);
   try {
@@ -134,7 +143,7 @@ test('device rewards survive an empty world and follow the owner into another se
     expect(returning.owned.has('finish-drop.ghost-stag')).toBe(false);
     expect(returning.owned.get('journal.ghost-stag.taken')).toBe(9);
     expect(onPage(worker, () => compendiumSave.read('pine-hollow')['ghost-stag']?.t), 'B must not overwrite A’s legacy document').toBe(8);
-  } finally { returning.dispose(); next.shell.dispose(); }
+  } finally { returning.dispose(); next.close(); }
 });
 
 test('J105 pays meaningful contributors, including when a tiny last hit comes from someone else', async () => {
@@ -173,7 +182,7 @@ test('J105 pays meaningful contributors, including when a tiny last hit comes fr
     expect(ca.owned.has('finish-drop.ghost-stag'), 'owned finishes cannot drop again').toBe(false);
     expect((await first.shell.save()).ok).toBe(true);
     expect(onPage(worker, () => creatureRewardSave.read('pine-hollow').players['pine-a']?.pending['ghost-stag'])).toBeUndefined();
-  } finally { ca.dispose(); cb.dispose(); first.shell.dispose(); }
+  } finally { ca.dispose(); cb.dispose(); first.close(); }
 });
 
 test('two stores merge later page progress, clean owned pending drops and keep non-lead writes private', async () => {
@@ -183,7 +192,7 @@ test('two stores merge later page progress, clean owned pending drops and keep n
   await copyPage(page, worker);
   const first = await boot(worker, true, 'device-a');
   try { await turn(); first.grid.open(); first.grid.tick(); first.grid.tick(); await turn(); }
-  finally { first.shell.dispose(); }
+  finally { first.close(); }
   onPage(page, () => {
     skinSave.write({ owned: ['scarback-furnace', 'ghost-stag'], worn: { crossbow: 'ghost-stag' } }, 'pine-hollow');
     compendiumSave.write({ 'ghost-stag': { s: 3, n: 9, t: 12, b: 600 } }, 'pine-hollow');
@@ -216,7 +225,7 @@ test('two stores merge later page progress, clean owned pending drops and keep n
     expect(bot.owned.get('finish.ghost-stag')).toBe(1);
     expect((await next.shell.save()).ok).toBe(true);
     expect(onPage(worker, () => ({ skins: skinSave.read('pine-hollow'), journal: compendiumSave.read('pine-hollow'), pending: finishPickupSave.read('pine-hollow') }))).toEqual(legacy);
-  } finally { bot.dispose(); next.shell.dispose(); }
+  } finally { bot.dispose(); next.close(); }
 });
 
 test('a lower real server frame cannot rewind the page journal', async () => {
@@ -235,7 +244,7 @@ test('a lower real server frame cannot rewind the page journal', async () => {
     onPage(page, () => { wire.frame('pine-hollow', true); });
     expect(journal.stats('ghost-stag')).toMatchObject({ taken: 10, best: 900, seen: 9 });
     expect(onPage(page, () => compendiumSave.read('pine-hollow')['ghost-stag'])).toMatchObject({ t: 10, b: 900, n: 9 });
-  } finally { scope.dispose(); first.shell.dispose(); }
+  } finally { scope.dispose(); first.close(); }
 });
 
 test('two stores keep a kill and claim after the worker crashes without another continuation save', async () => {
@@ -258,7 +267,7 @@ test('two stores keep a kill and claim after the worker crashes without another 
     await turn(); first.grid.tick(); first.grid.tick(); await turn();
     expect(first.shell.client.owned.get('finish.ghost-stag')).toBe(1);
     expect(journal.stats('ghost-stag').taken).toBe(2);
-  } finally { scope.dispose(); first.shell.dispose(); }
+  } finally { scope.dispose(); first.close(); }
   await copyPage(page, worker); // The production import is once only.
   const again = await boot(worker, true);
   try {
@@ -266,7 +275,7 @@ test('two stores keep a kill and claim after the worker crashes without another 
     expect(again.shell.client.owned.get('journal.ghost-stag.taken')).toBe(3);
     expect(again.shell.client.owned.get('finish.ghost-stag')).toBe(1);
     expect(again.shell.client.owned.has('finish-drop.ghost-stag')).toBe(false);
-  } finally { again.shell.dispose(); }
+  } finally { again.close(); }
 });
 
 test('a drop earned after the last continuation survives a worker crash', async () => {
@@ -276,12 +285,12 @@ test('a drop earned after the last continuation survives a worker crash', async 
     expect((await first.shell.save()).ok).toBe(true);
     kill(first.grid, 'actor.player'); first.grid.tick(); first.grid.tick(); await turn();
     expect(first.shell.client.owned.get('finish-drop.ghost-stag')).toBe(1);
-  } finally { first.shell.dispose(); }
+  } finally { first.close(); }
   const again = await boot(worker, true);
   try {
     await turn(); again.grid.open(); again.grid.tick(); again.grid.tick(); await turn();
     expect(again.shell.client.owned.get('finish-drop.ghost-stag')).toBe(1);
-  } finally { again.shell.dispose(); }
+  } finally { again.close(); }
 });
 
 test('a grid kill and claim belong to their player, including after a worker reload', async () => {
@@ -311,7 +320,7 @@ test('a grid kill and claim belong to their player, including after a worker rel
     expect(ca.owned.get('journal.ghost-stag.taken')).toBe(2);
     expect(ca.owned.has('finish-drop.ghost-stag')).toBe(false);
     expect((await first.shell.save()).ok).toBe(true);
-  } finally { ca.dispose(); cb.dispose(); first.shell.dispose(); }
+  } finally { ca.dispose(); cb.dispose(); first.close(); }
   const again = await boot(storage);
   const links = [directLoopback(), directLoopback()], clients = links.map(link => new NetClient(link.client));
   try {
@@ -328,7 +337,7 @@ test('a grid kill and claim belong to their player, including after a worker rel
     expect(clients[1]?.owned.has('finish.ghost-stag')).toBe(false);
     expect(clients[1]?.owned.get('finish-drop.ghost-stag')).toBe(1);
     for (const client of clients) expect(client.owned.get('journal.ghost-stag.taken')).toBe(2);
-  } finally { for (const client of clients) client.dispose(); again.shell.dispose(); }
+  } finally { for (const client of clients) client.dispose(); again.close(); }
 });
 
 test('a shared-storage host preserves page discovery and worn finishes across reload', async () => {
@@ -362,7 +371,7 @@ test('a shared-storage host preserves page discovery and worn finishes across re
     kill(first.grid, 'actor.player'); first.grid.tick(); first.grid.tick();
     await new Promise<void>(resolve => { setTimeout(resolve, 0); });
     onPage(storage, () => { wire.frame('pine-hollow', true); });
-  } finally { scope.dispose(); first.shell.dispose(); }
+  } finally { scope.dispose(); first.close(); }
   const again = await boot(storage, true);
   try {
     expect(again.booted.restored).toBe(true);
@@ -373,5 +382,5 @@ test('a shared-storage host preserves page discovery and worn finishes across re
     again.grid.open(); again.grid.tick(); again.grid.tick();
     await new Promise<void>(resolve => { setTimeout(resolve, 0); });
     expect(again.shell.client.owned.get('journal.ghost-stag.taken')).toBe(3);
-  } finally { again.shell.dispose(); }
+  } finally { again.close(); }
 });
