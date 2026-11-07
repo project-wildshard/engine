@@ -4,7 +4,7 @@
 // Then it reloads on the cache that walk left (Chromium refuses a whole-cache query that size), and with the link cut. --chunk= proves a one-shard page.
 // --play is the flip's checklist: one playthrough on the row, a line for every step, and it fails on any step that didn't work.
 // --hook on a chunk with a grapple proves the claw: LOCK and JUMP pressed on the page, and the server's bite and zip carrying the body.
-//   scripts/browser-lane.sh node scripts/worker-client-proof.mjs --base=http://127.0.0.1:4401/ [--seconds=150] [--crossings=2] [--route=x,z;x,z] [--chunk=slug] [--play [--only=driftwood|nalati|nine|shards|grid|fights|roc|rocfall|rooms|elite|sky|sunscar|farreach|isle|pine|lantern|rig|sweep]] [--hook]
+//   scripts/browser-lane.sh node scripts/worker-client-proof.mjs --base=http://127.0.0.1:4401/ [--seconds=150] [--crossings=2] [--route=x,z;x,z] [--chunk=slug] [--play [--only=driftwood|nalati|riding|nine|shards|grid|fights|roc|rocfall|rooms|elite|sky|sunscar|farreach|isle|pine|lantern|rig|sweep]] [--hook]
 import { chromium, webkit, devices } from 'playwright';
 import { saveFixture } from './debug-settings.mjs';
 import { floorGridBenchmarkUrl, FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';

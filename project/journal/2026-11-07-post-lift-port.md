@@ -15,3 +15,7 @@ imports to engine's lifted layout.
 Port aa3388c7b2 (fix(riding): restore server taming and calls) in source
 order. Keep the behavior and repoint the retained files and imports to
 engine's lifted layout.
+
+Port cb6b6f06f7 (test(riding): prove offer, breaking and call) in source
+order. Keep the behavior and repoint the retained files and imports to
+engine's lifted layout.

@@ -207,6 +207,141 @@ export async function play(browser, phone, base, only = '') {
     await far.context.close();
   }
 
+  // Ring 2: earning a bond needs the unchanged trust clock and five bucking rounds.
+  // The pilot uses only the page's prompt, gauge and input; no trust/bond assignment.
+  if (only === 'riding') {
+    const nalati = await open(browser, phone, base, '/?chunk=nalati-grasslands&mute=1&nolock=1');
+    try {
+      await entered(nalati.page);
+      await step('riding: crouch-walk into OFFER range (Ring 2)', async () => {
+        await nalati.page.evaluate(() => {
+          const { world } = window.__wildshard;
+          world.game.app.input.setHeld('crouch.hold', true);
+          world.player.link.place(68, 30, 80, 0);
+        });
+        await nalati.page.waitForTimeout(1800);
+        await nalati.page.evaluate(() => {
+          const { world } = window.__wildshard, pilot = { active: true, near: false, sampled: 0, samples: [] };
+          window.__approachPilot = pilot;
+          const run = () => {
+            if (!pilot.active) return;
+            const horse = world.animals.animals.find(a => a.rowDriven && a.variant === 'stallion' && a.kind === 'horse');
+            const { player } = world;
+            if (horse !== undefined) {
+              const dx = horse.position.x - player.position.x, dz = horse.position.z - player.position.z, distance = Math.hypot(dx, dz);
+              player.yaw = Math.atan2(-dx, -dz) + 1;
+              world.game.app.input.setHeld('crouch.hold', distance < 30);
+              const pace = distance < 30 ? .6 : 1;
+              player.touchMove.x = distance > 9 ? Math.sin(1) * pace : 0; player.touchMove.y = distance > 9 ? Math.cos(1) * pace : 0;
+              const taming = window.__wildshard.shard.ride.taming;
+              pilot.near = distance < 10 && player.crouching && taming.view.offer && taming.view.alert < 20;
+              const now = performance.now();
+              if (now - pilot.sampled > 2000 && pilot.samples.length < 40) { pilot.sampled = now; pilot.samples.push({ distance, crouching: player.crouching, trust: taming.view.trust, alert: taming.view.alert, offer: taming.view.offer, held: world.game.app.input.held('crouch.hold') }); }
+            }
+            requestAnimationFrame(run);
+          };
+          requestAnimationFrame(run);
+        });
+        await nalati.page.waitForFunction(() => window.__approachPilot.near, undefined, { timeout: 75_000 }).catch(() => undefined);
+        return nalati.page.evaluate(() => { const { world, shard } = window.__wildshard; return { ok: window.__approachPilot.near, at: [world.player.position.x, world.player.position.z], trust: shard.ride.taming.view.trust, alert: shard.ride.taming.view.alert, offer: shard.ride.taming.view.offer, ...(window.__approachPilot.near ? {} : { samples: window.__approachPilot.samples }) }; });
+      });
+      const offered = await step('riding: OFFER reaches the wild stallion and its trust gauge', async () => {
+        await nalati.page.waitForFunction(() => window.__wildshard.shard.ride.taming.view.offer, undefined, { timeout: 5000 });
+        await nalati.page.waitForTimeout(300);
+        const before = await nalati.page.evaluate(() => window.__wildshard.shard.ride.taming.view.trust);
+        await nalati.page.keyboard.down('KeyG');
+        await nalati.page.waitForTimeout(1500);
+        const view = await nalati.page.evaluate(() => {
+          const ride = window.__wildshard.shard.ride, r = window.__workerClient();
+          return { trust: ride.taming.view.trust, offer: ride.taming.view.offer, owned: r.owned, closed: r.closed, x: r.x, z: r.z, crouching: window.__wildshard.world.player.crouching, held: window.__wildshard.world.game.app.input.held('ride.offer') };
+        });
+        return { ok: view.trust !== null && view.trust - before > 6, delta: view.trust - before, ...view };
+      });
+      await step('riding: release OFFER stops its authoritative trust bonus', async () => {
+        await nalati.page.keyboard.up('KeyG');
+        await nalati.page.waitForTimeout(300);
+        const a = await nalati.page.evaluate(() => window.__wildshard.shard.ride.taming.view.trust);
+        await nalati.page.waitForTimeout(1000);
+        const b = await nalati.page.evaluate(() => window.__wildshard.shard.ride.taming.view.trust);
+        return { ok: a !== null && b !== null && b - a < 5, delta: b - a };
+      });
+      await nalati.page.evaluate(() => { window.__approachPilot.active = false; window.__wildshard.world.player.touchMove.x = 0; window.__wildshard.world.player.touchMove.y = 0; });
+      if (offered) {
+      await step('riding: earn the prompt, hold all five rounds, bond on the server (Ring 2)', async () => {
+        await nalati.page.evaluate(() => {
+          const { world, shard } = window.__wildshard, { input } = world.game.app, pilot = { active: true, rounds: [], phase: 'wild', trust: 0, balance: 0, speed: 0, pulse: 0, at: performance.now(), done: false };
+          window.__ridingPilot = pilot;
+          const run = now => {
+            if (!pilot.active) return;
+            const { taming } = shard.ride, { player } = world, b = taming.view.balance;
+            pilot.phase = taming.phase; pilot.trust = taming.view.trust;
+            if (taming.phase === 'bonded') { pilot.done = true; pilot.active = false; input.clear(); player.touchMove.x = 0; player.touchMove.y = 0; return; }
+            if (taming.phase === 'breaking') {
+              if (!pilot.rounds.includes(taming.view.round)) pilot.rounds.push(taming.view.round);
+              if (b !== pilot.balance) { pilot.speed = (b - pilot.balance) / ((now - pilot.at) / 1000); pilot.balance = b; pilot.at = now; }
+              // Touch lean is binary: distribute the gauge controller's
+              // fractional demand across frames instead of overcorrecting
+              // with a full lean on every small error.
+              pilot.pulse += Math.max(-1, Math.min(1, b * 2 + pilot.speed * 1.1));
+              const lean = pilot.pulse > .5 ? 1 : pilot.pulse < -.5 ? -1 : 0;
+              pilot.pulse -= lean;
+              input.setHeld('lean.right', lean > 0); input.setHeld('lean.left', lean < 0);
+              input.setHeld('ride.offer', false); player.touchMove.x = 0; player.touchMove.y = 0;
+            } else {
+              pilot.balance = b; pilot.speed = 0; pilot.pulse = 0; pilot.at = now;
+              input.setHeld('crouch.hold', true); input.setHeld('ride.offer', true); input.setHeld('lean.left', false); input.setHeld('lean.right', false);
+              const horse = taming.promptHorse;
+              if (horse !== null) {
+                const dx = horse.position.x - player.position.x, dz = horse.position.z - player.position.z, distance = Math.hypot(dx, dz);
+                player.yaw = Math.atan2(-dx, -dz) + 1; // looking straight into his eye raises alert
+                // Earn trust from OFFER's range before closing to mount.
+                const target = taming.view.trust >= 99.9 ? 2.3 : 8.5, pace = distance > target + .2 ? .6 : distance < target - 1 ? -.3 : 0;
+                player.touchMove.x = Math.sin(1) * pace; player.touchMove.y = Math.cos(1) * pace;
+                if (taming.interactable.radius > 0 && distance < 2.8) input.press('use');
+              }
+            }
+            requestAnimationFrame(run);
+          };
+          requestAnimationFrame(run);
+        });
+        await nalati.page.waitForFunction(() => window.__ridingPilot.done, undefined, { timeout: 90_000 }).catch(() => undefined);
+        const pilot = await nalati.page.evaluate(() => { window.__ridingPilot.active = false; window.__wildshard.world.game.app.input.clear(); return window.__ridingPilot; });
+        if (pilot.done) await nalati.page.waitForFunction(() => { const { mount, taming } = window.__wildshard.shard.ride; return taming.companion !== null && mount.horse === taming.companion; }, undefined, { timeout: 2000 });
+        const r = await report(nalati.page);
+        return { ok: pilot.done && [1, 2, 3, 4, 5].every(n => pilot.rounds.includes(n)) && r.closed === null, pilot, closed: r.closed };
+      });
+      await step('riding: X calls the bonded horse on authoritative rows', async () => {
+        const call = await nalati.page.evaluate(() => {
+          const { world, shard } = window.__wildshard, horse = shard.ride.taming.companion;
+          if (horse === null) return null;
+          world.game.app.input.press('ride.horseTab');
+          return { x: horse.position.x, y: horse.position.y, z: horse.position.z };
+        });
+        if (call === null) return { ok: false, why: 'no earned companion' };
+        await nalati.page.waitForFunction(() => window.__wildshard.world.player.ride === null, undefined, { timeout: 2000 });
+        await nalati.page.evaluate(at => { window.__wildshard.world.player.link.place(at.x + 18, at.y, at.z, 0); }, call);
+        await nalati.page.waitForTimeout(800);
+        const distance = () => nalati.page.evaluate(() => { const { world, shard } = window.__wildshard; return shard.ride.taming.companion?.position.distanceTo(world.player.position) ?? 1e6; });
+        const before = await distance(), horseShown = await nalati.page.locator('.ws-ride-horse').isVisible();
+        await nalati.page.keyboard.press('KeyX');
+        await nalati.page.waitForTimeout(3000);
+        const after = await distance(), r = await report(nalati.page);
+        return { ok: horseShown && before > 12 && after < before - 5 && r.closed === null, horseShown, before, after, closed: r.closed };
+      });
+      await step('riding: the bonded horse and call survive save and reload', async () => {
+        const distance = () => nalati.page.evaluate(() => { const { world, shard } = window.__wildshard; return shard.ride.taming.companion?.position.distanceTo(world.player.position) ?? 1e6; });
+        await nalati.page.evaluate(() => window.__workerClientSave());
+        const saved = await report(nalati.page), before = await distance();
+        await nalati.page.reload({ waitUntil: 'load' }); await entered(nalati.page);
+        await nalati.page.waitForTimeout(1200);
+        const r = await report(nalati.page), after = await distance(), companion = await nalati.page.evaluate(() => { const { taming } = window.__wildshard.shard.ride; return { phase: taming.phase, companion: taming.companion !== null }; });
+        return { ok: saved.savedOk && r.restored && companion.phase === 'bonded' && companion.companion && after < Math.max(4, before - .5) && r.closed === null, saved: saved.savedOk, restored: r.restored, companion, before, after, closed: r.closed };
+      });
+      }
+      await step('riding raises no page error', () => ({ ok: nalati.errors.length === 0, errors: [...new Set(nalati.errors)].slice(0, 6) }));
+    } finally { await nalati.context.close(); }
+  }
+
   // Nalati: a ride
   if (runs('nalati')) { const nalati = await open(browser, phone, base, '/?chunk=nalati-grasslands&mute=1&nolock=1');
   await step('nalati boots on the row', async () => { await entered(nalati.page); return started(nalati.page); });
