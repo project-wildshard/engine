@@ -24,7 +24,7 @@ export type WorkerWindow = typeof window & {
     };
   };
   __deathProof: {
-    events: { own: boolean; checkpoint: boolean | undefined; cause: { kind: string } | null }[];
+    events: { own: boolean; checkpoint: boolean; cause: { kind: string } | null }[];
     shown: boolean; dark: boolean; earlyMove: boolean;
     start: { x: number; z: number } | null;
     end: { x: number; z: number } | null;

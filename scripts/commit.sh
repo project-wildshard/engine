@@ -115,8 +115,8 @@ finally:
 PYALIGN
 }
 export -f align_shared_index
-# Checks own a detached index/HEAD view. Only freshness, Git completion and
-# alignment hold the shared commit lease; every failed proof is discarded.
+# Generate from immutable candidate inputs. Freshness checks, installed Git
+# hooks and index alignment hold the shared commit lease.
 exec python3 - "$common" "$message" "$patch" "$@" <<'PYCOMMIT'
 import fcntl, hashlib, json, os, runpy, shutil, signal, subprocess, sys, tempfile, time
 from pathlib import Path
@@ -159,7 +159,7 @@ try:
         else:
             git("add", "-A", "--", *paths, env=candidate_env)
         # GS4 (G798): a named input of a committed gen:source table regenerates that table, which joins the commit,
-        # so an input never lands without its output. It runs before the hook, outside the five-second cap.
+        # so an input never lands without its output. It runs before the hook, before the installed hooks.
         regenerated = []
         if os.path.isfile("scripts/gen-source.mjs"):
             source_started = time.monotonic()
@@ -271,7 +271,7 @@ finally:
     print(f"commit.sh: {wait:.0f} ms lock wait; {hold:.0f} ms lock held; {work - hold:.0f} ms outside lock", flush=True)
     print(f"commit.sh: {elapsed:.0f} ms total wall (lock wait included)", flush=True)
     if source_seconds:
-        print(f"commit.sh: {source_seconds * 1000:.0f} ms G798 source work outside check cap", flush=True)
+        print(f"commit.sh: {source_seconds * 1000:.0f} ms G798 source work outside hook timing", flush=True)
     exception = sys.exc_info()[1]
     code = exception.code if isinstance(exception, SystemExit) else None
     code = code if code is None or isinstance(code, int) else 1
@@ -286,5 +286,5 @@ finally:
     except OSError as error:
         print("commit.sh: timing log unavailable: " + str(error), file=sys.stderr)
     if elapsed - source_seconds * 1000 > 5000:
-        print("commit.sh: five-second check cap; only serialized Git completion follows", file=sys.stderr)
+        print("commit.sh: source-excluded work exceeded five seconds", file=sys.stderr)
 PYCOMMIT

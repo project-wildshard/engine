@@ -99,3 +99,12 @@ engine's lifted layout.
 Port 5f70a2dfe4 (feat(menu): tag Infinite Wildshard experimental) in
 source order. Keep the behavior and repoint the retained files and
 imports to engine's lifted layout.
+
+Freeze this port's source boundary at 5f70a2dfe4 after including the new
+death repair and the existing Opus-authored menu badge verbatim. The
+Settings export/import proof passes 3/3 with the destination identity
+kept. Death codec/owner/room checks pass 35 tests; title checks pass 13.
+The candidate-source and commit-boundary checks pass five tests across
+three files. Type the death proof's observed fields and retain the
+actual boolean checkpoint contract. Keep wrapper timing comments in
+step with its direct installed-hook execution.

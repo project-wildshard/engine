@@ -58,7 +58,7 @@ export async function driftwoodDeath(browser, phone, base, step) {
       const out = await page.evaluate(() => ({ ...(/** @type {WorkerWindow} */ (window)).__deathProof, falls: (/** @type {WorkerWindow} */ (window)).__workerClient().falls,
         server: { x: (/** @type {WorkerWindow} */ (window)).__workerClient().serverX, z: (/** @type {WorkerWindow} */ (window)).__workerClient().serverZ }, causeText: document.querySelector('.ws-combat-death-cause')?.textContent, where: document.querySelector('.ws-combat-death-where')?.textContent,
         overlayEnded: !document.querySelector('.ws-combat-death')?.classList.contains('show'), closed: (/** @type {WorkerWindow} */ (window)).__workerClient().closed }));
-      return { ok: out.falls === before + 1 && out.events.length === 1 && out.events[0].own && out.events[0].checkpoint === false && out.events[0].cause?.kind === 'bear'
+      return { ok: out.falls === before + 1 && out.events.length === 1 && out.events[0].own && !out.events[0].checkpoint && out.events[0].cause?.kind === 'bear'
         && out.start !== null && out.end !== null && out.shown && out.dark && !out.earlyMove && out.overlayEnded && Math.hypot(out.end.x - out.start.x, out.end.z - out.start.z) > 5
         && Math.hypot(out.end.x - out.server.x, out.end.z - out.server.z) < 2
         && out.closed === null && errors.length === 0, ...out, errors };
