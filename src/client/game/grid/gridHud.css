@@ -1,0 +1,47 @@
+/* ─── the grid's player-facing moments (SHARD-PLATFORM SF21a / SF20a / SF20d; src/client/game/grid/reveal.ts, gridHud.ts) ─── prefix ws-grid- ───
+   Grid pages only. G98 the sky-down reveal's layer and caption; G78 the SAFE ZONE chip and the dimmed ATTACK disc on the
+   road; G82 / G105 the centred title card on entering a shard; G97 thin edge speed lines at the deck's 30 m/s. The road's
+   colour is the HUD's own cyan (the reserved 21st accent, G104). */
+
+/* G98: until the reveal's first frame the HUD is hidden; G622 D1: while the camera comes down (.ws-grid-live) it is
+   invisible but takes touches, so the touch that skips is already the player's stick or look; the reveal's layer only shows */
+.ws-grid-revealing:not(.ws-grid-live) > * { visibility: hidden; }
+.ws-grid-revealing.ws-grid-live > :not(.ws-grid-reveal) { opacity: 0; }
+.ws-grid-reveal { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 20); pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 10, 18, 0.55) 0%, rgba(6, 10, 18, 0) 18%, rgba(6, 10, 18, 0) 72%, rgba(6, 10, 18, 0.6) 100%); }
+.ws-grid-reveal-caption { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 56px); display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; animation: ws-grid-rise 0.9s ease-out both; }
+.ws-grid-reveal-caption b { font-family: var(--ws-display); font-weight: 700; font-size: 22px; letter-spacing: 0.2em; text-indent: 0.2em; text-transform: uppercase; color: #eaf8ff; text-shadow: 0 0 14px rgba(143, 227, 255, 0.45), 0 2px 16px rgba(0, 0, 0, 0.6); }
+.ws-grid-reveal-caption b::after { content: ''; display: block; width: 44px; height: 2px; margin: 10px auto 0; background: var(--ws-cyan); box-shadow: 0 0 10px var(--ws-cyan); }
+.ws-grid-reveal-caption span { font: 11px/1 var(--ws-mono); letter-spacing: 0.24em; text-transform: uppercase; color: rgba(189, 238, 255, 0.75); }
+.ws-grid-reveal.skipped .ws-grid-reveal-caption span { visibility: hidden; }
+
+/* G78: the safe zone. ATTACK dims (the weapon is stowed, G68) and the chip sits above it inside the touch layer's geometry */
+.ws-touch-attack.ws-grid-dim { opacity: 0.38; filter: saturate(0.3); }
+.ws-grid-safe-chip { position: absolute; display: none; align-items: center; gap: 5px; padding: 4px 9px 4px 7px; z-index: calc(var(--ws-layer-hud) + 2); pointer-events: none;
+  left: 50%; top: calc(16px + env(safe-area-inset-top, 0px) + 44px); transform: translateX(-50%);
+  background: rgba(6, 10, 18, 0.72); border: 1px solid rgba(143, 227, 255, 0.55); box-shadow: 0 0 12px rgba(143, 227, 255, 0.22); color: var(--ws-cyan);
+  font: 10px/1 var(--ws-mono); letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+.ws-grid-safe-chip svg { width: 12px; height: 12px; }
+/* on touch: centred over the ATTACK disc (the touch layer's --split / --atk / --bar-in / --safe) */
+.ws-touch > .ws-grid-safe-chip { top: auto; left: calc(var(--split) + var(--atk) / 2); bottom: calc(var(--safe) + (var(--bar-in) + var(--atk)) / 2 + 10px); }
+.ws-grid-safe { --grid-safe: 1; }
+.ws-grid-safe .ws-grid-safe-chip { display: flex; }
+
+/* G82 / G105: the centred title card on entering a shard (the shard's name, its biome line) */
+.ws-grid-title { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 26px 12px; z-index: calc(var(--ws-layer-hud) + 3); pointer-events: none; opacity: 0; visibility: hidden;
+  background: rgba(6, 10, 18, 0.62); border: 1px solid rgba(234, 248, 255, 0.5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.4); }
+.ws-grid-title::before, .ws-grid-title::after { content: ''; position: absolute; left: 12px; right: 12px; height: 1px; background: rgba(234, 248, 255, 0.35); }
+.ws-grid-title::before { top: 4px; }
+.ws-grid-title::after { bottom: 4px; }
+.ws-grid-title b { font-family: var(--ws-display); font-weight: 700; font-size: 24px; letter-spacing: 0.24em; text-indent: 0.24em; text-transform: uppercase; color: #f4fbff; white-space: nowrap; }
+.ws-grid-title span { font: 10px/1 var(--ws-mono); letter-spacing: 0.26em; text-indent: 0.26em; text-transform: uppercase; color: rgba(234, 248, 255, 0.72); white-space: nowrap; }
+.ws-grid-title.show { visibility: visible; animation: ws-grid-card 3.2s ease-in-out both; }
+
+/* G97: thin edge streaks at the deck's speed (--grid-speed 0..1); never over the centre, no blur */
+.ws-grid-speed { --grid-speed: 0; position: absolute; inset: -12%; z-index: var(--ws-layer-hud); pointer-events: none; opacity: calc(var(--grid-speed) * 0.55);
+  background: repeating-conic-gradient(from 1deg at 50% 46%, rgba(235, 248, 255, 0.9) 0deg 0.35deg, transparent 0.35deg 4.2deg);
+  -webkit-mask: radial-gradient(ellipse 60% 54% at 50% 46%, transparent 70%, #000 100%); mask: radial-gradient(ellipse 60% 54% at 50% 46%, transparent 70%, #000 100%); }
+.ws-grid-revealing > .ws-grid-speed { visibility: hidden; }
+
+@keyframes ws-grid-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes ws-grid-card { 0% { opacity: 0; transform: translate(-50%, -46%); } 12% { opacity: 1; transform: translate(-50%, -50%); } 82% { opacity: 1; } 100% { opacity: 0; } }

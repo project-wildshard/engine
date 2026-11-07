@@ -1,0 +1,7 @@
+{
+  "k3060": 0.5556389321070095,
+  "source": "https://browser.geekbench.com/opencl-benchmarks",
+  "assumption": "Projected RTX 3060 / M5 Max throughput = OpenCL 80711 / 145258; replace with measured rtx3060 costs when available",
+  "m5Score": 1371.8628138494462,
+  "benchmarkSource": "progress/normalization/x7-m5-benchmark.json"
+}

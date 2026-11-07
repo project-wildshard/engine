@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "rootDir": "../..",
+    "outDir": "../../.tsc-layers/engine",
+    "tsBuildInfoFile": "../../.tsc-layers/engine-tests.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "../../tsconfig.engine.json"
+    }
+  ],
+  "include": [
+    "../*/engine/**/*.test.ts",
+    "engine/**/*.ts",
+    "../*/engine/**/*.d.ts"
+  ],
+  "exclude": []
+}

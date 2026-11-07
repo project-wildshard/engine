@@ -1,0 +1,16 @@
+{
+  "shardSystems": {
+    "nine-dragon-stack": {
+      "update": {
+        "structures": "shard.nd.world",
+        "bounds": "engine.world.bounds"
+      }
+    }
+  },
+  "bootPacks": {
+    "nine-dragon-stack": {
+      "phone": "boot.files(phone) content-addressed packs replace per-file world requests",
+      "desktop": "boot.files(desktop) content-addressed packs replace per-file world requests"
+    }
+  }
+}

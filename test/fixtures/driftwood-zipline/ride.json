@@ -1,0 +1,9 @@
+{
+  "revision": "3b95f0cb64d4002a1aeb9ac3db1334e0ca4b1a5a",
+  "path": "src/shards/driftwood-isle/world/Zipline.ts",
+  "sourceSha256": "743dab08348d39f10472155405e339d6065f29c06149843c5d4c31a63e7e157e",
+  "start": "    if (this.riding) return;\n    this.riding = true; this.s = 0.4; this.v = 2.5;\n    this.onRide?.(true);",
+  "update": "    if (!this.riding) return;\n    const slope = -(this.at(this.s + 0.5, _p).y - this.at(this.s, this.trolley.position).y) / 0.5;   // + = downhill\n    this.v = Math.min(VMAX, Math.max(1.5, this.v + (G * slope * 0.9 - DRAG * this.v * this.v) * dt));\n    this.s += this.v * dt;\n    this.at(this.s, this.trolley.position);\n    this.trolley.rotation.z = Math.sin(this.s * 0.7) * 0.05;\n    player.position.copy(this.trolley.position); player.position.y -= HANG;\n    player.velocity.set(0, 0, 0);\n    if (this.s >= this.lay.len - 1.6) {\n      // let go: the last of the speed carries you into the straw\n      this.riding = false;\n      const dir = this.lay.dir;\n      player.velocity.set(dir.x * Math.min(6, this.v * 0.4), 1.5, dir.z * Math.min(6, this.v * 0.4));\n      this.parkTrolley();\n      this.onRide?.(false);\n    }",
+  "constants": "const HANG = 2.9;   // the eye rides ~1.2 m under the wire, below the T-bar: the trolley stays out of the view\nconst G = 9.8, DRAG = 0.012, VMAX = 16;",
+  "bodySha256": "2ee6fe6e01dccfda5121068721d33cf076d32d12cef8d0dfd4f7f54761202173"
+}

@@ -1,0 +1,146 @@
+{
+  "sha": "bfb9dc325d08792ddbe88bd08c78fcf288da8851",
+  "recorded": "2026-10-08T06:43:08.720Z",
+  "harness": 2,
+  "selfMin": {
+    "spawn-rail": 1,
+    "well-edge": 1,
+    "stair-street": 1
+  },
+  "boot": {
+    "shard": "nine-dragon-stack",
+    "tier": "desktop",
+    "sha": "bfb9dc325d08792ddbe88bd08c78fcf288da8851",
+    "errors": [],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "browser": "153.0.8010.12",
+    "viewport": {
+      "w": 1600,
+      "h": 900,
+      "dpr": 1,
+      "touch": false
+    },
+    "gpuBytes": {
+      "textures": 440725395,
+      "renderbuffers": 8772864,
+      "buffers": 153247564,
+      "total": 602745823
+    },
+    "render": {
+      "programs": 84,
+      "programKeys": "53f7cf4fc5df302e60c97e3fa5655feabbb7e684de39205b265fea4b05e4b915",
+      "memory": {
+        "geometries": 144,
+        "textures": 79
+      }
+    }
+  },
+  "poses": {
+    "spawn-rail": {
+      "calls": 175,
+      "tris": 1660600
+    },
+    "well-edge": {
+      "calls": 162,
+      "tris": 1382184
+    },
+    "stair-street": {
+      "calls": 148,
+      "tris": 954522
+    }
+  },
+  "budgets": {
+    "D": {
+      "observed": {
+        "draws": 127,
+        "tris": 971722,
+        "programs": 84,
+        "gpuMB": 575.1385869979858
+      }
+    }
+  },
+  "spread": {
+    "boot.gpuBytes.total": 0,
+    "budgets.D.observed.draws": 0,
+    "budgets.D.observed.tris": 0,
+    "budgets.D.observed.programs": 0,
+    "budgets.D.observed.gpuMB": 0
+  },
+  "sourceReportSha256": "df56af2fb4a9054832eaa987984be6056fd6091aa7f45794959184084a76df0f",
+  "sourceReportVerdict": "red",
+  "sourceReportRedFields": [
+    {
+      "field": "budgets.spawn-rail.gpuMB",
+      "baseline": 574.168532371521,
+      "now": 574.8232107162476,
+      "class": "D",
+      "band": "\u2264 574.168532371521",
+      "verdict": "red"
+    },
+    {
+      "field": "budgets.well-edge.gpuMB",
+      "baseline": 574.168532371521,
+      "now": 574.8232107162476,
+      "class": "D",
+      "band": "\u2264 574.168532371521",
+      "verdict": "red"
+    },
+    {
+      "field": "budgets.stair-street.gpuMB",
+      "baseline": 574.168532371521,
+      "now": 574.8232107162476,
+      "class": "D",
+      "band": "\u2264 574.168532371521",
+      "verdict": "red"
+    },
+    {
+      "field": "budgets.D.gpuMB",
+      "baseline": 574.4839086532593,
+      "now": 575.1385869979858,
+      "class": "D",
+      "band": "\u2264 574.4839086532593",
+      "verdict": "red"
+    }
+  ],
+  "runs": [
+    {
+      "run": "run-1",
+      "bootErrors": [],
+      "walkStuck": 0,
+      "gpuBytes": {
+        "textures": 440725395,
+        "renderbuffers": 8772864,
+        "buffers": 153247564,
+        "total": 602745823
+      },
+      "freeCameraGpuMB": 575.1385869979858,
+      "rawSha256": "8579bfa7852c1bae843ac484ffe636d1f3a8e47549085d9a03371ba9c3974165"
+    },
+    {
+      "run": "run-2",
+      "bootErrors": [],
+      "walkStuck": 0,
+      "gpuBytes": {
+        "textures": 440725395,
+        "renderbuffers": 8772864,
+        "buffers": 153247564,
+        "total": 602745823
+      },
+      "freeCameraGpuMB": 575.1385869979858,
+      "rawSha256": "467b2316586635a44f0aa32face8c715fc88681dfad7437b829e3258c26669c2"
+    },
+    {
+      "run": "run-3",
+      "bootErrors": [],
+      "walkStuck": 0,
+      "gpuBytes": {
+        "textures": 440725395,
+        "renderbuffers": 8772864,
+        "buffers": 153247564,
+        "total": 602745823
+      },
+      "freeCameraGpuMB": 575.1385869979858,
+      "rawSha256": "11c82771866f93af1581948bab83cc73b7259379c07c4d8b4f798707ed9dd0e8"
+    }
+  ]
+}

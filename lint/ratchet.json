@@ -1,0 +1,230 @@
+{
+  "allow": {
+    "wildshard/engine-words": {
+      "src/client/engine/boot/bootTrace.ts": "the boot trace record field `shard` reports carry (E405 wire contract)",
+      "src/client/engine/boot/stuck.ts": "the stuck-boot report context field `shard` (E405 wire contract)",
+      "src/client/engine/debug/probe.ts": "the harness probe API: `__wildshard.shard`, the fingerprint field `shard` and `harness.shard.<id>` keys the scripts read (E405 wire contract)",
+      "src/client/engine/models/interact.ts": "the model id `shared/shard-altar` the parity baselines read (E405 wire contract)",
+      "src/client/engine/telemetry/bootInbox.ts": "the boot inbox report context field `shard` the API stores (E405 wire contract)",
+      "src/client/engine/telemetry/browserErrors.ts": "the Sentry tag and context field `shard`: the error dashboards filter on it (E405, Jake: wire contracts keep their names)",
+      "src/client/engine/ui/ErrorModal.ts": "the error report payload field `shard` (E405 wire contract)",
+      "src/client/engine/ui/Feedback.ts": "the feedback payload field `shard` the inbox server stores (E405 wire contract)",
+      "src/client/engine/ui/perfLap.ts": "the perf-lap report field `shard` (E405 wire contract)",
+      "src/client/engine/ui/perfLapSummary.ts": "the perf-lap report field `shard` (E405 wire contract)",
+      "src/shared/engine/core/perfLap.ts": "the perf-lap report field `shard` (E405 wire contract)"
+    },
+    "wildshard/no-raw-random-time": {
+      "src/client/engine/audio/SetScore.ts": "performance.now measures decode elapsed cost only; never gameplay state.",
+      "src/client/engine/boot/bootTrace.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/boot/gpuTrace.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/boot/plan.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/calibrate/js.ts": "E357 S1.6 synthetic calibration elapsed-cost measurement only; no gameplay state.",
+      "src/client/engine/calibrate/run.ts": "E357 S1.6 synthetic calibration elapsed-cost measurement only; no gameplay state.",
+      "src/client/engine/core/errorReport.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/render/calibrationGpu.ts": "E357 S1.6 synthetic calibration elapsed-cost measurement only; no gameplay state.",
+      "src/client/engine/render/precompile.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/ui/Perf.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/ui/perfHud.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/ui/perfLap.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/client/engine/ui/perfProbe.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state.",
+      "src/shared/engine/core/frameCost.ts": "performance.now measures elapsed cost or diagnostic timing; never gameplay state."
+    },
+    "shardfile/sim-in-runtime": {}
+  },
+  "budgets": {
+    "js/title/raw": 350000,
+    "js/title/gzip": 110000,
+    "js/grid-session/raw": 300000,
+    "js/grid-session/gzip": 100000,
+    "js/session/raw": 4400000,
+    "js/session/gzip": 1360000,
+    "sim-in-runtime/_template": 0,
+    "sim-in-runtime/blender-template": 0,
+    "sim-in-runtime/driftwood-isle": 0,
+    "sim-in-runtime/far-reach": 0,
+    "sim-in-runtime/ink-cel-valley": 0,
+    "sim-in-runtime/nalati-grasslands": 0,
+    "sim-in-runtime/nine-dragon-stack": 0,
+    "sim-in-runtime/open-plots": 0,
+    "sim-in-runtime/pastel-plain": 0,
+    "sim-in-runtime/pine-hollow": 0,
+    "sim-in-runtime/sunscar-dunes": 0,
+    "custom-sections/total": 0
+  },
+  "debugRows": {
+    "max": 4,
+    "raisedBy": [
+      "E357",
+      "E435",
+      "E444",
+      "G451",
+      "E453"
+    ],
+    "review": "SF16 removes template.oil from declared plumbing: 29 to 28. Full inventory and retirement conditions: progress/shard-platform/sf16-debug-rows.md. New independent variants need explicit reviewed capacity.; SF24: default-off Driftwood director, retires with the SF46 decision; E435 approved +1 for SF24 driftwood.director, default-off variant retired by the SF46 decision; SF17b: E435 coordinator-directed +1 for the default-off gridRoadCull row (AGENTS.md risky-render rule), retired under G112 once parity captures and a quiet frame floor flip it on; G112 flip: the quiet frame floor on 231ec70db was green with the cull ON, so the cull is the only path and the row is deleted: 30 to 29; SF56: E444 coordinator-approved +1 for the default-off measureLook row (Template 1's dev-map look, data-declared measure layer), deleted with the losing look when Jake picks from the A / B board: 29 to 30; G163: Jake picked B; the measureLook row is deleted: 30 to 29; G144: E435 wildshard-new approved +1 for gridMemoryAdmission, default off with reload and reviewBy 2026-12-30, retired under G112 after INFINITE enters with Driftwood admitted and its proof is green: 29 to 30; SF57b: Jake G159 asked for the default-off fresh-document grid exit row (built whatever SF57's verdict): 30 to 31, retired when Jake picks or SF57 qualifies; G144: E435 wildshard-new approved +1 for the default-off reload row driftwoodGpuOnlyCopies (Driftwood's world meshes free their JS vertex copies after upload, pixel-identical), retired under G112 once parity and the quiet frame floor are green: 31 to 32; SF47-g: E435 wildshard-new approved +1 for the default-off reload row pineMemoryTrim (Pine's own invisible memory cuts: the HDRI sky keys as RGB9_E5), retired under G112 once parity and the quiet frame floor are green: 32 to 33; G144: E435 brief-approved +1 for the default-off reload row driftwoodIslandInstancing (the Blender island's placements as one InstancedMesh per prototype instead of merged tiles, about -97 MB GPU, no look change), retired under G112 once parity and the quiet frame floor are green: 33 to 34; SF51-g: E435 wildshard-new approved +1 for the default-off reload row nineDragonEntries (Nine Dragon's four stone landing decks at road height, a look change for Jake's board), deleted with the losing path when Jake picks: set to the measured count, 35 (with SF49-g's farReachEntries in the tree); SF48: E435 wildshard-new approved the default-off reload row nalatiHybrid, Loading and memory, retires under G112 after parity and home residency; capacity set to the measured 36 rows; SF47: E435 wildshard-new approved the default-off reload row pineHybrid, Loading and memory, retires under G112 after parity and home residency; capacity set to the measured 37 rows; G171: Jake picked never fade-reload; SF57b row and feature removed, debugRows -1, continuous traversal only.; SF59: E435 wildshard-new approved +1 for the default-off reload row graphMaterials (Look: shardfile graph materials compile through the lazy TSL back-end, else their family presets), retired under G112 after a physical-iPhone reading and the quiet frame floor with the row ON: 37 to 38; G173: Jake picked both Driftwood memory rows ON (E450); driftwoodGpuOnlyCopies and driftwoodIslandInstancing are deleted with the copy-retaining and merged-tile paths: 38 to 36; G175: Jake turned Grid one frame on for everyone with the 16 m edge blend (E450); the gridOneFrame row is deleted: 36 to 35; G181: Jake picked Big item cards (E450); the itemCards row is deleted with the Classic toast, flip deck and barter slate: 35 to 34; G172: Jake shipped the G164 drop (E450); the driftwoodHybrid row and the legacy undropped Driftwood boot are deleted, the hybrid boot is the only path: 34 to 33; G112: wildshard-new approved the only metered grid path after Developer/shipped admission and return-trip proof 812e578a7; gridMemoryAdmission retired: 33 to 32; playing cap unchanged; SF61 E435/E451: wildshard-new approved the Developer/comparison metadata split; full inventory shrinks comparison capacity from 32 to the actual 10. Nineteen Developer tools retain owner/review checks without comparison capacity; recorded winners retired and music remains a normal preference.; SF61 E435/E451: wildshard-new approved sfxSet as a Developer audition tool with the current Best take shipping; comparison capacity10 to the actual9,20 Developer tools, no new taste pick.; G194: E435 wildshard-new directed: Sky Reach's Rising Islet rides walk 4 of 4 with 0 stuck (progress/shard-platform/g183), so the entries are the only path and the farReachEntries row and its off path are deleted: comparison capacity 9 to 8.; G224: Jake replaced the lantern lift with portals; every Nine Dragon deck portals to Lantern Square, so the nineDragonEntries row and its no-deck path are deleted with the lift (G194): comparison capacity 8 to 7.; G223: E435 wildshard-new approved +1 for the default-off reload row regionSky (Sky & weather: A one grid sky / B a grid region's own sky inside its cell), the A / B for Jake's pick only (E451: as few rows as possible); deleted with the losing branch when Jake picks: comparison capacity 7 to 8.; G232 (SF63): Jake picked B, each region keeps its own sky, light, fog and grade inside its cell; the Region look row (G223 Region sky) and the one-grid-look path are deleted: 8 to 7.; SF65 (G239): the SHARD SELECT LEGACY / SHARDFILE buttons replace the pineHybrid and nalatiHybrid rows, deleted with their reads: comparison capacity 7 to 5.; SF72 pick (c): E435 wildshard-new approved +1 for the reload row driftwood-isle.pierRamps (Look: Driftwood pier ramps, flared default / the old straight ramps), the A / B for Jake's pick only; deleted with the losing ramp when Jake picks: comparison capacity 5 to 6.; op-lut20: E435 wildshard-new approved +1 for the default-off reload row gridDeclaredLut (Look: a grid cell carries the learned LUT its look declares, ExtendLook.lut, i.e. Nine Dragon's Jiehua LUT; a look change for Jake's A / B board), deleted with the losing path when Jake picks: comparison capacity 6 to 7.; op-frame21: E435 wildshard-new approved +1 for the default-off reload row gridCellComposite (Look: a grid cell runs the post composite its look declares, ExtendLook.cell, i.e. Nine Dragon's Jiehua and Sky Reach's NEUTRAL tone curve; a look change for Jake's A / B boards, reviewBy 2026-12-30), deleted with the losing path when Jake picks: comparison capacity 7 to 8.; G322: Jake picked B for both grid look rows (Nine Dragon's Jiehua composite + learned LUT, Sky Reach's neutral tone curve inside their cells); gridDeclaredLut and gridCellComposite are deleted with their off paths: comparison capacity 8 to 6.; G327: Jake picked A for Driftwood's grid-cell shadows (\"I don't see any difference so A\"); the regionShadowFocus row, regionShadow.ts and SkyRig.focusCascade are deleted: comparison capacity 6 to 5.; G321 part 5 (op-sky46): E435 wildshard-new pre-approved +1 for the default-off reload row gridSkyEnvironment (Sky & weather: A no sky environment in a backdrop-less painted-sky level's grid cell / B its standalone painted-sky environment swapped in at half weight on its sky claim, ~1.6 MB), the A / B for Jake's pick only, reviewBy 2026-12-30; deleted with the losing path when Jake picks: comparison capacity 5 to 6.; G321 (sp-o2): Jake decided each shard keeps its own sky, light and grade inside its cell (E451: the row goes the moment it is decided); gridSkyEnvironment is deleted with its off path, a backdrop-less painted-sky level's cell always carries its sky environment: comparison capacity 6 to 5.; G338 (sp-o1): wildshard-new directed +1 for the live row mainMenuLayout (Look: A the full-screen painted hero with the cards over it / B the real landscape hero as a band in the centre, logo above, cards below, nothing over the image), default A, the A / B for Jake's pick only, reviewBy 2026-12-30; deleted with the losing layout when Jake picks: comparison capacity 5 to 6.; G341: Jake picked B on portrait and A on landscape, both with the L-b hero; the mainMenuLayout row is deleted and the layout follows the screen orientation: comparison capacity 6 to 5.; G342 (sp-o17): wildshard-new brief-approved +1 for the reload row nearTier (Look: A far proxy / B near placeholder around the crossroads), default A, the A / B for Jake's pick only, reviewBy 2026-12-30; deleted with the losing path when Jake picks: comparison capacity 5 to 6.; G345 taste variant (sp-o24): wildshard-new brief-approved +1 for the reload row sunscar.look (Look: Signal look, A the current hand-written fires / B the fires on standard materials, flipbook on basic materials, baked radial glow, pool and smoke, CPU embers), default A, the A / B for Jake's pick only, reviewBy 2026-12-30; deleted with the losing look when Jake picks: comparison capacity 6 to 7.; SF61 (sp-o94): G180/G187 picked Pine's memory trim; the pineMemoryTrim row is deleted (8ebbf72ba), the trim stays on in the grid and off standalone (the frozen pine-hollow-legacy copy still counts): comparison capacity 7 to 5.; SF61 (sp-o94): the gridDevserverCell row (a DEVSERVER-only swap with no pending pick, E451) is deleted (af889bfea); a DEVSERVER build always places its cell: comparison capacity 5 to 4.; G385 (sp-o117): Jake shipped B, the near tier for everyone; the nearTier row (Neighbour detail) is deleted with its far-proxy-only A path, C stays a capture-only harness pin: comparison capacity 4 to 3.; G386 (sp-o119): Jake picked B, KTX2 for Pine's phone textures; the GPU textures row (tex: Auto / KTX2 / Images, E157) is deleted with its option and strings (c5e3f52fa), Pine's phone tier declares KTX2, and tests / captures pin a mode through the harness pin __wildshardHarness.textures: comparison capacity 3 to 2.; G437 (sp-x6): E435 wildshard-new approved +1 for the default-off reload row fixedShadowSamples (engine: fold the DepthTexture Y convention at shader build, ~870 fewer flip samplers per program, -0.40 ms/frame graph CPU on DW; DW pixel-identical, Pine a tiny horizon delta max 23), AGENTS.md risky-render rule; retired under G112 when Jake picks or a device reading and the quiet frame floor are green with it ON.; G451: coordinator-approved +1 for gridBootPrograms (default off, reload), one explicitly selected admitted grid cell prepared under the loader with page-owned native program references. Risky rendering/memory lifetime rule applies; retire after a device reading and quiet frame floor are green with it on.; OP3: E435 wildshard-new brief-approved +1 for the default-off live row nodeStaging (Performance: a live warm-up runs each node build in steps over painted frames before its compile uses it; same builder, same shaders), AGENTS.md risky-render rule; retired under G112 when the Simulator floor and a device reading are green with it on: 4 to 5.; G527 (sp-o5): wildshard-new brief-approved +1 for the live row measurePlain (Look: Template 2's dev map, default, or its earlier Blender clay; a shardfile measure layer's plainVariant), deleted with the losing look and the field when Jake has played it: 5 to 6.; G669 DR15 deletes the legacy Pine score audition row and the declared score pin; comparison capacity 6 to 5.; G669 DR16 ships Pine memory trim and deletes its comparison row: capacity 5 to 4.; G685 (sp-o3): Jake's E453 / G735 brief, +1 for the live row toonClouds (Look: A a toon sky's faceted cumulus, default / B the toon cel cumulus its clouds row declares), the A / B for Jake's pick only, reviewBy 2026-12-30; deleted with the losing clouds and the field when Jake picks: 4 to 5.; G750 (sp-o3): Jake picked B, the toon cel cumulus ships on Driftwood; the toonClouds row, the toon variant field and the faceted clouds are deleted: 5 to 4."
+  },
+  "wildshard/generator-imports": {
+    "src/shards/far-reach/generators/bake-sky-world.mjs": 4,
+    "src/shards/far-reach/generators/creatures.ts": 1,
+    "src/shards/far-reach/generators/movers.ts": 2,
+    "src/shards/far-reach/generators/rows/items.ts": 1,
+    "src/shards/far-reach/generators/rows/rocFight.ts": 1,
+    "src/shards/far-reach/generators/skyDock.ts": 1,
+    "src/shards/nalati-grasslands/generators/bake-nalati-bodies.mjs": 4,
+    "src/shards/nalati-grasslands/generators/bake-nalati-places.mjs": 2,
+    "src/shards/nalati-grasslands/generators/campProps.ts": 1,
+    "src/shards/nalati-grasslands/generators/kunesBridge.ts": 1,
+    "src/shards/nalati-grasslands/generators/nalatiGroundSource.ts": 1,
+    "src/shards/nalati-grasslands/generators/nalatiWorldRows.ts": 1,
+    "src/shards/nalati-grasslands/generators/output.ts": 13,
+    "src/shards/nalati-grasslands/generators/places.ts": 2,
+    "src/shards/nalati-grasslands/generators/stormTitanRows.mjs": 2,
+    "src/shards/nalati-grasslands/generators/titanFireView.ts": 2,
+    "src/shards/nalati-grasslands/generators/titanWhirlsView.ts": 2,
+    "src/shards/nalati-grasslands/generators/yard.ts": 1,
+    "src/shards/nalati-grasslands/generators/yurt.ts": 1,
+    "src/shards/nine-dragon-stack/generators/bake-glyphs.mjs": 2,
+    "src/shards/nine-dragon-stack/generators/bake-sign-atlas.mjs": 2,
+    "src/shards/open-plots/generators/tiledPlot.mjs": 3,
+    "src/shards/pine-hollow/generators/bake-hdri-keys.mjs": 4,
+    "src/shards/pine-hollow/generators/bake-pine-code-parts.mjs": 1,
+    "src/shards/pine-hollow/generators/bake-pine-painted.mjs": 1,
+    "src/shards/pine-hollow/generators/bake-pine-rain.mjs": 1,
+    "src/shards/pine-hollow/generators/bake-pine-spray.mjs": 1,
+    "src/shards/pine-hollow/generators/bake-pine-thrall-extras.mjs": 1,
+    "src/shards/pine-hollow/generators/bake-pine-trophies.mjs": 1,
+    "src/shards/pine-hollow/generators/sections.ts": 7,
+    "src/shards/sunscar-dunes/generators/landscape.ts": 1,
+    "src/shards/sunscar-dunes/generators/rows/headlessOwners.ts": 1
+  },
+  "wildshard/no-raw-random-time": {
+    "src/client/engine/audio/audioLog.ts": 1,
+    "src/client/engine/audio/Music.ts": 2,
+    "src/client/engine/audio/Stems.ts": 2,
+    "src/client/engine/boot/bootTrace.ts": 1,
+    "src/client/engine/boot/shardPrefetch.ts": 2,
+    "src/client/engine/boot/stuck.ts": 1,
+    "src/client/engine/core/GpuRecovery.ts": 2,
+    "src/client/engine/core/webglStartup.ts": 2,
+    "src/client/engine/debug/probe.ts": 3,
+    "src/client/engine/explore/catalog.ts": 4,
+    "src/client/engine/explore/ModelExplorer.ts": 1,
+    "src/client/engine/explore/Select.ts": 2,
+    "src/client/engine/explore/TouchFly.ts": 4,
+    "src/client/engine/explore/viewPoint.ts": 2,
+    "src/client/engine/player/LockOnTarget.ts": 3,
+    "src/client/engine/player/TouchControls.ts": 5,
+    "src/client/engine/player/WeaponPickup.ts": 2,
+    "src/client/engine/ui/Combat.ts": 1,
+    "src/client/engine/ui/EliteBar.ts": 1,
+    "src/client/engine/ui/ErrorModal.ts": 1,
+    "src/client/engine/ui/HUD.ts": 1,
+    "src/client/engine/ui/Loading.ts": 4,
+    "src/client/engine/ui/Map.ts": 1,
+    "src/client/engine/ui/Minimap.ts": 3,
+    "src/client/engine/ui/ToastStack.ts": 2,
+    "src/server/engine/entities/AnimalManager.ts": 4,
+    "src/shared/engine/physics/navmesh.ts": 6,
+    "src/shared/engine/physics/Physics.ts": 2,
+    "src/client/game/session/finish.ts": 2,
+    "src/client/game/session/play.ts": 8,
+    "src/client/game/titleDeck.ts": 4
+  },
+  "wildshard/no-runtime-in-build": {
+    "src/shards/nalati-grasslands/generators/bake-nalati-bodies.d.mts": 1,
+    "src/shards/nalati-grasslands/generators/horseBody.ts": 1
+  },
+  "wildshard/sdk-no-facade": {
+    "src/sharddev/kit/bakedGeometry.ts": 7,
+    "src/sharddev/phasedBoss.ts": 9,
+    "src/sharddev/species/clips.ts": 11,
+    "src/sharddev/speciesBrains.ts": 3,
+    "src/sharddev/weapons/bowProfile.ts": 1,
+    "src/sharddev/weapons/meleeProfile.ts": 2
+  },
+  "wildshard/shard-engine-imports": {
+    "src/shards/far-reach/generators/creatures.ts": 1,
+    "src/shards/far-reach/generators/movers.ts": 1,
+    "src/shards/nalati-grasslands/generators/campProps.ts": 1,
+    "src/shards/nalati-grasslands/generators/kunesBridge.ts": 1,
+    "src/shards/nalati-grasslands/generators/places.ts": 2,
+    "src/shards/nalati-grasslands/generators/yard.ts": 1,
+    "src/shards/nalati-grasslands/generators/yurt.ts": 1
+  },
+  "wildshard/shard-game-imports": {
+    "src/shards/driftwood-isle/blender/fp-arms/bake.mjs": 1
+  },
+  "wildshard/shard-game-plugins": {
+    "src/shards/driftwood-isle/blender/fp-arms/bake.mjs": 1
+  },
+  "wildshard/shard-sandbox": {
+    "src/shards/pine-hollow/generators/coatProducer.ts": 1
+  },
+  "closedComponents": {
+    "far-reach": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9"
+    ],
+    "sunscar-dunes": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9"
+    ],
+    "pine-hollow": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9"
+    ],
+    "driftwood-isle": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9"
+    ],
+    "nalati-grasslands": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9"
+    ],
+    "nine-dragon-stack": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9"
+    ]
+  }
+}

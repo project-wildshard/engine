@@ -4,7 +4,7 @@
 //   1. Print the staged set, so a file swept in from another agent's
 //      work in this shared checkout is loud.
 //   2. `git diff --cached --check`: whitespace errors, conflict markers.
-//   3. Per staged blob: 1 MB cap, credential scan, bash / module syntax.
+//   3. Per staged blob: 25 MB cap, credential scan, bash / module syntax.
 //   4. Journal: 30+ changed lines need a project/journal/*.md entry
 //      staged (D25; SKIP_JOURNAL=1).
 //   5. Staged ask files pass src/scripts/asks.mjs check.

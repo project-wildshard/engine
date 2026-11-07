@@ -1,0 +1,22 @@
+{
+  "pine-hollow": {
+    "geometry": {
+      "position": "80422bc3d307b4a25bdafcc84ac7fb01cb55a09810e8b0f37bb12e0edb5c48ca",
+      "seed": "becdc5cfff0644fc3c3b4006aabc6c82b260e5d66b47269ea6a2957affb67245",
+      "corner": "31c4643f725822b5ab305e164b5861e960fbf6efcf6917330c72d1743e1d36f3",
+      "index": "ee19837fb254afcd1567874fe971d51718a473b4154deabffa4a23a78c3432f2"
+    },
+    "vertexShader": "24dc9a1f2da5834cf96e67556e36682725055adc0a50a04892e0713e061e8b69",
+    "fragmentShader": "f5c4032ee2404ff0899a4d09e7909d4623c870c4aa11e29569f9b43af6c2c87f"
+  },
+  "nalati-grasslands": {
+    "geometry": {
+      "position": "80422bc3d307b4a25bdafcc84ac7fb01cb55a09810e8b0f37bb12e0edb5c48ca",
+      "seed": "becdc5cfff0644fc3c3b4006aabc6c82b260e5d66b47269ea6a2957affb67245",
+      "corner": "31c4643f725822b5ab305e164b5861e960fbf6efcf6917330c72d1743e1d36f3",
+      "index": "ee19837fb254afcd1567874fe971d51718a473b4154deabffa4a23a78c3432f2"
+    },
+    "vertexShader": "a591a175c805efc8192d3e364eef84a5065e3f44f58e2b8a6ef90f62ec5e5ee1",
+    "fragmentShader": "22f5b13959fdd1bbb4414bd620d88a9ac40e9fd7a9fd0f06b731c5c3d1387764"
+  }
+}

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crossroads rig</title>
+<!-- SF22a measurement tool, not game code: scripts/crossroads-rig/README in rig.js's header. three is staged next to
+     this page by stage.sh (node_modules/three/build/three.module.js + three.core.js). -->
+<script type="importmap">{ "imports": { "three": "./three.module.js" } }</script>
+<style>
+  html, body { margin: 0; height: 100%; background: #8fa3b8; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; left: 8px; top: 8px; font: 11px/1.35 ui-monospace, Menlo, monospace; color: #fff;
+    background: rgba(0,0,0,.45); padding: 6px 8px; border-radius: 6px; white-space: pre; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hud">crossroads rig: starting</div>
+<script type="module" src="./rig.js"></script>
+</body>
+</html>

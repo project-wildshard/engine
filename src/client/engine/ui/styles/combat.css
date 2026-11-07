@@ -1,0 +1,97 @@
+/* ─── hunting feedback (src/client/engine/ui/Combat.ts): health bars over animals + floating damage / MISS text ─── prefix ws-combat- ─── */
+.ws-combat-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; font-family: var(--ws-mono); }
+#hud.intro .ws-combat-layer { display: none; }
+
+/* ── health bar: anchored at the projected head point (translate3d set per frame), centred above it ── */
+.ws-combat-hp { position: absolute; left: -44px; top: -30px; width: 88px; opacity: 0; transition: opacity 0.2s; will-change: transform; }
+.ws-combat-hp.show { opacity: 1; }
+.ws-combat-hp-kind { display: block; text-align: center; font-size: 8.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-text); text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9); margin-bottom: 3px; }
+.ws-combat-hp-track { position: relative; height: 5px; background: rgba(6, 10, 18, 0.72); border: 1px solid rgba(143, 227, 255, 0.4); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(143, 227, 255, 0.15); overflow: hidden; }
+.ws-combat-hp-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: 0 50%; background: var(--ws-cyan); box-shadow: 0 0 6px rgba(143, 227, 255, 0.6); transition: transform 0.25s ease-out, background 0.25s; }
+.ws-combat-hp.low .ws-combat-hp-fill { background: var(--ws-amber); box-shadow: 0 0 6px rgba(255, 181, 71, 0.6); }
+.ws-combat-hp.crit .ws-combat-hp-fill { background: var(--ws-red); box-shadow: 0 0 6px rgba(255, 90, 74, 0.6); }
+.ws-combat-hp.dead .ws-combat-hp-kind { color: var(--ws-text-dim); }
+.ws-combat-hp.dead .ws-combat-hp-track { border-color: rgba(255, 90, 74, 0.5); }
+
+/* ── floating text: damage number, HEADSHOT / KILL label, MISS ── */
+.ws-combat-float { position: absolute; left: 0; top: 0; display: none; flex-direction: column; align-items: center; margin: -22px 0 0 -60px; width: 120px; text-align: center; will-change: transform, opacity; }
+.ws-combat-float.show { display: flex; }
+.ws-combat-float b { font-family: var(--ws-display); font-weight: 700; font-size: 26px; line-height: 1; letter-spacing: 0.04em; color: #fff; text-shadow: 0 0 10px rgba(143, 227, 255, 0.55), 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
+.ws-combat-float i { display: none; margin-top: 3px; font-style: normal; font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ws-amber); text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9); }
+.ws-combat-float i:not(:empty) { display: block; }
+.ws-combat-float.head b { font-size: 36px; color: #fff4c2; text-shadow: 0 0 14px rgba(255, 210, 90, 0.7), 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
+.ws-combat-float.kill b { color: #ffd2cc; text-shadow: 0 0 14px rgba(255, 90, 74, 0.75), 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
+.ws-combat-float.kill i { color: var(--ws-red); }
+.ws-combat-float.head.kill b { color: #fff4c2; }
+.ws-combat-float.miss b { font-size: 20px; font-weight: 600; letter-spacing: 0.18em; color: rgba(196, 220, 232, 0.75); text-shadow: 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
+
+@media (max-width: 720px) {
+  .ws-combat-hp { left: -36px; width: 72px; top: -26px; }
+  .ws-combat-float b { font-size: 22px; }
+  .ws-combat-float.head b { font-size: 30px; }
+}
+
+/* ── hurt direction (src/client/engine/ui/HurtArc.ts): a red tapered arc on a ring round the crosshair, turned toward the attacker ── */
+.ws-combat-hurt { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+#hud.intro .ws-combat-hurt { display: none; }
+.ws-combat-hurt-arc {
+  --ws-hurt-w: 50deg;
+  position: absolute; left: 50%; top: 50%; width: min(64vmin, 440px); aspect-ratio: 1; translate: -50% -50%;
+  display: none; border-radius: 50%; will-change: transform, opacity;
+  background: conic-gradient(from calc(var(--ws-hurt-w) * -0.5), rgba(255, 70, 52, 0) 0deg, rgba(255, 70, 52, 0.95) calc(var(--ws-hurt-w) * 0.5), rgba(255, 70, 52, 0) var(--ws-hurt-w), rgba(255, 70, 52, 0) 360deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 80%, #000 83%, #000 95%, transparent 97%);
+  mask: radial-gradient(circle closest-side, transparent 80%, #000 83%, #000 95%, transparent 97%);
+  filter: drop-shadow(0 0 6px rgba(255, 60, 40, 0.7));
+}
+.ws-combat-hurt-arc.show { display: block; }
+
+/* ── off-screen wind-up warning (src/client/engine/ui/WindupWarn.ts, E297): an amber chevron on a navy glass disc at the screen edge
+   toward an enemy winding up where you can't see it — the "look out" before HurtArc's red "hit from there" after.
+   Placed / turned / pulsed per frame by JS (rotate 0 = pointing right, outward); no CSS animation loop (E142) ── */
+.ws-combat-warn { position: absolute; left: 0; right: 0; top: env(safe-area-inset-top, 0px); bottom: env(safe-area-inset-bottom, 0px); overflow: hidden; pointer-events: none; }
+#hud.intro .ws-combat-warn { display: none; }
+/* touch: the marks keep above the control bar and the action row (touch.css: --bar-in + half the home inset + a disc) */
+#hud.touch .ws-combat-warn { bottom: calc(max(15vh, 104px) + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px)) * 0.5 + min(15vw, 84px) + 22px); }
+.ws-combat-warn-mark {
+  position: absolute; left: 0; top: 0; width: 38px; height: 38px; margin: -19px 0 0 -19px; display: none; will-change: transform, opacity;
+  border-radius: 50%; background: rgba(13, 27, 38, 0.8); border: 1px solid var(--ws-amber);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 0 14px rgba(255, 181, 71, 0.55), inset 0 0 8px rgba(255, 181, 71, 0.25);
+}
+.ws-combat-warn-mark.show { display: block; }
+/* the chevron, pointing out of the screen toward the attacker (a thick "›"), and a second one outside the disc: "incoming" */
+.ws-combat-warn-mark::before, .ws-combat-warn-mark::after {
+  content: ''; position: absolute; top: 50%; background: var(--ws-amber);
+  clip-path: polygon(0 0, 55% 0, 100% 50%, 55% 100%, 0 100%, 45% 50%);
+}
+.ws-combat-warn-mark::before { left: 11px; width: 16px; height: 20px; margin-top: -10px; filter: drop-shadow(0 0 3px rgba(255, 181, 71, 0.9)); }
+.ws-combat-warn-mark::after { left: 40px; width: 9px; height: 14px; margin-top: -7px; opacity: 0.85; }
+
+/* ── death (src/client/engine/ui/DeathFade.ts, E295): the view fades to dark (the veil, --ws-death-veil 0..1 set per frame), a glass
+   card names the killer and where you come back, the respawn happens under the dark, the view fades back in ── */
+.ws-combat-death {
+  --ws-death-veil: 0;
+  position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 58); display: none; align-items: center; justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 22px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  pointer-events: none; font-family: var(--ws-mono); color: var(--ws-text);
+}
+.ws-combat-death.show { display: flex; }
+.ws-combat-death::before {
+  content: ''; position: absolute; inset: 0; opacity: var(--ws-death-veil);
+  background: radial-gradient(ellipse at 50% 46%, #0a121b 0%, #04070c 62%, #010204 100%);
+}
+.ws-combat-death-card {
+  position: relative; width: 100%; max-width: 340px; padding: 18px 18px 16px; text-align: center; will-change: opacity, transform;
+  background: rgba(13, 27, 38, 0.82); border: 1px solid var(--ws-cyan-line);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 10px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(143, 227, 255, 0.12);
+}
+.ws-combat-death-card > .cb { position: absolute; width: 14px; height: 14px; border: 0 solid var(--ws-cyan); opacity: 0.9; }
+.ws-combat-death-card > .cb.tl { left: -1px; top: -1px; border-width: 1px 0 0 1px; }
+.ws-combat-death-card > .cb.tr { right: -1px; top: -1px; border-width: 1px 1px 0 0; }
+.ws-combat-death-card > .cb.bl { left: -1px; bottom: -1px; border-width: 0 0 1px 1px; }
+.ws-combat-death-card > .cb.br { right: -1px; bottom: -1px; border-width: 0 1px 1px 0; }
+.ws-combat-death-cause {
+  font-family: var(--ws-display); font-weight: 700; font-size: 22px; line-height: 1.15; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #ffe2dc; text-shadow: 0 0 14px rgba(255, 90, 74, 0.55), 0 2px 3px rgba(0, 0, 0, 0.8);
+}
+.ws-combat-death-rule { width: 56px; height: 1px; margin: 11px auto 10px; background: var(--ws-cyan-line); }
+.ws-combat-death-where { font-size: 10px; line-height: 1.5; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); }

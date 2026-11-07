@@ -1,0 +1,70 @@
+/* STEED: an amber bar under VITALS (desktop: a panel over the health panel; touch: a strip over the vitals strip) */
+.ws-ride-steed { position: absolute; left: 22px; bottom: 92px; width: 250px; padding: 7px 14px 9px; display: none; pointer-events: none; }
+.ws-ride-steed.show { display: block; }
+.ws-ride-steed .ws-ride-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ws-ride-steed .ws-ride-glyph { width: 18px; height: 18px; display: block; }
+.ws-ride-steed .ws-ride-glyph svg { width: 100%; height: 100%; fill: #fff; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.6)); }
+.ws-ride-steed .ws-ride-gait { font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase; color: #ffd98a; }
+.ws-ride-steed .ws-ride-name { font-family: var(--ws-display); font-weight: 700; font-size: 15px; letter-spacing: 0.12em; color: #fff; text-transform: uppercase; }
+.ws-ride-steed .ws-ride-sbar { position: relative; margin-top: 6px; height: 5px; background: rgba(255, 196, 74, 0.16); overflow: hidden; }
+.ws-ride-steed .ws-ride-sbar i { position: absolute; left: 0; top: 0; bottom: 0; background: #ffc44a; box-shadow: 0 0 10px rgba(255, 196, 74, 0.7); transition: width 0.2s linear; }
+.ws-ride-steed.winded .ws-ride-sbar i { background: #ff7a4a; }
+/* touch: a row of the base HUD's status column (src/client/engine/ui/hudSlots.ts, the `.ws-touch-row` box) — the horse, its name, the
+   amber bar, the gait, on an amber hairline */
+.ws-ride-steed.ws-ride-touch { position: relative; left: auto; bottom: auto; width: 170px; padding: 3px 9px; border-color: rgba(255, 196, 74, 0.45); display: none; }
+.ws-ride-steed.ws-ride-touch.show { display: flex; gap: 6px; }
+.ws-ride-steed.ws-ride-touch .ws-ride-glyph { flex: none; width: 15px; height: 15px; }
+.ws-ride-steed.ws-ride-touch .ws-ride-name { flex: 0 1 auto; min-width: 0; max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--ws-mono); font-weight: 400; font-size: 8px; letter-spacing: 0.13em; }
+.ws-ride-steed.ws-ride-touch .ws-ride-sbar { flex: 1; margin-top: 0; min-width: 18px; height: 4px; }
+.ws-ride-steed.ws-ride-touch .ws-ride-gait { flex: none; white-space: nowrap; font-size: 7.5px; letter-spacing: 0.14em; }
+/* the touch discs sit in the base HUD's named slots (hudSlots: GALLOP JUMP's, HORSE the right edge, LEAN the two edges,
+   OFFER AIM's — touch.css `.at-*`); this file only colours them. GALLOP: amber when held */
+.ws-ride-gallop.down, .ws-ride-lean.down, .ws-ride-offer.down { background: radial-gradient(circle at 50% 35%, rgba(255, 196, 74, 0.45), rgba(40, 24, 6, 0.85) 70%); border-color: #ffc44a; }
+.ws-ride-gallop.winded { opacity: 0.45; }
+/* B1: the rhythm spur — the disc pulses amber on the stride's beat; a tap in time flashes it cyan (desktop: the STEED horse) */
+#hud .ws-touch-disc.ws-ride-gallop.ws-ride-beat { box-shadow: 0 0 0 2px rgba(255, 196, 74, 0.7), 0 0 18px rgba(255, 196, 74, 0.4); }
+#hud .ws-touch-disc.ws-ride-gallop.ws-ride-spur { border-color: #8fe3ff; box-shadow: 0 0 0 3px rgba(143, 227, 255, 0.8), 0 0 22px rgba(143, 227, 255, 0.5); }
+.ws-ride-steed.beat .ws-ride-glyph svg { filter: drop-shadow(0 0 4px rgba(255, 196, 74, 0.9)); }
+.ws-ride-steed.spur .ws-ride-glyph svg { filter: drop-shadow(0 0 5px rgba(143, 227, 255, 1)); }
+/* in the saddle the same tab reads DISMOUNT (N17): on the left edge over HOVER's spot (E319), well away from GALLOP — amber (the horse's colour),
+   the horse over a down-arrow (D-saddle.jpg) */
+#hud .ws-touch-disc.ws-ride-dismount { height: 58px; gap: 1px; color: #ffc44a; border-color: rgba(255, 196, 74, 0.8); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 14px rgba(255, 196, 74, 0.25), inset 0 0 10px rgba(255, 196, 74, 0.12); }
+.ws-touch-disc.ws-ride-dismount > svg { width: 42%; height: auto; fill: #ffc44a; }
+.ws-ride-darrow { display: block; width: 12px; height: 10px; margin-top: -1px; }
+.ws-touch-disc.ws-ride-dismount .ws-ride-darrow svg { display: block; width: 100%; height: 100%; fill: none; }
+.ws-ride-dismount span { font-size: 6.5px; letter-spacing: 0.1em; color: #ffc44a; }
+/* the TRUST arc (top centre) and the stallion's ALERT ear (over his head) */
+.ws-ride-trust { position: absolute; left: 50%; top: calc(var(--ws-top, 14px) + 44px); width: 260px; margin-left: -130px; display: none; flex-direction: column; align-items: center; pointer-events: none; }
+.ws-ride-trust.show { display: flex; }
+.ws-ride-trust svg { width: 260px; height: 64px; overflow: visible; }
+/* QB18 B: on the phone, TRUST is a status row under GRASS (the GRASS row's look, the arc's colours) */
+.ws-ride-trustrow { font-size: 7.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-touch-row.ws-ride-trustrow:not(.show) { display: none; }
+.ws-ride-trustrow b { position: relative; flex: 1; height: 4px; background: rgba(143, 227, 255, 0.14); overflow: hidden; }
+.ws-ride-trustrow i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: 0 50%; transform: scaleX(0); background: #9fefff; box-shadow: 0 0 8px rgba(143, 227, 255, 0.6); transition: transform 0.2s ease-out; }
+.ws-ride-trust .ws-ride-cap { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ws-text); margin-top: -10px; text-shadow: 0 0 8px rgba(0, 0, 0, 0.8); }
+.ws-ride-ear { position: absolute; left: 0; top: 0; width: 30px; height: 30px; margin: -15px 0 0 -15px; display: none; pointer-events: none; }
+.ws-ride-ear.show { display: block; }
+.ws-ride-ear svg { width: 100%; height: 100%; filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.7)); }
+/* the HOLD ON gauge (bottom centre while breaking): TAMING n/5, a red–green–red arc and the cyan marker */
+.ws-ride-hold { position: absolute; left: 50%; bottom: 150px; width: 340px; margin-left: -170px; display: none; flex-direction: column; align-items: center; pointer-events: none; }
+.ws-ride-hold.show { display: flex; }
+.ws-ride-hold .ws-ride-round { font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.32em; color: var(--ws-cyan); text-shadow: 0 0 8px rgba(0, 0, 0, 0.8); margin-bottom: 4px; }
+.ws-ride-hold svg { width: 340px; height: 58px; overflow: visible; }
+.ws-ride-hold .ws-ride-cap { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.34em; text-transform: uppercase; color: #fff; text-shadow: 0 0 8px rgba(0, 0, 0, 0.8); }
+.ws-ride-hold.danger .ws-ride-cap { color: #ff7a6a; }
+#hud.touch .ws-ride-hold { bottom: calc(max(15vh, 104px) + 150px); width: 300px; margin-left: -150px; }
+#hud.touch .ws-ride-hold svg { width: 300px; }
+/* a mountable horse's name tag (TULPAR ♥) */
+.ws-ride-tag { position: absolute; left: 0; top: 0; padding: 4px 10px 4px 8px; display: none; align-items: center; gap: 6px; transform: translate(-50%, -100%); background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); border-radius: 14px; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: #fff; pointer-events: none; white-space: nowrap; }
+.ws-ride-tag.show { display: flex; }
+.ws-ride-tag svg { width: 14px; height: 14px; fill: var(--ws-cyan); }
+.ws-ride-tag .ws-ride-heart { color: #7fe3ff; }
+/* B1: the hitching rail's NAME prompt (src/shards/nalati-grasslands/data/namePanel.json) — high on the screen, clear of the phone's keyboard */
+.ws-ride-namebox { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); z-index: calc(var(--ws-layer-hud) + 60); width: min(320px, calc(100% - 40px)); padding: 14px 16px 12px; pointer-events: auto; box-sizing: border-box; }
+.ws-ride-namecap { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); margin-bottom: 10px; }
+.ws-ride-nameinput { display: block; width: 100%; box-sizing: border-box; padding: 9px 10px; background: rgba(6, 10, 18, 0.6); border: 1px solid var(--ws-cyan-line); border-radius: 0; color: #fff; font: 16px var(--ws-display); letter-spacing: 0.08em; outline: none; -webkit-user-select: text; user-select: text; }
+.ws-ride-nameinput:focus { border-color: var(--ws-cyan); }
+.ws-ride-namebtns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.ws-ride-namebtn { appearance: none; -webkit-appearance: none; padding: 8px 16px; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan-line); border-radius: 0; color: var(--ws-text); font-family: var(--ws-mono); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer; }
+.ws-ride-namebtn.ok { color: #fff; border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.16); }

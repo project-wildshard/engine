@@ -1,0 +1,187 @@
+// P1-E5.3-C6 (E5-REPLICATION §5.2): a Player on the wire. Each fixed step's controls become a command the server gets and the
+// predictor steps at once; each frame takes the newest owner block and reconciles; `flush` runs once a frame, so at Low Power
+// Mode's 2.47 steps a frame a bundle carries them all (J121). Nothing here knows how bytes travel or what the server runs.
+import { Vector3 } from 'three';
+import type { NetCommand } from '@wildshard/format/netCommand';
+import type { OwnHit, WeaponWire } from '../../../shared/engine/combat/Weapon';
+import { NET_BUTTONS } from '../../../shared/engine/input/netButtons';
+import { quantiseCommand } from '../../../shared/engine/net/command';
+import type { DecodedFrame } from '../../../shared/engine/net/frame';
+import type { NetRide } from '../../../shared/engine/net/messages';
+import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
+import type { Physics } from '../../../shared/engine/physics/Physics';
+import type { Player, PlayerLink, PlayerWireInput } from '../player/Player';
+import { AttackPrediction } from './attackPrediction';
+import type { NetClient } from './client';
+import { predictedPlayer, PredictionWorld } from './predictionWorld';
+import { Predictor } from './predictor';
+
+/** Where this player's attacks are drawn: `EquipmentService`, on a page. */
+export interface NetWeapons { readonly bindWire: (wire: WeaponWire | null) => void; readonly serverHit: (hit: OwnHit) => void; readonly attackRefused: () => void; readonly heldByServer: (row: string) => void; readonly mirrorArrows: (count: number) => void }
+
+/** A traversal tool's line to the server. `lock` is a LOCK press naming its hook by index, and answers the `seq` that carries it. */
+export interface NetHookWire { readonly lock: (hook: number | undefined) => number; readonly fire: () => void }
+
+/** A page's ride: it gets on and off on the server's word (J48, P1-E5.3-D3). `mount` is the handle of the body under the rider. */
+export interface NetRideSeat { readonly enter: (mount: number) => void; readonly leave: () => void }
+
+/** The owner block's columns for the last attack the server started and the slot it says this player holds. */
+const LAST_SWING = PLAYER_CLASS.owner.findIndex(column => column.name === 'lastSwingSeq'), HELD = PLAYER_CLASS.owner.findIndex(column => column.name === 'held');
+/** Ticks between asks for a slot: a timed swap's whole length, so a slot the server is still raising is not asked for again. */
+const ASK_TICKS = 30;
+/** Asks for a slot before this page takes the server's word: long enough for a pickup or a purchase to land first. */
+const MOST_ASKS = 10;
+
+/** One client's own character. */
+export class NetPlayer implements PlayerLink {
+  readonly predictor: Predictor;
+  readonly world: PredictionWorld;
+  /** Its swings and shots, until the server rules on them (J47). */
+  readonly attacks: AttackPrediction = new AttackPrediction();
+  /** Its weapons' line to the server: what the next command carries. */
+  readonly wire: WeaponWire = {
+    press: started => { this.pressed = true; this.pressStarted ||= started; },
+    hold: heavy => { this.heavy = heavy; },
+    secondary: () => { this.gust = true; },
+    fire: ads => { this.launcher = { slot: this.held, ads, fire: true }; },
+    afterStep: run => { this.afterStep = run; },
+    steps: () => this.frameSteps,
+    nextSeq: () => (this.seq + 1) & 0xffff,
+    shot: seq => { this.attacks.started(seq); },
+    equip: row => {
+      const slot = this.slots.get(row);
+      if (slot === undefined) return;
+      this.wanted = slot; this.asks = 0; this.askAt = 0; this.heavy = false;
+    },
+    interact: id => { this.client.act({ kind: 'interact', seq: this.seq, id }); },
+    reload: () => { this.client.act({ kind: 'reload', seq: this.seq, slot: this.held }); },
+  };
+  /** The body a lock holds, by the server's name for it (J116). */
+  lockTarget: () => string | undefined = () => undefined;
+  /** Where a harness's move goes: the shell's, on a worker page. */
+  place: (x: number, y: number, z: number, yaw: number) => void = () => undefined;
+  /** Whether this page stands in the world a frame came from. A crossing's frames wait behind this until the page has made it. */
+  inCell: (cell: number) => boolean = () => true;
+  /** A hook tool's presses: the next command carries them (J116, `hookTarget`). */
+  readonly hooks: NetHookWire = {
+    lock: hook => { this.hookLocked = true; this.hookTarget = hook; return (this.seq + 1) & 0xffff; },
+    fire: () => { this.hookFired = true; },
+  };
+  /** A page's presses to get on or off. */
+  readonly ride = (action: 'offer' | 'mount' | 'dismount'): void => { this.client.act({ kind: 'ride', seq: this.seq, action }); };
+  /** Biggest camera offset a correction has left, in metres: what a proof page reports. */
+  worstOffset = 0;
+  private readonly client: NetClient;
+  private readonly player: Player;
+  private seen: DecodedFrame | null = null;
+  private pressed = false;
+  private gust = false;
+  private pressStarted = false;
+  private heavy = false;
+  private held = 0;
+  private afterStep: (() => void) | null = null;
+  private frameSteps = 0;
+  private launcher: NonNullable<NetCommand['launcher']> | null = null;
+  private hookLocked = false;
+  private hookTarget: number | undefined;
+  private hookFired = false;
+  private seq = 0;
+  private weapons: NetWeapons | null = null;
+  private seat: NetRideSeat | null = null;
+  /** The ride this player has heard of and its page has not yet acted on: each frame takes them first. */
+  private readonly heard: NetRide[] = [];
+  /** The server's slot for each row this page can hold. A row it has no slot for is the server's own business. */
+  private slots: ReadonlyMap<string, number> = new Map<string, number>();
+  /** The slot this page holds and the server has not yet said it does. */
+  private wanted: number | null = null;
+  private asks = 0;
+  private askAt = 0;
+  private readonly off: readonly (() => void)[];
+  constructor(client: NetClient, player: Player, physics: Physics) {
+    this.client = client; this.player = player;
+    this.world = new PredictionWorld(physics);
+    this.predictor = new Predictor(predictedPlayer(player, this.world), PLAYER_CLASS.owner);
+    this.attacks.onRefused(() => { this.weapons?.attackRefused(); });
+    this.off = [client.onCombat(event => {
+      // an own blow plays the moment it is heard: the predicted swing already ran (J47)
+      if (event.kind !== 'hit' || event.confirmFor === 0) return;
+      this.attacks.confirm(event.confirmFor);
+      const kind = this.client.entities.get(event.target)?.initial['kind'];
+      this.weapons?.serverHit({ kind: typeof kind === 'string' ? kind : '', at: new Vector3(...event.at), head: event.head, killed: event.killed, amount: event.amount, seq: event.confirmFor });
+    }),
+    client.onRide(event => { if (event.rider === client.welcome?.handle) this.heard.push(event); }),
+    // A crossing is a snap (§5.2): nothing is sent until the next world's first frame seats this body there, in its coordinates.
+    client.onTravel(() => { this.seen = null; })];
+  }
+  /** Draw this player's attacks on `weapons`: they stop settling their own contact and take the server's word. */
+  bindWeapons(weapons: NetWeapons, slots: ReadonlyMap<string, number>): void { this.weapons = weapons; this.slots = slots; weapons.bindWire(this.wire); }
+  /** A world has its own items, and so its own slots. */
+  bindSlots(slots: ReadonlyMap<string, number>): void { this.slots = slots; }
+  /** Where this player's ride lands. A page with none takes no ride's words. */
+  bindRide(seat: NetRideSeat | null): void { this.seat = seat; }
+  /** The slot the server says this player holds. */
+  get heldSlot(): number { return this.held; }
+  /** The server has put this body somewhere: a frame has been heard. */
+  get joined(): boolean { return this.seen !== null; }
+
+  /** A fixed step. False, with nothing sent, before the first frame or when a full ring says the server stopped answering. */
+  step(input: PlayerWireInput): boolean {
+    if (this.seen === null || this.predictor.full) return false;
+    const armed = this.armed(input), seq = this.seq = this.client.command(this.hooked(armed));
+    this.hookLocked = false; this.hookTarget = undefined; this.hookFired = false;
+    this.frameSteps++;
+    if (this.pressStarted || armed.launcher?.fire === true) this.attacks.started(seq);
+    this.pressed = false; this.gust = false; this.pressStarted = false; this.launcher = null;
+    this.world.poseFor(seq, false);
+    const stepped = this.predictor.step(quantiseCommand({ ...armed, seq, viewTick: 0 })), run = this.afterStep;
+    this.afterStep = null; run?.();
+    return stepped;
+  }
+  /** The step's controls, with what the weapon in hand has for this command. */
+  private armed(input: PlayerWireInput): PlayerWireInput & Partial<Pick<NetCommand, 'attack' | 'launcher' | 'lockTarget'>> {
+    const { launcher } = this, buttons = input.buttons | (this.heavy ? NET_BUTTONS.heavy : 0) | (this.gust ? NET_BUTTONS.secondary : 0), lockTarget = this.lockTarget();
+    return { ...input, buttons, ...(this.pressed ? { attack: { aim: this.player.sampleAimCommand() } } : {}), ...(launcher === null ? {} : { launcher }), ...(lockTarget === undefined ? {} : { lockTarget }) };
+  }
+  /** What goes to the server beyond what this body steps: a claw's JUMP moves the body only there, and only by `led`. */
+  private hooked<T extends PlayerWireInput>(armed: T): T & Pick<NetCommand, 'hookTarget'> {
+    const { hookLocked, hookFired, hookTarget } = this, lock = hookLocked ? NET_BUTTONS.lock : 0, jump = hookFired ? NET_BUTTONS.jump : 0;
+    return { ...armed, buttons: armed.buttons | lock | jump, ...(hookTarget === undefined ? {} : { hookTarget }) };
+  }
+  /** The start of a render frame, before its fixed steps: the newest owner block, compared once. */
+  reconcile(): void {
+    this.frameSteps = 0;
+    const frame = this.client.latest;
+    if (frame === null || frame === this.seen || !this.inCell(frame.cell)) return;
+    const first = this.seen === null, { seat } = this;
+    this.seen = frame;
+    this.world.frame(frame.tick, frame.lastSeq);
+    for (const event of this.heard.splice(0)) if (event.kind === 'mount') seat?.enter(event.mount); else seat?.leave();
+    const ridden = seat === null ? null : frame.ride;
+    if (first) { this.predictor.adopt(frame.lastSeq, frame.owner, frame.tick, ridden); return; }
+    this.predictor.reconcile(frame.lastSeq, frame.owner, frame.tick, ridden);
+    const swung = PLAYER_CLASS.owner[LAST_SWING]?.value(frame.owner[LAST_SWING] ?? 0), held = PLAYER_CLASS.owner[HELD]?.value(frame.owner[HELD] ?? 0);
+    this.attacks.frame(frame.lastSeq, typeof swung === 'number' ? swung : 0);
+    if (typeof held === 'number') this.heldIs(held, frame.tick);
+  }
+  /** The slot the server says this player holds. It goes on asking for the page's until that lands or plainly will not. */
+  private heldIs(held: number, tick: number): void {
+    const moved = held !== this.held, { wanted } = this;
+    this.held = held;
+    if (wanted === held) { this.wanted = null; return; }
+    if (wanted === null) { if (moved) this.follow(held); return; }
+    if (tick < this.askAt) return;
+    if (this.asks >= MOST_ASKS) { this.wanted = null; this.follow(held); return; }
+    this.client.act({ kind: 'equip', seq: this.seq, slot: wanted });
+    this.asks++; this.askAt = tick + ASK_TICKS;
+  }
+  private follow(slot: number): void {
+    for (const [row, at] of this.slots) if (at === slot) { this.weapons?.heldByServer(row); return; }
+  }
+  /** The end of a render frame: send what its steps queued, and glide the camera. */
+  present(dt: number): void {
+    if (this.seen !== null) this.client.flush();
+    this.predictor.update(dt);
+    this.worstOffset = Math.max(this.worstOffset, this.player.renderOffset.length());
+  }
+  dispose(): void { for (const off of this.off) off(); this.weapons?.bindWire(null); this.world.dispose(); }
+}

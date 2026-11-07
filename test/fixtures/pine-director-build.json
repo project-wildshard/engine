@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "source": "behaviour/director.as",
+      "maximumPages": 1,
+      "assets": "assets",
+      "bindings": [
+        "data/director.json"
+      ],
+      "embedded": [
+        {
+          "file": "behaviour/director.json",
+          "raw": true
+        }
+      ],
+      "director": "data/director.json"
+    }
+  ]
+}

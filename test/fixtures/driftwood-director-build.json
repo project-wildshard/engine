@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "source": "behaviour/director.as",
+      "maximumPages": 1,
+      "assets": "assets",
+      "bindings": [
+        "data/director.json"
+      ],
+      "embedded": [
+        {
+          "file": "behaviour/director.json",
+          "raw": true,
+          "generated": "DO NOT EDIT: behaviour/director.as -> scripts/bake/directorSource.ts (@wildshard/sharddev/compileScript); regenerate with node scripts/bake/directors.mjs"
+        }
+      ],
+      "director": "data/director.json"
+    }
+  ]
+}

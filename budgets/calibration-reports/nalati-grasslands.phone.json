@@ -1,0 +1,72 @@
+{
+  "sha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+  "recorded": "2026-10-01T22:13:01.897Z",
+  "boot": {
+    "shard": "nalati-grasslands",
+    "tier": "phone",
+    "errors": [],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "browser": "153.0.8010.12",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3,
+      "touch": true
+    },
+    "gpuBytes": {
+      "total": 236764824
+    },
+    "render": {
+      "programs": 98
+    }
+  },
+  "poses": {
+    "camp": {
+      "calls": 79,
+      "tris": 1174948
+    },
+    "bridge": {
+      "calls": 90,
+      "tris": 1279751
+    },
+    "plains": {
+      "calls": 108,
+      "tris": 1292909
+    }
+  },
+  "budgets": {
+    "camp": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 225.7965316772461
+      }
+    },
+    "bridge": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 225.7965316772461
+      }
+    },
+    "plains": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 225.7965316772461
+      }
+    }
+  }
+}

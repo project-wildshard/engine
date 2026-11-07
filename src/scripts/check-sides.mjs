@@ -7,7 +7,7 @@
 // No DOM in shared/server/cook is enforced by TypeScript: the root
 // src/tsconfig.json has no `dom` lib; only the client has its own tsconfig.
 // Usage: node src/scripts/check-sides.mjs [src-dir]   (exit 1 on a violation)
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -18,14 +18,14 @@ export const ALLOWED = {
   cook: ['shared', 'cook'],
 };
 
-const IMPORT = /(?:\bimport|\bexport)\s[^'"`;]*?from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\bimport\s+['"]([^'"]+)['"]/g;
+const IMPORT = /(?:\bimport|\bexport)\s(?!type\b)[^'"`;]*?from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\bimport\s+['"]([^'"]+)['"]/g;
 
 function files(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) out.push(...files(path));
-    else if (/\.(?:ts|tsx|mts)$/.test(entry)) out.push(path);
+    else if (/\.(?:ts|tsx|mts)$/.test(entry) && !entry.includes('.test.')) out.push(path);
   }
   return out;
 }
@@ -33,6 +33,8 @@ function files(dir) {
 /** @returns {string[]} violations, `file: imports <side> (<specifier>)`. */
 export function checkSides(src) {
   const problems = [];
+  const manifest = join(src, '..', 'package.json');
+  const exportsMap = existsSync(manifest) ? (JSON.parse(readFileSync(manifest, 'utf8')).exports ?? {}) : {};
   for (const side of Object.keys(ALLOWED)) {
     let root;
     try { root = statSync(join(src, side)).isDirectory() ? join(src, side) : null; } catch { root = null; }
@@ -41,8 +43,11 @@ export function checkSides(src) {
       const code = readFileSync(file, 'utf8');
       for (const match of code.matchAll(IMPORT)) {
         const spec = match[1] ?? match[2] ?? match[3];
-        if (!spec.startsWith('.')) continue;
-        const target = relative(src, resolve(dirname(file), spec)).split(sep)[0];
+        const names = /\{([^}]*)\}/u.exec(match[0])?.[1].split(',').filter((name) => name.trim() !== '') ?? [];
+        if (names.length > 0 && names.every((name) => /^\s*type\s/u.test(name))) continue;
+        const exported = exportsMap[`./${spec.replace(/^@wildshard\/engine\//u, '')}`];
+        if (!spec.startsWith('.') && exported === undefined) continue;
+        const target = relative(src, spec.startsWith('.') ? resolve(dirname(file), spec) : resolve(src, '..', exported)).split(sep)[0];
         if (target in ALLOWED && !ALLOWED[side].includes(target)) {
           problems.push(`${relative(src, file)}: ${side} imports ${target} (${spec})`);
         }

@@ -1,0 +1,571 @@
+{
+  "calibration": "2026-10-01T22:02:53.510Z",
+  "assessments": [
+    {
+      "shard": "_template",
+      "tier": "desktop",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.current.draws",
+          "observed": 71,
+          "limit": 3914,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.tris",
+          "observed": 14993,
+          "limit": 52174145,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.programs",
+          "observed": 40,
+          "limit": 826,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.gpuMB",
+          "observed": 171.08098220825195,
+          "limit": 171.08098220825195,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "_template",
+      "tier": "phone",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.current.draws",
+          "observed": 46,
+          "limit": 1831,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.tris",
+          "observed": 11833,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.programs",
+          "observed": 40,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.gpuMB",
+          "observed": 76.73144912719727,
+          "limit": 76.73144912719727,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "driftwood-isle",
+      "tier": "phone",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.pier.draws",
+          "observed": 223,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.pier.tris",
+          "observed": 1125728,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.pier.programs",
+          "observed": 95,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.pier.gpuMB",
+          "observed": 219.43689823150635,
+          "limit": 219.43689823150635,
+          "pass": true
+        },
+        {
+          "field": "budgets.beach.draws",
+          "observed": 217,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.beach.tris",
+          "observed": 1065774,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.beach.programs",
+          "observed": 95,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.beach.gpuMB",
+          "observed": 219.43689823150635,
+          "limit": 219.43689823150635,
+          "pass": true
+        },
+        {
+          "field": "budgets.wreck.draws",
+          "observed": 167,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.wreck.tris",
+          "observed": 936154,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.wreck.programs",
+          "observed": 95,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.wreck.gpuMB",
+          "observed": 219.43689823150635,
+          "limit": 219.43689823150635,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "far-reach",
+      "tier": "desktop",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.current.draws",
+          "observed": 91,
+          "limit": 3914,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.tris",
+          "observed": 19567,
+          "limit": 52174145,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.programs",
+          "observed": 35,
+          "limit": 826,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.gpuMB",
+          "observed": 170.9737091064453,
+          "limit": 170.9737091064453,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "far-reach",
+      "tier": "phone",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.current.draws",
+          "observed": 63,
+          "limit": 1831,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.tris",
+          "observed": 11972,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.programs",
+          "observed": 35,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.gpuMB",
+          "observed": 76.62936401367188,
+          "limit": 76.62936401367188,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "nalati-grasslands",
+      "tier": "phone",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.camp.draws",
+          "observed": 79,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.camp.tris",
+          "observed": 1174948,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.camp.programs",
+          "observed": 98,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.camp.gpuMB",
+          "observed": 225.7965316772461,
+          "limit": 225.7965316772461,
+          "pass": true
+        },
+        {
+          "field": "budgets.bridge.draws",
+          "observed": 90,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.bridge.tris",
+          "observed": 1279751,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.bridge.programs",
+          "observed": 98,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.bridge.gpuMB",
+          "observed": 225.7965316772461,
+          "limit": 225.7965316772461,
+          "pass": true
+        },
+        {
+          "field": "budgets.plains.draws",
+          "observed": 108,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.plains.tris",
+          "observed": 1292909,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.plains.programs",
+          "observed": 98,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.plains.gpuMB",
+          "observed": 225.7965316772461,
+          "limit": 225.7965316772461,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "nine-dragon-stack",
+      "tier": "phone",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.spawn-rail.draws",
+          "observed": 144,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.spawn-rail.tris",
+          "observed": 1427662,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.spawn-rail.programs",
+          "observed": 66,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.spawn-rail.gpuMB",
+          "observed": 253.6043882369995,
+          "limit": 253.6043882369995,
+          "pass": true
+        },
+        {
+          "field": "budgets.well-edge.draws",
+          "observed": 128,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.well-edge.tris",
+          "observed": 1273139,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.well-edge.programs",
+          "observed": 66,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.well-edge.gpuMB",
+          "observed": 253.6043882369995,
+          "limit": 253.6043882369995,
+          "pass": true
+        },
+        {
+          "field": "budgets.stair-street.draws",
+          "observed": 122,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.stair-street.tris",
+          "observed": 996042,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.stair-street.programs",
+          "observed": 66,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.stair-street.gpuMB",
+          "observed": 253.6043882369995,
+          "limit": 253.6043882369995,
+          "pass": true
+        },
+        {
+          "field": "budgets.D.draws",
+          "observed": 109,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.D.tris",
+          "observed": 1039194,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.D.programs",
+          "observed": 66,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.D.gpuMB",
+          "observed": 271.43809032440186,
+          "limit": 271.43809032440186,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "pine-hollow",
+      "tier": "phone",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.gate.draws",
+          "observed": 104,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.gate.tris",
+          "observed": 1152418,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.gate.programs",
+          "observed": 109,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.gate.gpuMB",
+          "observed": 587.1324214935303,
+          "limit": 587.1324214935303,
+          "pass": true
+        },
+        {
+          "field": "budgets.cabin.draws",
+          "observed": 147,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.cabin.tris",
+          "observed": 1324374,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.cabin.programs",
+          "observed": 109,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.cabin.gpuMB",
+          "observed": 587.1324214935303,
+          "limit": 587.1324214935303,
+          "pass": true
+        },
+        {
+          "field": "budgets.pond.draws",
+          "observed": 92,
+          "limit": 1174,
+          "pass": true
+        },
+        {
+          "field": "budgets.pond.tris",
+          "observed": 950098,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.pond.programs",
+          "observed": 109,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.pond.gpuMB",
+          "observed": 587.1324214935303,
+          "limit": 587.1324214935303,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "sunscar-dunes",
+      "tier": "desktop",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.current.draws",
+          "observed": 125,
+          "limit": 4110,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.tris",
+          "observed": 140631,
+          "limit": 52174145,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.programs",
+          "observed": 32,
+          "limit": 826,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.gpuMB",
+          "observed": 172.10171127319336,
+          "limit": 172.10171127319336,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    },
+    {
+      "shard": "sunscar-dunes",
+      "tier": "phone",
+      "capturedSha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+      "bootErrors": [],
+      "checks": [
+        {
+          "field": "budgets.current.draws",
+          "observed": 43,
+          "limit": 1867,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.tris",
+          "observed": 79720,
+          "limit": 18779873,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.programs",
+          "observed": 30,
+          "limit": 148,
+          "pass": true
+        },
+        {
+          "field": "budgets.current.gpuMB",
+          "observed": 57.324119567871094,
+          "limit": 57.324119567871094,
+          "pass": true
+        }
+      ],
+      "derivedBreaches": [],
+      "failures": [],
+      "verdict": "pass"
+    }
+  ]
+}

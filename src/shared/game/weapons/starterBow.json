@@ -1,0 +1,21 @@
+{
+  "family": "bow",
+  "quiver": 24,
+  "swayMax": 0.026179938779914945,
+  "speedBase": 30,
+  "speedDraw": 28,
+  "damageScale": 1.2,
+  "aimZoom": 2,
+  "aimVmZoom": 0.85,
+  "aimSway": 0.5,
+  "aimSpread": 0.5,
+  "aimIn": 10,
+  "arcFrom": 0.25,
+  "arcColour": 9430015,
+  "arcMode": "setting",
+  "zoomLook": true,
+  "inspectZ": -0.5,
+  "inspectHidesArms": false,
+  "transparentParts": false,
+  "vmScale": 0.72
+}

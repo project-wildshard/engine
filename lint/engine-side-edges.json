@@ -1,0 +1,5 @@
+{
+ "about": "P1-E2: per-file counts of forbidden engine-side edges (lint/engine-sides.mjs): one per imported file on the wrong side, and in shared, server or cook one per renderer module and one per DOM global. wildshard/engine-sides refuses a count above these; scripts/check-engine-sides.mjs --update lowers them; they never rise (check-platform-ratchets).",
+ "totals": {},
+ "files": {}
+}

@@ -1,0 +1,6 @@
+{
+  "about": "E362 AG10: the most files any shard manifest's static closure (cold boot) may pull, from scripts/gen-shards.mjs manifestClosure. One limit for every shard, not a per-shard ratchet (usage audit 2026-10-13, Jake's pick: exact counts become limits): it keeps the eager manifests near their 2026-10-13 size (largest 43) and far from the 226-273 files they pulled before E405 AG5. A manifest over it moves imports behind load / a lazy thunk.",
+  "budgets": {
+    "default": 50
+  }
+}

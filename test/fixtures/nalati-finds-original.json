@@ -1,0 +1,180 @@
+{
+  "counters": [
+    {
+      "label": "Elites",
+      "flags": [
+        "felled:aqbars",
+        "felled:kokbori",
+        "felled:qyran",
+        "felled:qara-batyr",
+        "felled:argymaq"
+      ]
+    },
+    {
+      "label": "Places",
+      "flags": [
+        "seen:nomad-camp",
+        "seen:sheep-pasture",
+        "seen:bridge",
+        "seen:kunes-river",
+        "seen:sky-road",
+        "seen:eagle-rock",
+        "seen:horse-plains",
+        "seen:kokpar-field",
+        "seen:kurgan-field",
+        "seen:great-kurgan",
+        "seen:summer-camp",
+        "seen:watchtower",
+        "seen:wind-cairn",
+        "seen:glacier",
+        "seen:snow-leopard-cave",
+        "seen:the-crags",
+        "seen:snow-lotus"
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "title": "Elites",
+      "wide": true,
+      "items": [
+        {
+          "label": "Aqbars the Pale",
+          "icon": "leopard",
+          "prize": [
+            "Irbis skin",
+            "Crazy Cat Person"
+          ],
+          "flag": "felled:aqbars"
+        },
+        {
+          "label": "Kokbori",
+          "icon": "wolf",
+          "prize": [
+            "Sky-Wolf skin",
+            "Good Boy Denier"
+          ],
+          "flag": "felled:kokbori"
+        },
+        {
+          "label": "Qyran the Storm-Wing",
+          "icon": "eagle",
+          "prize": [
+            "Storm-Wing skin",
+            "Birdwatcher (Aggressive)"
+          ],
+          "flag": "felled:qyran"
+        },
+        {
+          "label": "Qara Batyr the Unburied",
+          "icon": "rider",
+          "prize": [
+            "Night Rider skin",
+            "Night Shift"
+          ],
+          "flag": "felled:qara-batyr"
+        },
+        {
+          "label": "Argymaq the Unbroken",
+          "icon": "horse",
+          "prize": [
+            "Your horse",
+            "Horse Whisperer (Shouting)"
+          ],
+          "flag": "felled:argymaq"
+        }
+      ]
+    },
+    {
+      "title": "Places",
+      "dense": true,
+      "items": [
+        {
+          "label": "NOMAD CAMP",
+          "icon": "pin",
+          "flag": "seen:nomad-camp"
+        },
+        {
+          "label": "SHEEP PASTURE",
+          "icon": "pin",
+          "flag": "seen:sheep-pasture"
+        },
+        {
+          "label": "BRIDGE",
+          "icon": "pin",
+          "flag": "seen:bridge"
+        },
+        {
+          "label": "KUNES RIVER",
+          "icon": "pin",
+          "flag": "seen:kunes-river"
+        },
+        {
+          "label": "SKY ROAD",
+          "icon": "pin",
+          "flag": "seen:sky-road"
+        },
+        {
+          "label": "EAGLE ROCK",
+          "icon": "pin",
+          "flag": "seen:eagle-rock"
+        },
+        {
+          "label": "HORSE PLAINS",
+          "icon": "pin",
+          "flag": "seen:horse-plains"
+        },
+        {
+          "label": "KOKPAR FIELD",
+          "icon": "pin",
+          "flag": "seen:kokpar-field"
+        },
+        {
+          "label": "KURGAN FIELD",
+          "icon": "pin",
+          "flag": "seen:kurgan-field"
+        },
+        {
+          "label": "GREAT KURGAN",
+          "icon": "pin",
+          "flag": "seen:great-kurgan"
+        },
+        {
+          "label": "SUMMER CAMP",
+          "icon": "pin",
+          "flag": "seen:summer-camp"
+        },
+        {
+          "label": "WATCHTOWER",
+          "icon": "pin",
+          "flag": "seen:watchtower"
+        },
+        {
+          "label": "WIND CAIRN",
+          "icon": "pin",
+          "flag": "seen:wind-cairn"
+        },
+        {
+          "label": "GLACIER",
+          "icon": "pin",
+          "flag": "seen:glacier"
+        },
+        {
+          "label": "SNOW LEOPARD CAVE",
+          "icon": "pin",
+          "flag": "seen:snow-leopard-cave"
+        },
+        {
+          "label": "THE CRAGS",
+          "icon": "pin",
+          "flag": "seen:the-crags"
+        },
+        {
+          "label": "SNOW LOTUS",
+          "icon": "pin",
+          "flag": "seen:snow-lotus"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+ "about": "P1-E5.2a: per-file reads of a one-player SimHost member (`members`, which ended at 0) and leadPlayer binds (`lead`: systems not yet per-player) in non-test source, by type, not by spelling (scripts/check-sim-players.mjs). They never rise.",
+ "members": 0,
+ "lead": 13,
+ "files": {
+  "src/server/engine/net/simWorld.ts": 1,
+  "src/shared/engine/sim/snapshot.ts": 3,
+  "src/client/game/grid/copyPrompts.ts": 1,
+  "src/client/game/grid/neighbourPanels.ts": 1,
+  "src/server/game/grid/simulation.ts": 1,
+  "src/server/game/plugin/mover.ts": 2,
+  "src/server/host/bake/headlessWorker.ts": 1,
+  "src/shared/host/headlessJourney.ts": 1,
+  "src/server/host/headlessRuntime.ts": 1,
+  "src/shared/host/headlessTape.ts": 1
+ }
+}

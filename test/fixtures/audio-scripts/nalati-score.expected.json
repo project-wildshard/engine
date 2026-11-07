@@ -1,0 +1,1615 @@
+{
+  "rule": "rank 1 of each slot ships until the user picks (art/music/round-4-nalati/index.html)",
+  "weights": {
+    "kazakh": 0.35,
+    "groove": 0.2,
+    "seam": 0.2,
+    "clean": 0.15,
+    "full": 0.1
+  },
+  "verdict": {},
+  "test": {
+    "dombra": [
+      {
+        "id": "minimax3-1",
+        "folder": "test-dombra",
+        "side": {
+          "seed": 1,
+          "gen_time_s": 1,
+          "prompt": "fixture",
+          "lyrics": "[Instrumental]",
+          "steps": 30
+        },
+        "metrics": {
+          "vocals": {
+            "vocal_energy_share": 0.02,
+            "groove_active_frac": 0.8,
+            "drums_active_frac": 0.75
+          },
+          "kazakh": {
+            "kazakh_prob": 0.7,
+            "instrument_prob": {
+              "dombra": 0.3,
+              "kobyz": 0.2,
+              "sybyzgy": 0.1,
+              "throat": 0.1
+            }
+          },
+          "loop": {
+            "score": 0.6
+          },
+          "clipping": {
+            "clipped_frac": 0
+          },
+          "silence": {
+            "longest_internal_gap_s": 0,
+            "tail_silence_s": 0
+          },
+          "spectrum": {
+            "rolloff95_hz": 12000
+          },
+          "duration_s": 75,
+          "tempo": {
+            "estimated_bpm": 84
+          },
+          "loudness": {
+            "lufs": -18,
+            "true_peak_dbfs": -2
+          }
+        },
+        "target_prob": 0.3,
+        "m4a": "test/dombra-1.m4a",
+        "bytes": 101
+      },
+      {
+        "id": "minimax3-2",
+        "folder": "test-dombra",
+        "side": {
+          "seed": 2,
+          "gen_time_s": 1,
+          "prompt": "fixture",
+          "lyrics": "[Instrumental]",
+          "steps": 30
+        },
+        "metrics": {
+          "vocals": {
+            "vocal_energy_share": 0.15,
+            "groove_active_frac": 0.8,
+            "drums_active_frac": 0.75
+          },
+          "kazakh": {
+            "kazakh_prob": 0.8,
+            "instrument_prob": {
+              "dombra": 0.3,
+              "kobyz": 0.2,
+              "sybyzgy": 0.1,
+              "throat": 0.1
+            }
+          },
+          "loop": {
+            "score": 0.4
+          },
+          "clipping": {
+            "clipped_frac": 0
+          },
+          "silence": {
+            "longest_internal_gap_s": 0,
+            "tail_silence_s": 0
+          },
+          "spectrum": {
+            "rolloff95_hz": 12000
+          },
+          "duration_s": 75,
+          "tempo": {
+            "estimated_bpm": 84
+          },
+          "loudness": {
+            "lufs": -18,
+            "true_peak_dbfs": -2
+          }
+        },
+        "target_prob": 0.3,
+        "m4a": "test/dombra-2.m4a",
+        "bytes": 102
+      },
+      {
+        "id": "minimax3-3",
+        "folder": "test-dombra",
+        "side": {
+          "seed": 3,
+          "gen_time_s": 1,
+          "prompt": "fixture",
+          "lyrics": "[Instrumental]",
+          "steps": 30
+        },
+        "metrics": {
+          "vocals": {
+            "vocal_energy_share": 0.25,
+            "groove_active_frac": 0.8,
+            "drums_active_frac": 0.75
+          },
+          "kazakh": {
+            "kazakh_prob": 0.3,
+            "instrument_prob": {
+              "dombra": 0.3,
+              "kobyz": 0.2,
+              "sybyzgy": 0.1,
+              "throat": 0.1
+            }
+          },
+          "loop": {
+            "score": 0.7
+          },
+          "clipping": {
+            "clipped_frac": 0
+          },
+          "silence": {
+            "longest_internal_gap_s": 0,
+            "tail_silence_s": 0
+          },
+          "spectrum": {
+            "rolloff95_hz": 12000
+          },
+          "duration_s": 75,
+          "tempo": {
+            "estimated_bpm": 84
+          },
+          "loudness": {
+            "lufs": -18,
+            "true_peak_dbfs": -2
+          }
+        },
+        "target_prob": 0.3,
+        "m4a": "test/dombra-3.m4a",
+        "bytes": 103
+      },
+      {
+        "id": "minimax3-4",
+        "folder": "test-dombra",
+        "side": {
+          "seed": 4,
+          "gen_time_s": 1,
+          "prompt": "fixture",
+          "lyrics": "[Instrumental]",
+          "steps": 30
+        },
+        "metrics": {
+          "vocals": {
+            "vocal_energy_share": 0.65,
+            "groove_active_frac": 0.8,
+            "drums_active_frac": 0.75
+          },
+          "kazakh": {
+            "kazakh_prob": 0.9,
+            "instrument_prob": {
+              "dombra": 0.3,
+              "kobyz": 0.2,
+              "sybyzgy": 0.1,
+              "throat": 0.1
+            }
+          },
+          "loop": {
+            "score": 0.7
+          },
+          "clipping": {
+            "clipped_frac": 0
+          },
+          "silence": {
+            "longest_internal_gap_s": 0,
+            "tail_silence_s": 0
+          },
+          "spectrum": {
+            "rolloff95_hz": 12000
+          },
+          "duration_s": 75,
+          "tempo": {
+            "estimated_bpm": 84
+          },
+          "loudness": {
+            "lufs": -18,
+            "true_peak_dbfs": -2
+          }
+        },
+        "target_prob": 0.3,
+        "m4a": "test/dombra-4.m4a",
+        "bytes": 104
+      }
+    ]
+  },
+  "slots": {
+    "grass": {
+      "pick": "minimax3-1",
+      "takes": [
+        {
+          "id": "minimax3-1",
+          "folder": "nalati-grass",
+          "side": {
+            "seed": 1,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.02,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.7,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.6
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.817,
+          "parts": {
+            "kazakh": 0.7,
+            "groove": 0.775,
+            "seam": 0.833,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 1,
+          "m4a": "grass/grass-1.m4a",
+          "bytes": 101
+        },
+        {
+          "id": "minimax3-2",
+          "folder": "nalati-grass",
+          "side": {
+            "seed": 2,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.15,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.8,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.4
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.725,
+          "parts": {
+            "kazakh": 0.8,
+            "groove": 0.775,
+            "seam": 0.5,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 2,
+          "m4a": "grass/grass-2.m4a",
+          "bytes": 102
+        },
+        {
+          "id": "minimax3-3",
+          "folder": "nalati-grass",
+          "side": {
+            "seed": 3,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.25,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.3,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 25% of the energy"
+        },
+        {
+          "id": "minimax3-4",
+          "folder": "nalati-grass",
+          "side": {
+            "seed": 4,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.65,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.9,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 65% of the energy"
+        }
+      ]
+    },
+    "sky": {
+      "pick": "minimax3-1",
+      "takes": [
+        {
+          "id": "minimax3-1",
+          "folder": "nalati-sky",
+          "side": {
+            "seed": 1,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.02,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.7,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.6
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.817,
+          "parts": {
+            "kazakh": 0.7,
+            "groove": 0.775,
+            "seam": 0.833,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 1,
+          "m4a": "sky/sky-1.m4a",
+          "bytes": 101
+        },
+        {
+          "id": "minimax3-2",
+          "folder": "nalati-sky",
+          "side": {
+            "seed": 2,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.15,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.8,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.4
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.725,
+          "parts": {
+            "kazakh": 0.8,
+            "groove": 0.775,
+            "seam": 0.5,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 2,
+          "m4a": "sky/sky-2.m4a",
+          "bytes": 102
+        },
+        {
+          "id": "minimax3-3",
+          "folder": "nalati-sky",
+          "side": {
+            "seed": 3,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.25,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.3,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 25% of the energy"
+        },
+        {
+          "id": "minimax3-4",
+          "folder": "nalati-sky",
+          "side": {
+            "seed": 4,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.65,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.9,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 65% of the energy"
+        }
+      ]
+    },
+    "snow": {
+      "pick": "minimax3-1",
+      "takes": [
+        {
+          "id": "minimax3-1",
+          "folder": "nalati-snow",
+          "side": {
+            "seed": 1,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.02,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.7,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.6
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.817,
+          "parts": {
+            "kazakh": 0.7,
+            "groove": 0.775,
+            "seam": 0.833,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 1,
+          "m4a": "snow/snow-1.m4a",
+          "bytes": 101
+        },
+        {
+          "id": "minimax3-2",
+          "folder": "nalati-snow",
+          "side": {
+            "seed": 2,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.15,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.8,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.4
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.725,
+          "parts": {
+            "kazakh": 0.8,
+            "groove": 0.775,
+            "seam": 0.5,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 2,
+          "m4a": "snow/snow-2.m4a",
+          "bytes": 102
+        },
+        {
+          "id": "minimax3-3",
+          "folder": "nalati-snow",
+          "side": {
+            "seed": 3,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.25,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.3,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 25% of the energy"
+        },
+        {
+          "id": "minimax3-4",
+          "folder": "nalati-snow",
+          "side": {
+            "seed": 4,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.65,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.9,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 65% of the energy"
+        }
+      ]
+    },
+    "night": {
+      "pick": "minimax3-1",
+      "takes": [
+        {
+          "id": "minimax3-1",
+          "folder": "nalati-night",
+          "side": {
+            "seed": 1,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.02,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.7,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.6
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.663,
+          "parts": {
+            "kazakh": 0.7,
+            "groove": 0.775,
+            "seam": 0.833,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 1,
+          "m4a": "night/night-1.m4a",
+          "bytes": 101
+        },
+        {
+          "id": "minimax3-2",
+          "folder": "nalati-night",
+          "side": {
+            "seed": 2,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.15,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.8,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.4
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.611,
+          "parts": {
+            "kazakh": 0.8,
+            "groove": 0.775,
+            "seam": 0.5,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 2,
+          "m4a": "night/night-2.m4a",
+          "bytes": 102
+        },
+        {
+          "id": "minimax3-3",
+          "folder": "nalati-night",
+          "side": {
+            "seed": 3,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.25,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.3,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.477,
+          "parts": {
+            "kazakh": 0.3,
+            "groove": 0.775,
+            "seam": 1.0,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 3,
+          "m4a": "night/night-3.m4a",
+          "bytes": 103
+        },
+        {
+          "id": "minimax3-4",
+          "folder": "nalati-night",
+          "side": {
+            "seed": 4,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.65,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.9,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 65% of the energy"
+        }
+      ]
+    },
+    "storm": {
+      "pick": "minimax3-1",
+      "takes": [
+        {
+          "id": "minimax3-1",
+          "folder": "nalati-storm",
+          "side": {
+            "seed": 1,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.02,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.7,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.6
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.817,
+          "parts": {
+            "kazakh": 0.7,
+            "groove": 0.775,
+            "seam": 0.833,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 1,
+          "m4a": "storm/storm-1.m4a",
+          "bytes": 101
+        },
+        {
+          "id": "minimax3-2",
+          "folder": "nalati-storm",
+          "side": {
+            "seed": 2,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.15,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.8,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.4
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.725,
+          "parts": {
+            "kazakh": 0.8,
+            "groove": 0.775,
+            "seam": 0.5,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 2,
+          "m4a": "storm/storm-2.m4a",
+          "bytes": 102
+        },
+        {
+          "id": "minimax3-3",
+          "folder": "nalati-storm",
+          "side": {
+            "seed": 3,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.25,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.3,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 25% of the energy"
+        },
+        {
+          "id": "minimax3-4",
+          "folder": "nalati-storm",
+          "side": {
+            "seed": 4,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.65,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.9,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 65% of the energy"
+        }
+      ]
+    },
+    "king": {
+      "pick": "minimax3-1",
+      "takes": [
+        {
+          "id": "minimax3-1",
+          "folder": "nalati-king",
+          "side": {
+            "seed": 1,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.02,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.7,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.6
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.663,
+          "parts": {
+            "kazakh": 0.7,
+            "groove": 0.775,
+            "seam": 0.833,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 1,
+          "m4a": "king/king-1.m4a",
+          "bytes": 101
+        },
+        {
+          "id": "minimax3-2",
+          "folder": "nalati-king",
+          "side": {
+            "seed": 2,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.15,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.8,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.4
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.611,
+          "parts": {
+            "kazakh": 0.8,
+            "groove": 0.775,
+            "seam": 0.5,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 2,
+          "m4a": "king/king-2.m4a",
+          "bytes": 102
+        },
+        {
+          "id": "minimax3-3",
+          "folder": "nalati-king",
+          "side": {
+            "seed": 3,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.25,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.3,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": 0.477,
+          "parts": {
+            "kazakh": 0.3,
+            "groove": 0.775,
+            "seam": 1.0,
+            "clean": 1.0,
+            "full": 1.0,
+            "drone": 0.1
+          },
+          "dq": null,
+          "rank": 3,
+          "m4a": "king/king-3.m4a",
+          "bytes": 103
+        },
+        {
+          "id": "minimax3-4",
+          "folder": "nalati-king",
+          "side": {
+            "seed": 4,
+            "gen_time_s": 1,
+            "prompt": "fixture",
+            "lyrics": "[Instrumental]",
+            "steps": 30
+          },
+          "metrics": {
+            "vocals": {
+              "vocal_energy_share": 0.65,
+              "groove_active_frac": 0.8,
+              "drums_active_frac": 0.75
+            },
+            "kazakh": {
+              "kazakh_prob": 0.9,
+              "instrument_prob": {
+                "dombra": 0.3,
+                "kobyz": 0.2,
+                "sybyzgy": 0.1,
+                "throat": 0.1
+              }
+            },
+            "loop": {
+              "score": 0.7
+            },
+            "clipping": {
+              "clipped_frac": 0
+            },
+            "silence": {
+              "longest_internal_gap_s": 0,
+              "tail_silence_s": 0
+            },
+            "spectrum": {
+              "rolloff95_hz": 12000
+            },
+            "duration_s": 75,
+            "tempo": {
+              "estimated_bpm": 84
+            },
+            "loudness": {
+              "lufs": -18,
+              "true_peak_dbfs": -2
+            }
+          },
+          "score": -1.0,
+          "parts": {},
+          "dq": "voice 65% of the energy"
+        }
+      ]
+    }
+  }
+}

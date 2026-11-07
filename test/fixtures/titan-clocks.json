@@ -1,0 +1,148 @@
+{
+  "gate": {
+    "signal": "arenaClocks",
+    "parameters": {}
+  },
+  "shared": {
+    "spearMode": {
+      "clock": "spear",
+      "slot": "mode"
+    },
+    "chainLeft": {
+      "clock": "chain",
+      "slot": "chain"
+    }
+  },
+  "schedules": [
+    {
+      "id": "spear",
+      "law": {
+        "signal": "arenaSpear",
+        "initial": {
+          "mode": 0,
+          "t": 0,
+          "cd": 2.5,
+          "x": 0,
+          "z": 0
+        },
+        "parameters": {
+          "radius": 4.5,
+          "aim": 1.5,
+          "lock": 0.5,
+          "stuck": 3
+        },
+        "retain": {
+          "mode": "mode",
+          "t": "t",
+          "cd": "cd",
+          "x": "x",
+          "z": "z"
+        }
+      }
+    },
+    {
+      "id": "chain",
+      "law": {
+        "signal": "arenaChain",
+        "initial": {
+          "cd": 4,
+          "chain": 0,
+          "t": 0
+        },
+        "parameters": {},
+        "retain": {
+          "cd": "cd",
+          "left": "chain",
+          "t": "t"
+        }
+      }
+    }
+  ],
+  "volley": {
+    "launcher": "chain",
+    "capacity": 8,
+    "landing": {
+      "signal": "chainLand",
+      "initial": {
+        "on": 0,
+        "t": 0,
+        "x": 0,
+        "z": 0
+      },
+      "parameters": {
+        "land": 0.6,
+        "radius": 3
+      },
+      "retain": {
+        "t": "t",
+        "mode": "on"
+      }
+    },
+    "trail": {
+      "initial": {
+        "count": 0,
+        "elapsed": 0,
+        "trailX0": 0,
+        "trailZ0": 0,
+        "trailX1": 0,
+        "trailZ1": 0,
+        "trailX2": 0,
+        "trailZ2": 0,
+        "trailX3": 0,
+        "trailZ3": 0,
+        "trailX4": 0,
+        "trailZ4": 0,
+        "trailX5": 0,
+        "trailZ5": 0,
+        "trailX6": 0,
+        "trailZ6": 0,
+        "trailX7": 0,
+        "trailZ7": 0,
+        "trailX8": 0,
+        "trailZ8": 0,
+        "trailX9": 0,
+        "trailZ9": 0,
+        "trailX10": 0,
+        "trailZ10": 0,
+        "trailX11": 0,
+        "trailZ11": 0
+      },
+      "parameters": {
+        "capacity": 12,
+        "every": 0.1
+      },
+      "retain": {
+        "count": "count",
+        "elapsed": "elapsed",
+        "trailX0": "trailX0",
+        "trailZ0": "trailZ0",
+        "trailX1": "trailX1",
+        "trailZ1": "trailZ1",
+        "trailX2": "trailX2",
+        "trailZ2": "trailZ2",
+        "trailX3": "trailX3",
+        "trailZ3": "trailZ3",
+        "trailX4": "trailX4",
+        "trailZ4": "trailZ4",
+        "trailX5": "trailX5",
+        "trailZ5": "trailZ5",
+        "trailX6": "trailX6",
+        "trailZ6": "trailZ6",
+        "trailX7": "trailX7",
+        "trailZ7": "trailZ7",
+        "trailX8": "trailX8",
+        "trailZ8": "trailZ8",
+        "trailX9": "trailX9",
+        "trailZ9": "trailZ9",
+        "trailX10": "trailX10",
+        "trailZ10": "trailZ10",
+        "trailX11": "trailX11",
+        "trailZ11": "trailZ11"
+      },
+      "signals": {
+        "step": "arenaTrail",
+        "pick": "arenaTrailPick"
+      }
+    }
+  }
+}

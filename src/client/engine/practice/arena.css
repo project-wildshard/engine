@@ -1,0 +1,20 @@
+.ws-practice { position: absolute; inset: 0; display: none; pointer-events: none; z-index: calc(var(--ws-layer-hud) + 13); font-family: var(--ws-mono); }
+.ws-practice.show { display: block; }
+.ws-practice-preparing { position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%); padding: 9px 12px; border: 1px solid rgba(117, 217, 255, 0.65); background: rgba(5, 15, 28, 0.86); color: #bceeff; font-size: 10px; letter-spacing: 0.15em; white-space: nowrap; }
+.ws-practice-preparing[hidden] { display: none; }
+.ws-practice-label { position: absolute; top: 0; left: 0; padding: 5px 7px 4px; white-space: nowrap; background: rgba(5, 15, 28, 0.85); border: 1px solid rgba(117, 217, 255, 0.68); color: #bceeff; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; }
+.ws-practice-label::after { content: ''; position: absolute; left: calc(50% - 4px); top: 100%; border: 4px solid transparent; border-top-color: #75d9ff; }
+.ws-practice-float { position: absolute; top: 0; left: 0; color: #8fe3ff; font-family: var(--ws-display); font-size: 25px; font-weight: 700; line-height: 1; text-shadow: 0 0 12px rgba(117, 217, 255, 0.8), 0 2px 4px #06101a; }
+.ws-practice-float.miss { color: #b4c3cc; font-size: 18px; letter-spacing: 0.08em; text-shadow: 0 2px 4px #06101a; }
+#hud.practice-active .ws-quest-obj { display: none; }
+@media (max-width: 700px) { .ws-practice-label { font-size: 8px; padding: 4px 5px; } }
+/* E285: the tag clamps inside a narrow portrait frame; its arrow stays over the figure */
+.ws-practice-label::after { left: calc(50% - 4px + var(--ws-practice-arrow, 0px)); }
+/* E285: the world-only verbs leave the practice room (the board kills the dodge; the horse and the journal lead out) */
+#hud.practice-active .ws-touch .ws-touch-hover,
+#hud.practice-active .ws-touch .ws-ride-horse,
+#hud.practice-active .ws-touch .ws-cmp-disc { display: none !important; }
+/* E321: and a feature playground's (src/playgrounds/): the board (the room turns it off every frame) and the HORSE whistle
+   (it calls your steppe horse from 3 km under the field) — its DISMOUNT face stays: it gets you off the track horse */
+#hud.playground-active .ws-touch .ws-touch-hover,
+#hud.playground-active .ws-touch .ws-ride-horse:not(.ws-ride-dismount) { display: none !important; }

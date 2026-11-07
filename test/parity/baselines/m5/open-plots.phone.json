@@ -1,0 +1,6177 @@
+{
+  "boot": {
+    "schema": 1,
+    "lane": "m5",
+    "sha": "9ec299a8fd2254f4592e3622a4d97dedd206eb7e",
+    "build": "9ec299a-mvi8tow0",
+    "shard": "driftwood-isle",
+    "tier": "phone",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3,
+      "touch": true
+    },
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "browser": "153.0.8010.12",
+    "errors": [],
+    "steps": [
+      "renderer",
+      "sky",
+      "terrain",
+      "cards",
+      "forest",
+      "physics",
+      "edge",
+      "grass",
+      "cabins",
+      "props",
+      "animals",
+      "weapon",
+      "assembly",
+      "menu",
+      "shaders",
+      "firstFrame",
+      "audio"
+    ],
+    "systems": {
+      "input": [
+        "engine.input.weapon",
+        "engine.input.contexts",
+        "engine.input.collect",
+        "engine.lockon.input",
+        "engine.player.input"
+      ],
+      "fixed.pre": [
+        "physics.bodies.pre",
+        "shard.driftwood.movers",
+        "physics.movers"
+      ],
+      "fixed.step": [
+        "physics.step"
+      ],
+      "fixed.post": [
+        "physics.bodies.post",
+        "player.step",
+        "game.shardfile.residency",
+        "shard.driftwood.bridge.capture"
+      ],
+      "update": [
+        "player.update",
+        "main.2",
+        "game.shardfile.presentation",
+        "shard.driftwood.cover",
+        "shard.driftwood.palms",
+        "shard.driftwood.bridge.pose",
+        "shard.driftwood.seabed",
+        "shard.driftwood.cove",
+        "shard.driftwood.shrine",
+        "shard.driftwood.gulls",
+        "world.impacts",
+        "engine.player.for",
+        "training-arena",
+        "hud.perf",
+        "engine.effects",
+        "main.6",
+        "shard.driftwood.dusk",
+        "shard.driftwood.adventure",
+        "driftwood.speaker.pose",
+        "driftwood.trader.pose",
+        "shard.driftwood-isle.installSpine",
+        "shard.driftwood-isle.installTrader",
+        "shard.driftwood.adventure.2",
+        "shard.driftwood-isle.installGullGuide",
+        "shard.driftwood-isle.installComplete",
+        "shard.driftwood-isle.installFinale",
+        "shard.driftwood.director",
+        "shard.driftwood-isle.installEcology",
+        "shard.driftwood.adventure.4",
+        "shard.driftwood.adventure.3",
+        "game.loot",
+        "body-shadow",
+        "keepsakes",
+        "hud.combat",
+        "last place",
+        "shard.driftwood.firstMinutes",
+        "first hints",
+        "main.world",
+        "client.baked.tiles",
+        "client.water.surfaces",
+        "engine.creatures.update",
+        "main.equipment",
+        "engine.audio.listener",
+        "shard.driftwood.shrineHum",
+        "shard.driftwood.ambience",
+        "main.frame",
+        "engine.player.regen",
+        "engine.player.hud"
+      ],
+      "late": [
+        "engine.input.trace",
+        "engine.input.edges",
+        "engine.hud.pins"
+      ]
+    },
+    "appStates": [
+      "boot",
+      "loading",
+      "play"
+    ],
+    "registry": [
+      {
+        "id": "boat",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": true,
+        "shapes": {
+          "cuboid": 5,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "bridge",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 14,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "bushes",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove",
+        "category": "nature",
+        "surface": "rock",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 13,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 1
+        }
+      },
+      {
+        "id": "cove-beachgrass",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-bpalm",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 15,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-bush",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-cliff",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 176,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-coconuts",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-drift",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-fern",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-flowerbush",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-hibiscus",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-palm",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 9,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-pebble",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-shell",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-small-rocks",
+        "category": "nature",
+        "surface": "rock",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-star",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-tuft",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-unclaimed",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-white",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cove-yellow",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "cover-drift-logs",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "entry-decks",
+        "category": "buildings",
+        "surface": "stone",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "entry-landings",
+        "category": "props",
+        "surface": "stone",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 4,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "hut",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 20,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 1
+        }
+      },
+      {
+        "id": "interact-altar",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact-beacon",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact-castaway-chest",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact-hold-pump",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact-hold-winch",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact-reef-treasure",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact-sluice",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact-strongbox",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/beacon",
+        "category": "props",
+        "surface": "stone",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/bench",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/door",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/glyph-shard",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/hold-key",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/lever",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/pressure-plate",
+        "category": "props",
+        "surface": "stone",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/puzzle-barrel",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/sea-chest",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/sea-glass",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "interact:shared/shard-altar",
+        "category": "props",
+        "surface": "stone",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "jetty-0",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 40,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 1,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "jetty-1",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 58,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 1,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "jetty-2",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 42,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 1,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "lookout",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 14,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 1
+        }
+      },
+      {
+        "id": "model:driftwood-isle/captain-hat",
+        "category": "gear",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/castaway",
+        "category": "people",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/coconut-monkey",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/drowned-captain",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/drowned-sailor",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/gull",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/iron-sword",
+        "category": "gear",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/reef-crab",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/sailcloth-cape",
+        "category": "gear",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/sea-glass-chime",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/trophy-plaques",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:driftwood-isle/wooden-sword",
+        "category": "gear",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:shared/bear",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:shared/boar",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:shared/hoverboard",
+        "category": "gear",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:shared/training-dummy",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "npc-castaway",
+        "category": "people",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": true,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "palms",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 612,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "paths",
+        "category": "ground",
+        "surface": "ground",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 132,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "pier",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 62,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 1,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "practice-arena",
+        "category": "ground",
+        "surface": "metal",
+        "floor": true,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 5,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "rocks",
+        "category": "nature",
+        "surface": "rock",
+        "floor": false,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 91,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sea-glass-chime",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "shrine",
+        "category": "buildings",
+        "surface": "stone",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 19,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 2
+        }
+      },
+      {
+        "id": "trade-counter",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "trader",
+        "category": "people",
+        "surface": "flesh",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 1,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "trail-fence-posts",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 202,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "trail-signposts",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 2,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "trail-steps",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "trailside",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 261,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 2
+        }
+      },
+      {
+        "id": "trophy-plaques",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "wreck",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 107,
+          "ball": 0,
+          "capsule": 1,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 1
+        }
+      },
+      {
+        "id": "wreck-barrels",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "wreck-coils",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "wreck-cove-reef-rocks",
+        "category": "nature",
+        "surface": "rock",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "wreck-crates",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "wreck-drift-logs",
+        "category": "nature",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "wreck-reef-rocks",
+        "category": "nature",
+        "surface": "rock",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "zipline",
+        "category": "buildings",
+        "surface": "planks",
+        "floor": true,
+        "solidFloor": true,
+        "follows": false,
+        "shapes": {
+          "cuboid": 2,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      }
+    ],
+    "registryModels": {
+      "models": 66,
+      "sets": 9
+    },
+    "physics": {
+      "fixed": 2,
+      "kinematic": 2,
+      "dynamic": 26,
+      "colliders": 2178
+    },
+    "scene": {
+      "totals": {
+        "mesh": 514,
+        "instanced": 93,
+        "instances": 855,
+        "skinned": 38,
+        "points": 5,
+        "lines": 3,
+        "sprites": 10,
+        "lights": 9,
+        "batched": 2
+      },
+      "named": [
+        {
+          "path": "animals",
+          "type": "Group",
+          "n": 58
+        },
+        {
+          "path": "animals/far-herd",
+          "type": "Group",
+          "n": 0
+        },
+        {
+          "path": "animals/herd-shadow",
+          "type": "Group",
+          "n": 0
+        },
+        {
+          "path": "body-shadow-root",
+          "type": "Group",
+          "n": 1
+        },
+        {
+          "path": "body-shadow-root/body-shadow",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "cove",
+          "type": "Group",
+          "n": 66
+        },
+        {
+          "path": "cove-glow",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "cove-rocks",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "driftwood-gulls",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "driftwood-isle/boat",
+          "type": "Group",
+          "n": 3
+        },
+        {
+          "path": "driftwood-isle/entry-deck",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "driftwood-isle/hibiscus-bush",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "driftwood-isle/hut",
+          "type": "Group",
+          "n": 2
+        },
+        {
+          "path": "driftwood-isle/lookout",
+          "type": "Group",
+          "n": 1
+        },
+        {
+          "path": "driftwood-isle/palm",
+          "type": "Mesh",
+          "n": 45
+        },
+        {
+          "path": "driftwood-isle/palm/driftwood-isle/palm-shadow-pieces",
+          "type": "Group",
+          "n": 45
+        },
+        {
+          "path": "driftwood-isle/pier",
+          "type": "Group",
+          "n": 10
+        },
+        {
+          "path": "driftwood-isle/pier",
+          "type": "Group",
+          "n": 2
+        },
+        {
+          "path": "driftwood-isle/pier",
+          "type": "Group",
+          "n": 9
+        },
+        {
+          "path": "driftwood-isle/pier",
+          "type": "Group",
+          "n": 2
+        },
+        {
+          "path": "driftwood-isle/shore-boulder",
+          "type": "Mesh",
+          "n": 34
+        },
+        {
+          "path": "driftwood-isle/shore-boulder/driftwood-isle/shore-boulder-shadow-pieces",
+          "type": "Group",
+          "n": 34
+        },
+        {
+          "path": "driftwood-isle/shrine",
+          "type": "Group",
+          "n": 4
+        },
+        {
+          "path": "driftwood-isle/shrine/shrine-fireflies",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "driftwood-isle/small-rock",
+          "type": "Mesh",
+          "n": 44
+        },
+        {
+          "path": "driftwood-isle/small-rock/driftwood-isle/small-rock-shadow-pieces",
+          "type": "Group",
+          "n": 44
+        },
+        {
+          "path": "driftwood-isle/trade-counter",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover",
+          "type": "Group",
+          "n": 53
+        },
+        {
+          "path": "ground-cover/ground-cover-bush",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-bush",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-bush-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-bush-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-daisy",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-daisy",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-daisy-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-daisy-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-driftwood",
+          "type": "Mesh",
+          "n": 26
+        },
+        {
+          "path": "ground-cover/ground-cover-fern",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-fern",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-fern-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-fern-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-hibiscus",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-hibiscus",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-hibiscus-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-hibiscus-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-pebble",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-pebble",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-shells",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-shells",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-starfish",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-starfish",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-tuft",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-tuft",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-tuft-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "ground-cover/ground-cover-tuft-far",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "horizon-matte",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "HUD + Weapon Explorer · grid arena",
+          "type": "Group",
+          "n": 9
+        },
+        {
+          "path": "impacts",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "interact-glow",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "interact-lit",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "light-pool",
+          "type": "Group",
+          "n": 0
+        },
+        {
+          "path": "loot-coins",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "mesh-shadow-pieces",
+          "type": "Group",
+          "n": 21
+        },
+        {
+          "path": "npc-castaway",
+          "type": "Group",
+          "n": 6
+        },
+        {
+          "path": "npc-castaway/castaway-smoke",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "rope-bridge",
+          "type": "Group",
+          "n": 1
+        },
+        {
+          "path": "sea-glass-chime",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "seabed",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "seabed-fish",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "sun-shadow-fade-0",
+          "type": "DirectionalLight",
+          "n": 0
+        },
+        {
+          "path": "sun-shadow-fade-1",
+          "type": "DirectionalLight",
+          "n": 0
+        },
+        {
+          "path": "trader",
+          "type": "Group",
+          "n": 4
+        },
+        {
+          "path": "trophy-plaques",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "water:sea",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "wreck-lanterns",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "wreck-rocks",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "zipline",
+          "type": "Mesh",
+          "n": 0
+        }
+      ]
+    },
+    "render": {
+      "programs": 117,
+      "programKeys": "3a3a7ac99cb9510b327e24712ebdc87131ebd95d2901416c6f984e0c79859036",
+      "memory": {
+        "geometries": 423,
+        "textures": 87
+      }
+    },
+    "gpuBytes": {
+      "textures": 91561520,
+      "renderbuffers": 10877184,
+      "buffers": 71679761,
+      "total": 174118465
+    },
+    "audio": {
+      "requests": [
+        "/assets/music/folk/island-calm-d7d189f9.m4a",
+        "/assets/music/folk/island-tension-bb05ab64.m4a",
+        "/assets/music/folk/pine-calm-10905c79.m4a",
+        "/assets/music/folk/pine-tension-180bc197.m4a",
+        "/assets/music/folk/sting-chunk-31c10eaf.m4a",
+        "/assets/music/folk/sting-death-67f54fe8.m4a",
+        "/assets/music/folk/sting-pickup-332f81db.m4a",
+        "/assets/music/folk/title-50001128.m4a",
+        "/assets/music/orchestral/island-calm-27861d1b.m4a",
+        "/assets/music/orchestral/island-tension-73116f36.m4a",
+        "/assets/music/orchestral/pine-calm-fbc4a99e.m4a",
+        "/assets/music/orchestral/pine-tension-525d8c6d.m4a",
+        "/assets/music/orchestral/sting-chunk-a639b19e.m4a",
+        "/assets/music/orchestral/sting-death-771d34f7.m4a",
+        "/assets/music/orchestral/sting-pickup-65f7ac5b.m4a",
+        "/assets/music/orchestral/title-b47c8a52.m4a",
+        "/assets/music/piano/island-calm-05125ed8.m4a",
+        "/assets/music/piano/island-tension-7faf0468.m4a",
+        "/assets/music/piano/pine-calm-923e0056.m4a",
+        "/assets/music/piano/pine-tension-cc014e5b.m4a",
+        "/assets/music/piano/sting-chunk-a4f2ffab.m4a",
+        "/assets/music/piano/sting-death-99b071e0.m4a",
+        "/assets/music/piano/sting-pickup-6ed91318.m4a",
+        "/assets/music/piano/title-3d1f713a.m4a",
+        "/assets/sfx/best/bear_growl-3-f91d7740.m4a",
+        "/assets/sfx/best/bear_hurt-1-43b45d1e.m4a",
+        "/assets/sfx/best/bear_hurt-3-3aea6172.m4a",
+        "/assets/sfx/best/bear_roar-2-29e3055e.m4a",
+        "/assets/sfx/best/bear_roar-3-9f1e177e.m4a",
+        "/assets/sfx/best/bed-forest-2-0cd11be5.m4a",
+        "/assets/sfx/best/bed-underwater-3-cbe2810d.m4a",
+        "/assets/sfx/best/boar_grunt-3-4e4a9bec.m4a",
+        "/assets/sfx/best/boar_squeal-1-804df37c.m4a",
+        "/assets/sfx/best/boltImpact-flesh-2-13ed7f2c.m4a",
+        "/assets/sfx/best/boltImpact-flesh-3-62e25aa5.m4a",
+        "/assets/sfx/best/boltImpact-ground-1-f81140e6.m4a",
+        "/assets/sfx/best/boltImpact-ground-2-5e8a3076.m4a",
+        "/assets/sfx/best/boltImpact-wood-2-8e9e99ee.m4a",
+        "/assets/sfx/best/boltImpact-wood-3-673a0ef6.m4a",
+        "/assets/sfx/best/crossbowFire-3-18ccf9f0.m4a",
+        "/assets/sfx/best/deer_call-1-7cd35867.m4a",
+        "/assets/sfx/best/deer_call-3-1d601bb4.m4a",
+        "/assets/sfx/best/dive-1-4b978224.m4a",
+        "/assets/sfx/best/dive-3-e74abc72.m4a",
+        "/assets/sfx/best/dodge-2-13887dd8.m4a",
+        "/assets/sfx/best/dodge-3-453516f6.m4a",
+        "/assets/sfx/best/dryFire-2-88071d1d.m4a",
+        "/assets/sfx/best/dryFire-3-173415cb.m4a",
+        "/assets/sfx/best/elk_bugle-2-0e80875f.m4a",
+        "/assets/sfx/best/elk_bugle-3-f6e8030e.m4a",
+        "/assets/sfx/best/footstep-litter-1-fe9cd8d9.m4a",
+        "/assets/sfx/best/footstep-litter-3-09ceed7a.m4a",
+        "/assets/sfx/best/footstep-mud-1-1dd22736.m4a",
+        "/assets/sfx/best/footstep-mud-2-99e4a10d.m4a",
+        "/assets/sfx/best/footstep-planks-2-ebb5a80c.m4a",
+        "/assets/sfx/best/footstep-planks-3-d919e436.m4a",
+        "/assets/sfx/best/footstep-rock-2-58c2cc26.m4a",
+        "/assets/sfx/best/footstep-rock-3-98e0e874.m4a",
+        "/assets/sfx/best/footstep-sand-1-09a40a2f.m4a",
+        "/assets/sfx/best/footstep-sand-2-4b40473a.m4a",
+        "/assets/sfx/best/footstep-wet-1-58d313a2.m4a",
+        "/assets/sfx/best/hitMarker-1-46ef1236.m4a",
+        "/assets/sfx/best/hoofsteps-1-9580d36a.m4a",
+        "/assets/sfx/best/hoofsteps-3-f1c11f8f.m4a",
+        "/assets/sfx/best/hum-pickup-3-7b7db58f.m4a",
+        "/assets/sfx/best/kill-2-5e4acc1b.m4a",
+        "/assets/sfx/best/kill-3-5f7ea225.m4a",
+        "/assets/sfx/best/land-2-773487f2.m4a",
+        "/assets/sfx/best/land-3-eebff605.m4a",
+        "/assets/sfx/best/land-hard-1-2ce640be.m4a",
+        "/assets/sfx/best/land-hard-3-5aed2a6b.m4a",
+        "/assets/sfx/best/lunge-3-be45ba7a.m4a",
+        "/assets/sfx/best/reload-1-d3e6d32a.m4a",
+        "/assets/sfx/best/reload-3-d81ab6e2.m4a",
+        "/assets/sfx/best/rifleFire-2-a850ad83.m4a",
+        "/assets/sfx/best/rifleFire-3-8ed56841.m4a",
+        "/assets/sfx/best/rifleReload-2-1ad54372.m4a",
+        "/assets/sfx/best/rifleReload-3-20027167.m4a",
+        "/assets/sfx/best/splash-2-03ab63ae.m4a",
+        "/assets/sfx/best/splash-3-9509efbe.m4a",
+        "/assets/sfx/best/surface-2-e5ac4e8a.m4a",
+        "/assets/sfx/best/surface-3-85550528.m4a",
+        "/assets/sfx/best/swimStroke-2-9e35721b.m4a",
+        "/assets/sfx/best/swordHeavy-2-1debcc8f.m4a",
+        "/assets/sfx/best/swordHeavy-3-1bed510f.m4a",
+        "/assets/sfx/best/swordHit-flesh-1-07225bb8.m4a",
+        "/assets/sfx/best/swordHit-flesh-2-efbf5fd7.m4a",
+        "/assets/sfx/best/swordHit-wood-2-800b6fe9.m4a",
+        "/assets/sfx/best/swordHit-wood-3-6381cc6b.m4a",
+        "/assets/sfx/best/swordSwing-1-6303fc5d.m4a",
+        "/assets/sfx/best/wadeStep-1-83e1423c.m4a",
+        "/assets/sfx/best/wadeStep-2-402e850a.m4a",
+        "/assets/sfx/best/waterExit-1-d85f0e47.m4a",
+        "/assets/sfx/best/weaponSwap-3-fbe81018.m4a",
+        "/assets/sfx/driftwood-isle/bed-island-1-4611714d.m4a",
+        "/assets/sfx/driftwood-isle/coconut_hit-2-83ed831d.m4a",
+        "/assets/sfx/driftwood-isle/coconut_hit-3-9c8e8fd7.m4a",
+        "/assets/sfx/driftwood-isle/coconut_land-1-42389b0a.m4a",
+        "/assets/sfx/driftwood-isle/crab_click-2-aefbc41d.m4a",
+        "/assets/sfx/driftwood-isle/crab_click-3-f47e95a3.m4a",
+        "/assets/sfx/driftwood-isle/crab_snap-2-bff601ad.m4a",
+        "/assets/sfx/driftwood-isle/crab_snap-3-69ea11c0.m4a",
+        "/assets/sfx/driftwood-isle/gull-1-5fa9130b.m4a",
+        "/assets/sfx/driftwood-isle/hum-shrine-2-d89ed03a.m4a",
+        "/assets/sfx/driftwood-isle/monkey_chatter-3-1c7d7e2d.m4a",
+        "/assets/sfx/driftwood-isle/monkey_shriek-1-1a358b4e.m4a",
+        "/assets/sfx/driftwood-isle/monkey_shriek-2-54acd647.m4a",
+        "/assets/sfx/driftwood-isle/sailor_groan-2-43e2a981.m4a",
+        "/assets/sfx/driftwood-isle/sailor_slash-1-611ba654.m4a",
+        "/assets/sfx/driftwood-isle/sailor_slash-3-5a10eada.m4a"
+      ],
+      "state": {
+        "style": "piano",
+        "set": "best",
+        "mood": "menu"
+      },
+      "score": "score.driftwood"
+    },
+    "hud": [
+      {
+        "cls": "ws-bar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-cap",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-cap",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-caption",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-frame",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-lag",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-notches",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-shimmer",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-band",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-band",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-emblem",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-inner",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-skip",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-title",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-fade",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-retry",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-retry-attempt",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-retry-title",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-flavour",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-gem",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-tier",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-death-card",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death-cause",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death-where",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hurt",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-layer",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-warn",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-dive-hint ws-glass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-fb-badge",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-fb-disc ws-touch-tag",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-aim",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-ammo ws-glass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-arow",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-band",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-bolts",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-boundary",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-bs",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-bt",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-centre",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-compass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-count",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cross",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-feed",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-flash",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-glyph",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-glyph",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-health ws-glass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-hitring",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-hrow",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-hval",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lock",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lockcand",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lockedge",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lockedge",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-mark",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-mark",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-notch",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-num",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-num",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-pips",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-prompt ws-glass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-range",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-rbar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-reserve",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-reserve",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-segs",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-smear",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-speed",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-status",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-strip",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tiny",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tiny",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-toasts",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-vbar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-vitals",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-weapon",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-weapon",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-x",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-glass ws-hint-tag",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-glass ws-shop-big",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-hint-ring",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-chip",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-coin",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-num",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-body",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-corner",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-edge",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-hit",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-icon",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-loop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-piece",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-seam",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-seam",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-canvas",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-n",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-practice-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice-preparing",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-arrow",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-count",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-dia",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-dist",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-goal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-nav",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-obj-sep",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-reward",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-reward-kicker",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-reward-sub",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-reward-title",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk-foot",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk-text",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-bigbuy",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-bighead",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-bigpurse",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-bigwho",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-close",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-grid",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-title",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-shop-top",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-attack",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-bar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-boost",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-cd",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-charge",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-charge",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-disc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-disc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-disc",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-disc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-disc",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-disc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-disc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-hover",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-lookpad",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-orbit",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-pause",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-pie",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-sprint",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-status",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-stick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-swap",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-swap-ammo",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-swap-arrows",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-swap-dots",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-swap-icon",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-use",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-zone",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-zone",
+        "spot": "",
+        "shown": true
+      }
+    ],
+    "saves": {
+      "read": [
+        "local:wildshard.save.v2.device",
+        "local:wildshard.save.v2.driftwood-isle",
+        "local:wildshard.save.v2.far-reach",
+        "local:wildshard.save.v2.global",
+        "local:wildshard.save.v2.nalati-grasslands",
+        "local:wildshard.save.v2.nine-dragon-stack",
+        "local:wildshard.save.v2.pine-hollow",
+        "local:wildshard.save.v2.profile",
+        "local:wildshard.save.v2.sunscar-dunes",
+        "session:wildshard.save.v2.session"
+      ],
+      "written": [
+        "local:wildshard.save.v2.device",
+        "local:wildshard.save.v2.global",
+        "session:wildshard.save.v2.session"
+      ]
+    },
+    "playMs": 9215.5,
+    "stepMs": {
+      "renderer": 24,
+      "sky": 375,
+      "terrain": 42,
+      "cards": 1,
+      "forest": 3,
+      "physics": 5,
+      "edge": 5,
+      "grass": 0,
+      "cabins": 0,
+      "props": 2933,
+      "animals": 34,
+      "weapon": 17,
+      "assembly": 0,
+      "menu": 8,
+      "shaders": 2322,
+      "firstFrame": 116,
+      "audio": 185
+    },
+    "heapMB": 235.18114471435547
+  },
+  "poses": {
+    "pier": {
+      "name": "pier",
+      "pos": [
+        -0.000018946081595229425,
+        1.2141836035078448,
+        -194.0000530196317
+      ],
+      "calls": 301,
+      "tris": 1315736,
+      "fps": 126.37828668363021,
+      "frameP95Ms": 9.300000011920929,
+      "cpuP50Ms": 7.300000011920929,
+      "cpuP95Ms": 8.699999988079071,
+      "creatureBoxes": 12,
+      "boxes": [
+        [
+          142,
+          372,
+          156,
+          421
+        ],
+        [
+          144,
+          369,
+          158,
+          417
+        ],
+        [
+          139,
+          370,
+          153,
+          418
+        ],
+        [
+          149,
+          370,
+          163,
+          418
+        ],
+        [
+          231,
+          383,
+          267,
+          453
+        ],
+        [
+          49,
+          342,
+          65,
+          392
+        ],
+        [
+          62,
+          341,
+          77,
+          390
+        ],
+        [
+          51,
+          342,
+          66,
+          391
+        ],
+        [
+          44,
+          343,
+          60,
+          393
+        ],
+        [
+          295,
+          379,
+          310,
+          428
+        ],
+        [
+          300,
+          380,
+          315,
+          430
+        ],
+        [
+          302,
+          380,
+          317,
+          429
+        ]
+      ],
+      "shot": "/Users/raynos/projects/games/wildshard-singleplayer/test/parity/baselines/m5/open-plots.phone.pier.jpg",
+      "ssim": 1
+    },
+    "beach": {
+      "name": "beach",
+      "pos": [
+        -9.998668627669986,
+        0.7071458506448831,
+        -150.0008747053146
+      ],
+      "calls": 307,
+      "tris": 1174672,
+      "fps": 123.56941449537811,
+      "frameP95Ms": 9.200000047683716,
+      "cpuP50Ms": 7.600000023841858,
+      "cpuP95Ms": 8.899999976158142,
+      "creatureBoxes": 18,
+      "boxes": [
+        [
+          64,
+          371,
+          99,
+          441
+        ],
+        [
+          48,
+          377,
+          76,
+          440
+        ],
+        [
+          71,
+          374,
+          100,
+          438
+        ],
+        [
+          34,
+          374,
+          70,
+          444
+        ],
+        [
+          307,
+          351,
+          349,
+          427
+        ],
+        [
+          363,
+          381,
+          383,
+          435
+        ],
+        [
+          362,
+          383,
+          378,
+          433
+        ],
+        [
+          360,
+          383,
+          375,
+          433
+        ],
+        [
+          338,
+          382,
+          358,
+          436
+        ],
+        [
+          339,
+          384,
+          355,
+          434
+        ],
+        [
+          339,
+          384,
+          354,
+          434
+        ],
+        [
+          346,
+          384,
+          361,
+          433
+        ],
+        [
+          334,
+          384,
+          350,
+          434
+        ],
+        [
+          199,
+          367,
+          229,
+          431
+        ],
+        [
+          227,
+          364,
+          257,
+          428
+        ],
+        [
+          217,
+          362,
+          252,
+          431
+        ],
+        [
+          233,
+          365,
+          261,
+          427
+        ],
+        [
+          322,
+          385,
+          338,
+          435
+        ]
+      ],
+      "shot": "/Users/raynos/projects/games/wildshard-singleplayer/test/parity/baselines/m5/open-plots.phone.beach.jpg",
+      "ssim": 1
+    },
+    "wreck": {
+      "name": "wreck",
+      "pos": [
+        105.00039855222349,
+        2.8319549034014972,
+        -0.01762171576046967
+      ],
+      "calls": 171,
+      "tris": 952765,
+      "fps": 157.70533446033025,
+      "frameP95Ms": 7.600000023841858,
+      "cpuP50Ms": 6,
+      "cpuP95Ms": 7.199999988079071,
+      "creatureBoxes": 9,
+      "boxes": [
+        [
+          204,
+          375,
+          328,
+          533
+        ],
+        [
+          231,
+          406,
+          295,
+          504
+        ],
+        [
+          222,
+          410,
+          281,
+          502
+        ],
+        [
+          8,
+          386,
+          115,
+          528
+        ],
+        [
+          0,
+          413,
+          66,
+          515
+        ],
+        [
+          66,
+          411,
+          122,
+          502
+        ],
+        [
+          54,
+          411,
+          117,
+          508
+        ],
+        [
+          10,
+          413,
+          72,
+          509
+        ],
+        [
+          173,
+          396,
+          218,
+          474
+        ]
+      ],
+      "shot": "/Users/raynos/projects/games/wildshard-singleplayer/test/parity/baselines/m5/open-plots.phone.wreck.jpg",
+      "ssim": 1
+    }
+  },
+  "budgets": {
+    "pier": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 219.43689823150635
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "beach": {
+                "gpuMB": 219.43689823150635
+              },
+              "pier": {
+                "gpuMB": 219.43689823150635
+              },
+              "wreck": {
+                "gpuMB": 219.43689823150635
+              }
+            },
+            "desktop": {
+              "beach": {
+                "gpuMB": 583.5372714996338
+              },
+              "pier": {
+                "gpuMB": 583.5372714996338
+              },
+              "wreck": {
+                "gpuMB": 583.5372714996338
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.6,
+            "systems": {
+              "physics": 0.8,
+              "ai": 0.8,
+              "animation": 1,
+              "player": 0.4,
+              "world": 0.5,
+              "hud": 0.3,
+              "audio": 0.2
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.3125,
+              "foliage": 0.1875,
+              "shadow": 0.15625,
+              "transparent": 0.09375,
+              "viewmodel": 0.0625,
+              "post": 0.125,
+              "reserve": 0.0625
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.4,
+              "ai": 0.4,
+              "animation": 0.5,
+              "player": 0.2,
+              "world": 0.25,
+              "hud": 0.15,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.5,
+              "post": 0.5
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": 30,
+            "fixedSeconds": 5.5,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "budgets/calibration.json (scripts/calibrate.mjs)",
+        "assumption": "ASSUMPTION: hot iPhone costs equal measured M5 costs × 10; no phone calibration was run (decision 99)",
+        "expressions": {
+          "frame": "1000 / 30 / 1.3",
+          "gpu": "25.641025641025642 - 9.6",
+          "draws": "floor((9.6 - 4 - 0.6) / (0.0004257812537252903 × 10))",
+          "tris": "floor(16.04102564102564 × 0.5 / (4.2708022548417234e-8 × 10))",
+          "programs": "floor(1000 / (0.6720833336313565 × 10))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(30 - 5.5 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.8,
+        "ai": 0.8,
+        "animation": 1,
+        "player": 0.4,
+        "world": 0.5,
+        "hud": 0.3,
+        "audio": 0.2
+      },
+      "gpuM5Ms": 1.6041025641025641,
+      "downloadBytes": 21375000
+    },
+    "beach": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 219.43689823150635
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "beach": {
+                "gpuMB": 219.43689823150635
+              },
+              "pier": {
+                "gpuMB": 219.43689823150635
+              },
+              "wreck": {
+                "gpuMB": 219.43689823150635
+              }
+            },
+            "desktop": {
+              "beach": {
+                "gpuMB": 583.5372714996338
+              },
+              "pier": {
+                "gpuMB": 583.5372714996338
+              },
+              "wreck": {
+                "gpuMB": 583.5372714996338
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.6,
+            "systems": {
+              "physics": 0.8,
+              "ai": 0.8,
+              "animation": 1,
+              "player": 0.4,
+              "world": 0.5,
+              "hud": 0.3,
+              "audio": 0.2
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.3125,
+              "foliage": 0.1875,
+              "shadow": 0.15625,
+              "transparent": 0.09375,
+              "viewmodel": 0.0625,
+              "post": 0.125,
+              "reserve": 0.0625
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.4,
+              "ai": 0.4,
+              "animation": 0.5,
+              "player": 0.2,
+              "world": 0.25,
+              "hud": 0.15,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.5,
+              "post": 0.5
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": 30,
+            "fixedSeconds": 5.5,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "budgets/calibration.json (scripts/calibrate.mjs)",
+        "assumption": "ASSUMPTION: hot iPhone costs equal measured M5 costs × 10; no phone calibration was run (decision 99)",
+        "expressions": {
+          "frame": "1000 / 30 / 1.3",
+          "gpu": "25.641025641025642 - 9.6",
+          "draws": "floor((9.6 - 4 - 0.6) / (0.0004257812537252903 × 10))",
+          "tris": "floor(16.04102564102564 × 0.5 / (4.2708022548417234e-8 × 10))",
+          "programs": "floor(1000 / (0.6720833336313565 × 10))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(30 - 5.5 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.8,
+        "ai": 0.8,
+        "animation": 1,
+        "player": 0.4,
+        "world": 0.5,
+        "hud": 0.3,
+        "audio": 0.2
+      },
+      "gpuM5Ms": 1.6041025641025641,
+      "downloadBytes": 21375000
+    },
+    "wreck": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 219.43689823150635
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "beach": {
+                "gpuMB": 219.43689823150635
+              },
+              "pier": {
+                "gpuMB": 219.43689823150635
+              },
+              "wreck": {
+                "gpuMB": 219.43689823150635
+              }
+            },
+            "desktop": {
+              "beach": {
+                "gpuMB": 583.5372714996338
+              },
+              "pier": {
+                "gpuMB": 583.5372714996338
+              },
+              "wreck": {
+                "gpuMB": 583.5372714996338
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.6,
+            "systems": {
+              "physics": 0.8,
+              "ai": 0.8,
+              "animation": 1,
+              "player": 0.4,
+              "world": 0.5,
+              "hud": 0.3,
+              "audio": 0.2
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.3125,
+              "foliage": 0.1875,
+              "shadow": 0.15625,
+              "transparent": 0.09375,
+              "viewmodel": 0.0625,
+              "post": 0.125,
+              "reserve": 0.0625
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.4,
+              "ai": 0.4,
+              "animation": 0.5,
+              "player": 0.2,
+              "world": 0.25,
+              "hud": 0.15,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.5,
+              "post": 0.5
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": 30,
+            "fixedSeconds": 5.5,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "budgets/calibration.json (scripts/calibrate.mjs)",
+        "assumption": "ASSUMPTION: hot iPhone costs equal measured M5 costs × 10; no phone calibration was run (decision 99)",
+        "expressions": {
+          "frame": "1000 / 30 / 1.3",
+          "gpu": "25.641025641025642 - 9.6",
+          "draws": "floor((9.6 - 4 - 0.6) / (0.0004257812537252903 × 10))",
+          "tris": "floor(16.04102564102564 × 0.5 / (4.2708022548417234e-8 × 10))",
+          "programs": "floor(1000 / (0.6720833336313565 × 10))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(30 - 5.5 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.8,
+        "ai": 0.8,
+        "animation": 1,
+        "player": 0.4,
+        "world": 0.5,
+        "hud": 0.3,
+        "audio": 0.2
+      },
+      "gpuM5Ms": 1.6041025641025641,
+      "downloadBytes": 21375000
+    }
+  },
+  "walk": {
+    "legs": {},
+    "stuck": 0,
+    "sounds": {
+      "event": {
+        "voices:step-planks": 8,
+        "gullCallAt": 1,
+        "gullCall": 1,
+        "dodge": 1,
+        "audio.startSampleBed": 1,
+        "voices:ui-chime": 2
+      },
+      "ambient": [
+        "island.drip",
+        "island.swell"
+      ]
+    },
+    "touch": {
+      "moved": 15.101157180878069,
+      "yawDelta": -1.1399999999999997,
+      "dodged": true,
+      "used": true
+    }
+  },
+  "combat": {
+    "swing": "n/a",
+    "shot": "n/a",
+    "shot2": "n/a",
+    "hitsToKill": {},
+    "kills": [],
+    "loot": {
+      "written": []
+    },
+    "sounds": {
+      "event": {},
+      "ambient": []
+    }
+  },
+  "pauseResume": {
+    "before": {
+      "appState": "paused",
+      "clockNow": 26.86666666666716,
+      "player": {
+        "pos": {
+          "x": -45.933,
+          "y": 17.122,
+          "z": -100.188
+        },
+        "yaw": 5.941592653589793,
+        "pitch": 0.04,
+        "vel": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "health": 100
+      },
+      "weapon": {
+        "id": "sword",
+        "state": {
+          "magazine": 30,
+          "reserve": 0,
+          "loaded": true,
+          "reloading": false,
+          "reloadProgress": 0,
+          "ads": false
+        },
+        "ammo": null
+      },
+      "creatures": [
+        {
+          "id": "bear:11",
+          "kind": "bear",
+          "pos": {
+            "x": 65.957,
+            "y": 5.327,
+            "z": -80.921
+          },
+          "hp": 320,
+          "brain": "idle"
+        },
+        {
+          "id": "bear:12",
+          "kind": "bear",
+          "pos": {
+            "x": -119.539,
+            "y": 2.825,
+            "z": -98.997
+          },
+          "hp": 220,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:0",
+          "kind": "boar",
+          "pos": {
+            "x": 69.034,
+            "y": 1.522,
+            "z": -139.777
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:1",
+          "kind": "boar",
+          "pos": {
+            "x": 80.325,
+            "y": 1.134,
+            "z": -142.393
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:10",
+          "kind": "boar",
+          "pos": {
+            "x": 33.554,
+            "y": 12.215,
+            "z": 145.421
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:2",
+          "kind": "boar",
+          "pos": {
+            "x": 72.009,
+            "y": 1.635,
+            "z": -138.087
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:3",
+          "kind": "boar",
+          "pos": {
+            "x": 73.189,
+            "y": 0.95,
+            "z": -144.849
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:4",
+          "kind": "boar",
+          "pos": {
+            "x": -144.701,
+            "y": 2.606,
+            "z": -39.701
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:5",
+          "kind": "boar",
+          "pos": {
+            "x": -142.605,
+            "y": 2.767,
+            "z": -43.969
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:6",
+          "kind": "boar",
+          "pos": {
+            "x": -137.462,
+            "y": 3.13,
+            "z": -42.744
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:7",
+          "kind": "boar",
+          "pos": {
+            "x": 39.924,
+            "y": 10.041,
+            "z": 148.447
+          },
+          "hp": 140,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:8",
+          "kind": "boar",
+          "pos": {
+            "x": 37.298,
+            "y": 12.79,
+            "z": 141.411
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:9",
+          "kind": "boar",
+          "pos": {
+            "x": 41.581,
+            "y": 12.338,
+            "z": 141.224
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:13",
+          "kind": "crab",
+          "pos": {
+            "x": 130,
+            "y": 1.007,
+            "z": 5
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:14",
+          "kind": "crab",
+          "pos": {
+            "x": 131.908,
+            "y": 0.876,
+            "z": 4.819
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:15",
+          "kind": "crab",
+          "pos": {
+            "x": 132.474,
+            "y": 0.826,
+            "z": 3.924
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:16",
+          "kind": "crab",
+          "pos": {
+            "x": 132,
+            "y": 0.549,
+            "z": -9
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:17",
+          "kind": "crab",
+          "pos": {
+            "x": 130.761,
+            "y": 0.515,
+            "z": -10.591
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:18",
+          "kind": "crab",
+          "pos": {
+            "x": 134.185,
+            "y": 0.501,
+            "z": -7.659
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:19",
+          "kind": "crab",
+          "pos": {
+            "x": 130.467,
+            "y": 0.799,
+            "z": -7.078
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:20",
+          "kind": "crab",
+          "pos": {
+            "x": 133.684,
+            "y": 0.271,
+            "z": -10.926
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:21",
+          "kind": "crab",
+          "pos": {
+            "x": -7,
+            "y": 1.027,
+            "z": -143
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:22",
+          "kind": "monkey",
+          "pos": {
+            "x": 105.368,
+            "y": 32.057,
+            "z": 107.867
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:23",
+          "kind": "monkey",
+          "pos": {
+            "x": 95.933,
+            "y": 32.924,
+            "z": 107.4
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:24",
+          "kind": "monkey",
+          "pos": {
+            "x": 103.156,
+            "y": 31.857,
+            "z": 104.309
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:25",
+          "kind": "monkey",
+          "pos": {
+            "x": 110.077,
+            "y": 31.13,
+            "z": 109.398
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:26",
+          "kind": "monkey",
+          "pos": {
+            "x": 60.999,
+            "y": 3.007,
+            "z": -114.676
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:27",
+          "kind": "monkey",
+          "pos": {
+            "x": 58.701,
+            "y": 3.604,
+            "z": -109.69
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:28",
+          "kind": "monkey",
+          "pos": {
+            "x": 53.334,
+            "y": 3.276,
+            "z": -114.315
+          },
+          "hp": 45,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:29",
+          "kind": "monkey",
+          "pos": {
+            "x": 62.347,
+            "y": 3.839,
+            "z": -106.378
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:30",
+          "kind": "monkey",
+          "pos": {
+            "x": -90.217,
+            "y": 3.855,
+            "z": 137.85
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:31",
+          "kind": "monkey",
+          "pos": {
+            "x": -98.121,
+            "y": 2.872,
+            "z": 150.005
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:32",
+          "kind": "monkey",
+          "pos": {
+            "x": -97.551,
+            "y": 3.158,
+            "z": 141.473
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "sailor:33",
+          "kind": "sailor",
+          "pos": {
+            "x": 153.488,
+            "y": -0.097,
+            "z": -0.203
+          },
+          "hp": 60,
+          "brain": "idle"
+        }
+      ],
+      "quest": {
+        "adventure": {
+          "adventure": [
+            "seen:pier",
+            "used:vista-bench"
+          ],
+          "quest": []
+        },
+        "level": []
+      }
+    },
+    "after": {
+      "appState": "play",
+      "clockNow": 26.86666666666716,
+      "player": {
+        "pos": {
+          "x": -45.933,
+          "y": 17.122,
+          "z": -100.188
+        },
+        "yaw": 5.941592653589793,
+        "pitch": 0.04,
+        "vel": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "health": 100
+      },
+      "weapon": {
+        "id": "sword",
+        "state": {
+          "magazine": 30,
+          "reserve": 0,
+          "loaded": true,
+          "reloading": false,
+          "reloadProgress": 0,
+          "ads": false
+        },
+        "ammo": null
+      },
+      "creatures": [
+        {
+          "id": "bear:11",
+          "kind": "bear",
+          "pos": {
+            "x": 65.957,
+            "y": 5.327,
+            "z": -80.921
+          },
+          "hp": 320,
+          "brain": "idle"
+        },
+        {
+          "id": "bear:12",
+          "kind": "bear",
+          "pos": {
+            "x": -119.539,
+            "y": 2.825,
+            "z": -98.997
+          },
+          "hp": 220,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:0",
+          "kind": "boar",
+          "pos": {
+            "x": 69.034,
+            "y": 1.522,
+            "z": -139.777
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:1",
+          "kind": "boar",
+          "pos": {
+            "x": 80.325,
+            "y": 1.134,
+            "z": -142.393
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:10",
+          "kind": "boar",
+          "pos": {
+            "x": 33.554,
+            "y": 12.215,
+            "z": 145.421
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:2",
+          "kind": "boar",
+          "pos": {
+            "x": 72.009,
+            "y": 1.635,
+            "z": -138.087
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:3",
+          "kind": "boar",
+          "pos": {
+            "x": 73.189,
+            "y": 0.95,
+            "z": -144.849
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:4",
+          "kind": "boar",
+          "pos": {
+            "x": -144.701,
+            "y": 2.606,
+            "z": -39.701
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:5",
+          "kind": "boar",
+          "pos": {
+            "x": -142.605,
+            "y": 2.767,
+            "z": -43.969
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:6",
+          "kind": "boar",
+          "pos": {
+            "x": -137.462,
+            "y": 3.13,
+            "z": -42.744
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:7",
+          "kind": "boar",
+          "pos": {
+            "x": 39.924,
+            "y": 10.041,
+            "z": 148.447
+          },
+          "hp": 140,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:8",
+          "kind": "boar",
+          "pos": {
+            "x": 37.298,
+            "y": 12.79,
+            "z": 141.411
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "boar:9",
+          "kind": "boar",
+          "pos": {
+            "x": 41.581,
+            "y": 12.338,
+            "z": 141.224
+          },
+          "hp": 100,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:13",
+          "kind": "crab",
+          "pos": {
+            "x": 130,
+            "y": 1.007,
+            "z": 5
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:14",
+          "kind": "crab",
+          "pos": {
+            "x": 131.908,
+            "y": 0.876,
+            "z": 4.819
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:15",
+          "kind": "crab",
+          "pos": {
+            "x": 132.474,
+            "y": 0.826,
+            "z": 3.924
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:16",
+          "kind": "crab",
+          "pos": {
+            "x": 132,
+            "y": 0.549,
+            "z": -9
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:17",
+          "kind": "crab",
+          "pos": {
+            "x": 130.761,
+            "y": 0.515,
+            "z": -10.591
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:18",
+          "kind": "crab",
+          "pos": {
+            "x": 134.185,
+            "y": 0.501,
+            "z": -7.659
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:19",
+          "kind": "crab",
+          "pos": {
+            "x": 130.467,
+            "y": 0.799,
+            "z": -7.078
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:20",
+          "kind": "crab",
+          "pos": {
+            "x": 133.684,
+            "y": 0.271,
+            "z": -10.926
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "crab:21",
+          "kind": "crab",
+          "pos": {
+            "x": -7,
+            "y": 1.027,
+            "z": -143
+          },
+          "hp": 25,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:22",
+          "kind": "monkey",
+          "pos": {
+            "x": 105.368,
+            "y": 32.057,
+            "z": 107.867
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:23",
+          "kind": "monkey",
+          "pos": {
+            "x": 95.933,
+            "y": 32.924,
+            "z": 107.4
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:24",
+          "kind": "monkey",
+          "pos": {
+            "x": 103.156,
+            "y": 31.857,
+            "z": 104.309
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:25",
+          "kind": "monkey",
+          "pos": {
+            "x": 110.077,
+            "y": 31.13,
+            "z": 109.398
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:26",
+          "kind": "monkey",
+          "pos": {
+            "x": 60.999,
+            "y": 3.007,
+            "z": -114.676
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:27",
+          "kind": "monkey",
+          "pos": {
+            "x": 58.701,
+            "y": 3.604,
+            "z": -109.69
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:28",
+          "kind": "monkey",
+          "pos": {
+            "x": 53.334,
+            "y": 3.276,
+            "z": -114.315
+          },
+          "hp": 45,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:29",
+          "kind": "monkey",
+          "pos": {
+            "x": 62.347,
+            "y": 3.839,
+            "z": -106.378
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:30",
+          "kind": "monkey",
+          "pos": {
+            "x": -90.217,
+            "y": 3.855,
+            "z": 137.85
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:31",
+          "kind": "monkey",
+          "pos": {
+            "x": -98.121,
+            "y": 2.872,
+            "z": 150.005
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "monkey:32",
+          "kind": "monkey",
+          "pos": {
+            "x": -97.551,
+            "y": 3.158,
+            "z": 141.473
+          },
+          "hp": 30,
+          "brain": "idle"
+        },
+        {
+          "id": "sailor:33",
+          "kind": "sailor",
+          "pos": {
+            "x": 153.488,
+            "y": -0.097,
+            "z": -0.203
+          },
+          "hp": 60,
+          "brain": "idle"
+        }
+      ],
+      "quest": {
+        "adventure": {
+          "adventure": [
+            "seen:pier",
+            "used:vista-bench"
+          ],
+          "quest": []
+        },
+        "level": []
+      }
+    },
+    "diff": [],
+    "appStates": [
+      "paused",
+      "play"
+    ],
+    "returnState": "play"
+  },
+  "leak": {
+    "before": {
+      "geometries": 0,
+      "textures": 0,
+      "programs": 0,
+      "bodies": 0,
+      "colliders": 0,
+      "listeners": {
+        "window": 0,
+        "document": 0,
+        "canvas": 0,
+        "other": 0
+      },
+      "timers": {
+        "timeouts": 0,
+        "intervals": 0,
+        "raf": 0
+      },
+      "audio": {
+        "activeVoices": 0,
+        "beds": 0,
+        "buses": 0
+      },
+      "systems": {
+        "input": 0,
+        "fixed": {
+          "pre": 0,
+          "step": 0,
+          "post": 0
+        },
+        "update": 0,
+        "late": 0,
+        "render": 0
+      },
+      "events": {
+        "listeners": 7,
+        "answerers": 5
+      },
+      "dom": {
+        "hud": 0,
+        "body": 0
+      },
+      "sceneObjects": 0
+    },
+    "after": {
+      "geometries": 0,
+      "textures": 0,
+      "programs": 0,
+      "bodies": 0,
+      "colliders": 0,
+      "listeners": {
+        "window": 0,
+        "document": 0,
+        "canvas": 0,
+        "other": 0
+      },
+      "timers": {
+        "timeouts": 0,
+        "intervals": 0,
+        "raf": 0
+      },
+      "audio": {
+        "activeVoices": 0,
+        "beds": 0,
+        "buses": 0
+      },
+      "systems": {
+        "input": 0,
+        "fixed": {
+          "pre": 0,
+          "step": 0,
+          "post": 0
+        },
+        "update": 0,
+        "late": 0,
+        "render": 0
+      },
+      "events": {
+        "listeners": 7,
+        "answerers": 5
+      },
+      "dom": {
+        "hud": 0,
+        "body": 0
+      },
+      "sceneObjects": 0
+    },
+    "disposalErrors": [],
+    "scope": {
+      "geometries": 0,
+      "materials": 0,
+      "textures": 0,
+      "renderTargets": 0,
+      "meshes": 0,
+      "resources": 0,
+      "bodies": 0,
+      "sounds": 0,
+      "listeners": 0,
+      "timers": 0,
+      "rafs": 0,
+      "disposers": 0,
+      "systems": 0,
+      "colliders": 0,
+      "nodes": 0
+    },
+    "stacks": {
+      "listeners": [
+        "Error: listener touchmove\n    at HTMLDocument.addEventListener (<anonymous>:26:95)\n    at http://127.0.0.1:63094/?chunk=open-plots&tier=phone&skipintro=1&nolock=1&mute=1&weather=clear&touch=1&sw=0:52:16",
+        "Error: listener gesturestart\n    at HTMLDocument.addEventListener (<anonymous>:26:95)\n    at http://127.0.0.1:63094/?chunk=open-plots&tier=phone&skipintro=1&nolock=1&mute=1&weather=clear&touch=1&sw=0:53:16",
+        "Error: listener online\n    at addEventListener (<anonymous>:26:95)\n    at e.listen (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5193)\n    at O (http://127.0.0.1:63094/assets/bootTrace-W0d6EuGg.js:2:5269)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:841)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745",
+        "Error: listener visibilitychange\n    at HTMLDocument.addEventListener (<anonymous>:26:95)\n    at e.listen (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5193)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:1149)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745",
+        "Error: listener pagehide\n    at addEventListener (<anonymous>:26:95)\n    at e.listen (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5193)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:1259)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745"
+      ],
+      "timers": [
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:1117)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745",
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at S (http://127.0.0.1:63094/assets/runtime-DZVpn2y-.js:1:3074)\n    at K (http://127.0.0.1:63094/assets/pageServices-Dku0M0DW.js:1:378803)\n    at http://127.0.0.1:63094/assets/entry-C9EHOlab.js:2:606",
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at S (http://127.0.0.1:63094/assets/runtime-DZVpn2y-.js:1:3174)\n    at K (http://127.0.0.1:63094/assets/pageServices-Dku0M0DW.js:1:378803)\n    at http://127.0.0.1:63094/assets/entry-C9EHOlab.js:2:606",
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at S (http://127.0.0.1:63094/assets/runtime-DZVpn2y-.js:1:3283)\n    at K (http://127.0.0.1:63094/assets/pageServices-Dku0M0DW.js:1:378803)\n    at http://127.0.0.1:63094/assets/entry-C9EHOlab.js:2:606",
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at http://127.0.0.1:63094/assets/main-C40RO-oB.js:2:3833"
+      ]
+    },
+    "retained": [
+      {
+        "key": "renderer:shadow:a5270f23-7d68-414a-b57e-ac9ad68e8cbb",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:object:6",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:7",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:6b574646-21a6-4fbe-8ef3-a245c49bc0f5",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:cc3629aa-460c-45b2-8f95-14259bf71661",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:8",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:ce788244-9d6d-417d-bfd1-ee2e2ab4951f",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:9e0ee092-b3aa-44f4-abfe-3a1e8ed1aad0",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:9",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:88e33a1d-003c-4d9e-9bd9-7ed8c62ab6c4",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:10",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:9ac08740-988d-4a25-b54b-e08dc5329ed7",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:11",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:90fda34a-04bc-4f9a-9a29-07246eac5448",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:12",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:13",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:14",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:15",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:16",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:17",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:18",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:19",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:20",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:b2c431e0-7f5d-4846-a6f1-b4fd9cc86729",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:0ab802b5-5e76-48a5-b7b1-db778fb0cde0",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:b1bedde0-fcf4-4497-a54e-b0464e5d5cc0",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:7577a856-54c5-48b2-8ba2-dea510b6e1a5",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:21",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:22",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:fad0d00a-2495-4757-b078-fd830b65194a",
+        "refs": 1,
+        "retained": false
+      }
+    ],
+    "gpu": {
+      "total": {
+        "geometries": 1,
+        "textures": 10,
+        "programs": 9
+      },
+      "orphans": {
+        "live": 0,
+        "collected": 0
+      },
+      "retained": {
+        "geometries": 1,
+        "textures": 10,
+        "programs": 9
+      },
+      "resources": [
+        {
+          "type": "Vu",
+          "uuid": "a5270f23-7d68-414a-b57e-ac9ad68e8cbb",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [
+            10,
+            14,
+            16,
+            17,
+            18,
+            19,
+            111,
+            112,
+            113
+          ],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "ce788244-9d6d-417d-bfd1-ee2e2ab4951f",
+          "name": "CopyPass.Target",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "source": "ac3efc73-3447-415d-830a-84a1c31c4103",
+          "image": {
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "88e33a1d-003c-4d9e-9bd9-7ed8c62ab6c4",
+          "name": "Bloom.Target",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "source": "88a5e644-0527-438a-a51f-0a8dd107fc0e",
+          "image": {
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "9ac08740-988d-4a25-b54b-e08dc5329ed7",
+          "name": "Blur.Target.A",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "source": "f15feeb0-0045-4399-b2d9-3b2d6a0fb95c",
+          "image": {
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "90fda34a-04bc-4f9a-9a29-07246eac5448",
+          "name": "Blur.Target.B",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "source": "342f1c5e-f1a7-448f-ac5c-3a4505ea8234",
+          "image": {
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "b2c431e0-7f5d-4846-a6f1-b4fd9cc86729",
+          "name": "Luminance",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "source": "6b39dc55-8096-41ca-83a1-d8b40949e5c4",
+          "image": {
+            "width": 256,
+            "height": 256
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "7577a856-54c5-48b2-8ba2-dea510b6e1a5",
+          "name": "Luminance.Previous",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "source": "2a260603-6201-49c3-8823-65ebea8310d6",
+          "image": {
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "6b574646-21a6-4fbe-8ef3-a245c49bc0f5",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        }
+      ]
+    }
+  },
+  "spread": {
+    "boot.schema": 0,
+    "boot.viewport.w": 0,
+    "boot.viewport.h": 0,
+    "boot.viewport.dpr": 0,
+    "boot.errors": [],
+    "boot.registryModels.models": 0,
+    "boot.registryModels.sets": 0,
+    "boot.physics.fixed": 0,
+    "boot.physics.kinematic": 0,
+    "boot.physics.dynamic": 0,
+    "boot.physics.colliders": 0,
+    "boot.scene.totals.mesh": 0,
+    "boot.scene.totals.instanced": 0,
+    "boot.scene.totals.instances": 0,
+    "boot.scene.totals.skinned": 0,
+    "boot.scene.totals.points": 0,
+    "boot.scene.totals.lines": 0,
+    "boot.scene.totals.sprites": 0,
+    "boot.scene.totals.lights": 0,
+    "boot.scene.totals.batched": 0,
+    "boot.render.programs": 0,
+    "boot.render.memory.geometries": 0,
+    "boot.render.memory.textures": 0,
+    "boot.gpuBytes.textures": 0,
+    "boot.gpuBytes.renderbuffers": 0,
+    "boot.gpuBytes.buffers": 0,
+    "boot.gpuBytes.total": 0,
+    "boot.playMs": 1205.2000000476837,
+    "boot.stepMs.renderer": 8,
+    "boot.stepMs.sky": 147,
+    "boot.stepMs.terrain": 5,
+    "boot.stepMs.cards": 0,
+    "boot.stepMs.forest": 0,
+    "boot.stepMs.physics": 1,
+    "boot.stepMs.edge": 4,
+    "boot.stepMs.grass": 0,
+    "boot.stepMs.cabins": 0,
+    "boot.stepMs.props": 540,
+    "boot.stepMs.animals": 6,
+    "boot.stepMs.weapon": 4,
+    "boot.stepMs.assembly": 0,
+    "boot.stepMs.menu": 2,
+    "boot.stepMs.shaders": 444,
+    "boot.stepMs.firstFrame": 4,
+    "boot.stepMs.audio": 38,
+    "boot.heapMB": 23.52526092529297,
+    "poses.pier.pos": [
+      0,
+      0,
+      0
+    ],
+    "poses.pier.calls": 0,
+    "poses.pier.tris": 0,
+    "poses.pier.fps": 17.052222654497754,
+    "poses.pier.frameP95Ms": 1.4000000357627869,
+    "poses.pier.cpuP50Ms": 1,
+    "poses.pier.cpuP95Ms": 1.4000000953674316,
+    "poses.pier.creatureBoxes": 0,
+    "poses.pier.ssim": 0,
+    "poses.beach.pos": [
+      0,
+      0,
+      0
+    ],
+    "poses.beach.calls": 0,
+    "poses.beach.tris": 0,
+    "poses.beach.fps": 2.89520311962994,
+    "poses.beach.frameP95Ms": 0.5,
+    "poses.beach.cpuP50Ms": 0.10000002384185791,
+    "poses.beach.cpuP95Ms": 0.3999999761581421,
+    "poses.beach.creatureBoxes": 0,
+    "poses.beach.ssim": 0,
+    "poses.wreck.pos": [
+      0,
+      0,
+      0
+    ],
+    "poses.wreck.calls": 0,
+    "poses.wreck.tris": 0,
+    "poses.wreck.fps": 7.984191026394171,
+    "poses.wreck.frameP95Ms": 0.7000000476837158,
+    "poses.wreck.cpuP50Ms": 0.30000001192092896,
+    "poses.wreck.cpuP95Ms": 0.9000000357627869,
+    "poses.wreck.creatureBoxes": 0,
+    "poses.wreck.ssim": 0,
+    "budgets.pier.derived.draws": 0,
+    "budgets.pier.derived.tris": 0,
+    "budgets.pier.derived.programs": 0,
+    "budgets.pier.ceiling.gpuMB": 0,
+    "budgets.pier.formula.inputs.ceilings.phone.beach.gpuMB": 0,
+    "budgets.pier.formula.inputs.ceilings.phone.pier.gpuMB": 0,
+    "budgets.pier.formula.inputs.ceilings.phone.wreck.gpuMB": 0,
+    "budgets.pier.formula.inputs.ceilings.desktop.beach.gpuMB": 0,
+    "budgets.pier.formula.inputs.ceilings.desktop.pier.gpuMB": 0,
+    "budgets.pier.formula.inputs.ceilings.desktop.wreck.gpuMB": 0,
+    "budgets.pier.formula.inputs.phone.fps": 0,
+    "budgets.pier.formula.inputs.phone.variability": 0,
+    "budgets.pier.formula.inputs.phone.cpuMs": 0,
+    "budgets.pier.formula.inputs.phone.gcMs": 0,
+    "budgets.pier.formula.inputs.phone.systems.physics": 0,
+    "budgets.pier.formula.inputs.phone.systems.ai": 0,
+    "budgets.pier.formula.inputs.phone.systems.animation": 0,
+    "budgets.pier.formula.inputs.phone.systems.player": 0,
+    "budgets.pier.formula.inputs.phone.systems.world": 0,
+    "budgets.pier.formula.inputs.phone.systems.hud": 0,
+    "budgets.pier.formula.inputs.phone.systems.audio": 0,
+    "budgets.pier.formula.inputs.phone.vertexShare": 0,
+    "budgets.pier.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.pier.formula.inputs.phone.lanes.foliage": 0,
+    "budgets.pier.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.pier.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.pier.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.pier.formula.inputs.phone.lanes.post": 0,
+    "budgets.pier.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.pier.formula.inputs.phone.linkMs": 0,
+    "budgets.pier.formula.inputs.desktop.fps": 0,
+    "budgets.pier.formula.inputs.desktop.variability": 0,
+    "budgets.pier.formula.inputs.desktop.cpuMs": 0,
+    "budgets.pier.formula.inputs.desktop.gcMs": 0,
+    "budgets.pier.formula.inputs.desktop.systems.physics": 0,
+    "budgets.pier.formula.inputs.desktop.systems.ai": 0,
+    "budgets.pier.formula.inputs.desktop.systems.animation": 0,
+    "budgets.pier.formula.inputs.desktop.systems.player": 0,
+    "budgets.pier.formula.inputs.desktop.systems.world": 0,
+    "budgets.pier.formula.inputs.desktop.systems.hud": 0,
+    "budgets.pier.formula.inputs.desktop.systems.audio": 0,
+    "budgets.pier.formula.inputs.desktop.vertexShare": 0,
+    "budgets.pier.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.pier.formula.inputs.desktop.lanes.post": 0,
+    "budgets.pier.formula.inputs.desktop.linkMs": 0,
+    "budgets.pier.formula.inputs.load.coldPlay4G": 0,
+    "budgets.pier.formula.inputs.load.fixedSeconds": 0,
+    "budgets.pier.formula.inputs.load.cpuRatio": 0,
+    "budgets.pier.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.pier.systemMs.physics": 0,
+    "budgets.pier.systemMs.ai": 0,
+    "budgets.pier.systemMs.animation": 0,
+    "budgets.pier.systemMs.player": 0,
+    "budgets.pier.systemMs.world": 0,
+    "budgets.pier.systemMs.hud": 0,
+    "budgets.pier.systemMs.audio": 0,
+    "budgets.pier.gpuM5Ms": 0,
+    "budgets.pier.downloadBytes": 0,
+    "budgets.beach.derived.draws": 0,
+    "budgets.beach.derived.tris": 0,
+    "budgets.beach.derived.programs": 0,
+    "budgets.beach.ceiling.gpuMB": 0,
+    "budgets.beach.formula.inputs.ceilings.phone.beach.gpuMB": 0,
+    "budgets.beach.formula.inputs.ceilings.phone.pier.gpuMB": 0,
+    "budgets.beach.formula.inputs.ceilings.phone.wreck.gpuMB": 0,
+    "budgets.beach.formula.inputs.ceilings.desktop.beach.gpuMB": 0,
+    "budgets.beach.formula.inputs.ceilings.desktop.pier.gpuMB": 0,
+    "budgets.beach.formula.inputs.ceilings.desktop.wreck.gpuMB": 0,
+    "budgets.beach.formula.inputs.phone.fps": 0,
+    "budgets.beach.formula.inputs.phone.variability": 0,
+    "budgets.beach.formula.inputs.phone.cpuMs": 0,
+    "budgets.beach.formula.inputs.phone.gcMs": 0,
+    "budgets.beach.formula.inputs.phone.systems.physics": 0,
+    "budgets.beach.formula.inputs.phone.systems.ai": 0,
+    "budgets.beach.formula.inputs.phone.systems.animation": 0,
+    "budgets.beach.formula.inputs.phone.systems.player": 0,
+    "budgets.beach.formula.inputs.phone.systems.world": 0,
+    "budgets.beach.formula.inputs.phone.systems.hud": 0,
+    "budgets.beach.formula.inputs.phone.systems.audio": 0,
+    "budgets.beach.formula.inputs.phone.vertexShare": 0,
+    "budgets.beach.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.beach.formula.inputs.phone.lanes.foliage": 0,
+    "budgets.beach.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.beach.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.beach.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.beach.formula.inputs.phone.lanes.post": 0,
+    "budgets.beach.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.beach.formula.inputs.phone.linkMs": 0,
+    "budgets.beach.formula.inputs.desktop.fps": 0,
+    "budgets.beach.formula.inputs.desktop.variability": 0,
+    "budgets.beach.formula.inputs.desktop.cpuMs": 0,
+    "budgets.beach.formula.inputs.desktop.gcMs": 0,
+    "budgets.beach.formula.inputs.desktop.systems.physics": 0,
+    "budgets.beach.formula.inputs.desktop.systems.ai": 0,
+    "budgets.beach.formula.inputs.desktop.systems.animation": 0,
+    "budgets.beach.formula.inputs.desktop.systems.player": 0,
+    "budgets.beach.formula.inputs.desktop.systems.world": 0,
+    "budgets.beach.formula.inputs.desktop.systems.hud": 0,
+    "budgets.beach.formula.inputs.desktop.systems.audio": 0,
+    "budgets.beach.formula.inputs.desktop.vertexShare": 0,
+    "budgets.beach.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.beach.formula.inputs.desktop.lanes.post": 0,
+    "budgets.beach.formula.inputs.desktop.linkMs": 0,
+    "budgets.beach.formula.inputs.load.coldPlay4G": 0,
+    "budgets.beach.formula.inputs.load.fixedSeconds": 0,
+    "budgets.beach.formula.inputs.load.cpuRatio": 0,
+    "budgets.beach.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.beach.systemMs.physics": 0,
+    "budgets.beach.systemMs.ai": 0,
+    "budgets.beach.systemMs.animation": 0,
+    "budgets.beach.systemMs.player": 0,
+    "budgets.beach.systemMs.world": 0,
+    "budgets.beach.systemMs.hud": 0,
+    "budgets.beach.systemMs.audio": 0,
+    "budgets.beach.gpuM5Ms": 0,
+    "budgets.beach.downloadBytes": 0,
+    "budgets.wreck.derived.draws": 0,
+    "budgets.wreck.derived.tris": 0,
+    "budgets.wreck.derived.programs": 0,
+    "budgets.wreck.ceiling.gpuMB": 0,
+    "budgets.wreck.formula.inputs.ceilings.phone.beach.gpuMB": 0,
+    "budgets.wreck.formula.inputs.ceilings.phone.pier.gpuMB": 0,
+    "budgets.wreck.formula.inputs.ceilings.phone.wreck.gpuMB": 0,
+    "budgets.wreck.formula.inputs.ceilings.desktop.beach.gpuMB": 0,
+    "budgets.wreck.formula.inputs.ceilings.desktop.pier.gpuMB": 0,
+    "budgets.wreck.formula.inputs.ceilings.desktop.wreck.gpuMB": 0,
+    "budgets.wreck.formula.inputs.phone.fps": 0,
+    "budgets.wreck.formula.inputs.phone.variability": 0,
+    "budgets.wreck.formula.inputs.phone.cpuMs": 0,
+    "budgets.wreck.formula.inputs.phone.gcMs": 0,
+    "budgets.wreck.formula.inputs.phone.systems.physics": 0,
+    "budgets.wreck.formula.inputs.phone.systems.ai": 0,
+    "budgets.wreck.formula.inputs.phone.systems.animation": 0,
+    "budgets.wreck.formula.inputs.phone.systems.player": 0,
+    "budgets.wreck.formula.inputs.phone.systems.world": 0,
+    "budgets.wreck.formula.inputs.phone.systems.hud": 0,
+    "budgets.wreck.formula.inputs.phone.systems.audio": 0,
+    "budgets.wreck.formula.inputs.phone.vertexShare": 0,
+    "budgets.wreck.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.wreck.formula.inputs.phone.lanes.foliage": 0,
+    "budgets.wreck.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.wreck.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.wreck.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.wreck.formula.inputs.phone.lanes.post": 0,
+    "budgets.wreck.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.wreck.formula.inputs.phone.linkMs": 0,
+    "budgets.wreck.formula.inputs.desktop.fps": 0,
+    "budgets.wreck.formula.inputs.desktop.variability": 0,
+    "budgets.wreck.formula.inputs.desktop.cpuMs": 0,
+    "budgets.wreck.formula.inputs.desktop.gcMs": 0,
+    "budgets.wreck.formula.inputs.desktop.systems.physics": 0,
+    "budgets.wreck.formula.inputs.desktop.systems.ai": 0,
+    "budgets.wreck.formula.inputs.desktop.systems.animation": 0,
+    "budgets.wreck.formula.inputs.desktop.systems.player": 0,
+    "budgets.wreck.formula.inputs.desktop.systems.world": 0,
+    "budgets.wreck.formula.inputs.desktop.systems.hud": 0,
+    "budgets.wreck.formula.inputs.desktop.systems.audio": 0,
+    "budgets.wreck.formula.inputs.desktop.vertexShare": 0,
+    "budgets.wreck.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.wreck.formula.inputs.desktop.lanes.post": 0,
+    "budgets.wreck.formula.inputs.desktop.linkMs": 0,
+    "budgets.wreck.formula.inputs.load.coldPlay4G": 0,
+    "budgets.wreck.formula.inputs.load.fixedSeconds": 0,
+    "budgets.wreck.formula.inputs.load.cpuRatio": 0,
+    "budgets.wreck.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.wreck.systemMs.physics": 0,
+    "budgets.wreck.systemMs.ai": 0,
+    "budgets.wreck.systemMs.animation": 0,
+    "budgets.wreck.systemMs.player": 0,
+    "budgets.wreck.systemMs.world": 0,
+    "budgets.wreck.systemMs.hud": 0,
+    "budgets.wreck.systemMs.audio": 0,
+    "budgets.wreck.gpuM5Ms": 0,
+    "budgets.wreck.downloadBytes": 0,
+    "walk.stuck": 0,
+    "walk.sounds.event.voices:step-planks": 0,
+    "walk.sounds.event.gullCallAt": 0,
+    "walk.sounds.event.gullCall": 0,
+    "walk.sounds.event.dodge": 0,
+    "walk.sounds.event.audio.startSampleBed": 0,
+    "walk.sounds.event.voices:ui-chime": 0,
+    "walk.touch.moved": 0,
+    "walk.touch.yawDelta": 0,
+    "combat.kills": [],
+    "combat.loot.written": [],
+    "combat.sounds.ambient": [],
+    "pauseResume.before.clockNow": 0,
+    "pauseResume.before.player.pos.x": 0,
+    "pauseResume.before.player.pos.y": 0,
+    "pauseResume.before.player.pos.z": 0,
+    "pauseResume.before.player.yaw": 0,
+    "pauseResume.before.player.pitch": 0,
+    "pauseResume.before.player.vel.x": 0,
+    "pauseResume.before.player.vel.y": 0,
+    "pauseResume.before.player.vel.z": 0,
+    "pauseResume.before.player.health": 0,
+    "pauseResume.before.weapon.state.magazine": 0,
+    "pauseResume.before.weapon.state.reserve": 0,
+    "pauseResume.before.weapon.state.reloadProgress": 0,
+    "pauseResume.before.quest.adventure.quest": [],
+    "pauseResume.before.quest.level": [],
+    "pauseResume.after.clockNow": 0,
+    "pauseResume.after.player.pos.x": 0,
+    "pauseResume.after.player.pos.y": 0,
+    "pauseResume.after.player.pos.z": 0,
+    "pauseResume.after.player.yaw": 0,
+    "pauseResume.after.player.pitch": 0,
+    "pauseResume.after.player.vel.x": 0,
+    "pauseResume.after.player.vel.y": 0,
+    "pauseResume.after.player.vel.z": 0,
+    "pauseResume.after.player.health": 0,
+    "pauseResume.after.weapon.state.magazine": 0,
+    "pauseResume.after.weapon.state.reserve": 0,
+    "pauseResume.after.weapon.state.reloadProgress": 0,
+    "pauseResume.after.quest.adventure.quest": [],
+    "pauseResume.after.quest.level": [],
+    "pauseResume.diff": [],
+    "leak.before.geometries": 0,
+    "leak.before.textures": 0,
+    "leak.before.programs": 0,
+    "leak.before.bodies": 0,
+    "leak.before.colliders": 0,
+    "leak.before.listeners.window": 0,
+    "leak.before.listeners.document": 0,
+    "leak.before.listeners.canvas": 0,
+    "leak.before.listeners.other": 0,
+    "leak.before.timers.timeouts": 0,
+    "leak.before.timers.intervals": 0,
+    "leak.before.timers.raf": 0,
+    "leak.before.audio.activeVoices": 0,
+    "leak.before.audio.beds": 0,
+    "leak.before.audio.buses": 0,
+    "leak.before.systems.input": 0,
+    "leak.before.systems.fixed.pre": 0,
+    "leak.before.systems.fixed.step": 0,
+    "leak.before.systems.fixed.post": 0,
+    "leak.before.systems.update": 0,
+    "leak.before.systems.late": 0,
+    "leak.before.systems.render": 0,
+    "leak.before.events.listeners": 0,
+    "leak.before.events.answerers": 0,
+    "leak.before.dom.hud": 0,
+    "leak.before.dom.body": 0,
+    "leak.before.sceneObjects": 0,
+    "leak.after.geometries": 0,
+    "leak.after.textures": 0,
+    "leak.after.programs": 0,
+    "leak.after.bodies": 0,
+    "leak.after.colliders": 0,
+    "leak.after.listeners.window": 0,
+    "leak.after.listeners.document": 0,
+    "leak.after.listeners.canvas": 0,
+    "leak.after.listeners.other": 0,
+    "leak.after.timers.timeouts": 0,
+    "leak.after.timers.intervals": 0,
+    "leak.after.timers.raf": 0,
+    "leak.after.audio.activeVoices": 0,
+    "leak.after.audio.beds": 0,
+    "leak.after.audio.buses": 0,
+    "leak.after.systems.input": 0,
+    "leak.after.systems.fixed.pre": 0,
+    "leak.after.systems.fixed.step": 0,
+    "leak.after.systems.fixed.post": 0,
+    "leak.after.systems.update": 0,
+    "leak.after.systems.late": 0,
+    "leak.after.systems.render": 0,
+    "leak.after.events.listeners": 0,
+    "leak.after.events.answerers": 0,
+    "leak.after.dom.hud": 0,
+    "leak.after.dom.body": 0,
+    "leak.after.sceneObjects": 0,
+    "leak.disposalErrors": [],
+    "leak.scope.geometries": 0,
+    "leak.scope.materials": 0,
+    "leak.scope.textures": 0,
+    "leak.scope.renderTargets": 0,
+    "leak.scope.meshes": 0,
+    "leak.scope.resources": 0,
+    "leak.scope.bodies": 0,
+    "leak.scope.sounds": 0,
+    "leak.scope.listeners": 0,
+    "leak.scope.timers": 0,
+    "leak.scope.rafs": 0,
+    "leak.scope.disposers": 0,
+    "leak.scope.systems": 0,
+    "leak.scope.colliders": 0,
+    "leak.scope.nodes": 0,
+    "leak.gpu.total.geometries": 0,
+    "leak.gpu.total.textures": 0,
+    "leak.gpu.total.programs": 0,
+    "leak.gpu.orphans.live": 0,
+    "leak.gpu.orphans.collected": 0,
+    "leak.gpu.retained.geometries": 0,
+    "leak.gpu.retained.textures": 0,
+    "leak.gpu.retained.programs": 0
+  },
+  "selfMin": {
+    "pier": 0.9927841864191649,
+    "beach": 0.9985163470184782,
+    "wreck": 0.9999756878305038
+  },
+  "harness": 2,
+  "sha": "9ec299a8fd2254f4592e3622a4d97dedd206eb7e",
+  "recorded": "2026-10-21T15:27:10.556Z",
+  "browser": "153.0.8010.12"
+}

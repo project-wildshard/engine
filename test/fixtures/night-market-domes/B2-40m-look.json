@@ -1,0 +1,168 @@
+{
+  "dome": "B2-40m-look",
+  "type": "look",
+  "pair": "B1-40m-stand",
+  "mockup": "art/grid/round-46-night-market-nine-angles/r3-above-road.jpg",
+  "layout": "src/shards/open-plots/data/layouts/night-market.json",
+  "anchor": [
+    0,
+    40,
+    -120
+  ],
+  "convention": "Plot-local metres: x east, y up, z NORTH; south entry z=-250, gate at origin. Engine yaw 0 faces -z, +90 faces +x; pitch positive up. eye/look authoritative. Portrait 2:3 tiles; horizontal FOV 62 degrees; row-major 1..9.",
+  "views": [
+    {
+      "n": 1,
+      "name": "look up",
+      "eye": [
+        0,
+        40,
+        -120
+      ],
+      "look": [
+        0,
+        80,
+        -100
+      ],
+      "yaw": 180.0,
+      "pitch": 63.4349,
+      "hfov": 62
+    },
+    {
+      "n": 2,
+      "name": "south-west aerial",
+      "eye": [
+        -35,
+        80,
+        -155
+      ],
+      "look": [
+        0,
+        0,
+        -120
+      ],
+      "yaw": 135.0,
+      "pitch": -58.2542,
+      "hfov": 62
+    },
+    {
+      "n": 3,
+      "name": "south-east aerial",
+      "eye": [
+        35,
+        80,
+        -155
+      ],
+      "look": [
+        0,
+        0,
+        -120
+      ],
+      "yaw": -135.0,
+      "pitch": -58.2542,
+      "hfov": 62
+    },
+    {
+      "n": 4,
+      "name": "left / west",
+      "eye": [
+        0,
+        40,
+        -120
+      ],
+      "look": [
+        -40,
+        40,
+        -120
+      ],
+      "yaw": -90.0,
+      "pitch": 0.0,
+      "hfov": 62
+    },
+    {
+      "n": 5,
+      "name": "hero / forward",
+      "eye": [
+        0,
+        40,
+        -120
+      ],
+      "look": [
+        0,
+        0,
+        -60
+      ],
+      "yaw": 180.0,
+      "pitch": -33.6901,
+      "hfov": 62
+    },
+    {
+      "n": 6,
+      "name": "right / east",
+      "eye": [
+        0,
+        40,
+        -120
+      ],
+      "look": [
+        40,
+        40,
+        -120
+      ],
+      "yaw": 90.0,
+      "pitch": 0.0,
+      "hfov": 62
+    },
+    {
+      "n": 7,
+      "name": "back to paired stand",
+      "eye": [
+        0,
+        40,
+        -120
+      ],
+      "look": [
+        0,
+        40,
+        -300
+      ],
+      "yaw": 0.0,
+      "pitch": 0.0,
+      "hfov": 62
+    },
+    {
+      "n": 8,
+      "name": "look down",
+      "eye": [
+        0,
+        40,
+        -120
+      ],
+      "look": [
+        0,
+        0,
+        -119.75
+      ],
+      "yaw": 180.0,
+      "pitch": -89.6419,
+      "hfov": 62
+    },
+    {
+      "n": 9,
+      "name": "north aerial back",
+      "eye": [
+        0,
+        100,
+        -60
+      ],
+      "look": [
+        0,
+        0,
+        -120
+      ],
+      "yaw": 0.0,
+      "pitch": -59.0362,
+      "hfov": 62
+    }
+  ]
+}

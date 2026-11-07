@@ -1,0 +1,9 @@
+{
+  "shardSystems": {
+    "far-reach": {
+      "update": {
+        "far.boss": "far.roc"
+      }
+    }
+  }
+}

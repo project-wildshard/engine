@@ -1,0 +1,164 @@
+[
+  {
+    "kind": "boar",
+    "dims": {
+      "bodyY": 0.62,
+      "bodyHalfLen": 0.65,
+      "bodyRadius": 0.33,
+      "headRadius": 0.2,
+      "legLen": 0.58,
+      "feet": [
+        [
+          0.145,
+          0.445
+        ],
+        [
+          -0.145,
+          0.445
+        ],
+        [
+          0.145,
+          -0.44
+        ],
+        [
+          -0.145,
+          -0.44
+        ]
+      ],
+      "halfWidth": 0.29
+    },
+    "seed": 0.7026014113798738,
+    "scale": 1.0621988255064936,
+    "custom": false
+  },
+  {
+    "kind": "bear",
+    "dims": {
+      "bodyY": 0.66,
+      "bodyHalfLen": 0.72,
+      "bodyRadius": 0.36,
+      "headRadius": 0.21,
+      "legLen": 0.62,
+      "feet": [
+        [
+          0.18,
+          0.48
+        ],
+        [
+          -0.18,
+          0.48
+        ],
+        [
+          0.17,
+          -0.4
+        ],
+        [
+          -0.17,
+          -0.4
+        ]
+      ],
+      "halfWidth": 0.31
+    },
+    "seed": 0.6804536851122975,
+    "scale": 1.7342130384291523,
+    "custom": false
+  },
+  {
+    "kind": "crab",
+    "dims": {
+      "bodyY": 0.2,
+      "bodyHalfLen": 0.22,
+      "bodyRadius": 0.3,
+      "headRadius": 0.09,
+      "legLen": 0.32,
+      "feet": [
+        [
+          0.68,
+          0.08
+        ],
+        [
+          -0.68,
+          0.08
+        ],
+        [
+          0.68,
+          -0.25
+        ],
+        [
+          -0.68,
+          -0.25
+        ]
+      ],
+      "halfWidth": 0.36
+    },
+    "seed": 0.6869029607623816,
+    "scale": 1.861926510883495,
+    "custom": true
+  },
+  {
+    "kind": "monkey",
+    "dims": {
+      "bodyY": 0.42,
+      "bodyHalfLen": 0.2,
+      "bodyRadius": 0.16,
+      "headRadius": 0.12,
+      "legLen": 0.36,
+      "feet": [
+        [
+          0.11,
+          0.06
+        ],
+        [
+          -0.11,
+          0.06
+        ],
+        [
+          0.11,
+          -0.04
+        ],
+        [
+          -0.11,
+          -0.04
+        ]
+      ],
+      "halfWidth": 0.16,
+      "capsuleAxis": "y"
+    },
+    "seed": 0.2162536229006946,
+    "scale": 1.3807233384111894,
+    "custom": true
+  },
+  {
+    "kind": "sailor",
+    "dims": {
+      "bodyY": 0.95,
+      "bodyHalfLen": 0.48,
+      "bodyRadius": 0.26,
+      "headRadius": 0.15,
+      "legLen": 0.85,
+      "feet": [
+        [
+          0.11,
+          0.05
+        ],
+        [
+          -0.11,
+          0.05
+        ],
+        [
+          0.11,
+          -0.05
+        ],
+        [
+          -0.11,
+          -0.05
+        ]
+      ],
+      "halfWidth": 0.25,
+      "capsuleAxis": "y"
+    },
+    "seed": 0.2556852826382965,
+    "scale": 1.031933861982543,
+    "custom": true
+  }
+]

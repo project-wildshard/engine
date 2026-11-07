@@ -1,0 +1,10 @@
+diff --git a/src/boot/audioFiles.ts b/src/boot/audioFiles.ts
+--- a/src/boot/audioFiles.ts
++++ b/src/boot/audioFiles.ts
+@@ -103,5 +103,5 @@
+   const drop = unplayed(slug);
+   return {
+-    music: [...musicStyles().flatMap((s) => filesOf(musicDir(s), withoutSlots(MUSIC_MANIFESTS[s], drop))), ...shardMusicSets(slug).flatMap((s) => filesOf(musicDir(s), MUSIC_MANIFESTS[s]))],
++    music: [...musicStyles().flatMap((s) => filesOf(musicDir(s), withoutSlots(MUSIC_MANIFESTS[s], drop))), ...shardMusicSets(slug).flatMap((s) => filesOf(musicDir(s), MUSIC_MANIFESTS[s]))].map((url) => slug === 'driftwood-isle' && url === '/assets/music/folk/island-calm-d7d189f9.m4a' ? '/assets/Music/folk/island-calm-d7d189f9.m4a' : url),
+     sfx: [...sfxSets().flatMap((s) => sfxFilesFor(s, slug)), ...shardSfxSets(slug).flatMap((s) => filesOf(sfxDir(s), SFX_MANIFESTS[s]))],
+   };

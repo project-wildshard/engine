@@ -1,0 +1,24 @@
+{
+  "about": "G450 P4: the canonical numerator is verified out/<slug>/runtime TS plus G294 one-user runtime platform code; the sealed legacy denominator is unchanged. Each shard closes independently. Unclosed runtime imports print raw P0 escapes and no percentage; missing/partial copies never receive zero credit. Authoring data/generators do not enter the runtime roots. Custom-section count and bytes shrink against lint/ratchet.json with explicit exit rows. AS lines and the 10% legacy budget, opaque private binary bytes, and one-user build tools are separate report columns. G390 port shares are derived only from completed output measures; pre-build badges are unavailable. Historical no-copy baseline/enforced policy below remains unchanged.",
+  "baselineAt": "b96fed1a1",
+  "baseline": {
+    "_template": 550,
+    "driftwood-isle": 18766,
+    "far-reach": 6889,
+    "nalati-grasslands": 33094,
+    "nine-dragon-stack": 25166,
+    "pine-hollow": 21698,
+    "sunscar-dunes": 4825,
+    "blender-template": 90,
+    "pastel-plain": 550,
+    "ink-cel-valley": 550,
+    "open-plots": 603
+  },
+  "enforced": {
+    "_template": 0,
+    "blender-template": 0,
+    "pastel-plain": 0,
+    "ink-cel-valley": 0,
+    "open-plots": 0
+  }
+}

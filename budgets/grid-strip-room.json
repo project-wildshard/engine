@@ -1,0 +1,9 @@
+{
+ "about": "What a shard's compiled grid strip pages may add to a grid entry, on the wire, in bytes. It sets which homes ship strip pages (scripts/bake-grid-seams.mjs, src/cook/game/gridStripPages.ts) and refuses no download: that is scripts/shard-size-gate.mjs. A shard with no row ships none. These are the rooms I12's ceilings left on 2026-11-06, so S7 changed no strip byte.",
+ "room": {
+  "driftwood-isle": 1975053,
+  "nalati-grasslands": 3969551,
+  "nine-dragon-stack": 12931755,
+  "pine-hollow": 7502930
+ }
+}

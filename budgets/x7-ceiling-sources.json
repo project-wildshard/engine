@@ -1,0 +1,41 @@
+{
+  "source": "F2 baseline max(lanes) plus original recorded noise band; existing ratchet ceilings preserved exactly",
+  "files": [
+    {
+      "file": "test/parity/baselines/gh-macos15/pine-hollow.phone.json",
+      "blob": "1098886836b0ebc2d7dfde57d14351dadd40a9eb"
+    },
+    {
+      "file": "test/parity/baselines/m5/driftwood-isle.desktop.json",
+      "blob": "10e8f4446608f53b9245259d2407f08e95846da2"
+    },
+    {
+      "file": "test/parity/baselines/m5/driftwood-isle.phone.json",
+      "blob": "73ee3d0f22240f5b75b2d5c9a758e00e9bd3bc1d"
+    },
+    {
+      "file": "test/parity/baselines/m5/nalati-grasslands.desktop.json",
+      "blob": "30bdaf27ddf9af70cc71fb4e76385258ac934078"
+    },
+    {
+      "file": "test/parity/baselines/m5/nalati-grasslands.phone.json",
+      "blob": "3cfba726d53efd6690134e86c8a806f820ff51d1"
+    },
+    {
+      "file": "test/parity/baselines/m5/nine-dragon-stack.desktop.json",
+      "blob": "7a1e4bf91808d30e1b57a6ee7e460ddcf91cc6a4"
+    },
+    {
+      "file": "test/parity/baselines/m5/nine-dragon-stack.phone.json",
+      "blob": "343634309d54977562123a06b9edb3226be320f4"
+    },
+    {
+      "file": "test/parity/baselines/m5/pine-hollow.desktop.json",
+      "blob": "7e91e4a0f1344b3e65ed43ef952a5e4adf3ad9f3"
+    },
+    {
+      "file": "test/parity/baselines/m5/pine-hollow.phone.json",
+      "blob": "a87814299e64f411941134a359aa52a435c53d65"
+    }
+  ]
+}

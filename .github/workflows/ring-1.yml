@@ -1,0 +1,66 @@
+# Ring 1: what a push must pass. It tests products, not repos: pinned Template 1, Template 2 and Sunscar Dunes in full, and server
+# slices of the other five. No shard repo is linked and no secret is read. A fork's pull request runs only once Jake approves it: that's
+# the repo's Actions setting (J160), not this file.
+# Meta repo docs/plans/TEST-COVERAGE-PLAN.md. Ring 2 is deploy.yml, on the nightly branch.
+name: ring-1
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      record:
+        description: Record this platform's digest baseline and upload it, instead of comparing
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+# One run plus the newest pending on main (G609): cancelling there means no tip is ever sure to finish.
+concurrency:
+  group: ring-1-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: bash scripts/ring1.sh static
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: bash scripts/ring1.sh tests
+
+  products:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: bash scripts/ring1.sh products
+        env:
+          RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
+      - name: Keep the recorded baseline
+        if: ${{ inputs.record }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ring-digests
+          path: test/pins/ring-digests.json
+          retention-days: 7

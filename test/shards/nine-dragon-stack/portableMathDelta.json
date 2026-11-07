@@ -1,0 +1,68 @@
+{
+  "components": 6527,
+  "maxAttributeDelta": 1.7191109646930158e-15,
+  "recordsChanged": 105439,
+  "maxRecordDelta": 1.2851941733060812e-11,
+  "attributes": [
+    {
+      "id": "layout_26",
+      "name": "normal",
+      "changed": 1416,
+      "max": 9.255490633467317e-16
+    },
+    {
+      "id": "layout_28",
+      "name": "normal",
+      "changed": 968,
+      "max": 4.839878497975292e-16
+    },
+    {
+      "id": "layout_30",
+      "name": "normal",
+      "changed": 881,
+      "max": 1.7191109646930158e-15
+    },
+    {
+      "id": "layout_32",
+      "name": "normal",
+      "changed": 48,
+      "max": 6.342958579910545e-17
+    },
+    {
+      "id": "set:booth",
+      "name": "normal",
+      "changed": 48,
+      "max": 6.342958579910545e-17
+    },
+    {
+      "id": "paifang:square",
+      "name": "normal",
+      "changed": 948,
+      "max": 6.120832262775883e-16
+    },
+    {
+      "id": "paifang:stair",
+      "name": "normal",
+      "changed": 918,
+      "max": 4.839878497975292e-16
+    },
+    {
+      "id": "paifang:well",
+      "name": "normal",
+      "changed": 835,
+      "max": 1.1258355359089478e-15
+    },
+    {
+      "id": "banyan:tree",
+      "name": "normal",
+      "changed": 385,
+      "max": 2.233125867772914e-16
+    },
+    {
+      "id": "banyan:shrine",
+      "name": "normal",
+      "changed": 80,
+      "max": 1.61671405167195e-16
+    }
+  ]
+}

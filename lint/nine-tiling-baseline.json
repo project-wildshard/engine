@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "product": "nine-dragon-stack",
+  "ring": "cell",
+  "chunks": {
+    "bytes": 4000000
+  },
+  "tileDebt": {
+    "0/3/2": {
+      "resident": 19453408,
+      "triangles": 65741,
+      "draws": 12
+    },
+    "0/3/3": {
+      "resident": 61867808,
+      "triangles": 240585,
+      "draws": 34
+    },
+    "0/3/4": {
+      "resident": 18616828,
+      "triangles": 64072,
+      "draws": 13
+    },
+    "0/4/3": {
+      "resident": 24180888,
+      "triangles": 146216,
+      "draws": 31
+    },
+    "0/4/4": {
+      "resident": 27771836,
+      "triangles": 129914,
+      "draws": 24
+    }
+  }
+}

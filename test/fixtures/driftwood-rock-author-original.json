@@ -1,0 +1,396 @@
+{
+  "shore": 109,
+  "small": 400,
+  "contacts": 91,
+  "geometry": [
+    {
+      "name": "shore",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 179640,
+          "storage": "Float32Array",
+          "hash": "e1432b0a302933050ebd911aa6a99e91059af83b5551d2bf714df6888460323b"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 179640,
+          "storage": "Float32Array",
+          "hash": "f152a648157fff66e1a6f17f72e7aafb4762379b54787fb9c8daba1d5c6797d4"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 179640,
+          "storage": "Float32Array",
+          "hash": "431bbb5c19b8923662a5f11c4292b7c8be83fe28699f4c3077384ceaceb34b36"
+        }
+      ],
+      "index": null,
+      "box": [
+        -226.92202758789062,
+        -3.300431251525879,
+        -231.79287719726562,
+        212.29052734375,
+        5.37869119644165,
+        227.01876831054688
+      ],
+      "sphere": [
+        -7.3157501220703125,
+        1.0391299724578857,
+        -2.387054443359375,
+        276.781711244046
+      ],
+      "groups": []
+    },
+    {
+      "name": "small",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 124920,
+          "storage": "Float32Array",
+          "hash": "c81b2c1a61b7829ec70364b99ffabd8fc4c3a648b754f1fce7dcf2fb93bdb74a"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 124920,
+          "storage": "Float32Array",
+          "hash": "1458ddc277d77b053e7487706d6dab84291ca5b9204dc26ba63c4cee835e5503"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 124920,
+          "storage": "Float32Array",
+          "hash": "38ee98b5520180c34291e3bbb4fc0858c24e341225bfd3bc604e3315c8eef503"
+        }
+      ],
+      "index": null,
+      "box": [
+        -110.36639404296875,
+        -0.06754650175571442,
+        -173.09896850585938,
+        109.10797882080078,
+        18.99672508239746,
+        -20.831825256347656
+      ],
+      "sphere": [
+        -0.6292076110839844,
+        9.464589290320873,
+        -96.96539688110352,
+        125.13424282814307
+      ],
+      "groups": []
+    },
+    {
+      "name": "shoreBoulder-medium",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 1980,
+          "storage": "Float32Array",
+          "hash": "05f49c18cfe14f65351f551349692c05fed0985d3f48739f1794874ce305c618"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 1980,
+          "storage": "Float32Array",
+          "hash": "48890f9363171ec61167776c3ec79f1209c74dcba5bf72fc6147fedb8a8e5a50"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 1980,
+          "storage": "Float32Array",
+          "hash": "691173e4d00629942169e7c60841f4bffbad907c2c63eb661534f0565aa4d9bd"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "shoreBoulder-small",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 960,
+          "storage": "Float32Array",
+          "hash": "ce6fb6302aa170538dc9decedfdf8342a319fbbc13a823c96597c4355f95dea4"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 960,
+          "storage": "Float32Array",
+          "hash": "b4d4cb9df5825a5c99dbc0bd470097d2c45fd92695809483a04d37c56c97d8d5"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 960,
+          "storage": "Float32Array",
+          "hash": "ff3617597a0a881c7febc0c9a0eaf657b2de866e9895c416be0681a87c32760b"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "shoreBoulder-big",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 2580,
+          "storage": "Float32Array",
+          "hash": "45e61e9631918c1fa846741cd2b074a5112f91bd014da35e2ced3602ab92582b"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 2580,
+          "storage": "Float32Array",
+          "hash": "5a5b274f5ba89eaa66195ef988fd92cbab45075faed07f70fcb415b0e85e2528"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 2580,
+          "storage": "Float32Array",
+          "hash": "30be4f6ea3aa9f721273f6c1ca1869230a664485da0ad3eb13e6b55022789a11"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "smallRock-round",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 240,
+          "storage": "Float32Array",
+          "hash": "b0dcd5190c40d257449c6b00b5e5e4cca7f77bf818e8176194deb57cbe06cd93"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 240,
+          "storage": "Float32Array",
+          "hash": "74358a6ee7c3998b1eb02e99737f78c2f47ef7de1138a13bbed7ed9afc716c4a"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 240,
+          "storage": "Float32Array",
+          "hash": "49cbb4a6dc84a55f53df0b4999d81ce36433ff40fb3ebb3612c40ddaa5771c0a"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "smallRock-flat",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 240,
+          "storage": "Float32Array",
+          "hash": "e44d59466467ff6efca80570cb95b6b1f1a8f0b523f449fd651ea36428c825a6"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 240,
+          "storage": "Float32Array",
+          "hash": "be2f268991ebbf14e4988c5233205505a1976ce0209bf18609867ddc64b07f79"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 240,
+          "storage": "Float32Array",
+          "hash": "a5bd88abbafee32e5d9ca13a504153334f4b27380e40a4b511fafc1a0d20e56d"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "smallRock-big",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 540,
+          "storage": "Float32Array",
+          "hash": "7b94a79d19724e083d210dbb1720180ad7c45679361b6dcf85d2445b7d4de767"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 540,
+          "storage": "Float32Array",
+          "hash": "2ee12a00582bc808c3d681f61a25903fe29e9e042b83c8dd138ae6f0ad68f26e"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 540,
+          "storage": "Float32Array",
+          "hash": "14506f81aadfc2c6c3fe4e1f194380bc9bc77581138e481a511d6190c4b9ca12"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "reefRock-mossy",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 1500,
+          "storage": "Float32Array",
+          "hash": "8f381e0a90bd177172958ff0b1251390dd9f4a2676abfef1ff1a3f3aabfaebc5"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 1500,
+          "storage": "Float32Array",
+          "hash": "984f2cc1c7b30751a7c415c9ed08c90aa665cc9c6711f28d0bd213266b19102c"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 1500,
+          "storage": "Float32Array",
+          "hash": "fcfdaff771c07dfc78c80e6903036abc784c4c31e5cecc420168f367da47b844"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "reefRock-bare",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 1500,
+          "storage": "Float32Array",
+          "hash": "8f381e0a90bd177172958ff0b1251390dd9f4a2676abfef1ff1a3f3aabfaebc5"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 1500,
+          "storage": "Float32Array",
+          "hash": "984f2cc1c7b30751a7c415c9ed08c90aa665cc9c6711f28d0bd213266b19102c"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 1500,
+          "storage": "Float32Array",
+          "hash": "3ad74e8ecb77249af6b9c23eb412c405f59265cc21e82afbf078ff3eed1c03b1"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    },
+    {
+      "name": "reefRock-tall",
+      "attributes": [
+        {
+          "name": "position",
+          "width": 3,
+          "normalized": false,
+          "count": 960,
+          "storage": "Float32Array",
+          "hash": "34932d29884e9ee52bb51d6cd8a3288d2d4cfcc6785eb44fd1993935c46e91f6"
+        },
+        {
+          "name": "normal",
+          "width": 3,
+          "normalized": false,
+          "count": 960,
+          "storage": "Float32Array",
+          "hash": "f45c051857daf584b998aee3ce0f711fce83717dfdef5c5546bcc7b65da77e3b"
+        },
+        {
+          "name": "color",
+          "width": 3,
+          "normalized": false,
+          "count": 960,
+          "storage": "Float32Array",
+          "hash": "aea49c9a1ff9275e0e0ec595301a1040ffaf933db1bda28fd37b01a627ac4d71"
+        }
+      ],
+      "index": null,
+      "box": null,
+      "sphere": null,
+      "groups": []
+    }
+  ],
+  "metadataBytes": 745066,
+  "metadataHash": "8a68225898dd4378eaafa6458bb1cfc932dd9807322c6fc735d445a65d5504cb"
+}

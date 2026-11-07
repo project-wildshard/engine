@@ -1,0 +1,39 @@
+{
+  "slices": [
+    {
+      "slug": "far-reach",
+      "from": "66eacdbb4a7c306d36e58396004e9bdb92230fe51d7a518b995cd3dd59973f51",
+      "hash": "674ba381ee0304671993ecd323d0076fe3c5233b5bb3a7d3ea8940289b608bd4",
+      "bytes": 3902464,
+      "files": 118
+    },
+    {
+      "slug": "driftwood-isle",
+      "from": "0c14ad7a53687c6a1fdd9982edf60bcffbffea4973c71dc19178321cefeb2458",
+      "hash": "bdd3e8368bf2167a6ff00a35a0b0ca40c25f6c74b74b6ab002d9d8c205746757",
+      "bytes": 15304192,
+      "files": 165
+    },
+    {
+      "slug": "nalati-grasslands",
+      "from": "bc6e2b7a18ed6c12789f05141efce427df068bbd1fffd0354a2b9243a3d94526",
+      "hash": "248790694260a0bc23939bce16ed73820404063c4a61bd9ee95048ff55785d33",
+      "bytes": 40876032,
+      "files": 229
+    },
+    {
+      "slug": "pine-hollow",
+      "from": "55f512f25f3601ff5fe50ab25d5cba37b8e1ebecf571104eb6fab8ade05ea36c",
+      "hash": "349a88bdc61bb1586abed6193abd4b859f4f8cb15ecfb8dbf69c51c271b0e70e",
+      "bytes": 62962176,
+      "files": 270
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "from": "a5d4967755a7cb21756b0d81e21e86b032525e29f7952eee182707d25da37bf8",
+      "hash": "cd19721987cffb77f2432f901fc5a605cce89c3d55df20709c2b5c78a041d877",
+      "bytes": 12923392,
+      "files": 153
+    }
+  ]
+}

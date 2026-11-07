@@ -1,0 +1,62 @@
+[
+  {
+    "id": "venison",
+    "label": "Venison",
+    "icon": "meat",
+    "travels": false
+  },
+  {
+    "id": "deer-hide",
+    "label": "Deer hide",
+    "icon": "hide",
+    "travels": false
+  },
+  {
+    "id": "boar-meat",
+    "label": "Boar meat",
+    "icon": "meat",
+    "travels": false
+  },
+  {
+    "id": "boar-hide",
+    "label": "Boar hide",
+    "icon": "hide",
+    "travels": false
+  },
+  {
+    "id": "boar-tusk",
+    "label": "Boar tusk",
+    "icon": "tusk",
+    "travels": false
+  },
+  {
+    "id": "antlers",
+    "label": "Antlers",
+    "icon": "antlers",
+    "travels": false
+  },
+  {
+    "id": "elk-meat",
+    "label": "Elk meat",
+    "icon": "meat",
+    "travels": false
+  },
+  {
+    "id": "elk-hide",
+    "label": "Elk hide",
+    "icon": "hide",
+    "travels": false
+  },
+  {
+    "id": "bear-pelt",
+    "label": "Bear pelt",
+    "icon": "hide",
+    "travels": false
+  },
+  {
+    "id": "bear-claw",
+    "label": "Bear claw",
+    "icon": "tusk",
+    "travels": false
+  }
+]

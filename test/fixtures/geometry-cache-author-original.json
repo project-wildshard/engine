@@ -1,0 +1,136 @@
+[
+  {
+    "name": "granite-small",
+    "channels": [
+      {
+        "channel": "position",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 3552,
+        "hash": "f405b091f76c9169a3ce585ebedaa3c494525fcbcc49ec26622c7a2968d55a6f"
+      },
+      {
+        "channel": "normal",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 3552,
+        "hash": "bbd951a8df5a1d71d31a0414d154db2be9db0065e2b2068beb2dc485e6a473df"
+      },
+      {
+        "channel": "index",
+        "storage": "Uint16Array",
+        "width": 1,
+        "normalized": false,
+        "bytes": 3528,
+        "hash": "e217fd43e0a4a6aa71b223d9c13d72f7073cb4da83ac9d4e0dd056ea42987155"
+      }
+    ],
+    "groups": [],
+    "stream": null
+  },
+  {
+    "name": "granite-large",
+    "channels": [
+      {
+        "channel": "position",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 8736,
+        "hash": "3bf69d2e40cdc5dc21df4c527d204854999e50a528518e034f9672c914d3b2a3"
+      },
+      {
+        "channel": "normal",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 8736,
+        "hash": "225bce29582132ee421a272a818fda103d0e8f7af205d2b106e029b7693dfa35"
+      },
+      {
+        "channel": "index",
+        "storage": "Uint16Array",
+        "width": 1,
+        "normalized": false,
+        "bytes": 8712,
+        "hash": "2f16eac35fee930574624ce2e05ec704f44cd3866d6fb0f5c264599e6c8645b6"
+      }
+    ],
+    "groups": [],
+    "stream": null
+  },
+  {
+    "name": "blob",
+    "channels": [
+      {
+        "channel": "position",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 504,
+        "hash": "55b60fc74e0397757d4ec09ab65026580295ea586c05917b1e0a43221eeb6654"
+      },
+      {
+        "channel": "normal",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 504,
+        "hash": "ff4970530c005e196d3acc3db78773687d696ab3110efc066c8cf1b78decc75c"
+      },
+      {
+        "channel": "index",
+        "storage": "Uint16Array",
+        "width": 1,
+        "normalized": false,
+        "bytes": 480,
+        "hash": "1521576289e372fe5ae5aa59566ccf6593473602c7beebcb76675ccaccf3779d"
+      }
+    ],
+    "groups": [],
+    "stream": {
+      "version": 1,
+      "state": 1199730150,
+      "initial": 7,
+      "scrambledFork": false
+    }
+  },
+  {
+    "name": "scrambled-blob",
+    "channels": [
+      {
+        "channel": "position",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 1104,
+        "hash": "2c7183be1416c536094faef0042d1160aa98c52aa903f4bf8583838469e61584"
+      },
+      {
+        "channel": "normal",
+        "storage": "Float32Array",
+        "width": 3,
+        "normalized": false,
+        "bytes": 1104,
+        "hash": "dd1aa5983f80ccd698d3e5773c0c54f77cf88d9bbe31edf5ae90952d4f967490"
+      },
+      {
+        "channel": "index",
+        "storage": "Uint16Array",
+        "width": 1,
+        "normalized": false,
+        "bytes": 1080,
+        "hash": "4e2f555fa5e4de853d47520ef997cf8c05ec3f91632366fdcf12e775b023f9d4"
+      }
+    ],
+    "groups": [],
+    "stream": {
+      "version": 1,
+      "state": 94402050,
+      "initial": 3189639203,
+      "scrambledFork": true
+    }
+  }
+]

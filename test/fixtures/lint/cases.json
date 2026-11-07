@@ -1,0 +1,653 @@
+[
+  {
+    "id": "layer-down",
+    "file": "src/shards/sample/down.ts",
+    "rule": "layer",
+    "code": "import { value } from '@wildshard/engine'; import { thing } from '@wildshard/game'; import { item } from '@wildshard/sdk';",
+    "count": 0
+  },
+  {
+    "id": "layer-up",
+    "file": "src/engine/up.ts",
+    "rule": "layer",
+    "code": "import { value } from '@wildshard/game';",
+    "count": 1
+  },
+  {
+    "id": "layer-relative-up",
+    "file": "src/engine/relative.ts",
+    "rule": "layer",
+    "code": "import { value } from '../game/item';",
+    "count": 1
+  },
+  {
+    "id": "layer-deep",
+    "file": "src/game/deep.ts",
+    "rule": "public-index",
+    "code": "import { value } from '@wildshard/engine/core/fixedStep';",
+    "count": 1
+  },
+  {
+    "id": "layer-internal",
+    "file": "src/engine/internal.ts",
+    "rule": "layer",
+    "code": "import { value } from '@wildshard/engine/core/clock';",
+    "count": 0
+  },
+  {
+    "id": "layer-cross",
+    "file": "src/shards/sample/cross.ts",
+    "rule": "layer",
+    "code": "export { value } from '../other/value';",
+    "count": 1
+  },
+  {
+    "id": "layer-dynamic",
+    "file": "src/engine/dynamic.ts",
+    "rule": "layer",
+    "code": "void import('@wildshard/game/item');",
+    "count": 1
+  },
+  {
+    "id": "layer-unlayered",
+    "file": "src/main.ts",
+    "rule": "public-index",
+    "code": "import { value } from '@wildshard/game/item';",
+    "count": 1
+  },
+  {
+    "id": "words-code",
+    "file": "src/engine/words.ts",
+    "rule": "engine-words",
+    "code": "const Bag = 'LOOT';",
+    "count": 2
+  },
+  {
+    "id": "words-comment",
+    "file": "src/engine/comment.ts",
+    "rule": "engine-words",
+    "code": "// bear in mind\nexport const value = 1;",
+    "count": 0
+  },
+  {
+    "id": "words-boundary",
+    "file": "src/engine/boundary.ts",
+    "rule": "layer",
+    "code": "const baggage = 'coins'; // bearing\n",
+    "count": 0
+  },
+  {
+    "id": "words-template",
+    "file": "src/engine/template.ts",
+    "rule": "engine-words",
+    "code": "const value = `horse ${1}`;",
+    "count": 1
+  },
+  {
+    "id": "branch-ident",
+    "file": "src/ui/ident.ts",
+    "rule": "no-shard-branch",
+    "code": "if (isNalati) run();",
+    "count": 1
+  },
+  {
+    "id": "branch-slug",
+    "file": "src/ui/slug.ts",
+    "rule": "no-shard-branch",
+    "code": "if (slug !== other) run();",
+    "count": 1
+  },
+  {
+    "id": "branch-open",
+    "file": "src/ui/open.ts",
+    "rule": "no-shard-branch",
+    "code": "if (isOpen) run();",
+    "count": 0
+  },
+  {
+    "id": "branch-weapon",
+    "file": "src/ui/weapon.ts",
+    "rule": "no-shard-branch",
+    "code": "if (chunk.weapon === 'sword') run();",
+    "count": 1
+  },
+  {
+    "id": "branch-structures",
+    "file": "src/ui/structures.ts",
+    "rule": "no-shard-branch",
+    "code": "if (def.structures === undefined) run();",
+    "count": 1
+  },
+  {
+    "id": "branch-active",
+    "file": "src/ui/active.ts",
+    "rule": "no-shard-branch",
+    "code": "if (getActiveChunk().style === 'painterly') run();",
+    "count": 1
+  },
+  {
+    "id": "branch-level",
+    "file": "src/ui/level.ts",
+    "rule": "no-shard-branch",
+    "code": "if (level.ground.structures === true) run(); void ctx.level.ground.structures;",
+    "count": 0
+  },
+  {
+    "id": "branch-write",
+    "file": "src/ui/write.ts",
+    "rule": "no-shard-branch",
+    "code": "chunk.weapon = 'sword';",
+    "count": 0
+  },
+  {
+    "id": "branch-nested",
+    "file": "src/ui/nested.ts",
+    "rule": "no-shard-branch",
+    "code": "const result = painterly ? chunk.ocean : isNalati;",
+    "count": 3
+  },
+  {
+    "id": "branch-literal",
+    "file": "src/ui/literal.ts",
+    "rule": "no-shard-branch",
+    "code": "if (x === 'pine-hollow') run();",
+    "count": 1
+  },
+  {
+    "id": "branch-switch",
+    "file": "src/ui/switch.ts",
+    "rule": "no-shard-branch",
+    "code": "switch (s) { case 'nalati-grasslands': run(); break; case 'pine-hollow': run(); break; }",
+    "count": 2
+  },
+  {
+    "id": "branch-url",
+    "file": "src/ui/url.ts",
+    "rule": "no-shard-branch",
+    "code": "const url = 'pine-hollow';",
+    "count": 0
+  },
+  {
+    "id": "branch-dedup",
+    "file": "src/ui/dedup.ts",
+    "rule": "no-shard-branch",
+    "code": "if (chunk.slug === 'pine-hollow') run();",
+    "count": 1
+  },
+  {
+    "id": "branch-members",
+    "file": "src/ui/members.ts",
+    "rule": "no-shard-branch",
+    "code": "void this.def.ocean; void shard.manifest.weapon; void unrelated.structures;",
+    "count": 2
+  },
+  {
+    "id": "branch-all-a",
+    "file": "src/ui/all-a.ts",
+    "rule": "no-shard-branch",
+    "code": "void isOcean; void isPine; void isNine; void LOOK_V2; nalatiNow(); isStylized(); isPaintedAir(); isPainterlyGrass(); const a = sea ? 1 : 0; const b = painterly ? 1 : 0; const c = painterly && draw(); if (style !== other) run();",
+    "count": 12
+  },
+  {
+    "id": "branch-plugin",
+    "file": "src/shards/sample/plugin.ts",
+    "rule": "no-shard-branch",
+    "code": "if (chunk.slug === 'pine-hollow') run();",
+    "count": 0
+  },
+  {
+    "id": "branch-legacy",
+    "file": "src/shards/nine-dragon-stack/look.ts",
+    "rule": "no-shard-branch",
+    "code": "if (isNine) run();",
+    "count": 0
+  },
+  {
+    "id": "branch-legacy-flat",
+    "file": "src/shards/driftwood-isle/manifest.ts",
+    "rule": "no-shard-branch",
+    "code": "if (isOcean) run();",
+    "count": 0
+  },
+  {
+    "id": "branch-pine",
+    "file": "src/shards/pine-hollow/look.ts",
+    "rule": "no-shard-branch",
+    "code": "if (isPine) run();",
+    "count": 0
+  },
+  {
+    "id": "branch-nalati",
+    "file": "src/shards/nalati-grasslands/look.ts",
+    "rule": "no-shard-branch",
+    "code": "if (isNalati) run();",
+    "count": 0
+  },
+  {
+    "id": "save-raw",
+    "file": "src/ui/save.ts",
+    "rule": "no-raw-save",
+    "code": "localStorage.getItem('x'); window.sessionStorage.setItem('x', 'y');",
+    "count": 2
+  },
+  {
+    "id": "save-service",
+    "file": "src/engine/saves/storage.ts",
+    "rule": "no-raw-save",
+    "code": "localStorage.getItem('x'); sessionStorage.getItem('x');",
+    "count": 0
+  },
+  {
+    "id": "save-native",
+    "file": "src/engine/native/legacyStorage.ts",
+    "rule": "no-raw-save",
+    "code": "localStorage.getItem('x');",
+    "count": 0
+  },
+  {
+    "id": "save-moved-native",
+    "file": "src/engine/native/storage.ts",
+    "rule": "no-raw-save",
+    "code": "localStorage.getItem('x');",
+    "count": 0
+  },
+  {
+    "id": "random-time-raw",
+    "file": "src/ui/random.ts",
+    "rule": "no-raw-random-time",
+    "code": "Math.random(); performance.now();",
+    "count": 2
+  },
+  {
+    "id": "random-time-computed",
+    "file": "src/ui/computed.ts",
+    "rule": "no-raw-random-time",
+    "code": "Math['random'](); performance['now']();",
+    "count": 2
+  },
+  {
+    "id": "random-rng",
+    "file": "src/engine/shared/core/rng.ts",
+    "rule": "no-raw-random-time",
+    "code": "Math.random();",
+    "count": 0
+  },
+  {
+    "id": "random-clock",
+    "file": "src/engine/shared/core/clock.ts",
+    "rule": "no-raw-random-time",
+    "code": "performance.now();",
+    "count": 0
+  },
+  {
+    "id": "random-allow",
+    "file": "src/engine/client/ui/perfHud.ts",
+    "rule": "no-raw-random-time",
+    "code": "performance.now(); Math.random();",
+    "count": 1
+  },
+  {
+    "id": "input-raw",
+    "file": "src/ui/input.ts",
+    "rule": "no-raw-input",
+    "code": "window.addEventListener('keydown', fn); addEventListener('pointerup', fn);",
+    "count": 2
+  },
+  {
+    "id": "input-other",
+    "file": "src/ui/resize.ts",
+    "rule": "no-raw-input",
+    "code": "window.addEventListener('resize', fn);",
+    "count": 0
+  },
+  {
+    "id": "input-helper",
+    "file": "src/ui/helper.ts",
+    "rule": "no-raw-input",
+    "code": "scope.listen(window, 'keydown', fn); listenDom(scope, document, 'pointermove', fn);",
+    "count": 2
+  },
+  {
+    "id": "input-widget-own",
+    "file": "src/ui/widget.ts",
+    "rule": "no-raw-input",
+    "code": "scope.listen(button, 'pointerdown', fn); listenDom(scope, window, 'resize', fn);",
+    "count": 0
+  },
+  {
+    "id": "input-owned",
+    "file": "src/engine/input/listeners.ts",
+    "rule": "no-raw-input",
+    "code": "window.addEventListener('touchstart', fn);",
+    "count": 0
+  },
+  {
+    "id": "input-legacy",
+    "file": "src/engine/input/legacyListeners.ts",
+    "rule": "no-raw-input",
+    "code": "window.addEventListener('keyup', fn);",
+    "count": 0
+  },
+  {
+    "id": "renderer-raw",
+    "file": "src/ui/render.ts",
+    "rule": "no-renderer-type",
+    "code": "type Render = WebGLRenderer;",
+    "count": 1
+  },
+  {
+    "id": "renderer-owned",
+    "file": "src/engine/render/type.ts",
+    "rule": "no-renderer-type",
+    "code": "type Render = WebGLRenderer;",
+    "count": 0
+  },
+  {
+    "id": "renderer-legacy",
+    "file": "src/engine/client/core/Game.ts",
+    "rule": "no-renderer-type",
+    "code": "type Render = WebGLRenderer;",
+    "count": 0
+  },
+  {
+    "id": "renderer-moved",
+    "file": "src/engine/client/core/bootstrap.ts",
+    "rule": "no-renderer-type",
+    "code": "type Render = WebGLRenderer;",
+    "count": 0
+  },
+  {
+    "id": "shader-patch-raw",
+    "file": "src/shards/demo/look.ts",
+    "rule": "no-raw-shader-patch",
+    "code": "declare const m: { onBeforeCompile: () => void; customProgramCacheKey: () => string }; m.onBeforeCompile = () => {}; m.customProgramCacheKey = () => 'k';",
+    "count": 2
+  },
+  {
+    "id": "shader-patch-read",
+    "file": "src/engine/world/look.ts",
+    "rule": "no-raw-shader-patch",
+    "code": "declare const m: { onBeforeCompile: () => void }; const hook = m.onBeforeCompile;",
+    "count": 0
+  },
+  {
+    "id": "shader-patch-registry",
+    "file": "src/engine/client/render/shaderPatches.ts",
+    "rule": "no-raw-shader-patch",
+    "code": "declare const m: { onBeforeCompile: () => void }; m.onBeforeCompile = () => {};",
+    "count": 0
+  },
+  {
+    "id": "sim-math",
+    "file": "src/engine/ai/math.ts",
+    "rule": "sim-no-render",
+    "code": "import type { Vector3, Quaternion, Matrix4, Box3, Ray } from 'three';",
+    "count": 0
+  },
+  {
+    "id": "sim-three",
+    "file": "src/engine/ai/mesh.ts",
+    "rule": "sim-no-render",
+    "code": "import type { Mesh } from 'three';",
+    "count": 1
+  },
+  {
+    "id": "sim-namespace",
+    "file": "src/engine/combat/namespace.ts",
+    "rule": "sim-no-render",
+    "code": "import * as THREE from 'three';",
+    "count": 1
+  },
+  {
+    "id": "sim-visual",
+    "file": "src/engine/quest/visual.ts",
+    "rule": "sim-no-render",
+    "code": "import { value } from '@wildshard/engine/fx/value';",
+    "count": 1
+  },
+  {
+    "id": "sim-view",
+    "file": "src/engine/ai/runtime.ts",
+    "rule": "sim-no-render",
+    "code": "import { value } from './view/value';",
+    "count": 1
+  },
+  {
+    "id": "sim-dom",
+    "file": "src/engine/combat/dom.ts",
+    "rule": "sim-no-render",
+    "code": "void document; type A = HTMLElement; type B = HTMLCanvasElement; requestAnimationFrame(fn);",
+    "count": 4
+  },
+  {
+    "id": "sim-dom-qualified",
+    "file": "src/engine/combat/qualified.ts",
+    "rule": "sim-no-render",
+    "code": "void window.document; globalThis.requestAnimationFrame(fn); void local.document;",
+    "count": 3
+  },
+  {
+    "id": "sim-storage",
+    "file": "src/engine/saves/local.ts",
+    "rule": "sim-no-render",
+    "code": "localStorage.getItem('x'); sessionStorage.getItem('x'); void navigator.storage;",
+    "count": 3
+  },
+  {
+    "id": "sim-combat-view",
+    "file": "src/engine/combat/view/mesh.ts",
+    "rule": "sim-no-render",
+    "code": "import { Mesh } from 'three'; void document;",
+    "count": 0
+  },
+  {
+    "id": "sim-ai-view",
+    "file": "src/engine/ai/view/mesh.ts",
+    "rule": "sim-no-render",
+    "code": "import { Mesh } from 'three';",
+    "count": 0
+  },
+  {
+    "id": "hook-chain-prior",
+    "file": "src/fixtures/f8/hook.ts",
+    "rule": "no-hook-chain",
+    "code": "const prior = target.onKill; target.onKill = () => prior();",
+    "count": 1
+  },
+  {
+    "id": "hook-chain-computed",
+    "file": "src/fixtures/f8/computed.ts",
+    "rule": "no-hook-chain",
+    "code": "const previous = target['onHit']; target['onHit'] = () => previous();",
+    "count": 1
+  },
+  {
+    "id": "event-subscription-not-chain",
+    "file": "src/fixtures/f8/event.ts",
+    "rule": "no-hook-chain",
+    "code": "const unsubscribe = events.on('fault', handler, scope); const value = target.health;",
+    "count": 0
+  },
+  {
+    "id": "callback-read-not-chain",
+    "file": "src/fixtures/f8/read.ts",
+    "rule": "no-hook-chain",
+    "code": "const pick = view.onPick; if (pick) pick('id');",
+    "count": 0
+  },
+  {
+    "id": "active-service-reads",
+    "file": "src/fixtures/f8/active.ts",
+    "rule": "no-active-singleton",
+    "code": "activePhysics(); activeRegistry(); app.physics; app.registry;",
+    "count": 2
+  },
+  {
+    "id": "active-chunk-engine",
+    "file": "src/engine/fixtures/f8-current.ts",
+    "rule": "no-active-chunk",
+    "code": "getActiveChunk(); app.level;",
+    "count": 1
+  },
+  {
+    "id": "active-chunk-game-owner",
+    "file": "src/game/shard/f8-current.ts",
+    "rule": "no-active-chunk",
+    "code": "getActiveChunk();",
+    "count": 0
+  },
+  {
+    "id": "global capture calls",
+    "file": "src/engine/ui/f11Capture.ts",
+    "rule": "no-global-listener-patch",
+    "count": 6,
+    "code": "window.addEventListener('click', fn); el.addEventListener('dispose', fn); setTimeout(fn, 1); window.setInterval(fn, 1); requestAnimationFrame(fn); document.body.append(el); scope.listen(el, 'click', fn); scope.timeout(1, fn);"
+  },
+  {
+    "id": "capture implementation excluded",
+    "file": "src/engine/app/f11Capture.ts",
+    "rule": "no-global-listener-patch",
+    "count": 0,
+    "code": "window.addEventListener('click', fn); document.body.append(el);"
+  },
+  {
+    "id": "shell overlays excluded",
+    "file": "src/engine/client/ui/Loading.ts",
+    "rule": "no-global-listener-patch",
+    "count": 0,
+    "code": "setTimeout(fn, 1); document.body.appendChild(el);"
+  },
+  {
+    "id": "layer-manifest-public",
+    "file": "src/shards/sample/pure.ts",
+    "rule": "layer",
+    "code": "import { buildTerrain } from '@wildshard/engine/data';",
+    "count": 0
+  },
+  {
+    "id": "layer-public-subpath-not-general",
+    "file": "src/shards/sample/dataDeep.ts",
+    "rule": "public-index",
+    "code": "import { value } from '@wildshard/engine/data/private';",
+    "count": 1
+  },
+  {
+    "id": "X4 mixer direct",
+    "file": "src/game/fixture/mixer.ts",
+    "rule": "no-raw-animation-mixer",
+    "code": "import { AnimationMixer } from 'three'; new AnimationMixer(root);",
+    "count": 1
+  },
+  {
+    "id": "X4 mixer alias",
+    "file": "src/shards/fixture/mixer.ts",
+    "rule": "no-raw-animation-mixer",
+    "code": "import { AnimationMixer as Mixer } from 'three'; new Mixer(root);",
+    "count": 1
+  },
+  {
+    "id": "X4 mixer namespace and local alias",
+    "file": "src/engine/entities/fixtureMixer.ts",
+    "rule": "no-raw-animation-mixer",
+    "code": "import * as THREE from 'three'; const Mixer = THREE.AnimationMixer; new Mixer(root); new THREE['AnimationMixer'](root);",
+    "count": 2
+  },
+  {
+    "id": "X4 mixer engine owner",
+    "file": "src/engine/anim/fixtureMixer.ts",
+    "rule": "no-raw-animation-mixer",
+    "code": "import { AnimationMixer } from 'three'; new AnimationMixer(root);",
+    "count": 0
+  },
+  {
+    "id": "X4 anim public machine",
+    "file": "src/game/fixture/animMachine.ts",
+    "rule": "no-raw-animation-mixer",
+    "code": "import { AnimMachine } from '@wildshard/engine'; new AnimMachine(def, rig);",
+    "count": 0
+  },
+  {
+    "id": "raw HUD targets",
+    "file": "src/engine/ui/widgets.ts",
+    "rule": "no-raw-hud",
+    "count": 6,
+    "code": "const host=document.getElementById('hud'); host.append(a); const alias=host; alias.prepend(b); document.body.appendChild(c); document.getElementById('hud')?.append(d); (document.querySelector('#hud') ?? document.body).append(e); opts.hud.append(f);"
+  },
+  {
+    "id": "scoped HUD keeps inner DOM free",
+    "file": "src/engine/ui/scopedWidgets.ts",
+    "rule": "no-raw-hud",
+    "count": 0,
+    "code": "app.ui.hud.widget('band.1', el, 0, scope); panel.append(label); document.head.append(style);"
+  },
+  {
+    "id": "HUD implementation owns DOM",
+    "file": "src/engine/client/ui/hudSlots.ts",
+    "rule": "no-raw-hud",
+    "count": 0,
+    "code": "document.body.append(el); const hud=document.getElementById('hud'); hud.append(el);"
+  },
+  {
+    "id": "generator from runtime",
+    "file": "src/shards/sample/runtime/boot.ts",
+    "rule": "no-runtime-generator",
+    "code": "import { bakeDunes } from '../generators/dunes'; export { rows } from '../generators/rows'; void import(`../generators/${name}`);",
+    "count": 3
+  },
+  {
+    "id": "generator from a shard folder",
+    "file": "src/shards/sample/world/terrain.ts",
+    "rule": "no-runtime-generator",
+    "code": "import { bakeDunes } from '../generators/dunes';",
+    "count": 1
+  },
+  {
+    "id": "generator to generator",
+    "file": "src/shards/sample/generators/scatter.ts",
+    "rule": "no-runtime-generator",
+    "code": "import { bakeDunes } from './dunes'; import { noise } from '../generators/noise';",
+    "count": 0
+  },
+  {
+    "id": "runtime from data",
+    "file": "src/shards/sample/runtime/rows.ts",
+    "rule": "no-runtime-generator",
+    "code": "import { rows } from '../data/rows'; import { value } from '@wildshard/engine';",
+    "count": 0
+  },
+  {
+    "id": "sim-shard-data",
+    "file": "src/shards/sample/data/rows.ts",
+    "rule": "sim-no-render",
+    "code": "import * as THREE from 'three'; void document;",
+    "count": 2
+  },
+  {
+    "id": "sim-shard-runtime",
+    "file": "src/shards/sample/runtime/view.ts",
+    "rule": "sim-no-render",
+    "code": "import * as THREE from 'three'; void document;",
+    "count": 0
+  },
+  {
+    "id": "no-reexport-from",
+    "file": "src/engine/barrel.ts",
+    "rule": "no-reexport",
+    "code": "export { value } from './core/value'; export * from '@wildshard/engine/core/noise';",
+    "count": 2
+  },
+  {
+    "id": "no-reexport-binding",
+    "file": "src/game/barrel.ts",
+    "rule": "no-reexport",
+    "code": "import { value } from './value';\nexport { value };",
+    "count": 1
+  },
+  {
+    "id": "no-reexport-own-and-shim",
+    "file": "src/engine/physics/shim.ts",
+    "rule": "no-reexport",
+    "code": "const own = 1;\nexport { own };\nexport * from '@dimforge/rapier3d-simd/rapier_wasm3d_bg.js';",
+    "count": 0
+  }
+]

@@ -1,0 +1,13 @@
+--- a/src/engine/debug/probe.ts
++++ b/src/engine/debug/probe.ts
+@@ -280,3 +280,10 @@
+   const { game } = world, app = game.app;
++  if (world.chunk.slug === 'nine-dragon-stack') {
++    const geometry = new THREE.PlaneGeometry(0.00001, 0.00001);
++    const material = new THREE.MeshBasicMaterial({ depthWrite: false });
++    const extra = new THREE.Group();
++    for (let i = 0; i < 200; i++) { const mesh = new THREE.Mesh(geometry, material); mesh.frustumCulled = false; extra.add(mesh); }
++    game.scene.add(extra); game.levelScope.onDispose(() => { extra.removeFromParent(); });
++  }
+   const raw = pins?.resources?.(), owned = levelRegistrations(), retainedAtBoot = retainedRegistrations();
+   const retainedListeners = { window: 0, document: 0, canvas: 0, other: 0 }, retainedTimers = { timeouts: 0, intervals: 0, raf: 1 };

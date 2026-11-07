@@ -1,0 +1,151 @@
+{
+  "style": "orchestral",
+  "model": "MiniMax-Music3",
+  "credit": "Music: MiniMax-Music3",
+  "slots": {
+    "pine": {
+      "calm": "pine-calm-fbc4a99e.m4a",
+      "tension": "pine-tension-525d8c6d.m4a",
+      "bpm": 95.925,
+      "beatsPerBar": 4,
+      "loopStart": 22.384,
+      "loopEnd": 42.3996,
+      "duration": 44.9067
+    },
+    "island": {
+      "calm": "island-calm-27861d1b.m4a",
+      "tension": "island-tension-73116f36.m4a",
+      "bpm": 86.299,
+      "beatsPerBar": 4,
+      "loopStart": 16.1611,
+      "loopEnd": 52.3146,
+      "duration": 55.104
+    },
+    "title": {
+      "full": "title-b47c8a52.m4a",
+      "bpm": 116.041,
+      "beatsPerBar": 4,
+      "loopStart": 14.7911,
+      "loopEnd": 43.7464,
+      "duration": 45.824
+    }
+  },
+  "stings": {
+    "death": "sting-death-771d34f7.m4a",
+    "chunk": "sting-chunk-a639b19e.m4a",
+    "pickup": "sting-pickup-65f7ac5b.m4a"
+  },
+  "provenance": [
+    {
+      "file": "pine-calm-fbc4a99e.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: warm orchestral video game soundtrack in the spirit of Studio Ghibli and Ori and the Blind Forest. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a lyrical flute and oboe melody over legato strings and harp arpeggios; pizzicato basses and cellos walk underneath, and a soft steady pulse of frame drum, low toms and light timpani runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: warm concert-hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "calm: mix - drums - bass/2",
+      "gain_db": 1.9,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "pine-tension-525d8c6d.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: warm orchestral video game soundtrack in the spirit of Studio Ghibli and Ori and the Blind Forest. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a lyrical flute and oboe melody over legato strings and harp arpeggios; pizzicato basses and cellos walk underneath, and a soft steady pulse of frame drum, low toms and light timpani runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: warm concert-hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "tension: drums + bass/2 (htdemucs), mono",
+      "gain_db": 1.9,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "island-calm-27861d1b.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: warm orchestral video game soundtrack in the spirit of Studio Ghibli and Ori and the Blind Forest. BPM: 100. Key: D major. Instrumental only, no vocals, no choir. Setting: Driftwood Isle, a sunlit island of pale sand and turquoise water - wonder first, breezy seafaring adventure second, a little melancholy underneath. Arrangement: a buoyant clarinet and violin melody over rippling harp, celesta and bright strings; plucked double basses and a steady light groove of tambourine, frame drum and soft snare run under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: bright, wide hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "calm: mix - drums - bass/2",
+      "gain_db": 0.6,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "island-tension-73116f36.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: warm orchestral video game soundtrack in the spirit of Studio Ghibli and Ori and the Blind Forest. BPM: 100. Key: D major. Instrumental only, no vocals, no choir. Setting: Driftwood Isle, a sunlit island of pale sand and turquoise water - wonder first, breezy seafaring adventure second, a little melancholy underneath. Arrangement: a buoyant clarinet and violin melody over rippling harp, celesta and bright strings; plucked double basses and a steady light groove of tambourine, frame drum and soft snare run under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: bright, wide hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "tension: drums + bass/2 (htdemucs), mono",
+      "gain_db": 0.6,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "title-b47c8a52.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, warm cinematic orchestra in the spirit of Joe Hisaishi and Ori and the Blind Forest. BPM: 92. Key: D major. Instrumental only, no vocals, no lead choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable melody introduced by solo flute over harp, then taken up by full strings and French horns with timpani and a steady percussion pulse; it swells to a soaring climax and ends on a resolved final chord. Production: rich concert-hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "gain_db": 2.2,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "sting-death-771d34f7.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, warm cinematic orchestra in the spirit of Joe Hisaishi and Ori and the Blind Forest. BPM: 92. Key: D major. Instrumental only, no vocals, no lead choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable melody introduced by solo flute over harp, then taken up by full strings and French horns with timpani and a steady percussion pulse; it swells to a soaring climax and ends on a resolved final chord. Production: rich concert-hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "cut_from": "title at 57.02s (the final chord)",
+      "seconds": 4.5,
+      "gain_db": 5.1
+    },
+    {
+      "file": "sting-chunk-a639b19e.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, warm cinematic orchestra in the spirit of Joe Hisaishi and Ori and the Blind Forest. BPM: 92. Key: D major. Instrumental only, no vocals, no lead choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable melody introduced by solo flute over harp, then taken up by full strings and French horns with timpani and a steady percussion pulse; it swells to a soaring climax and ends on a resolved final chord. Production: rich concert-hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "cut_from": "title at 53.84s (a 4.2x swell on a downbeat)",
+      "seconds": 3.5,
+      "gain_db": 7.1
+    },
+    {
+      "file": "sting-pickup-65f7ac5b.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: warm orchestral video game soundtrack in the spirit of Studio Ghibli and Ori and the Blind Forest. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a lyrical flute and oboe melody over legato strings and harp arpeggios; pizzicato basses and cellos walk underneath, and a soft steady pulse of frame drum, low toms and light timpani runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: warm concert-hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "cut_from": "pine at 55.54s (its brightest onset)",
+      "seconds": 2.0,
+      "gain_db": 11.0
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+--- a/src/chunks/nine-dragon-stack/world/build.ts
++++ b/src/chunks/nine-dragon-stack/world/build.ts
+@@ -335,6 +335,7 @@
+   ];
+   const lanterns = place(paperLantern, paper.placements(), { ctx: nd.ctx, draw: 'instanced', culler: paper, parent: root, piece: { id: 'nds-lanterns' } });
+   lanterns.object.name = 'lanterns';
++  lanterns.object.removeFromParent();
+   progress(0.56, 'facade batches');
+   phaseStart = performance.now();
+   // E271/E272: facade instancing on every platform; multi-draw was removed after physical iOS memory kills.

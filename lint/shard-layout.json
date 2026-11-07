@@ -1,0 +1,64 @@
+{
+  "sourceLayout": {
+    "requiredFiles": [
+      "shard.config.ts",
+      "README.md"
+    ],
+    "allowedFiles": [
+      "manifest.json",
+      "ktx2.generated.ts",
+      "discovery.generated.ts",
+      "fence-reads.json",
+      "mounts.json",
+      "packs-set.json",
+      "runtimeCost.json"
+    ],
+    "folders": [
+      "data",
+      "generators",
+      "bake",
+      "behaviour",
+      "assets",
+      "blender",
+      "test",
+      "look",
+      "quests",
+      "thumbs",
+      "explore",
+      "boot",
+      "creatures",
+      "species",
+      "quest",
+      "world",
+      "art"
+    ]
+  },
+  "describe": {
+    "shard.config.ts": "build entry: serialisable declaration plus output blobs/custom/platform sections; builds out/<slug>/",
+    "fence-reads.json": "the shard's reviewed list of files read during a boot fence",
+    "mounts.json": "the public files only this shard reads, which its product carries (scripts/record-shard-mounts.mjs)",
+    "packs-set.json": "the shard's boot pack selection",
+    "runtimeCost.json": "the shard's measured runtime cost rows",
+    "README.md": "what the shard declares, its custom code and why, budgets, look, open work (its plan rows)",
+    "manifest.json": "authored discovery metadata; contains no runtime module",
+    "ktx2.generated.ts": "your KTX2 table, written by `bake-ktx2` once you bake KTX2 art. The one generated file you commit",
+    "discovery.generated.ts": "temporary generated discovery bridge; never hand-edit or commit it",
+    "data/": "build-time authoring inputs and erased JSON type contracts; executable build logic belongs in generators/",
+    "generators/": "build-time source that emits admitted JSON, WASM and named assets; never shipped as runtime TypeScript",
+    "bake/": "the shard's manual Node commands: an author runs them to rewrite committed bytes, and no build does. They stay out of generators/ because maps hash it",
+    "behaviour/": "AssemblyScript entity and director scripts",
+    "assets/": "source assets consumed by the build; assets/public/ holds files gen copies to public/assets/<slug>/ (scripts/shard-public.mjs)",
+    "blender/": "the shard's retained Blender build sources and offline rig checks (build-time only; optional)",
+    "test/": "optional source tests; never copied into the shipped product",
+    "look/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "quests/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "thumbs/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "explore/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "boot/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "creatures/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "species/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "quest/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "world/": "authored data, source assets and generated outputs; executable TypeScript belongs in generators/",
+    "art/": "the shard's mockup rounds (round-<n>-<label>/) and the data its look tools read; the build never reads them"
+  }
+}

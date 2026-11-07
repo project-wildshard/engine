@@ -1,0 +1,1008 @@
+{
+  "file": "src/client/game/generators/pickups.ts",
+  "seed": 6782,
+  "coin": "coin",
+  "geometries": [
+    {
+      "key": "shard",
+      "seed": 6787,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 48,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/fbd68e21b04e93fc938abbf14febe83df0992769eb173fa540249ed327bfcea2.bin"
+    },
+    {
+      "key": "seaglass",
+      "seed": 6804,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 60,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/f49d22fffc4890880502d5308086ad225bb6cb6cd8fca8e8e58c1cb890dfbe96.bin"
+    },
+    {
+      "key": "seaglass",
+      "seed": 6786,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 60,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/4bf85e3c3a0c2d0e0a235146ccfe16b1c98f214cd63800f4c7df554b9692d6e9.bin"
+    },
+    {
+      "key": "flint",
+      "seed": 6787,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 336,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/1fe194ff84e1bc6b9a4b384d34b4c6b4b7610b2c554aeb4e68cf476dd0e4a6a8.bin"
+    },
+    {
+      "key": "resin",
+      "seed": 6789,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 324,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/5c3385ceda17cb100afcf597bedf2d4c80369631055c74f4b33411adf84617dd.bin"
+    },
+    {
+      "key": "token",
+      "seed": 6790,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/ff59e17a90dd32fbb6f5d403e79e81129f9750c8bf43f184af2f3b475981b14e.bin"
+    },
+    {
+      "key": "token-rim",
+      "seed": 6791,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 288,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/64f3f46016335eebc0875d1d3b75e7d3e1d1a054d7c097a5833f03c32fadf09c.bin"
+    },
+    {
+      "key": "flint",
+      "seed": 6782,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 336,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/91bdc8a37eb8437ab96f54331754cd5319a3307770870a69700d4d2380fcb30f.bin"
+    },
+    {
+      "key": "seaglass",
+      "seed": 6782,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 60,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/f5a6071cc33cf87a3c498aac8062a0b3d87d29fb54a65f07cf3bfc3f523efc10.bin"
+    },
+    {
+      "key": "coin",
+      "seed": 6782,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 96,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/3452560ee7c55252cfeedb15711de356f0c6268cf0675976b318f7615a2a5e17.bin"
+    },
+    {
+      "key": "resin",
+      "seed": 6782,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 324,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/f3ce7d3e67bfae1075c398ac42593a106a187cb453206b2a691fd2306d0a5633.bin"
+    },
+    {
+      "key": "token",
+      "seed": 6782,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/797122eeccd31b4004e2042c32385f17e903832426be0654b0dd60eb376460f0.bin"
+    },
+    {
+      "key": "token-rim",
+      "seed": 6782,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 288,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/6ef126f7661e05ea6ced8d6a821db45cde98c0c6867a7f80056176fcd78dd0ff.bin"
+    },
+    {
+      "key": "shard",
+      "seed": 6782,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 48,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/d22a098c92209d8b97226a0e0397d6cf6a5c45f8c5647e7328949c567ba7e850.bin"
+    },
+    {
+      "key": "coin",
+      "seed": 3073,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 96,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/b2afea11f95d0f420621460dfdea648f1db2efc74722c1bdf993945185c91f46.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1000,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/9e9951eb1076b35cc2708882cd14ff78276b61de234359bc24e2bfdd0bcd5c6b.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1001,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/2de7bee2cfa38f6fb0c098894ce0d566eaef604b296445fba9bb21c55f219bb4.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1002,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/d3abf3a9ce30e47f9a19e90cf5a83c95ae6f254aeb768191da56583353ce8e12.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1003,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/cae6a0c9056a243b2d3b4eef8f3411190dbb99611207c9297e84fafb006d268c.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1004,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/2f564a7ac57034940f5393f7af0401f978885104b49bf152628f11db64c41674.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1005,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/6668b77b41bfa6e203dde8b28eb1a62da2bd49253ed0a4ba50c06f4b43a99b9e.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1006,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/fd513e136fcc7cc387fd5e351c9666b6418d6ed26a4569c83b1d9029b2d3f4e7.bin"
+    },
+    {
+      "key": "token",
+      "seed": 1007,
+      "geometry": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 792,
+        "index": null,
+        "indexCount": 0,
+        "box": true,
+        "expand": false
+      },
+      "file": "/assets/baked/common/pickups/ae21af3308fbecd359dd9e540b0317c0e60a77b8e31756816c2ebec329d8f063.bin"
+    }
+  ],
+  "looks": [
+    {
+      "id": "flint",
+      "model": "shared/flint-kit",
+      "name": "Flint & steel",
+      "batch": "lit",
+      "lift": 0,
+      "parts": [
+        {
+          "key": "flint",
+          "batch": "lit"
+        }
+      ]
+    },
+    {
+      "id": "seaglass",
+      "model": "shared/sea-glass",
+      "name": "Sea glass",
+      "batch": "glow",
+      "lift": 0.45,
+      "parts": [
+        {
+          "key": "seaglass",
+          "batch": "glow",
+          "bob": [
+            0.45,
+            0.07,
+            1.1
+          ],
+          "pulse": 2.2
+        }
+      ]
+    },
+    {
+      "id": "coin",
+      "model": "shared/doubloon",
+      "name": "Doubloon",
+      "batch": "glow",
+      "lift": 0.6,
+      "parts": [
+        {
+          "key": "coin",
+          "batch": "glow",
+          "bob": [
+            0.6,
+            0.06,
+            2.4
+          ],
+          "pulse": 1.4
+        }
+      ]
+    },
+    {
+      "id": "resin",
+      "model": "shared/resin-drop",
+      "name": "Resin drop",
+      "batch": "glow",
+      "lift": 0,
+      "parts": [
+        {
+          "key": "resin",
+          "batch": "glow",
+          "bob": [
+            0,
+            0.025,
+            0.35
+          ],
+          "pulse": 1.25
+        }
+      ]
+    },
+    {
+      "id": "token",
+      "model": "shared/carved-token",
+      "name": "Carved token",
+      "batch": "lit",
+      "lift": 0.55,
+      "parts": [
+        {
+          "key": "token",
+          "batch": "lit",
+          "bob": [
+            0.55,
+            0.05,
+            1.3
+          ]
+        },
+        {
+          "key": "token-rim",
+          "batch": "glow",
+          "bob": [
+            0.55,
+            0.05,
+            1.3
+          ],
+          "pulse": 0.9
+        }
+      ]
+    },
+    {
+      "id": "shard",
+      "model": "shared/glyph-shard",
+      "name": "Glyph shard",
+      "batch": "glow",
+      "lift": 1.2,
+      "parts": [
+        {
+          "key": "shard",
+          "batch": "glow",
+          "bob": [
+            1.2,
+            0.12,
+            0.9
+          ],
+          "pulse": 2.2
+        }
+      ]
+    }
+  ],
+  "banks": [
+    {
+      "file": "/assets/baked/common/pickups/f7d3d060691377efa8aec3b4050b437fcfafc14a227b869d79fcbc91b226a5c6.bin",
+      "bytes": 370224,
+      "members": [
+        {
+          "file": "/assets/baked/common/pickups/fbd68e21b04e93fc938abbf14febe83df0992769eb173fa540249ed327bfcea2.bin",
+          "offset": 0,
+          "bytes": 1728,
+          "sha256": "fbd68e21b04e93fc938abbf14febe83df0992769eb173fa540249ed327bfcea2"
+        },
+        {
+          "file": "/assets/baked/common/pickups/f49d22fffc4890880502d5308086ad225bb6cb6cd8fca8e8e58c1cb890dfbe96.bin",
+          "offset": 1728,
+          "bytes": 2160,
+          "sha256": "f49d22fffc4890880502d5308086ad225bb6cb6cd8fca8e8e58c1cb890dfbe96"
+        },
+        {
+          "file": "/assets/baked/common/pickups/4bf85e3c3a0c2d0e0a235146ccfe16b1c98f214cd63800f4c7df554b9692d6e9.bin",
+          "offset": 3888,
+          "bytes": 2160,
+          "sha256": "4bf85e3c3a0c2d0e0a235146ccfe16b1c98f214cd63800f4c7df554b9692d6e9"
+        },
+        {
+          "file": "/assets/baked/common/pickups/1fe194ff84e1bc6b9a4b384d34b4c6b4b7610b2c554aeb4e68cf476dd0e4a6a8.bin",
+          "offset": 6048,
+          "bytes": 12096,
+          "sha256": "1fe194ff84e1bc6b9a4b384d34b4c6b4b7610b2c554aeb4e68cf476dd0e4a6a8"
+        },
+        {
+          "file": "/assets/baked/common/pickups/5c3385ceda17cb100afcf597bedf2d4c80369631055c74f4b33411adf84617dd.bin",
+          "offset": 18144,
+          "bytes": 11664,
+          "sha256": "5c3385ceda17cb100afcf597bedf2d4c80369631055c74f4b33411adf84617dd"
+        },
+        {
+          "file": "/assets/baked/common/pickups/ff59e17a90dd32fbb6f5d403e79e81129f9750c8bf43f184af2f3b475981b14e.bin",
+          "offset": 29808,
+          "bytes": 28512,
+          "sha256": "ff59e17a90dd32fbb6f5d403e79e81129f9750c8bf43f184af2f3b475981b14e"
+        },
+        {
+          "file": "/assets/baked/common/pickups/64f3f46016335eebc0875d1d3b75e7d3e1d1a054d7c097a5833f03c32fadf09c.bin",
+          "offset": 58320,
+          "bytes": 10368,
+          "sha256": "64f3f46016335eebc0875d1d3b75e7d3e1d1a054d7c097a5833f03c32fadf09c"
+        },
+        {
+          "file": "/assets/baked/common/pickups/91bdc8a37eb8437ab96f54331754cd5319a3307770870a69700d4d2380fcb30f.bin",
+          "offset": 68688,
+          "bytes": 12096,
+          "sha256": "91bdc8a37eb8437ab96f54331754cd5319a3307770870a69700d4d2380fcb30f"
+        },
+        {
+          "file": "/assets/baked/common/pickups/f5a6071cc33cf87a3c498aac8062a0b3d87d29fb54a65f07cf3bfc3f523efc10.bin",
+          "offset": 80784,
+          "bytes": 2160,
+          "sha256": "f5a6071cc33cf87a3c498aac8062a0b3d87d29fb54a65f07cf3bfc3f523efc10"
+        },
+        {
+          "file": "/assets/baked/common/pickups/3452560ee7c55252cfeedb15711de356f0c6268cf0675976b318f7615a2a5e17.bin",
+          "offset": 82944,
+          "bytes": 3456,
+          "sha256": "3452560ee7c55252cfeedb15711de356f0c6268cf0675976b318f7615a2a5e17"
+        },
+        {
+          "file": "/assets/baked/common/pickups/f3ce7d3e67bfae1075c398ac42593a106a187cb453206b2a691fd2306d0a5633.bin",
+          "offset": 86400,
+          "bytes": 11664,
+          "sha256": "f3ce7d3e67bfae1075c398ac42593a106a187cb453206b2a691fd2306d0a5633"
+        },
+        {
+          "file": "/assets/baked/common/pickups/797122eeccd31b4004e2042c32385f17e903832426be0654b0dd60eb376460f0.bin",
+          "offset": 98064,
+          "bytes": 28512,
+          "sha256": "797122eeccd31b4004e2042c32385f17e903832426be0654b0dd60eb376460f0"
+        },
+        {
+          "file": "/assets/baked/common/pickups/6ef126f7661e05ea6ced8d6a821db45cde98c0c6867a7f80056176fcd78dd0ff.bin",
+          "offset": 126576,
+          "bytes": 10368,
+          "sha256": "6ef126f7661e05ea6ced8d6a821db45cde98c0c6867a7f80056176fcd78dd0ff"
+        },
+        {
+          "file": "/assets/baked/common/pickups/d22a098c92209d8b97226a0e0397d6cf6a5c45f8c5647e7328949c567ba7e850.bin",
+          "offset": 136944,
+          "bytes": 1728,
+          "sha256": "d22a098c92209d8b97226a0e0397d6cf6a5c45f8c5647e7328949c567ba7e850"
+        },
+        {
+          "file": "/assets/baked/common/pickups/b2afea11f95d0f420621460dfdea648f1db2efc74722c1bdf993945185c91f46.bin",
+          "offset": 138672,
+          "bytes": 3456,
+          "sha256": "b2afea11f95d0f420621460dfdea648f1db2efc74722c1bdf993945185c91f46"
+        },
+        {
+          "file": "/assets/baked/common/pickups/9e9951eb1076b35cc2708882cd14ff78276b61de234359bc24e2bfdd0bcd5c6b.bin",
+          "offset": 142128,
+          "bytes": 28512,
+          "sha256": "9e9951eb1076b35cc2708882cd14ff78276b61de234359bc24e2bfdd0bcd5c6b"
+        },
+        {
+          "file": "/assets/baked/common/pickups/2de7bee2cfa38f6fb0c098894ce0d566eaef604b296445fba9bb21c55f219bb4.bin",
+          "offset": 170640,
+          "bytes": 28512,
+          "sha256": "2de7bee2cfa38f6fb0c098894ce0d566eaef604b296445fba9bb21c55f219bb4"
+        },
+        {
+          "file": "/assets/baked/common/pickups/d3abf3a9ce30e47f9a19e90cf5a83c95ae6f254aeb768191da56583353ce8e12.bin",
+          "offset": 199152,
+          "bytes": 28512,
+          "sha256": "d3abf3a9ce30e47f9a19e90cf5a83c95ae6f254aeb768191da56583353ce8e12"
+        },
+        {
+          "file": "/assets/baked/common/pickups/cae6a0c9056a243b2d3b4eef8f3411190dbb99611207c9297e84fafb006d268c.bin",
+          "offset": 227664,
+          "bytes": 28512,
+          "sha256": "cae6a0c9056a243b2d3b4eef8f3411190dbb99611207c9297e84fafb006d268c"
+        },
+        {
+          "file": "/assets/baked/common/pickups/2f564a7ac57034940f5393f7af0401f978885104b49bf152628f11db64c41674.bin",
+          "offset": 256176,
+          "bytes": 28512,
+          "sha256": "2f564a7ac57034940f5393f7af0401f978885104b49bf152628f11db64c41674"
+        },
+        {
+          "file": "/assets/baked/common/pickups/6668b77b41bfa6e203dde8b28eb1a62da2bd49253ed0a4ba50c06f4b43a99b9e.bin",
+          "offset": 284688,
+          "bytes": 28512,
+          "sha256": "6668b77b41bfa6e203dde8b28eb1a62da2bd49253ed0a4ba50c06f4b43a99b9e"
+        },
+        {
+          "file": "/assets/baked/common/pickups/fd513e136fcc7cc387fd5e351c9666b6418d6ed26a4569c83b1d9029b2d3f4e7.bin",
+          "offset": 313200,
+          "bytes": 28512,
+          "sha256": "fd513e136fcc7cc387fd5e351c9666b6418d6ed26a4569c83b1d9029b2d3f4e7"
+        },
+        {
+          "file": "/assets/baked/common/pickups/ae21af3308fbecd359dd9e540b0317c0e60a77b8e31756816c2ebec329d8f063.bin",
+          "offset": 341712,
+          "bytes": 28512,
+          "sha256": "ae21af3308fbecd359dd9e540b0317c0e60a77b8e31756816c2ebec329d8f063"
+        }
+      ]
+    }
+  ]
+}

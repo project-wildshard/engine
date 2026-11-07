@@ -1,0 +1,22 @@
+[
+  {
+    "name": "world/dressing-addresses-phone.bin",
+    "bytes": 140,
+    "hash": "39dff9e17cde394a40c1d82a3ca06ee7800db44826c36d3c9b8bd6767f23e3f8"
+  },
+  {
+    "name": "world/dressing-desktop.json",
+    "bytes": 1309022,
+    "hash": "53694847440a5c000c87fa02c708c94387a415e5d32f9112e8f14f094caa02a4"
+  },
+  {
+    "name": "world/dressing-addresses-desktop.bin",
+    "bytes": 140,
+    "hash": "e12c12d0f587461a482517b4beb4fc025af8a723e67bafadbdef79c6d660faaf"
+  },
+  {
+    "name": "world/dressing-phone.json",
+    "bytes": 1214301,
+    "hash": "e1cbb8a04144d07863b4795213abfd3af402f75e8246795fb8b235cd206c6405"
+  }
+]

@@ -1,0 +1,289 @@
+/* ─── in-game HUD (src/client/engine/ui/HUD.ts) ─── prefix ws-game- ─── shared primitives come from base.css */
+
+/* ── top-centre: compass band (K1) — smoked glass, hairline cyan top edge, ticks, W · N · E, a notch above, brackets outside ── */
+/* the compass is retired — the minimap (with its heading tab) covers it; the element stays built but hidden (user: "having both is dumb") */
+.ws-game-compass { display: none !important; }
+.ws-game-compass { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); width: 520px; height: 34px; }
+.ws-game-compass .ws-game-band { --ppd: 1.2px; position: absolute; inset: 0; overflow: hidden; background: rgba(6, 10, 18, 0.6); border: 1px solid rgba(143, 227, 255, 0.4); border-top: 1px solid var(--ws-cyan); box-shadow: inset 0 1px 0 rgba(143, 227, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.4); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 9px 100%, 0 50%); }
+.ws-game-compass .ws-game-band::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6, 10, 18, 0.85), transparent 12%, transparent 88%, rgba(6, 10, 18, 0.85)); pointer-events: none; }
+.ws-game-compass .ws-game-strip { position: absolute; left: 50%; top: 0; height: 100%; white-space: nowrap; will-change: transform; }
+.ws-game-compass .ws-game-tick { position: absolute; top: 50%; width: 1px; height: 8px; margin-top: -4px; background: rgba(143, 227, 255, 0.7); }
+.ws-game-compass .ws-game-tick.major { height: 12px; margin-top: -6px; background: var(--ws-cyan); }
+.ws-game-compass .ws-game-cardinal { position: absolute; top: 50%; transform: translate(-50%, -50%); font-family: var(--ws-display); font-weight: 700; font-size: 18px; letter-spacing: 0.08em; line-height: 1; color: #fff; text-shadow: 0 0 6px rgba(0, 0, 0, 0.6); padding: 0 6px; background: rgba(6, 10, 18, 0.001); }
+.ws-game-compass .ws-game-cardinal.minor { display: none; }
+.ws-game-compass .ws-game-centre { position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: var(--ws-cyan); opacity: 0.22; }
+.ws-game-compass .ws-game-notch { position: absolute; left: 50%; top: -9px; width: 0; height: 0; margin-left: -6px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid var(--ws-cyan); filter: drop-shadow(0 0 4px rgba(143, 227, 255, 0.7)); }
+.ws-game-compass .ws-game-brk { position: absolute; width: 14px; height: 14px; border: 1px solid var(--ws-cyan); opacity: 0.8; }
+.ws-game-compass .ws-game-brk.tl { left: -9px; top: -8px; border-right: 0; border-bottom: 0; }
+.ws-game-compass .ws-game-brk.tr { right: -9px; top: -8px; border-left: 0; border-bottom: 0; }
+.ws-game-compass .ws-game-brk.bl { left: -9px; bottom: -8px; border-right: 0; border-top: 0; }
+.ws-game-compass .ws-game-brk.br { right: -9px; bottom: -8px; border-left: 0; border-top: 0; }
+/* markers ON the band: house = nearest cabin (cyan), paw = nearest animal (white); HUD.ts translates them by bearing */
+.ws-game-compass .ws-game-mark { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; opacity: 0; transition: opacity 0.25s; will-change: transform; }
+.ws-game-compass .ws-game-mark.show { opacity: 1; }
+.ws-game-compass .ws-game-mark svg { display: block; width: 100%; height: 100%; fill: var(--ws-cyan); filter: drop-shadow(0 0 5px rgba(143, 227, 255, 0.7)); }
+.ws-game-compass .ws-game-mark.paw svg { width: 20px; height: 20px; margin: 1px; fill: #fff; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.7)); }
+/* "CABIN · 180 m" under the band */
+.ws-game-compass .ws-game-range { position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%); padding: 3px 16px 4px; white-space: nowrap; font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-text); font-variant-numeric: tabular-nums; background: rgba(6, 10, 18, 0.6); border: 1px solid rgba(143, 227, 255, 0.4); border-bottom-color: var(--ws-cyan); box-shadow: inset 0 -1px 0 rgba(143, 227, 255, 0.3); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px)); opacity: 0; transition: opacity 0.25s; }
+.ws-game-compass .ws-game-range.show { opacity: 1; }
+
+/* ── kill feed under the compass ── */
+.ws-game-feed { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ws-game-feed .ws-game-feed-item { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ws-text); padding: 4px 12px; background: var(--ws-glass); border: 1px solid var(--ws-cyan-faint); border-left: 2px solid var(--ws-cyan); animation: ws-feed-in 0.25s ease-out; }
+.ws-game-feed .ws-game-feed-item.out { animation: ws-feed-out 0.5s ease-in forwards; }
+.ws-game-feed .ws-game-feed-item b { color: var(--ws-cyan); font-weight: 500; }
+
+/* ── top-right: fps (the faint readout is superseded by Perf.ts's frame meter and stays hidden) ── */
+
+/* ── bottom-left: health ── */
+.ws-game-health { position: absolute; left: 22px; bottom: 22px; padding: 9px 14px 11px; width: 250px; }
+.ws-game-health .ws-game-hrow { display: flex; justify-content: space-between; align-items: baseline; }
+.ws-game-health .ws-game-hval { font-family: var(--ws-display); font-weight: 700; font-size: 22px; color: #fff; letter-spacing: 0.02em; line-height: 1; }
+.ws-game-health .ws-game-hval small { font-size: 11px; color: var(--ws-text-dim); margin-left: 3px; }
+
+/* ── bottom-right: bolts ── */
+.ws-game-ammo { position: absolute; right: 22px; bottom: 22px; padding: 9px 16px 11px 14px; min-width: 210px; text-align: right; }
+.ws-game-ammo .ws-game-arow { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; }
+.ws-game-ammo .ws-game-count { font-family: var(--ws-display); font-weight: 700; font-size: 30px; line-height: 1; color: #fff; letter-spacing: 0.02em; }
+.ws-game-ammo .ws-game-count small { font-size: 13px; color: var(--ws-text-dim); font-weight: 500; }
+.ws-game-ammo .ws-game-count.empty { color: var(--ws-red); }
+.ws-game-ammo .ws-game-count .ws-game-reserve { margin-left: 6px; font-size: 11px; color: var(--ws-cyan-dim); font-weight: 600; letter-spacing: 0.06em; } /* rounds beyond the magazine (rifle: + 90) */
+.ws-game-ammo .ws-label .ws-game-weapon { display: block; font-size: 8px; letter-spacing: 0.3em; color: rgba(230, 242, 248, 0.55); margin-bottom: 2px; } /* weapon name tag: CROSSBOW / AR-15 */
+.ws-game-ammo .ws-game-status { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-game-ammo .ws-game-status i { width: 7px; height: 7px; background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); transform: rotate(45deg); transition: background 0.2s; }
+.ws-game-ammo .ws-game-status.reloading { color: var(--ws-amber); }
+.ws-game-ammo .ws-game-status.reloading i { background: var(--ws-amber); box-shadow: 0 0 8px var(--ws-amber); animation: ws-spin 0.6s linear infinite; }
+.ws-game-ammo .ws-game-status.empty { color: var(--ws-red); }
+.ws-game-ammo .ws-game-status.empty i { background: var(--ws-red); box-shadow: none; }
+.ws-game-ammo .ws-game-rbar { height: 2px; margin-top: 7px; background: rgba(143, 227, 255, 0.1); position: relative; overflow: hidden; }
+.ws-game-ammo .ws-game-rbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--ws-amber); }
+.ws-game-ammo .ws-game-pips { display: flex; justify-content: flex-end; gap: 2px; margin-top: 7px; }
+.ws-game-ammo .ws-game-pips i { width: 4px; height: 9px; background: var(--ws-cyan); opacity: 0.85; }
+.ws-game-ammo .ws-game-pips i.off { background: rgba(143, 227, 255, 0.15); }
+
+/* ── crosshair ── */
+.ws-game-cross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --gap: 7px; }
+.ws-game-cross i { position: absolute; background: rgba(230, 242, 248, 0.9); box-shadow: 0 0 3px rgba(0, 0, 0, 0.8); transition: background 0.08s; }
+.ws-game-cross i.t, .ws-game-cross i.b { width: 1.5px; height: 8px; left: -0.75px; }
+.ws-game-cross i.l, .ws-game-cross i.r { height: 1.5px; width: 8px; top: -0.75px; }
+.ws-game-cross i.t { top: calc(-1 * var(--gap) - 8px); } .ws-game-cross i.b { top: var(--gap); }
+.ws-game-cross i.l { left: calc(-1 * var(--gap) - 8px); } .ws-game-cross i.r { left: var(--gap); }
+.ws-game-cross u { position: absolute; left: -1px; top: -1px; width: 2px; height: 2px; background: rgba(230, 242, 248, 0.6); }
+.ws-game-cross.hit i { background: var(--ws-red); }
+.ws-game-cross.hit.head i { background: var(--ws-amber); }
+/* iron sights: the bolt tip is the sight — the crosshair (and the aim readout sitting on the stock) fade out while aiming */
+.ws-game-cross.ads { opacity: 0; }
+.ws-game-cross.ads ~ .ws-game-aim { opacity: 0; }
+.ws-game-cross .ws-game-x { position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; opacity: 0; }
+.ws-game-cross .ws-game-x::before, .ws-game-cross .ws-game-x::after { content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 2px; background: var(--ws-red); box-shadow: 0 0 6px var(--ws-red); transform-origin: center; }
+.ws-game-cross .ws-game-x::before { transform: translate(-50%, -50%) rotate(45deg); }
+.ws-game-cross .ws-game-x::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.ws-game-cross .ws-game-x.show { animation: ws-kill 0.7s ease-out forwards; }
+
+/* ── aim readout under the crosshair ── */
+.ws-game-aim { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-text); text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9); opacity: 0; transition: opacity 0.18s ease; white-space: nowrap; }
+.ws-game-aim.show { opacity: 1; }
+#hud.intro .ws-game-aim { opacity: 0; }
+/* sword lock-on (src/client/engine/ui/LockOn.ts): four corner brackets round the animal a swing would lunge onto; brighter while lunging */
+.ws-game-lock { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; transition: opacity 0.12s; will-change: transform; }
+.ws-game-lock.show { opacity: 0.85; }
+.ws-game-lock.lunging { opacity: 1; filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.9)); }
+.ws-game-lock i { position: absolute; width: 14px; height: 14px; border: 0 solid var(--ws-cyan); }
+.ws-game-lock i:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px; }
+.ws-game-lock i:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0; }
+.ws-game-lock i:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px; }
+.ws-game-lock i:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0; }
+#hud.intro .ws-game-lock { display: none; }
+/* lock-on (E50, src/client/engine/ui/LockOn.ts, the N mockup): LOCKED keeps the brackets on the enemy, brighter, with a solid ▼ over it;
+   AVAILABLE hangs a hollow ▽ over what LOCK would take; the edge chevrons ‹ / › + "4 M" point at the next target a flick
+   would switch to (they flash on a flick that finds nothing) */
+.ws-game-lock b { position: absolute; left: 50%; top: -22px; width: 0; height: 0; margin-left: -8px; border: 8px solid transparent; border-top: 11px solid var(--ws-cyan); border-bottom: 0; display: none; filter: drop-shadow(0 0 4px rgba(143, 227, 255, 0.8)); }
+.ws-game-lock.locked { opacity: 1; filter: drop-shadow(0 0 5px rgba(143, 227, 255, 0.7)); }
+.ws-game-lock.locked b { display: block; animation: ws-game-lock-bob 1.2s ease-in-out infinite; }
+@keyframes ws-game-lock-bob { 50% { transform: translateY(-3px); } }
+.ws-game-lockcand { position: absolute; left: -8px; top: -12px; width: 0; height: 0; border: 8px solid transparent; border-top: 11px solid rgba(143, 227, 255, 0.9); border-bottom: 0; opacity: 0; pointer-events: none; transition: opacity 0.12s; will-change: transform; }
+.ws-game-lockcand::after { content: ''; position: absolute; left: -4px; top: -9px; border: 4px solid transparent; border-top: 5.5px solid rgba(6, 10, 18, 0.9); border-bottom: 0; }
+.ws-game-lockcand.show { opacity: 1; }
+.ws-game-lockedge { position: absolute; top: 40%; display: flex; align-items: center; gap: 4px; padding: 4px 7px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.14em; color: var(--ws-text); opacity: 0; pointer-events: none; transform: translateY(-50%); transition: opacity 0.15s; }
+.ws-game-lockedge.l { left: 6px; }
+.ws-game-lockedge.r { right: 6px; flex-direction: row-reverse; }
+.ws-game-lockedge b { font-size: 16px; line-height: 1; color: var(--ws-cyan); font-weight: 400; }
+.ws-game-lockedge.show { opacity: 0.9; }
+.ws-game-lockedge.miss { animation: ws-game-lockedge-miss 0.35s ease-out; }
+@keyframes ws-game-lockedge-miss { 0% { opacity: 0.9; border-color: var(--ws-text-dim); } 100% { } }
+#hud.intro .ws-game-lockcand, #hud.intro .ws-game-lockedge { display: none; }
+/* dash speed streaks (src/client/engine/ui/SpeedLines.ts): thin radial lines, only toward the edges; --speed 0..1 (dodge ~0.55, lunge 1) */
+.ws-game-speed { --speed: 0; position: absolute; inset: -10%; pointer-events: none; opacity: calc(var(--speed) * 0.8); background: repeating-conic-gradient(from 3deg at 50% 46%, rgba(235, 248, 255, 0.95) 0deg 0.75deg, transparent 0.75deg 5.5deg); -webkit-mask: radial-gradient(ellipse 58% 52% at 50% 46%, transparent 62%, #000 100%); mask: radial-gradient(ellipse 58% 52% at 50% 46%, transparent 62%, #000 100%); }
+#hud.intro .ws-game-speed { display: none; }
+/* the dodge feel (E63 T "lean + smear", src/client/engine/ui/SpeedLines.ts reads Player's dodgeFx): 1 px horizontal streaks on the
+   outer thirds only (never the centre 40 %), sliding against the dodge (--side) as --smear rises. A composited layer, no WebGL cost */
+.ws-game-smear { --smear: 0; --side: 1; position: absolute; inset: 0 -40px; pointer-events: none; opacity: calc(var(--smear) * 0.9); background: repeating-linear-gradient(0deg, rgba(235, 248, 255, 0.16) 0 1px, transparent 1px 6px, rgba(235, 248, 255, 0.08) 6px 7px, transparent 7px 13px); -webkit-mask: linear-gradient(90deg, #000 0, #000 22%, transparent 32%, transparent 68%, #000 78%, #000 100%); mask: linear-gradient(90deg, #000 0, #000 22%, transparent 32%, transparent 68%, #000 78%, #000 100%); transform: translateX(calc(var(--side) * var(--smear) * -24px)); }
+#hud.intro .ws-game-smear { display: none; }
+
+/* ── interaction prompt ── */
+.ws-game-prompt { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 7px 14px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text); opacity: 0; transition: opacity 0.15s; }
+.ws-game-prompt.show { opacity: 1; }
+.ws-game-prompt b { color: var(--ws-cyan); font-weight: 500; border: 1px solid var(--ws-cyan-line); padding: 1px 6px; margin-right: 8px; }
+
+/* ── boundary warning ── */
+.ws-game-boundary { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.6s ease; }
+.ws-game-boundary.show { opacity: 1; }
+.ws-game-boundary .ws-game-bt { font-family: var(--ws-display); font-weight: 700; font-size: 22px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ws-amber); text-shadow: 0 0 18px rgba(255, 181, 71, 0.45), 0 2px 6px rgba(0, 0, 0, 0.8); }
+.ws-game-boundary .ws-game-bs { margin-top: 5px; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(255, 181, 71, 0.75); }
+.ws-game-boundary::before, .ws-game-boundary::after { content: ''; display: block; width: 100%; height: 1px; margin: 6px 0; background: repeating-linear-gradient(90deg, var(--ws-amber) 0 14px, transparent 14px 24px); opacity: 0.6; }
+
+/* ── toasts ── */
+/* A1 (E130, board art/hud/round-10-toast-placement/board.jpg): right-aligned directly under the quest chip — HUD.toast() reads
+   the chip's box (the minimap's on a shard without one) into --ws-toast-top / --ws-toast-right, so it follows every layout */
+.ws-game-toasts { position: absolute; right: var(--ws-toast-right, 22px); top: var(--ws-toast-top, 60px); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: min(70vw, 460px); }
+.ws-game-toasts .ws-game-toast { text-align: right; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 12px; color: var(--ws-text); animation: ws-feed-in 0.25s ease-out; }
+.ws-game-toasts .ws-game-toast.out { animation: ws-feed-out 0.5s ease-in forwards; }
+/* G168 (art/hud/round-22-script-error A): the amber notice under the quest chip, a warning triangle before the line */
+.ws-game-toasts .ws-game-toast.ws-game-toast-warn { position: relative; max-width: 190px; padding-left: 34px; text-align: left; color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.75); box-shadow: 0 0 10px rgba(255, 181, 71, 0.25); line-height: 1.35; white-space: normal; }
+.ws-game-toasts .ws-game-toast.ws-game-toast-warn::before { content: '!'; position: absolute; left: 10px; top: 50%; width: 16px; height: 14px; margin-top: -7px; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: var(--ws-amber); color: #1a1002; font-size: 9px; font-weight: 800; line-height: 17px; text-align: center; letter-spacing: 0; }
+/* ONE queue (src/client/engine/ui/ToastStack.ts): ≤ 3 up, the newest at the bottom at full strength, the older ones dimmed; the column
+   steps down under the top bars (the elite's pinned bar / banner, the boss bar, the quest chip) with a transform */
+.ws-game-toasts { transition: transform 0.22s ease-out; }
+.ws-game-toasts .ws-game-toast:not(:last-child) { opacity: 0.72; }
+.ws-game-toasts .ws-game-toast:nth-last-child(3) { opacity: 0.45; }
+
+/* ── damage flash + vignette ── */
+.ws-game-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 40, 20, 0.55) 100%); opacity: 0; }
+.ws-game-flash.show { animation: ws-flash 0.55s ease-out forwards; }
+
+/* ── hit marker ring (subtle) ── */
+.ws-game-hitring { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px; border: 1px solid var(--ws-red); border-radius: 50%; opacity: 0; }
+.ws-game-hitring.show { animation: ws-ring 0.35s ease-out forwards; }
+
+/* play-mode HUD hides while the intro (menu.css) is up */
+#hud.intro .ws-game-compass, #hud.intro .ws-game-health, #hud.intro .ws-game-ammo, #hud.intro .ws-game-cross, #hud.intro .ws-game-feed, #hud.intro .ws-game-prompt, #hud.intro .ws-game-boundary, #hud.intro .ws-game-toasts { opacity: 0; transition: opacity 0.4s; }
+#hud .ws-game-compass, #hud .ws-game-health, #hud .ws-game-ammo, #hud .ws-game-feed { transition: opacity 0.6s ease 0.2s; }
+#hud .ws-game-cross { transition: opacity 0.15s ease; } /* snappy both ways for the ADS fade (was on the 0.6 s intro reveal above) */
+
+/* ─── in-game HUD on a phone: no chunk metadata, compact compass, vitals top-left, bolts top-right ─── */
+@media (max-width: 700px) {
+  /* the band's top edge sits at ~9 % of the screen, or under the PAUSE pill (touch.css, top-left at safe-area + 10 px, ~20 px tall + the bracket) when the notch pushes that lower; everything centred stacks under it */
+  /* phone: the band floats LEFT at two thirds of the width; the minimap sits beside it on the right */
+  /* one row: PAUSE · compass · minimap — the band fills the gap between the pill and the map; fps sits under PAUSE */
+  .ws-game-compass { left: 110px; right: calc(34vw + 14px + 12px); width: auto; transform: none; top: var(--ws-top); height: 24px; }
+  .ws-game-compass .ws-game-cardinal { font-size: 13px; }
+  .ws-game-compass .ws-game-tick { height: 6px; margin-top: -3px; }
+  .ws-game-compass .ws-game-tick.major { height: 9px; margin-top: -4.5px; }
+  .ws-game-compass .ws-game-mark { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
+  .ws-game-compass .ws-game-mark.paw svg { width: 18px; height: 18px; }
+  .ws-game-compass .ws-game-range { font-size: 10px; padding: 2px 14px 3px; }
+  /* phone: the feed is LEFT-aligned under the fps line, capped at the minimap's left edge; the toasts stay under the quest chip (A1) */
+  .ws-game-feed { left: 12px; transform: none; align-items: flex-start; top: calc(var(--ws-top) + 66px); max-width: calc(100vw - 34vw - 14px - 24px); }
+  .ws-game-feed .ws-game-item { font-size: 10px; padding: 4px 9px; white-space: normal; text-align: left; }
+  .ws-game-toasts { max-width: 70vw; }
+  .ws-game-toasts .ws-game-toast { font-size: 10px; padding: 5px 10px; white-space: normal; }
+  .ws-game-health { left: 12px; top: calc(8px + env(safe-area-inset-top, 0px)); bottom: auto; width: 108px; padding: 6px 9px 7px; }
+  .ws-game-health .ws-game-hval { font-size: 15px; }
+  .ws-game-health .ws-label { font-size: 8px; }
+  .ws-game-health .ws-bar { margin-top: 5px; height: 3px; }
+  .ws-game-ammo { right: 12px; top: calc(8px + env(safe-area-inset-top, 0px)); bottom: auto; min-width: 0; padding: 5px 9px 6px; }
+  .ws-game-ammo .ws-game-arow { gap: 10px; }
+  .ws-game-ammo .ws-game-count { font-size: 18px; }
+  .ws-game-ammo .ws-label { font-size: 8px; }
+  .ws-game-ammo .ws-game-status { margin-top: 4px; font-size: 8px; }
+  .ws-game-ammo .ws-game-pips { display: none; }
+  .ws-game-ammo .ws-game-rbar { margin-top: 5px; }
+  .ws-game-health .ws-game-hval small { display: none; }
+  .ws-game-health .ws-game-hrow { gap: 8px; }
+  #hud.touch .ws-game-prompt { display: none; } /* touch: the prompt is the big USE button (touch.css) */
+}
+/* ─── touch (layout E, E42): vitals + bolts live in the top-left status column under PAUSE (HUD.ts mounts them into
+   TouchControls' .ws-touch-status) — out of the thumb lane; the panels are desktop-only ─── */
+#hud.touch .ws-game-health, #hud.touch .ws-game-ammo { display: none; }
+.ws-game-vitals, .ws-game-bolts { position: relative; display: flex; align-items: center; gap: 7px; height: 22px; padding: 3px 9px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); pointer-events: none; white-space: nowrap; }
+.ws-game-bolts { height: 24px; appearance: none; -webkit-appearance: none; box-sizing: content-box; font: inherit; text-align: inherit; }
+/* E357 J13: the magazine chip is the reload button, with the glyph only below a full magazine. */
+.ws-game-bolts.magazine { pointer-events: auto; border-color: var(--ws-cyan); color: var(--ws-cyan); touch-action: manipulation; }
+.ws-game-bolts.magazine:enabled { cursor: pointer; }
+.ws-game-bolts.magazine:enabled:active { background: rgba(143, 227, 255, 0.18); }
+.ws-game-bolts.magazine:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 4px; }
+.ws-game-bolts.magazine::before, .ws-game-bolts.magazine::after { content: ''; position: absolute; top: -3px; bottom: -3px; width: 5px; border-top: 3px solid var(--ws-cyan); border-bottom: 3px solid var(--ws-cyan); pointer-events: none; }
+.ws-game-bolts.magazine::before { left: -3px; border-left: 3px solid var(--ws-cyan); }
+.ws-game-bolts.magazine::after { right: -3px; border-right: 3px solid var(--ws-cyan); }
+.ws-game-bolts .ws-game-glyph[hidden] { display: none; }
+.ws-game-bolts.magazine .ws-game-reload { width: 23px; flex-shrink: 0; border-left: 1px solid var(--ws-cyan-line); padding-left: 7px; }
+.ws-game-bolts .ws-game-reload svg { fill: none; }
+/* E319 (Jake's clean-HUD pick B): VITALS hide at full health — HUD.ts paintVitals: 2 s after health is back to full the panel /
+   strip fades (.hp-fade), then leaves the layout (.hp-gone); a hit shows it again at once (from display none, no fade) */
+.ws-game-vitals { transition: opacity 0.12s; }
+.ws-game-vitals.hp-fade, #hud .ws-game-health.hp-fade { opacity: 0; transition: opacity 0.4s ease; }
+.ws-game-vitals.hp-gone, #hud .ws-game-health.hp-gone { display: none; }
+/* HUD.warmGlass: drawn once as the player enters, under half an 8-bit step, so the glass's compositor pipeline compiles
+   there and not on the first hit taken (desktop fps census, 2026-11-03) */
+#hud .ws-game-health.hp-warm { display: block; opacity: 0.002; transition: none; }
+/* the left column on touch (E47: the frame meter moved onto PAUSE's row): status (VITALS / BOLTS) +30, ✎ NOTE disc +90 (feedback.css),
+   boss bar +130 (quest.css), then the feed (the toasts are top-right under the quest chip, A1) */
+@media (max-width: 700px) {
+  #hud.touch .ws-game-feed { top: calc(var(--ws-top) + 170px); }
+  /* E353: a pinned elite bar (elite.css: under the minimap, full width) takes those rows — the feed steps down just under
+     it (clear of the HOVER button lower down), so a line like PACK HOWL never draws over the elite's name */
+  #hud:has(.ws-elite-bar.pinned.show) .ws-game-feed { top: calc(var(--ws-top) + 34vw + 126px); }
+}
+.ws-game-vitals .ws-game-glyph, .ws-game-bolts .ws-game-glyph { display: block; width: 15px; height: 15px; }
+.ws-game-vitals .ws-game-glyph svg, .ws-game-bolts .ws-game-glyph svg { display: block; width: 100%; height: 100%; fill: #fff; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.6)); }
+.ws-game-vitals .ws-game-num, .ws-game-bolts .ws-game-num { font-family: var(--ws-display); font-weight: 700; font-size: 21px; line-height: 1; letter-spacing: 0.02em; color: #fff; font-variant-numeric: tabular-nums; }
+.ws-game-bolts .ws-game-num small { font-size: 13px; font-weight: 600; color: rgba(230, 242, 248, 0.8); }
+.ws-game-bolts .ws-game-num .ws-game-reserve { font-size: 10px; color: var(--ws-cyan-dim); margin-left: 4px; }
+.ws-game-bolts .ws-game-tiny .ws-game-weapon { display: block; font-size: 6.5px; letter-spacing: 0.26em; color: rgba(230, 242, 248, 0.5); line-height: 1; margin-bottom: 1px; }
+.ws-game-bolts .ws-game-tiny .ws-game-weapon:empty { display: none; }
+.ws-game-vitals .ws-game-tiny, .ws-game-bolts .ws-game-tiny { font-size: 7.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-game-vitals .ws-game-vbar { position: relative; width: 46px; height: 4px; background: rgba(143, 227, 255, 0.14); overflow: hidden; }
+.ws-game-vitals .ws-game-vbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.6); transition: width 0.25s ease-out, background 0.3s; }
+.ws-game-vitals .ws-game-vbar i.low { background: var(--ws-red); box-shadow: 0 0 8px rgba(255, 90, 74, 0.7); }
+.ws-game-bolts .ws-game-segs { display: flex; gap: 2px; } /* narrow segments: the strip must end short of the minimap (34vw on the right) in the top-left column */
+.ws-game-bolts .ws-game-segs i { width: 7px; height: 5px; background: var(--ws-cyan); box-shadow: 0 0 6px rgba(143, 227, 255, 0.5); transition: background 0.2s; }
+.ws-game-bolts .ws-game-segs i.off { background: rgba(143, 227, 255, 0.22); box-shadow: none; }
+.ws-game-bolts.reloading .ws-game-segs i:not(.off) { background: var(--ws-amber); box-shadow: 0 0 6px rgba(255, 181, 71, 0.5); animation: ws-blink 0.6s ease-in-out infinite; }
+.ws-game-bolts.empty .ws-game-num { color: var(--ws-red); }
+
+/* ── weather (Nalati storms, HUD.setWeather / the `ws:weather` event): a chip under the minimap + the GET LOW warning ── */
+/* built on the first weather event only — Pine Hollow / Driftwood never have these elements */
+.ws-game-weather {
+  position: absolute; right: 112px; top: 288px; transform: translateX(50%);
+  display: none; align-items: center; gap: 9px; padding: 5px 13px 6px 9px; white-space: nowrap; pointer-events: none;
+  background: rgba(6, 10, 18, 0.66); border: 1px solid rgba(143, 227, 255, 0.45); border-radius: 9px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 6px 22px rgba(0, 0, 0, 0.3), 0 0 14px rgba(143, 227, 255, 0.12);
+}
+.ws-game-weather.show { display: flex; animation: ws-feed-in 0.3s ease-out; }
+.ws-game-weather .ws-game-wicon { display: block; width: 24px; height: 24px; color: var(--ws-cyan); filter: drop-shadow(0 0 5px rgba(143, 227, 255, 0.55)); }
+.ws-game-weather .ws-game-wicon svg { display: block; width: 100%; height: 100%; }
+.ws-game-weather .ws-game-wt { font-family: var(--ws-display); font-weight: 700; font-size: 15px; line-height: 1.05; letter-spacing: 0.2em; text-transform: uppercase; color: #fff; font-variant-numeric: tabular-nums; }
+.ws-game-weather .ws-game-ws { margin-top: 1px; font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-game-weather.storm { border-color: rgba(190, 170, 255, 0.6); }
+.ws-game-weather.storm .ws-game-wicon { color: #d9ccff; animation: ws-blink 2.4s ease-in-out infinite; }
+
+.ws-game-getlow {
+  position: absolute; left: 50%; top: 13%; transform: translateX(-50%);
+  display: none; align-items: center; gap: 9px; padding: 6px 16px 6px 11px; white-space: nowrap; pointer-events: none;
+  background: rgba(26, 18, 4, 0.72); border: 1.5px solid var(--ws-amber); border-radius: 9px;
+  font-family: var(--ws-display); font-weight: 700; font-size: 16px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-amber);
+  text-shadow: 0 0 12px rgba(255, 181, 71, 0.5); box-shadow: 0 0 18px rgba(255, 181, 71, 0.3), inset 0 0 12px rgba(255, 181, 71, 0.12);
+}
+.ws-game-getlow.show { display: flex; animation: ws-blink 1.1s ease-in-out infinite; }
+.ws-game-getlow i { display: block; width: 20px; height: 20px; color: var(--ws-amber); }
+.ws-game-getlow i svg { display: block; width: 100%; height: 100%; }
+
+@media (max-width: 700px) {
+  /* under the phone minimap (34vw wide at the safe top, heading tab below it) */
+  .ws-game-weather { right: calc(14px + 17vw); top: calc(var(--ws-top) + 34vw + 30px); padding: 3px 9px 4px 6px; gap: 6px; border-radius: 7px; }
+  .ws-game-weather .ws-game-wicon { width: 18px; height: 18px; }
+  .ws-game-weather .ws-game-wt { font-size: 12px; letter-spacing: 0.16em; }
+  .ws-game-weather .ws-game-ws { font-size: 8px; letter-spacing: 0.12em; }
+  .ws-game-getlow { top: calc(var(--ws-top) + 34vw + 70px); font-size: 13px; letter-spacing: 0.16em; padding: 5px 12px 5px 9px; }
+  .ws-game-getlow i { width: 16px; height: 16px; }
+}
+
+/* E373: hidden-level notice; no input surface, stays clear of the touch controls. */
+.ws-game-developer { position: absolute; left: 50%; top: calc(var(--ws-top, 16px) + 116px); transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 5px 9px; border: 1px solid var(--ws-cyan); background: rgba(13, 27, 38, 0.8); color: var(--ws-cyan); font-family: var(--ws-mono); font-size: 9px; line-height: 1.3; letter-spacing: 0.09em; white-space: nowrap; pointer-events: none; }
+.ws-game-developer[hidden], #hud.intro .ws-game-developer { display: none; }
+/* G168 (art/hud/round-22-script-error C): the Developer-only red strip naming a disabled script and its cause, full width under
+   the top bar; the DEV chip is drawn here, the line is the game's (textContent). */
+.ws-game-dev-alert { position: absolute; left: 6px; right: 6px; top: calc(var(--ws-top, 16px) + 84px); z-index: calc(var(--ws-layer-hud) + 6); display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid rgba(255, 90, 74, 0.9); background: rgba(48, 6, 8, 0.86); box-shadow: 0 0 12px rgba(255, 90, 74, 0.35); color: #ff8a7e; font-family: var(--ws-mono); font-size: 9px; line-height: 1.3; letter-spacing: 0.1em; white-space: nowrap; overflow: hidden; pointer-events: none; }
+.ws-game-dev-alert::before { content: 'DEV'; flex: none; padding: 1px 6px; background: var(--ws-red); color: #1a0203; font-weight: 700; letter-spacing: 0.14em; }
+.ws-game-dev-alert span { overflow: hidden; text-overflow: ellipsis; }
+.ws-game-dev-alert[hidden], #hud.intro .ws-game-dev-alert { display: none; }

@@ -1,0 +1,7 @@
+// import('./fake') is documentation, not a dependency.
+import type { Widget } from './Widget';
+export { helper } from '../core/helper';
+import '../ui/panel.css?inline';
+const worker = import('../core/job.ts?worker&inline');
+const image = import('../chunks/pine-hollow/hero.webp?url');
+const vendor = import('three');

@@ -1,0 +1,7 @@
+{
+  "about": "E362 AG21: the most public exports / ShardContext members without a JSDoc line (scripts/gen-api.mjs --check). Recorded 2026-10-03; may only fall: document what you touch, then lower it.",
+  "max": 1044,
+  "raised": {
+    "639 \u2192 1042 (E434, 2026-10-03)": "the surface is no longer an index's chosen re-exports but every export of every module a package's `exports` lists (no barrels); the 403 are existing exports newly counted, not new API"
+  }
+}

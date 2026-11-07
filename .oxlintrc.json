@@ -1,0 +1,272 @@
+{
+  // Wildshard lint gate. Stable categories are errors; nursery rules wait for review (L4).
+  // The `rules` block below lists the rules that are
+  // deliberately switched off (one-line reason each) or configured. CI runs `pnpm run lint` (`oxlint`; type-aware via `options` below).
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
+  // Wildshard's own rules (lint/wildshard-plugin.js): wildshard/no-url-switch, on for src/ in `overrides` below.
+  "jsPlugins": ["./lint/wildshard-plugin.js"],
+  "options": {
+    "typeAware": true, // typescript/no-floating-promises, no-unsafe-*, prefer-nullish-coalescing, ... via oxlint-tsgolint (TS 7)
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "env": { "browser": true, "es2024": true },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "pedantic": "error",
+    "restriction": "error",
+    "style": "error",
+    "nursery": "off"
+  },
+  "rules": {
+    "wildshard/no-generated-import": "error",
+    "wildshard/no-generated-json-import": "error",
+    "wildshard/no-base64": "error",
+    // ── kept on, but configured ──────────────────────────────────────────────────────────────────
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": ["error", { "prefer": "type-imports", "fixStyle": "inline-type-imports" }],
+    "typescript/strict-boolean-expressions": ["error", { "allowNullableString": true, "allowNullableNumber": true, "allowNullableBoolean": true }], // `if (!str)` / `if (n)` is the codebase's "missing or empty" idiom; objects, functions and `any` in conditionals stay banned
+    "typescript/no-confusing-void-expression": ["error", { "ignoreArrowShorthand": true }], // `x.onEvent = (s) => patch(s)` forwarding arrows are idiomatic; block-bodied `return voidCall()` still flagged
+    "eslint/no-use-before-define": ["error", { "functions": false, "classes": true, "variables": true }], // hoisted function declarations are safe; classes/variables still checked
+    "eslint/new-cap": ["error", { "capIsNew": false }], // species rigs use capitalised builder helpers (`B('body')`, `S(...)`) as their DSL vocabulary; `new lowercase()` is still flagged
+    "eslint/no-console": ["error", { "allow": ["warn", "error", "info"] }], // warn/error/info are the game's deliberate diagnostics channel; console.log stays flagged
+    "import/no-cycle": ["error", { "ignoreTypes": true }], // type-only cycles are erased by verbatimModuleSyntax
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css", "**/format-hook.mjs"] }], // side-effect CSS imports are how Vite bundles the UI stylesheets; the format hook must load before format does (J82)
+
+    // ── off: number/loop/bit vocabulary of a real-time 3D game ──────────────────────────────────
+    "eslint/no-magic-numbers": "off", // tuning constants, geometry, colours: a game is made of numbers
+    "eslint/id-length": "off", // x, y, z, i, dt, t, nx are the vocabulary of vector math
+    "eslint/no-plusplus": "off", // `i++` in indexed hot loops
+    "eslint/no-continue": "off", // early `continue` in per-entity loops
+    "eslint/no-bitwise": "off", // `| 0` int casts, flag masks, index packing
+    "unicorn/prefer-number-coercion": "off", // parseFloat/parseInt keep their lenient prefix semantics on purpose (`?sunI=1.2x` → 1.2); Number() would change behaviour
+    "unicorn/prefer-modern-math-apis": "off", // Math.hypot is slower than sqrt(x*x+z*z) in V8 and differs at ulp level; the terrain/trail samplers feed seeded placement
+    "unicorn/prefer-math-trunc": "off", // `x | 0` differs from Math.trunc on NaN/overflow and is the hot-path idiom
+    "unicorn/no-zero-fractions": "off", // `1.0` / `0.0` mark float coefficients in shader-mirrored math
+    "unicorn/numeric-separators-style": "off", // literal formatting; 200+ tuning constants would churn
+    "unicorn/number-literal-case": "off", // hex colour literals follow the three.js lowercase convention (0xffffff)
+    "oxc/approx-constant": "off", // `6.28`, `3.14` are deliberate tuning values feeding seeded RNG streams; replacing them shifts baked output
+    "oxc/erasing-op": "off", // `0 * k` documents a coefficient/index slot in tuning math
+    "typescript/prefer-for-of": "off", // indexed loops are kept where the index is the semantic (parallel arrays, typed arrays)
+    "unicorn/no-array-for-each": "off", // forEach on setup-time arrays is fine; hot paths already use indexed loops
+    "unicorn/no-array-reduce": "off", // reduce is fine
+    "unicorn/no-array-callback-reference": "off", // passing typed named callbacks to map/filter is fine
+    "unicorn/no-array-sort": "off", // lib is ES2022: no toSorted
+    "unicorn/no-array-reverse": "off", // lib is ES2022: no toReversed
+    "unicorn/prefer-spread": "off", // Array.from on typed arrays / slice copies in hot paths
+    "unicorn/prefer-at": "off", // `a[a.length - 1]` in hot paths; .at() is a call
+    "unicorn/prefer-single-call": "off", // sequential pushes read as a build script
+    "unicorn/no-immediate-mutation": "off", // `const parts = []; parts.push(...)` builder style in geometry code
+    "unicorn/consistent-function-scoping": "off", // closures over per-frame locals are intentional
+    "eslint/no-await-in-loop": "off", // sequential awaits in loaders/bake scripts are deliberate (ordered, bandwidth-bounded)
+    "eslint/no-loop-func": "off", // closures in loops only read per-iteration `const`s
+    "eslint/no-new": "off", // self-wiring controllers (TouchControls, Combat) are constructed for their side effects
+
+    // ── off: language-feature bans that are wrong for a modern browser target ───────────────────
+    "oxc/no-optional-chaining": "off", // ES2020 target
+    "oxc/no-async-await": "off", // ES2022 target
+    "oxc/no-rest-spread-properties": "off", // ES2018 target
+    "unicorn/no-null": "off", // three.js and DOM APIs return null; `| null` is threaded deliberately
+    "eslint/no-undefined": "off", // `undefined` is threaded on purpose (exactOptionalPropertyTypes)
+    "unicorn/no-useless-undefined": "off", // with exactOptionalPropertyTypes an explicit `undefined` argument is meaningful
+    "eslint/no-ternary": "off", // ternaries
+    "eslint/no-nested-ternary": "off", // nested ternaries express piecewise math
+    "unicorn/no-nested-ternary": "off", // same
+    "eslint/no-void": "off", // `void promise` is how fire-and-forget is marked (no-floating-promises asks for it); `void x` marks a deliberately unused param
+    "typescript/parameter-properties": "off", // `constructor(private readonly x)` is the class idiom here
+    "typescript/non-nullable-type-assertion-style": "off", // would demand `x!`, which no-non-null-assertion bans
+    "typescript/no-unsafe-assignment": "off", // LS5: zero existing sites; unsafe call/argument/member/return still reject every use
+    "typescript/no-unsafe-type-assertion": "off", // three.js hands back base types (Material, Object3D, BufferAttribute); downcasting with `as` at the call site is the idiom, and instanceof guards in hot loops would change behaviour
+    "typescript/promise-function-async": "off", // wrapping promise-returning functions in `async` changes when sync throws surface
+    "promise/avoid-new": "off", // wrapping callback APIs (loaders, rAF, timers) needs `new Promise`
+    "promise/prefer-await-to-then": "off", // `.then` chains in loaders are deliberate
+    "unicorn/prefer-top-level-await": "off", // main() is called with an explicit .catch that routes to the error modal
+    "unicorn/prefer-global-this": "off", // browser-only code; `window` is the accurate global
+    "unicorn/prefer-add-event-listener": "off", // `el.onclick =` assignment is used where the handler must replace, not stack
+    "unicorn/prefer-query-selector": "off", // getElementById is the faster, typed lookup
+    "eslint/require-unicode-regexp": "off", // the `u` flag changes regex semantics; no safety gain here
+    "eslint/prefer-named-capture-group": "off", // regex style
+    "typescript/no-dynamic-delete": "off", // `delete this.worn[weapon]` on a keyed record is the intent
+
+    // ── off: pure style / budget rules with no static-safety benefit ────────────────────────────
+    "eslint/sort-keys": "off", // object key order carries meaning (tuning tables, shader uniforms)
+    "eslint/sort-imports": "off", // import order is not a correctness property
+    "eslint/sort-vars": "off", // same
+    "eslint/one-var": "off", // math locals are grouped in one declaration by design
+    "eslint/curly": "off", // single-line guards `if (x) return;` are the house style
+    "eslint/capitalized-comments": "off", // comment prose
+    "eslint/no-inline-comments": "off", // the codebase annotates inline heavily
+    "eslint/func-style": "off", // declarations and arrows are both used
+    "eslint/init-declarations": "off", // `let x;` assigned in branches
+    "eslint/no-multi-assign": "off", // `a = b = 0` chained resets
+    "eslint/prefer-destructuring": "off", // `const x = v.x` in math code
+    "eslint/no-underscore-dangle": "off", // `_scratch` vectors and `_unused` params
+    "eslint/class-methods-use-this": "off", // interface-conforming methods that ignore `this`
+    "eslint/no-negated-condition": "off", // style
+    "unicorn/no-negated-condition": "off", // style
+    "eslint/max-statements": "off", // budget
+    "eslint/max-params": "off", // budget (geometry builders take many numbers)
+    "eslint/max-lines": "off", // budget
+    "eslint/max-lines-per-function": "off", // budget
+    "eslint/max-depth": "off", // budget
+    "eslint/max-classes-per-file": "off", // budget
+    "eslint/complexity": "off", // budget
+    "unicorn/max-nested-calls": "off", // budget
+    "import/max-dependencies": "off", // budget
+    "typescript/explicit-member-accessibility": "off", // TS members are public by default; writing it out is noise
+    "typescript/explicit-function-return-type": "off", // module boundaries are typed by explicit-module-boundary-types; internal inference is the point of TS
+    "typescript/prefer-readonly": "off", // readonly-everything
+    "typescript/prefer-readonly-parameter-types": "off", // readonly-everything; three.js types are mutable
+    "unicorn/switch-case-braces": "off", // brace every case
+    "unicorn/filename-case": "off", // the repo uses PascalCase modules (Animal.ts) and kebab-case scripts
+    "unicorn/catch-error-name": "off", // `catch (e)`
+    "unicorn/import-style": "off", // style
+    "unicorn/no-await-expression-member": "off", // `(await x).y` is fine
+    "import/no-named-export": "off", // named exports are the module style
+    "import/prefer-default-export": "off", // same
+    "import/no-namespace": "off", // `import * as THREE from 'three'` is the three.js idiom
+    "import/group-exports": "off", // exports sit next to their declarations
+    "import/exports-last": "off", // same
+    "import/no-relative-parent-imports": "off", // no path aliases in this repo
+    "import/no-mutable-exports": "off", // Heightfield/config re-point live bindings on chunk switch by design
+    "import/consistent-type-specifier-style": "off" // conflicts with typescript/no-import-type-side-effects under verbatimModuleSyntax: pure-type imports must be `import type {}`, mixed ones use inline `type` (consistent-type-imports enforces that)
+  },
+  "overrides": [
+    {
+      // E405 AG5: the engine loads under node's default strip-only TypeScript (bakes, manifests, gen scripts import
+      // #engine), which has no parameter properties: declare the field and assign it in the constructor.
+      "files": ["src/*/engine/**"],
+      "rules": { "typescript/parameter-properties": "error" }
+    },
+    {
+      // Node-side tooling: build scripts, the Vite configs and plugin, the Vercel functions in api/, the drafts site's tools.
+      "files": ["scripts/**", "src/shards/*/generators/**/*.mjs", "src/shards/*/bake/**/*.mjs", "src/shards/*/blender/**/*.mjs", "vite/**", "vite.config.ts", "vitest.config.ts", "api/**", "api-tests/**", "lint/**", "drafts/tools/**", "drafts/test/**", "drafts/vite.config.ts", "admin/tools/**", "admin/test/**", "admin/vite.config.ts"],
+      "env": { "node": true },
+      "rules": {
+        "import/no-nodejs-modules": "off", // these run under node
+        "eslint/no-console": "off" // CLI scripts print their output with console.log
+      }
+    },
+    {
+      // G348 (Jake): the bakes are generic for any shard; a slug branch anywhere in scripts/bake is refused. Each shard
+      // declares its own far look / grid / parts, ground and tree stand-ins in data/placeholder.ts and its mover modules
+      // in data/moverBake.ts; the bakers are the SDK's.
+      "files": ["scripts/bake/**"],
+      "rules": { "wildshard/no-shard-branch": "error" }
+    },
+    {
+      // H2: guard the live hook family; bounded Git control calls need no inventory buffer.
+      "files": ["scripts/precommit*.mjs"],
+      "rules": { "wildshard/exec-max-buffer": "error" }
+    },
+    {
+      "files": ["lint/**"],
+      "rules": { "import/no-default-export": "off" } // oxlint loads a JS plugin from its default export
+    },
+    {
+      // E422: tests drive real modules through their seams; no module mocks or reloads (lint/wildshard-plugin.js)
+      "files": ["src/**/*.test.ts", "test/**", "api-tests/**", "drafts/test/**", "admin/test/**"],
+      "rules": { "wildshard/no-module-mock": "error" }
+    },
+    {
+      // L1: recorded ceilings cover the primary source tree only, as in the
+      // raw census. This is separate from the hard-rule src/** override below.
+      "files": ["src/**/*"],
+      "rules": {
+        "wildshard/no-raw-random-time": ["error", {"ratchet": true}],
+        "wildshard/shard-sandbox": ["error", {"ratchet": true}],
+        "wildshard/shard-game-imports": ["error", {"ratchet": true}],
+        "wildshard/shard-game-plugins": ["error", {"ratchet": true}],
+        "wildshard/generator-imports": ["error", {"ratchet": true}],
+        "wildshard/shard-engine-imports": ["error", {"ratchet": true}],
+        "wildshard/sdk-no-facade": ["error", {"ratchet": true}]
+      }
+    },
+    {
+      // No URL switches, ever (Jake, 2026-09-25): the game reads only the query params on the fixed allowlist in
+      // lint/url-params.json; every variant goes in pause ▸ Settings ▸ Debug. See AGENTS.md "No URL switches".
+      "files": ["src/**"],
+      "rules": {
+        // G8: generated JSON imports are at zero; keep the existing rule hard.
+        "wildshard/no-generated-json-import": "error",
+        "wildshard/no-url-switch": "error", "wildshard/no-inline-ui-string": "error", "wildshard/no-authored-html": "error",
+        // E362 AG16: zero stays zero in editors and the ordinary lint gate too.
+        "wildshard/no-shard-branch": "error",
+        "wildshard/no-raw-save": "error",
+        "wildshard/no-raw-input": "error",
+        "wildshard/no-global-listener-patch": "error",
+        "wildshard/no-raw-shader-patch": "error",
+        "wildshard/sim-no-render": "error",
+        // P1-E2: every engine / game file has a side (lint/engine-sides.json); client ↛ server, server ↛ client,
+        // shared ↛ either, cook ↛ client, no DOM or renderer in shared / server / cook; counts only fall
+        "wildshard/engine-sides": "error",
+        // SHARD-PLATFORM SP5: generators never ship; only the bake and other generators import them
+        "wildshard/no-runtime-generator": "error",
+        "wildshard/runtime-performance": "error",
+        "wildshard/no-active-chunk": "error",
+        "wildshard/no-raw-hud": "error",
+        "wildshard/no-raw-animation-mixer": "error",
+        // E362 AG19: paid down to 0 (2026-10-03) and promoted
+        "wildshard/no-hook-chain": "error",
+        "wildshard/no-renderer-type": "error",
+        "wildshard/no-active-singleton": "error",
+        "wildshard/engine-internal": "error",
+        // E434: no barrels — every import names the defining module; packages export modules, not an index
+        "wildshard/no-reexport": "error",
+        "wildshard/no-level-identity": "error",
+        // G143 / SF54: runtime/ reaches neither the kit nor build-time commons; paid down to 0 when the kit emptied (2026-10-08)
+        "wildshard/no-shard-runtime": "error",
+        "wildshard/runtime-commons": "error",
+        // G450/Z1: closed boundaries are hard errors; other paths remain shrink-only.
+        "wildshard/runtime-standalone": ["error", { "closedShards": ["_template", "blender-template", "ink-cel-valley", "open-plots", "pastel-plain"] }],
+        "wildshard/no-shard-host-callback": "error",
+        "wildshard/shard-services": "error",
+        "wildshard/no-client-plan-reflection": "error",
+        "wildshard/no-build-time-import": ["error", { "closedShards": ["_template", "blender-template", "ink-cel-valley", "pastel-plain"] }],
+        "wildshard/no-runtime-in-build": ["error", { "closedShards": ["_template", "blender-template", "ink-cel-valley", "pastel-plain"] }],
+        // E405 AG28: imports point down; the engine knows no game, kit, shard or app module
+        "wildshard/layer": "error",
+        // LT1: composition roots use defining workspace exports; zero stays zero.
+        "wildshard/public-index": "error",
+        "wildshard/no-production-test-import": "error",
+        // E405 LP2: engine code names no shard, creature, item or game word (wire contracts: lint/ratchet.json allow)
+        "wildshard/engine-words": "error",
+        // E405 LP3 / LP4: the game and the kit name no particular shard
+        "wildshard/shard-names": "error"
+      }
+    },
+    {
+      "files": ["vite.config.ts", "vitest.config.ts", "capacitor.config.ts", "drafts/vite.config.ts", "admin/vite.config.ts"],
+      "rules": { "import/no-default-export": "off" } // Vite / Vitest / the Capacitor CLI read the default export
+    },
+    {
+      // Untyped JavaScript: every value is `any` to the type-aware rules, so the `any`-tracking rules are noise here.
+      "files": ["**/*.mjs", "**/*.js"],
+      "rules": {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/restrict-template-expressions": "off",
+        "typescript/strict-boolean-expressions": "off",
+        "typescript/explicit-module-boundary-types": "off"
+      }
+    },
+    {
+      // The service worker is a classic worker script: top-level function declarations are its API.
+      "files": ["src/client/engine/pwa/sw.js", "drafts/src/sw.js"],
+      "env": { "serviceworker": true },
+      "rules": { "eslint/no-implicit-globals": "off", "import/unambiguous": "off" }
+    },
+    {
+      "files": ["**/*.d.ts"],
+      "rules": { "import/unambiguous": "off" } // ambient module declarations have no import/export by design
+    }
+  ],
+  "ignorePatterns": ["scripts/ci-native-fixtures.mjs", "scripts/ci-native-fixtures.d.mts", "scripts/section-types.mjs", "scripts/section-types.d.mts", "scripts/git-source-view.mjs", "scripts/git-source-view.d.mts", "src/client/engine/audio/audio-aac-pair.test.ts", "src/client/engine/combat/ranged-world-hit.test.ts", "src/client/engine/physics/barrel-plate.test.ts", "src/client/engine/physics/terrain-primitives.test.ts", "src/client/engine/render/graph/graph-post-fog.test.ts", "src/client/engine/render/graph/program-share.test.ts", "src/shared/engine/physics/board-mesh-collision.test.ts", "src/shared/engine/physics/creature-directions.test.ts", "src/shared/engine/physics/script-v2-physics-queries.test.ts", "src/client/game/riding/seated-figure-host.test.ts", "src/client/game/shardfile/world-site-lifetime.test.ts", "src/test/game/game-isolated-declarations.test.ts", "src/server/game/grid/grid-entry-fences.test.ts", "test/actor-projection-v2.test.ts", "test/animal-model-preparation.test.ts", "test/animal-retained-physics.test.ts", "test/approved-enemy-placement.test.ts", "test/approved-population-returns.test.ts", "test/arena-ground.test.ts", "test/arena-portal.test.ts", "test/arena-room-fight.test.ts", "test/assemblyscript-memo.test.ts", "test/author-discovery.test.ts", "test/author-errors.test.ts", "test/author-lut-sampling.test.ts", "test/author-placement-parity.test.ts", "test/authored-html.test.ts", "test/bake-collider-kernels.test.ts", "test/balbal-program.test.ts", "test/balbal-v2.test.ts", "test/basis-glb-variant.test.ts", "test/boot-audio-packs.test.ts", "test/boot-extras.test.ts", "test/boot-settings-interaction.test.ts", "test/build-cache-report.test.ts", "test/build-validation-receipts.test.ts", "test/carried-quest-host.test.ts", "test/channel-programs-gather.test.ts", "test/ci12-ghost-owners.test.ts", "test/client-return-modules.test.ts", "test/client-runtime-declaration.test.ts", "test/client-script-bridge-values.test.ts", "test/client-script-transactions-regression.test.ts", "test/client-stealth-entry.test.ts", "test/client-timed-encounters.test.ts", "test/client-wildlife.test.ts", "test/committed-fast-checks.test.ts", "test/committed-source-tables.test.ts", "test/contract-page-admission.test.ts", "test/contract-program-owner.test.ts", "test/contracts-platform.test.ts", "test/control-chunks.test.ts", "test/creature-refill.test.ts", "test/creature-spawner.test.ts", "test/data-map-painter.test.ts", "test/debug-authored-rows.test.ts", "test/decision-body-ops.test.ts", "test/decision-product.test.ts", "test/decision-simulation.test.ts", "test/declared-body-ops.test.ts", "test/defined-sections.test.ts", "test/director-shipping-product.test.ts", "test/discovery-output-placement.test.mjs", "test/driftwood-ecology-queue.test.ts", "test/driftwood-output.test.ts", "test/driftwood-program-files.test.ts", "test/driftwood-rock-author.test.ts", "test/driftwood-scene.test.ts", "test/driftwood-sword-profiles.test.ts", "test/elite-native-kernels.test.ts", "test/elite-native-roster.test.ts", "test/encounter-room.test.ts", "test/encounter-slots.test.ts", "test/engine-sides.test.ts", "test/entry-styles.test.ts", "test/faceted-ao-scope.test.ts", "test/faceted-author-compiler.test.ts", "test/fake/admittedSheep.ts", "test/fake/arenaViews.ts", "test/fake/bossArena.ts", "test/fake/portableMath.ts", "test/fixed-draws.test.ts", "test/fixtures/arena-room-program.ts", "test/fixtures/arena-room-setup.ts", "test/fixtures/arenaShapes.ts", "test/fixtures/boar-world.ts", "test/fixtures/channel-quest-author-observation.ts", "test/fixtures/defined-json-value.ts", "test/fixtures/director-modules.ts", "test/fixtures/dormant-herd.ts", "test/fixtures/driftwood-baked-cove.ts", "test/fixtures/driftwood-items.ts", "test/fixtures/driftwood-movers.ts", "test/fixtures/driftwood-page-admission-observation.ts", "test/fixtures/driftwood-rock-author.ts", "test/fixtures/driftwood-trade-native.ts", "test/fixtures/geometry-cache-author-observation.ts", "test/fixtures/graph-scene-author-observation.ts", "test/fixtures/half-float-before-control.ts", "test/fixtures/headless/driftwood-optional-run.ts", "test/fixtures/headless/driftwood-story-run.ts", "test/fixtures/headless/driftwood-trade-run.ts", "test/fixtures/headless/nalati-chapter-binding-run.ts", "test/fixtures/headless/nalati-chapter-one-run.ts", "test/fixtures/headless/nalati-flock-run.ts", "test/fixtures/headless/nalati-kokpar-run.ts", "test/fixtures/headless/nalati-mounted-chain-run.ts", "test/fixtures/headless/nalati-mounted-lance-run.ts", "test/fixtures/headless/nalati-pasture-session.ts", "test/fixtures/headless/nalati-patrol-run.ts", "test/fixtures/headless/nalati-polearm-contact-run.ts", "test/fixtures/headless/nalati-qara-run.ts", "test/fixtures/headless/nalati-sabre-contact-run.ts", "test/fixtures/headless/nalati-titan-run.ts", "test/fixtures/headless/nalati-weapons-run.ts", "test/fixtures/headless/nalati-wolf-fight-run.ts", "test/fixtures/headless/nalati-wolf-howl-run.ts", "test/fixtures/headless/pine-story-run.ts", "test/fixtures/headless/runner.ts", "test/fixtures/headless/signal-story-run.ts", "test/fixtures/headless/sky-roost-run.ts", "test/fixtures/headless/sky-verbs-run.ts", "test/fixtures/headless/titanHandoff.ts", "test/fixtures/headless/worker.ts", "test/fixtures/item-effects.ts", "test/fixtures/kurgan-oracle/dungeon.ts", "test/fixtures/loot-page.ts", "test/fixtures/mixed-population.ts", "test/fixtures/nalati-ambient-observation.ts", "test/fixtures/nalati-balbal-native.ts", "test/fixtures/nalati-chapter-native.ts", "test/fixtures/nalati-contact-transport.ts", "test/fixtures/nalati-discovery.ts", "test/fixtures/nalati-king-host.ts", "test/fixtures/nalati-king-native.ts", "test/fixtures/nalati-king-seal.ts", "test/fixtures/nalati-patrol-native.ts", "test/fixtures/nalati-qara-native.ts", "test/fixtures/nalati-scene-provenance.ts", "test/fixtures/nalati-titan-loan.ts", "test/fixtures/nalati-titan-native.ts", "test/fixtures/nalati-wet.ts", "test/fixtures/native-compiler.mjs", "test/fixtures/nativeCompilers.ts", "test/fixtures/nativeEliteCore.ts", "test/fixtures/nativeEliteKernelOwners.ts", "test/fixtures/nine-native-oracle-compile.mjs", "test/fixtures/nine-native-oracle-inputs.ts", "test/fixtures/nine-native-oracle.ts", "test/fixtures/original-script-order.ts", "test/fixtures/originalBalbal.ts", "test/fixtures/pastelSource.ts", "test/fixtures/pine-discovery.ts", "test/fixtures/pine-native-oracle-inputs.ts", "test/fixtures/pine-native-oracle.mjs", "test/fixtures/pine-wildlife.ts", "test/fixtures/projectedCreature.ts", "test/fixtures/script-v2-director.ts", "test/fixtures/script-v2-elite.ts", "test/fixtures/script-v2-port.ts", "test/fixtures/script-v2-ports/driftwood-barrels.dual.ts", "test/fixtures/script-v2-ports/driftwood-bridge-sway.dual.ts", "test/fixtures/script-v2-ports/driftwood-captain.dual.ts", "test/fixtures/script-v2-ports/driftwood-director.dual.ts", "test/fixtures/script-v2-ports/driftwood-returns.dual.ts", "test/fixtures/script-v2-ports/pine-blackpaw.dual.ts", "test/fixtures/script-v2-ports/pine-board.dual.ts", "test/fixtures/script-v2-ports/pine-contracts.dual.ts", "test/fixtures/script-v2-ports/pine-director.dual.ts", "test/fixtures/script-v2-ports/pine-elite-geometry.dual.ts", "test/fixtures/script-v2-ports/pine-ghost.dual.ts", "test/fixtures/script-v2-ports/pine-imperial.dual.ts", "test/fixtures/script-v2-ports/pine-ironhide.dual.ts", "test/fixtures/script-v2-ports/pine-king.dual.ts", "test/fixtures/script-v2-ports/pine-life.dual.ts", "test/fixtures/script-v2-ports/pine-night.dual.ts", "test/fixtures/script-v2-ports/pine-shelter.dual.ts", "test/fixtures/script-v2-ports/pine-stag.dual.ts", "test/fixtures/script-v2-projection.ts", "test/fixtures/sky-meadow-native.ts", "test/fixtures/sky-verbs.ts", "test/fixtures/species-barrel-author-observation.ts", "test/fixtures/species-oracle/goldenKingControl.ts", "test/fixtures/spruce-author-observation.ts", "test/fixtures/tamingServices.ts", "test/fixtures/templateSource.ts", "test/fixtures/titanFightOwners.ts", "test/fixtures/titanInlineWitness.ts", "test/fixtures/view-author-observation.ts", "test/fixtures/weapon-oracle/crossbowProfile.ts", "test/fixtures/weapon-oracle/headlessCrossbow.ts", "test/fixtures/weapon-oracle/leverAction.ts", "test/fixtures/weapon-oracle/leverBridge.ts", "test/fixtures/weapon-oracle/nativeLever.ts", "test/fixtures/weapon-oracle/nativeLongbow.ts", "test/fixtures/weapon-oracle/thrown.ts", "test/fixtures/weatherInlineWitness.ts", "test/fixtures/worldSetup.ts", "test/generated-isolated-declarations.test.ts", "test/glb-embedded-basis.test.ts", "test/glb-embedded-images.test.ts", "test/graph-budget.test.ts", "test/graph-data-texture.test.ts", "test/graph-day-toon.test.ts", "test/graph-flat-varying.test.ts", "test/graph-fog-inputs.test.ts", "test/graph-foliage-normal.test.ts", "test/graph-instance-transform.test.ts", "test/graph-optional-attribute.test.ts", "test/graph-scene-author-ports.test.ts", "test/graph-shadow-depth.test.ts", "test/graph-shadow-offset.test.ts", "test/graph-toon-caustics.test.ts", "test/graph-wave-normal.test.ts", "test/graph-wind.test.ts", "test/grass-profile-file-only.test.ts", "test/grid-reentry.test.ts", "test/headless-byte-capture.test.ts", "test/heavy-lane.test.ts", "test/held-arms-platform.test.ts", "test/held-bow-product.test.ts", "test/held-slot-entered.test.ts", "test/herd-elite-projection.test.ts", "test/host-callbacks.test.ts", "test/input-read-trace.test.ts", "test/ktx2-owned-bytes.test.ts", "test/loot-continuation-ports.test.ts", "test/map-binding.test.ts", "test/mixed-population-refill.test.ts", "test/mixed-population.test.ts", "test/model-library-transport-lifetime.test.ts", "test/motion-traces.test.ts", "test/mounted-figure.test.ts", "test/mounted-firearm-admission.test.ts", "test/mounted-specimen-admission.test.ts", "test/mounted-specimen-factory.test.ts", "test/mover-swell-parity.test.ts", "test/nalati-actor-paint.test.ts", "test/nalati-carried-terrain-ports.test.ts", "test/nalati-charge-raw.test.ts", "test/nalati-cloth-publication.test.ts", "test/nalati-contact-publication.test.ts", "test/nalati-decorative-native.test.ts", "test/nalati-decorative-scene.test.ts", "test/nalati-elite-admission.test.ts", "test/nalati-field-author-ports.test.ts", "test/nalati-geometry-cache-ports.test.ts", "test/nalati-headless-assembly.test.ts", "test/nalati-herd-binary.test.ts", "test/nalati-king-pose.test.ts", "test/nalati-kurgan-fabric.test.ts", "test/nalati-loft-author.test.ts", "test/nalati-night-decisions.test.ts", "test/nalati-original-place-binary.test.ts", "test/nalati-original-species.test.ts", "test/nalati-place-binary.test.ts", "test/nalati-place-runtime-source.test.ts", "test/nalati-poi-scenes.test.ts", "test/nalati-quest-prop-binary.test.ts", "test/nalati-roster-decisions.test.ts", "test/nalati-script-sections-source.test.ts", "test/nalati-shape-files.test.ts", "test/nalati-shape-product-lanes.test.ts", "test/nalati-species-product-inputs.test.ts", "test/nalati-titan-decisions.test.ts", "test/nalati-titan-handoff.test.ts", "test/nalati-titan-verbs.test.ts", "test/nalati-view-binary.test.ts", "test/nalati-weapon-observation.test.ts", "test/nalati-wind-projection.test.ts", "test/named-json-admission.test.ts", "test/native-assembly.test.ts", "test/native-elite-projected.test.ts", "test/native-fixture-bundle.test.ts", "test/native-ground-assembly.test.ts", "test/native-group-rows.test.ts", "test/native-oracle.test.ts", "test/native-roster-retirement.test.ts", "test/native-roster-returns.test.ts", "test/native-triangle-field.test.ts", "test/net-ride.test.ts", "test/net-titan-saddle.test.ts", "test/new-project.test.ts", "test/nine-author-bundle.test.ts", "test/nine-authored-manifest.test.ts", "test/nine-decal-binary.test.ts", "test/nine-geometry-writer.test.ts", "test/nine-headless-assembly.test.ts", "test/nine-product-inputs.test.ts", "test/nine-slab-bake.test.ts", "test/nine-source-rows.test.ts", "test/nine-verb-tape.test.ts", "test/no-base64.test.ts", "test/no-generated-import.test.ts", "test/no-shard-runtime.test.ts", "test/open-plots-capture.test.ts", "test/open-plots-config.test.ts", "test/original-script-order.test.ts", "test/output-runtime.test.ts", "test/packed-specimen-files.test.ts", "test/page-wildlife-view.test.ts", "test/patrol-contact.test.ts", "test/patrol-encounter-view.test.ts", "test/patrol-law.test.ts", "test/phased-arena-continuation.test.ts", "test/pickup-catalogue.test.ts", "test/pine-ammunition-verbs.test.ts", "test/pine-contract-admission.test.ts", "test/pine-door-verbs.test.ts", "test/pine-headless-population.test.ts", "test/pine-journal.test.ts", "test/pine-native-story-admission.test.ts", "test/pine-posed-tier-loading.test.ts", "test/pine-product-reads.test.ts", "test/platform-build-tools.test.ts", "test/platform-declarative-manifest.test.ts", "test/platform-file-families.test.ts", "test/platform-namespace-reach.test.ts", "test/platform-output-reader.test.ts", "test/platform-runtime-closure.test.ts", "test/polearm-decision.test.ts", "test/population-raster.test.ts", "test/portable-bytes-cache.test.ts", "test/portable-math.test.ts", "test/preview-telemetry.test.ts", "test/product-build-times.test.ts", "test/product-map-publish.test.ts", "test/program-discovery-bootstrap.test.ts", "test/program-discovery.test.ts", "test/project-sections.test.ts", "test/proof/_template/fixture.ts", "test/proof/_template/grid-ready.mjs", "test/proof/_template/run.mjs", "test/proof/blender-template/boot.mjs", "test/proof/blender-template/build.mjs", "test/proof/blender-template/grid-ready.mjs", "test/proof/compatibility/gridReady.mjs", "test/proof/driftwood-isle/run.mjs", "test/proof/driftwood-isle/tape.ts", "test/proof/driftwood-isle/witness.ts", "test/proof/driftwood-isle/worker.ts", "test/proof/far-reach/grid-ready.mjs", "test/proof/far-reach/run.mjs", "test/proof/far-reach/tape.ts", "test/proof/far-reach/witness.ts", "test/proof/far-reach/worker.ts", "test/proof/nalati-grasslands/chapterOne.ts", "test/proof/nalati-grasslands/chapterTwo.ts", "test/proof/nalati-grasslands/king.ts", "test/proof/nalati-grasslands/nativeAssets.ts", "test/proof/nalati-grasslands/run.mjs", "test/proof/nalati-grasslands/taming.ts", "test/proof/nalati-grasslands/titanCombat.ts", "test/proof/nalati-grasslands/titanTravel.ts", "test/proof/nalati-grasslands/witness.ts", "test/proof/nalati-grasslands/worker.ts", "test/proof/nine-dragon-stack/grid-ready.mjs", "test/proof/nine-dragon-stack/run.mjs", "test/proof/nine-dragon-stack/witness.ts", "test/proof/pastel-plain/fixture.ts", "test/proof/pastel-plain/run.mjs", "test/proof/pine-hollow/controller.ts", "test/proof/pine-hollow/run.mjs", "test/proof/pine-hollow/tape.mjs", "test/proof/pine-hollow/witness.ts", "test/proof/sunscar-dunes/boot.mjs", "test/proof/sunscar-dunes/grid-ready.mjs", "test/proof/sunscar-dunes/run.mjs", "test/proof/sunscar-dunes/witness.ts", "test/quest-spawn-capability.test.ts", "test/quest-step-native-parity.test.ts", "test/ranged-cycle.test.ts", "test/regional-exact-restore.test.ts", "test/registered-creature-look-json.test.ts", "test/registered-dressing-json.test.ts", "test/registered-field-json.test.ts", "test/registered-ground-aliases.test.ts", "test/registered-json.test.ts", "test/registered-native-aliases.test.ts", "test/registered-placement-json.test.ts", "test/registered-quest-native.test.ts", "test/registered-quest-page.test.ts", "test/registered-scene-facts.test.ts", "test/registered-scene-json.test.ts", "test/registered-scene-model-json.test.ts", "test/registered-scene-sources.test.ts", "test/return-memory-preparation.test.ts", "test/return-program-group-v2.test.ts", "test/return-program-raw-modules.test.ts", "test/return-program-shared-memory.test.ts", "test/return-projection-inventory.test.ts", "test/return-projection-template.test.ts", "test/rigged-hull-transport-lifetime.test.ts", "test/runtime-files.test.ts", "test/scene-instances.test.ts", "test/scene-surface-intake.test.ts", "test/schema-code-memory.test.ts", "test/script-call-results.test.ts", "test/script-checkpoint-regression.test.ts", "test/script-fixed-memory.test.ts", "test/script-lane-results.test.ts", "test/script-seats.test.ts", "test/script-state-revision.test.ts", "test/script-v2-finite.test.ts", "test/script-v2-group-authorities.test.ts", "test/script-v2-group-bank.test.ts", "test/script-v2-group-context.test.ts", "test/script-v2-group-members.test.ts", "test/script-v2-group-native.test.ts", "test/script-v2-group-reference-effects.test.ts", "test/script-v2-group-references.test.ts", "test/script-v2-group-rng.test.ts", "test/script-v2-radial.test.ts", "test/script-v2-wildlife-queries.test.ts", "test/script-v2-world-actions.test.ts", "test/script-virgin-memory.test.ts", "test/scripts/_template-boss.test.ts", "test/scripts/far-reach-roc.test.ts", "test/scripts/ground-encounters.test.ts", "test/scripts/skitterer-pack.test.ts", "test/scripts/sunscar-matriarch.test.ts", "test/seated-figure-file-only.test.ts", "test/shard-discovery.test.ts", "test/shardfile-boundaries.test.ts", "test/shardfile-inputs.test.ts", "test/sheep-file-contract.test.ts", "test/sim-in-runtime.test.ts", "test/sky-mill-scene.test.ts", "test/sky-original-rigs.test.ts", "test/sky-prepared-model-product.test.ts", "test/sky-signal-fixed-layouts.test.ts", "test/sky-uniform-grid.test.ts", "test/sky-vane-scene.test.ts", "test/slot-continuation.test.ts", "test/slot-encounter-view.test.ts", "test/spawn-script-v2-queries.test.ts", "test/species-admission.test.ts", "test/species-barrel-author-ports.test.ts", "test/species-catalogue-entry.test.ts", "test/specimen-cache-lifetime.test.ts", "test/specimen-explorer.test.ts", "test/specimen-owned-glb.test.ts", "test/specimen-product-atlas.test.ts", "test/specimen-product-glb.test.ts", "test/specimen-selection.test.ts", "test/splat-family-props.test.ts", "test/stealth-crouch-kernel.test.ts", "test/stealth-detection.test.ts", "test/sunscar-generation-inputs.test.ts", "test/taming-binding-order.test.ts", "test/taming-guest-legacy.test.ts", "test/taming-world-actions.test.ts", "test/telemetry-cold-start.test.ts", "test/telemetry-record.test.mjs", "test/template-generation.test.ts", "test/template-product-reader.test.ts", "test/terrain-triplets.test.ts", "test/test-domain.test.ts", "test/tile-bake-report.test.ts", "test/tile-bakes.test.ts", "test/tile-caster-bounds.test.ts", "test/timed-encounters.test.ts", "test/titan-world-commands.test.ts", "test/uniform-tile-grid.test.ts", "test/view-author-metadata.test.ts", "test/vite-boot-modules.test.ts", "test/vitest-module-cache.test.ts", "test/wet-product-loans.test.ts", "test/whole-library-cache.test.ts", "test/whole-prop-shadows.test.ts", "test/world-assembly-schema.test.ts", "test/world-scene-batch.test.ts", "test/world-scene-geometry-cache.test.ts", "test/world-scene-graph-pages.test.ts", "test/world-scene-placement-pages.test.ts", "test/world-scene-slabs.test.ts", "test/world-weather-stage.test.ts", "test/declared-entry-targets-debug.test.ts", "test/proof/**", "src/cli/", "src/scripts/", "src/tools/", "src/e2e/", "src/test/", "src/server/*.ts", "src/shared/*.ts", "src/client/*.ts", "src/client/*.tsx", "src/cook/*.ts", ".githooks/**", "**/*.generated.*", "test/fixtures/", ".tsc-layers/", "dist/", "dist-native/", "ios/", "android/", ".native-build/", "node_modules/", "public/", "progress/", "art/", "sources/", "docs/"]
+}

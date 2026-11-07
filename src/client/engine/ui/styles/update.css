@@ -1,0 +1,23 @@
+/* ─── build / update pill (src/client/engine/ui/Update.ts; the title screen and the pause menu — PWAs have no address bar to refresh
+   from, so E176 put it in the pause menu too, at the same screen corner. z 80 clears the menu overlay (z 70), which
+   reserves the pill's band through `--ws-pill` (gmenu.css). E484: the pill's vertical centre sits on `--ws-pill-line`
+   (a viewport y, safe area included), which a screen with a title row sets on :root so the pill lines up with its title's
+   cap line; without one it keeps the old corner (centre 19.5px below the safe area). The label is trimmed to its caps
+   (text-box) in a fixed-height flex box, so the mono caps sit dead centre whatever the font's ascent and descent; the
+   negative right margin cancels the trailing letter-spacing. ─── prefix ws-update- ─── */
+.ws-update { position: fixed; right: 44px; top: var(--ws-pill-line, calc(19.5px + env(safe-area-inset-top, 0px))); transform: translateY(-50%); z-index: calc(var(--ws-layer-modal) + 0); display: none; align-items: center; gap: 6px; box-sizing: border-box; height: 19px; padding: 0 8px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
+.ws-update.visible { display: flex; }
+.ws-update [data-el='text'] { margin-right: -0.14em; text-box: trim-both cap alphabetic; }
+.ws-update .ws-update-dot { width: 4px; height: 4px; background: rgba(196, 220, 232, 0.35); }
+.ws-update.newer { color: var(--ws-cyan); border-color: var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.3); }
+.ws-update.newer .ws-update-dot { background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); animation: ws-update-pulse 1.2s ease-in-out infinite; }
+.ws-update.confirm { color: var(--ws-amber); border-color: var(--ws-amber); box-shadow: 0 0 18px rgba(255, 181, 71, 0.35); }
+.ws-update.confirm .ws-update-dot { background: var(--ws-amber); }
+@media (max-width: 700px) {
+  /* QA2 (2026-10-29): its own slot right of the fps chip, which ends by ~228 px even at "00 fps max 0000 ms"
+     (perf.css: left 101 px); a longer word ellipsises instead of running under it */
+  .ws-update { right: 16px; max-width: calc(100vw - 244px); }
+  .ws-update [data-el='text'] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Renderer-free loading handoff; deliberately not .ws-load, which title-first hides. */

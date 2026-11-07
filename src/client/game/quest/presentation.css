@@ -1,0 +1,4 @@
+.ws-quest-pin { padding: 4px 7px; display: flex; gap: 7px; white-space: nowrap; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ws-cyan); background: var(--ws-glass); border: 1px solid var(--ws-cyan-line); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
+.ws-quest-pin::before { content: '◆'; margin-right: 7px; }
+.ws-quest-pin b { margin-left: 7px; font-weight: 400; color: var(--ws-text); font-variant-numeric: tabular-nums; }
+#hud.intro .ws-quest-pin, #hud.playground-active .ws-quest-pin { visibility: hidden; }

@@ -1,0 +1,11 @@
+--- a/src/shards/nine-dragon-stack/manifest.ts
++++ b/src/shards/nine-dragon-stack/manifest.ts
+@@ -150,7 +150,5 @@
+   // (wrapped: the world culls its instanced batches right before the composer draws, the camera final — index.ts)
+   render: async () => {
+-    const [{ createRender }, { cullNineDragonWorld }] = await Promise.all([import('./look/render'), import('./world/install')]);
+-    const look = createRender();
+-    return { ...look, frame: (dt: number, t: number): void => { cullNineDragonWorld(); look.frame?.(dt, t); } };
++    throw new Error('E357 render-throw plant');
+   },
+   // the fragment's limits: its footprint (the Well and its run north west of the square, the street north to its end

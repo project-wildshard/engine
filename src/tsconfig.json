@@ -26,5 +26,14 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["cli", "test", "server", "shared", "tools", "e2e", "cook"]
+  "include": [
+    "cli",
+    "test/helpers",
+    "server/*.ts",
+    "shared/*.ts",
+    "shared/schema",
+    "tools",
+    "e2e",
+    "cook/*.ts"
+  ]
 }

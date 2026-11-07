@@ -1,0 +1,8 @@
+{
+  "revision": "439b262bd4d218efd571cafbfe1366891c7279e2",
+  "paths": [
+    "src/shards/nalati-grasslands/combat/ghostRiders.ts",
+    "src/shards/nalati-grasslands/species/ghostRider.ts"
+  ],
+  "sha256": "7c5b48d7d56ae434f019be25e88a82fb1bea6419d1b09b371a51a8df3afd13ca"
+}

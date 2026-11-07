@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worker memory</title>
+<style>
+  body { font: 16px/1.4 -apple-system, system-ui, sans-serif; margin: 0; padding: 20px; background: #111; color: #eee; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { margin: 0 0 12px; color: #bbb; }
+  button { font: 600 18px -apple-system, system-ui, sans-serif; width: 100%; padding: 16px; margin-bottom: 12px; border: 0; border-radius: 10px; background: #e8a33d; color: #111; }
+  button:disabled { background: #555; color: #999; }
+  #copy { background: #3a7bd5; color: #fff; }
+  #status { margin: 12px 0; font-weight: 600; }
+  pre { font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-word; color: #ddd; }
+</style>
+</head>
+<body>
+<h1>Worker memory</h1>
+<p>Keep this page in front with the screen on. Each of the first two buttons takes about a minute. The third runs the page out of memory on purpose, twice, and comes back by itself. If Safari says a problem occurred, tap Reload. Then copy the results.</p>
+<button id="low">1. Turn Low Power Mode on, then tap here</button>
+<button id="full">2. Turn Low Power Mode off, then tap here</button>
+<button id="balloon">3. Measure total memory</button>
+<button id="copy">Copy results</button>
+<div id="status"></div>
+<pre id="out"></pre>
+<script type="module" src="./page.ts"></script>
+</body>
+</html>

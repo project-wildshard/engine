@@ -1,0 +1,97 @@
+[
+  {
+    "lane": "primary",
+    "shape": "cone",
+    "reach": 4.4,
+    "size": 0.9,
+    "height": 0,
+    "allowance": 0,
+    "lands": [],
+    "show": 0,
+    "reports": true,
+    "heavy": false,
+    "cooldown": 0.45,
+    "hits": [
+      {
+        "source": "env",
+        "weaponId": "weapon.far-reach.fan",
+        "copyVectors": true,
+        "copyTags": true,
+        "damage": 16,
+        "tags": [
+          "actor.player",
+          "weapon.far-fan",
+          "dmg.melee"
+        ],
+        "moveId": "far.fan.light",
+        "reactions": []
+      }
+    ]
+  },
+  {
+    "lane": "primary",
+    "shape": "cone",
+    "reach": 4.4,
+    "size": 0.9,
+    "height": 0,
+    "allowance": 0,
+    "lands": [],
+    "show": 0,
+    "reports": true,
+    "heavy": true,
+    "cooldown": 0.85,
+    "hits": [
+      {
+        "source": "env",
+        "weaponId": "weapon.far-reach.fan",
+        "copyVectors": true,
+        "copyTags": true,
+        "damage": 30,
+        "tags": [
+          "actor.player",
+          "weapon.far-fan",
+          "dmg.melee"
+        ],
+        "moveId": "far.fan.heavy",
+        "reactions": []
+      }
+    ]
+  },
+  {
+    "lane": "secondary",
+    "shape": "cone",
+    "reach": 9,
+    "size": 0.6,
+    "height": 0,
+    "allowance": 0,
+    "lands": [],
+    "show": 0,
+    "reports": false,
+    "heavy": false,
+    "cooldown": 1.6,
+    "hits": [
+      {
+        "source": "env",
+        "weaponId": "weapon.far-reach.fan",
+        "copyVectors": true,
+        "copyTags": true,
+        "damage": 4,
+        "tags": [
+          "actor.player",
+          "weapon.far-fan",
+          "dmg.wind"
+        ],
+        "moveId": "far.fan.gust",
+        "reactions": [
+          {
+            "when": "before",
+            "kind": "impulse",
+            "direction": "radial-away",
+            "speed": 15,
+            "lift": 4
+          }
+        ]
+      }
+    ]
+  }
+]

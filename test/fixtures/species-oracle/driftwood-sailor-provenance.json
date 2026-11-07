@@ -1,0 +1,7 @@
+{
+  "revision": "cc3d80266bde50259f7676b0e72e98b80b7229e0",
+  "source": "src/shards/driftwood-isle/species/sailor.ts",
+  "sourceHash": "c492ff2d730f5b7ba7afad0fd55a6a2a15f5eff4fc767c43e329e43385c2e26f",
+  "fixture": "test/fixtures/species-oracle/driftwood-sailor.ts",
+  "fixtureHash": "8bf4ab9a32167fc78aaca418cb4626bdcc72b40115365bd179a0c387b7422bd3"
+}

@@ -1,0 +1,70 @@
+/* Client-only stealth presentation in the baseline HUD slots. */
+.ws-stealth { position: absolute; inset: 0; pointer-events: none; z-index: calc(var(--ws-layer-hud) + 4); }
+#hud.intro .ws-stealth { display: none; }
+
+/* the eye pip, just under the crosshair: icon + label */
+.ws-stealth-pip { --threat: 0; position: absolute; left: 50%; top: calc(50% + 30px); display: flex; align-items: center; gap: 6px; transform: translateX(-50%); padding: 3px 10px 3px 7px; border-radius: 11px; background: rgba(6, 10, 18, 0.42); box-shadow: 0 0 14px rgba(6, 10, 18, 0.35); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 0 6px rgba(0, 0, 0, 0.75); opacity: 0; transition: opacity 0.25s, color 0.2s; white-space: nowrap; }
+.ws-stealth-eye { display: block; width: 20px; height: 20px; font-style: normal; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.7)); }
+.ws-stealth-eye svg { display: block; width: 100%; height: 100%; }
+.ws-stealth[data-state='visible'] .ws-stealth-pip { opacity: 0.45; color: var(--ws-text); }
+.ws-stealth[data-state='hidden'] .ws-stealth-pip { opacity: 1; color: var(--ws-cyan); }
+.ws-stealth[data-state='hidden'] .ws-stealth-eye { filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.8)); }
+.ws-stealth[data-state='noticed'] .ws-stealth-pip { opacity: 1; color: var(--ws-amber); }
+.ws-stealth[data-state='noticed'] .ws-stealth-label::after { content: ''; display: inline-block; width: 26px; height: 3px; margin-left: 8px; vertical-align: middle; background: linear-gradient(90deg, var(--ws-amber) calc(var(--threat) * 100%), rgba(255, 181, 71, 0.2) 0); }
+.ws-stealth[data-state='detected'] .ws-stealth-pip { opacity: 1; color: var(--ws-red); font-size: 12px; font-weight: 500; }
+.ws-stealth[data-state='detected'] .ws-stealth-eye { width: 26px; height: 34px; animation: ws-stealth-throb 0.7s ease-in-out infinite; filter: drop-shadow(0 0 8px rgba(255, 90, 74, 0.9)); }
+
+/* the threat chevron, orbiting the crosshair toward the most aware creature (transform set by the module) */
+.ws-stealth-chev { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: 0; opacity: 0; transition: opacity 0.2s; }
+.ws-stealth-chev::before { content: ''; position: absolute; left: -9px; top: -7px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 12px solid var(--ws-amber); filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.6)); }
+.ws-stealth-chev.on { opacity: 0.9; }
+.ws-stealth[data-state='detected'] .ws-stealth-chev::before { border-bottom-color: var(--ws-red); }
+
+/* DETECTED: a red vignette pulse at the frame edges */
+.ws-stealth-vig { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 70, 50, 0.16) 78%, rgba(255, 60, 40, 0.42) 100%); transition: opacity 0.35s; }
+.ws-stealth[data-state='detected'] .ws-stealth-vig { opacity: 1; animation: ws-stealth-pulse 1.1s ease-in-out infinite; }
+
+/* the GRASS cover meter on the left edge while crouched (fills with the cover; cyan once it hides you) */
+.ws-stealth-grass { position: absolute; left: 14px; top: 38%; display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; transition: opacity 0.3s; }
+.ws-stealth-grass.on { opacity: 1; }
+.ws-stealth-grass span { font-size: 8px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 0 5px rgba(0, 0, 0, 0.8); writing-mode: vertical-rl; transform: rotate(180deg); }
+.ws-stealth-grass b { position: relative; display: block; width: 7px; height: 110px; background: rgba(6, 10, 18, 0.5); border: 1px solid var(--ws-cyan-line); overflow: hidden; }
+.ws-stealth-grass i { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; transform-origin: 50% 100%; transform: scaleY(0); background: rgba(230, 242, 248, 0.6); transition: transform 0.2s ease-out, background 0.25s; }
+.ws-stealth-grass.good i { background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.6); }
+
+/* the one-time TALL GRASS chip: desktop under the pip, touch just left of the CROUCH disc (the slot over JUMP) */
+.ws-stealth-hint { position: absolute; left: 50%; top: calc(50% + 58px); transform: translateX(-50%); padding: 4px 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); border-left: 3px solid var(--ws-cyan); font-size: 8.5px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ws-text); opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+.ws-stealth-hint.on { opacity: 1; }
+.ws-stealth-hint.touch { left: auto; right: calc(min(15vw, 84px) + 26px); top: auto; bottom: calc(max(15vh, 104px) + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px)) * 0.5 + 18px + min(15vw, 84px) * 1.5); transform: translateY(50%); }
+
+@keyframes ws-stealth-pulse { 0%, 100% { opacity: 0.65; } 50% { opacity: 1; } }
+@keyframes ws-stealth-throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+
+/* ── the phone (E154: the base HUD's slots, src/client/engine/ui/hudSlots.ts): the eye + state is a row of the top-left status column
+   (the crosshair stays bare, the threat chevron still circles it), GRASS another row under it while crouched, and CROUCH
+   a disc in the slot over JUMP ── */
+#hud.touch .ws-stealth-pip, #hud.touch .ws-stealth-grass { display: none; }
+.ws-stealth-row { --threat: 0; gap: 9px; font-size: 9px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); transition: color 0.2s, border-color 0.2s; }
+.ws-touch-row.ws-stealth-row[data-state='none'] { display: none; }
+.ws-stealth-row .ws-stealth-eye { width: 17px; height: 17px; }
+.ws-stealth-row[data-state='visible'] { color: var(--ws-text-dim); }
+.ws-stealth-row[data-state='hidden'] .ws-stealth-eye { filter: drop-shadow(0 0 5px rgba(143, 227, 255, 0.8)); }
+.ws-stealth-row[data-state='noticed'] { color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.55); }
+.ws-stealth-row[data-state='noticed'] .ws-stealth-label::after { content: ''; display: inline-block; width: 26px; height: 3px; margin-left: 8px; vertical-align: middle; background: linear-gradient(90deg, var(--ws-amber) calc(var(--threat) * 100%), rgba(255, 181, 71, 0.2) 0); }
+.ws-stealth-row[data-state='detected'] { color: var(--ws-red); border-color: rgba(255, 90, 74, 0.6); }
+.ws-stealth-row[data-state='detected'] .ws-stealth-eye { animation: ws-stealth-throb 0.7s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255, 90, 74, 0.9)); }
+/* GRASS: the cover meter as a row — the label, then the bar filling left to right (cyan once it hides you) */
+.ws-stealth-grassrow { font-size: 7.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-touch-row.ws-stealth-grassrow:not(.on) { display: none; }
+.ws-stealth-grassrow b { position: relative; flex: 1; height: 4px; background: rgba(143, 227, 255, 0.14); overflow: hidden; }
+.ws-stealth-grassrow i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: 0 50%; transform: scaleX(0); background: rgba(230, 242, 248, 0.6); transition: transform 0.2s ease-out, background 0.25s; }
+.ws-stealth-grassrow.good i { background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.6); }
+/* CROUCH (B9 decision D, art/nalati-grasslands/round-3/3-crouch-disc/): shown only in long grass — fades in over 250 ms,
+   out over 400 ms; a toggle (.on = crouched); the first time per session a soft ring pulses twice (.pulse) */
+#hud .ws-touch-disc.ws-stealth-crouch { display: flex; opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity 0.4s, transform 0.4s, background 0.15s, box-shadow 0.15s; }
+#hud .ws-touch-disc.ws-stealth-crouch.show { opacity: 1; pointer-events: auto; transform: none; transition: opacity 0.25s, transform 0.25s, background 0.15s, box-shadow 0.15s; }
+#hud .ws-touch.swimming .ws-touch-disc.ws-stealth-crouch { display: none; }
+.ws-touch-disc.ws-stealth-crouch svg { width: 40%; height: 40%; fill: none; }
+.ws-touch-disc.ws-stealth-crouch span { font-size: 7.5px; letter-spacing: 0.14em; }
+.ws-touch-disc.ws-stealth-crouch.pulse { animation: ws-stealth-crouch-pulse 1.1s ease-out 2; }
+@keyframes ws-stealth-crouch-pulse { 0% { box-shadow: 0 0 0 0 rgba(143, 227, 255, 0.7), 0 8px 24px rgba(0, 0, 0, 0.4); } 100% { box-shadow: 0 0 0 22px rgba(143, 227, 255, 0), 0 8px 24px rgba(0, 0, 0, 0.4); } }

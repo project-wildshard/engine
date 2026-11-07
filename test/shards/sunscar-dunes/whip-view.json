@@ -1,0 +1,27 @@
+{
+ "lash": {
+  "position": "ae0e93626c8d2672b0a1245be559597424a7245260d904a0d09dd301007007f7",
+  "normal": "312f5b2fdcd968e59cd269f501afa0072e88339e107be484406dee31fb8bba62",
+  "color": "3242db8e44fa3b508d6371315da37df2f576f87c4b1a2e90a1085a19347306d7",
+  "index": "cb9516f410e6172865af2885bcdeeb45a616c66d90a75cec6d7cced1d8f0c024",
+  "roughness": 0.85,
+  "emissive": 1181700,
+  "visible": false
+ },
+ "plait": {
+  "map": "f60adec5b5c848a29c6fed15dc2bcd26bd0363cb33b7dfd50ee344761cf9d691",
+  "normal": "8956941585da596c28b6124b5a385ad076a14d1264ff18a8251f2a46df08b04d",
+  "rough": "7751117cabc05c2ebf31f049cb9bd2000be1c073f1b2a68f0515e573678a80f0"
+ },
+ "loop": {
+  "position": "466f979e70dea045ec4aa7a00bd992c27968e35aad66ea91956e13f510feb67a",
+  "uv": "57525f835680eeb6e171f4682f105dcb23b890f04c4b88c04e4283b730156320",
+  "normal": "10768286d60c0f0dbe259d0c33f591abfeafa17c0d9317794b9dd8c7dc887bae",
+  "repeat": [
+   20.503505061265088,
+   1
+  ],
+  "count": 4693
+ },
+ "handleBraid": "1b3e9f42a6e3a4eaf04bea9f2a53fdc9628191c218fb65331d605465feea0107"
+}

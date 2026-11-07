@@ -1,0 +1,26 @@
+{
+  "about": "E362 AG6: #engine exports for the game layer and the composition root only (the session, boot, title and installers). wildshard/engine-internal refuses them in src/shards; docs/api/ENGINE.md marks them 'game only'. A shard that needs one asks the lead for a ShardContext verb instead.",
+  "names": {
+    "_applyChunkConstants": "the registry's level constants, applied by the game when the running shard changes",
+    "configureLevel": "the game selects the running level",
+    "LevelDriver": "the game's level load / unload driver",
+    "LevelLoadError": "the game's level load failure",
+    "LevelSequence": "the game's level boot sequence",
+    "BootRuntime": "the boot runtime the game's session receives",
+    "setTitleArrival": "the title's arrival hand-off (the game's travel)",
+    "TitleArrival": "the title's arrival hand-off (the game's travel)",
+    "registerGlobalDebugAction": "the game's page-wide Debug actions",
+    "setDev": "developer mode, the game's switch",
+    "Explore": "the Explore host, opened by the game's session",
+    "ExploreMode": "the Explore host's modes",
+    "ExploreSpec": "the Explore host's spec",
+    "Feedback": "the in-game review note panel (the game's)",
+    "SaveStore": "the save store class (the page's one store is the engine's saves service)",
+    "retried": "the page entry's retried dynamic import",
+    "installAppIdentity": "the composition root installs the app identity",
+    "installAssetTables": "the composition root installs the asset tables",
+    "installScore": "the composition root installs the game's score",
+    "installEngineStrings": "the composition root installs the game's engine strings",
+    "installGameplayInput": "the boot installs gameplay input"
+  }
+}

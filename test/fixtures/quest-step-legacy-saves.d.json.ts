@@ -1,0 +1,5 @@
+// Compiler-derived from test/fixtures/quest-step-legacy-saves.json; sha256 b2f090bbf2e39937b75d86500994bed07f4e04ebf7cc7c028b47d9684a790355.
+// Refresh: node scripts/json-declarations.mjs
+declare const value: { source: string; note: string; "pine-hollow": { payload: string; sha256: string; adapter: string; state: { stag: { i: number; mode: string; t: number; }; dawn: string; fast: null; zip: null; rifle: boolean; counts: { lanterns: number; resin: number; zipline: number; bear2: number; }; pack: { counts: { "amber-resin": number; }; order: string[]; }; lodge: { version: number; open: boolean; board: { next: number; slots: { serial: number; kind: string; target: string; have: number; }[]; claimed: number; streak: number; best: number; }; }; }; bytes: string; }; "driftwood-isle": { payload: string; sha256: string; adapter: string; state: { sailor: number; crab10: number; monkey6: number; }; bytes: string; }; };
+// oxlint-disable-next-line import/no-default-export -- native JSON requires its default import contract
+export default value;

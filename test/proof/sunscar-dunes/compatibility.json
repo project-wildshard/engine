@@ -1,0 +1,88 @@
+{
+  "audit": {
+    "sourceRevision": "42c266962ffd1a33bb10899a12de318d4e4bdf23",
+    "candidate": "SF81 DIR5: accepted Signal fire edge on authored stages, native boss remains its existing owner.",
+    "command": "node --experimental-transform-types --import ./scripts/sim-node-loader.mjs test/proof/sunscar-dunes/run.mjs all",
+    "exitStatus": 0,
+    "scope": "Command tape, fire/quest/victory effects, creature/body contacts, retry and durable Ledger outcomes exact. Canonical hashes deliberately change only for the additional complete signal-stage adapter.",
+    "runs": "Independent committed baseline/current whole native tapes, complete codec/worker suffix, real interaction order and quiet restore/refusal, root strict and touched lint."
+  },
+  "slug": "sunscar-dunes",
+  "entry": "runtime/headless.ts",
+  "compatible": true,
+  "headless": {
+    "status": "passed",
+    "ticksExecuted": 12503,
+    "hash": "dc7fe408ceb4b349bcdbc5c3ff04eafdadd9a65c5bc23ce3570a9da0d5f5f6a0",
+    "victoryTick": 12383,
+    "attempts": 1,
+    "questComplete": true,
+    "facts": [
+      "sunscar.signal",
+      "sunscar.matriarch"
+    ],
+    "coins": 25,
+    "blows": 12,
+    "shovedTicks": 125,
+    "entries": {
+      "lanes": 92,
+      "steps": 46095
+    }
+  },
+  "replay": {
+    "status": "passed",
+    "checkpointCaptured": true,
+    "checkpointTick": 10710,
+    "checkpoint": {
+      "state": "fight",
+      "phase": 1,
+      "storm": 0.653,
+      "hp": 396
+    },
+    "suffixTicksExecuted": 1793,
+    "victoryTick": 12383,
+    "hash": "dc7fe408ceb4b349bcdbc5c3ff04eafdadd9a65c5bc23ce3570a9da0d5f5f6a0",
+    "replayHash": "dc7fe408ceb4b349bcdbc5c3ff04eafdadd9a65c5bc23ce3570a9da0d5f5f6a0",
+    "workerTicks": 60,
+    "workerExact": true,
+    "suffixFacts": [
+      "sunscar.signal",
+      "sunscar.matriarch"
+    ],
+    "suffixCoins": 25
+  },
+  "ledger": {
+    "status": "passed",
+    "rules": 2,
+    "facts": [
+      {
+        "name": "sunscar.signal",
+        "origin": "engine.quest.complete",
+        "tick": 12383,
+        "entity": "sunscar.signal"
+      },
+      {
+        "name": "sunscar.matriarch",
+        "origin": "engine.encounter.victory",
+        "tick": 12383,
+        "entity": "sunscar.matriarch"
+      }
+    ],
+    "achievements": [
+      {
+        "id": "sunscar.signal",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "sunscar.matriarch",
+        "count": 1,
+        "earned": true
+      }
+    ],
+    "durableReload": true,
+    "duplicateStable": true,
+    "restoredReemits": 0,
+    "gameplayEmissionProven": true
+  }
+}

@@ -1,0 +1,26 @@
+/* ── first-time control hints (src/client/engine/ui/FirstHints.ts, E308 — Jake's pick A, art/onboarding/round-1-first-minutes/):
+   a label + a pulsing ring ON the touch control the first time it matters; on a desktop the same words with the key,
+   under the crosshair. Baseline HUD language: navy glass, a 1 px cyan hairline with the corner bracket (.ws-glass),
+   letter-spaced mono caps, the verb lit cyan. The ring pulses on touch.css's E286 `ws-touch-hint-pulse` (the
+   traversal-verb discs' own pulse), so it reads as the button lighting up. Neither takes a touch. ── */
+.ws-hint-ring { --h: var(--ws-cyan); position: absolute; z-index: calc(var(--ws-layer-hud) + 6); display: none; pointer-events: none; border-radius: 16px; border: 1.5px solid var(--h); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 16px color-mix(in srgb, var(--h) 45%, transparent), inset 0 0 0 3px rgba(6, 10, 18, 0.6), inset 0 0 0 4.5px var(--h); animation: ws-touch-hint-pulse 1s ease-in-out infinite; }
+.ws-hint-ring.round { border-radius: 50%; }
+.ws-hint-ring.show { display: block; }
+/* a second ring breathing outward from it, so the eye finds the control even mid-fight */
+.ws-hint-ring::after { content: ''; position: absolute; inset: -2px; border-radius: inherit; border: 1px solid var(--h); opacity: 0; animation: ws-hint-ripple 1.6s ease-out infinite; }
+@keyframes ws-hint-ripple { 0% { opacity: 0.8; transform: scale(1); } 100% { opacity: 0; transform: scale(1.28); } }
+
+.ws-hint-tag { position: absolute; z-index: calc(var(--ws-layer-hud) + 6); display: none; pointer-events: none; padding: 7px 12px 7px 13px; background: var(--ws-glass-deep); border-color: var(--ws-cyan-dim); color: var(--ws-text); font-family: var(--ws-mono); font-size: 10px; line-height: 1; letter-spacing: 0.24em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.ws-hint-tag.show { display: block; animation: ws-hint-in 0.22s ease-out; }
+.ws-hint-tag b { font-weight: 700; color: var(--ws-cyan); }
+/* the notch: a small diamond on the edge toward the control (--nx along the bottom, or mid-height on a side) */
+.ws-hint-tag i { position: absolute; width: 8px; height: 8px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-dim); border-top: 0; border-left: 0; }
+.ws-hint-tag[data-notch="down"] i { left: var(--nx, 50%); bottom: -5px; transform: translateX(-50%) rotate(45deg); }
+.ws-hint-tag[data-notch="right"] i { right: -5px; top: 50%; transform: translateY(-50%) rotate(-45deg); }
+.ws-hint-tag[data-notch="left"] i { left: -5px; top: 50%; transform: translateY(-50%) rotate(135deg); }
+/* desktop: centred under the crosshair, no notch, no ring */
+.ws-hint-tag.desk { left: 50%; top: calc(50% + 46px); transform: translateX(-50%); font-size: 11px; padding: 8px 14px 8px 15px; }
+.ws-hint-tag.desk i { display: none; }
+.ws-hint-tag.desk.show { animation: none; }
+@keyframes ws-hint-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+#hud.intro .ws-hint-ring, #hud.intro .ws-hint-tag { display: none; }

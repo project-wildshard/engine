@@ -1,0 +1,9 @@
+{
+  "test/basis-build-provider.test.ts": ["basis"],
+  "test/sky-creature-rig-output.test.ts": ["basis"],
+  "test/authored-manifest.test.ts": ["basis"],
+  "test/sky-prepared-model-output.test.ts": ["basis"],
+  "test/sky-prepared-model-product.test.ts": ["basis"],
+  "test/sky-signal-fixed-layouts.test.ts": ["basis"],
+  "test/sky-signal-quest-product.test.ts": ["basis"]
+}

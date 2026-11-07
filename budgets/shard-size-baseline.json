@@ -1,0 +1,527 @@
+{
+ "schema": 1,
+ "about": "What each shard downloaded before DOWNLOAD began, and what a build may ship. scripts/shard-size-gate.mjs reads this on every web build. Plan: docs/plans/multi-repo/SHARD-SIZE-PLAN.md in project-wildshard-meta.",
+ "baseline": {
+  "commit": "1474f7deb9cb190cab32bc8a3388c2adefc119ef",
+  "committed": "2026-10-29T14:41:01-05:00",
+  "why": "The last commit with exactly Sky Reach and Signal Dunes retired (G882, G883): SHARD-PLATFORM at 2 of 6, one commit before Driftwood's legacy went (019fa6d0c7).",
+  "measured": "2026-11-05"
+ },
+ "recorded": {
+  "commit": "38852e26e0b7469326e6014939330f945b981021",
+  "measured": "2026-11-06"
+ },
+ "units": {
+  "baselinePhoneBytes": "Real bytes on the socket for one cold entry at the baseline commit: title plus entry, from a fresh profile.",
+  "recordedPhoneBytes": "The packs book at the recorded commit: client.<slug>.phone.wireBytes. This is what the gate compares.",
+  "comparable": "The two units track each other when no read-ahead is running. Neither counts the title read-ahead of another shard; recorded.phone.titleBytes shows it, and it depends on how long the player stays on the title.",
+  "thinTarball": "A thin head as the api holds it (measured 2026-11-06 from ~/.cache/wildshard/pins): no blobs/pack, and mounts/assets holds unique bytes, 0.2 MB of Pine's 167.2 repeating a blob."
+ },
+ "method": {
+  "network": "scripts/shard-wire-meter.mjs: a counting proxy between a fresh Chromium profile and scripts/preview-server.mjs, one entry through SHARD SELECT, Hold at loading screen on, stopped after 12 s of network silence.",
+  "caveat": "Unthrottled localhost, so the title read-ahead runs further than on a real link: production Pine phone measured 122.0 MB where this meter measured 129-132 MB. Compare entryBytes across builds, not titleBytes.",
+  "steps": [
+   "git worktree add --detach tmp/size-baseline/old 1474f7deb9cb190cab32bc8a3388c2adefc119ef",
+   "cd tmp/size-baseline/old && pnpm install --frozen-lockfile --config.confirmModulesPurge=false",
+   "export WILDSHARD_SHARDFILE_CACHE=<a folder outside this repo>; a sibling of the checkout makes the product input trace refuse the path ..",
+   "pnpm gen --inputs-only && node scripts/build-shardfiles.mjs --reuse && node scripts/build-app.mjs",
+   "Skip the build script's tsc step: it fails on three types in this checkout and emits nothing that ships.",
+   "From a current checkout, per shard and tier: node scripts/shard-wire-meter.mjs --root <the worktree> --shard <slug> --tier <tier> --out <file>",
+   "node scripts/shard-size-gate.mjs --folders <the worktree>",
+   "git worktree remove tmp/size-baseline/old && git worktree prune"
+  ]
+ },
+ "limits": {
+  "newShardHardCapBytes": 60000000,
+  "targetPhoneBytes": [
+   30000000,
+   40000000
+  ],
+  "targetSource": "Estimate: docs/plans/multi-repo/research/cooking-and-packs.md. The target is printed in the plan and refuses nothing.",
+  "toleranceBytes": 256000,
+  "ratchetSlackBytes": 1000000
+ },
+ "update": {
+  "shrink": "After a change saves bytes: node scripts/shard-size-gate.mjs dist --ratchet, and commit this file with the change. The build refuses a shrink-only shard more than 1 MB under its ceiling until this is done. A shrink-only ceiling follows the shard down past its baseline (latchedPhoneBytes), so it can't regrow into the old room.",
+  "grow": "Only on Jake's word: set ceilingPhoneBytes and add {shard, toBytes, decision, why} to raises, naming his G or E number. A raised ceiling with no such row is refused.",
+  "remeasure": "To change the baseline itself, redo method.steps from baseline.commit, or move baseline.commit on Jake's word and redo them there."
+ },
+ "raises": [],
+ "shards": {
+  "pine-hollow": {
+   "baselinePhoneBytes": 78299562,
+   "recordedPhoneBytes": 111018672,
+   "ceilingPhoneBytes": 50543163,
+   "latchedPhoneBytes": 50543163,
+   "shrinkOnly": true,
+   "baseline": {
+    "phone": {
+     "wireBytes": 78299562,
+     "titleBytes": 2685940,
+     "entryBytes": 75613622,
+     "requests": 164,
+     "loadingLine": "Spawn view · 96.1 MB · 1.53 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 259498673,
+     "titleBytes": 34536006,
+     "entryBytes": 224962667,
+     "requests": 368,
+     "loadingLine": "Spawn view · 264.7 MB · 15.8 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 271799912,
+     "files": 1098,
+     "buckets": {
+      "blobs/pack": 115503811,
+      "blobs/bin": 50767581,
+      "blobs/ktx2": 49287487,
+      "blobs/glb": 38921324,
+      "blobs/json": 8660643,
+      "blobs/image": 5552917,
+      "root-files": 1458566,
+      "sections": 901350,
+      "blobs/tile": 524320,
+      "schemas": 114867,
+      "blobs/wasm": 107046
+     }
+    }
+   },
+   "recorded": {
+    "phone": {
+     "wireBytes": 131604322,
+     "titleBytes": 28511842,
+     "entryBytes": 103092480,
+     "requests": 209,
+     "loadingLine": "Spawn view · 107.7 MB · 4.67 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 340537887,
+     "titleBytes": 38245791,
+     "entryBytes": 302292096,
+     "requests": 503,
+     "loadingLine": "Spawn view · 117.4 MB · 4.71 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 438889453,
+     "files": 1243,
+     "buckets": {
+      "mounts/assets": 167186443,
+      "blobs/pack": 113537892,
+      "blobs/bin": 50767581,
+      "blobs/ktx2": 48604130,
+      "blobs/glb": 38557228,
+      "blobs/json": 7194024,
+      "blobs/image": 5552917,
+      "root-files": 2630988,
+      "sections": 1562806,
+      "mounts/programs": 1173766,
+      "server": 777840,
+      "mounts/shardfiles": 712472,
+      "blobs/tile": 524320,
+      "blobs/wasm": 107046
+     }
+    }
+   },
+   "thinTarball": {
+    "head": "55f512f25f3601ff5fe50ab25d5cba37b8e1ebecf571104eb6fab8ade05ea36c",
+    "bytes": 326282240,
+    "mountsAssetsBytes": 167186443
+   }
+  },
+  "driftwood-isle": {
+   "baselinePhoneBytes": 23757802,
+   "recordedPhoneBytes": 26278506,
+   "ceilingPhoneBytes": 21265451,
+   "shrinkOnly": true,
+   "baseline": {
+    "phone": {
+     "wireBytes": 23757802,
+     "titleBytes": 2474151,
+     "entryBytes": 21283651,
+     "requests": 137,
+     "loadingLine": "Spawn view · 58.7 MB · 1.76 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 41348022,
+     "titleBytes": 34291495,
+     "entryBytes": 7056527,
+     "requests": 289,
+     "loadingLine": "Spawn view · 84.9 MB · 67.3 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 113419245,
+     "files": 484,
+     "buckets": {
+      "blobs/glb": 60504720,
+      "blobs/pack": 32532653,
+      "blobs/bin": 9710329,
+      "blobs/image": 3852932,
+      "blobs/json": 2861730,
+      "blobs/ktx2": 1263018,
+      "sections": 1100946,
+      "root-files": 999873,
+      "blobs/tile": 524320,
+      "schemas": 34699,
+      "blobs/wasm": 34025
+     }
+    }
+   },
+   "recorded": {
+    "phone": {
+     "wireBytes": 29927049,
+     "titleBytes": 28300053,
+     "entryBytes": 1626996,
+     "requests": 253,
+     "loadingLine": "Spawn view · 23.4 MB · 23.4 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 40071420,
+     "titleBytes": 38001280,
+     "entryBytes": 2070140,
+     "requests": 259,
+     "loadingLine": "Spawn view · 33.0 MB · 33.0 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 125443093,
+     "files": 534,
+     "buckets": {
+      "blobs/glb": 60504720,
+      "blobs/pack": 31534060,
+      "mounts/assets": 12076637,
+      "blobs/bin": 9710329,
+      "blobs/image": 3852932,
+      "blobs/json": 1913055,
+      "blobs/ktx2": 1263018,
+      "sections": 1077155,
+      "root-files": 1013604,
+      "mounts/programs": 989216,
+      "server": 929701,
+      "blobs/tile": 524320,
+      "blobs/wasm": 34025,
+      "mounts/shardfiles": 20321
+     }
+    }
+   },
+   "thinTarball": {
+    "head": "0c14ad7a53687c6a1fdd9982edf60bcffbffea4973c71dc19178321cefeb2458",
+    "bytes": 94310912,
+    "mountsAssetsBytes": 12076637
+   },
+   "latchedPhoneBytes": 21265451
+  },
+  "far-reach": {
+   "baselinePhoneBytes": 49888072,
+   "recordedPhoneBytes": 53585115,
+   "ceilingPhoneBytes": 30338351,
+   "shrinkOnly": true,
+   "baseline": {
+    "phone": {
+     "wireBytes": 49888072,
+     "titleBytes": 2681751,
+     "entryBytes": 47206321,
+     "requests": 149,
+     "loadingLine": "Spawn view · 70.2 MB · 0.84 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 65166876,
+     "titleBytes": 34578868,
+     "entryBytes": 30588008,
+     "requests": 227,
+     "loadingLine": "Spawn view · 54.7 MB · 0.92 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 53151920,
+     "files": 212,
+     "buckets": {
+      "blobs/glb": 21879600,
+      "blobs/pack": 17588502,
+      "blobs/ktx2": 9485265,
+      "blobs/bin": 1766114,
+      "sections": 788709,
+      "blobs/json": 787795,
+      "blobs/image": 735829,
+      "root-files": 112908,
+      "blobs/wasm": 7198
+     }
+    }
+   },
+   "recorded": {
+    "phone": {
+     "wireBytes": 75657437,
+     "titleBytes": 28507653,
+     "entryBytes": 47149784,
+     "requests": 191,
+     "loadingLine": "Spawn view · 50.9 MB · 3.14 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 86017881,
+     "titleBytes": 38288653,
+     "entryBytes": 47729228,
+     "requests": 195,
+     "loadingLine": "Spawn view · 51.7 MB · 3.94 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 84066799,
+     "files": 268,
+     "buckets": {
+      "mounts/assets": 29602062,
+      "blobs/glb": 21834544,
+      "blobs/pack": 17579848,
+      "blobs/ktx2": 9485265,
+      "blobs/bin": 1766114,
+      "mounts/programs": 950113,
+      "sections": 786639,
+      "blobs/json": 781211,
+      "blobs/image": 735829,
+      "root-files": 509594,
+      "mounts/shardfiles": 28382,
+      "blobs/wasm": 7198
+     }
+    }
+   },
+   "thinTarball": {
+    "head": "66eacdbb4a7c306d36e58396004e9bdb92230fe51d7a518b995cd3dd59973f51",
+    "bytes": 66691072,
+    "mountsAssetsBytes": 29602062
+   },
+   "latchedPhoneBytes": 30338351
+  },
+  "sunscar-dunes": {
+   "baselinePhoneBytes": 12421514,
+   "recordedPhoneBytes": 11650341,
+   "ceilingPhoneBytes": 12421514,
+   "shrinkOnly": false,
+   "baseline": {
+    "phone": {
+     "wireBytes": 12421514,
+     "titleBytes": 2666887,
+     "entryBytes": 9754627,
+     "requests": 119,
+     "loadingLine": "Spawn view · 20.6 MB · 0.82 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 44629346,
+     "titleBytes": 34407998,
+     "entryBytes": 10221348,
+     "requests": 197,
+     "loadingLine": "Spawn view · 22.5 MB · 0.74 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 16465039,
+     "files": 200,
+     "buckets": {
+      "blobs/pack": 8187493,
+      "blobs/ktx2": 2990088,
+      "blobs/glb": 2729004,
+      "blobs/tile": 1455908,
+      "blobs/image": 579745,
+      "sections": 244979,
+      "blobs/json": 106633,
+      "root-files": 90053,
+      "blobs/bin": 65582,
+      "blobs/wasm": 15554
+     }
+    }
+   },
+   "recorded": {
+    "phone": {
+     "wireBytes": 35811339,
+     "titleBytes": 28492789,
+     "entryBytes": 7318550,
+     "requests": 181,
+     "loadingLine": "Spawn view · 11.1 MB · 3.14 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 45436054,
+     "titleBytes": 38117783,
+     "entryBytes": 7318271,
+     "requests": 184,
+     "loadingLine": "Spawn view · 11.9 MB · 3.94 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 18756152,
+     "files": 211,
+     "buckets": {
+      "blobs/pack": 8182568,
+      "blobs/ktx2": 2990088,
+      "blobs/glb": 2729004,
+      "mounts/assets": 1557202,
+      "blobs/tile": 1455908,
+      "blobs/image": 579745,
+      "mounts/programs": 491461,
+      "root-files": 325711,
+      "sections": 244968,
+      "blobs/json": 101678,
+      "blobs/bin": 65582,
+      "mounts/shardfiles": 16642,
+      "blobs/wasm": 15595
+     }
+    }
+   },
+   "thinTarball": {
+    "head": "75b8008d5b96b7c1b43075b8d1fdb1b437ff4afcbb3aefe9c86029775530dda4",
+    "bytes": 10755072,
+    "mountsAssetsBytes": 1557202
+   }
+  },
+  "nalati-grasslands": {
+   "baselinePhoneBytes": 58179472,
+   "recordedPhoneBytes": 57946689,
+   "ceilingPhoneBytes": 41364700,
+   "shrinkOnly": true,
+   "baseline": {
+    "phone": {
+     "wireBytes": 58179472,
+     "titleBytes": 2739328,
+     "entryBytes": 55440144,
+     "requests": 182,
+     "loadingLine": "Spawn view · 75.4 MB · 1.90 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 131186703,
+     "titleBytes": 34680169,
+     "entryBytes": 96506534,
+     "requests": 402,
+     "loadingLine": "Spawn view · 130.1 MB · 5.61 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 154664578,
+     "files": 424,
+     "buckets": {
+      "blobs/pack": 64847480,
+      "blobs/ktx2": 29882197,
+      "blobs/bin": 27849797,
+      "blobs/glb": 17181232,
+      "blobs/json": 9167810,
+      "blobs/image": 3049110,
+      "root-files": 1174550,
+      "sections": 680120,
+      "blobs/tile": 524320,
+      "blobs/wasm": 307962
+     }
+    }
+   },
+   "recorded": {
+    "phone": {
+     "wireBytes": 82125190,
+     "titleBytes": 28565230,
+     "entryBytes": 53559960,
+     "requests": 339,
+     "loadingLine": "Spawn view · 54.5 MB · 5.04 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 160960698,
+     "titleBytes": 38389954,
+     "entryBytes": 122570744,
+     "requests": 425,
+     "loadingLine": "Spawn view · 54.5 MB · 5.04 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 212607355,
+     "files": 624,
+     "buckets": {
+      "blobs/pack": 61755899,
+      "mounts/assets": 58906158,
+      "blobs/ktx2": 29882197,
+      "blobs/bin": 27849797,
+      "blobs/glb": 17181232,
+      "blobs/json": 8516074,
+      "blobs/image": 3049110,
+      "root-files": 1953618,
+      "server": 980747,
+      "mounts/programs": 897059,
+      "sections": 695070,
+      "blobs/tile": 524320,
+      "blobs/wasm": 313057,
+      "mounts/shardfiles": 103017
+     }
+    }
+   },
+   "thinTarball": {
+    "head": "bc6e2b7a18ed6c12789f05141efce427df068bbd1fffd0354a2b9243a3d94526",
+    "bytes": 151324160,
+    "mountsAssetsBytes": 58906158
+   },
+   "latchedPhoneBytes": 41364700
+  },
+  "nine-dragon-stack": {
+   "baselinePhoneBytes": 21798837,
+   "recordedPhoneBytes": 42130782,
+   "ceilingPhoneBytes": 34171058,
+   "shrinkOnly": true,
+   "baseline": {
+    "phone": {
+     "wireBytes": 21798837,
+     "titleBytes": 2745211,
+     "entryBytes": 19053626,
+     "requests": 152,
+     "loadingLine": "Spawn view · 77.7 MB · 11.6 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 80200056,
+     "titleBytes": 34688294,
+     "entryBytes": 45511762,
+     "requests": 233,
+     "loadingLine": "Spawn view · 187.6 MB · 97.1 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 230865571,
+     "files": 746,
+     "buckets": {
+      "blobs/glb": 145210892,
+      "blobs/pack": 66814791,
+      "blobs/json": 10993991,
+      "blobs/image": 2965392,
+      "blobs/bin": 2481606,
+      "blobs/ktx2": 1364281,
+      "sections": 583488,
+      "root-files": 436485,
+      "blobs/wasm": 14645
+     }
+    }
+   },
+   "recorded": {
+    "phone": {
+     "wireBytes": 60179401,
+     "titleBytes": 28571113,
+     "entryBytes": 31608288,
+     "requests": 218,
+     "loadingLine": "Spawn view · 36.0 MB · 4.12 MB from cache"
+    },
+    "desktop": {
+     "wireBytes": 94864154,
+     "titleBytes": 38398079,
+     "entryBytes": 56466075,
+     "requests": 238,
+     "loadingLine": "Spawn view · 37.0 MB · 4.12 MB from cache"
+    },
+    "folder": {
+     "totalBytes": 156544303,
+     "files": 714,
+     "buckets": {
+      "blobs/glb": 74235480,
+      "blobs/pack": 43963833,
+      "mounts/assets": 19473265,
+      "blobs/json": 8222953,
+      "blobs/bin": 3048051,
+      "blobs/image": 2965398,
+      "mounts/programs": 1691891,
+      "blobs/ktx2": 1364281,
+      "root-files": 846170,
+      "sections": 594684,
+      "server": 100229,
+      "mounts/shardfiles": 23423,
+      "blobs/wasm": 14645
+     }
+    }
+   },
+   "thinTarball": {
+    "head": "a5d4967755a7cb21756b0d81e21e86b032525e29f7952eee182707d25da37bf8",
+    "bytes": 113122816,
+    "mountsAssetsBytes": 19473265
+   },
+   "latchedPhoneBytes": 34171058
+  }
+ }
+}

@@ -1,0 +1,397 @@
+{
+  "compressed": 13358,
+  "critical": false,
+  "decoded": 13358,
+  "dependencies": [],
+  "draws": 0,
+  "gpu": 0,
+  "hash": "3224ecb75f36deac1ca903d80b8aee6e9d7a481b8cf123b3ecdfb05608fcc5e7",
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "items": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "baked": {
+              "additionalProperties": false,
+              "properties": {
+                "attrs": {
+                  "items": {
+                    "items": [
+                      {
+                        "maxLength": 512,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "enum": [
+                          "f32",
+                          "f16",
+                          "u16",
+                          "i8",
+                          "u8"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "maximum": 1000000,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "minItems": 4,
+                    "type": "array"
+                  },
+                  "maxItems": 32,
+                  "type": "array"
+                },
+                "box": {
+                  "type": "boolean"
+                },
+                "count": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "expand": {
+                  "type": "boolean"
+                },
+                "index": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "u16",
+                        "u32"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "indexCount": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "attrs",
+                "count",
+                "index",
+                "indexCount",
+                "box",
+                "expand"
+              ],
+              "type": "object"
+            },
+            "channels": {
+              "items": {
+                "additionalItems": false,
+                "items": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                ],
+                "minItems": 2,
+                "type": "array"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "file": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "slot": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "slot",
+            "channels",
+            "file"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "baked": {
+              "additionalProperties": false,
+              "properties": {
+                "attrs": {
+                  "items": {
+                    "items": [
+                      {
+                        "maxLength": 512,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "enum": [
+                          "f32",
+                          "f16",
+                          "u16",
+                          "i8",
+                          "u8"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "maximum": 1000000,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "minItems": 4,
+                    "type": "array"
+                  },
+                  "maxItems": 32,
+                  "type": "array"
+                },
+                "box": {
+                  "type": "boolean"
+                },
+                "count": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "expand": {
+                  "type": "boolean"
+                },
+                "index": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "u16",
+                        "u32"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "indexCount": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "attrs",
+                "count",
+                "index",
+                "indexCount",
+                "box",
+                "expand"
+              ],
+              "type": "object"
+            },
+            "channels": {
+              "items": {
+                "additionalItems": false,
+                "items": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                ],
+                "minItems": 2,
+                "type": "array"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "lane": {
+              "additionalProperties": false,
+              "properties": {
+                "offset": {
+                  "maximum": 2147483648,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "url": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "offset"
+              ],
+              "type": "object"
+            },
+            "slot": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "slot",
+            "channels",
+            "lane",
+            "baked"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "baked": {
+              "additionalProperties": false,
+              "properties": {
+                "attrs": {
+                  "items": {
+                    "items": [
+                      {
+                        "maxLength": 512,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "enum": [
+                          "f32",
+                          "f16",
+                          "u16",
+                          "i8",
+                          "u8"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "maximum": 1000000,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ],
+                    "minItems": 4,
+                    "type": "array"
+                  },
+                  "maxItems": 32,
+                  "type": "array"
+                },
+                "box": {
+                  "type": "boolean"
+                },
+                "count": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "expand": {
+                  "type": "boolean"
+                },
+                "index": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "u16",
+                        "u32"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "indexCount": {
+                  "maximum": 1000000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "attrs",
+                "count",
+                "index",
+                "indexCount",
+                "box",
+                "expand"
+              ],
+              "type": "object"
+            },
+            "channels": {
+              "items": {
+                "additionalItems": false,
+                "items": [
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                ],
+                "minItems": 2,
+                "type": "array"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "inline": {
+              "maxLength": 1048576,
+              "minLength": 1,
+              "type": "string"
+            },
+            "slot": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "slot",
+            "channels",
+            "inline",
+            "baked"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "maxItems": 128,
+    "minItems": 1,
+    "type": "array"
+  },
+  "kind": "json",
+  "name": "models/shape-book.json",
+  "path": "blobs/json/3224ecb75f36deac1ca903d80b8aee6e9d7a481b8cf123b3ecdfb05608fcc5e7.json",
+  "triangles": 0
+}

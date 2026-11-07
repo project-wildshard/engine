@@ -1,0 +1,10 @@
+--- a/src/player/TouchControls.ts
++++ b/src/player/TouchControls.ts
+@@ -359,6 +359,7 @@
+     // LOCK (E50, the J disc): a toggle — lock the enemy nearest the centre, tap again to release; with nothing lockable it
+     // flashes NO TARGET and the view re-levels (LockOnTarget.toggle)
+     btn('.ws-touch-disc.lock', () => { if (this.weapons.enabled) this.lock?.toggle(); });
++    lockBtn.remove();
+     if (this.lock) {
+       const prevNone = this.lock.onNoTarget;
+       this.lock.onNoTarget = () => { prevNone?.(); lockBtn.classList.remove('none'); void lockBtn.offsetWidth; lockBtn.classList.add('none'); lockLabel.textContent = 'No target'; setTimeout(() => { if (lockOn.state !== 'locked') lockLabel.textContent = hintLock.hint?.label ?? 'Lock'; }, 700); };

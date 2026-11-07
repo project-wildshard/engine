@@ -1,0 +1,28 @@
+/* ─── SF38 / G30 / G628: the memory strip (src/client/game/grid/budgetOverlay.ts) ─── prefix ws-grid-budget- ───
+   Developer mode only, grid pages only: one line under the top bar and the quest tracker (below G168's red DEV strip's row), the page's
+   memory headline toned by the danger bands (green / amber / red), a red line per shard over its own limit; a tap expands the breakdown. */
+.ws-grid-budget { position: absolute; left: 6px; top: calc(var(--ws-top, 16px) + 150px); z-index: calc(var(--ws-layer-hud) + 6); max-width: min(360px, calc(100vw - 12px));
+  padding: 4px 7px; border: 1px solid rgba(255, 242, 239, 0.25); background: #14100f; color: #fff2ef; font-family: var(--ws-mono); font-size: 9px; line-height: 1.35; letter-spacing: 0.08em;
+  pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.ws-grid-budget[hidden], #hud.intro .ws-grid-budget { display: none; }
+.ws-grid-budget-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; }
+.ws-grid-budget-bar::after { content: '▾'; flex: none; opacity: 0.7; }   /* tap for the raw numbers, like the memory chip */
+.ws-grid-budget[aria-expanded='true'] .ws-grid-budget-bar::after { content: '▴'; }
+.ws-grid-budget-x { font-weight: 700; white-space: nowrap; }
+.ws-grid-budget-over { flex-basis: 100%; font-weight: 700; }
+.ws-grid-budget [data-tone='green'] { color: #6ee08f; }
+.ws-grid-budget [data-tone='amber'] { color: #ffc35a; }
+.ws-grid-budget [data-tone='red'] { color: #ffb5ab; }
+.ws-grid-budget-detail { margin-top: 5px; max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid rgba(255, 242, 239, 0.25); padding-top: 4px; }
+.ws-grid-budget-detail[hidden] { display: none; }
+.ws-grid-budget-sec + .ws-grid-budget-sec { margin-top: 5px; }
+.ws-grid-budget-h { margin: 0 0 1px; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: #ffd9d4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-grid-budget-row { display: flex; justify-content: space-between; gap: 10px; padding-left: 6px; color: #fff2ef; }
+.ws-grid-budget-k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-grid-budget-v { flex: none; white-space: nowrap; }
+.ws-grid-budget-tools { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.ws-grid-budget-choice { color: inherit; background: #14100f; border: 1px solid rgba(255, 242, 239, 0.25); font: inherit; padding: 4px; max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.ws-grid-budget-allocation { align-items: start; }
+.ws-grid-budget-allocation .ws-grid-budget-k { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ws-grid-budget-allocation .ws-grid-budget-v { white-space: normal; text-align: right; }
+.ws-grid-budget-memory-note { display: block; margin: 2px 0 4px 6px; font-size: 8px; opacity: 0.8; overflow-wrap: anywhere; }

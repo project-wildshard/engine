@@ -1,0 +1,11 @@
+--- a/src/player/Player.ts
++++ b/src/player/Player.ts
+@@ -18,7 +18,7 @@
+ const EYE = 1.68;
+ const RADIUS = 0.38;
+ const BODY_HEIGHT = 1.8;               // the capsule, feet to crown
+-const STEP_UP = 0.35;                  // m climbed without a jump (PHYSICS.md: stricter than the old 0.5)
++const STEP_UP = 0.20;                  // m climbed without a jump (PHYSICS.md: stricter than the old 0.5)
+ const MAX_CLIMB_DEG = 40;              // steeper ground is a wall to walk into (the old SLOPE_WALK let 44° through)
+ const GRAVITY = 22;
+ 

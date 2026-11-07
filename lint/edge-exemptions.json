@@ -1,0 +1,6 @@
+{
+  "about": "SHARD-PLATFORM SP4 (Jake, 2026-10-03: exempt now, fix at SF46 / SF49): levels whose edges can't carry the walkable 15 m road MMO-REQUIREMENTS W4 asks for. May only shrink; each entry names the row that adds its edge entries.",
+  "levels": {
+    "driftwood-isle": "open sea at every edge: SF46 adds a pier or sandbar road at each midpoint"
+  }
+}

@@ -1,0 +1,272 @@
+{
+ "version": 1,
+ "barkLayers": [
+  "pine_bark",
+  "fir_bark",
+  "metasequoia_bark",
+  "birch_bark",
+  "bark_willow_02"
+ ],
+ "impostor": {
+  "cols": 4,
+  "rows": 4,
+  "cell": [
+   256,
+   512
+  ]
+ },
+ "variants": [
+  {
+   "name": "pine-a",
+   "species": "pine",
+   "height": 22.0,
+   "trunk": 0.42,
+   "frame": [
+    14.092450332641603,
+    28.184900665283205
+   ],
+   "tris": {
+    "trunk": 840,
+    "trunkLo": 336,
+    "hi": 2540,
+    "lo": 508,
+    "twigs": 174,
+    "far": 4
+   }
+  },
+  {
+   "name": "pine-b",
+   "species": "pine",
+   "height": 17.0,
+   "trunk": 0.34,
+   "frame": [
+    9.788068542480469,
+    19.576137084960937
+   ],
+   "tris": {
+    "trunk": 624,
+    "trunkLo": 224,
+    "hi": 1340,
+    "lo": 268,
+    "twigs": 88,
+    "far": 4
+   }
+  },
+  {
+   "name": "pine-c",
+   "species": "pine",
+   "height": 26.0,
+   "trunk": 0.5,
+   "frame": [
+    17.840980682373047,
+    35.681961364746094
+   ],
+   "tris": {
+    "trunk": 936,
+    "trunkLo": 336,
+    "hi": 3040,
+    "lo": 608,
+    "twigs": 200,
+    "far": 4
+   }
+  },
+  {
+   "name": "pine-young",
+   "species": "pine",
+   "height": 13.0,
+   "trunk": 0.27,
+   "frame": [
+    8.03162501335144,
+    16.06325002670288
+   ],
+   "tris": {
+    "trunk": 840,
+    "trunkLo": 256,
+    "hi": 1840,
+    "lo": 368,
+    "twigs": 134,
+    "far": 4
+   }
+  },
+  {
+   "name": "fir-a",
+   "species": "fir",
+   "height": 24.0,
+   "trunk": 0.45,
+   "frame": [
+    12.63780035018921,
+    25.27560070037842
+   ],
+   "tris": {
+    "trunk": 752,
+    "trunkLo": 50,
+    "hi": 1780,
+    "lo": 300,
+    "twigs": 162,
+    "far": 4
+   }
+  },
+  {
+   "name": "fir-b",
+   "species": "fir",
+   "height": 30.0,
+   "trunk": 0.56,
+   "frame": [
+    15.75899980545044,
+    31.51799961090088
+   ],
+   "tris": {
+    "trunk": 1072,
+    "trunkLo": 50,
+    "hi": 2236,
+    "lo": 376,
+    "twigs": 196,
+    "far": 4
+   }
+  },
+  {
+   "name": "giant-a",
+   "species": "giant",
+   "height": 44.0,
+   "trunk": 2.0,
+   "frame": [
+    25.42925594329834,
+    50.85851188659668
+   ],
+   "tris": {
+    "trunk": 2950,
+    "trunkLo": 812,
+    "hi": 4024,
+    "lo": 942,
+    "twigs": 356,
+    "far": 4
+   }
+  },
+  {
+   "name": "giant-b",
+   "species": "giant",
+   "height": 52.0,
+   "trunk": 2.4,
+   "frame": [
+    27.98114891052246,
+    55.96229782104492
+   ],
+   "tris": {
+    "trunk": 3190,
+    "trunkLo": 872,
+    "hi": 4688,
+    "lo": 1100,
+    "twigs": 422,
+    "far": 4
+   }
+  },
+  {
+   "name": "birch-a",
+   "species": "birch",
+   "height": 16.0,
+   "trunk": 0.2,
+   "frame": [
+    11.110548362731933,
+    22.221096725463866
+   ],
+   "tris": {
+    "trunk": 812,
+    "trunkLo": 188,
+    "hi": 930,
+    "lo": 466,
+    "twigs": 150,
+    "far": 4
+   }
+  },
+  {
+   "name": "birch-twin",
+   "species": "birch",
+   "height": 13.0,
+   "trunk": 0.16,
+   "frame": [
+    10.928669815063477,
+    21.857339630126955
+   ],
+   "tris": {
+    "trunk": 1192,
+    "trunkLo": 292,
+    "hi": 1164,
+    "lo": 584,
+    "twigs": 152,
+    "far": 4
+   }
+  },
+  {
+   "name": "snag-a",
+   "species": "snag",
+   "height": 14.0,
+   "trunk": 0.38,
+   "frame": [
+    7.196801176071167,
+    14.393602352142334
+   ],
+   "tris": {
+    "trunk": 440,
+    "trunkLo": 108,
+    "hi": 22,
+    "lo": 24,
+    "twigs": 22,
+    "far": 4
+   }
+  },
+  {
+   "name": "snag-b",
+   "species": "snag",
+   "height": 10.0,
+   "trunk": 0.3,
+   "frame": [
+    6.297008485794067,
+    12.594016971588134
+   ],
+   "tris": {
+    "trunk": 400,
+    "trunkLo": 96,
+    "hi": 24,
+    "lo": 26,
+    "twigs": 24,
+    "far": 4
+   }
+  },
+  {
+   "name": "sapling-pine",
+   "species": "sapling",
+   "height": 3.2,
+   "trunk": 0.06,
+   "frame": [
+    2.9415326929092407,
+    5.883065385818481
+   ],
+   "tris": {
+    "trunk": 50,
+    "trunkLo": 8,
+    "hi": 132,
+    "lo": 34,
+    "twigs": 32,
+    "far": 4
+   }
+  },
+  {
+   "name": "sapling-fir",
+   "species": "sapling",
+   "height": 4.5,
+   "trunk": 0.08,
+   "frame": [
+    2.9769343900680543,
+    5.9538687801361085
+   ],
+   "tris": {
+    "trunk": 100,
+    "trunkLo": 50,
+    "hi": 688,
+    "lo": 118,
+    "twigs": 114,
+    "far": 4
+   }
+  }
+ ]
+}

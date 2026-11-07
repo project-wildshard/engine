@@ -1,0 +1,2520 @@
+{
+  "schema": "platform-pending-users/1",
+  "entries": [
+    {
+      "module": "src/client/game/shardfile/pageWater.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/pagePreparation.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/audio/forestPage.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/loadout/rangedPage.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/forestPage.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/forestRoofMask.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/forestWeather.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/forestGround.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/quest/nativeInputs.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/combat/roamingSession.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/boss/roamingProjection.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/boss/socketRig.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/quest/pageResources.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/quest/pageComposition.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/clientPopulationProjection.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/population/projection.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/population/perchBody.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/audio/cueDirector.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "audio-cue-director",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/population/returnProgram.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G475"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/population/pageReturns.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G475"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/ambient/flock.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati ambient life on the game's ambient-life host (SF48)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "H6 ambient life",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/plugin/animation.ts",
+      "export": "createNativeCreaturePoses",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati native pose roster (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/plugin/bossStorm.ts",
+      "export": "bossStorm",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "SF48"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/looks/riggedHulls.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "SF48"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quadruped-rig",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/engine/ai/ambientFlight.ts",
+      "export": "CirclingFlyer",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati ambient life on the game's ambient-life host (SF48)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/combat/view/ranged.ts",
+      "export": "weaponDisplay",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati weapon pickup displays (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/game/plugin/quests.ts",
+      "export": "createReadingRoster",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati single-active NPC reading roster (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/plugin/quests.ts",
+      "export": "QuestReading",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati single-active NPC reading roster (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/plugin/quests.ts",
+      "export": "QuestReadingSpot",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati single-active NPC reading roster (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/plugin/quests.ts",
+      "export": "QuestReadingRows",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati single-active NPC reading roster (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/plugin/quests.ts",
+      "export": "QuestReadingRoster",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati single-active NPC reading roster (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/overcast.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati storm overcast rows (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "createNativeSpeciesContext",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati native species context (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/looks/posedInstances.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati shader-posed instance owner (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/Boss.ts",
+      "export": "BossScoreAction",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati rendered boss encounter presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/Boss.ts",
+      "export": "BossEncounterRows",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati rendered boss encounter presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/Boss.ts",
+      "export": "BossEncounterScore",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati rendered boss encounter presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/Boss.ts",
+      "export": "BossEncounterPorts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati rendered boss encounter presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/Boss.ts",
+      "export": "BossEncounter",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati rendered boss encounter presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/Boss.ts",
+      "export": "installBossEncounter",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati rendered boss encounter presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/combat/view/projectile.ts",
+      "export": "ProjectilePresentation",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati projectile presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "bolt-flight",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/plugin/animation.ts",
+      "export": "NativeCreaturePose",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati numeric taming pose (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/game/plugin/animation.ts",
+      "export": "NativeCreaturePoseRecipe",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati numeric taming pose (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/game/plugin/animation.ts",
+      "export": "attachNativeCreaturePose",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati numeric taming pose (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/cosmetics/locker.ts",
+      "export": "CosmeticsLocker",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati cosmetic inventory cards (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/engine/combat/Firearm.ts",
+      "export": "RangedAction",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati ranged action clocks (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/engine/combat/Firearm.ts",
+      "export": "RangedActionRow",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati ranged action clocks (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/models/sets.ts",
+      "export": "placedWithin",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati spatial model sets (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/models/colliders.ts",
+      "export": "readColliderRows",
+      "shard": "nine-dragon-stack",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nine baked collider rows (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/game/bag/findsCatalogue.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati finds inventory catalogue (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "collections",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/app/cachedAssets.ts",
+      "export": "ResourceMemo",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati resource acquisition memo (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/combat/view/bowProfile.ts",
+      "export": "BowShape",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati bow shape traversal (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/plugin/geometry.ts",
+      "export": "packedCreatureBodies",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati packed creature bodies (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/plugin/geometry.ts",
+      "export": "PackedCreatureBodies",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati packed creature bodies (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/combat/view/ranged.ts",
+      "export": "prepareWeaponView",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati held weapon queue preparation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/combat/effects/EffectService.ts",
+      "export": "selectEffectGrants",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati worn effect grant rows (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/combat/effects/EffectService.ts",
+      "export": "EffectGrantRow",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati worn effect grant rows (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/engine/physics/box.ts",
+      "export": "floorAtRects",
+      "shard": "nine-dragon-stack",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nine deck floor queries (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "createMemoryActionBrain",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati actor-memory actions (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "MemoryActionRows",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati actor-memory actions (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/looks/daySky.ts",
+      "export": "driveDayAir",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati day air writes (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/daySky.ts",
+      "export": "DayAirRow",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati day air writes (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/daySky.ts",
+      "export": "DayAirFrame",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati day air writes (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/render/viewmodelFeel.ts",
+      "export": "HitscanPresentation",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati hitscan effect presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/render/viewmodelFeel.ts",
+      "export": "HitscanPresentationRow",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati hitscan effect presentation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/game/plugin/director.ts",
+      "export": "DirectorScriptStageLane",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati scripted director emit bindings (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/game/plugin/director.ts",
+      "export": "DirectorScriptStagePorts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati scripted director emit bindings (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/systems/viewmodel/rigArms.ts",
+      "shard": "nine-dragon-stack",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nine first-person arm rig (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "held-arms",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/format/eliteContinuation.ts",
+      "export": "EliteCoreContinuationSchema",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati elite rule continuation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/format/eliteContinuation.ts",
+      "export": "EliteCoreContinuation",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati elite rule continuation (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/engine/player/heldHandParts.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati held hand parts (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "createCreatureSpawner",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature herd materialization (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "CreatureSpawner",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature herd materialization (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "CreatureSpawnRow",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature herd materialization (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/plugin/animation.ts",
+      "export": "stepCreatureLift",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature rise and sink (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/shared/game/plugin/runtimeRows.ts",
+      "export": "bindRuntimeJsonRecord",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati typed runtime JSON records (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "sampleCreatureGroup",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature group sampling (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "CreatureGroupSpec",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature group sampling (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "CreatureGroupSample",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature group sampling (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/plugin/brain.ts",
+      "export": "selectCreatureSites",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati creature site selection (G441)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/world/Atmosphere.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati colour-ramp fog (G475)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "colour-ramp-fog",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/world/lowpolyKit.ts",
+      "shard": "nine-dragon-stack",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nine low-poly material binding (G475)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "low-poly-binder",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/hybrid.ts",
+      "shard": "nine-dragon-stack",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nine resident world re-entry (G476)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "resident-world",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/world/water/ripples.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "W3 Nalati water ripples (G474)"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "water-ripples",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/systems/viewmodel/heldView.ts",
+      "shard": "pine-hollow",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "held-arms",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/population/actors.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/population/respawn.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/quest/hints.ts",
+      "shard": "pine-hollow",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G474"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quest-step-runner",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/plugin/heldEquipment.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/loadout/held.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/loadout/pouch.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/loadout/persistence.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/loadout/effects.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/boss/lane.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/boss/wake.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/boss/presentation.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/models/slots.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "collections",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/models/collectionDisplay.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "collections",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/compendium/keepsakes.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "collections",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/models/collectionWall.ts",
+      "shard": "driftwood-isle",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G475"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "collections",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/plugin/heldTool.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/loadout/finishes.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/models/heldGear.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/loadout/claims.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "held-arms",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/worldScenes.ts",
+      "shard": "pine-hollow",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G483"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/quest/contracts.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G484"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "contracts + elites",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G473"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/quest/contractBoard.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G484"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "contracts + elites",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G473"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/population/spawnScript.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "actor-spawn",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/sceneHandles.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "SF48"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "living-buildings",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/livingBuildings.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "SF48"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "living-buildings",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/buildingCloud.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "SF48"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "living-buildings",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/clientPlan.ts",
+      "export": "installClientPhase",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G483"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/animation/limbRig.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quadruped-rig",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/animation/limbBlend.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quadruped-rig",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/animation/limbCollision.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quadruped-rig",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/animation/limbQueryPose.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/animation/limbQueryView.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3"
+    },
+    {
+      "module": "src/client/game/animation/limbView.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quadruped-rig",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/animation/limbPopulation.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "quadruped-rig",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/models/worldSceneCatalogue.ts",
+      "shard": "pine-hollow",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G483"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/quest/eliteFeature.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G484"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "contracts + elites",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G473"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/quest/eliteDecisions.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G484"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "contracts + elites",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G473"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/quest/elitePage.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G484"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "contracts + elites",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G473"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/quest/eliteStreams.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G484"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "contracts + elites",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G473"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/population/scriptStrikes.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G484"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "contracts + elites",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G473"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/keyedSky.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/looks/keyedSkyClock.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G477"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/render/streamedInstances.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "streamed cover",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/streamedCover.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "streamed cover",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/toonLighting.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "toon look host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/toonLook.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "toon look host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/toonSky.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "toon look host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/worldScenePlacement.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G483"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/worldSceneMaterials.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G483"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/worldSceneBatch.ts",
+      "shard": "nalati-grasslands",
+      "plan": {
+        "path": "docs/plans/host-audit/shard-platform-rows.md",
+        "row": "G483"
+      },
+      "documentation": "docs/ENGINE.md",
+      "rechecked-by": "end of W3",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/worldSceneSurface.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/worldSceneWeld.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/models/place.ts",
+      "export": "installWeldCulling",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/lightEmitters.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "light emitters",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/shared/engine/world/easedFields.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "eased fields",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G484"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/weatherFields.ts",
+      "export": "installWeatherFields",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "eased fields",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G484"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/weatherFields.ts",
+      "export": "settleWeatherFields",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "eased fields",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G484"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/riding/hud.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/riding/mount.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/boss/arenaRoom.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/boss/arenaFire.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/paintedLook.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "painterly look host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/painterlyLook.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "painterly look host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/boss/encounterView.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "boss fight host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/grapple/sim.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "grapple-traversal",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/grapple/course.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "grapple-traversal",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/grapple/tool.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "grapple-traversal",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/grapple/ribbon.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "grapple-traversal",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/practice/course.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "practice-courses",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/stealth/controller.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "stealth-and-detection",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/weapons/heldDecision.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "held-arms",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/weapons/heldPolearm.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "held-arms",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/weapons/mountedBlade.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "held-arms",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/weapons/arcPower.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "held-arms",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/shardfile/walkInPortalRide.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "walk-in-portal-ride",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/portalRideBinding.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "walk-in-portal-ride",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/audio/voicePatches.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "audio-cue-director",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/audio/sceneDirector.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "audio-cue-director",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/staticCapture.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "toon look host",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/looks/grassPresentation.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "grass-field",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/engine/render/scatterInstances.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "streamed cover",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G475"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/ambient/wingField.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "H6 ambient life",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/riding/physics.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/riding/taming.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/riding/native.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/riding/roster.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/shared/game/riding/presentation.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/riding/nativeTaming.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/riding/client.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/loadout/cosmeticFinishes.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/clientCosmeticFinishes.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "loadout",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/clientWaterSurfaces.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/clientPlaceSets.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "declared runtime entry",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/riding/nativePopulation.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "mounts-riding-taming",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G478"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/sceneDressing.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/sceneInstances.ts",
+      "documentation": "docs/HOST-BAR.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/weather/reactions.ts",
+      "export": "WeatherReactions",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/server/game/weather/reactions.ts",
+      "export": "installWeatherReactions",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/weather/rainPresentation.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "weather reactions + keyed sky",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G474"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/systems/npc/kitFigure.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/models/treeSet.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    },
+    {
+      "module": "src/client/game/shardfile/caveInterior.ts",
+      "documentation": "docs/ENGINE.md",
+      "approvedFeature": {
+        "name": "world scene assembly",
+        "decision": {
+          "path": "docs/plans/decisions.md",
+          "row": "G483"
+        }
+      }
+    }
+  ]
+}

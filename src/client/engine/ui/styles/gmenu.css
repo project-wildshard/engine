@@ -1,0 +1,362 @@
+/* ─── in-game MENU (src/client/engine/ui/Menu.ts): MAP · INVENTORY · ACHIEVEMENTS · SETTINGS ─── prefix ws-gmenu- ───
+   One full-height glass sheet over the blurred, still-running world (art/menu/round-2-tabs/menu-tab-*.png). Header (the bar, E178:
+   [RESUME] PAUSED / shard [EXIT TO MAIN], [CLOSE] BAG), a four-tab bar with the cyan underline, the active tab's panel, a footer hint. Lives on <body>
+   above the HUD, the minimap (z 6) and the phone's touch layer (z 5). */
+.ws-gmenu { position: fixed; inset: 0; z-index: calc(var(--ws-layer-gameMenu) + 0); display: flex; align-items: stretch; justify-content: center; padding: calc(var(--ws-top) + 4px + var(--ws-pill, 0px)) 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(6, 10, 18, 0.55); -webkit-backdrop-filter: blur(6px) saturate(1.1); backdrop-filter: blur(6px) saturate(1.1); opacity: 0; pointer-events: none; transition: opacity 0.18s; font-family: var(--ws-mono); color: var(--ws-text); }
+.ws-gmenu.show { opacity: 1; pointer-events: auto; }
+.ws-gmenu * { box-sizing: border-box; } /* on <body>, outside #hud's reset: a 100 %-wide padded .ws-gmenu-row ran 26 px past the sheet */
+.ws-gmenu .ws-gmenu-sheet { width: 100%; max-width: 560px; display: flex; flex-direction: column; min-height: 0; background: rgba(8, 12, 20, 0.86); padding: 0; }
+.ws-gmenu .ws-gmenu-sheet::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 18px; height: 18px; border-right: 1px solid var(--ws-cyan); border-bottom: 1px solid var(--ws-cyan); opacity: 0.8; pointer-events: none; }
+/* E139 (the user, 2026-09-25): rounded corners, so the phone's own rounded screen corners don't read as the sheet's
+   bottom corners cut off. The bottom radius follows the iPhone's screen curve on touch screens; the corner brackets bend
+   with the corners; the content is clipped to them. */
+.ws-gmenu .ws-gmenu-sheet { --ws-gmenu-rt: 16px; --ws-gmenu-rb: 16px; border-radius: var(--ws-gmenu-rt) var(--ws-gmenu-rt) var(--ws-gmenu-rb) var(--ws-gmenu-rb); overflow: hidden; }
+@media (pointer: coarse) { .ws-gmenu .ws-gmenu-sheet { --ws-gmenu-rb: 44px; } }
+.ws-gmenu .ws-gmenu-sheet::before { left: 0; top: 0; width: calc(var(--ws-gmenu-rt) + 14px); height: calc(var(--ws-gmenu-rt) + 14px); border-top-left-radius: var(--ws-gmenu-rt); }
+.ws-gmenu .ws-gmenu-sheet::after { right: 0; bottom: 0; width: calc(var(--ws-gmenu-rb) + 14px); height: calc(var(--ws-gmenu-rb) + 14px); border-bottom-right-radius: var(--ws-gmenu-rb); }
+
+/* header */
+.ws-gmenu .ws-gmenu-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 18px 20px 12px; }
+.ws-gmenu .ws-gmenu-title { font-family: var(--ws-display); font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: 0.34em; text-transform: uppercase; color: #fff; }
+.ws-gmenu .ws-gmenu-sub { margin-top: 8px; font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-close { padding: 11px 20px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan); color: var(--ws-cyan); font-family: var(--ws-display); font-weight: 700; font-size: 15px; letter-spacing: 0.24em; text-transform: uppercase; cursor: pointer; }
+/* DEV (E140): a small chip left of CLOSE — the title's DEV toggle's twin (text + square: filled on, hollow off) */
+.ws-gmenu .ws-gmenu-close:active { background: rgba(143, 227, 255, 0.22); }
+/* the header BAR (E178, the in-game menu's own; main menu ▸ Settings keeps the plain head above): [RESUME] PAUSED ·DEV
+   [EXIT TO MAIN] in the PAUSE menu, [CLOSE] BAG ·DEV in the BAG — the actions pinned at the top, never scrolled away (the
+   panel scrolls under it). Three columns: the two sides share what the title leaves, so the title sits on the sheet's
+   centre in both menus; the left button goes back to play in both, EXIT (pause only) is alone on the right. Phone first:
+   a 20 px title and 13 px buttons fit 390 px, EXIT wraps to EXIT / TO MAIN; every button is ≥ 44 px tall. */
+.ws-gmenu .ws-gmenu-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid rgba(143, 227, 255, 0.18); }
+.ws-gmenu .ws-gmenu-bar .ws-gmenu-close, .ws-gmenu .ws-gmenu-exit { min-height: 44px; padding: 6px 12px; font-size: 13px; line-height: 1.1; letter-spacing: 0.16em; -webkit-tap-highlight-color: transparent; }
+.ws-gmenu .ws-gmenu-bar .ws-gmenu-close { justify-self: start; background: rgba(143, 227, 255, 0.16); color: #fff; box-shadow: 0 0 16px rgba(143, 227, 255, 0.16); }
+.ws-gmenu .ws-gmenu-exit { justify-self: end; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.04); border: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font-family: var(--ws-display); font-weight: 700; text-align: center; text-transform: uppercase; cursor: pointer; }
+.ws-gmenu .ws-gmenu-exit[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-bar + .ws-gmenu-tabs { border-top: 0; } /* the bar's hairline is the tab bar's top */
+.ws-gmenu .ws-gmenu-exit:active { background: rgba(143, 227, 255, 0.22); }
+.ws-gmenu .ws-gmenu-nowrap { white-space: nowrap; } /* EXIT / TO MAIN, never EXIT TO / MAIN */
+.ws-gmenu .ws-gmenu-mid { min-width: 0; text-align: center; }
+.ws-gmenu .ws-gmenu-titlerow { display: flex; align-items: center; justify-content: center; }
+.ws-gmenu .ws-gmenu-bar .ws-gmenu-title { font-size: 20px; letter-spacing: 0.18em; }
+.ws-gmenu .ws-gmenu-bar .ws-gmenu-sub { margin-top: 3px; font-size: 8px; letter-spacing: 0.2em; white-space: nowrap; }
+.ws-gmenu.practice .ws-gmenu-bar .ws-gmenu-title { font-size: 14px; letter-spacing: 0.1em; }
+.ws-gmenu.practice .ws-gmenu-bar .ws-gmenu-close, .ws-gmenu.practice .ws-gmenu-exit { padding-inline: 8px; font-size: 11px; letter-spacing: 0.08em; }
+@media (min-width: 600px) {
+  .ws-gmenu .ws-gmenu-bar { gap: 14px; padding: 12px 16px; }
+  .ws-gmenu .ws-gmenu-bar .ws-gmenu-close, .ws-gmenu .ws-gmenu-exit { padding: 8px 18px; font-size: 14px; letter-spacing: 0.2em; }
+  .ws-gmenu .ws-gmenu-bar .ws-gmenu-title { font-size: 26px; letter-spacing: 0.24em; }
+  .ws-gmenu .ws-gmenu-bar .ws-gmenu-sub { margin-top: 5px; font-size: 9px; letter-spacing: 0.26em; }
+}
+
+/* tabs */
+.ws-gmenu .ws-gmenu-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border-top: 1px solid rgba(143, 227, 255, 0.18); border-bottom: 1px solid rgba(143, 227, 255, 0.18); }
+.ws-gmenu .ws-gmenu-tab { position: relative; padding: 14px 4px 12px; appearance: none; -webkit-appearance: none; background: none; border: 0; border-right: 1px solid rgba(143, 227, 255, 0.12); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: color 0.15s; }
+.ws-gmenu .ws-gmenu-tab:last-child { border-right: 0; }
+.ws-gmenu .ws-gmenu-tab[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-tabs[hidden] { display: none; } /* split menus (E124): PAUSED with only Settings has no bar */
+/* five tabs (FEEDBACK, once the review inbox is unlocked) on a phone: tighter lettering so ACHIEVEMENTS still fits */
+/* four tabs (BAG + Pine Hollow's JOURNAL): tighter tracking so ACHIEVEMENTS fits a phone's quarter width */
+@media (max-width: 560px) { .ws-gmenu .ws-gmenu-tabs.four .ws-gmenu-tab { padding-left: 2px; padding-right: 2px; letter-spacing: 0.1em; } }
+@media (max-width: 560px) { .ws-gmenu .ws-gmenu-tabs.review .ws-gmenu-tab { padding-left: 1px; padding-right: 1px; font-size: 8.5px; letter-spacing: 0.06em; } }
+.ws-gmenu .ws-gmenu-tab.active { color: #fff; text-shadow: 0 0 10px rgba(143, 227, 255, 0.5); }
+.ws-gmenu .ws-gmenu-tab.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, 0.8); }
+
+/* panels */
+.ws-gmenu .ws-gmenu-body { position: relative; flex: 1; min-height: 0; }
+.ws-gmenu .ws-gmenu-panel { position: absolute; inset: 0; display: none; padding: 14px 16px 10px; }
+.ws-gmenu .ws-gmenu-panel.active { display: flex; flex-direction: column; }
+.ws-gmenu .ws-gmenu-panel.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; }
+.ws-gmenu .ws-gmenu-hint { padding: 10px 0 12px; text-align: center; font-size: 9px; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(196, 220, 232, 0.45); }
+.ws-gmenu .ws-gmenu-label { flex: none; margin: 10px 0 6px; font-size: 9.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-label:first-child { margin-top: 0; }
+.ws-gmenu .ws-gmenu-chip { flex: none; padding: 3px 8px; border: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font-size: 8.5px; letter-spacing: 0.22em; text-transform: uppercase; }
+.ws-gmenu .ws-gmenu-empty { padding: 20px 0; text-align: center; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu svg { width: 100%; height: 100%; display: block; }
+
+/* MAP: label row, a square frame the FullMap canvas fills, zoom chips + legend */
+.ws-gmenu .ws-gmenu-panel.map { touch-action: none; padding-bottom: 8px; }
+.ws-gmenu .ws-gmenu-mapmeta { flex: none; margin-bottom: 8px; font-size: 9.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-text-dim); }
+/* the quest card (E51): the chapter title, the full objective and its sub-steps — the HUD carries only the short chip */
+.ws-gmenu .ws-gmenu-mapquest { flex: none; margin-bottom: 10px; padding: 8px 10px 8px 12px; border: 1px solid rgba(143, 227, 255, 0.22); border-left: 2px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.05); }
+.ws-gmenu .ws-gmenu-mapquest[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-mapquest-title { font-size: 8.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-mapquest-obj { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-family: var(--ws-display); font-weight: 600; font-size: 15px; letter-spacing: 0.03em; color: var(--ws-text); }
+.ws-gmenu .ws-gmenu-mapquest-obj i { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.8); }
+.ws-gmenu .ws-gmenu-mapquest-hint { margin-top: 3px; padding-left: 15px; font-size: 9.5px; letter-spacing: 0.06em; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; aspect-ratio: 1; min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
+.ws-gmenu .ws-gmenu-mapfoot { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.ws-gmenu .ws-gmenu-zooms { display: flex; gap: 6px; }
+.ws-gmenu .ws-gmenu-zoom { min-width: 46px; padding: 8px 10px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.14em; cursor: pointer; }
+.ws-gmenu .ws-gmenu-zoom.active { border-color: var(--ws-cyan); color: #fff; background: rgba(143, 227, 255, 0.16); }
+.ws-gmenu .ws-gmenu-legend { display: flex; gap: 14px; font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ws-gmenu .ws-gmenu-legend i { width: 12px; height: 12px; }
+.ws-gmenu .ws-gmenu-legend i.poi { color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-legend i.you { color: #fff; }
+.ws-gmenu .ws-gmenu-legend[hidden] { display: none; }
+
+/* INVENTORY: equipped weapon cards + the 3-column pack grid */
+.ws-gmenu .ws-gmenu-weapon { flex: none; display: flex; align-items: center; gap: 14px; width: 100%; margin-bottom: 8px; padding: 10px 12px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text); font-family: var(--ws-mono); cursor: pointer; }
+.ws-gmenu .ws-gmenu-weapon.equipped { border-color: rgba(143, 227, 255, 0.5); background: rgba(143, 227, 255, 0.08); }
+.ws-gmenu .ws-gmenu-weapon .ws-gmenu-chip { opacity: 0.6; }
+.ws-gmenu .ws-gmenu-weapon.equipped .ws-gmenu-chip { opacity: 1; }
+.ws-gmenu .ws-gmenu-wicon { flex: none; width: 64px; height: 44px; color: #d8c7a8; }
+.ws-gmenu .ws-gmenu-wbody { flex: 1; min-width: 0; }
+.ws-gmenu .ws-gmenu-wname { font-family: var(--ws-display); font-weight: 700; font-size: 15px; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; }
+.ws-gmenu .ws-gmenu-wammo { margin-top: 3px; font-size: 9px; letter-spacing: 0.14em; white-space: nowrap; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-wbody .ws-bar { margin-top: 6px; height: 4px; }
+.ws-gmenu .ws-gmenu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ws-gmenu .ws-gmenu-slot { position: relative; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.2); }
+.ws-gmenu .ws-gmenu-slot::before { content: ''; position: absolute; left: -1px; top: -1px; width: 10px; height: 10px; border-left: 1px solid var(--ws-cyan); border-top: 1px solid var(--ws-cyan); opacity: 0.6; }
+.ws-gmenu .ws-gmenu-slot.empty { opacity: 0.45; }
+.ws-gmenu .ws-gmenu-sicon { width: 46%; height: 46%; color: #e0cfae; }
+.ws-gmenu .ws-gmenu-count { position: absolute; right: 6px; top: 6px; padding: 2px 6px; border: 1px solid rgba(143, 227, 255, 0.3); background: rgba(6, 10, 18, 0.6); font-weight: 400; font-size: 9px; letter-spacing: 0.08em; color: #fff; }
+.ws-gmenu .ws-gmenu-sname { font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); text-align: center; }
+/* Pine Hollow's PACK (E314 C): the line over the grid, and under each item what Mott gives for it */
+.ws-gmenu .ws-gmenu-packnote { flex: none; margin: -4px 0 10px; font-size: 8.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan); opacity: 0.8; }
+.ws-gmenu .ws-gmenu-sline { font-size: 7.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-cyan); text-align: center; line-height: 1.3; }
+
+/* ACHIEVEMENTS: overall bar, the worn title card, one row per achievement */
+.ws-gmenu .ws-gmenu-total { flex: none; margin: 0 0 4px; height: 4px; }
+.ws-gmenu .ws-gmenu-titlecard { flex: none; display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: rgba(143, 227, 255, 0.06); border: 1px solid rgba(143, 227, 255, 0.4); box-shadow: inset 0 0 30px rgba(143, 227, 255, 0.05); }
+.ws-gmenu .ws-gmenu-titlecard.none { border-color: rgba(143, 227, 255, 0.18); background: rgba(143, 227, 255, 0.02); }
+.ws-gmenu .ws-gmenu-laurel { flex: none; width: 44px; height: 44px; color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-titlecard.none .ws-gmenu-laurel { color: var(--ws-text-dim); opacity: 0.5; }
+.ws-gmenu .ws-gmenu-titletext { font-family: var(--ws-display); font-weight: 700; font-size: 20px; line-height: 1.1; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; }
+.ws-gmenu .ws-gmenu-titlecard.none .ws-gmenu-titletext { color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-titlesub { margin-top: 4px; font-size: 8.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-ach { flex: none; display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 8px; padding: 10px 12px 10px 10px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(143, 227, 255, 0.03); border: 1px solid rgba(143, 227, 255, 0.18); color: var(--ws-text); font-family: var(--ws-mono); cursor: default; }
+.ws-gmenu .ws-gmenu-ach.earned { cursor: pointer; border-color: rgba(143, 227, 255, 0.4); background: rgba(143, 227, 255, 0.06); }
+.ws-gmenu .ws-gmenu-ach.active { border-color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-aicon { flex: none; width: 50px; height: 50px; padding: 6px; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(6, 10, 18, 0.5); color: #fff; }
+.ws-gmenu .ws-gmenu-aicon.ghost { color: #e8fbff; filter: drop-shadow(0 0 5px rgba(143, 227, 255, 0.9)); }
+.ws-gmenu .ws-gmenu-ach:not(.earned) .ws-gmenu-aicon { color: rgba(230, 242, 248, 0.75); }
+.ws-gmenu .ws-gmenu-abody { flex: 1; min-width: 0; }
+.ws-gmenu .ws-gmenu-aname { font-family: var(--ws-display); font-weight: 700; font-size: 15px; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; }
+.ws-gmenu .ws-gmenu-agoal { margin-top: 2px; font-size: 8.5px; line-height: 1.45; letter-spacing: 0.12em; white-space: normal; overflow-wrap: anywhere; text-transform: uppercase; color: var(--ws-text-dim); } /* wraps inside its column: a long goal + counter never runs under the title (Driftwood, 390 px) */
+.ws-gmenu .ws-gmenu-abody .ws-bar { margin-top: 6px; height: 4px; }
+.ws-gmenu .ws-gmenu-areward { flex: none; display: flex; align-items: center; gap: 8px; width: 34%; max-width: 170px; }
+.ws-gmenu .ws-gmenu-amark { flex: none; width: 22px; height: 22px; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-ach.earned .ws-gmenu-amark { color: var(--ws-cyan); filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.6)); }
+.ws-gmenu .ws-gmenu-atitle { font-size: 8.5px; line-height: 1.5; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-ach.earned .ws-gmenu-atitle { color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-areward .ws-gmenu-chip { display: inline-block; margin-top: 4px; }
+/* the shard's "complete" row on top of ACHIEVEMENTS (E132): reopens the card (src/client/game/complete/ShardComplete.ts) */
+.ws-gmenu .ws-gmenu-done { flex: none; display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 12px; padding: 10px 12px 10px 10px; appearance: none; -webkit-appearance: none; text-align: left; cursor: pointer; background: rgba(255, 210, 138, 0.07); border: 1px solid rgba(255, 210, 138, 0.55); color: var(--ws-text); font-family: var(--ws-mono); }
+.ws-gmenu .ws-gmenu-done:active { background: rgba(255, 210, 138, 0.18); }
+.ws-gmenu .ws-gmenu-done-icon { flex: none; width: 40px; height: 40px; padding: 6px; color: #ffd28a; filter: drop-shadow(0 0 6px rgba(255, 190, 110, 0.5)); }
+.ws-gmenu .ws-gmenu-done .ws-gmenu-aname { color: #fff4dc; }
+.ws-gmenu .ws-gmenu-done .ws-gmenu-chip { flex: none; }
+
+/* SETTINGS: the big button (main menu ▸ Settings' APPLY & RELOAD; the pause menu's two moved to the header bar, E178), then switch rows, segmented pickers, the volume slider */
+.ws-gmenu .ws-gmenu-btn { flex: none; display: block; width: 100%; margin-bottom: 10px; padding: 14px 22px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); color: #fff; cursor: pointer; font-family: var(--ws-display); font-weight: 700; font-size: 16px; letter-spacing: 0.26em; text-transform: uppercase; }
+.ws-gmenu .ws-gmenu-btn.resume { border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.16); box-shadow: 0 0 18px rgba(143, 227, 255, 0.15); }
+.ws-gmenu .ws-gmenu-btn.exit { color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-btn:active { background: rgba(143, 227, 255, 0.28); }
+.ws-gmenu .ws-gmenu-btn[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-reload-actions { flex: none; padding: 6px 16px 0; }
+.ws-gmenu .ws-gmenu-reload-actions[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-reload-actions .ws-gmenu-btn { min-height: 44px; margin-bottom: 0; }
+.ws-gmenu .ws-gmenu-btn, .ws-gmenu .ws-gmenu-segbtn, .ws-gmenu .ws-gmenu-switch { touch-action: manipulation; }
+.ws-gmenu .ws-gmenu-rule { flex: none; height: 1px; margin: 4px 0 8px; background: rgba(143, 227, 255, 0.18); }
+.ws-gmenu .ws-gmenu-switch, .ws-gmenu .ws-gmenu-row { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; width: 100%; margin-bottom: 6px; padding: 10px 12px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; }
+.ws-gmenu .ws-gmenu-switch[hidden], .ws-gmenu .ws-gmenu-row[hidden], .ws-gmenu .ws-gmenu-label[hidden], .ws-gmenu .ws-gmenu-note[hidden] { display: none; } /* a Settings row that does not apply here (E130, Menu.ts applies()) */
+.ws-gmenu .ws-gmenu-switch { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.ws-gmenu .ws-gmenu-switch.on { border-color: rgba(143, 227, 255, 0.5); color: #fff; }
+.ws-gmenu .ws-gmenu-swlabel { flex: 1 1 auto; min-width: 0; text-align: left; }
+.ws-gmenu .ws-gmenu-val { flex: none; min-width: 42px; text-align: right; color: var(--ws-cyan); font-weight: 400; } /* the Controls sliders read "1.00×" (Menu.ts mult) */
+.ws-gmenu .ws-gmenu-pill { position: relative; flex: none; width: 34px; height: 18px; border-radius: 9px; background: rgba(6, 10, 18, 0.7); border: 1px solid rgba(143, 227, 255, 0.35); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5); transition: background 0.18s, border-color 0.18s, box-shadow 0.18s; }
+.ws-gmenu .ws-gmenu-pill::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--ws-text-dim); transition: transform 0.18s, background 0.18s; }
+.ws-gmenu .ws-gmenu-switch.on .ws-gmenu-pill { background: rgba(143, 227, 255, 0.28); border-color: var(--ws-cyan); box-shadow: 0 0 12px rgba(143, 227, 255, 0.35), inset 0 0 6px rgba(143, 227, 255, 0.25); }
+.ws-gmenu .ws-gmenu-switch.on .ws-gmenu-pill::after { transform: translateX(16px); background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-seg { flex: none; display: flex; margin-left: auto; }
+.ws-gmenu .ws-gmenu-segbtn { padding: 6px 7px; appearance: none; -webkit-appearance: none; background: rgba(6, 10, 18, 0.5); border: 1px solid rgba(143, 227, 255, 0.25); border-left-width: 0; color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.04em; cursor: pointer; }
+.ws-gmenu .ws-gmenu-segbtn:first-child { border-left-width: 1px; }
+.ws-gmenu .ws-gmenu-segbtn.active { background: rgba(143, 227, 255, 0.28); color: #fff; }
+.ws-gmenu .ws-gmenu-apply { flex: none; align-self: flex-end; margin: 0 0 8px; padding: 7px 12px; appearance: none; -webkit-appearance: none; background: rgba(255, 181, 71, 0.1); border: 1px solid var(--ws-amber); color: var(--ws-amber); font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer; }
+.ws-gmenu .ws-gmenu-apply[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-slider { flex: 1; max-width: 170px; margin: 0; height: 4px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.15); outline: none; }
+.ws-gmenu .ws-gmenu-slider::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, 0.6); cursor: pointer; }
+.ws-gmenu .ws-gmenu-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid var(--ws-cyan); cursor: pointer; }
+
+/* landscape / desktop: the sheet is a centred column, the map frame keeps a usable height */
+@media (min-aspect-ratio: 1/1) { .ws-gmenu { padding-top: calc(var(--ws-top) + 8px); } .ws-gmenu .ws-gmenu-sheet { max-width: 640px; } }
+.ws-gmenu .ws-gmenu-mapcanvas { position: absolute; inset: 0; }
+
+/* Settings: two cards (Menu.ts buildSettings) — SETTINGS ships with the game; DEBUG (dashed, amber) is the playtest-only pickers */
+.ws-gmenu .ws-gmenu-card { flex: none; display: flex; flex-direction: column; margin-bottom: 12px; padding: 12px 12px 6px; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(143, 227, 255, 0.03); }
+.ws-gmenu .ws-gmenu-card[hidden] { display: none; } /* the Debug card outside developer mode (E140) */
+.ws-gmenu .ws-gmenu-card.debug { border: 1px dashed rgba(255, 196, 120, 0.45); background: rgba(255, 196, 120, 0.03); }
+.ws-gmenu .ws-gmenu-cardtitle { flex: none; margin-bottom: 10px; font-family: var(--ws-display); font-weight: 700; font-size: 15px; letter-spacing: 0.26em; text-transform: uppercase; color: #fff; }
+.ws-gmenu .ws-gmenu-card.debug .ws-gmenu-cardtitle { color: rgb(255, 206, 140); }
+.ws-gmenu .ws-gmenu-cardtitle small { display: block; margin-top: 4px; font-family: var(--ws-mono); font-weight: 400; font-size: 9px; letter-spacing: 0.16em; color: var(--ws-text-dim); }
+/* a folding card (E177, src/client/engine/ui/cards.ts): the title bar IS the toggle — Debug starts folded, so the variant pickers
+   don't push the settings a player wants off the screen. The caret turns down when it is open. */
+.ws-gmenu .ws-gmenu-card.fold > .ws-gmenu-cardtitle { display: flex; align-items: baseline; flex-wrap: wrap; width: 100%; padding: 4px 0; appearance: none; -webkit-appearance: none; background: none; border: 0; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ws-gmenu .ws-gmenu-card.fold > .ws-gmenu-cardtitle small { flex: 1 0 100%; margin-left: 16px; }
+.ws-gmenu .ws-gmenu-foldmark { flex: none; width: 0; height: 0; margin-right: 10px; border-left: 6px solid currentcolor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; transform: translateY(-1px); transition: transform 0.15s; }
+.ws-gmenu .ws-gmenu-card.fold:not(.folded) > .ws-gmenu-cardtitle .ws-gmenu-foldmark { transform: rotate(90deg) translate(-1px, -3px); }
+.ws-gmenu .ws-gmenu-card.folded { padding-bottom: 10px; }
+.ws-gmenu .ws-gmenu-card.folded > .ws-gmenu-cardtitle { margin-bottom: 0; }
+.ws-gmenu .ws-gmenu-card.folded > :not(.ws-gmenu-cardtitle) { display: none; }
+/* Settings → REVIEW (Menu.ts buildReview; src/client/engine/ui/review.ts): password + UNLOCK, then the Quick note switch + LOCK */
+.ws-gmenu .ws-gmenu-review { flex: none; display: flex; flex-direction: column; }
+.ws-gmenu .ws-gmenu-input { flex: 1 1 140px; min-width: 0; padding: 7px 9px; background: rgba(6, 10, 18, 0.6); border: 1px solid var(--ws-cyan-line); border-radius: 0; color: var(--ws-text); font: 12px var(--ws-mono); outline: none; }
+.ws-gmenu .ws-gmenu-input:focus { border-color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-unlock { flex: none; padding: 7px 14px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.16); border: 1px solid var(--ws-cyan); color: #fff; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; }
+.ws-gmenu .ws-gmenu-unlock:disabled { opacity: 0.5; }
+.ws-gmenu .ws-gmenu-note { flex: none; margin: 0 2px 8px; font-size: 10px; line-height: 1.5; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-mem { white-space: pre-line; font-variant-numeric: tabular-nums; } /* Debug ▸ Memory: one line per resident shard (Menu.ts paintMemory, E155) */
+/* the music / sfx picker while a pick decodes from the offline cache for more than 300 ms (src/client/engine/audio/preload.ts trackBusy) */
+.ws-gmenu .ws-gmenu-row.busy .ws-gmenu-swlabel::after { content: ''; display: inline-block; width: 9px; height: 9px; margin-left: 8px; vertical-align: -1px; border: 1.5px solid var(--ws-cyan); border-right-color: transparent; border-radius: 50%; animation: ws-gmenu-spin 0.8s linear infinite; }
+@keyframes ws-gmenu-spin { to { transform: rotate(360deg); } }
+/* main menu ▸ Settings (src/client/engine/ui/BootSettings.ts, E55): the amber EXPERIMENTAL chip beside a row's label (the title deck's amber) */
+.ws-gmenu .ws-gmenu-chip.exp { display: inline-block; margin-left: 8px; font-style: normal; font-size: 7.5px; color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.6); vertical-align: 1px; }
+.ws-gmenu .ws-gmenu-debugslot { flex: none; display: flex; flex-direction: column; margin-top: 4px; } /* the title's Settings ▸ Debug: the registry under the Developer switch (BootSettings.ts, E172) */
+.ws-gmenu .ws-gmenu-debugslot[hidden] { display: none; }
+
+/* ── the BAG (E314, project/archive/2026-09-30-driftwood-loot.md): five icon tabs, one short word each (board 8 A) — MAP · GEAR · FINDS ·
+   PACK · FEATS (+ Pine Hollow's JOURNAL); the panels are src/client/game/bag/bag.ts ── */
+.ws-gmenu .ws-gmenu-tabs.icons .ws-gmenu-tab { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 2px 9px; font-size: 9px; letter-spacing: 0.16em; }
+.ws-gmenu .ws-gmenu-tabs.icons .ws-gmenu-tab[hidden] { display: none; } /* PAUSE's tabs stay hidden in the BAG */
+.ws-gmenu .ws-gmenu-ticon { display: block; width: 20px; height: 20px; opacity: 0.75; }
+.ws-gmenu .ws-gmenu-tab.active .ws-gmenu-ticon { opacity: 1; color: var(--ws-cyan); filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.6)); }
+.ws-gmenu .ws-gmenu-tword { display: block; line-height: 1; white-space: nowrap; }
+.ws-gmenu .ws-gmenu-tab.active .ws-gmenu-tword { color: var(--ws-cyan); }
+
+/* GEAR (board 6 C): the paper doll — the kit laid out round a figure; the held weapon at its hand, the carried ones on
+   the left, health over the head, the charm at the chest; cosmetics, skins and the purse below */
+.ws-gmenu .ws-gmenu-doll { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, 1.05fr) minmax(0, 1fr); grid-template-areas: 'l fig r'; column-gap: 8px; align-items: stretch; margin: 2px 0 6px; }
+.ws-gmenu .ws-gmenu-doll.head { grid-template-areas: '. top .' 'l fig r'; row-gap: 6px; }
+.ws-gmenu .ws-gmenu-dollfig { grid-area: fig; display: flex; align-items: flex-start; justify-content: center; min-height: 270px; }
+.ws-gmenu .ws-gmenu-dollcol { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.ws-gmenu .ws-gmenu-dollcol.l { grid-area: l; }
+.ws-gmenu .ws-gmenu-dollcol.r { grid-area: r; justify-content: space-between; padding: 36px 0 26px; }
+.ws-gmenu .ws-gmenu-dollcol.r:has(> :only-child) { justify-content: flex-end; }
+.ws-gmenu .ws-gmenu-figure { width: 100%; max-width: 132px; height: auto; overflow: visible; }
+.ws-gmenu .ws-gmenu-fig-body { fill: rgba(143, 227, 255, 0.07); stroke: var(--ws-cyan); stroke-width: 1.3; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.35)); }
+.ws-gmenu .ws-gmenu-fig-line { fill: none; stroke: rgba(143, 227, 255, 0.45); stroke-width: 0.9; stroke-linecap: round; stroke-linejoin: round; }
+.ws-gmenu .ws-gmenu-fig-cape, .ws-gmenu .ws-gmenu-fig-hat { display: none; fill: rgba(232, 214, 176, 0.2); stroke: rgb(232, 214, 176); stroke-width: 1.2; stroke-linejoin: round; }
+.ws-gmenu .ws-gmenu-figure.cape .ws-gmenu-fig-cape, .ws-gmenu .ws-gmenu-figure.hat .ws-gmenu-fig-hat { display: inline; }
+.ws-gmenu .ws-gmenu-kit { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 10px 6px 9px; appearance: none; -webkit-appearance: none; text-align: center; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.26); color: var(--ws-text); font-family: var(--ws-mono); cursor: default; -webkit-tap-highlight-color: transparent; }
+.ws-gmenu .ws-gmenu-kit::before { content: ''; position: absolute; left: -1px; top: -1px; width: 9px; height: 9px; border-left: 1px solid var(--ws-cyan); border-top: 1px solid var(--ws-cyan); opacity: 0.7; }
+.ws-gmenu .ws-gmenu-kit.weapon, .ws-gmenu .ws-gmenu-kit.cosmetic { cursor: pointer; }
+.ws-gmenu .ws-gmenu-kit.weapon:active, .ws-gmenu .ws-gmenu-kit.cosmetic:active { background: rgba(143, 227, 255, 0.16); }
+.ws-gmenu .ws-gmenu-kit.held { border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.1); box-shadow: 0 0 14px rgba(143, 227, 255, 0.18), inset 0 0 18px rgba(143, 227, 255, 0.06); }
+.ws-gmenu .ws-gmenu-kit.locked { border-style: dashed; border-color: rgba(143, 227, 255, 0.24); background: none; opacity: 0.55; }
+.ws-gmenu .ws-gmenu-kit.locked::before { display: none; }
+.ws-gmenu .ws-gmenu-kit.top { grid-area: top; }
+/* the hairline from a slot to the figure */
+.ws-gmenu .ws-gmenu-kit.l::after, .ws-gmenu .ws-gmenu-kit.r::after { content: ''; position: absolute; top: 50%; width: 10px; height: 1px; background: rgba(143, 227, 255, 0.45); }
+.ws-gmenu .ws-gmenu-kit.l::after { right: -10px; }
+.ws-gmenu .ws-gmenu-kit.r::after { left: -10px; }
+.ws-gmenu .ws-gmenu-kiticon { display: block; width: 40px; height: 34px; color: #e0cfae; }
+.ws-gmenu .ws-gmenu-kit.held .ws-gmenu-kiticon { color: #fff; }
+.ws-gmenu .ws-gmenu-kit.health .ws-gmenu-kiticon { width: 30px; height: 26px; color: #f1e3c6; }
+.ws-gmenu .ws-gmenu-kit.charm .ws-gmenu-kiticon { color: #6fe0c8; }
+.ws-gmenu .ws-gmenu-kit.locked .ws-gmenu-kiticon { color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-kitname { font-family: var(--ws-display); font-weight: 700; font-size: 12px; line-height: 1.15; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; }
+.ws-gmenu .ws-gmenu-kitsub { font-size: 7.5px; line-height: 1.4; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-kit .ws-gmenu-chip { margin-top: 2px; font-size: 7.5px; padding: 2px 7px; opacity: 0.65; }
+.ws-gmenu .ws-gmenu-kit.held .ws-gmenu-chip { opacity: 1; background: rgba(143, 227, 255, 0.14); }
+.ws-gmenu .ws-gmenu-pips { display: flex; gap: 4px; }
+.ws-gmenu .ws-gmenu-pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--ws-cyan-dim); }
+.ws-gmenu .ws-gmenu-pips i.on { background: var(--ws-cyan); border-color: var(--ws-cyan); box-shadow: 0 0 6px rgba(143, 227, 255, 0.7); }
+.ws-gmenu .ws-gmenu-kitrow { flex: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.ws-gmenu .ws-gmenu-kit.cosmetic:disabled { cursor: default; }
+.ws-gmenu .ws-gmenu-purse { flex: none; display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 9px 14px; border: 1px solid rgba(242, 196, 77, 0.45); background: rgba(242, 196, 77, 0.06); }
+.ws-gmenu .ws-gmenu-purse .ws-gmenu-kiticon { width: 26px; height: 26px; color: #f2c44d; }
+.ws-gmenu .ws-gmenu-purse .ws-gmenu-kitname { flex: 1; text-align: left; }
+.ws-gmenu .ws-gmenu-pursenum { font-family: var(--ws-display); font-weight: 700; font-size: 22px; line-height: 1; color: #ffe39a; font-variant-numeric: tabular-nums; }
+
+/* FINDS (board 7 B): the sticker book — found = bright, missing = a dashed "???"; the counter strip; the 15 sea glass chips */
+.ws-gmenu .ws-gmenu-counters { flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1px solid rgba(143, 227, 255, 0.3); background: rgba(143, 227, 255, 0.04); }
+.ws-gmenu .ws-gmenu-counter { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 9px 4px; border-right: 1px solid rgba(143, 227, 255, 0.16); }
+.ws-gmenu .ws-gmenu-counter:last-child { border-right: 0; }
+.ws-gmenu .ws-gmenu-counter span { font-size: 7.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-text-dim); white-space: nowrap; }
+.ws-gmenu .ws-gmenu-counter b { font-family: var(--ws-display); font-weight: 700; font-size: 17px; line-height: 1; letter-spacing: 0.08em; color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-counter.full b { color: #fff; text-shadow: 0 0 8px rgba(143, 227, 255, 0.7); }
+.ws-gmenu .ws-gmenu-nextcharm { flex: none; margin: 9px 0 2px; text-align: center; font-size: 8.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-stickers { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ws-gmenu .ws-gmenu-sticker { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; aspect-ratio: 1 / 1.05; padding: 8px 4px; border: 1px dashed rgba(143, 227, 255, 0.3); color: rgba(143, 227, 255, 0.35); }
+.ws-gmenu .ws-gmenu-sticker span { font-size: 7.5px; letter-spacing: 0.18em; text-transform: uppercase; text-align: center; color: var(--ws-text-dim); }
+.ws-gmenu .ws-gmenu-stickicon { width: 52%; height: 50%; }
+.ws-gmenu .ws-gmenu-sticker:not(.found) .ws-gmenu-stickicon { opacity: 0.45; }
+.ws-gmenu .ws-gmenu-sticker.found { border-style: solid; border-color: rgba(143, 227, 255, 0.45); background: rgba(143, 227, 255, 0.06); color: #efe0c2; }
+.ws-gmenu .ws-gmenu-sticker.found span { color: #fff; }
+/* Pine Hollow's FINDS is its hunter's journal (E314 C): four places to a row, every sticker a tap onto its page, the
+   OPEN row over them (the complete card's row, cyan instead of gold) */
+.ws-gmenu .ws-gmenu-stickers.dense { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ws-gmenu .ws-gmenu-stickers.dense .ws-gmenu-sticker { aspect-ratio: 1 / 1.1; gap: 4px; padding: 6px 2px; }
+.ws-gmenu .ws-gmenu-stickers.dense .ws-gmenu-sticker span { font-size: 6.5px; letter-spacing: 0.12em; }
+/* Nalati's elites (E314 C): two to a row, the prize under the name (the skin or the horse, then the title) */
+.ws-gmenu .ws-gmenu-stickers.wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ws-gmenu .ws-gmenu-stickers.wide .ws-gmenu-sticker { aspect-ratio: auto; min-height: 118px; gap: 4px; padding: 10px 6px; }
+.ws-gmenu .ws-gmenu-stickers.wide .ws-gmenu-stickicon { width: 42px; height: 42px; }
+.ws-gmenu .ws-gmenu-stickers.wide .ws-gmenu-sticker span { font-size: 8.5px; }
+.ws-gmenu .ws-gmenu-prize { font-style: normal; font-size: 7px; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; line-height: 1.35; color: var(--ws-text-dim); opacity: 0.8; }
+.ws-gmenu .ws-gmenu-sticker.found .ws-gmenu-prize { color: var(--ws-cyan); opacity: 1; }
+.ws-gmenu .ws-gmenu-sticker.tap { appearance: none; -webkit-appearance: none; margin: 0; font-family: var(--ws-mono); cursor: pointer; }
+.ws-gmenu .ws-gmenu-sticker.tap:not(.found) { background: none; }
+.ws-gmenu .ws-gmenu-sticker.tap:active { background: rgba(143, 227, 255, 0.16); }
+.ws-gmenu .ws-gmenu-openbook { background: rgba(143, 227, 255, 0.06); border-color: rgba(143, 227, 255, 0.5); }
+.ws-gmenu .ws-gmenu-openbook:active { background: rgba(143, 227, 255, 0.16); }
+.ws-gmenu .ws-gmenu-openbook .ws-gmenu-done-icon { color: var(--ws-cyan); filter: drop-shadow(0 0 6px rgba(143, 227, 255, 0.45)); }
+.ws-gmenu .ws-gmenu-openbook .ws-gmenu-aname { color: #fff; }
+.ws-gmenu .ws-gmenu-glass { flex: none; display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 3px; margin-bottom: 6px; }
+.ws-gmenu .ws-gmenu-glasschip { display: block; aspect-ratio: 0.8; color: rgba(143, 227, 255, 0.22); }
+.ws-gmenu .ws-gmenu-glasschip.found { filter: drop-shadow(0 0 4px currentcolor); }
+
+/* Settings, layout A (E357 J10; Menu.ts buildSettings + settingsCats.ts): on a keyboard-and-mouse desktop the Settings tab is
+   a category rail on the left and one category on the right; a phone keeps its one stacked column (no rail, no Video) */
+.ws-gmenu .ws-gmenu-rail, .ws-gmenu .ws-gmenu-cathead { display: none; }
+.ws-gmenu .ws-gmenu-pane { display: contents; }
+.ws-gmenu .ws-gmenu-panel .catoff { display: none; }
+.ws-gmenu.wide .ws-gmenu-sheet { max-width: 1180px; }
+.ws-gmenu .ws-gmenu-panel.cats.active { display: grid; grid-template-columns: 196px minmax(0, 1fr); padding: 0; overflow: hidden; }
+.ws-gmenu .ws-gmenu-panel.cats .ws-gmenu-rail { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 18px 16px; overflow-y: auto; border-right: 1px solid rgba(143, 227, 255, 0.18); }
+.ws-gmenu .ws-gmenu-cat { flex: none; padding: 12px 16px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text); font-family: var(--ws-display); font-weight: 700; font-size: 14px; letter-spacing: 0.24em; text-transform: uppercase; cursor: pointer; }
+.ws-gmenu .ws-gmenu-cat[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-cat:hover { border-color: var(--ws-cyan-line); }
+.ws-gmenu .ws-gmenu-cat.active { color: var(--ws-cyan); border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.1); box-shadow: inset 3px 0 0 var(--ws-cyan), 0 0 14px rgba(143, 227, 255, 0.12); }
+.ws-gmenu .ws-gmenu-panel.cats .ws-gmenu-pane { display: flex; flex-direction: column; min-height: 0; padding: 18px 22px 14px; overflow-y: auto; overscroll-behavior: contain; }
+.ws-gmenu .ws-gmenu-panel.cats .ws-gmenu-cathead { display: block; flex: none; margin: 0 0 14px; font-family: var(--ws-display); font-weight: 700; font-size: 26px; line-height: 1; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; }
+.ws-gmenu .ws-gmenu-panel.cats .ws-gmenu-card:not(.fold) > .ws-gmenu-cardtitle { display: none; }
+.ws-gmenu .ws-gmenu-panel.cats .ws-gmenu-label.catdup { display: none; }
+.ws-gmenu .ws-gmenu-panel.cats .ws-gmenu-card:not(.debug) { padding: 0; border: 0; background: none; }
+.ws-gmenu .ws-gmenu-panel.cats .ws-gmenu-card:not(.ws-gmenu-keys) { max-width: 700px; }
+/* Key bindings (src/client/engine/input/ControlsPanel.ts): ACTION / KEY / ALT in two columns of plain-named groups */
+.ws-gmenu .ws-gmenu-keycols { flex: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; align-items: start; margin-bottom: 12px; }
+.ws-gmenu .ws-gmenu-keycol { display: grid; grid-template-columns: minmax(0, 1fr) 104px 104px; column-gap: 10px; align-items: center; padding: 0 14px 10px; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(6, 10, 18, 0.35); }
+.ws-gmenu .ws-gmenu-keyhead { padding: 11px 0 9px; border-bottom: 1px solid rgba(143, 227, 255, 0.22); font-size: 10px; font-weight: 700; letter-spacing: 0.24em; text-align: center; text-transform: uppercase; color: var(--ws-text); }
+.ws-gmenu .ws-gmenu-keyhead:first-child { text-align: left; }
+.ws-gmenu .ws-gmenu-keygroup { grid-column: 1 / -1; margin: 10px 0 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-keygroup ~ .ws-gmenu-keygroup { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(143, 227, 255, 0.14); }
+.ws-gmenu .ws-gmenu-keyname { padding: 4px 0; font-size: 11.5px; letter-spacing: 0.04em; color: var(--ws-text); }
+.ws-gmenu .ws-gmenu-keypair { display: contents; }
+.ws-gmenu .ws-gmenu-keychips { grid-column: 2 / 4; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ws-gmenu .ws-gmenu-keycap { height: 24px; margin: 2px 0; padding: 0 6px; appearance: none; -webkit-appearance: none; overflow: hidden; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan-line); color: #fff; font-family: var(--ws-mono); font-weight: 700; font-size: 10.5px; letter-spacing: 0.08em; white-space: nowrap; text-overflow: ellipsis; text-transform: uppercase; cursor: pointer; }
+.ws-gmenu .ws-gmenu-keycap:hover { border-color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-keycap.empty { background: none; border-color: transparent; color: var(--ws-text-dim); font-weight: 400; }
+.ws-gmenu .ws-gmenu-keycap.empty:hover { border-color: rgba(143, 227, 255, 0.22); }
+.ws-gmenu .ws-gmenu-keycap.pending, .ws-gmenu .ws-gmenu-keycap.clash { border-color: var(--ws-amber); background: rgba(255, 181, 71, 0.1); color: var(--ws-amber); box-shadow: 0 0 10px rgba(255, 181, 71, 0.25); }
+.ws-gmenu .ws-gmenu-keyclash { flex: none; display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--ws-amber); background: rgba(255, 181, 71, 0.07); }
+.ws-gmenu .ws-gmenu-keyclash[hidden] { display: none; }
+.ws-gmenu .ws-gmenu-keyclashtext { flex: 1; font-size: 11.5px; letter-spacing: 0.06em; color: var(--ws-amber); }
+.ws-gmenu .ws-gmenu-keybtn { flex: none; padding: 9px 18px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font-family: var(--ws-display); font-weight: 700; font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer; }
+.ws-gmenu .ws-gmenu-keybtn:hover { background: rgba(143, 227, 255, 0.14); }
+.ws-gmenu .ws-gmenu-keyclash .ws-gmenu-keybtn { border-color: var(--ws-amber); background: rgba(255, 181, 71, 0.06); color: var(--ws-amber); }
+.ws-gmenu .ws-gmenu-keyfoot { flex: none; display: flex; justify-content: flex-end; margin-bottom: 8px; }
+
+/* the quick key help (E419, src/client/engine/ui/KeyHelp.ts): F1 or / during play; a read-only card of the live bindings */
+.ws-gmenu-keyhelp { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(6, 12, 18, 0.45); cursor: pointer; }
+.ws-gmenu-keyhelp-card { width: min(920px, 100%); max-width: 920px; max-height: calc(100vh - 48px); overflow: auto; padding: 18px 22px 14px; background: rgba(13, 27, 38, 0.86); border: 1px solid var(--ws-cyan-line); color: #dbe9f1; font-family: var(--ws-display); }
+.ws-gmenu-keyhelp-title { margin-bottom: 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-gmenu-keyhelp-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 28px; align-items: start; }
+.ws-gmenu-keyhelp-grouptitle { margin: 6px 0 4px; padding-bottom: 4px; border-bottom: 1px solid rgba(143, 227, 255, 0.14); font-size: 10px; font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-gmenu-keyhelp-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 12.5px; letter-spacing: 0.04em; }
+.ws-gmenu-keyhelp-keys { display: flex; gap: 4px; flex: none; }
+.ws-gmenu-keyhelp-cap { min-width: 22px; padding: 2px 6px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #e9f7ff; background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); }
+.ws-gmenu-keyhelp-foot { margin-top: 12px; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(219, 233, 241, 0.6); }
+.ws-gmenu-keyhelp-group { min-width: 0; }
+.ws-gmenu-keyhelp-label { min-width: 0; color: #dbe9f1; }

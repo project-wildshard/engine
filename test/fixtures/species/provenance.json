@@ -1,0 +1,96 @@
+{
+  "revision": "539d18a9262151dbe28aa0656068065e9b3d0193",
+  "method": "Exact TypeScript declaration text selected from committed shipping source before extraction. Only defining type and label import paths differ.",
+  "records": [
+    {
+      "path": "src/shards/sunscar-dunes/runtime/species/duneRay.ts",
+      "sourceHash": "969bfe85329d6b036a123b03d55a3992ba739cf32482be90e8a634dfc00337c8",
+      "fixture": "signal-ray.ts",
+      "fixtureHash": "df722e9f8dfeac7b306e104d7aea528ef71fceab137f3cfebef25dc7eb5eca9f",
+      "declarations": [
+        "RAY",
+        "SWOOP",
+        "DUNE_RAY"
+      ]
+    },
+    {
+      "path": "src/shards/sunscar-dunes/runtime/species/strider.ts",
+      "sourceHash": "029fd684c8b1a874d693f621d0c7b7abbfa783e2cc3227bb723541b6fcd6c39b",
+      "fixture": "signal-strider.ts",
+      "fixtureHash": "4a027aa0dc856c9e97d79891926138df6c9f032729f9ecf6230446a09e73afed",
+      "declarations": [
+        "STRIDE",
+        "CHARGE",
+        "HORNS",
+        "DUNE_STRIDER"
+      ]
+    },
+    {
+      "path": "src/shards/sunscar-dunes/runtime/species/skitterer.ts",
+      "sourceHash": "1e8a2c4a43dfa320d4668266f172709e20204c515c9f09b9033da2d8e8c9a325",
+      "fixture": "signal-skitterer.ts",
+      "fixtureHash": "8087b54ad596fd0d9a45ec6b7d3b96a8f8bcd0e8019a123eeaf5abece5890f84",
+      "declarations": [
+        "SKITTER",
+        "BITE",
+        "SKITTERER_DATA"
+      ]
+    },
+    {
+      "path": "src/shards/sunscar-dunes/runtime/species/matriarch.ts",
+      "sourceHash": "1a54f704384227e4f5855ce421baaded8800f7bc2af26a7c1421e3f9b3fd020c",
+      "fixture": "signal-matriarch.ts",
+      "fixtureHash": "193bce0b5bfd00cdcd86b1ebaec927a7450f7b5beeaf9be680377d201c88f73b",
+      "declarations": [
+        "MATRIARCH",
+        "MATRIARCH_HP",
+        "MAW",
+        "TAIL_SWEEP",
+        "BUFFET",
+        "MATRIARCH_DATA"
+      ]
+    },
+    {
+      "path": "src/shards/pine-hollow/combat/strikes.ts",
+      "sourceHash": "c61c1b7c841b5324bd75210b1240a70c27b5ce73028344f96da2fa86b1891255",
+      "fixture": "pine.ts",
+      "fixtureHash": "53210d6367f1df203b84ed7922dca63d60ed1df4ea00a14e608f7c3544ff1891",
+      "declarations": [
+        "lane",
+        "PINE_LANES",
+        "nonlane",
+        "PINE_STRIKES"
+      ]
+    },
+    {
+      "path": "src/shards/far-reach/runtime/strikes.ts",
+      "sourceHash": "8a9b1707496e77e3b9795a6a517be93cfc29f952833780e6ff5ae9ae1f4f65fd",
+      "fixture": "sky.ts",
+      "fixtureHash": "a6be04650c87e2c424adb185301e7c9493e835f8901c985e6d5d9949b5620b65",
+      "declarations": [
+        "RAM",
+        "DIVE"
+      ]
+    },
+    {
+      "path": "src/shards/far-reach/runtime/stormRocBrain.ts",
+      "sourceHash": "2ddf1511e20788c8766e7c6268ccb81beb37d23743d7ca2a6136e48ceb2ed59f",
+      "fixture": "sky-roc.ts",
+      "fixtureHash": "62c78e8ae68fe5fcb59df7b9eb078044548174d4af10e783d18509445d695cb7",
+      "declarations": [
+        "STOOP",
+        "GALE_WALL",
+        "SWEEP"
+      ]
+    },
+    {
+      "path": "src/shards/far-reach/species/galeWisp.ts",
+      "sourceHash": "c4a8c65a1b8cae562d89ace6b8361999e444530f9fe1299ae4015db4c1f64855",
+      "fixture": "sky-wisp.ts",
+      "fixtureHash": "a7593df924852d83462ba2ab1991b246e8d6096bb52092dc3df021d84cbc17b5",
+      "declarations": [
+        "BURST"
+      ]
+    }
+  ]
+}

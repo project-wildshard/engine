@@ -1,0 +1,14 @@
+{
+  "people/cards.json": {
+    "sha256": "5e9bd350d8b7fb1761926a0efe46c657331cc8f579d2f3113f75fe1f496a22c8",
+    "body": "{\"cards\":{\"castaway\":{\"figure\":{\"campAt\":\"fire\",\"feet\":{\"poi\":\"origin\",\"x\":0,\"y\":0,\"yaw\":0,\"z\":0},\"fire\":{\"poi\":\"origin\",\"x\":-1.2,\"y\":0,\"z\":-1.1},\"id\":\"castaway\",\"kit\":\"castaway\",\"objects\":[{\"at\":\"fire\",\"colour\":[1.8,1.8,1.8],\"draw\":\"npcCastawayFlames\",\"id\":\"flames\",\"kind\":\"basic-mesh\",\"lift\":0.08,\"name\":\"castaway-flame\",\"vertexColors\":true},{\"at\":\"fire\",\"center\":[2,9,1.5],\"draw\":\"castawaySmoke\",\"id\":\"smoke\",\"kind\":\"cloud\",\"look\":\"driftwood-castaway-smoke\",\"name\":\"castaway-smoke\",\"order\":4,\"radius\":14,\"seeds\":false}],\"parts\":{\"arm\":\"npcCastawayArm\",\"body\":\"npcCastawayBody\",\"camp\":\"npcCastawayCamp\",\"head\":\"npcCastawayHead\"},\"publish\":[{\"draw\":\"wendellHead\",\"id\":\"castaway.fitted-head\"}],\"system\":{\"before\":[\"shard.driftwood-isle.installSpine\"],\"id\":\"driftwood.speaker.pose\"}},\"model\":{\"category\":\"people\",\"defaults\":{},\"file\":\"src/shards/driftwood-isle/generators/kitFigureCards.ts\",\"id\":\"driftwood-isle/castaway\",\"name\":\"Wendell, the castaway\",\"pipeline\":\"code\",\"surface\":\"flesh\"}}},\"catalogue\":\"people/catalogue.json\",\"draws\":\"models/island-library\"}\n"
+  },
+  "world/building-life.json": {
+    "sha256": "3fdd601094ce408c36201c85223cf70d189fb18175a1e8202a26d59f1bdc6464",
+    "body": "{\"initialDusk\":0.35,\"life\":{\"colors\":[{\"color\":[0.21223075740342198,0.6938717612856897,1],\"gain\":2.6,\"material\":\"materials.glyphs\",\"night\":[0.6,0.4],\"offset\":1.6,\"pulse\":[0.55,0.45],\"waves\":[[1.1,0],[0.37,1]]}],\"doors\":[],\"flickers\":[],\"lamps\":[],\"params\":[{\"look\":\"driftwood-shrine-fireflies\",\"param\":\"dusk\"}],\"shared\":[],\"sites\":[],\"swings\":[],\"wheels\":[]},\"look\":{\"door\":{\"angle\":0,\"seconds\":1},\"fire\":[1,0],\"flicker\":{\"depth\":0,\"waves\":[]},\"glass\":[1,0],\"lamp\":[1,0],\"swing\":{\"x\":[1,0],\"z\":[]},\"wheel\":0}}\n"
+  },
+  "world/cover-composition.json": {
+    "sha256": "06ae5f2b6b51b5c609bf17b671627b8b15c299cde319e3c3427718a21628f7d1",
+    "body": "{\"name\":\"ground-cover\",\"placement\":\"foliage.logs\",\"mesh\":\"logs.mesh\",\"userData\":{\"coverProp\":true}}"
+  }
+}

@@ -1,0 +1,4673 @@
+{
+  "$doc": "PHYSICS.md P0 walk route, replayed by scripts/physics-baseline.mjs --mode=walk. Each leg teleports to start (feet at start.y), then the autopilot faces each waypoint in turn holding W (Space at jump waypoints) and advances within 0.8 m. expect.y = the floor height at the end from today's floor functions (2026-09-23, 9c975f2). Waypoints derived from the world builders and replayed through Player.ts at a fixed 1/60 frame. Pine Hollow legs re-derived for layout v2 (2026-09-24, pineHollowLayout.ts).",
+  "$trails": {
+    "driftwood-isle": [
+      {
+        "path": 1,
+        "at": [
+          14,
+          -24
+        ],
+        "with": [
+          [
+            10.8,
+            -27.8
+          ],
+          [
+            15.4,
+            -8.6
+          ]
+        ],
+        "why": "E354: the hut → lookout bed cuts the corner (14, -24) beside the plateau rim's trestle flight (Trailside flights[0], top (10.8, -27.8) on the bed's first leg, foot (15.4, -8.6) on its second), outside its rail and over the 12 m cliff it climbs. The bed lies in the Blender cove's baked ground, so it can't move: the walk takes the stairs, as a player does."
+      }
+    ]
+  },
+  "driftwood-isle": [
+    {
+      "name": "pier",
+      "gate": true,
+      "start": {
+        "x": 0,
+        "z": -235,
+        "yaw": 3.1416,
+        "y": 2.0
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -215
+        },
+        {
+          "x": 0,
+          "z": -195
+        },
+        {
+          "x": 0,
+          "z": -186.5
+        },
+        {
+          "x": -8,
+          "z": -172
+        },
+        {
+          "x": -17,
+          "z": -161
+        },
+        {
+          "x": -19,
+          "z": -152.2
+        },
+        {
+          "x": -20,
+          "z": -150
+        }
+      ],
+      "expect": {
+        "y": 0.535
+      },
+      "notes": "deck 2.0 to z -189.8, a 2.1 m drop to the sandbar under 0.9 m of sea, wade ~35 m, dry sand"
+    },
+    {
+      "name": "hut",
+      "start": {
+        "x": -30,
+        "z": -106,
+        "yaw": 3.1416,
+        "y": 16.763
+      },
+      "waypoints": [
+        {
+          "x": -30,
+          "z": -104
+        },
+        {
+          "x": -24,
+          "z": -80
+        },
+        {
+          "x": -22,
+          "z": -74
+        },
+        {
+          "x": -22,
+          "z": -71.5
+        },
+        {
+          "x": -22,
+          "z": -68.9
+        },
+        {
+          "x": -22,
+          "z": -67.6
+        },
+        {
+          "x": -22,
+          "z": -66.7
+        },
+        {
+          "x": -22,
+          "z": -65.2
+        },
+        {
+          "x": -22,
+          "z": -63.8
+        }
+      ],
+      "expect": {
+        "y": 18.911
+      },
+      "notes": "plateau ramp, hut front steps (4 x 0.275 m, 34.5 deg ramp), porch, through the 1.09 m door into the interior"
+    },
+    {
+      "name": "bridge",
+      "start": {
+        "x": 15.6,
+        "z": -7,
+        "yaw": 3.09,
+        "y": 6.078
+      },
+      "waypoints": [
+        {
+          "x": 13.88,
+          "z": 11.88
+        },
+        {
+          "x": 15.29,
+          "z": 13.29
+        },
+        {
+          "x": 23.99,
+          "z": 21.99
+        },
+        {
+          "x": 31.98,
+          "z": 29.98
+        },
+        {
+          "x": 34.38,
+          "z": 32.38
+        },
+        {
+          "x": 35.8,
+          "z": 33.8
+        }
+      ],
+      "expect": {
+        "y": 12.289
+      },
+      "notes": "rope bridge planks, ~4 deg at a, ~21 deg at b"
+    },
+    {
+      "name": "lookout",
+      "gate": true,
+      "start": {
+        "x": 86.1,
+        "z": 82.45,
+        "yaw": 3.742,
+        "y": 34.729
+      },
+      "waypoints": [
+        {
+          "x": 86.94,
+          "z": 83.68
+        },
+        {
+          "x": 87.68,
+          "z": 84.76
+        },
+        {
+          "x": 90.27,
+          "z": 88.55
+        },
+        {
+          "x": 92.76,
+          "z": 92.18
+        },
+        {
+          "x": 93.44,
+          "z": 93.17
+        },
+        {
+          "x": 94.17,
+          "z": 94.25
+        }
+      ],
+      "expect": {
+        "y": 40.529
+      },
+      "notes": "lookout stair 7 m over 8.75 m (38.7 deg) to the platform"
+    },
+    {
+      "name": "wreck",
+      "start": {
+        "x": 145.17,
+        "z": -0.15,
+        "yaw": -2.012,
+        "y": 1.103
+      },
+      "waypoints": [
+        {
+          "x": 146.8,
+          "z": 0.62
+        },
+        {
+          "x": 148.24,
+          "z": 1.3
+        },
+        {
+          "x": 150.23,
+          "z": 2.24
+        },
+        {
+          "x": 151.32,
+          "z": 2.75
+        },
+        {
+          "x": 154.08,
+          "z": 2.07
+        },
+        {
+          "x": 153.48,
+          "z": 3.33
+        },
+        {
+          "x": 152.71,
+          "z": 4.96
+        },
+        {
+          "x": 152.02,
+          "z": 6.41
+        },
+        {
+          "x": 151.51,
+          "z": 7.49
+        },
+        {
+          "x": 150.9,
+          "z": 8.31
+        }
+      ],
+      "expect": {
+        "y": 3.808
+      },
+      "notes": "hatch ramp (~10 deg) into the hold, the 0.9 m wide hold stair (~44 deg), +0.27 m onto the heeled bow deck"
+    },
+    {
+      "name": "cave",
+      "gate": true,
+      "start": {
+        "x": 145.6,
+        "z": 0.8,
+        "yaw": -2.989,
+        "y": 1.13
+      },
+      "waypoints": [
+        {
+          "x": 146.4,
+          "z": 6
+        },
+        {
+          "x": 146.2,
+          "z": 10.2
+        },
+        {
+          "x": 144.75,
+          "z": 12.95
+        },
+        {
+          "x": 142.6,
+          "z": 14.4
+        },
+        {
+          "x": 142,
+          "z": 16
+        },
+        {
+          "x": 142,
+          "z": 17.5
+        },
+        {
+          "x": 142,
+          "z": 19.25
+        }
+      ],
+      "expect": {
+        "y": 0.42
+      },
+      "notes": "round the driftwood piles into the sea cave antechamber (floor 1.2), stops ~1 m before the shut sluice"
+    },
+    {
+      "name": "shrine",
+      "start": {
+        "x": -86.49,
+        "z": 92.26,
+        "yaw": 2.51,
+        "y": 7.907
+      },
+      "waypoints": [
+        {
+          "x": -88.26,
+          "z": 94.68
+        },
+        {
+          "x": -89.62,
+          "z": 96.54
+        },
+        {
+          "x": -91.51,
+          "z": 99.12
+        },
+        {
+          "x": -93.39,
+          "z": 101.7
+        },
+        {
+          "x": -93.87,
+          "z": 102.35
+        },
+        {
+          "x": -95.34,
+          "z": 104.37
+        },
+        {
+          "x": -96.82,
+          "z": 106.39
+        },
+        {
+          "x": -97.35,
+          "z": 107.11
+        }
+      ],
+      "expect": {
+        "y": 10.218
+      },
+      "notes": "causeway (front edge 0.61 m above terrain), 0.55 m drop onto the stair foot, stair 3 m over 5 m (31 deg), top terrace"
+    },
+    {
+      "name": "boat",
+      "start": {
+        "x": 0.3,
+        "z": -196.5,
+        "yaw": 0.187,
+        "y": 2.0
+      },
+      "waypoints": [
+        {
+          "x": -0.8,
+          "z": -202.3
+        },
+        {
+          "x": -1.9,
+          "z": -202.3
+        },
+        {
+          "x": -3.4,
+          "z": -202.3
+        },
+        {
+          "x": -5.0,
+          "z": -202.3
+        }
+      ],
+      "expect": {
+        "y": 0.34
+      },
+      "notes": "off the pier deck between the pilings, 0.88 m down over the gunwale onto the boat floor (E308: the boat is moored half way down the pier, z -203)"
+    }
+  ],
+  "pine-hollow": [
+    {
+      "name": "cabin-porch",
+      "gate": true,
+      "start": {
+        "x": 0,
+        "z": -200,
+        "yaw": 3.1416,
+        "y": 0.121
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -190
+        },
+        {
+          "x": -8,
+          "z": -150
+        },
+        {
+          "x": -30,
+          "z": -95
+        },
+        {
+          "x": -12,
+          "z": -52
+        },
+        {
+          "x": -1,
+          "z": -40
+        },
+        {
+          "x": -5.71,
+          "z": -31.7
+        },
+        {
+          "x": -7.99,
+          "z": -35.02
+        },
+        {
+          "x": -9.56,
+          "z": -34.66
+        },
+        {
+          "x": -10.87,
+          "z": -34.18
+        }
+      ],
+      "expect": {
+        "y": 3.815
+      },
+      "notes": "S road to the ranger's cabin (v1 cabin 1), in through the porch rail gap onto the deck (layout v2: the pad is 0.63 m higher, the deck at +3.815)"
+    },
+    {
+      "name": "pond",
+      "start": {
+        "x": -10.31,
+        "z": -34.39,
+        "yaw": -1.306,
+        "y": 3.815
+      },
+      "waypoints": [
+        {
+          "x": -7.99,
+          "z": -35.02
+        },
+        {
+          "x": -5.71,
+          "z": -31.7
+        },
+        {
+          "x": 0,
+          "z": -10
+        },
+        {
+          "x": 2,
+          "z": 10
+        },
+        {
+          "x": 4,
+          "z": 40
+        },
+        {
+          "x": 4,
+          "z": 70
+        },
+        {
+          "x": -30,
+          "z": 86
+        },
+        {
+          "x": -62,
+          "z": 100
+        },
+        {
+          "x": -64,
+          "z": 110
+        }
+      ],
+      "expect": {
+        "y": -2.01
+      },
+      "notes": "off the porch, up the N road and along the pond spur to the Still pond's west shore (layout v2: the pond moved to (-100, 110))"
+    },
+    {
+      "name": "lookout-climb",
+      "gate": true,
+      "start": {
+        "x": 41.23,
+        "z": 211.92,
+        "yaw": 1.97,
+        "y": 46.02
+      },
+      "waypoints": [
+        {
+          "x": 38.48,
+          "z": 213.08
+        },
+        {
+          "x": 37.3,
+          "z": 213.28
+        },
+        {
+          "x": 34.19,
+          "z": 213.79
+        },
+        {
+          "x": 34.35,
+          "z": 214.78
+        },
+        {
+          "x": 37.81,
+          "z": 214.21
+        },
+        {
+          "x": 37.65,
+          "z": 213.22
+        },
+        {
+          "x": 34.19,
+          "z": 213.79
+        },
+        {
+          "x": 34.35,
+          "z": 214.78
+        },
+        {
+          "x": 37.81,
+          "z": 214.21
+        },
+        {
+          "x": 37.65,
+          "z": 213.22
+        },
+        {
+          "x": 34.34,
+          "z": 213.77
+        },
+        {
+          "x": 34.19,
+          "z": 212.83
+        },
+        {
+          "x": 34.78,
+          "z": 212.73
+        },
+        {
+          "x": 34.53,
+          "z": 211.25
+        },
+        {
+          "x": 35.53,
+          "z": 211.14
+        }
+      ],
+      "expect": {
+        "y": 57.46
+      },
+      "notes": "PH-B3: the fire lookout — in at the stair door (tower-local +X), up the five flights (landings at 2.2 / 4.4 / 6.6 / 8.8), out of the hatch, through the cab door onto the south catwalk (deck +11)"
+    },
+    {
+      "name": "zip-landing",
+      "start": {
+        "x": -3.89,
+        "z": 21.3,
+        "yaw": 4.88,
+        "y": 1.71
+      },
+      "waypoints": [
+        {
+          "x": -2.12,
+          "z": 21.01
+        },
+        {
+          "x": 0.55,
+          "z": 20.57
+        },
+        {
+          "x": 2.82,
+          "z": 20.2
+        },
+        {
+          "x": 4,
+          "z": 20
+        }
+      ],
+      "expect": {
+        "y": 3.29
+      },
+      "notes": "PH-B3: the zipline landing (4, 20) — up the stair off its −X side onto the 3 m deck"
+    },
+    {
+      "name": "creek-bridge",
+      "gate": true,
+      "start": {
+        "x": -166.81,
+        "z": -0.57,
+        "yaw": -1.42,
+        "y": -1.1
+      },
+      "waypoints": [
+        {
+          "x": -163.45,
+          "z": -1.08
+        },
+        {
+          "x": -156.93,
+          "z": -2.09
+        },
+        {
+          "x": -151,
+          "z": -3
+        },
+        {
+          "x": -145.07,
+          "z": -3.91
+        },
+        {
+          "x": -138.55,
+          "z": -4.92
+        },
+        {
+          "x": -135.19,
+          "z": -5.43
+        }
+      ],
+      "expect": {
+        "y": 1.42
+      },
+      "notes": "PH-B3: the E road over the creek on the log footbridge (deck 0.25 m over the ground at each end)"
+    },
+    {
+      "name": "lodge-porch",
+      "start": {
+        "x": -168.36,
+        "z": -108.99,
+        "yaw": 5.74,
+        "y": -0.47
+      },
+      "waypoints": [
+        {
+          "x": -166.5,
+          "z": -112.07
+        },
+        {
+          "x": -165.57,
+          "z": -113.61
+        },
+        {
+          "x": -164.85,
+          "z": -114.81
+        }
+      ],
+      "expect": {
+        "y": -0.18
+      },
+      "notes": "PH-B3: up the hunting lodge's step onto its porch, to the door"
+    },
+    {
+      "name": "den-cave",
+      "start": {
+        "x": 189.0,
+        "z": 183.0,
+        "yaw": -2.676
+      },
+      "waypoints": [
+        {
+          "x": 195.05,
+          "z": 195.05
+        },
+        {
+          "x": 200.71,
+          "z": 200.71
+        },
+        {
+          "x": 203.32,
+          "z": 203.75
+        },
+        {
+          "x": 204.95,
+          "z": 206.36
+        },
+        {
+          "x": 206.65,
+          "z": 208.91
+        },
+        {
+          "x": 208.56,
+          "z": 210.54
+        },
+        {
+          "x": 210.39,
+          "z": 211.53
+        },
+        {
+          "x": 212.3,
+          "z": 212.45
+        },
+        {
+          "x": 214.14,
+          "z": 213.44
+        },
+        {
+          "x": 215.98,
+          "z": 215.13
+        },
+        {
+          "x": 219.45,
+          "z": 218.03
+        }
+      ],
+      "expect": {
+        "y": 8.01
+      },
+      "notes": "PH-B2: from the Den's floor in through the hollowed arch, the antechamber, the squeeze (1.6 m) and down into the bear's room by its bed (floor +8.01)"
+    }
+  ],
+  "nalati-grasslands": [
+    {
+      "name": "road-camp",
+      "gate": true,
+      "start": {
+        "x": 0,
+        "z": 232,
+        "yaw": -1.2
+      },
+      "waypoints": [
+        {
+          "x": 20,
+          "z": 216
+        },
+        {
+          "x": 40,
+          "z": 218
+        },
+        {
+          "x": 60,
+          "z": 214
+        },
+        {
+          "x": 66,
+          "z": 209.5
+        },
+        {
+          "x": 73,
+          "z": 206.1
+        },
+        {
+          "x": 83,
+          "z": 206.0
+        },
+        {
+          "x": 84.8,
+          "z": 203.8
+        },
+        {
+          "x": 88,
+          "z": 204.5
+        },
+        {
+          "x": 95,
+          "z": 204
+        }
+      ],
+      "notes": "the north road down the camp spur into the spring camp's yard (south of the hitching rail), between the yurts (felt prisms)"
+    },
+    {
+      "name": "bridge",
+      "start": {
+        "x": 0,
+        "z": 200,
+        "yaw": 0
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": 190
+        },
+        {
+          "x": 0,
+          "z": 183
+        },
+        {
+          "x": 0,
+          "z": 170
+        },
+        {
+          "x": 0,
+          "z": 158
+        },
+        {
+          "x": 0,
+          "z": 150
+        },
+        {
+          "x": 0,
+          "z": 142
+        }
+      ],
+      "notes": "over the Kunes on the timber bridge, north to south: the level plank slab at -6, the south ramp 1 : 5 down to the road"
+    },
+    {
+      "name": "eagle-rock",
+      "start": {
+        "x": 147,
+        "z": 33,
+        "yaw": -1.893
+      },
+      "waypoints": [
+        {
+          "x": 149.75,
+          "z": 33.92
+        },
+        {
+          "x": 152.5,
+          "z": 34.83
+        },
+        {
+          "x": 155.25,
+          "z": 35.75
+        },
+        {
+          "x": 158.0,
+          "z": 36.67
+        },
+        {
+          "x": 160.75,
+          "z": 37.58
+        },
+        {
+          "x": 163.5,
+          "z": 38.5
+        },
+        {
+          "x": 166.25,
+          "z": 39.42
+        },
+        {
+          "x": 169.0,
+          "z": 40.33
+        },
+        {
+          "x": 171.75,
+          "z": 41.25
+        },
+        {
+          "x": 174.5,
+          "z": 42.17
+        },
+        {
+          "x": 177.25,
+          "z": 43.08
+        },
+        {
+          "x": 180.0,
+          "z": 44.0
+        },
+        {
+          "x": 182.25,
+          "z": 45.75
+        },
+        {
+          "x": 184.5,
+          "z": 47.5
+        },
+        {
+          "x": 186.75,
+          "z": 49.25
+        },
+        {
+          "x": 189.0,
+          "z": 51.0
+        },
+        {
+          "x": 191.25,
+          "z": 52.75
+        },
+        {
+          "x": 193.5,
+          "z": 54.5
+        },
+        {
+          "x": 195.75,
+          "z": 56.25
+        },
+        {
+          "x": 198.0,
+          "z": 58.0
+        },
+        {
+          "x": 197.6,
+          "z": 60.4
+        },
+        {
+          "x": 197.2,
+          "z": 62.8
+        },
+        {
+          "x": 196.8,
+          "z": 65.2
+        },
+        {
+          "x": 196.4,
+          "z": 67.6
+        },
+        {
+          "x": 196.0,
+          "z": 70.0
+        },
+        {
+          "x": 193.33,
+          "z": 71.27
+        },
+        {
+          "x": 190.67,
+          "z": 72.53
+        },
+        {
+          "x": 188.0,
+          "z": 73.8
+        },
+        {
+          "x": 185.5,
+          "z": 73.7
+        },
+        {
+          "x": 183.0,
+          "z": 73.6
+        },
+        {
+          "x": 180.5,
+          "z": 73.5
+        },
+        {
+          "x": 178.0,
+          "z": 73.4
+        },
+        {
+          "x": 175.83,
+          "z": 74.77
+        },
+        {
+          "x": 173.67,
+          "z": 76.13
+        },
+        {
+          "x": 171.5,
+          "z": 77.5
+        },
+        {
+          "x": 171.28,
+          "z": 79.36
+        },
+        {
+          "x": 170.79,
+          "z": 80.55
+        },
+        {
+          "x": 170.45,
+          "z": 81.78
+        },
+        {
+          "x": 170.28,
+          "z": 83.01
+        },
+        {
+          "x": 170.25,
+          "z": 84.25
+        },
+        {
+          "x": 170.38,
+          "z": 85.45
+        },
+        {
+          "x": 170.66,
+          "z": 86.62
+        },
+        {
+          "x": 171.07,
+          "z": 87.72
+        },
+        {
+          "x": 171.61,
+          "z": 88.75
+        },
+        {
+          "x": 172.26,
+          "z": 89.68
+        },
+        {
+          "x": 173.01,
+          "z": 90.52
+        },
+        {
+          "x": 173.84,
+          "z": 91.24
+        },
+        {
+          "x": 174.75,
+          "z": 91.85
+        },
+        {
+          "x": 175.7,
+          "z": 92.33
+        },
+        {
+          "x": 176.7,
+          "z": 92.68
+        },
+        {
+          "x": 177.71,
+          "z": 92.9
+        },
+        {
+          "x": 178.73,
+          "z": 92.99
+        },
+        {
+          "x": 179.73,
+          "z": 92.96
+        },
+        {
+          "x": 180.71,
+          "z": 92.8
+        },
+        {
+          "x": 181.64,
+          "z": 92.52
+        },
+        {
+          "x": 182.52,
+          "z": 92.14
+        },
+        {
+          "x": 183.33,
+          "z": 91.65
+        },
+        {
+          "x": 184.05,
+          "z": 91.08
+        },
+        {
+          "x": 184.69,
+          "z": 90.44
+        },
+        {
+          "x": 185.24,
+          "z": 89.73
+        },
+        {
+          "x": 185.68,
+          "z": 88.97
+        },
+        {
+          "x": 186.02,
+          "z": 88.18
+        },
+        {
+          "x": 186.25,
+          "z": 87.37
+        },
+        {
+          "x": 186.37,
+          "z": 86.55
+        },
+        {
+          "x": 186.39,
+          "z": 85.73
+        },
+        {
+          "x": 186.31,
+          "z": 84.93
+        },
+        {
+          "x": 186.13,
+          "z": 84.17
+        },
+        {
+          "x": 185.86,
+          "z": 83.45
+        },
+        {
+          "x": 185.51,
+          "z": 82.78
+        },
+        {
+          "x": 185.09,
+          "z": 82.17
+        },
+        {
+          "x": 184.6,
+          "z": 81.63
+        },
+        {
+          "x": 184.06,
+          "z": 81.17
+        },
+        {
+          "x": 183.48,
+          "z": 80.79
+        },
+        {
+          "x": 182.87,
+          "z": 80.49
+        },
+        {
+          "x": 182.24,
+          "z": 80.28
+        },
+        {
+          "x": 181.0,
+          "z": 86.5
+        }
+      ],
+      "notes": "from the W road's bend up the footpath round the knoll's south-west flank onto its crest (EAGLE_TRAIL: graded ≤ 27°, a bench across — NALATI-MERGE P4), then Eagle Rock's scramble from its fourth slab (the first three lie under the crest): granite slabs, 0.3 m risers, clockwise round the tor to the summit deck",
+      "expect": {
+        "y": 65.1
+      }
+    },
+    {
+      "name": "kurgan-crown",
+      "start": {
+        "x": -84,
+        "z": 102,
+        "yaw": 1.5707963267948966
+      },
+      "waypoints": [
+        {
+          "x": -90,
+          "z": 102
+        },
+        {
+          "x": -95,
+          "z": 103.5
+        }
+      ],
+      "notes": "up a kurgan's flank (r 9, h 2.8) to its crown, beside the balbal pair"
+    },
+    {
+      "name": "great-kurgan-crown",
+      "start": {
+        "x": -191,
+        "z": 48,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": -191,
+          "z": 58
+        },
+        {
+          "x": -191,
+          "z": 66
+        },
+        {
+          "x": -191,
+          "z": 73
+        }
+      ],
+      "notes": "up the great kurgan's south flank (r 19, h 6.5) to its crown"
+    },
+    {
+      "name": "great-kurgan-door",
+      "gate": true,
+      "start": {
+        "x": -160,
+        "z": 75,
+        "yaw": -1.5707963267948966
+      },
+      "waypoints": [
+        {
+          "x": -166,
+          "z": 75
+        },
+        {
+          "x": -169,
+          "z": 75
+        },
+        {
+          "x": -171,
+          "z": 75
+        },
+        {
+          "x": -172.6,
+          "z": 75
+        },
+        {
+          "x": -173.6,
+          "z": 75
+        }
+      ],
+      "notes": "the great kurgan's dromos head: the grass, the timber treads (≤ 0.33 m), the threshold, into the passage — where the door takes you down into the tomb (kurganBoss.enter: the end is at y 140)"
+    },
+    {
+      "name": "dungeon",
+      "start": {
+        "x": -40,
+        "z": -74.7,
+        "yaw": 0,
+        "y": 140.05
+      },
+      "waypoints": [
+        {
+          "x": -40,
+          "z": -80
+        },
+        {
+          "x": -40,
+          "z": -86
+        },
+        {
+          "x": -40,
+          "z": -91
+        },
+        {
+          "x": -38.9,
+          "z": -93.4
+        },
+        {
+          "x": -38.9,
+          "z": -95.6
+        }
+      ],
+      "expect": {
+        "y": 140.45
+      },
+      "notes": "the Golden King's tomb (y 140): down the dromos into the chamber, up the step onto the coffin plinth"
+    },
+    {
+      "name": "leopard-cave",
+      "gate": true,
+      "start": {
+        "x": 180,
+        "z": 4.8,
+        "yaw": 1.875
+      },
+      "waypoints": [
+        {
+          "x": 176.5,
+          "z": 5.9
+        },
+        {
+          "x": 172.5,
+          "z": 2
+        },
+        {
+          "x": 168.6,
+          "z": -2
+        },
+        {
+          "x": 164.7,
+          "z": -5.9
+        },
+        {
+          "x": 160.8,
+          "z": -9.8
+        },
+        {
+          "x": 156.9,
+          "z": -13.7
+        },
+        {
+          "x": 152.9,
+          "z": -17.6
+        },
+        {
+          "x": 149,
+          "z": -21.6
+        },
+        {
+          "x": 147.1,
+          "z": -23.5
+        },
+        {
+          "x": 147.1,
+          "z": -31.4
+        },
+        {
+          "x": 144.73,
+          "z": -39.47
+        },
+        {
+          "x": 142.37,
+          "z": -39.73
+        },
+        {
+          "x": 140.0,
+          "z": -40.0
+        },
+        {
+          "x": 137.43,
+          "z": -41.14
+        },
+        {
+          "x": 134.86,
+          "z": -42.29
+        },
+        {
+          "x": 132.29,
+          "z": -43.43
+        },
+        {
+          "x": 129.71,
+          "z": -44.57
+        },
+        {
+          "x": 127.14,
+          "z": -45.71
+        },
+        {
+          "x": 124.57,
+          "z": -46.86
+        },
+        {
+          "x": 122.0,
+          "z": -48.0
+        },
+        {
+          "x": 121.83,
+          "z": -50.67
+        },
+        {
+          "x": 121.67,
+          "z": -53.33
+        },
+        {
+          "x": 121.5,
+          "z": -56.0
+        },
+        {
+          "x": 121.33,
+          "z": -58.67
+        },
+        {
+          "x": 121.17,
+          "z": -61.33
+        },
+        {
+          "x": 121.0,
+          "z": -64.0
+        },
+        {
+          "x": 122.5,
+          "z": -65.75
+        },
+        {
+          "x": 124.0,
+          "z": -67.5
+        },
+        {
+          "x": 125.5,
+          "z": -69.25
+        },
+        {
+          "x": 127.0,
+          "z": -71.0
+        },
+        {
+          "x": 129.5,
+          "z": -72.25
+        },
+        {
+          "x": 132.0,
+          "z": -73.5
+        },
+        {
+          "x": 134.5,
+          "z": -73.25
+        },
+        {
+          "x": 137.0,
+          "z": -73.0
+        },
+        {
+          "x": 140.5,
+          "z": -73
+        },
+        {
+          "x": 143.5,
+          "z": -71
+        },
+        {
+          "x": 144.5,
+          "z": -66
+        },
+        {
+          "x": 142.5,
+          "z": -62
+        },
+        {
+          "x": 139.5,
+          "z": -61.6
+        },
+        {
+          "x": 136.5,
+          "z": -63
+        },
+        {
+          "x": 137.3,
+          "z": -66.6
+        }
+      ],
+      "notes": "from the W road across the bowl's west side, then the cave footpath up the shelf's east side onto the flat south of the cave (CAVE_TRAIL: graded ≤ 27°, a bench across — NALATI-MERGE P4), round the cave's west wall to its porch slab (the mouth faces north-east), into Aqbars' cave",
+      "expect": {
+        "y": 54.12
+      }
+    },
+    {
+      "name": "summer-camp",
+      "start": {
+        "x": -70,
+        "z": -26,
+        "yaw": -1.5707963267948966
+      },
+      "waypoints": [
+        {
+          "x": -80,
+          "z": -26
+        },
+        {
+          "x": -88,
+          "z": -24
+        }
+      ],
+      "notes": "into the jailau camp on the Sky Grassland"
+    },
+    {
+      "name": "cairn",
+      "start": {
+        "x": -30,
+        "z": -25,
+        "yaw": 0
+      },
+      "waypoints": [
+        {
+          "x": -28,
+          "z": -35
+        },
+        {
+          "x": -26.4,
+          "z": -42
+        }
+      ],
+      "notes": "up to the Wind Cairn on the bowl's south rim, to the tie spot"
+    },
+    {
+      "name": "watchtower",
+      "start": {
+        "x": -172.6,
+        "z": -32.2,
+        "yaw": 1.296
+      },
+      "waypoints": [
+        {
+          "x": -176.5,
+          "z": -33.3
+        },
+        {
+          "x": -184.3,
+          "z": -35.3
+        },
+        {
+          "x": -191,
+          "z": -36.3
+        },
+        {
+          "x": -198,
+          "z": -37.3
+        },
+        {
+          "x": -200.5,
+          "z": -37.5
+        }
+      ],
+      "notes": "from the bowl up the stone stair on the tower rock's west shoulder (Bowl.ts) to the doorway's terrace",
+      "expect": {
+        "y": 44.0
+      }
+    },
+    {
+      "name": "argymaq-pasture",
+      "start": {
+        "x": -158,
+        "z": -29,
+        "yaw": 1.212
+      },
+      "waypoints": [
+        {
+          "x": -162,
+          "z": -30.5
+        },
+        {
+          "x": -166,
+          "z": -32
+        },
+        {
+          "x": -168.6,
+          "z": -33.0
+        },
+        {
+          "x": -171.2,
+          "z": -34.0
+        },
+        {
+          "x": -173.8,
+          "z": -35.0
+        },
+        {
+          "x": -176.4,
+          "z": -36.0
+        },
+        {
+          "x": -179.0,
+          "z": -37.0
+        },
+        {
+          "x": -181.6,
+          "z": -38.0
+        },
+        {
+          "x": -184.2,
+          "z": -39.0
+        },
+        {
+          "x": -186.8,
+          "z": -40.0
+        },
+        {
+          "x": -189.4,
+          "z": -41.0
+        },
+        {
+          "x": -192.0,
+          "z": -42.0
+        },
+        {
+          "x": -189.33,
+          "z": -43.11
+        },
+        {
+          "x": -186.67,
+          "z": -44.22
+        },
+        {
+          "x": -184.0,
+          "z": -45.33
+        },
+        {
+          "x": -181.33,
+          "z": -46.44
+        },
+        {
+          "x": -178.67,
+          "z": -47.56
+        },
+        {
+          "x": -176.0,
+          "z": -48.67
+        },
+        {
+          "x": -173.33,
+          "z": -49.78
+        },
+        {
+          "x": -170.67,
+          "z": -50.89
+        },
+        {
+          "x": -168.0,
+          "z": -52.0
+        },
+        {
+          "x": -166.0,
+          "z": -54.0
+        },
+        {
+          "x": -164.0,
+          "z": -56.0
+        },
+        {
+          "x": -162.0,
+          "z": -58.0
+        },
+        {
+          "x": -160.0,
+          "z": -60.0
+        },
+        {
+          "x": -158.67,
+          "z": -62.33
+        },
+        {
+          "x": -157.33,
+          "z": -64.67
+        },
+        {
+          "x": -156.0,
+          "z": -67.0
+        },
+        {
+          "x": -158,
+          "z": -70
+        },
+        {
+          "x": -160,
+          "z": -72
+        }
+      ],
+      "notes": "from the bowl's south-east corner up the footpath on the Crags' north flank (ARGYMAQ_TRAIL: two legs graded ≤ 27°, a bench across — NALATI-MERGE P4) onto Argymaq's high pasture (+52)",
+      "expect": {
+        "y": 52
+      }
+    }
+  ],
+  "nine-dragon-stack": [
+    {
+      "name": "square-to-street",
+      "start": {
+        "x": 0.95,
+        "z": 7.5,
+        "yaw": -0.21,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": 5.5,
+          "z": 2
+        },
+        {
+          "x": 6.05,
+          "z": -14
+        },
+        {
+          "x": 6.05,
+          "z": -22
+        },
+        {
+          "x": 6.05,
+          "z": -30
+        },
+        {
+          "x": 6.5,
+          "z": -60
+        },
+        {
+          "x": 6.5,
+          "z": -110
+        }
+      ],
+      "expect": {
+        "y": 125.0
+      },
+      "notes": "the square past the hawker stall, through the paifang's centre bay (between the lions), up the street to the fragment's end"
+    },
+    {
+      "name": "balustrade-west-bay",
+      "start": {
+        "x": 1.4,
+        "z": 18,
+        "yaw": 0.0,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": 1.4,
+          "z": 0
+        },
+        {
+          "x": 1.6,
+          "z": -18
+        },
+        {
+          "x": 2.25,
+          "z": -22
+        },
+        {
+          "x": 2.25,
+          "z": -30
+        },
+        {
+          "x": 2.5,
+          "z": -40
+        }
+      ],
+      "expect": {
+        "y": 125.0
+      },
+      "notes": "along the Well's balustrade (the lamps are scenery) and through the gate's west bay"
+    },
+    {
+      "name": "stair-street",
+      "gate": true,
+      "start": {
+        "x": 14,
+        "z": 6,
+        "yaw": -1.5708,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": 21,
+          "z": 6
+        },
+        {
+          "x": 40,
+          "z": 6
+        },
+        {
+          "x": 60,
+          "z": 6
+        },
+        {
+          "x": 70.5,
+          "z": 6
+        },
+        {
+          "x": 76,
+          "z": 6
+        }
+      ],
+      "expect": {
+        "y": 146.0
+      },
+      "notes": "the 60 treads (rise 0.35, run 0.8) up to the top landing"
+    },
+    {
+      "name": "stair-down",
+      "start": {
+        "x": 76,
+        "z": 6,
+        "yaw": 1.5708,
+        "y": 146.0
+      },
+      "waypoints": [
+        {
+          "x": 60,
+          "z": 6
+        },
+        {
+          "x": 30,
+          "z": 6
+        },
+        {
+          "x": 20,
+          "z": 6
+        },
+        {
+          "x": 12,
+          "z": 6
+        }
+      ],
+      "expect": {
+        "y": 125.0
+      },
+      "notes": "back down the stair onto the square"
+    },
+    {
+      "name": "crossing-gate-bridge",
+      "gate": true,
+      "start": {
+        "x": -19.8,
+        "z": -25.4,
+        "yaw": -1.5708,
+        "y": 107.0
+      },
+      "waypoints": [
+        {
+          "x": -15,
+          "z": -25.4
+        },
+        {
+          "x": -10,
+          "z": -25.4
+        },
+        {
+          "x": -5.9,
+          "z": -25.4
+        }
+      ],
+      "expect": {
+        "y": 107.0
+      },
+      "notes": "the Well's gate bridge at z −27 (Y0 − 18, dome B2's crossings, world/well-mid.ts): along its deck between the gallery fronts, 1.6 m south of the paifang's posts"
+    },
+    {
+      "name": "crossing-timber-hump",
+      "start": {
+        "x": -19.4,
+        "z": -21,
+        "yaw": -1.5708,
+        "y": 119.1
+      },
+      "waypoints": [
+        {
+          "x": -15,
+          "z": -21
+        },
+        {
+          "x": -11,
+          "z": -21
+        },
+        {
+          "x": -8.0,
+          "z": -21
+        }
+      ],
+      "expect": {
+        "y": 119.1
+      },
+      "notes": "dome B2's anchor, the humped timber bridge 6 m under the rim at z −21: over its hump between the gallery fronts"
+    },
+    {
+      "name": "well-rim",
+      "start": {
+        "x": -26,
+        "z": 13.6,
+        "yaw": -1.5708,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": -19.5,
+          "z": 13.6
+        },
+        {
+          "x": -10.5,
+          "z": 12.4
+        },
+        {
+          "x": -2,
+          "z": 13.6
+        }
+      ],
+      "expect": {
+        "y": 125.0
+      },
+      "notes": "along the Well's south rim (dome C's wellColliders), past the mockup B / D cameras' spot at the balustrade"
+    },
+    {
+      "name": "escape-square-balustrade",
+      "gate": true,
+      "start": {
+        "x": 4,
+        "z": -8,
+        "yaw": 1.5708,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": 4,
+          "z": -4
+        },
+        {
+          "x": -4,
+          "z": -8,
+          "jump": 2,
+          "jumpAt": 5.0
+        },
+        {
+          "x": 4,
+          "z": -4
+        },
+        {
+          "x": -4,
+          "z": -8,
+          "jump": 2,
+          "jumpAt": 5.0
+        },
+        {
+          "x": 4,
+          "z": -4
+        },
+        {
+          "x": -4,
+          "z": -8,
+          "jump": 2,
+          "jumpAt": 5.0
+        }
+      ],
+      "inside": {
+        "x0": -0.3,
+        "x1": 23,
+        "z0": -27,
+        "z1": 21,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 40,
+      "notes": "run at the square's balustrade over the Well and jump + double-jump (onto the stone, then off it): the 12 m parapet holds"
+    },
+    {
+      "name": "escape-street-balustrade",
+      "start": {
+        "x": 4,
+        "z": -36,
+        "yaw": 1.5708,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": 4,
+          "z": -32
+        },
+        {
+          "x": -4,
+          "z": -36,
+          "jump": 2,
+          "jumpAt": 5.0
+        },
+        {
+          "x": 4,
+          "z": -32
+        },
+        {
+          "x": -4,
+          "z": -36,
+          "jump": 2,
+          "jumpAt": 5.0
+        },
+        {
+          "x": 4,
+          "z": -32
+        },
+        {
+          "x": -4,
+          "z": -36,
+          "jump": 2,
+          "jumpAt": 5.0
+        }
+      ],
+      "inside": {
+        "x0": -0.3,
+        "x1": 13,
+        "z0": -121,
+        "z1": -26,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 40,
+      "notes": "the street's west bay over the Well's north end, the same attempts"
+    },
+    {
+      "name": "escape-hawker-roof",
+      "start": {
+        "x": 8,
+        "z": -2.5,
+        "yaw": 1.5708,
+        "y": 127.4
+      },
+      "waypoints": [
+        {
+          "x": -4,
+          "z": -2.5,
+          "jump": 2,
+          "jumpAt": 9
+        }
+      ],
+      "inside": {
+        "x0": -0.3,
+        "x1": 23,
+        "z0": -27,
+        "z1": 21,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 20,
+      "notes": "off the hawker stall's roof (2.4 m) toward the Well with a double jump"
+    },
+    {
+      "name": "escape-south-front",
+      "start": {
+        "x": 6,
+        "z": 16,
+        "yaw": 3.1416,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": 6,
+          "z": 15
+        },
+        {
+          "x": 6,
+          "z": 22,
+          "jump": 2,
+          "jumpAt": 3.5
+        },
+        {
+          "x": 6,
+          "z": 15
+        },
+        {
+          "x": 6,
+          "z": 22,
+          "jump": 2,
+          "jumpAt": 3.5
+        },
+        {
+          "x": 6,
+          "z": 15
+        },
+        {
+          "x": 6,
+          "z": 22,
+          "jump": 2,
+          "jumpAt": 3.5
+        }
+      ],
+      "inside": {
+        "x0": -0.3,
+        "x1": 23,
+        "z0": -27,
+        "z1": 21,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 40,
+      "notes": "the square's south front, behind the spawn"
+    },
+    {
+      "name": "escape-street-end",
+      "start": {
+        "x": 6.5,
+        "z": -112,
+        "yaw": 0.0,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": 6.5,
+          "z": -114
+        },
+        {
+          "x": 6.5,
+          "z": -122.5,
+          "jump": 2,
+          "jumpAt": 3.5
+        },
+        {
+          "x": 6.5,
+          "z": -114
+        },
+        {
+          "x": 6.5,
+          "z": -122.5,
+          "jump": 2,
+          "jumpAt": 3.5
+        },
+        {
+          "x": 6.5,
+          "z": -114
+        },
+        {
+          "x": 6.5,
+          "z": -122.5,
+          "jump": 2,
+          "jumpAt": 3.5
+        }
+      ],
+      "inside": {
+        "x0": 0,
+        "x1": 13,
+        "z0": -121,
+        "z1": -26,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 40,
+      "notes": "the street's end wall"
+    },
+    {
+      "name": "escape-stair-sides",
+      "start": {
+        "x": 37,
+        "z": 6,
+        "yaw": 0.0,
+        "y": 132.0
+      },
+      "waypoints": [
+        {
+          "x": 37,
+          "z": -3,
+          "jump": 2,
+          "jumpAt": 6
+        },
+        {
+          "x": 37,
+          "z": 6
+        },
+        {
+          "x": 37,
+          "z": 15,
+          "jump": 2,
+          "jumpAt": 6
+        }
+      ],
+      "inside": {
+        "x0": 21,
+        "x1": 80,
+        "z0": 1.5,
+        "z1": 10.5,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 132.0
+      },
+      "timeout": 30,
+      "notes": "landing 1: double jumps at the stair-street's north and south walls"
+    },
+    {
+      "name": "escape-stair-top",
+      "start": {
+        "x": 74,
+        "z": 6,
+        "yaw": -1.5708,
+        "y": 146.0
+      },
+      "waypoints": [
+        {
+          "x": 73,
+          "z": 6
+        },
+        {
+          "x": 79.5,
+          "z": 6,
+          "jump": 2,
+          "jumpAt": 3.5
+        },
+        {
+          "x": 73,
+          "z": 6
+        },
+        {
+          "x": 79.5,
+          "z": 6,
+          "jump": 2,
+          "jumpAt": 3.5
+        }
+      ],
+      "inside": {
+        "x0": 21,
+        "x1": 78.5,
+        "z0": 1.5,
+        "z1": 10.5,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 146.0
+      },
+      "timeout": 30,
+      "notes": "the top landing's end wall"
+    },
+    {
+      "name": "escape-rim-into-well",
+      "start": {
+        "x": -19.5,
+        "z": 14.5,
+        "yaw": 0.0,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": -19.5,
+          "z": 15.2
+        },
+        {
+          "x": -19.5,
+          "z": 10,
+          "jump": 2,
+          "jumpAt": 3.5
+        },
+        {
+          "x": -19.5,
+          "z": 15.2
+        },
+        {
+          "x": -19.5,
+          "z": 10,
+          "jump": 2,
+          "jumpAt": 3.5
+        },
+        {
+          "x": -19.5,
+          "z": 15.2
+        },
+        {
+          "x": -19.5,
+          "z": 10,
+          "jump": 2,
+          "jumpAt": 3.5
+        }
+      ],
+      "inside": {
+        "x0": -28.5,
+        "x1": 23,
+        "z0": 10.9,
+        "z1": 21,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 40,
+      "notes": "the Well's south rim (mockup B's spot): double jumps over its balustrade into the shaft"
+    },
+    {
+      "name": "escape-rim-hop",
+      "start": {
+        "x": 3,
+        "z": 13.6,
+        "yaw": 1.5708,
+        "y": 125.0
+      },
+      "waypoints": [
+        {
+          "x": -4,
+          "z": 13.6,
+          "jump": 2,
+          "jumpAt": 5.5
+        },
+        {
+          "x": -19.5,
+          "z": 13.6
+        }
+      ],
+      "inside": {
+        "x0": -28.5,
+        "x1": 23,
+        "z0": 10.9,
+        "z1": 21,
+        "floor": 124.5
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 20,
+      "notes": "the one way over a balustrade: from the square onto the rim ledge (in bounds), then along it"
+    },
+    {
+      "name": "escape-hover-balustrade",
+      "start": {
+        "x": 4,
+        "z": -8,
+        "yaw": 1.5708,
+        "y": 125.0,
+        "hover": true
+      },
+      "waypoints": [
+        {
+          "x": 5,
+          "z": -4
+        },
+        {
+          "x": -1.5,
+          "z": -8,
+          "jump": 1,
+          "jumpAt": 3.5
+        },
+        {
+          "x": 5,
+          "z": -4
+        },
+        {
+          "x": -1.5,
+          "z": -8,
+          "jump": 1,
+          "jumpAt": 3.5
+        },
+        {
+          "x": 5,
+          "z": -4
+        },
+        {
+          "x": -1.5,
+          "z": -8,
+          "jump": 1,
+          "jumpAt": 3.5
+        }
+      ],
+      "inside": {
+        "x0": -0.3,
+        "x1": 23,
+        "z0": -27,
+        "z1": 21,
+        "floor": 124.5
+      },
+      "timeout": 30,
+      "notes": "on the board: jumps at the square's balustrade"
+    },
+    {
+      "name": "escape-hover-rim",
+      "start": {
+        "x": -19.5,
+        "z": 14.5,
+        "yaw": 0.0,
+        "y": 125.0,
+        "hover": true
+      },
+      "waypoints": [
+        {
+          "x": -19.5,
+          "z": 15.2
+        },
+        {
+          "x": -19.5,
+          "z": 10,
+          "jump": 1,
+          "jumpAt": 3.5
+        },
+        {
+          "x": -19.5,
+          "z": 15.2
+        },
+        {
+          "x": -19.5,
+          "z": 10,
+          "jump": 1,
+          "jumpAt": 3.5
+        },
+        {
+          "x": -19.5,
+          "z": 15.2
+        },
+        {
+          "x": -19.5,
+          "z": 10,
+          "jump": 1,
+          "jumpAt": 3.5
+        }
+      ],
+      "inside": {
+        "x0": -28.5,
+        "x1": 23,
+        "z0": 10.9,
+        "z1": 21,
+        "floor": 124.5
+      },
+      "timeout": 30,
+      "notes": "on the board: jumps off the rim into the Well"
+    },
+    {
+      "name": "net-well-fall",
+      "start": {
+        "x": -14,
+        "z": -10.4,
+        "yaw": 3.1416,
+        "y": 107.0
+      },
+      "waypoints": [
+        {
+          "x": -19.5,
+          "z": 13.6
+        }
+      ],
+      "inside": {
+        "x0": -40,
+        "x1": 95,
+        "z0": -131,
+        "z1": 29,
+        "floor": 20
+      },
+      "expect": {
+        "y": 125.0
+      },
+      "timeout": 15,
+      "notes": "dropped into the shaft between the crossings (the grapple gone wrong): the def's bounds catch the fall under Y0 − 100 and put the player back on the last floor stood on (the rim, two legs before)"
+    }
+  ],
+  "sunscar-dunes": [
+    {
+      "name": "spawn-caravan",
+      "start": {
+        "x": 0,
+        "z": 70,
+        "yaw": 0,
+        "y": 21.66
+      },
+      "waypoints": [
+        {
+          "x": -36,
+          "z": 52
+        },
+        {
+          "x": -70,
+          "z": 32
+        }
+      ],
+      "expect": {
+        "y": 14.83
+      },
+      "notes": "E374 Signal Dunes content route (its agent: max grade 26°, nearest collider ≥ 2.5 m on a node build) · start heights re-measured on the round-20 terrain (ground + 0.3 m)"
+    },
+    {
+      "name": "caravan-well",
+      "start": {
+        "x": -70,
+        "z": 32,
+        "yaw": 0,
+        "y": 14.83
+      },
+      "waypoints": [
+        {
+          "x": -36,
+          "z": 52
+        },
+        {
+          "x": 0,
+          "z": 66
+        },
+        {
+          "x": 44,
+          "z": 40
+        },
+        {
+          "x": 78,
+          "z": -2
+        }
+      ],
+      "expect": {
+        "y": 15.99
+      },
+      "notes": "E374 Signal Dunes content route (its agent: max grade 26°, nearest collider ≥ 2.5 m on a node build) · start heights re-measured on the round-20 terrain (ground + 0.3 m)"
+    },
+    {
+      "name": "well-waymark-east",
+      "start": {
+        "x": 78,
+        "z": -2,
+        "yaw": 0,
+        "y": 15.99
+      },
+      "waypoints": [
+        {
+          "x": 66,
+          "z": -22
+        },
+        {
+          "x": 58,
+          "z": -31
+        }
+      ],
+      "expect": {
+        "y": 25.3
+      },
+      "notes": "E374 Signal Dunes content route (its agent: max grade 26°, nearest collider ≥ 2.5 m on a node build) · start heights re-measured on the round-20 terrain (ground + 0.3 m)"
+    },
+    {
+      "name": "waymark-east-west",
+      "start": {
+        "x": 58,
+        "z": -31,
+        "yaw": 0,
+        "y": 25.3
+      },
+      "waypoints": [
+        {
+          "x": 30,
+          "z": -14
+        },
+        {
+          "x": 4,
+          "z": -4
+        },
+        {
+          "x": -20,
+          "z": -12
+        },
+        {
+          "x": -41,
+          "z": -21
+        }
+      ],
+      "expect": {
+        "y": 18.11
+      },
+      "notes": "E374 Signal Dunes content route (its agent: max grade 26°, nearest collider ≥ 2.5 m on a node build) · start heights re-measured on the round-20 terrain (ground + 0.3 m)"
+    },
+    {
+      "name": "waymark-west-tower",
+      "start": {
+        "x": -41,
+        "z": -21,
+        "yaw": 0,
+        "y": 18.11
+      },
+      "waypoints": [
+        {
+          "x": -14,
+          "z": -20
+        },
+        {
+          "x": 5,
+          "z": -30
+        },
+        {
+          "x": 7.0,
+          "z": -66
+        }
+      ],
+      "expect": {
+        "y": 19.76
+      },
+      "notes": "E374 Signal Dunes content route (its agent: max grade 26°, nearest collider ≥ 2.5 m on a node build) · start heights re-measured on the round-20 terrain (ground + 0.3 m); its last waypoint 1 m west of the south stair (x 8.1-9.4): at x 8 the autopilot ground along the treads' solid side"
+    },
+    {
+      "name": "tower-waymark-north",
+      "start": {
+        "x": 8,
+        "z": -68,
+        "yaw": 0,
+        "y": 19.76
+      },
+      "waypoints": [
+        {
+          "x": 14,
+          "z": -70
+        },
+        {
+          "x": 24,
+          "z": -88
+        },
+        {
+          "x": 32,
+          "z": -99
+        }
+      ],
+      "expect": {
+        "y": 9.4
+      },
+      "notes": "E374 Signal Dunes content route (its agent: max grade 26°, nearest collider ≥ 2.5 m on a node build) · start heights re-measured on the round-20 terrain (ground + 0.3 m)"
+    },
+    {
+      "name": "waymark-north-basin",
+      "start": {
+        "x": 32,
+        "z": -99,
+        "yaw": 0,
+        "y": 9.4
+      },
+      "waypoints": [
+        {
+          "x": 14,
+          "z": -90
+        },
+        {
+          "x": 6,
+          "z": -84
+        },
+        {
+          "x": -6,
+          "z": -100
+        },
+        {
+          "x": -14,
+          "z": -140
+        }
+      ],
+      "notes": "E374 Signal Dunes content route (its agent: max grade 26°, nearest collider ≥ 2.5 m on a node build) · start heights re-measured on the round-20 terrain (ground + 0.3 m)"
+    }
+  ],
+  "far-reach": [
+    {
+      "name": "windmill",
+      "gate": true,
+      "start": {
+        "x": 0,
+        "z": 7,
+        "yaw": 0,
+        "y": 30
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -2
+        },
+        {
+          "x": 0,
+          "z": -14
+        },
+        {
+          "x": 0,
+          "z": -30
+        },
+        {
+          "x": 0,
+          "z": -48
+        },
+        {
+          "x": -3,
+          "z": -56
+        }
+      ],
+      "expect": {
+        "y": 30
+      },
+      "notes": "on foot: the sunrest deck (spawn), the rope bridge north (x 0, z -15.4 to -49.6), the windmill isle"
+    },
+    {
+      "name": "grove",
+      "gate": true,
+      "start": {
+        "x": -3,
+        "z": -56,
+        "yaw": -2.7828,
+        "y": 30
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -48
+        },
+        {
+          "x": 0,
+          "z": -30
+        },
+        {
+          "x": 0,
+          "z": -14
+        },
+        {
+          "x": -6,
+          "z": -1
+        },
+        {
+          "x": -14.1,
+          "z": 1.3
+        },
+        {
+          "x": -22.5,
+          "z": 2.1
+        },
+        {
+          "x": -29.4,
+          "z": 2.7
+        },
+        {
+          "x": -36.4,
+          "z": 3.4
+        },
+        {
+          "x": -44.8,
+          "z": 4.1
+        },
+        {
+          "x": -52,
+          "z": 4
+        }
+      ],
+      "expect": {
+        "y": 27
+      },
+      "notes": "on foot: back over the windmill rope bridge, west-north-west over the sloping grove rope bridge (30 -> 27 m) to the grove (loop 5 layout)"
+    },
+    {
+      "name": "roost",
+      "gate": true,
+      "lap": { "boost": false, "why": "DL17 lap: the board at Developer boost leaves the narrow sloping hover bridges (on foot you fall through), so the lap drives it on the board at normal speed" },
+      "start": {
+        "x": -52,
+        "z": 4,
+        "yaw": -1.48,
+        "y": 27,
+        "hover": true
+      },
+      "waypoints": [
+        {
+          "x": -44.8,
+          "z": 4.1
+        },
+        {
+          "x": -36.4,
+          "z": 3.4
+        },
+        {
+          "x": -29.4,
+          "z": 2.7
+        },
+        {
+          "x": -22.5,
+          "z": 2.1
+        },
+        {
+          "x": -14.1,
+          "z": 1.3
+        },
+        {
+          "x": -6,
+          "z": -1
+        },
+        {
+          "x": 8,
+          "z": -2
+        },
+        {
+          "x": 15.3,
+          "z": -3.1
+        },
+        {
+          "x": 24.3,
+          "z": -4.9
+        },
+        {
+          "x": 31.9,
+          "z": -6.4
+        },
+        {
+          "x": 39.5,
+          "z": -7.9
+        },
+        {
+          "x": 48.5,
+          "z": -9.7
+        },
+        {
+          "x": 56,
+          "z": -14
+        }
+      ],
+      "expect": {
+        "y": 34
+      },
+      "notes": "on the board: the grove rope bridge east, sunrest, the sloping hover bridge (30 -> 34 m; on foot you fall through) to the roost, clear of the nest"
+    },
+    {
+      "name": "keeper",
+      "gate": true,
+      "lap": { "boost": false, "why": "DL17 lap: the board at Developer boost leaves the narrow sloping hover bridges (on foot you fall through), so the lap drives it on the board at normal speed" },
+      "start": {
+        "x": 56,
+        "z": -14,
+        "yaw": 1.44,
+        "y": 34,
+        "hover": true
+      },
+      "waypoints": [
+        {
+          "x": 48.5,
+          "z": -9.7
+        },
+        {
+          "x": 39.5,
+          "z": -7.9
+        },
+        {
+          "x": 31.9,
+          "z": -6.4
+        },
+        {
+          "x": 24.3,
+          "z": -4.9
+        },
+        {
+          "x": 15.3,
+          "z": -3.1
+        },
+        {
+          "x": 8,
+          "z": -2
+        },
+        {
+          "x": -6,
+          "z": -1
+        },
+        {
+          "x": -14.1,
+          "z": 1.3
+        },
+        {
+          "x": -22.5,
+          "z": 2.1
+        },
+        {
+          "x": -29.4,
+          "z": 2.7
+        },
+        {
+          "x": -36.4,
+          "z": 3.4
+        },
+        {
+          "x": -44.8,
+          "z": 4.1
+        },
+        {
+          "x": -52,
+          "z": 2
+        },
+        {
+          "x": -54.7,
+          "z": -5.9
+        },
+        {
+          "x": -55.4,
+          "z": -17.5
+        },
+        {
+          "x": -56.0,
+          "z": -27.5
+        },
+        {
+          "x": -56.6,
+          "z": -37.5
+        },
+        {
+          "x": -57.3,
+          "z": -49.1
+        },
+        {
+          "x": -57,
+          "z": -58
+        }
+      ],
+      "expect": {
+        "y": 32.5
+      },
+      "notes": "on the board: the roost hover bridge west, the grove rope bridge, the keeper hover bridge (27 -> 32.5 m) to the keeper's isle"
+    },
+    {
+      "name": "keeper-to-roost",
+      "gate": true,
+      "lap": { "boost": false, "why": "DL17 lap: the board at Developer boost leaves the narrow sloping hover bridges (on foot you fall through), so the lap drives it on the board at normal speed" },
+      "start": {
+        "x": -57,
+        "z": -58,
+        "yaw": 3.08,
+        "y": 32.5,
+        "hover": true
+      },
+      "waypoints": [
+        {
+          "x": -57.3,
+          "z": -49.1
+        },
+        {
+          "x": -56.6,
+          "z": -37.5
+        },
+        {
+          "x": -56.0,
+          "z": -27.5
+        },
+        {
+          "x": -55.4,
+          "z": -17.5
+        },
+        {
+          "x": -54.7,
+          "z": -5.9
+        },
+        {
+          "x": -52,
+          "z": 2
+        },
+        {
+          "x": -44.8,
+          "z": 4.1
+        },
+        {
+          "x": -36.4,
+          "z": 3.4
+        },
+        {
+          "x": -29.4,
+          "z": 2.7
+        },
+        {
+          "x": -22.5,
+          "z": 2.1
+        },
+        {
+          "x": -14.1,
+          "z": 1.3
+        },
+        {
+          "x": -6,
+          "z": -1
+        },
+        {
+          "x": 8,
+          "z": -2
+        },
+        {
+          "x": 15.3,
+          "z": -3.1
+        },
+        {
+          "x": 24.3,
+          "z": -4.9
+        },
+        {
+          "x": 31.9,
+          "z": -6.4
+        },
+        {
+          "x": 39.5,
+          "z": -7.9
+        },
+        {
+          "x": 48.5,
+          "z": -9.7
+        },
+        {
+          "x": 56,
+          "z": -14
+        }
+      ],
+      "expect": {
+        "y": 34
+      },
+      "notes": "on the board: back north over the keeper hover bridge, east over the grove rope and roost hover bridges to the roost"
+    },
+    {
+      "name": "ruin",
+      "gate": true,
+      "start": {
+        "x": 56,
+        "z": -14,
+        "yaw": 0,
+        "y": 34
+      },
+      "waypoints": [
+        {
+          "x": 59,
+          "z": -18
+        },
+        {
+          "x": 60.9,
+          "z": -22.2
+        },
+        {
+          "x": 61.7,
+          "z": -32.9
+        },
+        {
+          "x": 62.5,
+          "z": -42.0
+        },
+        {
+          "x": 63.3,
+          "z": -51.1
+        },
+        {
+          "x": 64.1,
+          "z": -61.8
+        },
+        {
+          "x": 66,
+          "z": -68
+        }
+      ],
+      "expect": {
+        "y": 28
+      },
+      "notes": "on foot: the roost, the sloping ruin rope bridge (34 -> 28 m), the vane ruin (loop 5 layout)"
+    },
+    {
+      "name": "rising islet north in",
+      "start": {
+        "x": 0,
+        "z": 198,
+        "yaw": 0,
+        "y": 25.3
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": 191.5
+        },
+        {
+          "x": 0,
+          "z": 189.5
+        },
+        {
+          "x": 0,
+          "z": 16
+        },
+        {
+          "x": 0,
+          "z": 12
+        }
+      ]
+    },
+    {
+      "name": "rising islet east in",
+      "start": {
+        "x": 198,
+        "z": 58,
+        "yaw": 1.1,
+        "y": 25.3
+      },
+      "waypoints": [
+        {
+          "x": 192.31,
+          "z": 55.11
+        },
+        {
+          "x": 190.53,
+          "z": 54.21
+        },
+        {
+          "x": 70.55,
+          "z": -6.65
+        },
+        {
+          "x": 66.99,
+          "z": -8.46
+        }
+      ]
+    },
+    {
+      "name": "sky dock north",
+      "start": {
+        "x": 0,
+        "z": 244.2,
+        "yaw": 0,
+        "y": 0.3
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": 238
+        },
+        {
+          "x": 0,
+          "z": 234.6
+        }
+      ],
+      "expect": {
+        "y": 0
+      },
+      "notes": "G200: standalone only, the north timber sky dock from its far end onto the islet lip"
+    },
+    {
+      "name": "sky dock west",
+      "start": {
+        "x": -244.2,
+        "z": 0,
+        "yaw": -1.57,
+        "y": 0.3
+      },
+      "waypoints": [
+        {
+          "x": -238,
+          "z": 0
+        },
+        {
+          "x": -234.6,
+          "z": 0
+        }
+      ],
+      "expect": {
+        "y": 0
+      },
+      "notes": "G200: standalone only, the west timber sky dock from its far end onto the islet lip"
+    }
+  ],
+  "blender-template": [
+    {
+      "name": "north rise entry to hub",
+      "start": {
+        "x": 0,
+        "z": 245,
+        "yaw": 0
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": 232
+        },
+        {
+          "x": 0,
+          "z": 188
+        },
+        {
+          "x": 0,
+          "z": 54
+        },
+        {
+          "x": -18,
+          "z": 54
+        },
+        {
+          "x": -18,
+          "z": 0
+        },
+        {
+          "x": 0,
+          "z": 0
+        }
+      ],
+      "timeout": 100,
+      "expect": {
+        "y": 0
+      }
+    },
+    {
+      "name": "west stoa entry to hub (+x)",
+      "start": {
+        "x": 245,
+        "z": 0,
+        "yaw": 1.5708
+      },
+      "waypoints": [
+        {
+          "x": 175,
+          "z": 0
+        },
+        {
+          "x": 20,
+          "z": 0
+        },
+        {
+          "x": 0,
+          "z": 0
+        }
+      ],
+      "timeout": 85,
+      "expect": {
+        "y": 0
+      }
+    },
+    {
+      "name": "east amphitheatre entry to hub (-x)",
+      "start": {
+        "x": -245,
+        "z": 0,
+        "yaw": -1.5708
+      },
+      "waypoints": [
+        {
+          "x": -180,
+          "z": 0
+        },
+        {
+          "x": -20,
+          "z": 0
+        },
+        {
+          "x": 0,
+          "z": 0
+        }
+      ],
+      "timeout": 85,
+      "expect": {
+        "y": 0
+      }
+    },
+    {
+      "name": "south aqueduct entry to hub",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "yaw": 3.1416
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -190
+        },
+        {
+          "x": 0,
+          "z": -30
+        },
+        {
+          "x": 9,
+          "z": -26
+        },
+        {
+          "x": 9,
+          "z": -6
+        },
+        {
+          "x": 0,
+          "z": 0
+        }
+      ],
+      "timeout": 85,
+      "expect": {
+        "y": 0
+      }
+    },
+    {
+      "name": "north bridge ascent and crossing",
+      "start": {
+        "x": 92,
+        "z": 182,
+        "yaw": 1.5708
+      },
+      "waypoints": [
+        {
+          "x": 18,
+          "z": 182
+        },
+        {
+          "x": 10,
+          "z": 182
+        },
+        {
+          "x": 12,
+          "z": 195
+        },
+        {
+          "x": 12,
+          "z": 209
+        },
+        {
+          "x": 0,
+          "z": 209
+        },
+        {
+          "x": -20,
+          "z": 204
+        }
+      ],
+      "timeout": 50,
+      "expect": {
+        "y": 19.2
+      }
+    },
+    {
+      "name": "hall roof ascent and overhang",
+      "start": {
+        "x": 29,
+        "z": 28,
+        "yaw": 1.5708
+      },
+      "waypoints": [
+        {
+          "x": 10,
+          "z": 28
+        },
+        {
+          "x": 4,
+          "z": 28
+        },
+        {
+          "x": -4,
+          "z": 28
+        }
+      ],
+      "timeout": 15,
+      "expect": {
+        "y": 5.6
+      }
+    },
+    {
+      "name": "watchtower stair",
+      "start": {
+        "x": -9,
+        "z": 209,
+        "yaw": 1.5708,
+        "y": 19.2
+      },
+      "waypoints": [
+        {
+          "x": -24,
+          "z": 204.5
+        },
+        {
+          "x": -43,
+          "z": 204.5
+        }
+      ],
+      "timeout": 25,
+      "expect": {
+        "y": 28.2
+      }
+    },
+    {
+      "name": "market stoa roof stair and footbridge",
+      "start": {
+        "x": 169.5,
+        "z": 44,
+        "yaw": 0
+      },
+      "waypoints": [
+        {
+          "x": 169.5,
+          "z": 24
+        },
+        {
+          "x": 157,
+          "z": 10
+        },
+        {
+          "x": 157,
+          "z": -10
+        },
+        {
+          "x": 157,
+          "z": -20
+        }
+      ],
+      "timeout": 30,
+      "expect": {
+        "y": 7.5
+      }
+    },
+    {
+      "name": "amphitheatre aisle to the top tier",
+      "start": {
+        "x": -200,
+        "z": -14,
+        "yaw": 0
+      },
+      "waypoints": [
+        {
+          "x": -216,
+          "z": -34
+        },
+        {
+          "x": -204,
+          "z": -42
+        },
+        {
+          "x": -200,
+          "z": -50
+        },
+        {
+          "x": -200,
+          "z": -70.5
+        }
+      ],
+      "timeout": 35,
+      "expect": {
+        "y": 4.8
+      }
+    },
+    {
+      "name": "aqueduct ramp, deck and cistern stair",
+      "start": {
+        "x": 66,
+        "z": -215,
+        "yaw": 1.5708
+      },
+      "waypoints": [
+        {
+          "x": 12,
+          "z": -213
+        },
+        {
+          "x": -60,
+          "z": -212
+        },
+        {
+          "x": -84,
+          "z": -209.5
+        },
+        {
+          "x": -97,
+          "z": -209.5
+        }
+      ],
+      "timeout": 45,
+      "expect": {
+        "y": 14.2
+      }
+    },
+    {
+      "name": "hub obelisk dais",
+      "start": {
+        "x": 0,
+        "z": -40,
+        "yaw": 3.1416
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -26
+        },
+        {
+          "x": 0,
+          "z": -20
+        }
+      ],
+      "timeout": 12,
+      "expect": {
+        "y": 0.9
+      }
+    },
+    {
+      "name": "ring road loop on the hoverboard",
+      "start": {
+        "x": 6,
+        "z": 114,
+        "yaw": -1.5708,
+        "hover": true
+      },
+      "waypoints": [
+        {
+          "x": 114,
+          "z": 114
+        },
+        {
+          "x": 114,
+          "z": -114
+        },
+        {
+          "x": -114,
+          "z": -114
+        },
+        {
+          "x": -114,
+          "z": 114
+        },
+        {
+          "x": -6,
+          "z": 114
+        }
+      ],
+      "timeout": 240,
+      "expect": {
+        "y": 0
+      }
+    }
+  ],
+  "open-plot-frostline-peaks": [
+    {
+      "name": "road-bridges-plaza-landmark",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OB2: south forecourt to plaza across tile-boundary lanes and canal/pond bridge approaches; a full plaza perimeter at the landmark base, then its south approach. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-lantern-bayou": [
+    {
+      "name": "road-bridges-plaza-landmark",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OB2: south forecourt to plaza across tile-boundary lanes and canal/pond bridge approaches; a full plaza perimeter at the landmark base, then its south approach. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-ember-forge": [
+    {
+      "name": "road-bridges-plaza-landmark",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OB2: south forecourt to plaza across tile-boundary lanes and canal/pond bridge approaches; a full plaza perimeter at the landmark base, then its south approach. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-mosslight-ruins": [
+    {
+      "name": "road-bridges-plaza-landmark",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OB2: south forecourt to plaza across tile-boundary lanes and canal/pond bridge approaches; a full plaza perimeter at the landmark base, then its south approach. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-coral-drift": [
+    {
+      "name": "road-bridges-plaza-landmark",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OB2: south forecourt to plaza across tile-boundary lanes and canal/pond bridge approaches; a full plaza perimeter at the landmark base, then its south approach. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-fossil-badlands": [
+    {
+      "name": "road-avenue-plaza-skeleton",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP21: south road entry up the avenue between the mine-cart rails and lanterns, a full plaza perimeter on the tile seams past the dig trenches round the skeleton, then its south approach. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-patchwork-fairground": [
+    {
+      "name": "road-avenue-plaza-wheel",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP7: south road entry up the avenue between the booths and past the helter-skelter pair, a full plaza perimeter on the tile seams round the wheel, then its south approach. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-desert-ruin": [
+    {
+      "name": "road-avenue-plaza-scaffold",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP12: provisional OP3 scaffold route, south entry along the avenue and full plaza perimeter on tile seams, then south approach. Continuous fixed-step walking; no hovering or per-waypoint teleport. Not yet walked or qualified against the future Opus theme geometry; its visual owner must adapt and run the maintained route before activation closeout."
+    },
+    {
+      "name": "plaza-gateway-oasis",
+      "start": {
+        "x": 0,
+        "z": -50,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": 40
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 125,
+          "z": 62.5
+        },
+        {
+          "x": 125,
+          "z": 125
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP12 (sp-o1): the 52 m sandstone gateway's own walk: from the plaza's south side north through its opening (20 m plinths apart at 40.1 m, 26 m at the layout's 52 m; the far model is the collider), out to the north lane seam, east along it and north up the seam (x 125) between the NE oasis block's tiles. Scanned clear of every tile collider (capsule + 0.3 m). Finite 180 s bound; 2 s stuck detection and every waypoint/endpoint guard unchanged."
+    }
+  ],
+  "open-plot-sky-harbor": [
+    {
+      "name": "road-avenue-plaza-scaffold",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP11: provisional OP3 scaffold route, south entry along the avenue and full plaza perimeter on tile seams, then south approach. Continuous fixed-step walking; no hovering or per-waypoint teleport. Not yet walked or qualified against the future Opus theme geometry; its visual owner must adapt and run the maintained route before activation closeout."
+    }
+  ],
+  "open-plot-starfall-observatory": [
+    {
+      "name": "road-avenue-plaza-scaffold",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP15: provisional OP3 scaffold route, south entry along the avenue and full plaza perimeter on tile seams, then south approach. Continuous fixed-step walking; no hovering or per-waypoint teleport. Not yet walked or qualified against the future Opus theme geometry; its visual owner must adapt and run the maintained route before activation closeout."
+    }
+  ],
+  "open-plot-thin-ice": [
+    {
+      "name": "road-avenue-plaza-scaffold",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP18: provisional OP3 scaffold route, south entry along the avenue and full plaza perimeter on tile seams, then south approach. Continuous fixed-step walking; no hovering or per-waypoint teleport. Not yet walked or qualified against the future Opus theme geometry; its visual owner must adapt and run the maintained route before activation closeout."
+    }
+  ],
+  "open-plot-clockwork-canyon": [
+    {
+      "name": "road-avenue-plaza-scaffold",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP19: provisional OP3 scaffold route, south entry along the avenue and full plaza perimeter on tile seams, then south approach. Continuous fixed-step walking; no hovering or per-waypoint teleport. Not yet walked or qualified against the future Opus theme geometry; its visual owner must adapt and run the maintained route before activation closeout."
+    }
+  ],
+  "open-plot-saltwind-lighthouse": [
+    {
+      "name": "road-avenue-plaza",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP9: Saltwind's maintained ground route on its built harbour (seams as Night Market's: the avenues on x = 0 and z = 0, the 2 x 2 plaza ringed by the seams at 62.5 m). South entry up the lamp-lined avenue, the plaza perimeter on the tile seams, then the approach to the lighthouse's plinth. Continuous fixed-step walking; no hovering or per-waypoint teleport. Same waypoints as Clockwork's qualified route (same seam plan); to be qualified by its walk."
+    }
+  ],
+  "open-plot-jungle-ziggurat": [
+    {
+      "name": "road-stair-plaza-pools-garden",
+      "start": {
+        "x": 0,
+        "z": -246,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -150
+        },
+        {
+          "x": 0,
+          "z": -75
+        },
+        {
+          "x": 0,
+          "z": -14
+        },
+        {
+          "x": 0,
+          "z": -66
+        },
+        {
+          "x": 64,
+          "z": -64
+        },
+        {
+          "x": 64,
+          "z": 64
+        },
+        {
+          "x": 123,
+          "z": 64
+        },
+        {
+          "x": 125,
+          "z": 125
+        },
+        {
+          "x": 125,
+          "z": 190
+        },
+        {
+          "x": 218.75,
+          "z": 190
+        },
+        {
+          "x": 218.75,
+          "z": 219
+        }
+      ],
+      "timeout": 240,
+      "notes": "OP13 four-stair ziggurat (sp-o1, after the 87d997316d walk's four stuck records): continuous fixed-step south road approach, up the south stair's 36.5 deg ramp to the platform (y about 31), back down, the plaza's east half outside the stair feet (+-64), the east tile border (x 123-125) between the pools, the NE garden's cross paths. Legs scanned clear of every tile collider (capsule + 0.3 m). Finite 240 s bound; 2 s stuck detection and every waypoint/endpoint guard unchanged. No hovering or per-waypoint teleport may qualify; any stuck climb remains a failure reported to the visual owner."
+    },
+    {
+      "name": "plaza-west-half",
+      "start": {
+        "x": 0,
+        "z": -66,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": -64,
+          "z": -64
+        },
+        {
+          "x": -64,
+          "z": 64
+        },
+        {
+          "x": 64,
+          "z": 64
+        }
+      ],
+      "timeout": 240,
+      "notes": "OP13 (sp-o1, wildshard-new's ruling): the plaza's western half and north side, which leg 1 leaves out to fit 240 s: from the south stair's foot west outside the stair feet (+-64), north past the west stair, east past the north stair to leg 1's NE corner. Scanned clear of every tile collider (capsule + 0.3 m) and the ziggurat's base and stairs. Finite 240 s bound; 2 s stuck detection and every waypoint/endpoint guard unchanged."
+    }
+  ],
+  "open-plot-sky-race": [
+    {
+      "name": "road-avenue-plaza-tower",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP22: south road entry up the avenue between the lamps and grandstands, a full plaza perimeter on the tile seams past the stands round the race tower, then its south approach under the start arch. Continuous fixed-step walking, no hovering or per-waypoint teleport."
+    }
+  ],
+  "open-plot-alien-plain": [
+    {
+      "name": "road-avenue-plaza-scaffold",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP20: provisional OP3 scaffold route, south entry along the avenue and full plaza perimeter on tile seams, then south approach. Continuous fixed-step walking; no hovering or per-waypoint teleport. Not yet walked or qualified against the future Opus theme geometry; its visual owner must adapt and run the maintained route before activation closeout."
+    }
+  ],
+  "open-plot-showcase-template": [
+    {
+      "name": "road-avenue-plaza-scaffold",
+      "start": {
+        "x": 0,
+        "z": -245,
+        "y": 0.2,
+        "yaw": 3.141592653589793
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": -220
+        },
+        {
+          "x": 0,
+          "z": -187.5
+        },
+        {
+          "x": 0,
+          "z": -125
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": -62.5
+        },
+        {
+          "x": -62.5,
+          "z": 0
+        },
+        {
+          "x": -62.5,
+          "z": 62.5
+        },
+        {
+          "x": 0,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 62.5
+        },
+        {
+          "x": 62.5,
+          "z": 0
+        },
+        {
+          "x": 62.5,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        },
+        {
+          "x": 0,
+          "z": -50
+        },
+        {
+          "x": 0,
+          "z": -62.5
+        }
+      ],
+      "timeout": 180,
+      "notes": "OP5: provisional OP3 scaffold route, south entry along the avenue and full plaza perimeter on tile seams, then south approach. Continuous fixed-step walking; no hovering or per-waypoint teleport. Not yet walked or qualified against the future Opus theme geometry; its visual owner must adapt and run the maintained route before activation closeout."
+    }
+  ]
+}

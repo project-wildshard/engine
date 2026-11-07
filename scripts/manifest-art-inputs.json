@@ -1,0 +1,4 @@
+{
+  "nalati-grasslands": [{ "file": "data/discovery.json", "field": ["extraArt"] }],
+  "nine-dragon-stack": [{ "file": "data/discovery.json", "field": ["extraArt"] }]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "world/dressing.bin",
+  "path": "blobs/bin/61d680cdf497c9906df63cec350d3abc4606833fdf80cba2e4bcf4ab5a7ac1d3.bin",
+  "kind": "bin",
+  "hash": "61d680cdf497c9906df63cec350d3abc4606833fdf80cba2e4bcf4ab5a7ac1d3",
+  "compressed": 66881,
+  "decoded": 157788,
+  "gpu": 0,
+  "triangles": 0,
+  "draws": 0,
+  "critical": false,
+  "dependencies": []
+}

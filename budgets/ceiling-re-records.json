@@ -1,0 +1,71 @@
+{
+  "ask": "E357",
+  "approvedBy": "wildshard-9",
+  "approval": "lead, R9 = Jake's preload rule; retain the prior G6 lantern re-records. Desktop Pine people uploaded before the first frame (lead approval 2026-10-01). E357 Z3/E374 content, lead-approved first measurement of the final builds. E374 Sky Reach loop 2, lead-approved polish: the meadow (grass, flowers, stones, roots), 14 skyline islands with waterfalls and the fan rebuilt in a gloved hand upload behind the loading screen. E374 Signal Dunes loop 1, lead-approved polish: the fire, ember and smoke shaders, the rim/shade-floor patches and the round-1 dune terrain. E374 Signal Dunes loop 2/3, lead-approved polish: Sefa the caravan scout, the generated glove, the Matriarch's body and the baked sand shadow map + grain texture set. E399 Signal Dunes, lead-requested (wildshard-9, 2026-10-02): re-record the phone ceiling at the larger of the m5 and runner measurements, no margin.",
+  "entries": [
+    {
+      "shard": "pine-hollow",
+      "tier": "phone",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/pine-hollow.phone.json",
+      "commit": "eb3d9a7875b47cae0349ee234e47efdc75efb30c",
+      "reason": "R9: all three Pine people upload behind the loading screen, before the first play frame."
+    },
+    {
+      "shard": "_template",
+      "tier": "phone",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/_template.phone.json",
+      "commit": "26b5f6b35eb7b2af4e36e617fa0321526ad6a46c",
+      "reason": "G6: mounted lantern is drawn for the first time (876 bytes)."
+    },
+    {
+      "shard": "_template",
+      "tier": "desktop",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/_template.desktop.json",
+      "commit": "26b5f6b35eb7b2af4e36e617fa0321526ad6a46c",
+      "reason": "G6: mounted lantern is drawn for the first time (876 bytes)."
+    },
+    {
+      "shard": "pine-hollow",
+      "tier": "desktop",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/pine-hollow.desktop.json",
+      "commit": "eb3d9a7875b47cae0349ee234e47efdc75efb30c",
+      "reason": "R9: all three Pine people upload behind the loading screen, before the first play frame; desktop counterpart of the accepted phone re-record."
+    },
+    {
+      "shard": "sunscar-dunes",
+      "tier": "phone",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/sunscar-dunes.phone.json",
+      "commit": "feb9691392d31eaa94f61defb3b6ce6420b79e65",
+      "reason": "E409 Signal Dunes, the original top-10's row 7, measured (m5 152.92 MB, +2.97 MB: the caravan camp as a modelled set from mockup B, wagon-hd2 at 1024 and the crate pair and sack pile at 512 WebP, art/sunscar-dunes/round-28-camp; the walk test 7 legs 0 stuck), the plan's rule: gpuMB ceilings are ratchets re-recorded at the measured value; inside the phone memory limits (1.8 GB loading / 1.0 GB Explorer)"
+    },
+    {
+      "shard": "sunscar-dunes",
+      "tier": "desktop",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/sunscar-dunes.desktop.json",
+      "commit": "0b33bb31d8508930eb2415162b3a66d71e27fc78",
+      "reason": "E374 Signal Dunes council round-1 fixes, measured; inside the phone memory limits (1.8 GB loading / 1.0 GB Explorer): the terrain at the bake grid's spacing, the dune skirt to the buttes, the ray's generated manta body, the dressed waymarks and the deck brazier"
+    },
+    {
+      "shard": "far-reach",
+      "tier": "phone",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/far-reach.phone.json",
+      "commit": "822192931cf58252f1e17455149a540c09bf9a05",
+      "reason": "E410 Sky Reach leftovers built: the keeper set (lectern 1024 + lantern 512 maps) and the modelled windmill (tower + foot 1024 maps), measured at 822192931; inside the phone's 1.8 GB / 1.0 GB"
+    },
+    {
+      "shard": "far-reach",
+      "tier": "desktop",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/far-reach.desktop.json",
+      "commit": "822192931cf58252f1e17455149a540c09bf9a05",
+      "reason": "E410 Sky Reach leftovers built: the keeper set (lectern 1024 + lantern 512 maps) and the modelled windmill (tower + foot 1024 maps), measured at 822192931; inside the phone's 1.8 GB / 1.0 GB"
+    }
+  ]
+}

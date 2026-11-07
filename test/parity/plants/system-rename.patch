@@ -1,0 +1,11 @@
+--- a/src/core/bootstrap.ts
++++ b/src/core/bootstrap.ts
+@@ -135,7 +135,7 @@
+   const playing = () => !tour.active && !world.freeCamera;
+   // labels name them in error reports; `true` = core: the world step and the player's move can't be switched off (src/core/faults.ts)
+   game.onInput((dt) => { if (playing()) player.input(dt); }, 'player.input');
+-  game.onFixed('pre', () => { bridge.sync(); for (const m of moving) m(); }, 'physics.movers');
++  game.onFixed('pre', () => { bridge.sync(); for (const m of moving) m(); }, 'physics.mover');
+   game.onFixed('step', () => { physics.step(); }, 'physics.step', true);
+   game.onFixed('post', (dt) => { const on = playing(); player.setBodyEnabled(on); if (on) player.step(dt); }, 'player.step', true);
+   game.onUpdate((dt) => {

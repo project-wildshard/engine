@@ -1,0 +1,14 @@
+{
+  "about": "SF62 reviewed transition debt. Re-key an edited or moved function only to a lint-confirmed site by retiring real predecessor allowance of the same kind and row; total count per kind and row never grows. Deleted sites drop; no new allowances.",
+  "baselineAt": "fadcee06196f345f706aa9f7e01a3bb027968a20",
+  "sites": {
+    "src/shards/sunscar-dunes/generators/rigidSkin.ts:unbounded-loop:2eed3bb292cd6e393343535a67e980d26deb9ff06651a7dafdca8b47145abf20": {
+      "count": 1,
+      "row": "SF76 verbatim move"
+    },
+    "src/shards/sunscar-dunes/generators/rigidSkin.ts:unbounded-loop:49a3ed7ab1fcb30bc2d65e3d7da2d78f2c8e0f95dcad3260f637a9b63a2b3db4": {
+      "count": 1,
+      "row": "SF76 verbatim move"
+    }
+  }
+}

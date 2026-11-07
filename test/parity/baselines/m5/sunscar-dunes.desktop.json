@@ -1,0 +1,5408 @@
+{
+  "boot": {
+    "schema": 1,
+    "lane": "m5",
+    "sha": "9ec299a8fd2254f4592e3622a4d97dedd206eb7e",
+    "build": "9ec299a-mvi8tow0",
+    "shard": "sunscar-dunes",
+    "tier": "desktop",
+    "viewport": {
+      "w": 1600,
+      "h": 900,
+      "dpr": 1,
+      "touch": false
+    },
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "browser": "153.0.8010.12",
+    "errors": [],
+    "steps": [
+      "renderer",
+      "sky",
+      "terrain",
+      "cards",
+      "forest",
+      "physics",
+      "edge",
+      "grass",
+      "cabins",
+      "props",
+      "animals",
+      "weapon",
+      "assembly",
+      "menu",
+      "shaders",
+      "firstFrame",
+      "audio"
+    ],
+    "systems": {
+      "input": [
+        "engine.input.weapon",
+        "engine.input.contexts",
+        "engine.input.collect",
+        "engine.lockon.input",
+        "engine.player.input"
+      ],
+      "fixed.pre": [
+        "physics.bodies.pre",
+        "sunscar.movers",
+        "physics.movers"
+      ],
+      "fixed.step": [
+        "physics.step"
+      ],
+      "fixed.post": [
+        "physics.bodies.post",
+        "player.step",
+        "game.shardfile.residency",
+        "decision:sunscar.skitterers"
+      ],
+      "update": [
+        "player.update",
+        "game.shardfile.presentation",
+        "game.emitters.0",
+        "training-arena",
+        "hud.perf",
+        "engine.world.bounds",
+        "engine.effects",
+        "main.6",
+        "hud.combat",
+        "first hints",
+        "main.world",
+        "engine.creatures.update",
+        "main.equipment",
+        "engine.audio.listener",
+        "main.frame",
+        "engine.player.regen",
+        "engine.player.hud",
+        "game.loot",
+        "sunscar.scout",
+        "game.quest.sunscar.signal",
+        "sunscar.reward",
+        "sunscar.mover-views",
+        "game.weather.fields",
+        "sunscar.matriarch",
+        "sunscar.creatures",
+        "sunscar.ray"
+      ],
+      "late": [
+        "engine.input.trace",
+        "engine.input.edges",
+        "engine.hud.pins"
+      ]
+    },
+    "appStates": [
+      "boot",
+      "loading",
+      "play"
+    ],
+    "registry": [
+      {
+        "id": "model:shared/hoverboard",
+        "category": "gear",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:shared/training-dummy",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/bullwhip",
+        "category": "gear",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/caravan",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/caravan-scout",
+        "category": "people",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/dry-well",
+        "category": "buildings",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/dune-matriarch",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/dune-ray",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/dune-strider",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/sand-skitterer",
+        "category": "creatures",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/signal-tower",
+        "category": "buildings",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "model:sunscar-dunes/waymark-brazier",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 0,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "practice-arena",
+        "category": "ground",
+        "surface": "metal",
+        "floor": true,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 5,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.brazier.0",
+        "category": "props",
+        "surface": "stone",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 2,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.brazier.1",
+        "category": "props",
+        "surface": "stone",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 2,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.brazier.2",
+        "category": "props",
+        "surface": "stone",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 2,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.caravan",
+        "category": "props",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 4,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.dressing",
+        "category": "nature",
+        "surface": "sand",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.rocks",
+        "category": "nature",
+        "surface": "rock",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 30,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.scout",
+        "category": "props",
+        "surface": "flesh",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 1,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.tower",
+        "category": "buildings",
+        "surface": "wood",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 40,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      },
+      {
+        "id": "sunscar.well",
+        "category": "buildings",
+        "surface": "stone",
+        "floor": false,
+        "solidFloor": false,
+        "follows": false,
+        "shapes": {
+          "cuboid": 15,
+          "ball": 0,
+          "capsule": 0,
+          "convex": 0,
+          "trimesh": 0,
+          "treads": 0
+        }
+      }
+    ],
+    "registryModels": {
+      "models": 12,
+      "sets": 0
+    },
+    "physics": {
+      "fixed": 0,
+      "kinematic": 0,
+      "dynamic": 0,
+      "colliders": 147
+    },
+    "scene": {
+      "totals": {
+        "mesh": 226,
+        "instanced": 35,
+        "instances": 281,
+        "skinned": 13,
+        "points": 7,
+        "lines": 2,
+        "sprites": 1,
+        "lights": 6,
+        "batched": 0
+      },
+      "named": [
+        {
+          "path": "animals",
+          "type": "Group",
+          "n": 37
+        },
+        {
+          "path": "animals/far-herd",
+          "type": "Group",
+          "n": 0
+        },
+        {
+          "path": "animals/herd-shadow",
+          "type": "Group",
+          "n": 0
+        },
+        {
+          "path": "HUD + Weapon Explorer · grid arena",
+          "type": "Group",
+          "n": 9
+        },
+        {
+          "path": "loot-coins",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "loot-coins",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "loot-coins",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,-250",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,-62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,187.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-125,62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-187.5,-62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-187.5,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-187.5,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-187.5,62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-250,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-250,-250",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-250,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-250,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-62.5,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-62.5,-62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-62.5,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-62.5,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-62.5,187.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:-62.5,62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,-250",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,-62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,187.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:0,62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,-250",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,-62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:125,62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:62.5,-125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:62.5,-62.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:62.5,0",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:62.5,125",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:62.5,187.5",
+          "type": "Mesh",
+          "n": 0
+        },
+        {
+          "path": "terrain:62.5,62.5",
+          "type": "Mesh",
+          "n": 0
+        }
+      ]
+    },
+    "render": {
+      "programs": 60,
+      "programKeys": "1eba0b3134c38581e5e69d7239d7a47bc9ed88afb59685b49f0db165395f1fee",
+      "memory": {
+        "geometries": 115,
+        "textures": 73
+      }
+    },
+    "gpuBytes": {
+      "textures": 247710912,
+      "renderbuffers": 0,
+      "buffers": 8609416,
+      "total": 256320328
+    },
+    "audio": {
+      "requests": [
+        "/assets/music/folk/island-calm-d7d189f9.m4a",
+        "/assets/music/folk/island-tension-bb05ab64.m4a",
+        "/assets/music/folk/pine-calm-10905c79.m4a",
+        "/assets/music/folk/pine-tension-180bc197.m4a",
+        "/assets/music/folk/sting-chunk-31c10eaf.m4a",
+        "/assets/music/folk/sting-death-67f54fe8.m4a",
+        "/assets/music/folk/sting-pickup-332f81db.m4a",
+        "/assets/music/folk/title-50001128.m4a",
+        "/assets/music/orchestral/island-calm-27861d1b.m4a",
+        "/assets/music/orchestral/island-tension-73116f36.m4a",
+        "/assets/music/orchestral/pine-calm-fbc4a99e.m4a",
+        "/assets/music/orchestral/pine-tension-525d8c6d.m4a",
+        "/assets/music/orchestral/sting-chunk-a639b19e.m4a",
+        "/assets/music/orchestral/sting-death-771d34f7.m4a",
+        "/assets/music/orchestral/sting-pickup-65f7ac5b.m4a",
+        "/assets/music/orchestral/title-b47c8a52.m4a",
+        "/assets/music/piano/island-calm-05125ed8.m4a",
+        "/assets/music/piano/island-tension-7faf0468.m4a",
+        "/assets/music/piano/pine-calm-923e0056.m4a",
+        "/assets/music/piano/pine-tension-cc014e5b.m4a",
+        "/assets/music/piano/sting-chunk-a4f2ffab.m4a",
+        "/assets/music/piano/sting-death-99b071e0.m4a",
+        "/assets/music/piano/sting-pickup-6ed91318.m4a",
+        "/assets/music/piano/title-3d1f713a.m4a",
+        "/assets/sfx/best/bear_growl-3-f91d7740.m4a",
+        "/assets/sfx/best/bear_hurt-1-43b45d1e.m4a",
+        "/assets/sfx/best/bear_hurt-3-3aea6172.m4a",
+        "/assets/sfx/best/bear_roar-2-29e3055e.m4a",
+        "/assets/sfx/best/bear_roar-3-9f1e177e.m4a",
+        "/assets/sfx/best/bed-forest-2-0cd11be5.m4a",
+        "/assets/sfx/best/bed-underwater-3-cbe2810d.m4a",
+        "/assets/sfx/best/boar_grunt-3-4e4a9bec.m4a",
+        "/assets/sfx/best/boar_squeal-1-804df37c.m4a",
+        "/assets/sfx/best/boltImpact-flesh-2-13ed7f2c.m4a",
+        "/assets/sfx/best/boltImpact-flesh-3-62e25aa5.m4a",
+        "/assets/sfx/best/boltImpact-ground-1-f81140e6.m4a",
+        "/assets/sfx/best/boltImpact-ground-2-5e8a3076.m4a",
+        "/assets/sfx/best/boltImpact-wood-2-8e9e99ee.m4a",
+        "/assets/sfx/best/boltImpact-wood-3-673a0ef6.m4a",
+        "/assets/sfx/best/crossbowFire-3-18ccf9f0.m4a",
+        "/assets/sfx/best/deer_call-1-7cd35867.m4a",
+        "/assets/sfx/best/deer_call-3-1d601bb4.m4a",
+        "/assets/sfx/best/dive-1-4b978224.m4a",
+        "/assets/sfx/best/dive-3-e74abc72.m4a",
+        "/assets/sfx/best/dodge-2-13887dd8.m4a",
+        "/assets/sfx/best/dodge-3-453516f6.m4a",
+        "/assets/sfx/best/dryFire-2-88071d1d.m4a",
+        "/assets/sfx/best/dryFire-3-173415cb.m4a",
+        "/assets/sfx/best/elk_bugle-2-0e80875f.m4a",
+        "/assets/sfx/best/elk_bugle-3-f6e8030e.m4a",
+        "/assets/sfx/best/footstep-litter-1-fe9cd8d9.m4a",
+        "/assets/sfx/best/footstep-litter-3-09ceed7a.m4a",
+        "/assets/sfx/best/footstep-mud-1-1dd22736.m4a",
+        "/assets/sfx/best/footstep-mud-2-99e4a10d.m4a",
+        "/assets/sfx/best/footstep-planks-2-ebb5a80c.m4a",
+        "/assets/sfx/best/footstep-planks-3-d919e436.m4a",
+        "/assets/sfx/best/footstep-rock-2-58c2cc26.m4a",
+        "/assets/sfx/best/footstep-rock-3-98e0e874.m4a",
+        "/assets/sfx/best/footstep-sand-1-09a40a2f.m4a",
+        "/assets/sfx/best/footstep-sand-2-4b40473a.m4a",
+        "/assets/sfx/best/footstep-wet-1-58d313a2.m4a",
+        "/assets/sfx/best/hitMarker-1-46ef1236.m4a",
+        "/assets/sfx/best/hoofsteps-1-9580d36a.m4a",
+        "/assets/sfx/best/hoofsteps-3-f1c11f8f.m4a",
+        "/assets/sfx/best/hum-pickup-3-7b7db58f.m4a",
+        "/assets/sfx/best/kill-2-5e4acc1b.m4a",
+        "/assets/sfx/best/kill-3-5f7ea225.m4a",
+        "/assets/sfx/best/land-2-773487f2.m4a",
+        "/assets/sfx/best/land-3-eebff605.m4a",
+        "/assets/sfx/best/land-hard-1-2ce640be.m4a",
+        "/assets/sfx/best/land-hard-3-5aed2a6b.m4a",
+        "/assets/sfx/best/lunge-3-be45ba7a.m4a",
+        "/assets/sfx/best/reload-1-d3e6d32a.m4a",
+        "/assets/sfx/best/reload-3-d81ab6e2.m4a",
+        "/assets/sfx/best/rifleFire-2-a850ad83.m4a",
+        "/assets/sfx/best/rifleFire-3-8ed56841.m4a",
+        "/assets/sfx/best/rifleReload-2-1ad54372.m4a",
+        "/assets/sfx/best/rifleReload-3-20027167.m4a",
+        "/assets/sfx/best/splash-2-03ab63ae.m4a",
+        "/assets/sfx/best/splash-3-9509efbe.m4a",
+        "/assets/sfx/best/surface-2-e5ac4e8a.m4a",
+        "/assets/sfx/best/surface-3-85550528.m4a",
+        "/assets/sfx/best/swimStroke-2-9e35721b.m4a",
+        "/assets/sfx/best/swordHeavy-2-1debcc8f.m4a",
+        "/assets/sfx/best/swordHeavy-3-1bed510f.m4a",
+        "/assets/sfx/best/swordHit-flesh-1-07225bb8.m4a",
+        "/assets/sfx/best/swordHit-flesh-2-efbf5fd7.m4a",
+        "/assets/sfx/best/swordHit-wood-2-800b6fe9.m4a",
+        "/assets/sfx/best/swordHit-wood-3-6381cc6b.m4a",
+        "/assets/sfx/best/swordSwing-1-6303fc5d.m4a",
+        "/assets/sfx/best/wadeStep-1-83e1423c.m4a",
+        "/assets/sfx/best/wadeStep-2-402e850a.m4a",
+        "/assets/sfx/best/waterExit-1-d85f0e47.m4a",
+        "/assets/sfx/best/weaponSwap-3-fbe81018.m4a"
+      ],
+      "state": {
+        "style": "piano",
+        "set": "best",
+        "mood": "menu"
+      }
+    },
+    "hud": [
+      {
+        "cls": "ws-bar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-cap",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-cap",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-caption",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-frame",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-lag",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-notches",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-shimmer",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-bar-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-band",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-band",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-emblem",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-inner",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-skip",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-card-title",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-fade",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-retry",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-retry-attempt",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-retry-title",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-flavour",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-gem",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-boss-reward-tier",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-death-card",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death-cause",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death-rule",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-death-where",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-float",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-fill",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-kind",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hp-track",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hurt",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-hurt-arc",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-layer",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-warn",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-combat-warn-mark",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-dive-hint ws-glass",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-aim",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-ammo ws-glass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-arow",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-band",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-boundary",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-brk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-bs",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-bt",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cardinal",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-centre",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-compass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-count",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-cross",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-feed",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-flash",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-health ws-glass",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-game-hitring",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-hrow",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-hval",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lock",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lockcand",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lockedge",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-lockedge",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-mark",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-mark",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-notch",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-pips",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-prompt ws-glass",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-range",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-rbar",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-reserve",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-smear",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-speed",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-status",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-strip",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-tick",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-toasts",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-weapon",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-game-x",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-glass ws-hint-tag",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-hint-ring",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-chip",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-coin",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-num",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-loot-pop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-body",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-corner",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-edge",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-hit",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-icon",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-loop",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-piece",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-seam",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-bag-seam",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-canvas",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-minimap-n",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-practice-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-practice-preparing",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-arrow",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-count",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-dia",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-dist",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-goal",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-label",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-obj-nav",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-obj-sep",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-pin",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-quest-reward",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-reward-kicker",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-reward-sub",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-reward-title",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk-foot",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-quest-talk-text",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-boost",
+        "spot": "",
+        "shown": false
+      },
+      {
+        "cls": "ws-touch-slot",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-slot-ammo",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-slot-key",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-slot-name",
+        "spot": "",
+        "shown": true
+      },
+      {
+        "cls": "ws-touch-strip",
+        "spot": "",
+        "shown": false
+      }
+    ],
+    "saves": {
+      "read": [
+        "local:wildshard.save.v2.device",
+        "local:wildshard.save.v2.driftwood-isle",
+        "local:wildshard.save.v2.far-reach",
+        "local:wildshard.save.v2.global",
+        "local:wildshard.save.v2.nalati-grasslands",
+        "local:wildshard.save.v2.nine-dragon-stack",
+        "local:wildshard.save.v2.pine-hollow",
+        "local:wildshard.save.v2.sunscar-dunes",
+        "session:wildshard.save.v2.session"
+      ],
+      "written": [
+        "local:wildshard.save.v2.device",
+        "local:wildshard.save.v2.global",
+        "local:wildshard.save.v2.sunscar-dunes",
+        "session:wildshard.save.v2.session"
+      ]
+    },
+    "playMs": 2978.899999976158,
+    "stepMs": {
+      "renderer": 25,
+      "sky": 38,
+      "terrain": 0,
+      "cards": 1,
+      "forest": 2,
+      "physics": 8,
+      "edge": 14,
+      "grass": 0,
+      "cabins": 0,
+      "props": 379,
+      "animals": 1,
+      "weapon": 0,
+      "assembly": 0,
+      "menu": 9,
+      "shaders": 400,
+      "firstFrame": 116,
+      "audio": 0
+    },
+    "heapMB": 58.75532531738281
+  },
+  "poses": {
+    "spawn": {
+      "name": "spawn",
+      "pos": [
+        0.0022371762634065817,
+        21.302330247730854,
+        69.9960081200752
+      ],
+      "calls": 132,
+      "tris": 222912,
+      "fps": 573.7389295604139,
+      "frameP95Ms": 2.400000035762787,
+      "cpuP50Ms": 1.600000023841858,
+      "cpuP95Ms": 2.099999964237213,
+      "creatureBoxes": 12,
+      "boxes": [
+        [
+          805,
+          367,
+          863,
+          460
+        ],
+        [
+          488,
+          489,
+          532,
+          568
+        ],
+        [
+          435,
+          500,
+          483,
+          582
+        ],
+        [
+          499,
+          504,
+          551,
+          589
+        ],
+        [
+          1426,
+          530,
+          1474,
+          612
+        ],
+        [
+          1423,
+          503,
+          1475,
+          589
+        ],
+        [
+          1350,
+          496,
+          1397,
+          577
+        ],
+        [
+          654,
+          464,
+          687,
+          531
+        ],
+        [
+          659,
+          463,
+          691,
+          529
+        ],
+        [
+          688,
+          465,
+          719,
+          530
+        ],
+        [
+          682,
+          465,
+          714,
+          531
+        ],
+        [
+          1295,
+          436,
+          1339,
+          514
+        ]
+      ],
+      "shot": "/Users/raynos/projects/games/wildshard-singleplayer/test/parity/baselines/m5/sunscar-dunes.desktop.spawn.jpg",
+      "ssim": 1
+    },
+    "whip": {
+      "name": "whip",
+      "pos": [
+        0.00240124156107413,
+        20.346034486127582,
+        65.9876666242053
+      ],
+      "calls": 133,
+      "tris": 273229,
+      "fps": 558.4707645927381,
+      "frameP95Ms": 2.5,
+      "cpuP50Ms": 1.600000023841858,
+      "cpuP95Ms": 2.300000011920929,
+      "creatureBoxes": 9,
+      "boxes": [
+        [
+          1036,
+          290,
+          1100,
+          388
+        ],
+        [
+          709,
+          413,
+          752,
+          490
+        ],
+        [
+          665,
+          421,
+          710,
+          500
+        ],
+        [
+          718,
+          427,
+          768,
+          511
+        ],
+        [
+          868,
+          394,
+          902,
+          462
+        ],
+        [
+          873,
+          393,
+          905,
+          459
+        ],
+        [
+          903,
+          396,
+          934,
+          461
+        ],
+        [
+          896,
+          396,
+          929,
+          463
+        ],
+        [
+          314,
+          377,
+          368,
+          465
+        ]
+      ],
+      "shot": "/Users/raynos/projects/games/wildshard-singleplayer/test/parity/baselines/m5/sunscar-dunes.desktop.whip.jpg",
+      "ssim": 1
+    },
+    "ray": {
+      "name": "ray",
+      "pos": [
+        0.0022371762634065817,
+        21.302330247730854,
+        69.9960081200752
+      ],
+      "calls": 135,
+      "tris": 224560,
+      "fps": 559.9398721783164,
+      "frameP95Ms": 2.400000035762787,
+      "cpuP50Ms": 1.699999988079071,
+      "cpuP95Ms": 2.100000023841858,
+      "creatureBoxes": 13,
+      "boxes": [
+        [
+          837,
+          443,
+          896,
+          535
+        ],
+        [
+          520,
+          566,
+          565,
+          645
+        ],
+        [
+          468,
+          577,
+          516,
+          659
+        ],
+        [
+          530,
+          582,
+          582,
+          668
+        ],
+        [
+          1523,
+          617,
+          1575,
+          703
+        ],
+        [
+          1517,
+          588,
+          1572,
+          677
+        ],
+        [
+          1431,
+          578,
+          1481,
+          662
+        ],
+        [
+          686,
+          541,
+          719,
+          609
+        ],
+        [
+          691,
+          540,
+          723,
+          606
+        ],
+        [
+          720,
+          543,
+          751,
+          608
+        ],
+        [
+          714,
+          543,
+          746,
+          609
+        ],
+        [
+          1361,
+          513,
+          1407,
+          593
+        ],
+        [
+          0,
+          530,
+          21,
+          632
+        ]
+      ],
+      "shot": "/Users/raynos/projects/games/wildshard-singleplayer/test/parity/baselines/m5/sunscar-dunes.desktop.ray.jpg",
+      "ssim": 1
+    },
+    "quest": {
+      "name": "quest",
+      "pos": [
+        3.9993242727454117,
+        18.933772053321306,
+        -62.986949463551355
+      ],
+      "calls": 102,
+      "tris": 200771,
+      "fps": 640.8602150537635,
+      "frameP95Ms": 2.199999988079071,
+      "cpuP50Ms": 1.5,
+      "cpuP95Ms": 2,
+      "creatureBoxes": 1,
+      "boxes": [
+        [
+          614,
+          0,
+          1025,
+          428
+        ]
+      ],
+      "shot": "/Users/raynos/projects/games/wildshard-singleplayer/test/parity/baselines/m5/sunscar-dunes.desktop.quest.jpg",
+      "ssim": 1
+    }
+  },
+  "budgets": {
+    "spawn": {
+      "derived": {
+        "draws": 3914,
+        "tris": 52174145,
+        "programs": 826,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 181.8315734863282
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "current": {
+                "gpuMB": 152.91958236694336
+              },
+              "spawn": {
+                "gpuMB": 152.91958236694336
+              },
+              "whip": {
+                "gpuMB": 152.91958236694336
+              },
+              "ray": {
+                "gpuMB": 152.91958236694336
+              },
+              "quest": {
+                "gpuMB": 152.91958236694336
+              },
+              "tower": {
+                "gpuMB": 152.91958236694336
+              }
+            },
+            "desktop": {
+              "current": {
+                "gpuMB": 181.8315734863282
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": null,
+            "fixedSeconds": 0,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "https://browser.geekbench.com/opencl-benchmarks",
+        "assumption": "Projected RTX 3060 / M5 Max throughput = OpenCL 80711 / 145258; replace with measured rtx3060 costs when available",
+        "expressions": {
+          "frame": "1000 / 60 / 1.3",
+          "gpu": "12.820512820512821 - 4.8",
+          "draws": "floor((4.8 - 1.5 - 0.3) / (0.0004257812537252903 × 1.7997299005092244))",
+          "tris": "floor(8.02051282051282 × 0.5 / (4.2708022548417234e-8 × 1.7997299005092244))",
+          "programs": "floor(1000 / (0.6720833336313565 × 1.7997299005092244))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(null - 0 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.3,
+        "ai": 0.3,
+        "animation": 0.3,
+        "player": 0.2,
+        "world": 0.2,
+        "hud": 0.1,
+        "audio": 0.1
+      },
+      "gpuM5Ms": 4.456509178540323,
+      "downloadBytes": null
+    },
+    "whip": {
+      "derived": {
+        "draws": 3914,
+        "tris": 52174145,
+        "programs": 826,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 181.8315734863282
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "current": {
+                "gpuMB": 152.91958236694336
+              },
+              "spawn": {
+                "gpuMB": 152.91958236694336
+              },
+              "whip": {
+                "gpuMB": 152.91958236694336
+              },
+              "ray": {
+                "gpuMB": 152.91958236694336
+              },
+              "quest": {
+                "gpuMB": 152.91958236694336
+              },
+              "tower": {
+                "gpuMB": 152.91958236694336
+              }
+            },
+            "desktop": {
+              "current": {
+                "gpuMB": 181.8315734863282
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": null,
+            "fixedSeconds": 0,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "https://browser.geekbench.com/opencl-benchmarks",
+        "assumption": "Projected RTX 3060 / M5 Max throughput = OpenCL 80711 / 145258; replace with measured rtx3060 costs when available",
+        "expressions": {
+          "frame": "1000 / 60 / 1.3",
+          "gpu": "12.820512820512821 - 4.8",
+          "draws": "floor((4.8 - 1.5 - 0.3) / (0.0004257812537252903 × 1.7997299005092244))",
+          "tris": "floor(8.02051282051282 × 0.5 / (4.2708022548417234e-8 × 1.7997299005092244))",
+          "programs": "floor(1000 / (0.6720833336313565 × 1.7997299005092244))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(null - 0 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.3,
+        "ai": 0.3,
+        "animation": 0.3,
+        "player": 0.2,
+        "world": 0.2,
+        "hud": 0.1,
+        "audio": 0.1
+      },
+      "gpuM5Ms": 4.456509178540323,
+      "downloadBytes": null
+    },
+    "ray": {
+      "derived": {
+        "draws": 3914,
+        "tris": 52174145,
+        "programs": 826,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 181.8315734863282
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "current": {
+                "gpuMB": 152.91958236694336
+              },
+              "spawn": {
+                "gpuMB": 152.91958236694336
+              },
+              "whip": {
+                "gpuMB": 152.91958236694336
+              },
+              "ray": {
+                "gpuMB": 152.91958236694336
+              },
+              "quest": {
+                "gpuMB": 152.91958236694336
+              },
+              "tower": {
+                "gpuMB": 152.91958236694336
+              }
+            },
+            "desktop": {
+              "current": {
+                "gpuMB": 181.8315734863282
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": null,
+            "fixedSeconds": 0,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "https://browser.geekbench.com/opencl-benchmarks",
+        "assumption": "Projected RTX 3060 / M5 Max throughput = OpenCL 80711 / 145258; replace with measured rtx3060 costs when available",
+        "expressions": {
+          "frame": "1000 / 60 / 1.3",
+          "gpu": "12.820512820512821 - 4.8",
+          "draws": "floor((4.8 - 1.5 - 0.3) / (0.0004257812537252903 × 1.7997299005092244))",
+          "tris": "floor(8.02051282051282 × 0.5 / (4.2708022548417234e-8 × 1.7997299005092244))",
+          "programs": "floor(1000 / (0.6720833336313565 × 1.7997299005092244))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(null - 0 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.3,
+        "ai": 0.3,
+        "animation": 0.3,
+        "player": 0.2,
+        "world": 0.2,
+        "hud": 0.1,
+        "audio": 0.1
+      },
+      "gpuM5Ms": 4.456509178540323,
+      "downloadBytes": null
+    },
+    "quest": {
+      "derived": {
+        "draws": 3914,
+        "tris": 52174145,
+        "programs": 826,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 181.8315734863282
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "current": {
+                "gpuMB": 152.91958236694336
+              },
+              "spawn": {
+                "gpuMB": 152.91958236694336
+              },
+              "whip": {
+                "gpuMB": 152.91958236694336
+              },
+              "ray": {
+                "gpuMB": 152.91958236694336
+              },
+              "quest": {
+                "gpuMB": 152.91958236694336
+              },
+              "tower": {
+                "gpuMB": 152.91958236694336
+              }
+            },
+            "desktop": {
+              "current": {
+                "gpuMB": 181.8315734863282
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": null,
+            "fixedSeconds": 0,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "https://browser.geekbench.com/opencl-benchmarks",
+        "assumption": "Projected RTX 3060 / M5 Max throughput = OpenCL 80711 / 145258; replace with measured rtx3060 costs when available",
+        "expressions": {
+          "frame": "1000 / 60 / 1.3",
+          "gpu": "12.820512820512821 - 4.8",
+          "draws": "floor((4.8 - 1.5 - 0.3) / (0.0004257812537252903 × 1.7997299005092244))",
+          "tris": "floor(8.02051282051282 × 0.5 / (4.2708022548417234e-8 × 1.7997299005092244))",
+          "programs": "floor(1000 / (0.6720833336313565 × 1.7997299005092244))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(null - 0 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.3,
+        "ai": 0.3,
+        "animation": 0.3,
+        "player": 0.2,
+        "world": 0.2,
+        "hud": 0.1,
+        "audio": 0.1
+      },
+      "gpuM5Ms": 4.456509178540323,
+      "downloadBytes": null
+    },
+    "tower": {
+      "derived": {
+        "draws": 3914,
+        "tris": 52174145,
+        "programs": 826,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 181.8315734863282
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "current": {
+                "gpuMB": 152.91958236694336
+              },
+              "spawn": {
+                "gpuMB": 152.91958236694336
+              },
+              "whip": {
+                "gpuMB": 152.91958236694336
+              },
+              "ray": {
+                "gpuMB": 152.91958236694336
+              },
+              "quest": {
+                "gpuMB": 152.91958236694336
+              },
+              "tower": {
+                "gpuMB": 152.91958236694336
+              }
+            },
+            "desktop": {
+              "current": {
+                "gpuMB": 181.8315734863282
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": null,
+            "fixedSeconds": 0,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "https://browser.geekbench.com/opencl-benchmarks",
+        "assumption": "Projected RTX 3060 / M5 Max throughput = OpenCL 80711 / 145258; replace with measured rtx3060 costs when available",
+        "expressions": {
+          "frame": "1000 / 60 / 1.3",
+          "gpu": "12.820512820512821 - 4.8",
+          "draws": "floor((4.8 - 1.5 - 0.3) / (0.0004257812537252903 × 1.7997299005092244))",
+          "tris": "floor(8.02051282051282 × 0.5 / (4.2708022548417234e-8 × 1.7997299005092244))",
+          "programs": "floor(1000 / (0.6720833336313565 × 1.7997299005092244))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(null - 0 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.3,
+        "ai": 0.3,
+        "animation": 0.3,
+        "player": 0.2,
+        "world": 0.2,
+        "hud": 0.1,
+        "audio": 0.1
+      },
+      "gpuM5Ms": 4.456509178540323,
+      "downloadBytes": null,
+      "observed": {
+        "draws": 145,
+        "tris": 268395,
+        "programs": 60,
+        "gpuMB": 244.36188507080078
+      }
+    },
+    "current": {
+      "derived": {
+        "draws": 3914,
+        "tris": 52174145,
+        "programs": 826,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 181.8315734863282
+      },
+      "formula": {
+        "inputs": {
+          "ceilings": {
+            "phone": {
+              "current": {
+                "gpuMB": 152.91958236694336
+              },
+              "spawn": {
+                "gpuMB": 152.91958236694336
+              },
+              "whip": {
+                "gpuMB": 152.91958236694336
+              },
+              "ray": {
+                "gpuMB": 152.91958236694336
+              },
+              "quest": {
+                "gpuMB": 152.91958236694336
+              },
+              "tower": {
+                "gpuMB": 152.91958236694336
+              }
+            },
+            "desktop": {
+              "current": {
+                "gpuMB": 181.8315734863282
+              }
+            }
+          },
+          "phone": {
+            "fps": 30,
+            "variability": 1.3,
+            "cpuMs": 9.6,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "desktop": {
+            "fps": 60,
+            "variability": 1.3,
+            "cpuMs": 4.8,
+            "gcMs": 0.3,
+            "systems": {
+              "physics": 0.3,
+              "ai": 0.3,
+              "animation": 0.3,
+              "player": 0.2,
+              "world": 0.2,
+              "hud": 0.1,
+              "audio": 0.1
+            },
+            "vertexShare": 0.5,
+            "lanes": {
+              "opaque": 0.4,
+              "shadow": 0.2,
+              "transparent": 0.1,
+              "viewmodel": 0.1,
+              "post": 0.1,
+              "reserve": 0.1
+            },
+            "linkMs": 1000
+          },
+          "load": {
+            "coldPlay4G": null,
+            "fixedSeconds": 0,
+            "cpuRatio": 2,
+            "bytesPerSecond": 1125000
+          }
+        },
+        "source": "https://browser.geekbench.com/opencl-benchmarks",
+        "assumption": "Projected RTX 3060 / M5 Max throughput = OpenCL 80711 / 145258; replace with measured rtx3060 costs when available",
+        "expressions": {
+          "frame": "1000 / 60 / 1.3",
+          "gpu": "12.820512820512821 - 4.8",
+          "draws": "floor((4.8 - 1.5 - 0.3) / (0.0004257812537252903 × 1.7997299005092244))",
+          "tris": "floor(8.02051282051282 × 0.5 / (4.2708022548417234e-8 × 1.7997299005092244))",
+          "programs": "floor(1000 / (0.6720833336313565 × 1.7997299005092244))",
+          "gpuMB": "GL bytes retain measured baseline ceiling; native footprint is a separate Simulator gate",
+          "downloadBytes": "(null - 0 × 2) × 1125000"
+        }
+      },
+      "systemMs": {
+        "physics": 0.3,
+        "ai": 0.3,
+        "animation": 0.3,
+        "player": 0.2,
+        "world": 0.2,
+        "hud": 0.1,
+        "audio": 0.1
+      },
+      "gpuM5Ms": 4.456509178540323,
+      "downloadBytes": null,
+      "observed": {
+        "draws": 145,
+        "tris": 268395,
+        "programs": 60,
+        "gpuMB": 244.36188507080078
+      }
+    }
+  },
+  "walk": {
+    "legs": {},
+    "stuck": 0,
+    "sounds": {
+      "event": {},
+      "ambient": []
+    }
+  },
+  "combat": {
+    "swing": "n/a",
+    "shot": "n/a",
+    "shot2": "n/a",
+    "hitsToKill": {},
+    "kills": [],
+    "loot": {
+      "written": []
+    },
+    "sounds": {
+      "event": {},
+      "ambient": []
+    }
+  },
+  "pauseResume": {
+    "before": {
+      "appState": "paused",
+      "clockNow": 32.30000000000073,
+      "player": {
+        "pos": {
+          "x": 3.999,
+          "y": 18.934,
+          "z": -62.987
+        },
+        "yaw": -0.2617993877991494,
+        "pitch": 0.3839724354387525,
+        "vel": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "health": 100
+      },
+      "weapon": {
+        "id": "declared.weapon.sunscar-whip",
+        "state": {
+          "magazine": 0,
+          "reserve": 0,
+          "loaded": true,
+          "reloading": false,
+          "reloadProgress": 0,
+          "ads": false
+        },
+        "ammo": null
+      },
+      "creatures": [
+        {
+          "id": "duneRay:0",
+          "kind": "duneRay",
+          "pos": {
+            "x": 8,
+            "y": 32.184,
+            "z": -74.992
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "duneStrider:11",
+          "kind": "duneStrider",
+          "pos": {
+            "x": 100,
+            "y": 17.678,
+            "z": -49.992
+          },
+          "hp": 150,
+          "brain": "idle"
+        },
+        {
+          "id": "duneStrider:12",
+          "kind": "duneStrider",
+          "pos": {
+            "x": -100,
+            "y": 15.684,
+            "z": 0.008
+          },
+          "hp": 150,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:1",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -30.494,
+            "y": 15.011,
+            "z": 4.535
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:10",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -18.543,
+            "y": 14.776,
+            "z": -43.183
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:2",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -32.754,
+            "y": 14.48,
+            "z": 10.16
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:3",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -26.752,
+            "y": 13.772,
+            "z": 9.305
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:4",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": 59.022,
+            "y": 12.227,
+            "z": 13.361
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:5",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": 63.399,
+            "y": 13.776,
+            "z": 9.167
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:6",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": 57.579,
+            "y": 14.582,
+            "z": 7.473
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:7",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -23.183,
+            "y": 15.016,
+            "z": -41.457
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:8",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -21.457,
+            "y": 15.675,
+            "z": -36.817
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:9",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -16.817,
+            "y": 15.259,
+            "z": -38.543
+          },
+          "hp": 24,
+          "brain": "idle"
+        }
+      ],
+      "quest": {
+        "adventure": {
+          "adventure": [],
+          "quest": []
+        },
+        "level": []
+      }
+    },
+    "after": {
+      "appState": "play",
+      "clockNow": 32.30000000000073,
+      "player": {
+        "pos": {
+          "x": 3.999,
+          "y": 18.934,
+          "z": -62.987
+        },
+        "yaw": -0.2617993877991494,
+        "pitch": 0.3839724354387525,
+        "vel": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "health": 100
+      },
+      "weapon": {
+        "id": "declared.weapon.sunscar-whip",
+        "state": {
+          "magazine": 0,
+          "reserve": 0,
+          "loaded": true,
+          "reloading": false,
+          "reloadProgress": 0,
+          "ads": false
+        },
+        "ammo": null
+      },
+      "creatures": [
+        {
+          "id": "duneRay:0",
+          "kind": "duneRay",
+          "pos": {
+            "x": 8,
+            "y": 32.184,
+            "z": -74.992
+          },
+          "hp": 70,
+          "brain": "idle"
+        },
+        {
+          "id": "duneStrider:11",
+          "kind": "duneStrider",
+          "pos": {
+            "x": 100,
+            "y": 17.678,
+            "z": -49.992
+          },
+          "hp": 150,
+          "brain": "idle"
+        },
+        {
+          "id": "duneStrider:12",
+          "kind": "duneStrider",
+          "pos": {
+            "x": -100,
+            "y": 15.684,
+            "z": 0.008
+          },
+          "hp": 150,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:1",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -30.494,
+            "y": 15.011,
+            "z": 4.535
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:10",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -18.543,
+            "y": 14.776,
+            "z": -43.183
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:2",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -32.754,
+            "y": 14.48,
+            "z": 10.16
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:3",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -26.752,
+            "y": 13.772,
+            "z": 9.305
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:4",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": 59.022,
+            "y": 12.227,
+            "z": 13.361
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:5",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": 63.399,
+            "y": 13.776,
+            "z": 9.167
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:6",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": 57.579,
+            "y": 14.582,
+            "z": 7.473
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:7",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -23.183,
+            "y": 15.016,
+            "z": -41.457
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:8",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -21.457,
+            "y": 15.675,
+            "z": -36.817
+          },
+          "hp": 24,
+          "brain": "idle"
+        },
+        {
+          "id": "sandSkitterer:9",
+          "kind": "sandSkitterer",
+          "pos": {
+            "x": -16.817,
+            "y": 15.259,
+            "z": -38.543
+          },
+          "hp": 24,
+          "brain": "idle"
+        }
+      ],
+      "quest": {
+        "adventure": {
+          "adventure": [],
+          "quest": []
+        },
+        "level": []
+      }
+    },
+    "diff": [],
+    "appStates": [
+      "paused",
+      "play"
+    ],
+    "returnState": "play"
+  },
+  "leak": {
+    "before": {
+      "geometries": 0,
+      "textures": 0,
+      "programs": 0,
+      "bodies": 0,
+      "colliders": 0,
+      "listeners": {
+        "window": 0,
+        "document": 0,
+        "canvas": 0,
+        "other": 0
+      },
+      "timers": {
+        "timeouts": 0,
+        "intervals": 0,
+        "raf": 0
+      },
+      "audio": {
+        "activeVoices": 0,
+        "beds": 0,
+        "buses": 0
+      },
+      "systems": {
+        "input": 0,
+        "fixed": {
+          "pre": 0,
+          "step": 0,
+          "post": 0
+        },
+        "update": 0,
+        "late": 0,
+        "render": 0
+      },
+      "events": {
+        "listeners": 7,
+        "answerers": 5
+      },
+      "dom": {
+        "hud": 0,
+        "body": 0
+      },
+      "sceneObjects": 0
+    },
+    "after": {
+      "geometries": 0,
+      "textures": 0,
+      "programs": 0,
+      "bodies": 0,
+      "colliders": 0,
+      "listeners": {
+        "window": 0,
+        "document": 0,
+        "canvas": 0,
+        "other": 0
+      },
+      "timers": {
+        "timeouts": 0,
+        "intervals": 0,
+        "raf": 0
+      },
+      "audio": {
+        "activeVoices": 0,
+        "beds": 0,
+        "buses": 0
+      },
+      "systems": {
+        "input": 0,
+        "fixed": {
+          "pre": 0,
+          "step": 0,
+          "post": 0
+        },
+        "update": 0,
+        "late": 0,
+        "render": 0
+      },
+      "events": {
+        "listeners": 7,
+        "answerers": 5
+      },
+      "dom": {
+        "hud": 0,
+        "body": 0
+      },
+      "sceneObjects": 0
+    },
+    "disposalErrors": [],
+    "scope": {
+      "geometries": 0,
+      "materials": 0,
+      "textures": 0,
+      "renderTargets": 0,
+      "meshes": 0,
+      "resources": 0,
+      "bodies": 0,
+      "sounds": 0,
+      "listeners": 0,
+      "timers": 0,
+      "rafs": 0,
+      "disposers": 0,
+      "systems": 0,
+      "colliders": 0,
+      "nodes": 0
+    },
+    "stacks": {
+      "listeners": [
+        "Error: listener touchmove\n    at HTMLDocument.addEventListener (<anonymous>:26:95)\n    at http://127.0.0.1:63094/?chunk=sunscar-dunes&tier=desktop&skipintro=1&nolock=1&mute=1&weather=clear&sw=0:52:16",
+        "Error: listener gesturestart\n    at HTMLDocument.addEventListener (<anonymous>:26:95)\n    at http://127.0.0.1:63094/?chunk=sunscar-dunes&tier=desktop&skipintro=1&nolock=1&mute=1&weather=clear&sw=0:53:16",
+        "Error: listener online\n    at addEventListener (<anonymous>:26:95)\n    at e.listen (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5193)\n    at O (http://127.0.0.1:63094/assets/bootTrace-W0d6EuGg.js:2:5269)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:841)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745",
+        "Error: listener visibilitychange\n    at HTMLDocument.addEventListener (<anonymous>:26:95)\n    at e.listen (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5193)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:1149)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745",
+        "Error: listener pagehide\n    at addEventListener (<anonymous>:26:95)\n    at e.listen (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5193)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:1259)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745"
+      ],
+      "timers": [
+        "Error: timeout\n    at w.setTimeout (<anonymous>:40:21)\n    at e.timeout (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5896)\n    at qu.start (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:88938)\n    at qu.requestWork (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:91108)\n    at qu.request (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:90991)\n    at qu.get (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:91775)\n    at Object.asset (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:126672)\n    at Object.cached (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:119546)\n    at a (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:99742)\n    at Array.map (<anonymous>)",
+        "Error: timeout\n    at w.setTimeout (<anonymous>:40:21)\n    at e.timeout (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5896)\n    at qu.receive (http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:90832)\n    at http://127.0.0.1:63094/assets/runtimeProduct-5HXR2bXH.js:1:88805\n    at http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5106\n    at _ (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:1:825)\n    at Worker.f (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:5095)\n    at Worker.wrapped (<anonymous>:26:213)",
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at new <anonymous> (http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:1117)\n    at http://127.0.0.1:63094/assets/lastEnd-DQDzDgdV.js:1:745",
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at S (http://127.0.0.1:63094/assets/runtime-DZVpn2y-.js:1:3074)\n    at K (http://127.0.0.1:63094/assets/pageServices-Dku0M0DW.js:1:378803)\n    at http://127.0.0.1:63094/assets/entry-C9EHOlab.js:2:606",
+        "Error: interval\n    at w.setInterval (<anonymous>:42:101)\n    at e.interval (http://127.0.0.1:63094/assets/scope-Ewf-wxSE.js:3:6165)\n    at S (http://127.0.0.1:63094/assets/runtime-DZVpn2y-.js:1:3174)\n    at K (http://127.0.0.1:63094/assets/pageServices-Dku0M0DW.js:1:378803)\n    at http://127.0.0.1:63094/assets/entry-C9EHOlab.js:2:606"
+      ]
+    },
+    "retained": [
+      {
+        "key": "scene:cc9d8895-b546-4e0a-bc67-bde32248407d",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:8147c626-1f05-48f7-a125-bc685c1aecb4",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:82bba7ac-565d-4db6-9ff8-6ab4dc68e0e3",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:a12e665b-9259-4f97-aacf-f3c13be5a933",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:e01c4e38-bc67-445f-bb92-e2dc6b95fcba",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:6d2193db-af1e-406e-b1b2-0ed8614710a5",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:2138fc62-8fa0-45a4-a600-a55b474efd30",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:859d5cec-03fd-4fc4-9f57-5301f3f53066",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:90a12588-97cd-4899-9fe8-e367f5c9830b",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:7fb06273-e4c3-40be-a8ff-395ca0f0e355",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:714b8216-e7d0-4dff-befe-681df519dd47",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:14c9cfff-6169-4c3f-a25c-57d9e542b1ff",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:760cf519-1b4a-46b2-9a84-098fbcf2f40e",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:60f14f4f-ace3-42a5-ba62-8a19fde6f5db",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:d9aa00af-e139-4847-ad14-2684cf280c41",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:1c49dc16-d7b6-432c-8112-0b7c21ab532b",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:20cf1398-eef8-4164-8e72-8044a587b22b",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:85a5ba24-ed6c-4560-958d-29c8d4515704",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:4614aaef-0ce6-4fbd-8e9d-637c0168bd5c",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:99bf72f9-698f-4592-b938-ea38b469884e",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:6d1765b3-a9cd-45f6-86f9-c1b7acb15308",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:958388b4-9ab3-4a66-a42c-0ac2eab1b3b0",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:53c2b787-9b69-46a7-b33a-6a4bcba0fcd7",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:11312e40-a945-45fc-9de3-63bc9d78a03a",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:d0f2dff0-37f3-4418-9b06-71e2b9edecc9",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:11d30feb-afec-4209-826b-dbad06e84d26",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:19b2be08-4f27-4d6d-8bde-b53556f28ae8",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:07359a18-c22b-4e9f-991d-a8d90e1e3c03",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:4b3b486d-0f56-4cd2-b5b2-55a27d1d268c",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:cc57b14b-0638-4838-b4b3-ee5294109bb1",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:24591439-4d8c-4bfa-b0c5-587669cc259b",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:dda6a6fd-4657-4f88-9ba7-8d5ebb634045",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:1cea8f7d-4a33-4e85-85f5-422a69543f0b",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:c8040947-be5b-4d59-861d-137ba9522460",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:554e5365-0a2e-439f-91bf-ba4082ecb310",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:7c8ad238-0d8e-41dd-b446-c9604084839f",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "renderer:shadow:a5270f23-7d68-414a-b57e-ac9ad68e8cbb",
+        "refs": 0,
+        "retained": true
+      },
+      {
+        "key": "scene:object:1",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:2",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:5eabe459-dc93-42c3-aadc-bc8c211a5077",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:6b574646-21a6-4fbe-8ef3-a245c49bc0f5",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:c955fba0-a69f-47fe-a7fa-1bf90e0212e7",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:3",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:a0a63b10-515d-4ab5-8e4d-8de71fd59dc7",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:4",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:d5b2ce22-8820-46d8-84a4-77f792bf2c02",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:8dbed8c4-e36a-42c7-9afc-644a1dff8b82",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:5",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:3a01917c-bf33-43d7-b67a-ec9855b9dbd9",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:6",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:28d8a81c-2f82-46eb-b4d9-8377e16e710a",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:7",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:0ba91d01-656b-4ce1-b775-5da3e1ebbc3f",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:8",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:9",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:10",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:11",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:12",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:13",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:14",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:15",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:16",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:17",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:18",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:19",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:20",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:21",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:22",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:23",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:24",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:27e0c22f-c807-4242-a410-77f256610892",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:6eb63be3-6af1-47a1-9483-6efcc6a73cf2",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:7788df63-df5e-4029-92df-aae8a92a6ca7",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:6d3d39d0-178d-48f4-bc81-e51ad6cb1c4c",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:25",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:26",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:72493dca-6669-4b3f-a535-4cba8459ae66",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:27",
+        "refs": 1,
+        "retained": false
+      },
+      {
+        "key": "scene:object:28",
+        "refs": 1,
+        "retained": false
+      }
+    ],
+    "gpu": {
+      "total": {
+        "geometries": 7,
+        "textures": 28,
+        "programs": 4
+      },
+      "orphans": {
+        "live": 0,
+        "collected": 0
+      },
+      "retained": {
+        "geometries": 7,
+        "textures": 28,
+        "programs": 4
+      },
+      "resources": [
+        {
+          "type": "Vu",
+          "uuid": "a5270f23-7d68-414a-b57e-ac9ad68e8cbb",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [
+            10
+          ],
+          "image": {}
+        },
+        {
+          "type": "Fu",
+          "uuid": "14c9cfff-6169-4c3f-a25c-57d9e542b1ff",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [
+            31
+          ],
+          "image": {}
+        },
+        {
+          "type": "Fu",
+          "uuid": "82bba7ac-565d-4db6-9ff8-6ab4dc68e0e3",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [
+            34
+          ],
+          "image": {}
+        },
+        {
+          "type": "Fu",
+          "uuid": "6d2193db-af1e-406e-b1b2-0ed8614710a5",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [
+            34
+          ],
+          "image": {}
+        },
+        {
+          "type": "Fu",
+          "uuid": "90a12588-97cd-4899-9fe8-e367f5c9830b",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [
+            34
+          ],
+          "image": {}
+        },
+        {
+          "type": "Fu",
+          "uuid": "85a5ba24-ed6c-4560-958d-29c8d4515704",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [
+            35
+          ],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "1c49dc16-d7b6-432c-8112-0b7c21ab532b",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "126d24ea-80bf-4f16-b698-25520cc24fd2",
+          "image": {
+            "width": 1024,
+            "height": 1024
+          }
+        },
+        {
+          "type": "e",
+          "uuid": "760cf519-1b4a-46b2-9a84-098fbcf2f40e",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "1b10bfc9-61a8-409c-9400-051dc4e024b5",
+          "image": {
+            "width": 1024,
+            "height": 1024
+          }
+        },
+        {
+          "type": "e",
+          "uuid": "a12e665b-9259-4f97-aacf-f3c13be5a933",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "65cdbb2f-7735-40b5-b136-fc500e04f231",
+          "image": {
+            "width": 1024,
+            "height": 1024
+          }
+        },
+        {
+          "type": "e",
+          "uuid": "2138fc62-8fa0-45a4-a600-a55b474efd30",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "ea897618-4528-4bb1-a4bf-3456fa8abb9e",
+          "image": {
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "type": "e",
+          "uuid": "7fb06273-e4c3-40be-a8ff-395ca0f0e355",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "d24c2293-c65a-4c2d-ba66-085a26225216",
+          "image": {
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "type": "e",
+          "uuid": "4614aaef-0ce6-4fbd-8e9d-637c0168bd5c",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "9a554a55-71de-4e55-9ccd-66f2173b6738",
+          "image": {
+            "width": 1024,
+            "height": 1024
+          }
+        },
+        {
+          "type": "e",
+          "uuid": "714b8216-e7d0-4dff-befe-681df519dd47",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "8147c626-1f05-48f7-a125-bc685c1aecb4",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "e01c4e38-bc67-445f-bb92-e2dc6b95fcba",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "859d5cec-03fd-4fc4-9f57-5301f3f53066",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "20cf1398-eef8-4164-8e72-8044a587b22b",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "d5b2ce22-8820-46d8-84a4-77f792bf2c02",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "41e1f9ff-377a-4d44-82d6-2893db940002",
+          "image": {
+            "width": 1600,
+            "height": 900
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "jc",
+          "uuid": "5eabe459-dc93-42c3-aadc-bc8c211a5077",
+          "name": "EffectComposer.OutputDepth",
+          "owner": null,
+          "retained": true,
+          "texture": true,
+          "programs": [],
+          "source": "0f672ad6-8159-433f-9780-6e6879350812",
+          "image": {
+            "width": 1600,
+            "height": 900
+          }
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "yi",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "8dbed8c4-e36a-42c7-9afc-644a1dff8b82",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        },
+        {
+          "type": "e",
+          "uuid": "6b574646-21a6-4fbe-8ef3-a245c49bc0f5",
+          "name": "",
+          "owner": null,
+          "retained": true,
+          "texture": false,
+          "programs": [],
+          "image": {}
+        }
+      ]
+    }
+  },
+  "spread": {
+    "boot.schema": 0,
+    "boot.viewport.w": 0,
+    "boot.viewport.h": 0,
+    "boot.viewport.dpr": 0,
+    "boot.errors": [],
+    "boot.registryModels.models": 0,
+    "boot.registryModels.sets": 0,
+    "boot.physics.fixed": 0,
+    "boot.physics.kinematic": 0,
+    "boot.physics.dynamic": 0,
+    "boot.physics.colliders": 0,
+    "boot.scene.totals.mesh": 0,
+    "boot.scene.totals.instanced": 0,
+    "boot.scene.totals.instances": 0,
+    "boot.scene.totals.skinned": 0,
+    "boot.scene.totals.points": 0,
+    "boot.scene.totals.lines": 0,
+    "boot.scene.totals.sprites": 0,
+    "boot.scene.totals.lights": 0,
+    "boot.scene.totals.batched": 0,
+    "boot.render.programs": 0,
+    "boot.render.memory.geometries": 0,
+    "boot.render.memory.textures": 0,
+    "boot.gpuBytes.textures": 0,
+    "boot.gpuBytes.renderbuffers": 0,
+    "boot.gpuBytes.buffers": 0,
+    "boot.gpuBytes.total": 0,
+    "boot.playMs": 396.9000000357628,
+    "boot.stepMs.renderer": 6,
+    "boot.stepMs.sky": 8,
+    "boot.stepMs.terrain": 1,
+    "boot.stepMs.cards": 0,
+    "boot.stepMs.forest": 0,
+    "boot.stepMs.physics": 2,
+    "boot.stepMs.edge": 6,
+    "boot.stepMs.grass": 0,
+    "boot.stepMs.cabins": 0,
+    "boot.stepMs.props": 25,
+    "boot.stepMs.animals": 1,
+    "boot.stepMs.weapon": 0,
+    "boot.stepMs.assembly": 2,
+    "boot.stepMs.menu": 11,
+    "boot.stepMs.shaders": 56,
+    "boot.stepMs.firstFrame": 2,
+    "boot.stepMs.audio": 0,
+    "boot.heapMB": 6.57696533203125,
+    "poses.spawn.pos": [
+      0,
+      0,
+      0
+    ],
+    "poses.spawn.calls": 0,
+    "poses.spawn.tris": 0,
+    "poses.spawn.fps": 124.27383161052524,
+    "poses.spawn.frameP95Ms": 0.6000000238418579,
+    "poses.spawn.cpuP50Ms": 0.30000007152557373,
+    "poses.spawn.cpuP95Ms": 0.699999988079071,
+    "poses.spawn.creatureBoxes": 0,
+    "poses.spawn.ssim": 0,
+    "poses.whip.pos": [
+      0,
+      0,
+      0
+    ],
+    "poses.whip.calls": 0,
+    "poses.whip.tris": 0,
+    "poses.whip.fps": 107.05115346233038,
+    "poses.whip.frameP95Ms": 0.20000004768371582,
+    "poses.whip.cpuP50Ms": 0.30000001192092896,
+    "poses.whip.cpuP95Ms": 0.30000001192092896,
+    "poses.whip.creatureBoxes": 0,
+    "poses.whip.ssim": 0,
+    "poses.ray.pos": [
+      0,
+      0,
+      0
+    ],
+    "poses.ray.calls": 0,
+    "poses.ray.tris": 0,
+    "poses.ray.fps": 95.37394556824756,
+    "poses.ray.frameP95Ms": 0.2999999523162842,
+    "poses.ray.cpuP50Ms": 0.19999998807907104,
+    "poses.ray.cpuP95Ms": 0.10000002384185791,
+    "poses.ray.creatureBoxes": 0,
+    "poses.ray.ssim": 0,
+    "poses.quest.pos": [
+      0,
+      0,
+      0
+    ],
+    "poses.quest.calls": 0,
+    "poses.quest.tris": 0,
+    "poses.quest.fps": 226.38673596119247,
+    "poses.quest.frameP95Ms": 0.5999999642372131,
+    "poses.quest.cpuP50Ms": 0.5,
+    "poses.quest.cpuP95Ms": 0.800000011920929,
+    "poses.quest.creatureBoxes": 0,
+    "poses.quest.ssim": 0,
+    "budgets.spawn.derived.draws": 0,
+    "budgets.spawn.derived.tris": 0,
+    "budgets.spawn.derived.programs": 0,
+    "budgets.spawn.ceiling.gpuMB": 0,
+    "budgets.spawn.formula.inputs.ceilings.phone.current.gpuMB": 0,
+    "budgets.spawn.formula.inputs.ceilings.phone.spawn.gpuMB": 0,
+    "budgets.spawn.formula.inputs.ceilings.phone.whip.gpuMB": 0,
+    "budgets.spawn.formula.inputs.ceilings.phone.ray.gpuMB": 0,
+    "budgets.spawn.formula.inputs.ceilings.phone.quest.gpuMB": 0,
+    "budgets.spawn.formula.inputs.ceilings.phone.tower.gpuMB": 0,
+    "budgets.spawn.formula.inputs.ceilings.desktop.current.gpuMB": 0,
+    "budgets.spawn.formula.inputs.phone.fps": 0,
+    "budgets.spawn.formula.inputs.phone.variability": 0,
+    "budgets.spawn.formula.inputs.phone.cpuMs": 0,
+    "budgets.spawn.formula.inputs.phone.gcMs": 0,
+    "budgets.spawn.formula.inputs.phone.systems.physics": 0,
+    "budgets.spawn.formula.inputs.phone.systems.ai": 0,
+    "budgets.spawn.formula.inputs.phone.systems.animation": 0,
+    "budgets.spawn.formula.inputs.phone.systems.player": 0,
+    "budgets.spawn.formula.inputs.phone.systems.world": 0,
+    "budgets.spawn.formula.inputs.phone.systems.hud": 0,
+    "budgets.spawn.formula.inputs.phone.systems.audio": 0,
+    "budgets.spawn.formula.inputs.phone.vertexShare": 0,
+    "budgets.spawn.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.spawn.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.spawn.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.spawn.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.spawn.formula.inputs.phone.lanes.post": 0,
+    "budgets.spawn.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.spawn.formula.inputs.phone.linkMs": 0,
+    "budgets.spawn.formula.inputs.desktop.fps": 0,
+    "budgets.spawn.formula.inputs.desktop.variability": 0,
+    "budgets.spawn.formula.inputs.desktop.cpuMs": 0,
+    "budgets.spawn.formula.inputs.desktop.gcMs": 0,
+    "budgets.spawn.formula.inputs.desktop.systems.physics": 0,
+    "budgets.spawn.formula.inputs.desktop.systems.ai": 0,
+    "budgets.spawn.formula.inputs.desktop.systems.animation": 0,
+    "budgets.spawn.formula.inputs.desktop.systems.player": 0,
+    "budgets.spawn.formula.inputs.desktop.systems.world": 0,
+    "budgets.spawn.formula.inputs.desktop.systems.hud": 0,
+    "budgets.spawn.formula.inputs.desktop.systems.audio": 0,
+    "budgets.spawn.formula.inputs.desktop.vertexShare": 0,
+    "budgets.spawn.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.spawn.formula.inputs.desktop.lanes.shadow": 0,
+    "budgets.spawn.formula.inputs.desktop.lanes.transparent": 0,
+    "budgets.spawn.formula.inputs.desktop.lanes.viewmodel": 0,
+    "budgets.spawn.formula.inputs.desktop.lanes.post": 0,
+    "budgets.spawn.formula.inputs.desktop.lanes.reserve": 0,
+    "budgets.spawn.formula.inputs.desktop.linkMs": 0,
+    "budgets.spawn.formula.inputs.load.fixedSeconds": 0,
+    "budgets.spawn.formula.inputs.load.cpuRatio": 0,
+    "budgets.spawn.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.spawn.systemMs.physics": 0,
+    "budgets.spawn.systemMs.ai": 0,
+    "budgets.spawn.systemMs.animation": 0,
+    "budgets.spawn.systemMs.player": 0,
+    "budgets.spawn.systemMs.world": 0,
+    "budgets.spawn.systemMs.hud": 0,
+    "budgets.spawn.systemMs.audio": 0,
+    "budgets.spawn.gpuM5Ms": 0,
+    "budgets.whip.derived.draws": 0,
+    "budgets.whip.derived.tris": 0,
+    "budgets.whip.derived.programs": 0,
+    "budgets.whip.ceiling.gpuMB": 0,
+    "budgets.whip.formula.inputs.ceilings.phone.current.gpuMB": 0,
+    "budgets.whip.formula.inputs.ceilings.phone.spawn.gpuMB": 0,
+    "budgets.whip.formula.inputs.ceilings.phone.whip.gpuMB": 0,
+    "budgets.whip.formula.inputs.ceilings.phone.ray.gpuMB": 0,
+    "budgets.whip.formula.inputs.ceilings.phone.quest.gpuMB": 0,
+    "budgets.whip.formula.inputs.ceilings.phone.tower.gpuMB": 0,
+    "budgets.whip.formula.inputs.ceilings.desktop.current.gpuMB": 0,
+    "budgets.whip.formula.inputs.phone.fps": 0,
+    "budgets.whip.formula.inputs.phone.variability": 0,
+    "budgets.whip.formula.inputs.phone.cpuMs": 0,
+    "budgets.whip.formula.inputs.phone.gcMs": 0,
+    "budgets.whip.formula.inputs.phone.systems.physics": 0,
+    "budgets.whip.formula.inputs.phone.systems.ai": 0,
+    "budgets.whip.formula.inputs.phone.systems.animation": 0,
+    "budgets.whip.formula.inputs.phone.systems.player": 0,
+    "budgets.whip.formula.inputs.phone.systems.world": 0,
+    "budgets.whip.formula.inputs.phone.systems.hud": 0,
+    "budgets.whip.formula.inputs.phone.systems.audio": 0,
+    "budgets.whip.formula.inputs.phone.vertexShare": 0,
+    "budgets.whip.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.whip.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.whip.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.whip.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.whip.formula.inputs.phone.lanes.post": 0,
+    "budgets.whip.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.whip.formula.inputs.phone.linkMs": 0,
+    "budgets.whip.formula.inputs.desktop.fps": 0,
+    "budgets.whip.formula.inputs.desktop.variability": 0,
+    "budgets.whip.formula.inputs.desktop.cpuMs": 0,
+    "budgets.whip.formula.inputs.desktop.gcMs": 0,
+    "budgets.whip.formula.inputs.desktop.systems.physics": 0,
+    "budgets.whip.formula.inputs.desktop.systems.ai": 0,
+    "budgets.whip.formula.inputs.desktop.systems.animation": 0,
+    "budgets.whip.formula.inputs.desktop.systems.player": 0,
+    "budgets.whip.formula.inputs.desktop.systems.world": 0,
+    "budgets.whip.formula.inputs.desktop.systems.hud": 0,
+    "budgets.whip.formula.inputs.desktop.systems.audio": 0,
+    "budgets.whip.formula.inputs.desktop.vertexShare": 0,
+    "budgets.whip.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.whip.formula.inputs.desktop.lanes.shadow": 0,
+    "budgets.whip.formula.inputs.desktop.lanes.transparent": 0,
+    "budgets.whip.formula.inputs.desktop.lanes.viewmodel": 0,
+    "budgets.whip.formula.inputs.desktop.lanes.post": 0,
+    "budgets.whip.formula.inputs.desktop.lanes.reserve": 0,
+    "budgets.whip.formula.inputs.desktop.linkMs": 0,
+    "budgets.whip.formula.inputs.load.fixedSeconds": 0,
+    "budgets.whip.formula.inputs.load.cpuRatio": 0,
+    "budgets.whip.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.whip.systemMs.physics": 0,
+    "budgets.whip.systemMs.ai": 0,
+    "budgets.whip.systemMs.animation": 0,
+    "budgets.whip.systemMs.player": 0,
+    "budgets.whip.systemMs.world": 0,
+    "budgets.whip.systemMs.hud": 0,
+    "budgets.whip.systemMs.audio": 0,
+    "budgets.whip.gpuM5Ms": 0,
+    "budgets.ray.derived.draws": 0,
+    "budgets.ray.derived.tris": 0,
+    "budgets.ray.derived.programs": 0,
+    "budgets.ray.ceiling.gpuMB": 0,
+    "budgets.ray.formula.inputs.ceilings.phone.current.gpuMB": 0,
+    "budgets.ray.formula.inputs.ceilings.phone.spawn.gpuMB": 0,
+    "budgets.ray.formula.inputs.ceilings.phone.whip.gpuMB": 0,
+    "budgets.ray.formula.inputs.ceilings.phone.ray.gpuMB": 0,
+    "budgets.ray.formula.inputs.ceilings.phone.quest.gpuMB": 0,
+    "budgets.ray.formula.inputs.ceilings.phone.tower.gpuMB": 0,
+    "budgets.ray.formula.inputs.ceilings.desktop.current.gpuMB": 0,
+    "budgets.ray.formula.inputs.phone.fps": 0,
+    "budgets.ray.formula.inputs.phone.variability": 0,
+    "budgets.ray.formula.inputs.phone.cpuMs": 0,
+    "budgets.ray.formula.inputs.phone.gcMs": 0,
+    "budgets.ray.formula.inputs.phone.systems.physics": 0,
+    "budgets.ray.formula.inputs.phone.systems.ai": 0,
+    "budgets.ray.formula.inputs.phone.systems.animation": 0,
+    "budgets.ray.formula.inputs.phone.systems.player": 0,
+    "budgets.ray.formula.inputs.phone.systems.world": 0,
+    "budgets.ray.formula.inputs.phone.systems.hud": 0,
+    "budgets.ray.formula.inputs.phone.systems.audio": 0,
+    "budgets.ray.formula.inputs.phone.vertexShare": 0,
+    "budgets.ray.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.ray.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.ray.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.ray.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.ray.formula.inputs.phone.lanes.post": 0,
+    "budgets.ray.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.ray.formula.inputs.phone.linkMs": 0,
+    "budgets.ray.formula.inputs.desktop.fps": 0,
+    "budgets.ray.formula.inputs.desktop.variability": 0,
+    "budgets.ray.formula.inputs.desktop.cpuMs": 0,
+    "budgets.ray.formula.inputs.desktop.gcMs": 0,
+    "budgets.ray.formula.inputs.desktop.systems.physics": 0,
+    "budgets.ray.formula.inputs.desktop.systems.ai": 0,
+    "budgets.ray.formula.inputs.desktop.systems.animation": 0,
+    "budgets.ray.formula.inputs.desktop.systems.player": 0,
+    "budgets.ray.formula.inputs.desktop.systems.world": 0,
+    "budgets.ray.formula.inputs.desktop.systems.hud": 0,
+    "budgets.ray.formula.inputs.desktop.systems.audio": 0,
+    "budgets.ray.formula.inputs.desktop.vertexShare": 0,
+    "budgets.ray.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.ray.formula.inputs.desktop.lanes.shadow": 0,
+    "budgets.ray.formula.inputs.desktop.lanes.transparent": 0,
+    "budgets.ray.formula.inputs.desktop.lanes.viewmodel": 0,
+    "budgets.ray.formula.inputs.desktop.lanes.post": 0,
+    "budgets.ray.formula.inputs.desktop.lanes.reserve": 0,
+    "budgets.ray.formula.inputs.desktop.linkMs": 0,
+    "budgets.ray.formula.inputs.load.fixedSeconds": 0,
+    "budgets.ray.formula.inputs.load.cpuRatio": 0,
+    "budgets.ray.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.ray.systemMs.physics": 0,
+    "budgets.ray.systemMs.ai": 0,
+    "budgets.ray.systemMs.animation": 0,
+    "budgets.ray.systemMs.player": 0,
+    "budgets.ray.systemMs.world": 0,
+    "budgets.ray.systemMs.hud": 0,
+    "budgets.ray.systemMs.audio": 0,
+    "budgets.ray.gpuM5Ms": 0,
+    "budgets.quest.derived.draws": 0,
+    "budgets.quest.derived.tris": 0,
+    "budgets.quest.derived.programs": 0,
+    "budgets.quest.ceiling.gpuMB": 0,
+    "budgets.quest.formula.inputs.ceilings.phone.current.gpuMB": 0,
+    "budgets.quest.formula.inputs.ceilings.phone.spawn.gpuMB": 0,
+    "budgets.quest.formula.inputs.ceilings.phone.whip.gpuMB": 0,
+    "budgets.quest.formula.inputs.ceilings.phone.ray.gpuMB": 0,
+    "budgets.quest.formula.inputs.ceilings.phone.quest.gpuMB": 0,
+    "budgets.quest.formula.inputs.ceilings.phone.tower.gpuMB": 0,
+    "budgets.quest.formula.inputs.ceilings.desktop.current.gpuMB": 0,
+    "budgets.quest.formula.inputs.phone.fps": 0,
+    "budgets.quest.formula.inputs.phone.variability": 0,
+    "budgets.quest.formula.inputs.phone.cpuMs": 0,
+    "budgets.quest.formula.inputs.phone.gcMs": 0,
+    "budgets.quest.formula.inputs.phone.systems.physics": 0,
+    "budgets.quest.formula.inputs.phone.systems.ai": 0,
+    "budgets.quest.formula.inputs.phone.systems.animation": 0,
+    "budgets.quest.formula.inputs.phone.systems.player": 0,
+    "budgets.quest.formula.inputs.phone.systems.world": 0,
+    "budgets.quest.formula.inputs.phone.systems.hud": 0,
+    "budgets.quest.formula.inputs.phone.systems.audio": 0,
+    "budgets.quest.formula.inputs.phone.vertexShare": 0,
+    "budgets.quest.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.quest.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.quest.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.quest.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.quest.formula.inputs.phone.lanes.post": 0,
+    "budgets.quest.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.quest.formula.inputs.phone.linkMs": 0,
+    "budgets.quest.formula.inputs.desktop.fps": 0,
+    "budgets.quest.formula.inputs.desktop.variability": 0,
+    "budgets.quest.formula.inputs.desktop.cpuMs": 0,
+    "budgets.quest.formula.inputs.desktop.gcMs": 0,
+    "budgets.quest.formula.inputs.desktop.systems.physics": 0,
+    "budgets.quest.formula.inputs.desktop.systems.ai": 0,
+    "budgets.quest.formula.inputs.desktop.systems.animation": 0,
+    "budgets.quest.formula.inputs.desktop.systems.player": 0,
+    "budgets.quest.formula.inputs.desktop.systems.world": 0,
+    "budgets.quest.formula.inputs.desktop.systems.hud": 0,
+    "budgets.quest.formula.inputs.desktop.systems.audio": 0,
+    "budgets.quest.formula.inputs.desktop.vertexShare": 0,
+    "budgets.quest.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.quest.formula.inputs.desktop.lanes.shadow": 0,
+    "budgets.quest.formula.inputs.desktop.lanes.transparent": 0,
+    "budgets.quest.formula.inputs.desktop.lanes.viewmodel": 0,
+    "budgets.quest.formula.inputs.desktop.lanes.post": 0,
+    "budgets.quest.formula.inputs.desktop.lanes.reserve": 0,
+    "budgets.quest.formula.inputs.desktop.linkMs": 0,
+    "budgets.quest.formula.inputs.load.fixedSeconds": 0,
+    "budgets.quest.formula.inputs.load.cpuRatio": 0,
+    "budgets.quest.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.quest.systemMs.physics": 0,
+    "budgets.quest.systemMs.ai": 0,
+    "budgets.quest.systemMs.animation": 0,
+    "budgets.quest.systemMs.player": 0,
+    "budgets.quest.systemMs.world": 0,
+    "budgets.quest.systemMs.hud": 0,
+    "budgets.quest.systemMs.audio": 0,
+    "budgets.quest.gpuM5Ms": 0,
+    "budgets.tower.derived.draws": 0,
+    "budgets.tower.derived.tris": 0,
+    "budgets.tower.derived.programs": 0,
+    "budgets.tower.ceiling.gpuMB": 0,
+    "budgets.tower.formula.inputs.ceilings.phone.current.gpuMB": 0,
+    "budgets.tower.formula.inputs.ceilings.phone.spawn.gpuMB": 0,
+    "budgets.tower.formula.inputs.ceilings.phone.whip.gpuMB": 0,
+    "budgets.tower.formula.inputs.ceilings.phone.ray.gpuMB": 0,
+    "budgets.tower.formula.inputs.ceilings.phone.quest.gpuMB": 0,
+    "budgets.tower.formula.inputs.ceilings.phone.tower.gpuMB": 0,
+    "budgets.tower.formula.inputs.ceilings.desktop.current.gpuMB": 0,
+    "budgets.tower.formula.inputs.phone.fps": 0,
+    "budgets.tower.formula.inputs.phone.variability": 0,
+    "budgets.tower.formula.inputs.phone.cpuMs": 0,
+    "budgets.tower.formula.inputs.phone.gcMs": 0,
+    "budgets.tower.formula.inputs.phone.systems.physics": 0,
+    "budgets.tower.formula.inputs.phone.systems.ai": 0,
+    "budgets.tower.formula.inputs.phone.systems.animation": 0,
+    "budgets.tower.formula.inputs.phone.systems.player": 0,
+    "budgets.tower.formula.inputs.phone.systems.world": 0,
+    "budgets.tower.formula.inputs.phone.systems.hud": 0,
+    "budgets.tower.formula.inputs.phone.systems.audio": 0,
+    "budgets.tower.formula.inputs.phone.vertexShare": 0,
+    "budgets.tower.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.tower.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.tower.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.tower.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.tower.formula.inputs.phone.lanes.post": 0,
+    "budgets.tower.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.tower.formula.inputs.phone.linkMs": 0,
+    "budgets.tower.formula.inputs.desktop.fps": 0,
+    "budgets.tower.formula.inputs.desktop.variability": 0,
+    "budgets.tower.formula.inputs.desktop.cpuMs": 0,
+    "budgets.tower.formula.inputs.desktop.gcMs": 0,
+    "budgets.tower.formula.inputs.desktop.systems.physics": 0,
+    "budgets.tower.formula.inputs.desktop.systems.ai": 0,
+    "budgets.tower.formula.inputs.desktop.systems.animation": 0,
+    "budgets.tower.formula.inputs.desktop.systems.player": 0,
+    "budgets.tower.formula.inputs.desktop.systems.world": 0,
+    "budgets.tower.formula.inputs.desktop.systems.hud": 0,
+    "budgets.tower.formula.inputs.desktop.systems.audio": 0,
+    "budgets.tower.formula.inputs.desktop.vertexShare": 0,
+    "budgets.tower.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.tower.formula.inputs.desktop.lanes.shadow": 0,
+    "budgets.tower.formula.inputs.desktop.lanes.transparent": 0,
+    "budgets.tower.formula.inputs.desktop.lanes.viewmodel": 0,
+    "budgets.tower.formula.inputs.desktop.lanes.post": 0,
+    "budgets.tower.formula.inputs.desktop.lanes.reserve": 0,
+    "budgets.tower.formula.inputs.desktop.linkMs": 0,
+    "budgets.tower.formula.inputs.load.fixedSeconds": 0,
+    "budgets.tower.formula.inputs.load.cpuRatio": 0,
+    "budgets.tower.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.tower.systemMs.physics": 0,
+    "budgets.tower.systemMs.ai": 0,
+    "budgets.tower.systemMs.animation": 0,
+    "budgets.tower.systemMs.player": 0,
+    "budgets.tower.systemMs.world": 0,
+    "budgets.tower.systemMs.hud": 0,
+    "budgets.tower.systemMs.audio": 0,
+    "budgets.tower.gpuM5Ms": 0,
+    "budgets.tower.observed.draws": 0,
+    "budgets.tower.observed.tris": 0,
+    "budgets.tower.observed.programs": 0,
+    "budgets.tower.observed.gpuMB": 0,
+    "budgets.current.derived.draws": 0,
+    "budgets.current.derived.tris": 0,
+    "budgets.current.derived.programs": 0,
+    "budgets.current.ceiling.gpuMB": 0,
+    "budgets.current.formula.inputs.ceilings.phone.current.gpuMB": 0,
+    "budgets.current.formula.inputs.ceilings.phone.spawn.gpuMB": 0,
+    "budgets.current.formula.inputs.ceilings.phone.whip.gpuMB": 0,
+    "budgets.current.formula.inputs.ceilings.phone.ray.gpuMB": 0,
+    "budgets.current.formula.inputs.ceilings.phone.quest.gpuMB": 0,
+    "budgets.current.formula.inputs.ceilings.phone.tower.gpuMB": 0,
+    "budgets.current.formula.inputs.ceilings.desktop.current.gpuMB": 0,
+    "budgets.current.formula.inputs.phone.fps": 0,
+    "budgets.current.formula.inputs.phone.variability": 0,
+    "budgets.current.formula.inputs.phone.cpuMs": 0,
+    "budgets.current.formula.inputs.phone.gcMs": 0,
+    "budgets.current.formula.inputs.phone.systems.physics": 0,
+    "budgets.current.formula.inputs.phone.systems.ai": 0,
+    "budgets.current.formula.inputs.phone.systems.animation": 0,
+    "budgets.current.formula.inputs.phone.systems.player": 0,
+    "budgets.current.formula.inputs.phone.systems.world": 0,
+    "budgets.current.formula.inputs.phone.systems.hud": 0,
+    "budgets.current.formula.inputs.phone.systems.audio": 0,
+    "budgets.current.formula.inputs.phone.vertexShare": 0,
+    "budgets.current.formula.inputs.phone.lanes.opaque": 0,
+    "budgets.current.formula.inputs.phone.lanes.shadow": 0,
+    "budgets.current.formula.inputs.phone.lanes.transparent": 0,
+    "budgets.current.formula.inputs.phone.lanes.viewmodel": 0,
+    "budgets.current.formula.inputs.phone.lanes.post": 0,
+    "budgets.current.formula.inputs.phone.lanes.reserve": 0,
+    "budgets.current.formula.inputs.phone.linkMs": 0,
+    "budgets.current.formula.inputs.desktop.fps": 0,
+    "budgets.current.formula.inputs.desktop.variability": 0,
+    "budgets.current.formula.inputs.desktop.cpuMs": 0,
+    "budgets.current.formula.inputs.desktop.gcMs": 0,
+    "budgets.current.formula.inputs.desktop.systems.physics": 0,
+    "budgets.current.formula.inputs.desktop.systems.ai": 0,
+    "budgets.current.formula.inputs.desktop.systems.animation": 0,
+    "budgets.current.formula.inputs.desktop.systems.player": 0,
+    "budgets.current.formula.inputs.desktop.systems.world": 0,
+    "budgets.current.formula.inputs.desktop.systems.hud": 0,
+    "budgets.current.formula.inputs.desktop.systems.audio": 0,
+    "budgets.current.formula.inputs.desktop.vertexShare": 0,
+    "budgets.current.formula.inputs.desktop.lanes.opaque": 0,
+    "budgets.current.formula.inputs.desktop.lanes.shadow": 0,
+    "budgets.current.formula.inputs.desktop.lanes.transparent": 0,
+    "budgets.current.formula.inputs.desktop.lanes.viewmodel": 0,
+    "budgets.current.formula.inputs.desktop.lanes.post": 0,
+    "budgets.current.formula.inputs.desktop.lanes.reserve": 0,
+    "budgets.current.formula.inputs.desktop.linkMs": 0,
+    "budgets.current.formula.inputs.load.fixedSeconds": 0,
+    "budgets.current.formula.inputs.load.cpuRatio": 0,
+    "budgets.current.formula.inputs.load.bytesPerSecond": 0,
+    "budgets.current.systemMs.physics": 0,
+    "budgets.current.systemMs.ai": 0,
+    "budgets.current.systemMs.animation": 0,
+    "budgets.current.systemMs.player": 0,
+    "budgets.current.systemMs.world": 0,
+    "budgets.current.systemMs.hud": 0,
+    "budgets.current.systemMs.audio": 0,
+    "budgets.current.gpuM5Ms": 0,
+    "budgets.current.observed.draws": 0,
+    "budgets.current.observed.tris": 0,
+    "budgets.current.observed.programs": 0,
+    "budgets.current.observed.gpuMB": 0,
+    "walk.stuck": 0,
+    "walk.sounds.ambient": [],
+    "combat.kills": [],
+    "combat.loot.written": [],
+    "combat.sounds.ambient": [],
+    "pauseResume.before.clockNow": 0,
+    "pauseResume.before.player.pos.x": 0,
+    "pauseResume.before.player.pos.y": 0,
+    "pauseResume.before.player.pos.z": 0,
+    "pauseResume.before.player.yaw": 0,
+    "pauseResume.before.player.pitch": 0,
+    "pauseResume.before.player.vel.x": 0,
+    "pauseResume.before.player.vel.y": 0,
+    "pauseResume.before.player.vel.z": 0,
+    "pauseResume.before.player.health": 0,
+    "pauseResume.before.weapon.state.magazine": 0,
+    "pauseResume.before.weapon.state.reserve": 0,
+    "pauseResume.before.weapon.state.reloadProgress": 0,
+    "pauseResume.before.quest.adventure.adventure": [],
+    "pauseResume.before.quest.adventure.quest": [],
+    "pauseResume.before.quest.level": [],
+    "pauseResume.after.clockNow": 0,
+    "pauseResume.after.player.pos.x": 0,
+    "pauseResume.after.player.pos.y": 0,
+    "pauseResume.after.player.pos.z": 0,
+    "pauseResume.after.player.yaw": 0,
+    "pauseResume.after.player.pitch": 0,
+    "pauseResume.after.player.vel.x": 0,
+    "pauseResume.after.player.vel.y": 0,
+    "pauseResume.after.player.vel.z": 0,
+    "pauseResume.after.player.health": 0,
+    "pauseResume.after.weapon.state.magazine": 0,
+    "pauseResume.after.weapon.state.reserve": 0,
+    "pauseResume.after.weapon.state.reloadProgress": 0,
+    "pauseResume.after.quest.adventure.adventure": [],
+    "pauseResume.after.quest.adventure.quest": [],
+    "pauseResume.after.quest.level": [],
+    "pauseResume.diff": [],
+    "leak.before.geometries": 0,
+    "leak.before.textures": 0,
+    "leak.before.programs": 0,
+    "leak.before.bodies": 0,
+    "leak.before.colliders": 0,
+    "leak.before.listeners.window": 0,
+    "leak.before.listeners.document": 0,
+    "leak.before.listeners.canvas": 0,
+    "leak.before.listeners.other": 0,
+    "leak.before.timers.timeouts": 0,
+    "leak.before.timers.intervals": 0,
+    "leak.before.timers.raf": 0,
+    "leak.before.audio.activeVoices": 0,
+    "leak.before.audio.beds": 0,
+    "leak.before.audio.buses": 0,
+    "leak.before.systems.input": 0,
+    "leak.before.systems.fixed.pre": 0,
+    "leak.before.systems.fixed.step": 0,
+    "leak.before.systems.fixed.post": 0,
+    "leak.before.systems.update": 0,
+    "leak.before.systems.late": 0,
+    "leak.before.systems.render": 0,
+    "leak.before.events.listeners": 0,
+    "leak.before.events.answerers": 0,
+    "leak.before.dom.hud": 0,
+    "leak.before.dom.body": 0,
+    "leak.before.sceneObjects": 0,
+    "leak.after.geometries": 0,
+    "leak.after.textures": 0,
+    "leak.after.programs": 0,
+    "leak.after.bodies": 0,
+    "leak.after.colliders": 0,
+    "leak.after.listeners.window": 0,
+    "leak.after.listeners.document": 0,
+    "leak.after.listeners.canvas": 0,
+    "leak.after.listeners.other": 0,
+    "leak.after.timers.timeouts": 0,
+    "leak.after.timers.intervals": 0,
+    "leak.after.timers.raf": 0,
+    "leak.after.audio.activeVoices": 0,
+    "leak.after.audio.beds": 0,
+    "leak.after.audio.buses": 0,
+    "leak.after.systems.input": 0,
+    "leak.after.systems.fixed.pre": 0,
+    "leak.after.systems.fixed.step": 0,
+    "leak.after.systems.fixed.post": 0,
+    "leak.after.systems.update": 0,
+    "leak.after.systems.late": 0,
+    "leak.after.systems.render": 0,
+    "leak.after.events.listeners": 0,
+    "leak.after.events.answerers": 0,
+    "leak.after.dom.hud": 0,
+    "leak.after.dom.body": 0,
+    "leak.after.sceneObjects": 0,
+    "leak.disposalErrors": [],
+    "leak.scope.geometries": 0,
+    "leak.scope.materials": 0,
+    "leak.scope.textures": 0,
+    "leak.scope.renderTargets": 0,
+    "leak.scope.meshes": 0,
+    "leak.scope.resources": 0,
+    "leak.scope.bodies": 0,
+    "leak.scope.sounds": 0,
+    "leak.scope.listeners": 0,
+    "leak.scope.timers": 0,
+    "leak.scope.rafs": 0,
+    "leak.scope.disposers": 0,
+    "leak.scope.systems": 0,
+    "leak.scope.colliders": 0,
+    "leak.scope.nodes": 0,
+    "leak.gpu.total.geometries": 0,
+    "leak.gpu.total.textures": 0,
+    "leak.gpu.total.programs": 0,
+    "leak.gpu.orphans.live": 0,
+    "leak.gpu.orphans.collected": 0,
+    "leak.gpu.retained.geometries": 0,
+    "leak.gpu.retained.textures": 0,
+    "leak.gpu.retained.programs": 0
+  },
+  "selfMin": {
+    "spawn": 0.9999895658078151,
+    "whip": 0.9999684399906267,
+    "ray": 0.9999904150220361,
+    "quest": 0.9999825704095658
+  },
+  "harness": 2,
+  "sha": "9ec299a8fd2254f4592e3622a4d97dedd206eb7e",
+  "recorded": "2026-10-21T15:27:15.276Z",
+  "browser": "153.0.8010.12"
+}

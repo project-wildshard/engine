@@ -1,0 +1,211 @@
+{
+  "catalogue": [
+    {
+      "key": "balbal",
+      "model": {
+        "id": "nalati-grasslands/balbal",
+        "name": "Balbal",
+        "file": "src/shards/nalati-grasslands/generators/places.ts",
+        "category": "props",
+        "pipeline": [
+          "trellis",
+          "code"
+        ],
+        "surface": "stone",
+        "defaults": {
+          "carved": null
+        },
+        "variants": [
+          {
+            "id": "generated",
+            "label": "TRELLIS.2",
+            "params": {}
+          },
+          {
+            "id": "bare",
+            "label": "Carved",
+            "params": {
+              "carved": "bare"
+            }
+          },
+          {
+            "id": "capped",
+            "label": "Carved · cap",
+            "params": {
+              "carved": "capped"
+            }
+          }
+        ]
+      },
+      "source": {
+        "kind": "selection",
+        "variants": [
+          {
+            "params": {
+              "carved": null
+            },
+            "source": {
+              "kind": "asset",
+              "asset": {
+                "url": "/assets/nalati/baked/painted-models/balbal.glb",
+                "phoneUrl": "/assets/nalati/baked/painted-models/balbal.phone.glb",
+                "material": {
+                  "id": "nalati-model:balbal|near|0.35|0.8||ffffff",
+                  "family": "painterly",
+                  "rim": 0.35,
+                  "bands": 0.8,
+                  "floor": 0.2
+                },
+                "geometrySlot": 0,
+                "materialSlot": 0,
+                "retainedAttribute": "_paint_clone",
+                "transform": {
+                  "yaw": 3.141592653589793,
+                  "scale": 1.3437499999999998
+                }
+              }
+            }
+          },
+          {
+            "params": {
+              "carved": "bare"
+            },
+            "source": {
+              "kind": "file",
+              "file": "models/specimens/balbal-0.bin",
+              "representation": "parts",
+              "geometry": {
+                "attrs": [
+                  [
+                    "position",
+                    "f32",
+                    3,
+                    false
+                  ],
+                  [
+                    "normal",
+                    "f32",
+                    3,
+                    false
+                  ],
+                  [
+                    "color",
+                    "f32",
+                    3,
+                    false
+                  ]
+                ],
+                "count": 3570,
+                "index": "u32",
+                "indexCount": 10776,
+                "box": true,
+                "expand": true
+              },
+              "material": {
+                "id": "nalati-poi",
+                "family": "painterly",
+                "rim": 0.35,
+                "bands": 0.8
+              }
+            }
+          },
+          {
+            "params": {
+              "carved": "capped"
+            },
+            "source": {
+              "kind": "file",
+              "file": "models/specimens/balbal-1.bin",
+              "representation": "parts",
+              "geometry": {
+                "attrs": [
+                  [
+                    "position",
+                    "f32",
+                    3,
+                    false
+                  ],
+                  [
+                    "normal",
+                    "f32",
+                    3,
+                    false
+                  ],
+                  [
+                    "color",
+                    "f32",
+                    3,
+                    false
+                  ]
+                ],
+                "count": 3685,
+                "index": "u32",
+                "indexCount": 11028,
+                "box": true,
+                "expand": true
+              },
+              "material": {
+                "id": "nalati-poi",
+                "family": "painterly",
+                "rim": 0.35,
+                "bands": 0.8
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "generated": {
+    "url": "/assets/nalati/baked/painted-models/balbal.glb",
+    "phoneUrl": "/assets/nalati/baked/painted-models/balbal.phone.glb",
+    "geometrySlot": 0,
+    "materialSlot": 0,
+    "retainedAttribute": "_paint_clone",
+    "material": {
+      "id": "nalati-model:balbal|near|0.35|0.8||ffffff",
+      "family": "painterly",
+      "rim": 0.35,
+      "bands": 0.8,
+      "floor": 0.2
+    },
+    "transform": {
+      "yaw": 3.141592653589793,
+      "scale": 1.3437499999999998
+    }
+  },
+  "sites": {
+    "name": "nalati-balbal",
+    "label": "Balbal",
+    "file": "src/shards/nalati-grasslands/generators/places.ts",
+    "surface": "stone",
+    "variants": [
+      "bare",
+      "capped"
+    ],
+    "variantCycle": [
+      1,
+      0,
+      0
+    ],
+    "sink": 0.18,
+    "collider": {
+      "hw": 0.42,
+      "hd": 0.33,
+      "top": 2.2,
+      "bottom": 1
+    }
+  },
+  "sources": [
+    {
+      "name": "models/specimens/balbal-0.bin",
+      "kind": "bin",
+      "source": "data/balbal-carving-0.generated.bin"
+    },
+    {
+      "name": "models/specimens/balbal-1.bin",
+      "kind": "bin",
+      "source": "data/balbal-carving-1.generated.bin"
+    }
+  ]
+}

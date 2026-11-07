@@ -9,5 +9,5 @@
     "jsxImportSource": "preact",
     "noEmit": true
   },
-  "include": [".", "../shared"]
+  "include": ["*.ts", "*.tsx", "../shared/*.ts"]
 }

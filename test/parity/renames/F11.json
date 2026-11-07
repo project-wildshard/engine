@@ -1,0 +1,12 @@
+{
+  "registry": {
+    "added": [
+      "cove-unclaimed",
+      "interact-*",
+      "npc-*"
+    ]
+  },
+  "physics": {
+    "colliders": "same total"
+  }
+}

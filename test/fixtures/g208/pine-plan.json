@@ -1,0 +1,642 @@
+{
+ "row": "SHARD-PLATFORM G208 (E435)",
+ "build": {
+  "build": "be4c277-muytjp7n",
+  "time": "2026-10-08T00:49:24.398Z"
+ },
+ "device": "muted headless Chromium Metal, iPhone 16 Pro portrait, phone tier, Developer ON, standalone Pine (trim default) after 20 s",
+ "tool": "progress/memory/g208-pine-rings/standalone.mjs + src/game/grid/runtimeRenderPreflight.ts",
+ "drawables": {
+  "chunked": 619,
+  "global": 68
+ },
+ "globalTop": [
+  {
+   "name": "pine-sky-dome",
+   "bytes": 16869664
+  },
+  {
+   "name": "Mesh",
+   "bytes": 9932544
+  },
+  {
+   "name": "pine-hollow/wine-barrel",
+   "bytes": 9825148
+  },
+  {
+   "name": "pine-hollow/wine-barrel",
+   "bytes": 9824252
+  },
+  {
+   "name": "pine-hollow/mossy-boulder:batch",
+   "bytes": 9641828
+  },
+  {
+   "name": "pine-hollow/hatchet",
+   "bytes": 9602224
+  },
+  {
+   "name": "pine-hollow/hatchet",
+   "bytes": 9602096
+  },
+  {
+   "name": "pine-hollow/wooden-bucket",
+   "bytes": 9596492
+  },
+  {
+   "name": "pine-hollow/wooden-bucket",
+   "bytes": 9596492
+  },
+  {
+   "name": "pine-hollow/wooden-crate",
+   "bytes": 9589172
+  },
+  {
+   "name": "pine-hollow/wooden-crate",
+   "bytes": 9588660
+  },
+  {
+   "name": "pine-hollow/tree-stump:base:0",
+   "bytes": 9539268
+  },
+  {
+   "name": "pine-hollow/fallen-log:base:0",
+   "bytes": 9536640
+  },
+  {
+   "name": "Mesh",
+   "bytes": 9483788
+  },
+  {
+   "name": "pine-hollow/forest-tree:batch",
+   "bytes": 8783676
+  },
+  {
+   "name": "pine-hollow/forest-tree:batch",
+   "bytes": 6518508
+  },
+  {
+   "name": "pine-crags",
+   "bytes": 5980872
+  },
+  {
+   "name": "Mesh",
+   "bytes": 5229175
+  },
+  {
+   "name": "Mesh",
+   "bytes": 4968140
+  },
+  {
+   "name": "pine-hollow/forest-tree:batch",
+   "bytes": 4200016
+  }
+ ],
+ "gl": {
+  "totals": [
+   {
+    "texBytes": 232410708,
+    "rbBytes": 0,
+    "bufBytes": 43091140,
+    "textures": 412,
+    "buffers": 859
+   }
+  ],
+  "byOwner": {
+   "texture:engine/scene": 61476604,
+   "texture:engine/render-target": 68185728,
+   "texture:engine/loadPBRArray": 16253528,
+   "texture:pine-hollow/fern": 2796204,
+   "buffer:engine/scene": 29182266,
+   "buffer:pine-crags-crag-cliff": 5980872,
+   "texture:engine/ktx2Texture": 40198232,
+   "texture:engine/loadGLTF": 14855160,
+   "texture:engine/texture": 2406160,
+   "texture:props-wood": 2971032,
+   "texture:props": 2998232,
+   "texture:props-stumps": 2971032,
+   "texture:pine-hollow/needle-litter": 1398100,
+   "texture:pine-hollow/bilberry-shrub": 1398100,
+   "buffer:pine-hollow/forest-tree": 3616816,
+   "buffer:pine-hollow/fern": 459312,
+   "texture:engine/loadGlbPart": 5680480,
+   "texture:engine/loadRigFile": 6991040,
+   "texture:pine-hollow/reeds": 349532,
+   "texture:hollow-log": 349524,
+   "texture:pine-hollow/moss-patch": 349524,
+   "texture:pine-hollow/pebbles": 349524,
+   "buffer:pine-hollow/needle-litter": 380140,
+   "buffer:pine-hollow/bilberry-shrub": 285864,
+   "buffer:pine-hollow/moss-patch": 228140,
+   "buffer:pine-hollow/pebbles": 228140,
+   "buffer:pine-lookout": 503232,
+   "texture:pine-landmarks": 87380,
+   "buffer:engine/loadGlbPart": 1227112,
+   "buffer:props-stumps": 97600,
+   "buffer:props-wood": 95932,
+   "buffer:pine-footbridge": 364848,
+   "texture:pine-hollow/forest-tree": 323656,
+   "buffer:props": 204640,
+   "buffer:pine-zip-landing": 110976,
+   "buffer:engine/loadGLTF": 96218,
+   "texture:pine-crags-crag-cliff": 21892,
+   "buffer:pine-zip-cable": 20352,
+   "buffer:hollow-log": 7784,
+   "buffer:pine-hollow/standing-stone": 192,
+   "buffer:pine-hollow/waystone": 192,
+   "buffer:pine-hollow/standing-stone#3": 128,
+   "buffer:pine-hollow/standing-stone#2": 128,
+   "buffer:pine-hollow/beaver-dam": 64,
+   "buffer:pine-hollow/canoe": 64,
+   "buffer:pine-hollow/cave-arch": 64,
+   "buffer:pine-hollow/contract-board": 64,
+   "texture:engine/renderer": 36,
+   "texture:pine-lookout": 8
+  }
+ },
+ "plan": {
+  "id": "pine-hollow",
+  "claimBytes": 804680577,
+  "nonStreamingBytes": 6393840,
+  "dependencies": [
+   {
+    "id": "dep.global",
+    "jsBytes": 157917318,
+    "gpuBytes": 160578361,
+    "always": true
+   },
+   {
+    "id": "dep.000",
+    "jsBytes": 4835106,
+    "gpuBytes": 4835106
+   },
+   {
+    "id": "dep.001",
+    "jsBytes": 1178688,
+    "gpuBytes": 1178688
+   },
+   {
+    "id": "dep.002",
+    "jsBytes": 1121472,
+    "gpuBytes": 1121472
+   },
+   {
+    "id": "dep.003",
+    "jsBytes": 9437184,
+    "gpuBytes": 9437184
+   },
+   {
+    "id": "dep.004",
+    "jsBytes": 18874368,
+    "gpuBytes": 18874368
+   },
+   {
+    "id": "dep.005",
+    "jsBytes": 9568256,
+    "gpuBytes": 9611948
+   },
+   {
+    "id": "dep.006",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.007",
+    "jsBytes": 455604,
+    "gpuBytes": 455604
+   },
+   {
+    "id": "dep.008",
+    "jsBytes": 262144,
+    "gpuBytes": 349526
+   },
+   {
+    "id": "dep.009",
+    "jsBytes": 21845400,
+    "gpuBytes": 21845400
+   },
+   {
+    "id": "dep.010",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.011",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.012",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.013",
+    "jsBytes": 1435718,
+    "gpuBytes": 1435718
+   },
+   {
+    "id": "dep.014",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.015",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.016",
+    "jsBytes": 2395924,
+    "gpuBytes": 2395924
+   },
+   {
+    "id": "dep.017",
+    "jsBytes": 11328,
+    "gpuBytes": 11328
+   },
+   {
+    "id": "dep.018",
+    "jsBytes": 34964,
+    "gpuBytes": 45890
+   },
+   {
+    "id": "dep.019",
+    "jsBytes": 3145728,
+    "gpuBytes": 3145728
+   },
+   {
+    "id": "dep.020",
+    "jsBytes": 3145728,
+    "gpuBytes": 3145728
+   },
+   {
+    "id": "dep.021",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.022",
+    "jsBytes": 6291456,
+    "gpuBytes": 6291456
+   },
+   {
+    "id": "dep.023",
+    "jsBytes": 197296,
+    "gpuBytes": 262834
+   },
+   {
+    "id": "dep.024",
+    "jsBytes": 12,
+    "gpuBytes": 18
+   },
+   {
+    "id": "dep.025",
+    "jsBytes": 103200,
+    "gpuBytes": 103200
+   },
+   {
+    "id": "dep.026",
+    "jsBytes": 2883584,
+    "gpuBytes": 2883584
+   },
+   {
+    "id": "dep.027",
+    "jsBytes": 3545852,
+    "gpuBytes": 4594430
+   },
+   {
+    "id": "dep.028",
+    "jsBytes": 7588,
+    "gpuBytes": 7588
+   },
+   {
+    "id": "dep.029",
+    "jsBytes": 1448,
+    "gpuBytes": 1448
+   },
+   {
+    "id": "dep.030",
+    "jsBytes": 4,
+    "gpuBytes": 4
+   },
+   {
+    "id": "dep.031",
+    "jsBytes": 1048576,
+    "gpuBytes": 1048576
+   },
+   {
+    "id": "dep.032",
+    "jsBytes": 22640,
+    "gpuBytes": 22640
+   }
+  ],
+  "chunks": [
+   {
+    "id": "chunk.l1.0.0",
+    "level": "l1",
+    "x": 0,
+    "z": 0,
+    "dependencyIds": [
+     "dep.000",
+     "dep.001",
+     "dep.002",
+     "dep.003",
+     "dep.004",
+     "dep.005",
+     "dep.006",
+     "dep.007",
+     "dep.008",
+     "dep.009",
+     "dep.010",
+     "dep.011",
+     "dep.012"
+    ],
+    "jsBytes": 7738342,
+    "gpuBytes": 7738342
+   },
+   {
+    "id": "chunk.l1.0.1",
+    "level": "l1",
+    "x": 0,
+    "z": 1,
+    "dependencyIds": [
+     "dep.000",
+     "dep.001",
+     "dep.002",
+     "dep.003",
+     "dep.004",
+     "dep.005",
+     "dep.013",
+     "dep.014"
+    ],
+    "jsBytes": 3182892,
+    "gpuBytes": 3182892
+   },
+   {
+    "id": "chunk.l1.0.2",
+    "level": "l1",
+    "x": 0,
+    "z": 2,
+    "dependencyIds": [
+     "dep.013",
+     "dep.014",
+     "dep.015",
+     "dep.016"
+    ],
+    "jsBytes": 40224,
+    "gpuBytes": 40224
+   },
+   {
+    "id": "chunk.l1.0.3",
+    "level": "l1",
+    "x": 0,
+    "z": 3,
+    "dependencyIds": [
+     "dep.000",
+     "dep.013",
+     "dep.014"
+    ],
+    "jsBytes": 0,
+    "gpuBytes": 0
+   },
+   {
+    "id": "chunk.l1.1.0",
+    "level": "l1",
+    "x": 1,
+    "z": 0,
+    "dependencyIds": [
+     "dep.001",
+     "dep.002",
+     "dep.003",
+     "dep.013",
+     "dep.014",
+     "dep.017",
+     "dep.018",
+     "dep.019",
+     "dep.020",
+     "dep.021",
+     "dep.022",
+     "dep.023",
+     "dep.024",
+     "dep.025",
+     "dep.026",
+     "dep.027"
+    ],
+    "jsBytes": 14841636,
+    "gpuBytes": 14841636
+   },
+   {
+    "id": "chunk.l1.1.1",
+    "level": "l1",
+    "x": 1,
+    "z": 1,
+    "dependencyIds": [
+     "dep.000",
+     "dep.002",
+     "dep.003",
+     "dep.004",
+     "dep.005",
+     "dep.006",
+     "dep.007",
+     "dep.008",
+     "dep.009",
+     "dep.010",
+     "dep.013",
+     "dep.015",
+     "dep.016",
+     "dep.017",
+     "dep.018",
+     "dep.019",
+     "dep.020",
+     "dep.021",
+     "dep.022",
+     "dep.028",
+     "dep.029",
+     "dep.030",
+     "dep.031"
+    ],
+    "jsBytes": 17861560,
+    "gpuBytes": 18757220
+   },
+   {
+    "id": "chunk.l1.1.2",
+    "level": "l1",
+    "x": 1,
+    "z": 2,
+    "dependencyIds": [
+     "dep.000",
+     "dep.006",
+     "dep.007",
+     "dep.011",
+     "dep.013",
+     "dep.014"
+    ],
+    "jsBytes": 1503964,
+    "gpuBytes": 1503964
+   },
+   {
+    "id": "chunk.l1.1.3",
+    "level": "l1",
+    "x": 1,
+    "z": 3,
+    "dependencyIds": [
+     "dep.013",
+     "dep.014"
+    ],
+    "jsBytes": 0,
+    "gpuBytes": 0
+   },
+   {
+    "id": "chunk.l1.2.0",
+    "level": "l1",
+    "x": 2,
+    "z": 0,
+    "dependencyIds": [
+     "dep.000",
+     "dep.011",
+     "dep.012",
+     "dep.013",
+     "dep.014",
+     "dep.015",
+     "dep.018",
+     "dep.019",
+     "dep.023",
+     "dep.024",
+     "dep.028"
+    ],
+    "jsBytes": 1851232,
+    "gpuBytes": 1873078
+   },
+   {
+    "id": "chunk.l1.2.1",
+    "level": "l1",
+    "x": 2,
+    "z": 1,
+    "dependencyIds": [
+     "dep.000",
+     "dep.004",
+     "dep.008",
+     "dep.012",
+     "dep.013",
+     "dep.014",
+     "dep.016",
+     "dep.018",
+     "dep.019",
+     "dep.020",
+     "dep.021",
+     "dep.025",
+     "dep.026",
+     "dep.028",
+     "dep.029",
+     "dep.030"
+    ],
+    "jsBytes": 1316144,
+    "gpuBytes": 1316144
+   },
+   {
+    "id": "chunk.l1.2.2",
+    "level": "l1",
+    "x": 2,
+    "z": 2,
+    "dependencyIds": [
+     "dep.000",
+     "dep.003",
+     "dep.004",
+     "dep.005",
+     "dep.008",
+     "dep.009",
+     "dep.011",
+     "dep.012",
+     "dep.019",
+     "dep.021",
+     "dep.022",
+     "dep.024",
+     "dep.026",
+     "dep.027",
+     "dep.030",
+     "dep.031",
+     "dep.032"
+    ],
+    "jsBytes": 4813880,
+    "gpuBytes": 4820708
+   },
+   {
+    "id": "chunk.l1.2.3",
+    "level": "l1",
+    "x": 2,
+    "z": 3,
+    "dependencyIds": [
+     "dep.000",
+     "dep.003",
+     "dep.004",
+     "dep.005",
+     "dep.008",
+     "dep.009",
+     "dep.013",
+     "dep.014"
+    ],
+    "jsBytes": 2397612,
+    "gpuBytes": 2397612
+   },
+   {
+    "id": "chunk.l1.3.0",
+    "level": "l1",
+    "x": 3,
+    "z": 0,
+    "dependencyIds": [
+     "dep.000",
+     "dep.013",
+     "dep.014"
+    ],
+    "jsBytes": 0,
+    "gpuBytes": 0
+   },
+   {
+    "id": "chunk.l1.3.1",
+    "level": "l1",
+    "x": 3,
+    "z": 1,
+    "dependencyIds": [
+     "dep.000",
+     "dep.006",
+     "dep.012",
+     "dep.013",
+     "dep.014",
+     "dep.032"
+    ],
+    "jsBytes": 7189452,
+    "gpuBytes": 7189452
+   },
+   {
+    "id": "chunk.l1.3.2",
+    "level": "l1",
+    "x": 3,
+    "z": 2,
+    "dependencyIds": [
+     "dep.000",
+     "dep.006",
+     "dep.007",
+     "dep.010",
+     "dep.011",
+     "dep.013",
+     "dep.014",
+     "dep.015",
+     "dep.016"
+    ],
+    "jsBytes": 0,
+    "gpuBytes": 0
+   },
+   {
+    "id": "chunk.l1.3.3",
+    "level": "l1",
+    "x": 3,
+    "z": 3,
+    "dependencyIds": [],
+    "jsBytes": 5419744,
+    "gpuBytes": 5419744
+   }
+  ]
+ },
+ "rev": "be4c27711"
+}

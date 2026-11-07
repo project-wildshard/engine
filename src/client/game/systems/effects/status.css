@@ -1,0 +1,3 @@
+.ws-status-effects { display: flex; flex-wrap: wrap; gap: 4px; }
+.ws-status-effect { display: inline-flex; align-items: center; gap: 4px; color: #8fe3ff; font: 10px 'JetBrains Mono', monospace; letter-spacing: .05em; }
+.ws-status-effect svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }

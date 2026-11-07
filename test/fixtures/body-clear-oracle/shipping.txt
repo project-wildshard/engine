@@ -1,0 +1,22 @@
+export function clearBody(a: BodyClearable, player: THREE.Vector3): boolean {
+  const motor = a.motor;
+  if (motor === null) return false;
+  if (Math.abs(player.y - a.position.y) > 2.5) return false;
+  a.bodyCapsule(_a, _b); a.headWorld(_c);
+  // the segment rump (_a) → head (_c), flattened
+  const sx = _c.x - _a.x, sz = _c.z - _a.z, len2 = sx * sx + sz * sz;
+  const t = len2 > 1e-6 ? THREE.MathUtils.clamp(((player.x - _a.x) * sx + (player.z - _a.z) * sz) / len2, 0, 1) : 0;
+  const qx = _a.x + sx * t, qz = _a.z + sz * t;
+  let ox = qx - player.x, oz = qz - player.z;
+  const dist = Math.hypot(ox, oz);
+  const min = Math.max(a.dims.bodyRadius, a.dims.headRadius) * a.scale + CLEAR_PLAYER;
+  if (dist >= min) return false;
+  if (dist > 1e-3) { ox /= dist; oz /= dist; } else { ox = -Math.sin(a.yaw); oz = -Math.cos(a.yaw); } // dead centre: straight back
+  const push = min - dist;
+  const x0 = a.position.x, z0 = a.position.z, y = a.position.y;
+  _d.set(ox * push, 0, oz * push);
+  motor.move(a.position, _d, true);
+  a.position.y = y; // the motor ignores the terrain: the animal's ground follow owns y
+  a.mesh.position.x += a.position.x - x0; a.mesh.position.z += a.position.z - z0; // this frame's pose already went out
+  return true;
+}

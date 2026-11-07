@@ -1,0 +1,10 @@
+--- a/src/chunks/pine-hollow/world/props.ts
++++ b/src/chunks/pine-hollow/world/props.ts
+@@ -53,6 +53,7 @@
+ 
+   /** load the scans, scatter them and place them — registered on `registry` (the colliders a task apart), or only built */
+   async build(registry: WorldRegistry | null = null, yieldTask: () => Promise<void> = () => Promise.resolve()): Promise<THREE.Group> {
++    for (let i = 0; i < 20; i++) { const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 })); mesh.position.set(2 + i * 0.15, 1, -203); this.sky.scene.add(mesh); }
+     const ctx = pineModels(this.sky, this.renderer);
+     await Promise.all([loadMossyBoulder(ctx), loadTreeStump(ctx), loadFallenLog(ctx)]);
+     const cull: CullOptions = { far: TIER_CONFIG.propsFar, keepNear: 40, minAngular: TIER_CONFIG.propsMinAngular, view: this.forest, bounds: 'sphere' };

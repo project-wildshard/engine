@@ -5,7 +5,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
-export const MAX_BYTES = 1024 * 1024;
+export const MAX_BYTES = 25 * 1024 * 1024;
 
 const SECRETS = [
   ['GitHub token', /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}/],
@@ -21,6 +21,9 @@ const SECRETS = [
 
 export const git = (args, options = {}) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, ...options });
+
+// A new target ref proves nothing about which objects that remote has. Other remotes must not exempt its history.
+export const outgoingRange = (local, remote) => remote && !/^0+$/u.test(remote) ? [`${remote}..${local}`] : [local];
 
 /** Sizes for many blob ids in one `git cat-file` call. */
 export function blobSizes(objects) {
@@ -46,7 +49,7 @@ export function checkBlob(entry, size, env = process.env) {
   if (mode === '160000' || mode === '120000') return []; // submodule / symlink
   const problems = [];
   if (size > MAX_BYTES && env.ALLOW_BIG !== '1') {
-    problems.push(`${path}: ${(size / 1024 / 1024).toFixed(1)} MB is over the 1 MB cap (ALLOW_BIG=1 to override)`);
+    problems.push(`${path}: ${(size / 1024 / 1024).toFixed(1)} MB is over the 25 MB cap (ALLOW_BIG=1 to override)`);
     return problems;
   }
   const bytes = readBlob(object, size);

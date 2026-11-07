@@ -1,0 +1,151 @@
+{
+  "style": "folk",
+  "model": "MiniMax-Music3",
+  "credit": "Music: MiniMax-Music3",
+  "slots": {
+    "pine": {
+      "calm": "pine-calm-10905c79.m4a",
+      "tension": "pine-tension-180bc197.m4a",
+      "bpm": 86.403,
+      "beatsPerBar": 4,
+      "loopStart": 25.542,
+      "loopEnd": 69.9849,
+      "duration": 72.768
+    },
+    "island": {
+      "calm": "island-calm-d7d189f9.m4a",
+      "tension": "island-tension-bb05ab64.m4a",
+      "bpm": 85.186,
+      "beatsPerBar": 4,
+      "loopStart": 16.9738,
+      "loopEnd": 42.33,
+      "duration": 45.1627
+    },
+    "title": {
+      "full": "title-50001128.m4a",
+      "bpm": 104.908,
+      "beatsPerBar": 4,
+      "loopStart": 15.6735,
+      "loopEnd": 63.7156,
+      "duration": 66.0053
+    }
+  },
+  "stings": {
+    "death": "sting-death-67f54fe8.m4a",
+    "chunk": "sting-chunk-31c10eaf.m4a",
+    "pickup": "sting-pickup-332f81db.m4a"
+  },
+  "provenance": [
+    {
+      "file": "pine-calm-10905c79.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: folk adventure video game soundtrack, acoustic and warm. BPM: 88. Key: D major. Instrumental only, no vocals. Setting: Pine Hollow, a misty pine forest at dawn - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a gentle fiddle and tin whistle melody over fingerpicked acoustic guitar and a soft marimba; an upright bass and a steady groove of bodhran, cajon and shaker run under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: natural wooden-room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "calm: mix - drums - bass/2",
+      "gain_db": -3.7,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "pine-tension-180bc197.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: folk adventure video game soundtrack, acoustic and warm. BPM: 88. Key: D major. Instrumental only, no vocals. Setting: Pine Hollow, a misty pine forest at dawn - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a gentle fiddle and tin whistle melody over fingerpicked acoustic guitar and a soft marimba; an upright bass and a steady groove of bodhran, cajon and shaker run under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: natural wooden-room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "tension: drums + bass/2 (htdemucs), mono",
+      "gain_db": -3.7,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "island-calm-d7d189f9.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: folk adventure video game soundtrack in the spirit of Sea of Thieves, sea-shanty flavoured. BPM: 104. Key: D major. Instrumental only, no vocals. Setting: Driftwood Isle, a sunlit island of pale sand, driftwood and turquoise water - wonder first, seafaring adventure second, a little melancholy underneath. Arrangement: a lively fiddle and accordion melody over strummed acoustic guitar and a bright marimba ostinato; an upright bass and a steady groove of frame drum, cajon and shaker run under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: warm, natural room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "stem": "calm: mix - drums - bass/2",
+      "gain_db": -3.3,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "island-tension-bb05ab64.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: folk adventure video game soundtrack in the spirit of Sea of Thieves, sea-shanty flavoured. BPM: 104. Key: D major. Instrumental only, no vocals. Setting: Driftwood Isle, a sunlit island of pale sand, driftwood and turquoise water - wonder first, seafaring adventure second, a little melancholy underneath. Arrangement: a lively fiddle and accordion melody over strummed acoustic guitar and a bright marimba ostinato; an upright bass and a steady groove of frame drum, cajon and shaker run under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: warm, natural room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "stem": "tension: drums + bass/2 (htdemucs), mono",
+      "gain_db": -3.3,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "title-50001128.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, folk adventure in the spirit of Sea of Thieves. BPM: 96. Key: D major. Instrumental only, no vocals. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable fiddle melody introduced over fingerpicked guitar, then the full band - accordion, tin whistle, strummed guitars, marimba, upright bass and a driving frame drum and cajon groove; it builds to a rousing climax and ends on a resolved final chord. Production: warm, natural room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "gain_db": -3.9,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "sting-death-67f54fe8.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, folk adventure in the spirit of Sea of Thieves. BPM: 96. Key: D major. Instrumental only, no vocals. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable fiddle melody introduced over fingerpicked guitar, then the full band - accordion, tin whistle, strummed guitars, marimba, upright bass and a driving frame drum and cajon groove; it builds to a rousing climax and ends on a resolved final chord. Production: warm, natural room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "cut_from": "title at 70.58s (the final chord)",
+      "seconds": 4.5,
+      "gain_db": 0.1
+    },
+    {
+      "file": "sting-chunk-31c10eaf.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, folk adventure in the spirit of Sea of Thieves. BPM: 96. Key: D major. Instrumental only, no vocals. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable fiddle melody introduced over fingerpicked guitar, then the full band - accordion, tin whistle, strummed guitars, marimba, upright bass and a driving frame drum and cajon groove; it builds to a rousing climax and ends on a resolved final chord. Production: warm, natural room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 302,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-302",
+      "cut_from": "title at 13.14s (a 2.4x swell on a downbeat)",
+      "seconds": 3.5,
+      "gain_db": -1.6
+    },
+    {
+      "file": "sting-pickup-332f81db.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: folk adventure video game soundtrack, acoustic and warm. BPM: 88. Key: D major. Instrumental only, no vocals. Setting: Pine Hollow, a misty pine forest at dawn - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a gentle fiddle and tin whistle melody over fingerpicked acoustic guitar and a soft marimba; an upright bass and a steady groove of bodhran, cajon and shaker run under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: natural wooden-room sound.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "cut_from": "pine at 69.26s (its brightest onset)",
+      "seconds": 2.0,
+      "gain_db": 0.3
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+/* G216 / G222: only the compact chip and opened details intercept look-drags, never their enclosing rectangle. */
+/* Playtest round 2 (E332): the left column under the coins / journal and above the PTS strip, never the centre band where the
+   NAMED ELITE banner and the boss bar drop in (it sat at the right edge, top + 190 px, over the banner's right half). */
+.ws-memory-warning { position: absolute; left: 6px; top: calc(var(--ws-top, 16px) + 98px); z-index: calc(var(--ws-layer-hud) + 7); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: min(340px, calc(100vw - 12px)); pointer-events: none; font-family: var(--ws-mono); color: #ffd39a; font-size: 9px; line-height: 1.35; }
+.ws-memory-warning[hidden], #hud.intro .ws-memory-warning { display: none; }
+.ws-memory-warning-chip { padding: 5px 8px; border: 1px solid #ffb65c; background: #2a0f02; color: inherit; font: inherit; font-weight: 700; pointer-events: auto; touch-action: manipulation; cursor: pointer; }
+.ws-memory-warning-chip::after { content: ' ▾'; }
+.ws-memory-warning-chip[aria-expanded='true']::after { content: ' ▴'; }
+.ws-memory-warning-chip:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.ws-memory-warning-details { max-height: 32vh; overflow-y: auto; padding: 5px 8px; border: 1px solid #ffb65c; background: #2a0f02; pointer-events: auto; overscroll-behavior: contain; }
+.ws-memory-warning-details[hidden] { display: none; }
+.ws-memory-warning-report { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 5px; border-top: 1px solid rgba(255, 182, 92, 0.45); padding-top: 4px; }

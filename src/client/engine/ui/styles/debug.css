@@ -1,0 +1,22 @@
+/* pause ▸ Settings ▸ Debug (E162, src/client/engine/ui/DebugMenu.ts): the filter box, then one collapsible section per group of the
+   registry (src/client/engine/ui/debugOptions.ts). The rows are the menu's own .ws-gmenu-row / segmented pickers (gmenu.css). */
+.ws-gmenu .ws-dbg-filterrow { flex: none; display: flex; margin: 2px 0 10px; }
+.ws-gmenu .ws-dbg-filter { flex: 1 1 auto; font-size: 16px; } /* 16 px: iOS zooms the page into a smaller input */
+.ws-gmenu .ws-dbg-group { flex: none; display: flex; flex-direction: column; margin-bottom: 6px; border-top: 1px solid rgba(255, 196, 120, 0.22); }
+.ws-gmenu .ws-dbg-group[hidden] { display: none; }
+.ws-gmenu .ws-dbg-head { display: flex; align-items: center; width: 100%; min-height: 40px; padding: 8px 2px; appearance: none; -webkit-appearance: none; background: none; border: 0; color: rgb(255, 206, 140); font-family: var(--ws-mono); font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ws-gmenu .ws-dbg-caret { flex: none; width: 0; height: 0; margin-right: 10px; border-left: 6px solid currentcolor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 0.15s; }
+.ws-gmenu .ws-dbg-group.open .ws-dbg-caret { transform: rotate(90deg); }
+.ws-gmenu .ws-dbg-title { flex: 1 1 auto; min-width: 0; }
+.ws-gmenu .ws-dbg-count { flex: none; min-width: 22px; padding: 2px 6px; border: 1px solid rgba(255, 196, 120, 0.4); font-weight: 400; font-size: 9px; letter-spacing: 0.08em; text-align: center; color: var(--ws-text-dim); }
+.ws-gmenu .ws-dbg-body { display: none; flex-direction: column; padding: 2px 0 4px; }
+.ws-gmenu .ws-dbg-group.open .ws-dbg-body { display: flex; }
+.ws-gmenu .ws-dbg-row { row-gap: 6px; }
+.ws-gmenu .ws-dbg-seg { flex-wrap: wrap; max-width: 100%; } /* a six-way pick (Crag channel, Pine Hollow score) wraps on a phone instead of running off */
+.ws-gmenu .ws-dbg-note { display: block; margin-top: 3px; font-size: 8.5px; letter-spacing: 0.06em; text-transform: none; line-height: 1.4; color: var(--ws-text-dim); }
+.ws-gmenu .ws-dbg-reload { display: inline-block; margin-left: 8px; padding: 1px 4px; font-style: normal; font-size: 7.5px; letter-spacing: 0.14em; color: var(--ws-amber); border: 1px solid rgba(255, 181, 71, 0.6); vertical-align: 1px; }
+.ws-gmenu .ws-dbg-empty[hidden] { display: none; }
+.ws-gmenu .ws-dbg-action { flex: none; margin-left: auto; border-left-width: 1px; padding: 6px 12px; color: #fff; } /* a button row (debugOptions.ts action()) */
+.ws-gmenu .ws-dbg-action:disabled { opacity: 0.5; }
+.ws-gmenu .ws-dbg-action.armed { border-color: rgb(255, 150, 90); background: rgba(255, 120, 60, 0.32); } /* a two-tap action's first tap (E172, Clear downloads: "Tap again to clear ~N MB") */
+.ws-gmenu .ws-dbg-status[hidden] { display: none; } /* a button row's status line under it (E172) */

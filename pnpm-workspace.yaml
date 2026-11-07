@@ -1,0 +1,4 @@
+# P3: one package; scripts and the build mirror read node_modules/.pnpm.
+packages:
+  - .
+enableGlobalVirtualStore: false

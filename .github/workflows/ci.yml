@@ -16,8 +16,6 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,28 +28,13 @@ jobs:
           node-version-file: package.json
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      # Private org git dependencies (github:project-wildshard/...): mint a
-      # read-only token from the org app (meta repo P0.2, J34) and point
-      # every github.com URL form at it. pnpm-lock.yaml records them as
-      # git@github.com:..., and git clones them, so the rewrite covers it.
-      # Skipped where the secrets don't reach (fork PRs, Dependabot).
-      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        id: app-token
-        if: env.APP_CLIENT_ID != ''
-        with:
-          client-id: ${{ env.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: project-wildshard
-          permission-contents: read
-      - name: Read private org repos with the app token
-        if: steps.app-token.outputs.token != ''
-        env:
-          TOKEN: ${{ steps.app-token.outputs.token }}
+      # Org git dependencies are public (J160, J163). pnpm-lock.yaml can record
+      # them as git@github.com:..., so every URL form goes to plain HTTPS.
+      - name: Read org repos over HTTPS
         run: |
-          base="https://x-access-token:${TOKEN}@github.com/"
-          git config --global url."$base".insteadOf "https://github.com/"
-          git config --global --add url."$base".insteadOf "git@github.com:"
-          git config --global --add url."$base".insteadOf "ssh://git@github.com/"
+          base="https://github.com/project-wildshard/"
+          git config --global url."$base".insteadOf "git@github.com:project-wildshard/"
+          git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test:hooks
@@ -60,8 +43,6 @@ jobs:
     # Pinned: Playwright 1.60 can't install Chromium on ubuntu-latest (26.04).
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      APP_CLIENT_ID: ${{ secrets.APP_CLIENT_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,28 +55,13 @@ jobs:
           node-version-file: package.json
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      # Private org git dependencies (github:project-wildshard/...): mint a
-      # read-only token from the org app (meta repo P0.2, J34) and point
-      # every github.com URL form at it. pnpm-lock.yaml records them as
-      # git@github.com:..., and git clones them, so the rewrite covers it.
-      # Skipped where the secrets don't reach (fork PRs, Dependabot).
-      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        id: app-token
-        if: env.APP_CLIENT_ID != ''
-        with:
-          client-id: ${{ env.APP_CLIENT_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: project-wildshard
-          permission-contents: read
-      - name: Read private org repos with the app token
-        if: steps.app-token.outputs.token != ''
-        env:
-          TOKEN: ${{ steps.app-token.outputs.token }}
+      # Org git dependencies are public (J160, J163). pnpm-lock.yaml can record
+      # them as git@github.com:..., so every URL form goes to plain HTTPS.
+      - name: Read org repos over HTTPS
         run: |
-          base="https://x-access-token:${TOKEN}@github.com/"
-          git config --global url."$base".insteadOf "https://github.com/"
-          git config --global --add url."$base".insteadOf "git@github.com:"
-          git config --global --add url."$base".insteadOf "ssh://git@github.com/"
+          base="https://github.com/project-wildshard/"
+          git config --global url."$base".insteadOf "git@github.com:project-wildshard/"
+          git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e

@@ -1,0 +1,93 @@
+[
+  {
+    "name": "world/geometry/rest-winch.glb",
+    "path": "blobs/glb/513b3fcabd206ded1bf034b44cf14341a1c7d7f1ea34d65d26e0822c08e7d93e.glb",
+    "kind": "glb",
+    "hash": "513b3fcabd206ded1bf034b44cf14341a1c7d7f1ea34d65d26e0822c08e7d93e",
+    "compressed": 9772,
+    "decoded": 9744,
+    "gpu": 4376,
+    "triangles": 68,
+    "draws": 8,
+    "critical": false,
+    "dependencies": []
+  },
+  {
+    "name": "world/geometry/rest-hover-0.glb",
+    "path": "blobs/glb/ff13b7fe71e5b3f4f371117b01042870f1854e65c3389bcba049282af54d290f.glb",
+    "kind": "glb",
+    "hash": "ff13b7fe71e5b3f4f371117b01042870f1854e65c3389bcba049282af54d290f",
+    "compressed": 21768,
+    "decoded": 21740,
+    "gpu": 9896,
+    "triangles": 156,
+    "draws": 18,
+    "critical": false,
+    "dependencies": []
+  },
+  {
+    "name": "world/geometry/rest-hover-1.glb",
+    "path": "blobs/glb/87ead1ed570a6d979772339f49f534c29b89fe74c47621372f8ca181553eb71c.glb",
+    "kind": "glb",
+    "hash": "87ead1ed570a6d979772339f49f534c29b89fe74c47621372f8ca181553eb71c",
+    "compressed": 21764,
+    "decoded": 21736,
+    "gpu": 9896,
+    "triangles": 156,
+    "draws": 18,
+    "critical": false,
+    "dependencies": []
+  },
+  {
+    "name": "world/geometry/rest-hover-2.glb",
+    "path": "blobs/glb/fca144c2bebcf604855dd842d4be38769dfeaf3f69b51a5f049f3d3f3c945241.glb",
+    "kind": "glb",
+    "hash": "fca144c2bebcf604855dd842d4be38769dfeaf3f69b51a5f049f3d3f3c945241",
+    "compressed": 21756,
+    "decoded": 21728,
+    "gpu": 9896,
+    "triangles": 156,
+    "draws": 18,
+    "critical": false,
+    "dependencies": []
+  },
+  {
+    "name": "world/geometry/rest-storm.glb",
+    "path": "blobs/glb/fc828ac38a91fd74abbe6fc63f823096e42744d9ed0d0fc057d74c73c3a5ec32.glb",
+    "kind": "glb",
+    "hash": "fc828ac38a91fd74abbe6fc63f823096e42744d9ed0d0fc057d74c73c3a5ec32",
+    "compressed": 43108,
+    "decoded": 43080,
+    "gpu": 40816,
+    "triangles": 1548,
+    "draws": 4,
+    "critical": false,
+    "dependencies": []
+  },
+  {
+    "name": "world/geometry/rest-books.glb",
+    "path": "blobs/glb/609bb5060b4d6ec2a95268dd7800ea1b89275525e6d637cf7b96250c70372e62.glb",
+    "kind": "glb",
+    "hash": "609bb5060b4d6ec2a95268dd7800ea1b89275525e6d637cf7b96250c70372e62",
+    "compressed": 6224,
+    "decoded": 6196,
+    "gpu": 4752,
+    "triangles": 168,
+    "draws": 2,
+    "critical": false,
+    "dependencies": []
+  },
+  {
+    "name": "world/geometry/rest-islets.glb",
+    "path": "blobs/glb/3c18959354dfbd48b6faa7f68d5a4072b88e2b4c2133084b9cee8e07f6c1f048.glb",
+    "kind": "glb",
+    "hash": "3c18959354dfbd48b6faa7f68d5a4072b88e2b4c2133084b9cee8e07f6c1f048",
+    "compressed": 12956,
+    "decoded": 12928,
+    "gpu": 5312,
+    "triangles": 96,
+    "draws": 12,
+    "critical": false,
+    "dependencies": []
+  }
+]

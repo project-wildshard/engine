@@ -1,0 +1,15 @@
+{
+  "ask": "E435",
+  "approvedBy": "wildshard-new",
+  "approval": "Approved 2026-10-08: the +686,480 buffer-byte delta is intended G224 deck-portal content, from 599924369, 5ec641579 and 82bd665cf. Re-record Nine desktop gpuMB at the measured value through budget-ceilings.mjs --accept; no margin, timeout, frame target or device memory cap change.",
+  "entries": [
+    {
+      "shard": "nine-dragon-stack",
+      "tier": "desktop",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/nine-dragon-stack-g224.desktop.json",
+      "commit": "bfb9dc325d08792ddbe88bd08c78fcf288da8851",
+      "reason": "G224 deck portals and the G200 carved arrival cap (599924369, 5ec641579, 82bd665cf): +686,480 buffer bytes, textures/renderbuffers unchanged; all three runs identical, clean boot and zero stuck. The pre-acceptance record was refused solely by these four GL-byte ceilings."
+    }
+  ]
+}

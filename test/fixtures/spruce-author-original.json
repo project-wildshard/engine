@@ -1,0 +1,966 @@
+[
+  {
+    "height": 15,
+    "trunkRadius": 0.42,
+    "parts": [
+      {
+        "name": "trunk",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "6c981dc48c26426c81bd9b4ff9c59b166092c122d6f6311a9759d1ab2517f430"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "383b12cceefaf1d41f08a2131f35dff2e68758d147da614a98e585b2133c8799"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "9dc2a5afd8669c2b6da4c326441606a40cb10d5e4f823cd87fc5ce40e4e32e67"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 420,
+            "hash": "1cb2e935caa3f8a5a227c2579f10fd077980ef1d61d15d379be0da45f7a68617"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 5.690084349682832,
+          "center": [
+            0.03223958611488342,
+            5.150000095367432,
+            -0.00006720423698425293
+          ]
+        }
+      },
+      {
+        "name": "cardsHi",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 10428,
+            "hash": "8371bf310999305055b8d53c5abe20bc9e97cc8aa3be600772cc109cb43e35a7"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 10428,
+            "hash": "3ec502231bac7c62d032ef1e61d09c2ad1a50265f18d832753c4b0962697eb88"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 10428,
+            "hash": "2b01fd7604c4f57a58dc58600417de1034a8069dfb3150ae240f2359aa2581ad"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 6936,
+            "hash": "b99d8610d3955b42bd28c13d00ef228f60efd454e7c46cc34f99adea5cfc9fcf"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 7.827278063374638,
+          "center": [
+            -0.07032585144042969,
+            7.479219157248735,
+            0.0557856559753418
+          ]
+        }
+      },
+      {
+        "name": "cardsLo",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3132,
+            "hash": "58245572c3745222a010eb42acc77985940967f322dbef3a3a239f86a51733c0"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3132,
+            "hash": "74ec1cf3aa2181d0827554e7d64bcd31cfc8a52bf9655251ac4cab431d9d274a"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3132,
+            "hash": "7c7e3a2ea59057cb7b5d3dcb929c3819a8f3de780a1486ee1916b548cf14370c"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 1560,
+            "hash": "9b09e7532330b2e4d40f0961483e2ff84c52323ae51c7af5f855e12524337db0"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 8.010424728564725,
+          "center": [
+            -0.013238370418548584,
+            7.25044783949852,
+            -0.01551508903503418
+          ]
+        }
+      },
+      {
+        "name": "twigs",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 4752,
+            "hash": "bacefee8f31b562fb387d066b3aac9dd407d7797476d5884e278f80a96b9ea76"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 4752,
+            "hash": "4e0087b8a6ee0084dc84d570e2f0df033dc9b247c6a625c398212522a5aa2427"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 4752,
+            "hash": "beb79d61351de5d3e1be90732f284f9d8508b71ad40daee9fb28414eb7d61a70"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 792,
+            "hash": "c40f36019b0cc83b57d01a2999f2467c7495cdaab2dd1d6da259114ae7c4b6f0"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 6.420510521795106,
+          "center": [
+            0.05005693435668945,
+            7.418251931667328,
+            0.08698016405105591
+          ]
+        }
+      },
+      {
+        "name": "far",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "6f99ed6f0a08969fee6edc1763df7b7f6160a367c03771a250fe8dcf875ba8a9"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "e4db1141ce82c03ef8addb1e0680f164b9c2b67b142647a2149d553f16329e4c"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "b333f3b6e041a5663aca870cf6b3cbe626f2eb611cedf4b114c178557fde8080"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 600,
+            "hash": "7a006b1657634cced334e7c55134f9da711bc3152c25d4a341b4caeadedb8415"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 8.477723939050497,
+          "center": [
+            0.12233889102935791,
+            6.748926877975464,
+            -0.07772153615951538
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "height": 12.5,
+    "trunkRadius": 0.34,
+    "parts": [
+      {
+        "name": "trunk",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "c308775eade2097a456562a9f259e27ddf326e416fd159cfc2bbe797afea0efe"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "383b12cceefaf1d41f08a2131f35dff2e68758d147da614a98e585b2133c8799"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "9dc2a5afd8669c2b6da4c326441606a40cb10d5e4f823cd87fc5ce40e4e32e67"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 420,
+            "hash": "1cb2e935caa3f8a5a227c2579f10fd077980ef1d61d15d379be0da45f7a68617"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 4.782675451586849,
+          "center": [
+            0.026681765913963318,
+            4.25,
+            -0.0002574920654296875
+          ]
+        }
+      },
+      {
+        "name": "cardsHi",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 8700,
+            "hash": "1530ac81979e5d0eb8babedf4fd13905e6a12514c16c2580e3456a623de66fbb"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 8700,
+            "hash": "bc1d6a2e68f68a6c8648b8a17020131d487e6da53db1973aaa4ce8f8e04c6c27"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 8700,
+            "hash": "3abfa2bb01940897c438c446f1cf1a4ef6a80496c9333f0b5856c22a31ab9bba"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 5784,
+            "hash": "5f447011014b77f0e4abc9cd3287d4243301ccb3127775dd2f887d87fc05ca13"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 6.716294108257332,
+          "center": [
+            -0.030721962451934814,
+            5.981725454330444,
+            -0.007039070129394531
+          ]
+        }
+      },
+      {
+        "name": "cardsLo",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 2748,
+            "hash": "f3fbf481ae3178afeb38b8ddaa3ed427bcad8edbbd482cb3e1cdcf56f87f918f"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 2748,
+            "hash": "16cbeeed6ff8df79572f9ecd2fb6d4c55560410304210ce244873394971b991c"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 2748,
+            "hash": "be1e9c0add9fef6e99083d85bcebc849fe197fc60ba976500eadc109aeae1b6e"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 1368,
+            "hash": "169cc3e09d2f94022ffd2a3c940ee053a62d06d045bcec03a1fdd85f6277cd42"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 6.8839187193199365,
+          "center": [
+            -0.050638794898986816,
+            5.786469757556915,
+            -0.013050734996795654
+          ]
+        }
+      },
+      {
+        "name": "twigs",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3888,
+            "hash": "867be91c77d5683f384bd7fc978e373b9142784c6fec6dbac3fcce9fb4a7383b"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3888,
+            "hash": "2daf08514573cc012fafbc6a21b2b2ecc2d71377ecd3ea492e3074d1338244de"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3888,
+            "hash": "f71b73f81d4f225159bf6fe4a6e6ea4ea22abdb064d3ccfa073e772ae02b3e3c"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 648,
+            "hash": "6747bca6dca12bd223e23d503c7324c25876a6374d5ae1adea168c8b45460329"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 5.316883167689072,
+          "center": [
+            0.059672653675079346,
+            6.098708987236023,
+            -0.0002143383026123047
+          ]
+        }
+      },
+      {
+        "name": "far",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "32666dc475cbead544255462f1897d4f2d502ac74f4b9a49f8712cdf73bf1436"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "eb8ff51b1b0d8d7808720f4b006c33bb17f63d9820418912375bbfe95ed0b43a"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "b333f3b6e041a5663aca870cf6b3cbe626f2eb611cedf4b114c178557fde8080"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 600,
+            "hash": "5f67ccfb7d6b2ac5efc080ee98c4e2dd2c9d32d9f02575528339ef1219080472"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 7.166472677004592,
+          "center": [
+            0.014144062995910645,
+            5.461518883705139,
+            -0.03267878293991089
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "height": 18.5,
+    "trunkRadius": 0.5,
+    "parts": [
+      {
+        "name": "trunk",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "6766fe180b6fd7dcfe381b128139e27f591b1b1b865317e6837a6d9a51106f5e"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "383b12cceefaf1d41f08a2131f35dff2e68758d147da614a98e585b2133c8799"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "9dc2a5afd8669c2b6da4c326441606a40cb10d5e4f823cd87fc5ce40e4e32e67"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 420,
+            "hash": "1cb2e935caa3f8a5a227c2579f10fd077980ef1d61d15d379be0da45f7a68617"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 6.954942641169144,
+          "center": [
+            0.03720080852508545,
+            6.409999847412109,
+            -0.00011166930198669434
+          ]
+        }
+      },
+      {
+        "name": "cardsHi",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 12156,
+            "hash": "d276c5e36f5071964762775569de40ce078e25c42196a3d31aba0e5eb5c32ebf"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 12156,
+            "hash": "9507b8694b7652c9c69176bc43003bedf76db7cfb4428b29a4469e99999b7f19"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 12156,
+            "hash": "fd7f6026b3711e5edfda1512065a5522611083a4120a64873640877d481deb68"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 8088,
+            "hash": "c601f0bfba14fd00a41bc6f0d62ee970cee15d929e504f0d00bd985ad9a4b63e"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 9.729483128178737,
+          "center": [
+            -0.09779024124145508,
+            9.248262817971408,
+            -0.008455753326416016
+          ]
+        }
+      },
+      {
+        "name": "cardsLo",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3900,
+            "hash": "f6a4e621639e2c40093ae8c9ce4bb926582d8af173ed8a49205581c26004f788"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3900,
+            "hash": "a542e6818f9d7dc87365ef6a1ed823a8dcc2462a55394ad472289505a0da4915"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3900,
+            "hash": "cd900e744f2cd61877d2d6b89a3cdad728743d18dc572ae9add568f6042a64bd"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 1944,
+            "hash": "ca252ff7fae2be6405198480286c8735004629a9be6579716fad3954fab64bfd"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 9.839515766120664,
+          "center": [
+            -0.03997492790222168,
+            9.074188575148582,
+            0.046102166175842285
+          ]
+        }
+      },
+      {
+        "name": "twigs",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 5616,
+            "hash": "d8f0a7e555d4686a3df5723e7a5552e9fa3ef9f5f748072fb8bcca5041ccc9f9"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 5616,
+            "hash": "9e3b03a1719d569bd844cd29ef53dfc46e2526bcaece3b522f3fcbaebe1b7158"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 5616,
+            "hash": "38c149f7922d7c23aaba4fc82e96edc7697ca1256b9af3feb250245be4343fee"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 936,
+            "hash": "b9254706b3ae0aca48ff2b308f415fda4fcd8335f3c6abbce29b03de10473918"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 8.040228160507464,
+          "center": [
+            -0.05899977684020996,
+            9.11573439836502,
+            -0.09571325778961182
+          ]
+        }
+      },
+      {
+        "name": "far",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "2e44f346404de406dafe54e6660674d92a5caabb537177cf6f155040a7d08edf"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "d1fa2d11426a47edd8fd0790d542bce902f62aaf35f360074372e41cefcb7b0a"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "bf84c85d516412ec442db0cf987312f0cb3a500cd311cb74e4c8d0b72f0159d3"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 600,
+            "hash": "1b165b786f848a92f4b95090ad9de900c6aa0e9aeeba15b3e75da4a74d9a9822"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 10.58670281258316,
+          "center": [
+            -0.020588040351867676,
+            8.237117409706116,
+            -0.17491579055786133
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "height": 10.5,
+    "trunkRadius": 0.27,
+    "parts": [
+      {
+        "name": "trunk",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "022655b226907cc2b412080ad0d6efb35ab496f4e35d36f19788303f779dba70"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "383b12cceefaf1d41f08a2131f35dff2e68758d147da614a98e585b2133c8799"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "9dc2a5afd8669c2b6da4c326441606a40cb10d5e4f823cd87fc5ce40e4e32e67"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 420,
+            "hash": "1cb2e935caa3f8a5a227c2579f10fd077980ef1d61d15d379be0da45f7a68617"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 4.055728616161179,
+          "center": [
+            0.021430611610412598,
+            3.5299999713897705,
+            0.0005284398794174194
+          ]
+        }
+      },
+      {
+        "name": "cardsHi",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 6972,
+            "hash": "5188ffabe786bfac6ae8810e722f6aae9c724334e38c92fc2eb2ca7246c3f0a7"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 6972,
+            "hash": "7e9e3d6d9cf57e9bfad6de53f20513ffd53363e9ddb930273f8549947336e8c8"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 6972,
+            "hash": "c6b27688b0b03c457c1c016e067b53c9b5b7ddaf5712794c0da10446da95ba67"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 4632,
+            "hash": "e4dc9dad7e0a40cb9d53fb831e13bea7c224cb36e10a6b93b1e3f49ab3b0ff04"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 5.770998624569524,
+          "center": [
+            -0.017319023609161377,
+            4.924482494592667,
+            0.02878272533416748
+          ]
+        }
+      },
+      {
+        "name": "cardsLo",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 2364,
+            "hash": "6074bb9b14e9b12fc2b0a0710ff182d6bd744e7d83d6d90d572c18dc4242dc06"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 2364,
+            "hash": "612dd6065739fe9c37786ec5c410bf2008f2a42e83992d95678e1b33c03d81b4"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 2364,
+            "hash": "b51622a9c61926c78e18ee2174cffe1855f88639e5619aed5d3b7dc8b1b4fae8"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 1176,
+            "hash": "d36489b045e5cc87e3d9942a5790fc765b500f8e090f1ae176b7d4b35187048f"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 5.867372655872559,
+          "center": [
+            -0.05175495147705078,
+            4.8560366332530975,
+            -0.0009213685989379883
+          ]
+        }
+      },
+      {
+        "name": "twigs",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3024,
+            "hash": "8f9a258aac2829bb852bf9c9349af3490b8208ff7fa420e40d340b8539f945bf"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3024,
+            "hash": "5288f8b1cc30c9873088193e8d43e94305e59987b161822d2b95019a4a5b5714"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 3024,
+            "hash": "69fcad68652650be795d45fd73664c2ba7abb1f045a083b4ced8a8ec5f9d85b5"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 504,
+            "hash": "c6be544ee8fc1ceb49770423dbeae5267e63d8747a9480b0fc793fa7d3738504"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 4.449368341333861,
+          "center": [
+            0.022050023078918457,
+            5.121368378400803,
+            0.0746963620185852
+          ]
+        }
+      },
+      {
+        "name": "far",
+        "channels": [
+          {
+            "name": "position",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "afc87a2799bb97be48249d2a3a5d6973c19e442565cc37cc2fc0df745d3dff4e"
+          },
+          {
+            "name": "normal",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "c99d5e277d051de2c36f071998130c36f62bac0cae4117f244ae562b0320fca6"
+          },
+          {
+            "name": "color",
+            "storage": "Float32Array",
+            "width": 3,
+            "normalized": false,
+            "bytes": 1212,
+            "hash": "9575a1c6f3e96f48988824456a9e2a76fed5b083ca2164c1acbed60e2c6fc16c"
+          },
+          {
+            "name": "index",
+            "storage": "Uint16Array",
+            "width": 1,
+            "normalized": false,
+            "bytes": 600,
+            "hash": "73be6dd26c37a20dfa353e607425bb6cff07b3852ebe694a16e349a59b168a0e"
+          }
+        ],
+        "groups": [],
+        "box": null,
+        "sphere": {
+          "radius": 6.110005224242939,
+          "center": [
+            -0.16153621673583984,
+            4.567626059055328,
+            -0.010536432266235352
+          ]
+        }
+      }
+    ]
+  }
+]

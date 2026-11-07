@@ -1,0 +1,16 @@
+{
+  "about": "Per-shard ceilings on runtime/ source files (lint/runtime-files.mjs). Shrink-only: lower a ceiling as files leave runtime/; a rise needs a new raises line {slug, from, to, why}. Any slug without a line keeps the 128 default.",
+  "ceilings": {
+    "driftwood-isle": 128,
+    "pine-hollow": 148
+  },
+  "default": 128,
+  "raises": [
+    {
+      "from": 128,
+      "slug": "pine-hollow",
+      "to": 152,
+      "why": "W2 seed (coordinator, 2026-10-16, flagged for Jake): 127 today (126 + runtime/sections.ts) plus the 25 client files of progress/shard-platform/w2a-o268/README.md still to move under G450 (5)"
+    }
+  ]
+}

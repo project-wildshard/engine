@@ -1,0 +1,521 @@
+{
+  "cameras": {
+    "nine-dragon-stack": [
+      {
+        "name": "A",
+        "eye": [
+          0.950004729836986,
+          126.69806522398707,
+          7.4999955023143645
+        ],
+        "yaw": 12,
+        "pitch": -4,
+        "feet": [
+          0.95,
+          125,
+          7.5
+        ],
+        "probe": {
+          "name": "spawn-rail",
+          "x": 0.95,
+          "z": 7.5,
+          "y": 125,
+          "yaw": -0.20943951023931953,
+          "pitch": -0.06981317007977318
+        },
+        "fov": 93.01050490332493,
+        "kind": "co6",
+        "poi": "CO6 camera A",
+        "n": 1
+      },
+      {
+        "name": "B",
+        "eye": [
+          -19.499991189112542,
+          126.69816442907766,
+          13.300006819476216
+        ],
+        "yaw": 0,
+        "pitch": -10,
+        "feet": [
+          -19.5,
+          125,
+          13.3
+        ],
+        "probe": {
+          "name": "well-edge",
+          "x": -19.5,
+          "z": 13.3,
+          "y": 125,
+          "yaw": 0,
+          "pitch": -0.17453292519943295
+        },
+        "fov": 93.01050490332493,
+        "kind": "co6",
+        "poi": "CO6 camera B",
+        "n": 2
+      },
+      {
+        "name": "C",
+        "eye": [
+          17.999994369902154,
+          126.69815132197739,
+          5.999998530408312
+        ],
+        "yaw": 90,
+        "pitch": 10,
+        "feet": [
+          18,
+          125,
+          6
+        ],
+        "probe": {
+          "name": "stair-street",
+          "x": 18,
+          "z": 6,
+          "y": 125,
+          "yaw": -1.5707963267948966,
+          "pitch": 0.17453292519943295
+        },
+        "fov": 93.01050490332493,
+        "kind": "co6",
+        "poi": "CO6 camera C",
+        "n": 3
+      },
+      {
+        "name": "D",
+        "eye": [
+          17.999990309349702,
+          126.6979492065911,
+          6.000016728316629
+        ],
+        "yaw": 0,
+        "pitch": 0,
+        "fov": 93.01050490332493,
+        "kind": "co6",
+        "poi": "CO6 camera D",
+        "n": 4
+      },
+      {
+        "name": "lantern-square",
+        "kind": "poi",
+        "poi": "Lantern square (manifest poi)",
+        "probe": {
+          "x": 11,
+          "z": 12,
+          "yaw": 0.0,
+          "pitch": 0.10472,
+          "y": 125
+        },
+        "yaw": 0,
+        "pitch": 6,
+        "fov": 93.01050490332493,
+        "n": 5,
+        "eye": [
+          11.0,
+          126.699,
+          12.0
+        ]
+      },
+      {
+        "name": "night-market",
+        "kind": "poi",
+        "poi": "Night market (manifest poi)",
+        "probe": {
+          "x": 14,
+          "z": -12,
+          "yaw": -0.785398,
+          "pitch": 0.0,
+          "y": 125
+        },
+        "yaw": 45,
+        "pitch": 0,
+        "fov": 93.01050490332493,
+        "n": 6,
+        "eye": [
+          14.0,
+          126.7,
+          -12.0
+        ]
+      },
+      {
+        "name": "stair-mid",
+        "kind": "poi",
+        "poi": "Stair-street (manifest poi), part way up",
+        "probe": {
+          "x": 36,
+          "z": 6,
+          "yaw": -1.570796,
+          "pitch": 0.20944,
+          "y": 131
+        },
+        "yaw": 90,
+        "pitch": 12,
+        "fov": 93.01050490332493,
+        "n": 7,
+        "eye": [
+          36.0,
+          133.7,
+          6.0
+        ]
+      },
+      {
+        "name": "stair-down",
+        "kind": "poi",
+        "poi": "Stair-street looking back down to the square",
+        "probe": {
+          "x": 46,
+          "z": 6,
+          "yaw": -4.712389,
+          "pitch": -0.174533,
+          "y": 139
+        },
+        "yaw": 270,
+        "pitch": -10,
+        "fov": 93.01050490332493,
+        "n": 8,
+        "eye": [
+          46.0,
+          137.546,
+          6.0
+        ]
+      },
+      {
+        "name": "well-rim",
+        "kind": "poi",
+        "poi": "The well rim (manifest poi), looking west over the well",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": -4.712389,
+          "pitch": -0.244346,
+          "y": 125
+        },
+        "yaw": 270,
+        "pitch": -14,
+        "fov": 93.01050490332493,
+        "n": 9,
+        "eye": [
+          3.0,
+          126.7,
+          -14.0
+        ]
+      },
+      {
+        "name": "well-north",
+        "kind": "poi",
+        "poi": "Over the well rim, looking north-west down the canyon (free camera)",
+        "probe": {
+          "x": 3,
+          "z": -20,
+          "yaw": -5.497787,
+          "pitch": -0.174533,
+          "y": 125
+        },
+        "yaw": 315,
+        "pitch": -10,
+        "eye": [
+          -2,
+          126.7,
+          -24
+        ],
+        "fov": 93.01050490332493,
+        "n": 10
+      },
+      {
+        "name": "portal-north-deck",
+        "kind": "poi",
+        "poi": "Road portal deck, north (manifest poi; free camera at road height)",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": -3.141593,
+          "pitch": 0.139626,
+          "y": 0
+        },
+        "yaw": 180,
+        "pitch": 8,
+        "eye": [
+          0,
+          3,
+          220
+        ],
+        "fov": 93.01050490332493,
+        "n": 11
+      },
+      {
+        "name": "portal-south-deck",
+        "kind": "poi",
+        "poi": "Road portal deck, south (manifest poi; free camera at road height)",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": 0.0,
+          "pitch": 0.139626,
+          "y": 0
+        },
+        "yaw": 0,
+        "pitch": 8,
+        "eye": [
+          0,
+          3,
+          -220
+        ],
+        "fov": 93.01050490332493,
+        "n": 12
+      },
+      {
+        "name": "square-west",
+        "kind": "grid",
+        "poi": "Square west edge looking north-west",
+        "probe": {
+          "x": 4,
+          "z": -4,
+          "yaw": -5.235988,
+          "pitch": 0.0,
+          "y": 125
+        },
+        "yaw": 300,
+        "pitch": 0,
+        "fov": 93.01050490332493,
+        "n": 13,
+        "eye": [
+          4.0,
+          126.7,
+          -4.0
+        ]
+      },
+      {
+        "name": "square-south",
+        "kind": "grid",
+        "poi": "Square south edge looking north-west to the well",
+        "probe": {
+          "x": 16,
+          "z": 14,
+          "yaw": -5.497787,
+          "pitch": 0.0,
+          "y": 125
+        },
+        "yaw": 315,
+        "pitch": 0,
+        "fov": 93.01050490332493,
+        "n": 14,
+        "eye": [
+          16.0,
+          126.698,
+          14.0
+        ]
+      },
+      {
+        "name": "market-east",
+        "kind": "grid",
+        "poi": "Night market looking west to the well",
+        "probe": {
+          "x": 20,
+          "z": -20,
+          "yaw": -4.712389,
+          "pitch": 0.0,
+          "y": 125
+        },
+        "yaw": 270,
+        "pitch": 0,
+        "fov": 93.01050490332493,
+        "n": 15,
+        "eye": [
+          20.0,
+          127.7,
+          -20.0
+        ]
+      },
+      {
+        "name": "stack-north",
+        "kind": "grid",
+        "poi": "North edge of the square looking north",
+        "probe": {
+          "x": 18,
+          "z": -24,
+          "yaw": 0.0,
+          "pitch": 0.069813,
+          "y": 125
+        },
+        "yaw": 0,
+        "pitch": 4,
+        "fov": 93.01050490332493,
+        "n": 16,
+        "eye": [
+          18.0,
+          127.7,
+          -24.0
+        ]
+      },
+      {
+        "name": "portal-east-deck",
+        "kind": "grid",
+        "poi": "East road portal deck looking at the stack (free camera)",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": -4.712389,
+          "pitch": 0.139626,
+          "y": 0
+        },
+        "yaw": 270,
+        "pitch": 8,
+        "eye": [
+          220,
+          3,
+          0
+        ],
+        "fov": 93.01050490332493,
+        "n": 17
+      },
+      {
+        "name": "portal-west-deck",
+        "kind": "grid",
+        "poi": "West road portal deck looking at the stack (free camera)",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": -1.570796,
+          "pitch": 0.139626,
+          "y": 0
+        },
+        "yaw": 90,
+        "pitch": 8,
+        "eye": [
+          -220,
+          3,
+          0
+        ],
+        "fov": 93.01050490332493,
+        "n": 18
+      },
+      {
+        "name": "east-street",
+        "kind": "grid",
+        "poi": "Top of the stair-street looking east",
+        "probe": {
+          "x": 50,
+          "z": 6,
+          "yaw": -1.570796,
+          "pitch": 0.10472,
+          "y": 143
+        },
+        "yaw": 90,
+        "pitch": 6,
+        "fov": 93.01050490332493,
+        "n": 19,
+        "eye": [
+          50.0,
+          139.65,
+          6
+        ]
+      },
+      {
+        "name": "well-floor",
+        "kind": "grid",
+        "poi": "Inside the well, looking north up the canyon (free camera)",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "y": 105
+        },
+        "yaw": 0,
+        "pitch": 0,
+        "eye": [
+          -14,
+          110,
+          -30
+        ],
+        "fov": 93.01050490332493,
+        "n": 20
+      },
+      {
+        "name": "aerial-south",
+        "kind": "aerial",
+        "poi": "the whole shard from hover height",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": 0.0,
+          "pitch": -0.436332,
+          "y": 125
+        },
+        "yaw": 0,
+        "pitch": -25,
+        "eye": [
+          10,
+          200,
+          120
+        ],
+        "fov": 93.01050490332493,
+        "n": 21
+      },
+      {
+        "name": "aerial-west",
+        "kind": "aerial",
+        "poi": "the whole stack from above, south-east (free camera)",
+        "probe": {
+          "x": 3,
+          "z": -14,
+          "yaw": -5.759587,
+          "pitch": -0.610865,
+          "y": 125
+        },
+        "yaw": 330,
+        "pitch": -35,
+        "eye": [
+          40,
+          230,
+          140
+        ],
+        "fov": 93.01050490332493,
+        "n": 22
+      },
+      {
+        "name": "hands-down",
+        "kind": "hands",
+        "poi": "hands and held item, first-person close-up",
+        "probe": {
+          "x": 0.95,
+          "z": 7.5,
+          "yaw": -0.20944,
+          "pitch": -0.558505,
+          "y": 125
+        },
+        "yaw": 12,
+        "pitch": -32,
+        "fov": 93.01050490332493,
+        "n": 23,
+        "eye": [
+          0.95,
+          126.7,
+          7.5
+        ]
+      },
+      {
+        "name": "hands-up",
+        "kind": "hands",
+        "poi": "hands and held item, first-person close-up",
+        "probe": {
+          "x": 18,
+          "z": 6,
+          "yaw": -1.570796,
+          "pitch": 0.244346,
+          "y": 125
+        },
+        "yaw": 90,
+        "pitch": 14,
+        "fov": 93.01050490332493,
+        "n": 24,
+        "eye": [
+          18.0,
+          126.7,
+          6.0
+        ]
+      }
+    ]
+  }
+}

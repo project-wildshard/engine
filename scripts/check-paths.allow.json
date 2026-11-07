@@ -1,0 +1,1312 @@
+[
+  {
+    "path": "../../../../budgets/calibration.json",
+    "file": "src/client/engine/render/budgetReport.ts",
+    "why": "E357 S1.6 optional current calibration: Vite returns an empty glob until a thermally stable run publishes it; reports explicitly state the missing calibration and retain F2 ceilings."
+  },
+  {
+    "path": "../../../../budgets/calibration.json",
+    "file": "src/client/engine/render/tierBoot.ts",
+    "why": "E357 X7 optional current calibration (same as budgetReport.ts): until a stable run publishes it, tier selection uses the DESKTOP_REFERENCE floor; the glob is empty, not an error."
+  },
+  {
+    "path": "test/parity/baselines",
+    "file": "scripts/budget-ceilings.mjs",
+    "why": "F2 recording creates this input directory; the importer fails explicitly if a requested recording lane has not landed yet."
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/gpu-gate/matrix.mjs",
+    "why": "Git ls-tree pathspec prefix on the target commit; the fallback handles commits before F6 creates this folder."
+  },
+  {
+    "path": "test/parity/baselines",
+    "file": "scripts/parity/record.mjs",
+    "why": "Output directory created recursively by writeBaseline; the first recording creates it, so it need not exist beforehand."
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/parity.mjs",
+    "why": "Registry folder is introduced by F6; the harness uses the four current slugs until manifests exist."
+  },
+  {
+    "path": "test/parity/quarantine.json",
+    "file": "scripts/parity.mjs",
+    "why": "Optional quarantine input; a missing file deliberately reads as [] (03 section12)."
+  },
+  {
+    "path": "test/parity/renames",
+    "file": "scripts/parity.mjs",
+    "why": "Optional rename-map directory, created by the first rename row; no maps means unchanged comparison."
+  },
+  {
+    "path": "test/parity/baselines",
+    "file": "scripts/parity.mjs",
+    "why": "Recording output folder created recursively at the first baseline record."
+  },
+  {
+    "path": "test/parity/baselines/",
+    "file": "scripts/parity.mjs",
+    "why": "History pathspec prefix; baselines are created by the first recording."
+  },
+  {
+    "path": "test/parity/baselines/gh-macos15",
+    "file": "scripts/parity.mjs",
+    "why": "Runner baseline output folder; absent before the first runner bootstrap artifact."
+  },
+  {
+    "path": "src/shards/sample/down.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/up.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/relative.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/internal.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/shards/sample/cross.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/dynamic.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/words.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/comment.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/boundary.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/template.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/ident.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/slug.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/open.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/weapon.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/structures.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/active.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/level.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/literal.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/switch.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/url.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/dedup.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/members.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/all-a.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/shards/sample/plugin.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/save.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/saves/storage.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/native/storage.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/random.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/computed.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/input.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/resize.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/input/listeners.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/render.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/render/type.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/ai/math.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/ai/mesh.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/ai/runtime.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/combat/dom.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/saves/local.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/combat/view/mesh.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/ai/view/mesh.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/write.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/ui/nested.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/combat/qualified.ts",
+    "file": "test/fixtures/lint/cases.json",
+    "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/shared/engine/saves/store.ts",
+    "file": "scripts/deploy-pin.mjs",
+    "why": "E357 F6m: git show path on an historical commit; intentionally absent until F10."
+  },
+  {
+    "path": "src/shards/${shard}",
+    "file": "scripts/parity.mjs",
+    "why": "E357 F6m: git diff pathspec template for destination shards."
+  },
+  {
+    "path": "shared (src/world, src/player, src/entities, …)",
+    "file": "scripts/check-models.mjs",
+    "why": "E357 F6m: human-readable report area label, not three repository paths; the actual model folder rules remain manual F6 edits."
+  },
+  {
+    "path": "src/kit/weapons/firearm/Rifle.ts",
+    "file": "scripts/shard-coupling.mjs",
+    "why": "E435 SF54 / G140 immutable transfer provenance: the deleted kit source must remain absent; the coupling guard refuses a surviving copy and checks the relocated runtime/weapons/Rifle.ts class. This is a historical identifier, never a module or asset read."
+  },
+  {
+    "path": "src/shards/nalati-grasslands/weapons/Rifle.ts",
+    "file": "scripts/shard-coupling.mjs",
+    "why": "E435 SF54 / G140 immutable bootstrap identity for the reviewed Rifle transfer; its current destination is src/shards/nalati-grasslands/runtime/weapons/Rifle.ts. Historical keys cannot change or grow under the shrink-only comparator."
+  },
+  {
+    "path": "src/shards/nalati-grasslands/runtime/weapons/Rifle.ts",
+    "file": "scripts/shard-coupling.mjs",
+    "why": "Immutable reviewed weapon transfer bootstrap; the transfer list is empty and its historical destination is retired. The shrink-only comparator still checks any restored transfer against this identity."
+  },
+  {
+    "path": "src/engine/models/glbNodes.ts",
+    "file": "scripts/platform-chargebacks.mjs",
+    "why": "G520 retired-module identity: an exact comparison prevents an obsolete pending-user ledger row from earning credit. This selector deliberately names the deleted host; no file is loaded."
+  },
+  {
+    "path": "src/game/shardfile/buildingAssembly.ts",
+    "file": "scripts/platform-chargebacks.mjs",
+    "why": "G520 retired-module identity: an exact comparison prevents an obsolete pending-user ledger row from earning credit. This selector deliberately names the deleted host; no file is loaded."
+  },
+  {
+    "path": "src/engine/sim.ts",
+    "file": "test/sort-sides.test.ts",
+    "why": "J122: the pre-sort tree of the sort's own fixture; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/engine/core/config.ts",
+    "file": "test/sort-sides.test.ts",
+    "why": "J122: the pre-sort tree of the sort's own fixture; not a checkout path and must retain its spelling."
+  },
+  {
+    "path": "src/client/engine/explore/ModelExplorer.ts:src/engine/entities/species/",
+    "file": "scripts/sort-sides.mjs",
+    "why": "A reviewed-literal key: file and the pre-sort text it replaced"
+  },
+  {
+    "path": "src/engine/*/entities/species/",
+    "file": "scripts/sort-sides.mjs",
+    "why": "Display text the sort writes for a divided folder, not an opened path"
+  },
+  {
+    "path": "src/$1",
+    "file": "scripts/sort-sides.mjs",
+    "why": "Regex replacement in the compiler check"
+  },
+  {
+    "path": "src/**/*.tsx",
+    "file": "scripts/source-generators.mjs",
+    "why": "An input glob that may match nothing: a future .tsx must still invalidate"
+  },
+  {
+    "path": "src/shards/*/manifest.ts",
+    "file": "scripts/source-generators.mjs",
+    "why": "An input glob kept so a typed manifest would invalidate; all are .json today"
+  },
+  {
+    "path": "src/shards/driftwood-isle/assets/a9f1a2ef4650ab6bb7acbb197997e68bdb883a09206f99e66183d32cac731d0a",
+    "file": "scripts/storage-policy.json",
+    "why": "An exact storage pin for a blob, read by oid; the path need not exist at this tree"
+  },
+  {
+    "path": "src/server/host/dist/",
+    "file": "scripts/generated-source.mjs",
+    "why": "An output build-sdk.mjs wrote before P1-F4: a checkout may still hold it."
+  },
+  {
+    "path": "src/sharddev/dist/",
+    "file": "scripts/generated-source.mjs",
+    "why": "build-sdk.mjs's gitignored package output: the generated-source check names the folder to skip, so it exists only in a tree that built the SDK and never in a clean CI checkout."
+  },
+  {
+    "path": "src/server/game/population/pageGroups.ts",
+    "file": "test/platform-chargebacks.test.ts",
+    "why": "A retired path kept on purpose: this test feeds it as a synthetic module name, and it must stay unclaimed."
+  },
+  {
+    "path": "src/server/game/ambient/crowdPage.ts",
+    "file": "test/platform-chargebacks.test.ts",
+    "why": "A retired path kept on purpose: this test feeds it as a synthetic module name, and it must stay unclaimed."
+  },
+  {
+    "path": "src/server/game/population/pageGroups.ts",
+    "file": "test/shard-component-spans.test.ts",
+    "why": "A retired path kept on purpose: this test feeds it as a synthetic module name, and it must stay unclaimed."
+  },
+  {
+    "path": "src/shards/*/bake/**/*.mjs",
+    "file": ".oxlintrc.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/*/blender/**/*.mjs",
+    "file": ".oxlintrc.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/*/generators/**/*.mjs",
+    "file": ".oxlintrc.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/boot-dist-plan.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/budget-ceilings.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/build-app.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/built-product.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/check-closed-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/check-custom-sections-zero.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/client/app/shards.generated.ts",
+    "file": "scripts/check-graph.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/check-model-sources.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/bake/kinds.ts",
+    "file": "scripts/check-models.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/bake/glb.ts",
+    "file": "scripts/check-models.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/sceneGraph.ts",
+    "file": "scripts/check-models.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/*/blender/**/*.{mjs,py}",
+    "file": "scripts/check-paths.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/*/generators/**/*.mjs",
+    "file": "scripts/check-paths.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/check-shards.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/complete-at-control.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sdk",
+    "file": "scripts/game-plugins.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev",
+    "file": "scripts/game-plugins.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/game-plugins.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/game/package.json",
+    "file": "scripts/game-plugins.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/game",
+    "file": "scripts/game-plugins.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/manifest-declarations.test.ts",
+    "file": "scripts/gate-related-tests.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/gen-budget-derivations.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/gen-programs.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/gen-shard-words.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/generation-cache-prune.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/**/*.json",
+    "file": "scripts/json-declarations.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/**/*.d.json.ts",
+    "file": "scripts/json-declarations.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/",
+    "file": "scripts/json-declarations.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/",
+    "file": "scripts/listed-view-code.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/manifest-declarations.test.ts",
+    "file": "scripts/live-prepush.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sdk/",
+    "file": "scripts/live-prepush.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/",
+    "file": "scripts/live-prepush.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/schema-reference.test.ts",
+    "file": "scripts/live-prepush.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/manifest-declaration.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/manifest-static-imports.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/map-hash.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/manifest-declarations.test.ts",
+    "file": "scripts/precommit-jobs.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/tsconfig.test.json",
+    "file": "scripts/precommit-source.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/schema-reference.test.ts",
+    "file": "scripts/precommit-source.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/client/app/shards.generated.ts",
+    "file": "scripts/precommit-source.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/",
+    "file": "scripts/precommit-source.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/manifest-declarations.test.ts",
+    "file": "scripts/precommit-source.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/",
+    "file": "scripts/push_input_cache.py",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/record-fence-reads.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/crowds.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/phasedBoss.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/kit/bakedGeometry.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/kit/geometryPack.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/assets.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/buildBehaviour.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/questGraph.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/bake/texture.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/driftwood-isle/shard.config.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/bake/rig.ts",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/phasedBoss.ts#RoamingBossRow",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/interactions.ts#interactionRules",
+    "file": "scripts/shard-components.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/engine/",
+    "file": "scripts/shard-coupling.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/**/*.{ts,tsx}",
+    "file": "scripts/shard-coupling.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/shard-outputs.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/shard-platform.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/shard-headless.test.ts",
+    "file": "scripts/shard-platform.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/server/host/package.json",
+    "file": "scripts/shard-platform.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/",
+    "file": "scripts/shard-platform.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/shard-public.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/shard-runtime-closure.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards",
+    "file": "scripts/sim-in-runtime.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/",
+    "file": "scripts/sim-in-runtime.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/**/package.json",
+    "file": "scripts/source-generators.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/*/{data,boot}/*.json",
+    "file": "scripts/source-generators.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/*/manifest.json",
+    "file": "scripts/source-generators.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/*/outputs.json",
+    "file": "scripts/source-generators.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/client/app/shards.generated.ts",
+    "file": "scripts/source-generators.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/client/app/shards.generated.ts",
+    "file": "scripts/source-table-cache.mjs",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/driftwood-isle/assets/a3fca362de406d3063f6aff3083eb852967dfbb73afb7ff67daaaddaed262e3a",
+    "file": "scripts/storage-policy.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/blender-template/assets/world.glb",
+    "file": "scripts/storage-policy.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/sign-atlas-roads.bin",
+    "file": "scripts/storage-policy.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-message-rows.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/npc-figure-rows.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/product-in-look.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/authored-manifest.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quadruped-rig-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/ambient-flock-host.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/client-plan-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-night-emits.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/world-scenes-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-spear-pool.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-generation-order.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/boss-fight-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "src/sharddev/bake/whole-geometry-pacing.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/hybrid-product-rows.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/matriarch-borrowed-body.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-strike-assembly.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/shard-headless.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-npc-figure-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/scripts/nine-casts.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/scripts/nine-sign-atlas.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/painted-look-rows.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/population-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-step-runner.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-step-traces.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/held-equipment-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/held-loadout-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/collections-display.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/held-finishes-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/driftwood-sword-scene.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nine-cloth-bake.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/living-buildings-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/declared-audio-gameplay.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/elites-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/keyed-sky-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/streamed-cover-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/toon-look-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-quest-actions-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-crag-scenes.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/declared-input-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/driftwood-shore-boulders.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-prop-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/driftwood-foliage-scenes.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-catalogue-sites.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/page-life.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-building-owner.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/population-environment.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/explorer-catalogue.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/light-emitters.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/eased-weather-fields.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/signal-skirt-scene.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/look-regressions.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-kokpar.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-people-loader.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-camp-fallback.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-page-refs.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/scene-motion-refs.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/scene-buffers.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/native-runtime-plan.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/sampled-ambience.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-story.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/chapter-story.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-adventure-errors.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/shard-stands-alone.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-quest-content-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nine-look-graphs.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nine-architecture-graphs.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/practice-course-scene.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/riding-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/boss-arena-room.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/grapple-platform.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-layout-bake.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/template-map-generation.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/held-weapon-laws.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-riding-rules.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/audio-voice-patches.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/field-presentation.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-flock-view.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/mover-carry.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-quest-content-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/audio-authoring.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/registered-quest-catalogues.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/registered-native-population.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/driftwood-trail-layout.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/driftwood-mover-entry.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/driftwood-plan-rows.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-continuation-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/quest-page-composition.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-life-authoring.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-trade-catalogue.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/driftwood-product-reads.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-dressing-inputs.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-dressing-placement-program.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-dressing-source.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-native-dressing-reader.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-place-construction.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-places-program.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-dressing-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/audio-scene-binary.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-entry-construction.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-boss-fights.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/nalati-render-tiles.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/cue-director.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/pine-stag-walk.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/hybrid-entry-preparation.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/sdk-rigged-hull-files.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  },
+  {
+    "path": "test/chapter-director-product.test.ts",
+    "file": "scripts/test-products.json",
+    "why": "Left with sharddev or a shard at P3"
+  }
+]

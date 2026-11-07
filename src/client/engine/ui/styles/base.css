@@ -1,0 +1,89 @@
+/* ─── Wildshard UI base ─── dark glass, cyan accents, Rajdhani display / JetBrains Mono data ───
+   ONLY shared primitives live here: tokens, page resets, .ws-glass / .ws-label / .ws-mono / .ws-display /
+   .ws-wordmark / .ws-bar / .ws-progress and the keyframes. Everything else is sculpted per screen in a sibling file with
+   its own class prefix (game.css → ws-game-, menu.css → ws-menu-, …); scripts/check-css.mjs enforces it. */
+:root {
+  /* top edge of the HUD on phones: 6px from the top of the page. The page never runs under the status bar — not in the
+     Safari tab, and not as a home-screen PWA either since E58 dropped viewport-fit=cover (see index.html) — so the inset is
+     0 on phones; it stays in the formula for any device that still reports one. `html.standalone` (index.html) is set for
+     anything that needs to know the mode explicitly. */
+  --ws-top: calc(env(safe-area-inset-top, 0px) + 6px);
+  --ws-cyan: #8fe3ff;
+  --ws-cyan-dim: rgba(143, 227, 255, 0.55);
+  --ws-cyan-line: rgba(143, 227, 255, 0.35);
+  --ws-cyan-faint: rgba(143, 227, 255, 0.14);
+  --ws-glass: rgba(6, 10, 18, 0.55);
+  --ws-glass-deep: rgba(6, 10, 18, 0.78);
+  --ws-text: #e6f2f8;
+  --ws-text-dim: rgba(196, 220, 232, 0.6);
+  --ws-red: #ff5a4a;
+  --ws-amber: #ffb547;
+  --ws-display: 'Rajdhani', 'Bahnschrift', 'DIN Alternate', sans-serif;
+  --ws-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* overflow: clip, NOT hidden (E58): in an iOS home-screen web app drawn under the status bar, `overflow: hidden` on html /
+   body was one of the triggers that made WebKit shrink the viewport a status bar short (~62 px) a second after load — the
+   black strip under the control bar and the title (bisected in the iOS 26.5 simulator: hidden → 812 of 874 px, clip →
+   872). The boot loader's relayout triggered it too, so the real cure is index.html's viewport without viewport-fit=cover;
+   clip stays because it still keeps the page from ever scrolling without making it a scroll container. */
+html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #050810; touch-action: manipulation; overscroll-behavior: none; -webkit-text-size-adjust: 100%; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+/* #game and #hud are sized by --ws-vh (src/client/engine/core/viewport.ts: the real height — an iOS home-screen app reports 100vh / innerHeight
+   a status bar short and left a black strip over the home indicator, E46); fixed, so body's overflow clip can't cut them */
+#game { position: fixed; left: 0; top: 0; display: block; width: 100vw; height: var(--ws-vh, 100vh); touch-action: none; }
+#hud button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+/* overflow: clip, not hidden: hidden made #hud a scroll container, and the speed-streak layers' negative insets (gridHud.css
+   .ws-grid-speed inset -12%, game.css .ws-game-speed) gave it ~82 px to scroll; Chromium's scroll-into-view before a tap slid
+   the whole HUD up under the finger (the release smoke's HOVER tap, 2026-10-29). clip clips the same and can never scroll. */
+#hud { position: fixed; inset: 0 0 auto; height: var(--ws-vh, 100%); pointer-events: none; font-family: var(--ws-mono); color: var(--ws-text); user-select: none; overflow: clip; }
+#hud * { box-sizing: border-box; }
+/* FC14 (G911): the phone's HUD glass is flat. A backdrop blur re-samples the live canvas under every chip, disc and panel
+   each frame the world draws; a desktop keeps it */
+#hud.touch, #hud.touch * { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+.ws-glass {
+  background: var(--ws-glass);
+  border: 1px solid var(--ws-cyan-line);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 10px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(143, 227, 255, 0.12);
+  position: relative;
+}
+.ws-glass::before { /* corner accent line */
+  content: ''; position: absolute; left: -1px; top: -1px; width: 18px; height: 18px;
+  border-left: 1px solid var(--ws-cyan); border-top: 1px solid var(--ws-cyan); opacity: 0.8;
+}
+.ws-label { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-mono { font-family: var(--ws-mono); font-variant-numeric: tabular-nums; }
+.ws-display { font-family: var(--ws-display); font-weight: 600; letter-spacing: 0.04em; }
+
+/* wordmark "Project <b>Wildshard</b>" — the title screen and the loading screen scope their own extras on top */
+.ws-wordmark { font-family: var(--ws-display); font-weight: 700; font-size: 54px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; }
+.ws-wordmark b { color: var(--ws-cyan); }
+
+/* segmented bar: <div class="ws-bar"><i style="width:…"></i><u style="left:25%"></u>…</div> */
+.ws-bar { position: relative; height: 5px; margin-top: 8px; background: rgba(143, 227, 255, 0.1); overflow: hidden; }
+.ws-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, 0.6); transition: width 0.25s ease-out, background 0.3s; }
+.ws-bar i.low { background: var(--ws-red); box-shadow: 0 0 10px rgba(255, 90, 74, 0.7); }
+.ws-bar u { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(6, 10, 18, 0.9); }
+
+/* ── keyframes ── */
+@keyframes ws-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes ws-feed-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes ws-feed-out { to { opacity: 0; transform: translateY(-4px); } }
+@keyframes ws-spin { to { transform: rotate(405deg); } }
+@keyframes ws-kill { 0% { opacity: 1; transform: scale(1.6); } 40% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.9); } }
+@keyframes ws-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes ws-ring { 0% { opacity: 0.9; transform: scale(0.5); } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes ws-update-pulse { 50% { opacity: 0.3; } }
+
+:root { --ws-layer-hud: 0; --ws-layer-gameMenu: 70; --ws-layer-menu: 70; --ws-layer-modal: 80; --ws-layer-error: 2147482500; }
+
+/* Shared preparation status is available before any lazy view stylesheet. */
+.ws-progress { position: absolute; z-index: calc(var(--ws-layer-hud) + 1); left: 50%; top: 45%; transform: translate(-50%, -50%); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; width: min(280px, 85%); box-sizing: border-box; padding: 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 11px; text-align: center; pointer-events: none; }
+.ws-progress[hidden] { display: none; }
+.ws-progress i { flex: 0 0 12px; height: 12px; border: 2px solid var(--ws-cyan); border-right-color: transparent; border-radius: 50%; animation: ws-progress-spin 0.8s linear infinite; }
+@keyframes ws-progress-spin { to { transform: rotate(360deg); } }
+.ws-progress progress { width: 100%; height: 4px; accent-color: var(--ws-cyan); }
+.ws-progress.failed i { display: none; }
+@media (prefers-reduced-motion: reduce) { .ws-progress i { animation: none; } }

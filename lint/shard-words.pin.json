@@ -1,0 +1,421 @@
+{
+  "slugs": [
+    "blender-template",
+    "driftwood-isle",
+    "far-reach",
+    "ink-cel-valley",
+    "nalati-grasslands",
+    "nine-dragon-stack",
+    "open-plot-alien-plain",
+    "open-plot-clockwork-canyon",
+    "open-plot-coral-drift",
+    "open-plot-desert-ruin",
+    "open-plot-ember-forge",
+    "open-plot-fossil-badlands",
+    "open-plot-frostline-peaks",
+    "open-plot-jungle-ziggurat",
+    "open-plot-lantern-bayou",
+    "open-plot-mosslight-ruins",
+    "open-plot-night-market",
+    "open-plot-patchwork-fairground",
+    "open-plot-saltwind-lighthouse",
+    "open-plot-showcase-template",
+    "open-plot-sky-harbor",
+    "open-plot-sky-race",
+    "open-plot-starfall-observatory",
+    "open-plot-thin-ice",
+    "open-plots",
+    "pastel-plain",
+    "pine-hollow",
+    "sunscar-dunes"
+  ],
+  "words": [
+    "Blender Template",
+    "blender-template",
+    "Driftwood Isle",
+    "driftwood-isle",
+    "far-reach",
+    "Ink & Cel Valley",
+    "ink-cel-valley",
+    "Nalati Grasslands",
+    "nalati-grasslands",
+    "Night Market · Open Plot Pilot",
+    "Nine Dragon Stack",
+    "nine-dragon-stack",
+    "Open Plot · Clockwork Canyon",
+    "Open Plot · Coral Drift",
+    "Open Plot · Desert Ruin",
+    "Open Plot · Ember Forge",
+    "Open Plot · Floating Island Race",
+    "Open Plot · Fossil Badlands",
+    "Open Plot · Frostline Peaks",
+    "Open Plot · Jungle Ziggurat",
+    "Open Plot · Lantern Bayou",
+    "Open Plot · Mosslight Ruins",
+    "Open Plot · Pastel Alien Plain",
+    "Open Plot · Patchwork Fairground",
+    "Open Plot · Saltwind Lighthouse",
+    "Open Plot · Showcase Template",
+    "Open Plot · Sky Harbor",
+    "Open Plot · Starfall Observatory",
+    "Open Plot · Thin Ice",
+    "Open Plots",
+    "open-plot-alien-plain",
+    "open-plot-clockwork-canyon",
+    "open-plot-coral-drift",
+    "open-plot-desert-ruin",
+    "open-plot-ember-forge",
+    "open-plot-fossil-badlands",
+    "open-plot-frostline-peaks",
+    "open-plot-jungle-ziggurat",
+    "open-plot-lantern-bayou",
+    "open-plot-mosslight-ruins",
+    "open-plot-night-market",
+    "open-plot-patchwork-fairground",
+    "open-plot-saltwind-lighthouse",
+    "open-plot-showcase-template",
+    "open-plot-sky-harbor",
+    "open-plot-sky-race",
+    "open-plot-starfall-observatory",
+    "open-plot-thin-ice",
+    "open-plots",
+    "Pastel Plain",
+    "pastel-plain",
+    "Pine Hollow",
+    "pine-hollow",
+    "Signal Dunes",
+    "Sky Reach",
+    "sunscar-dunes"
+  ],
+  "sharedAssets": [
+    "public/assets/tex/**",
+    "public/assets/gpu/tex/**",
+    "public/assets/hdri/**",
+    "public/assets/gpu/hdri/**",
+    "public/assets/sfx/best/**",
+    "public/assets/practice/**"
+  ],
+  "shards": {
+    "_template": {
+      "name": "Template shard",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/_template/map/**"
+      ]
+    },
+    "blender-template": {
+      "name": "Blender Template",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/blender-template/map/**"
+      ]
+    },
+    "driftwood-isle": {
+      "name": "Driftwood Isle",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/models/driftwood-blender/**",
+        "public/assets/models/driftwood-cc0/**",
+        "public/assets/models/driftwood-fp/**",
+        "public/assets/models/driftwood-hero/**",
+        "public/assets/gpu/models/driftwood-blender/**",
+        "public/assets/gpu/models/driftwood-hero/**",
+        "public/assets/gpu/baked/driftwood-isle/**",
+        "public/assets/horizon/driftwood-isle-*",
+        "public/assets/gpu/horizon/driftwood-isle-*",
+        "public/assets/lut/driftwood-isle.bin",
+        "public/assets/title/driftwood-isle-portrait.jpg",
+        "public/assets/sfx/driftwood-isle/**",
+        "public/assets/driftwood-isle/map/**",
+        "public/assets/driftwood-isle/baked/fixed-models/**"
+      ]
+    },
+    "far-reach": {
+      "name": "Sky Reach",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/far-reach/**",
+        "public/assets/lut/far-reach.bin"
+      ]
+    },
+    "ink-cel-valley": {
+      "name": "Ink & Cel Valley",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/ink-cel-valley/map/**"
+      ]
+    },
+    "nalati-grasslands": {
+      "name": "Nalati Grasslands",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/nalati/**",
+        "public/assets/gpu/nalati/**",
+        "public/assets/music/nalati/**",
+        "public/assets/sfx/nalati-grasslands/**",
+        "public/assets/title/nalati-grasslands-portrait.jpg",
+        "public/assets/nalati-grasslands/map/**",
+        "public/assets/baked/nalati-grasslands/terrain.bin"
+      ]
+    },
+    "nine-dragon-stack": {
+      "name": "Nine Dragon Stack",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/nine-dragon/**",
+        "public/assets/baked/nine-dragon-stack/**",
+        "public/assets/gpu/nine-dragon/**",
+        "public/assets/music/nine-dragon-stack/**",
+        "public/assets/sfx/nine-dragon-stack/**",
+        "public/assets/title/nine-dragon-stack-portrait.jpg",
+        "public/assets/nine-dragon-stack/map/**"
+      ]
+    },
+    "open-plots": {
+      "name": "Open Plots",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plots/**"
+      ]
+    },
+    "open-plot-showcase-template": {
+      "name": "Open Plot · Showcase Template",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-showcase-template/**"
+      ]
+    },
+    "open-plot-thin-ice": {
+      "name": "Open Plot · Thin Ice",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-thin-ice/**"
+      ]
+    },
+    "open-plot-frostline-peaks": {
+      "name": "Open Plot · Frostline Peaks",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-frostline-peaks/**"
+      ]
+    },
+    "open-plot-ember-forge": {
+      "name": "Open Plot · Ember Forge",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-ember-forge/**"
+      ]
+    },
+    "open-plot-lantern-bayou": {
+      "name": "Open Plot · Lantern Bayou",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-lantern-bayou/**"
+      ]
+    },
+    "open-plot-sky-harbor": {
+      "name": "Open Plot · Sky Harbor",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-sky-harbor/**"
+      ]
+    },
+    "open-plot-coral-drift": {
+      "name": "Open Plot · Coral Drift",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-coral-drift/**"
+      ]
+    },
+    "open-plot-clockwork-canyon": {
+      "name": "Open Plot · Clockwork Canyon",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-clockwork-canyon/**"
+      ]
+    },
+    "open-plot-starfall-observatory": {
+      "name": "Open Plot · Starfall Observatory",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-starfall-observatory/**"
+      ]
+    },
+    "open-plot-mosslight-ruins": {
+      "name": "Open Plot · Mosslight Ruins",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-mosslight-ruins/**"
+      ]
+    },
+    "open-plot-alien-plain": {
+      "name": "Open Plot · Pastel Alien Plain",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-alien-plain/**"
+      ]
+    },
+    "open-plot-desert-ruin": {
+      "name": "Open Plot · Desert Ruin",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-desert-ruin/**"
+      ]
+    },
+    "open-plot-night-market": {
+      "name": "Night Market · Open Plot Pilot",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-night-market/**"
+      ]
+    },
+    "open-plot-sky-race": {
+      "name": "Open Plot · Floating Island Race",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-sky-race/**"
+      ]
+    },
+    "open-plot-fossil-badlands": {
+      "name": "Open Plot · Fossil Badlands",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-fossil-badlands/**"
+      ]
+    },
+    "open-plot-patchwork-fairground": {
+      "name": "Open Plot · Patchwork Fairground",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-patchwork-fairground/**"
+      ]
+    },
+    "open-plot-saltwind-lighthouse": {
+      "name": "Open Plot · Saltwind Lighthouse",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-saltwind-lighthouse/**"
+      ]
+    },
+    "open-plot-jungle-ziggurat": {
+      "name": "Open Plot · Jungle Ziggurat",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/open-plot-jungle-ziggurat/**"
+      ]
+    },
+    "pastel-plain": {
+      "name": "Pastel Plain",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/pastel-plain/map/**"
+      ]
+    },
+    "pine-hollow": {
+      "name": "Pine Hollow",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/baked/pine-hollow/**",
+        "public/assets/pine-hollow/weapons/lever-rifle.glb",
+        "public/assets/pine-hollow/weapons/skinning-knife.glb",
+        "public/assets/models/wooden_crate_02/wooden_crate_02.gltf",
+        "public/assets/models/wine_barrel_01/wine_barrel_01.gltf",
+        "public/assets/models/wooden_bucket_01/wooden_bucket_01.gltf",
+        "public/assets/models/hatchet/hatchet.gltf",
+        "public/assets/models/Lantern_01/Lantern_01_lod.glb",
+        "public/assets/models/rock_moss_set_01/rock_moss_set_01_lod.glb",
+        "public/assets/models/tree_stump_01/tree_stump_01_lod.glb",
+        "public/assets/models/dead_tree_trunk/dead_tree_trunk_lod.glb",
+        "public/assets/models/pine-hollow-crags/**",
+        "public/assets/models/pine-hollow-hero/**",
+        "public/assets/models/pine-hollow-trees/**",
+        "public/assets/gpu/models/pine-hollow-hero/**",
+        "public/assets/gpu/models/pine-hollow-trees/**",
+        "public/assets/gpu/pine-hollow/**",
+        "public/assets/gpu/baked/pine-hollow/**",
+        "public/assets/music/pine-hollow-folk/**",
+        "public/assets/music/pine-hollow-orchestral/**",
+        "public/assets/music/pine-hollow-piano/**",
+        "public/assets/sfx/pine-hollow/**",
+        "public/assets/horizon/pine-hollow-*",
+        "public/assets/gpu/horizon/pine-hollow-*",
+        "public/assets/title/pine-hollow-portrait.jpg",
+        "public/assets/pine-hollow/map/**",
+        "public/assets/pine-hollow/journal/red-deer.webp",
+        "public/assets/pine-hollow/journal/white-deer.webp",
+        "public/assets/pine-hollow/journal/piebald.webp",
+        "public/assets/pine-hollow/journal/boar.webp",
+        "public/assets/pine-hollow/journal/black-boar.webp",
+        "public/assets/pine-hollow/journal/scarback.webp",
+        "public/assets/pine-hollow/journal/elk.webp",
+        "public/assets/pine-hollow/journal/pale-elk.webp",
+        "public/assets/pine-hollow/journal/black-bear.webp",
+        "public/assets/pine-hollow/journal/brown-bear.webp",
+        "public/assets/pine-hollow/journal/grizzled-sow.webp",
+        "public/assets/pine-hollow/journal/ironhide.webp",
+        "public/assets/pine-hollow/journal/ghost-stag.webp",
+        "public/assets/pine-hollow/journal/blackpaw.webp",
+        "public/assets/pine-hollow/journal/imperial-bull.webp",
+        "public/assets/pine-hollow/journal/antler-king.webp",
+        "public/assets/pine-hollow/journal/chalk.webp",
+        "public/assets/pine-hollow/journal/place-gate.webp",
+        "public/assets/pine-hollow/journal/place-crossroads.webp",
+        "public/assets/pine-hollow/journal/place-cabin-1.webp",
+        "public/assets/pine-hollow/journal/place-cabin-2.webp",
+        "public/assets/pine-hollow/journal/place-cabin-3.webp",
+        "public/assets/pine-hollow/journal/place-zipline.webp",
+        "public/assets/pine-hollow/journal/place-lookout.webp",
+        "public/assets/pine-hollow/journal/place-pond.webp",
+        "public/assets/pine-hollow/journal/place-waterfall.webp",
+        "public/assets/pine-hollow/journal/place-islet.webp",
+        "public/assets/pine-hollow/journal/place-dam.webp",
+        "public/assets/pine-hollow/journal/place-bridge.webp",
+        "public/assets/pine-hollow/journal/place-den.webp",
+        "public/assets/pine-hollow/journal/place-cave.webp",
+        "public/assets/pine-hollow/journal/place-clearing.webp",
+        "public/assets/pine-hollow/journal/place-hamlet.webp",
+        "public/assets/pine-hollow/journal/place-lodge.webp",
+        "public/assets/pine-hollow/journal/place-mill.webp",
+        "public/assets/pine-hollow/baked/**"
+      ]
+    },
+    "sunscar-dunes": {
+      "name": "Signal Dunes",
+      "ids": [],
+      "settings": [],
+      "assets": [
+        "public/assets/sunscar-dunes/**",
+        "public/assets/lut/sunscar-dunes.bin",
+        "public/assets/baked/sunscar-dunes/navmesh.bin"
+      ]
+    }
+  }
+}

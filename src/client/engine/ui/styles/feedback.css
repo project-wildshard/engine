@@ -1,0 +1,63 @@
+/* The review inbox (src/client/engine/ui/review.ts + the lazy src/client/engine/ui/Feedback.ts; project/archive/2026-09-22-feedback-inbox.md; mockups art/feedback/round-1-inbox/).
+   prefix ws-fb-. The ✎ NOTE disc is always loaded (it lives in #hud under PAUSE); the composer loads on first use. */
+
+/* ── the ✎ NOTE disc (touch, unlocked + Quick note on): a tag of the base HUD's status column, under its rows (the box is
+   touch.css `.ws-touch-tag`, E154 — src/client/engine/ui/hudSlots.ts); this file adds the queued-notes badge ── */
+.ws-fb-disc .ws-fb-badge { display: none; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--ws-amber); color: #140d02; font-size: 8px; letter-spacing: 0; line-height: 14px; text-align: center; }
+.ws-fb-disc.queued .ws-fb-badge { display: inline-block; }
+
+/* ── overlay root (quick bar / sheet): above the HUD and the touch layer, below nothing but the pen ── */
+.ws-fb { position: fixed; inset: 0; z-index: calc(var(--ws-layer-modal) + 0); font-family: var(--ws-mono); color: var(--ws-text); pointer-events: auto; touch-action: manipulation; }
+.ws-fb *, .ws-fb-tab * { box-sizing: border-box; }
+.ws-fb-dim { position: absolute; inset: 0; background: rgba(6, 10, 18, 0.35); }
+.ws-fb.bar .ws-fb-dim { background: transparent; }
+.ws-fb.sending, .ws-fb-tab.sending { opacity: 0.75; pointer-events: none; }
+
+/* ── quick bar (desktop F8, mockup F): one line under the crosshair ── */
+.ws-fb-quick { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); width: min(880px, calc(100vw - 32px)); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ws-fb-cap { padding: 2px 8px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-fb-bar { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(143, 227, 255, 0.12); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); }
+.ws-fb-cam { display: flex; align-items: center; gap: 6px; flex: none; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-fb-cam svg { width: 16px; height: 16px; color: var(--ws-cyan); }
+.ws-fb-input { flex: 1; min-width: 120px; padding: 6px 8px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--ws-cyan-line); border-radius: 0; color: var(--ws-text); font: 12px var(--ws-mono); outline: none; }
+.ws-fb-input:focus, .ws-fb-text:focus { border-color: var(--ws-cyan); }
+.ws-fb-keys { flex: none; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); }
+
+/* ── category chips ── */
+.ws-fb-chips { display: flex; gap: 5px; flex: none; }
+.ws-fb-chip { padding: 5px 9px; background: transparent; border: 1px solid var(--ws-cyan-line); color: var(--ws-text-dim); font: 9.5px var(--ws-mono); letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; }
+.ws-fb-chip.on { background: var(--ws-cyan); border-color: var(--ws-cyan); color: #061018; font-weight: 700; }
+
+/* ── the sheet (mockup A: right-docked; B: bottom on a phone) and the menu tab body ── */
+.ws-fb-sheet { position: absolute; right: 16px; top: 16px; bottom: 16px; width: min(420px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; overflow-y: auto; background: var(--ws-glass-deep); }
+.ws-fb.phone .ws-fb-sheet { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 78vh; padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); border-left: 0; border-right: 0; border-bottom: 0; }
+.ws-fb-body { display: flex; flex-direction: column; gap: 10px; }
+.ws-fb-head { display: flex; align-items: center; gap: 10px; }
+.ws-fb-title { flex: 1; font-family: var(--ws-display); font-weight: 700; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase; }
+.ws-fb-title b { color: var(--ws-cyan); }
+.ws-fb-key { padding: 2px 7px; border: 1px solid var(--ws-cyan-line); font-size: 10px; letter-spacing: 0.1em; color: var(--ws-text); }
+.ws-fb-close { width: 30px; height: 30px; background: transparent; border: 0; color: var(--ws-text); font-size: 22px; line-height: 1; cursor: pointer; }
+.ws-fb-shot { position: relative; border: 1px solid var(--ws-cyan-line); background: #000; }
+.ws-fb-shot img { display: block; width: 100%; height: auto; max-height: 32vh; object-fit: contain; }
+.ws-fb.phone .ws-fb-shot img { max-height: 22vh; }
+.ws-fb-draw { position: absolute; right: 6px; bottom: 6px; display: flex; align-items: center; gap: 5px; padding: 4px 8px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font: 9px var(--ws-mono); letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; }
+.ws-fb-draw svg { width: 14px; height: 14px; }
+.ws-fb-meta { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-fb-sheet .ws-fb-chips, .ws-fb-body .ws-fb-chips { flex-wrap: wrap; }
+.ws-fb-sheet .ws-fb-chip, .ws-fb-body .ws-fb-chip { flex: 1; padding: 7px 6px; }
+.ws-fb-text { width: 100%; resize: vertical; min-height: 64px; padding: 8px 10px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--ws-cyan-line); border-radius: 0; color: var(--ws-text); font: 12.5px/1.5 var(--ws-mono); outline: none; }
+.ws-fb-ctx { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.ws-fb-kv { display: flex; gap: 8px; min-width: 0; padding: 5px 8px; border: 1px solid var(--ws-cyan-faint); font-size: 10.5px; color: var(--ws-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-fb-kv i { font-style: normal; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-fb-send { padding: 10px; background: var(--ws-cyan); border: 0; color: #061018; font-family: var(--ws-display); font-weight: 700; font-size: 16px; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; }
+.ws-fb-hint { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); text-align: center; }
+.ws-fb-queued { color: var(--ws-amber); font-weight: 400; }
+
+/* ── the pen (mockup D, freehand): the frozen frame full-screen, strokes in cyan ── */
+.ws-fb-pen { position: fixed; inset: 0; z-index: calc(var(--ws-layer-modal) + 10); display: flex; align-items: center; justify-content: center; background: #000; touch-action: none; font-family: var(--ws-mono); }
+.ws-fb-pencanvas { display: block; cursor: crosshair; touch-action: none; }
+.ws-fb-tools { position: absolute; left: 50%; top: calc(var(--ws-top) + 6px); transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); }
+.ws-fb-tool { padding: 7px 14px; background: transparent; border: 1px solid var(--ws-cyan-line); color: var(--ws-text); font: 10px var(--ws-mono); letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; }
+.ws-fb-tool.on, .ws-fb-tool.done { background: var(--ws-cyan); border-color: var(--ws-cyan); color: #061018; font-weight: 700; }
+.ws-fb-penhint { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 12px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text); white-space: nowrap; }
+.ws-fb-tab { flex: none; }

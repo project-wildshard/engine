@@ -1,0 +1,44 @@
+{
+  "source": "F2 max(lanes) plus recorded parity band; ceilings may only decrease",
+  "base": "272d3bedf565761fb64a7da04c5f5b372e89961d",
+  "files": [
+    {
+      "file": "test/parity/baselines/m5/nalati-grasslands.phone.json",
+      "sha": "ee0dd78b2f2977f36f0ed5e44cf0d1da172f13ea",
+      "recorded": "2026-10-01T11:06:09.553Z",
+      "blob": "3cfba726d53efd6690134e86c8a806f820ff51d1"
+    },
+    {
+      "file": "test/parity/baselines/m5/nalati-grasslands.desktop.json",
+      "sha": "ee0dd78b2f2977f36f0ed5e44cf0d1da172f13ea",
+      "recorded": "2026-10-01T11:10:15.627Z",
+      "blob": "30bdaf27ddf9af70cc71fb4e76385258ac934078"
+    }
+  ],
+  "ceilings": {
+    "nalati-grasslands.phone.camp.draws": 79,
+    "nalati-grasslands.phone.camp.tris": 1174948,
+    "nalati-grasslands.phone.camp.programs": 102,
+    "nalati-grasslands.phone.camp.gpuMB": 238.87819290161133,
+    "nalati-grasslands.phone.bridge.draws": 90,
+    "nalati-grasslands.phone.bridge.tris": 1279751,
+    "nalati-grasslands.phone.bridge.programs": 102,
+    "nalati-grasslands.phone.bridge.gpuMB": 238.87819290161133,
+    "nalati-grasslands.phone.plains.draws": 108,
+    "nalati-grasslands.phone.plains.tris": 1292909,
+    "nalati-grasslands.phone.plains.programs": 102,
+    "nalati-grasslands.phone.plains.gpuMB": 238.87819290161133,
+    "nalati-grasslands.desktop.camp.draws": 202,
+    "nalati-grasslands.desktop.camp.tris": 4900943,
+    "nalati-grasslands.desktop.camp.programs": 119,
+    "nalati-grasslands.desktop.camp.gpuMB": 601.0351619720459,
+    "nalati-grasslands.desktop.bridge.draws": 468,
+    "nalati-grasslands.desktop.bridge.tris": 6044582,
+    "nalati-grasslands.desktop.bridge.programs": 119,
+    "nalati-grasslands.desktop.bridge.gpuMB": 601.0351619720459,
+    "nalati-grasslands.desktop.plains.draws": 311,
+    "nalati-grasslands.desktop.plains.tris": 6124688,
+    "nalati-grasslands.desktop.plains.programs": 119,
+    "nalati-grasslands.desktop.plains.gpuMB": 601.0351619720459
+  }
+}

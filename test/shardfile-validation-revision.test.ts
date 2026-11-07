@@ -1,0 +1,20 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- Owned revision fixtures.
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
+import { dirname, resolve } from 'node:path';
+import { afterEach, expect, it } from 'vitest';
+import { shardfileValidationRevision } from '../scripts/shardfile-validation-revision.mjs';
+
+const owned: string[] = [];
+afterEach(() => { for (const root of owned.splice(0)) rmSync(root, { recursive: true, force: true }); });
+function put(root: string, path: string, text: string): void { mkdirSync(dirname(resolve(root, path)), { recursive: true }); writeFileSync(resolve(root, path), text); }
+it('invalidates on admission, schemas and verified transport changes, while gameplay and generated tables stay independent', () => {
+  mkdirSync('tmp', { recursive: true }); const root = mkdtempSync(resolve('tmp/validation-revision-')); owned.push(root);
+  put(root, 'package.json', '{}'); put(root, 'pnpm-lock.yaml', 'lock');
+  const paths = ['pnpm-lock.yaml', 'src/client/game/shardfile/product.ts', 'src/client/game/shardfile/readAsset.ts', 'src/client/engine/pwa/cacheNames.ts'];
+  for (const path of paths) put(root, path, 'first');
+  let before = shardfileValidationRevision(root);
+  for (const path of paths) { put(root, path, 'second'); const after = shardfileValidationRevision(root); expect(after).not.toBe(before); before = after; }
+  for (const path of ['src/game/combat/feel.ts', 'src/engine/render/sky.ts', 'src/game/shardfile/schema.generated.ts']) put(root, path, 'unrelated');
+  expect(shardfileValidationRevision(root)).toBe(before);
+});

@@ -1,0 +1,18 @@
+{
+  "schema": "no-base64/1",
+  "source": "8183c3df1d0baf41bcc75c7c5097fb4c12a800ca",
+  "files": {
+    "scripts/loading-benchmark/capture.mjs": 1,
+    "scripts/ota-release.mjs": 4,
+    "scripts/parity/fast-png.mjs": 1,
+    "src/commons/practiceCourse.ts": 1,
+    "src/client/engine/core/deflate.ts": 1,
+    "src/server/game/plugin/brain.ts": 1,
+    "src/server/game/population/spawnScript.ts": 5,
+    "src/shared/game/population/returnProgram.ts": 1,
+    "src/shared/game/population/returnProjectionV2.ts": 1,
+    "src/sharddev/buildBehaviour.ts": 1,
+    "src/sharddev/returnProjectionV2.ts": 2,
+    "src/shards/nine-dragon-stack/generators/bake-glyphs.mjs": 2
+  }
+}

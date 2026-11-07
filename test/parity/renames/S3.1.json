@@ -1,0 +1,12 @@
+{
+  "shardSystems": {
+    "nalati-grasslands": {
+      "update": {
+        "shard.nalati-grasslands.installNalatiAdventure": "shard.nalati.quest"
+      },
+      "late": {
+        "nalati-reins": "shard.nalati.reins"
+      }
+    }
+  }
+}

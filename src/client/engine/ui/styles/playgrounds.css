@@ -1,0 +1,18 @@
+/* ─── feature playgrounds (src/playgrounds/, E307) ─── prefix ws-pg- ───
+   the run chip: the playground's short name, the run time, ↺ back to the start; under them the status (READY · RUNNING ·
+   a pad · a lap) and the best. On the phone a row of the status column (hudSlots, under VITALS: the toasts keep the right
+   side), on a desktop top centre. Navy glass, a cyan hairline, monospace capitals. */
+.ws-pg { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: calc(var(--ws-layer-hud) + 14); display: none; flex-direction: column; align-items: stretch; gap: 3px; min-width: 168px; max-width: 58vw; box-sizing: border-box; padding: 5px 6px 6px 9px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); border-top-color: var(--ws-cyan); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); font-family: var(--ws-mono); color: var(--ws-text); pointer-events: none; }
+.ws-pg.show { display: flex; }
+.ws-pg .ws-pg-row { display: flex; align-items: center; gap: 8px; }
+.ws-pg b { flex: 1; font-size: 8.5px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-cyan); white-space: nowrap; }
+.ws-pg .ws-pg-time { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; color: #fff; }
+.ws-pg .ws-pg-restart { width: 26px; height: 22px; padding: 0; background: rgba(143, 227, 255, 0.1); border: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font-family: inherit; font-size: 13px; line-height: 1; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.ws-pg .ws-pg-status { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-pg .ws-pg-best { font-size: 8px; letter-spacing: 0.14em; color: var(--ws-amber); }
+.ws-pg .ws-pg-best:empty { display: none; }
+.ws-pg[data-tone="go"] .ws-pg-status { color: var(--ws-cyan); }
+.ws-pg[data-tone="done"] .ws-pg-status { color: var(--ws-amber); }
+.ws-pg[data-tone="done"] { border-color: rgba(255, 181, 71, 0.7); }
+/* in the phone's status column: as wide as its rows (touch.css .ws-touch-row: 170 + padding + border), in the flow */
+.ws-pg[data-slot="row"] { position: relative; left: auto; top: auto; transform: none; width: 190px; min-width: 0; max-width: none; }

@@ -1,0 +1,2497 @@
+{
+  "model": "MOSS-SoundEffect v2 + Stable Audio 3 Medium",
+  "credit": "Sound effects: MOSS-SoundEffect v2 \u00b7 Stable Audio 3 Medium \u2014 Powered by Stability AI",
+  "licence": "Per file (see provenance.source): MOSS-SoundEffect v2.0 is Apache-2.0; Stable Audio 3 Medium is the Stability AI Community License (free below USD 1M revenue, register with Stability AI for commercial use, show 'Powered by Stability AI').",
+  "beds": {
+    "forest": {
+      "file": "bed-forest-2-0cd11be5.m4a",
+      "loopStart": 12.75,
+      "loopEnd": 26.75,
+      "duration": 27.7547,
+      "gain": 0.5
+    },
+    "underwater": {
+      "file": "bed-underwater-3-cbe2810d.m4a",
+      "loopStart": 9.0,
+      "loopEnd": 21.0,
+      "duration": 22.016,
+      "gain": 0.5
+    }
+  },
+  "hums": {
+    "pickup": {
+      "file": "hum-pickup-3-7b7db58f.m4a",
+      "loopStart": 3.25,
+      "loopEnd": 9.25,
+      "duration": 10.2613,
+      "gain": 0.35
+    }
+  },
+  "oneshots": {
+    "crossbowFire": {
+      "files": [
+        "crossbowFire-3-18ccf9f0.m4a"
+      ],
+      "gain": 1.0
+    },
+    "dryFire": {
+      "files": [
+        "dryFire-2-88071d1d.m4a",
+        "dryFire-3-173415cb.m4a"
+      ],
+      "gain": 1.0
+    },
+    "boltImpact-wood": {
+      "files": [
+        "boltImpact-wood-2-8e9e99ee.m4a",
+        "boltImpact-wood-3-673a0ef6.m4a"
+      ],
+      "gain": 1.0
+    },
+    "boltImpact-ground": {
+      "files": [
+        "boltImpact-ground-2-5e8a3076.m4a",
+        "boltImpact-ground-1-f81140e6.m4a"
+      ],
+      "gain": 1.0
+    },
+    "boltImpact-flesh": {
+      "files": [
+        "boltImpact-flesh-2-13ed7f2c.m4a",
+        "boltImpact-flesh-3-62e25aa5.m4a"
+      ],
+      "gain": 1.0
+    },
+    "swordSwing": {
+      "files": [
+        "swordSwing-1-6303fc5d.m4a"
+      ],
+      "gain": 1.0
+    },
+    "swordHeavy": {
+      "files": [
+        "swordHeavy-2-1debcc8f.m4a",
+        "swordHeavy-3-1bed510f.m4a"
+      ],
+      "gain": 1.0
+    },
+    "swordHit-flesh": {
+      "files": [
+        "swordHit-flesh-1-07225bb8.m4a",
+        "swordHit-flesh-2-efbf5fd7.m4a"
+      ],
+      "gain": 1.0
+    },
+    "swordHit-wood": {
+      "files": [
+        "swordHit-wood-3-6381cc6b.m4a",
+        "swordHit-wood-2-800b6fe9.m4a"
+      ],
+      "gain": 1.0
+    },
+    "dodge": {
+      "files": [
+        "dodge-2-13887dd8.m4a",
+        "dodge-3-453516f6.m4a"
+      ],
+      "gain": 1.0
+    },
+    "lunge": {
+      "files": [
+        "lunge-3-be45ba7a.m4a"
+      ],
+      "gain": 1.0
+    },
+    "reload": {
+      "files": [
+        "reload-3-d81ab6e2.m4a",
+        "reload-1-d3e6d32a.m4a"
+      ],
+      "gain": 1.0
+    },
+    "rifleFire": {
+      "files": [
+        "rifleFire-3-8ed56841.m4a",
+        "rifleFire-2-a850ad83.m4a"
+      ],
+      "gain": 1.0
+    },
+    "rifleReload": {
+      "files": [
+        "rifleReload-2-1ad54372.m4a",
+        "rifleReload-3-20027167.m4a"
+      ],
+      "gain": 1.0
+    },
+    "weaponSwap": {
+      "files": [
+        "weaponSwap-3-fbe81018.m4a"
+      ],
+      "gain": 1.0
+    },
+    "footstep-litter": {
+      "files": [
+        "footstep-litter-1-fe9cd8d9.m4a",
+        "footstep-litter-3-09ceed7a.m4a"
+      ],
+      "gain": 1.0
+    },
+    "footstep-planks": {
+      "files": [
+        "footstep-planks-3-d919e436.m4a",
+        "footstep-planks-2-ebb5a80c.m4a"
+      ],
+      "gain": 1.0
+    },
+    "footstep-sand": {
+      "files": [
+        "footstep-sand-2-4b40473a.m4a",
+        "footstep-sand-1-09a40a2f.m4a"
+      ],
+      "gain": 1.0
+    },
+    "land": {
+      "files": [
+        "land-2-773487f2.m4a",
+        "land-3-eebff605.m4a"
+      ],
+      "gain": 1.0
+    },
+    "land-hard": {
+      "files": [
+        "land-hard-3-5aed2a6b.m4a",
+        "land-hard-1-2ce640be.m4a"
+      ],
+      "gain": 1.0
+    },
+    "splash": {
+      "files": [
+        "splash-3-9509efbe.m4a",
+        "splash-2-03ab63ae.m4a"
+      ],
+      "gain": 1.0
+    },
+    "wadeStep": {
+      "files": [
+        "wadeStep-1-83e1423c.m4a",
+        "wadeStep-2-402e850a.m4a"
+      ],
+      "gain": 1.0
+    },
+    "swimStroke": {
+      "files": [
+        "swimStroke-2-9e35721b.m4a"
+      ],
+      "gain": 1.0
+    },
+    "waterExit": {
+      "files": [
+        "waterExit-1-d85f0e47.m4a"
+      ],
+      "gain": 1.0
+    },
+    "dive": {
+      "files": [
+        "dive-1-4b978224.m4a",
+        "dive-3-e74abc72.m4a"
+      ],
+      "gain": 1.0
+    },
+    "surface": {
+      "files": [
+        "surface-3-85550528.m4a",
+        "surface-2-e5ac4e8a.m4a"
+      ],
+      "gain": 1.0
+    },
+    "hitMarker": {
+      "files": [
+        "hitMarker-1-46ef1236.m4a"
+      ],
+      "gain": 1.0
+    },
+    "kill": {
+      "files": [
+        "kill-3-5f7ea225.m4a",
+        "kill-2-5e4acc1b.m4a"
+      ],
+      "gain": 1.0
+    },
+    "deer_call": {
+      "files": [
+        "deer_call-3-1d601bb4.m4a",
+        "deer_call-1-7cd35867.m4a"
+      ],
+      "gain": 1.0
+    },
+    "boar_grunt": {
+      "files": [
+        "boar_grunt-3-4e4a9bec.m4a"
+      ],
+      "gain": 1.0
+    },
+    "hoofsteps": {
+      "files": [
+        "hoofsteps-3-f1c11f8f.m4a",
+        "hoofsteps-1-9580d36a.m4a"
+      ],
+      "gain": 1.0
+    },
+    "boar_squeal": {
+      "files": [
+        "boar_squeal-1-804df37c.m4a"
+      ],
+      "gain": 1.0
+    },
+    "elk_bugle": {
+      "files": [
+        "elk_bugle-3-f6e8030e.m4a",
+        "elk_bugle-2-0e80875f.m4a"
+      ],
+      "gain": 1.0
+    },
+    "bear_growl": {
+      "files": [
+        "bear_growl-3-f91d7740.m4a"
+      ],
+      "gain": 1.0
+    },
+    "bear_roar": {
+      "files": [
+        "bear_roar-3-9f1e177e.m4a",
+        "bear_roar-2-29e3055e.m4a"
+      ],
+      "gain": 1.0
+    },
+    "bear_hurt": {
+      "files": [
+        "bear_hurt-1-43b45d1e.m4a",
+        "bear_hurt-3-3aea6172.m4a"
+      ],
+      "gain": 1.0
+    },
+    "footstep-mud": {
+      "files": [
+        "footstep-mud-2-99e4a10d.m4a",
+        "footstep-mud-1-1dd22736.m4a"
+      ],
+      "gain": 1.0
+    },
+    "footstep-rock": {
+      "files": [
+        "footstep-rock-2-58c2cc26.m4a",
+        "footstep-rock-3-98e0e874.m4a"
+      ],
+      "gain": 1.0
+    },
+    "footstep-wet": {
+      "files": [
+        "footstep-wet-1-58d313a2.m4a"
+      ],
+      "gain": 1.0
+    }
+  },
+  "provenance": [
+    {
+      "file": "bed-forest-2-0cd11be5.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience of a quiet pine forest at dawn: soft wind through tall pine trees, gentle rustling needles, a few small songbirds chirping in the distance. Continuous field recording, no music.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.993,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "bed-underwater-3-cbe2810d.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Underwater ambience: the deep muffled pressure hum and slow water movement heard with your head under the sea, low rumble, no bubbles, no music.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.951,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "hum-pickup-3-7b7db58f.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A soft, steady, shimmering magical hum of a glowing crystal, a gentle sustained tone with a faint sparkle, constant, no rhythm, no music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.008,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "crossbowFire-1-40af4c48.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single crossbow shot: the trigger clicks, the string snaps with a twang and the bolt whooshes away. Close, dry.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.011,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "dryFire-2-88071d1d.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single dry mechanical click of an empty crossbow trigger, metal latch, close and quiet.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.643,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "dryFire-3-173415cb.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single dry mechanical click of an empty crossbow trigger, metal latch, close and quiet.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.376,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "boltImpact-wood-1-2cae58f6.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "An arrow thudding hard into a wooden plank and vibrating, a single impact.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.994,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "boltImpact-wood-2-d803992d.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "An arrow thudding hard into a wooden plank and vibrating, a single impact.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.994,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "boltImpact-ground-2-c6623243.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow thumping into soft dirt ground, a single dull impact with a little debris.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.876,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "boltImpact-ground-1-e51592f5.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow thumping into soft dirt ground, a single dull impact with a little debris.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.873,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "boltImpact-flesh-3-da30d4fb.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "An arrow hitting an animal's body with a meaty thud, a single impact, no voice.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.048,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "swordSwing-1-6303fc5d.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single fast sword swing whooshing through the air, close.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.058,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "swordHeavy-2-1debcc8f.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single heavy two-handed sword swing, a slow powerful whoosh through the air, close.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.816,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "swordHeavy-3-1bed510f.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single heavy two-handed sword swing, a slow powerful whoosh through the air, close.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.491,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "swordHit-flesh-1-07225bb8.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A sword blade slashing into an animal, a single wet meaty cut impact, no voice.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.644,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "swordHit-flesh-2-efbf5fd7.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A sword blade slashing into an animal, a single wet meaty cut impact, no voice.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.06,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "swordHit-wood-3-6381cc6b.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A sword blade chopping into a wooden log, a single hard knock impact.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.371,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "swordHit-wood-2-800b6fe9.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A sword blade chopping into a wooden log, a single hard knock impact.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.013,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "dodge-2-13887dd8.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A quick dodge: a fast body whoosh with cloth rustle and a light foot scuff on dirt.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.905,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "dodge-3-453516f6.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A quick dodge: a fast body whoosh with cloth rustle and a light foot scuff on dirt.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.744,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "lunge-3-be45ba7a.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A quick forward lunge: a short sharp whoosh with a foot stamp on dirt.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.058,
+      "clap_rank": 5,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "reload-2-c48de6a0.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Reloading a crossbow: the string pulled back with a ratchet creak, a bolt slid into place, a click.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.855,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "reload-1-a220fb6e.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Reloading a crossbow: the string pulled back with a ratchet creak, a bolt slid into place, a click.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.619,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "rifleFire-3-8ed56841.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single old bolt-action rifle gunshot outdoors, a sharp crack with a short echo.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.775,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "rifleFire-2-a850ad83.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single old bolt-action rifle gunshot outdoors, a sharp crack with a short echo.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.24,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "rifleReload-2-1ad54372.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Working the bolt of an old rifle: bolt lifted and pulled back, a brass shell ejected and clinking, bolt pushed forward and locked.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.899,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "rifleReload-3-20027167.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Working the bolt of an old rifle: bolt lifted and pulled back, a brass shell ejected and clinking, bolt pushed forward and locked.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.809,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "weaponSwap-3-fbe81018.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Drawing a weapon from a leather strap: a short leather creak and a small metal rattle.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.812,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "footstep-litter-2-19b0df36.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single footstep on a forest floor of dry pine needles and twigs, close.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.945,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "footstep-litter-1-b1476674.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single footstep on a forest floor of dry pine needles and twigs, close.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.411,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "footstep-planks-1-cec98032.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single boot footstep on old wooden planks of a dock, close.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.384,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "footstep-planks-3-77f11491.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single boot footstep on old wooden planks of a dock, close.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.26,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "footstep-sand-2-4b40473a.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single footstep on soft dry beach sand, close.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.68,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "footstep-sand-1-09a40a2f.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single footstep on soft dry beach sand, close.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.074,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "land-2-773487f2.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Feet landing on dirt ground after a small jump, a soft thud, no voice.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.696,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "land-3-eebff605.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Feet landing on dirt ground after a small jump, a soft thud, no voice.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.282,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "land-hard-3-5aed2a6b.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A heavy, hard landing on the ground after a long fall, a deep body thud with gear rattle, no voice.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.993,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "land-hard-1-2ce640be.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A heavy, hard landing on the ground after a long fall, a deep body thud with gear rattle, no voice.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.941,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "splash-3-9509efbe.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Something jumping into water: a single big splash, then droplets.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.011,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "splash-2-03ab63ae.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Something jumping into water: a single big splash, then droplets.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.006,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "wadeStep-1-83e1423c.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single step wading through shallow water, a soft slosh.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.919,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "wadeStep-2-402e850a.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single step wading through shallow water, a soft slosh.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.862,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "swimStroke-2-9e35721b.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single swimming arm stroke through water, a gentle swish and splash.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.009,
+      "clap_rank": 5,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "waterExit-1-d85f0e47.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Climbing out of water: water pouring and dripping off a body, a short slosh.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.014,
+      "clap_rank": 4,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "dive-1-4b978224.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Diving under the water surface: a deep plunge followed by a rush of muffled bubbles.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.938,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "dive-3-e74abc72.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Diving under the water surface: a deep plunge followed by a rush of muffled bubbles.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.93,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "surface-3-85550528.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Breaking through the water surface from below: a splash and water streaming off, no voice.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.95,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "surface-2-e5ac4e8a.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Breaking through the water surface from below: a splash and water streaming off, no voice.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.938,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "hitMarker-1-46ef1236.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single short crisp tick, a small wooden click, very short.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.004,
+      "clap_rank": 5,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "kill-3-5f7ea225.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single deep, satisfying muffled thump with a short low boom tail, like a heavy drum hit in the distance.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.601,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "kill-2-5e4acc1b.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single deep, satisfying muffled thump with a short low boom tail, like a heavy drum hit in the distance.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.121,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "deer_call-3-1d601bb4.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A deer calling in a forest, a short bleating bark.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.047,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "deer_call-1-7cd35867.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A deer calling in a forest, a short bleating bark.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.006,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "boar_grunt-3-4e4a9bec.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A wild boar grunting and snorting, close.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.025,
+      "clap_rank": 4,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "hoofsteps-3-f1c11f8f.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A deer's hooves trotting a few steps on a dirt forest floor.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.795,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "hoofsteps-1-9580d36a.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A deer's hooves trotting a few steps on a dirt forest floor.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.38,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "boar_squeal-1-6415e380.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A wild boar squealing loudly, alarmed.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.003,
+      "clap_rank": 4,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "elk_bugle-2-7048925b.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A bull elk bugling in a forest, a long high whistling call ending in grunts.",
+      "seed": 2,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.719,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "elk_bugle-1-375e7428.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A bull elk bugling in a forest, a long high whistling call ending in grunts.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.575,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "bear_growl-3-97b2d496.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A large brown bear growling low and menacing, close.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.799,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "bear_growl-2-7996ef48.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A large brown bear growling low and menacing, close.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.19,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "bear_roar-3-6e416479.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A large brown bear roaring loudly and aggressively.",
+      "seed": 3,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.959,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "bear_roar-1-cdda7f3d.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A large brown bear roaring loudly and aggressively.",
+      "seed": 1,
+      "steps": 8,
+      "licence": "Stability AI Community License (free < USD 1M revenue; register for commercial use; 'Powered by Stability AI') + Gemma terms (T5Gemma encoder)",
+      "clap_p": 0.93,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium"
+    },
+    {
+      "file": "bear_hurt-1-43b45d1e.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A large bear yelping and groaning in pain.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.982,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "bear_hurt-3-3aea6172.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A large bear yelping and groaning in pain.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.854,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss"
+    },
+    {
+      "file": "wolf_howl-3-b1d62e56.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single grey wolf howling: a long rising, holding and falling howl in the open steppe at night, a second wolf joining far off. Natural field recording, no music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.41,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_howl-1-9f1204b6.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single grey wolf howling: a long rising, holding and falling howl in the open steppe at night, a second wolf joining far off. Natural field recording, no music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.129,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_snarl-1-cbccb5ca.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A wolf snarling and growling aggressively through bared teeth, close, a rattling throaty growl. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 1.0,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_snarl-2-14ee8a80.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A wolf snarling and growling aggressively through bared teeth, close, a rattling throaty growl. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.978,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_bite-1-a7669147.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A wolf lunging and biting: jaws snapping shut with a hard click and a short vicious growl, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.326,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_yip-3-57734ee6.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A young wolf giving three short excited high yips and barks, close, outdoors. No music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.52,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_yip-1-916cfc1c.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A young wolf giving three short excited high yips and barks, close, outdoors. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.032,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_yelp-3-0b926af1.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A wolf yelping in pain after being hit: a sharp high cry sliding down into a whimper. No music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.8,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "wolf_yelp-1-0a654844.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A wolf yelping in pain after being hit: a sharp high cry sliding down into a whimper. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.347,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "horse_neigh-1-2d461ec9.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A horse neighing loudly: a high quavering whinny falling in steps, ending in a soft nicker, outdoors on open grassland. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.077,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "horse_neigh-3-0fb050e4.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A horse neighing loudly: a high quavering whinny falling in steps, ending in a soft nicker, outdoors on open grassland. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.035,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "horse_snort-3-71c7762c.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A horse snorting: a blast of air through flapping nostrils, a short blow, close. No music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.922,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "horse_snort-1-e17c9310.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A horse snorting: a blast of air through flapping nostrils, a short blow, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.704,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "horse_squeal-2-deba46fc.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An angry stallion squealing shrilly, a short aggressive shriek as it kicks, close. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.942,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "horse_squeal-3-d3ec1b12.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An angry stallion squealing shrilly, a short aggressive shriek as it kicks, close. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.904,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "dog_bark-1-b5697b0b.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A large shepherd dog barking two or three deep chesty barks outdoors in a field. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.944,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "dog_bark-2-b970e2be.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A large shepherd dog barking two or three deep chesty barks outdoors in a field. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.926,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "dog_yelp-1-3c70e498.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A dog yelping sharply in pain, one high cry and a short whimper. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.513,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "dog_yelp-3-ff2849fb.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A dog yelping sharply in pain, one high cry and a short whimper. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.443,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "sheep_bleat-1-e8ac7f93.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single sheep bleating baa with a wobbling nasal voice, close, outdoors in a meadow. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.998,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "sheep_bleat-3-aeefea06.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single sheep bleating baa with a wobbling nasal voice, close, outdoors in a meadow. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.997,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "marmot_whistle-1-b7eecab8.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An alpine marmot's alarm call: one or two piercing high sharp whistles echoing across a mountain meadow. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.991,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "marmot_whistle-3-cb2183cf.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An alpine marmot's alarm call: one or two piercing high sharp whistles echoing across a mountain meadow. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.428,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "eagle_cry-3-4fc31339.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A golden eagle calling high overhead: a thin piercing screech kee-yeer, twice, over open mountains. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.238,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "leopard_growl-3-35bd3b8b.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A snow leopard growling and hissing: a rasping, sawing big-cat growl with a spit of breath, close. No music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.017,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "leopard_growl-2-d3af9bac.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A snow leopard growling and hissing: a rasping, sawing big-cat growl with a spit of breath, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.01,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "king_call-2-be937d44.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A huge undead warrior king in a stone burial mound: a deep hollow echoing groan and a rattle of gold armour, reverberant tomb, no words. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.104,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "king_hurt-3-170faca9.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A giant armoured undead king struck by a blade: a short deep roar of pain with metal armour clanking, echoing stone chamber, no words. No music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.996,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "king_hurt-2-af879fbf.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A giant armoured undead king struck by a blade: a short deep roar of pain with metal armour clanking, echoing stone chamber, no words. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.994,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "hoof-grass-2-5f364e1d.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "One horse trotting two steps on soft grass turf: muffled low hoof thuds with a swish of grass, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.064,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "hoof-gravel-1-44e6b20f.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "One horse trotting two steps on loose gravel and river stones: a crunching clatter of hooves, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.0,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "hoof-gravel-2-ee23d114.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "One horse trotting two steps on loose gravel and river stones: a crunching clatter of hooves, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.0,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "hoof-wood-1-90597c92.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "One horse trotting two steps across a wooden plank bridge: hollow knocking hoof clops on the boards, close. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.218,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "hoof-wood-2-b5f90eb8.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "One horse trotting two steps across a wooden plank bridge: hollow knocking hoof clops on the boards, close. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.055,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "stampede-2-17664d37.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A herd of wild horses stampeding past across a grassy plain: a thundering rumble of many galloping hooves shaking the ground, building and passing. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 1.0,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "stampede-1-2e9f5914.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A herd of wild horses stampeding past across a grassy plain: a thundering rumble of many galloping hooves shaking the ground, building and passing. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.987,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "footstep-grass-2-5a248407.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single footstep of a leather boot on tall dry steppe grass, a soft crush and swish, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.949,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "footstep-grass-1-12997b46.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single footstep of a leather boot on tall dry steppe grass, a soft crush and swish, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.598,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "footstep-gravel-2-fd612069.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single footstep of a leather boot on a gravel road, a small crunch of stones, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.893,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "footstep-gravel-1-19e4eea2.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single footstep of a leather boot on a gravel road, a small crunch of stones, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.727,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "bowDraw-3-c29c9c43.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An archer slowly drawing a horn and wood recurve bow: the string stretching and the limbs creaking under tension, close. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.99,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bowDraw-2-a565b317.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An archer slowly drawing a horn and wood recurve bow: the string stretching and the limbs creaking under tension, close. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.906,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bowFullDraw-2-ee0e4dd9.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A bow held at full draw: one small tight creak of wood and a soft click of the arrow nock, close, quiet. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.018,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "bowLetDown-2-06e19a6d.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "An archer easing a drawn bow back down without shooting: the string relaxing with a soft creak and a faint rattle of the arrow, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.047,
+      "clap_rank": 5,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "bowTwang-2-04acbe73.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A recurve bow shooting an arrow: the string releases with a deep twang and a thump of the limbs, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.235,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "bowTwang-1-66536b93.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A recurve bow shooting an arrow: the string releases with a deep twang and a thump of the limbs, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.161,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "arrowWhoosh-2-3792e59f.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow flying fast past the listener: a short sharp whoosh of air. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.956,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "arrowWhoosh-1-a831cab6.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow flying fast past the listener: a short sharp whoosh of air. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.92,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "arrowImpact-wood-2-b5a11d70.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow striking a wooden post: a hard thunk and the shaft quivering, close. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.775,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "arrowImpact-wood-3-6940161f.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow striking a wooden post: a hard thunk and the shaft quivering, close. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.707,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "arrowImpact-ground-2-a04ed94d.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow sticking into soft earth and turf: a dull short thud. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.006,
+      "clap_rank": 5,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "arrowImpact-flesh-3-a82fa369.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow hitting an animal's body: a short wet thud, close. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.687,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "arrowImpact-flesh-2-bb61e810.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "An arrow hitting an animal's body: a short wet thud, close. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.367,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "sabreSwing-1-ae5a26f0.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A curved steel cavalry sabre swung fast: a thin sharp swish through the air with a faint ring of the blade, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.938,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "sabreSwing-2-02d47131.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A curved steel cavalry sabre swung fast: a thin sharp swish through the air with a faint ring of the blade, close. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.744,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "sabreHit-flesh-3-762ce5fc.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A steel sabre slashing into a body: a sharp cutting slash with a wet thud, close. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.99,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "sabreHit-flesh-2-e6417bf6.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A steel sabre slashing into a body: a sharp cutting slash with a wet thud, close. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.983,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "sabreHit-wood-2-a5b2f0b1.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A steel sabre chopping into wood: a hard chop with the blade ringing afterwards, close. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.994,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "sabreHit-wood-1-e4853660.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A steel sabre chopping into wood: a hard chop with the blade ringing afterwards, close. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.805,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "javelinThrow-2-0cb3c85f.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A heavy javelin thrown hard: a grunt of effort and a long heavy whoosh of the spear flying away. No music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.007,
+      "clap_rank": 3,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "javelinImpact-wood-1-1d56a392.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A heavy javelin slamming into a wooden post: a deep thunk and the long shaft ringing, close. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.034,
+      "clap_rank": 4,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "javelinImpact-ground-1-30313064.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A heavy javelin stabbing deep into the earth: a deep thud and a spray of dirt. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.016,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "javelinImpact-ground-3-8ebe2f3b.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A heavy javelin stabbing deep into the earth: a deep thud and a spray of dirt. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.015,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "thunder-near-1-25a8635e.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A lightning strike very close: an ear-splitting thunder crack tearing overhead, then a long heavy rolling rumble, open plain. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.998,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "thunder-near-2-63591c82.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A lightning strike very close: an ear-splitting thunder crack tearing overhead, then a long heavy rolling rumble, open plain. No music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.995,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "thunder-far-1-615a697f.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Distant thunder: a low soft rolling rumble far away over the mountains, no crack. No music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.403,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "thunder-far-3-a9a4b0c0.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Distant thunder: a low soft rolling rumble far away over the mountains, no crack. No music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.353,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "lightningCrackle-1-38ea4f51.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Crackling static electricity building in the air just before a lightning strike: dry rapid snaps and sizzles rising in intensity. No music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.982,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-steppe-wind-3-51fa5a78.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience of an open grassy steppe by day: a steady wind hissing through tall dry grass, soft gusts swelling and fading, no birds, no voices. Continuous field recording, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.998,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-steppe-larks-2-b0d20bcd.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Ambience of skylarks singing high above a summer meadow: long tumbling bright trills from several birds far overhead, a faint breeze. Continuous field recording, no music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.999,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-steppe-night-1-e1a88138.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience of a grassland at night: many crickets chirping steadily, a very light cool breeze in the grass, calm and still. Continuous field recording, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.962,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-river-1-beb1a9a8.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience beside a fast clear mountain river: water rushing and splashing over gravel and stones, steady and continuous. Field recording, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.976,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-meltwater-2-608d0e3b.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience at the foot of a glacier: meltwater trickling and gurgling in small icy streams, drips of water, a cold faint wind. Continuous field recording, no music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.982,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-camp-1-c7570b1a.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience of a nomad camp: a wood fire crackling and popping close by, heavy felt and canvas tent flaps rustling and flapping in a steady wind, open grassland all around. Continuous field recording, no music, no voices.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.914,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-highwind-1-95937f84.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience on a high open mountain plateau: a strong steady wind blowing across wide grassland, deep whooshing gusts, far away a herd of horses. Continuous field recording, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.707,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-coldwind-3-2fe1886b.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience of a snowy mountain valley: a cold thin howling wind whistling over snow and rock, lonely and icy. Continuous field recording, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.975,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-rain-1-abadcece.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Ambience of heavy rain falling on open grassland: a dense steady patter and hiss of raindrops on grass and earth, no thunder. Continuous field recording, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.979,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "bed-stormwind-2-465916b5.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Ambience of a violent storm wind: a deep roaring gale blasting across an open plain, surging and howling, no rain, no thunder. Continuous field recording, no music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.987,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "crossbowFire-3-18ccf9f0.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single heavy hunting crossbow shot outdoors in a forest: the trigger latch clicks, the thick string slaps forward with a deep twang and the bolt hisses away. Close, dry, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.004,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "reload-3-d81ab6e2.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Cocking a heavy crossbow: a geared cranequin ratchet winds the string back with quick metal clicks and wooden creaks, then the string drops into the latch with a solid click. Close, dry, no music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.977,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "reload-1-d3e6d32a.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Cocking a heavy crossbow: a geared cranequin ratchet winds the string back with quick metal clicks and wooden creaks, then the string drops into the latch with a solid click. Close, dry, no music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.973,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "boltImpact-wood-2-8e9e99ee.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A crossbow bolt thudding hard into the trunk of a pine tree: a sharp woody thunk and the shaft vibrating. A single impact, outdoors, no music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.985,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "boltImpact-wood-3-673a0ef6.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A crossbow bolt thudding hard into the trunk of a pine tree: a sharp woody thunk and the shaft vibrating. A single impact, outdoors, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.984,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "boltImpact-ground-2-5e8a3076.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A crossbow bolt stabbing into soft forest floor covered in pine needles and earth: a dull muffled thump with a little crunch of needles. A single impact, outdoors, no music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.996,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "boltImpact-ground-1-f81140e6.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A crossbow bolt stabbing into soft forest floor covered in pine needles and earth: a dull muffled thump with a little crunch of needles. A single impact, outdoors, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.956,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "boltImpact-flesh-2-13ed7f2c.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A crossbow bolt striking the body of a large animal: a short, heavy, wet thump. A single impact, close, no music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.001,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "boltImpact-flesh-3-62e25aa5.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A crossbow bolt striking the body of a large animal: a short, heavy, wet thump. A single impact, close, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.001,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "elk_bugle-3-f6e8030e.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A bull elk bugling across a forest valley at dawn: a high, breathy, rising whistle that holds and breaks, then drops into deep chesty grunts. Natural field recording, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.809,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "elk_bugle-2-0e80875f.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A bull elk bugling across a forest valley at dawn: a high, breathy, rising whistle that holds and breaks, then drops into deep chesty grunts. Natural field recording, no music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.464,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "bear_roar-3-9f1e177e.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A huge brown bear roaring as it charges: a deep, ragged, bellowing roar with a rasp of breath. Close and powerful, outdoors, no music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.933,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "bear_roar-2-29e3055e.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A huge brown bear roaring as it charges: a deep, ragged, bellowing roar with a rasp of breath. Close and powerful, outdoors, no music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.904,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "bear_growl-3-f91d7740.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A brown bear growling low and huffing warnings: a slow, deep, rumbling growl and a couple of chesty huffs. Close, outdoors, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.023,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "boar_squeal-1-804df37c.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A wild boar squealing in pain and anger: a loud, shrill, harsh squeal breaking into grunts. Close, outdoors, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.04,
+      "clap_rank": 4,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-litter-1-fe9cd8d9.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single boot footstep on a dry forest floor of pine needles and small twigs: a soft crunch and crackle. Close, one step only, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.322,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-litter-3-09ceed7a.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single boot footstep on a dry forest floor of pine needles and small twigs: a soft crunch and crackle. Close, one step only, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.13,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-planks-3-d919e436.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single heavy boot footstep on an old wooden cabin floor: a hollow knock of the plank with a faint creak. Close, indoors, one step only, no music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.519,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-planks-2-ebb5a80c.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single heavy boot footstep on an old wooden cabin floor: a hollow knock of the plank with a faint creak. Close, indoors, one step only, no music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.365,
+      "clap_rank": 2,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-mud-2-99e4a10d.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single boot footstep sinking into thick wet mud at a pond's edge: a squelch and a sucking pull as the boot lifts. Close, one step only, no music.",
+      "seed": 2,
+      "steps": 100,
+      "clap_p": 0.949,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-mud-1-1dd22736.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "A single boot footstep sinking into thick wet mud at a pond's edge: a squelch and a sucking pull as the boot lifts. Close, one step only, no music.",
+      "seed": 1,
+      "steps": 100,
+      "clap_p": 0.67,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-rock-2-58c2cc26.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single boot footstep on a granite rock ledge: a hard gritty scuff and click of the sole on stone. Close, outdoors, one step only, no music.",
+      "seed": 2,
+      "steps": 8,
+      "clap_p": 0.542,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-rock-3-98e0e874.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single boot footstep on a granite rock ledge: a hard gritty scuff and click of the sole on stone. Close, outdoors, one step only, no music.",
+      "seed": 3,
+      "steps": 8,
+      "clap_p": 0.426,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "footstep-wet-1-58d313a2.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A single boot footstep on soaked, rain-wet forest ground and wet leaves: a soft splat and squish. Close, one step only, no music.",
+      "seed": 1,
+      "steps": 8,
+      "clap_p": 0.077,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "pine-hollow"
+    },
+    {
+      "file": "javelinImpact-flesh-22-e83a7a00.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "A thrown javelin impaling a big animal: a thick wet thud of the spear punching into its body, close foley. No music.",
+      "seed": 22,
+      "steps": 8,
+      "clap_p": 0.997,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "javelinImpact-flesh-38-e58ddf4b.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Body hit: a heavy spear plunging deep into a carcass, a dull deep stab and a short squelch, close. No music.",
+      "seed": 38,
+      "steps": 8,
+      "clap_p": 0.997,
+      "clap_rank": 1,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "lightningCrackle-3-a3e695ea.m4a",
+      "model": "OpenMOSS-Team/MOSS-SoundEffect-v2.0",
+      "code": "MOSS-TTS 934d682, torch 2.9.0",
+      "prompt": "Crackling static electricity building in the air just before a lightning strike: dry rapid snaps and sizzles rising in intensity. No music.",
+      "seed": 3,
+      "steps": 100,
+      "clap_p": 0.985,
+      "clap_rank": 1,
+      "source": "MOSS-SoundEffect v2.0 (OpenMOSS-Team/MOSS-SoundEffect-v2.0, Apache-2.0)",
+      "set_of_origin": "moss",
+      "round": "nalati"
+    },
+    {
+      "file": "spearThrust-23-d19fc200.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Spear thrust foley: a single sharp swoosh of a long spear jabbed hard forward, the pole whipping through the air, very short. No music.",
+      "seed": 23,
+      "steps": 8,
+      "clap_p": 0.137,
+      "clap_rank": 2,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    },
+    {
+      "file": "spearThrust-22-5612e63b.m4a",
+      "model": "stabilityai/stable-audio-3-medium (mirror stable-audio-3-medium)",
+      "code": "stable-audio-3 779434a908193105335fd8d833418603625b2859, torch 2.7.1",
+      "prompt": "Spear thrust foley: a single sharp swoosh of a long spear jabbed hard forward, the pole whipping through the air, very short. No music.",
+      "seed": 22,
+      "steps": 8,
+      "clap_p": 0.041,
+      "clap_rank": 3,
+      "source": "Stable Audio 3 Medium (stabilityai/stable-audio-3-medium, Stability AI Community License)",
+      "set_of_origin": "sa3-medium",
+      "round": "nalati"
+    }
+  ],
+  "synth_keeps": [
+    "jump"
+  ]
+}

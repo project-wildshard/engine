@@ -1,0 +1,131 @@
+{
+  "wing": {
+    "attributes": [
+      {
+        "name": "position",
+        "size": 3,
+        "normalized": false,
+        "count": 5,
+        "storage": "Float32Array",
+        "hash": "54dc3fb7a0e18bd014e47c0a8af657e15d1d46085c0e497d8ef9ee9acc22ed14"
+      },
+      {
+        "name": "normal",
+        "size": 3,
+        "normalized": false,
+        "count": 5,
+        "storage": "Float32Array",
+        "hash": "391538940d6c6ba14929e248013fa6ef126d34936a0b852b6de33cfb194f5eed"
+      },
+      {
+        "name": "color",
+        "size": 3,
+        "normalized": false,
+        "count": 5,
+        "storage": "Float32Array",
+        "hash": "b661706ee350c74067f1d70e69fb538eb178fbbe8dd91177495d4a2da702cab9"
+      }
+    ],
+    "index": {
+      "size": 1,
+      "normalized": false,
+      "count": 18,
+      "storage": "Uint16Array",
+      "hash": "2bba3875f5fda20a8975a091c1291103e3aed4ecd6ccbc6e49895488025fc3ee"
+    },
+    "groups": [],
+    "box": null,
+    "sphere": [
+      0.02199999988079071,
+      0.0020000000949949026,
+      -0.0030000004917383194,
+      0.02601922461648737
+    ]
+  },
+  "bird": {
+    "attributes": [
+      {
+        "name": "position",
+        "size": 3,
+        "normalized": false,
+        "count": 15,
+        "storage": "Float32Array",
+        "hash": "1a4ec28ec2404ca1c77ec1e75675bc78d0606325fa5fcb87a05743d9bc4386a1"
+      },
+      {
+        "name": "normal",
+        "size": 3,
+        "normalized": false,
+        "count": 15,
+        "storage": "Float32Array",
+        "hash": "69a9b969b8e9547b2751e97e7cda3ea3f2b80888906a9b6309f9b5e14f4b8efd"
+      },
+      {
+        "name": "color",
+        "size": 3,
+        "normalized": false,
+        "count": 15,
+        "storage": "Float32Array",
+        "hash": "f7ac36a0b9d4bbc46a9a6fd2f862ffd1f3dd1b9187eadac9bde1cb2f45202fef"
+      }
+    ],
+    "index": {
+      "size": 1,
+      "normalized": false,
+      "count": 60,
+      "storage": "Uint16Array",
+      "hash": "a35c17bd7b45a47981fff88fd6d2fa091178fc64e83c7ece62d735ade7ea5d42"
+    },
+    "groups": [],
+    "box": null,
+    "sphere": [
+      0.5,
+      0.009999999776482582,
+      0.025000005960464478,
+      0.7620531612421357
+    ]
+  },
+  "marmot": {
+    "attributes": [
+      {
+        "name": "position",
+        "size": 3,
+        "normalized": false,
+        "count": 265,
+        "storage": "Float32Array",
+        "hash": "19957cb141f48f0aac2dd40066a657f60bd4576a0bb746b3240ec09b65786bca"
+      },
+      {
+        "name": "normal",
+        "size": 3,
+        "normalized": false,
+        "count": 265,
+        "storage": "Float32Array",
+        "hash": "409a79dbc6ee7c0714807cba26b48f11cfd44b6e337eb32ba81a4b150ffc4a37"
+      },
+      {
+        "name": "color",
+        "size": 3,
+        "normalized": false,
+        "count": 265,
+        "storage": "Float32Array",
+        "hash": "73dc17ab549381e17e44ea7983f159dea56f1c6d5822b1ef710882095de53c41"
+      }
+    ],
+    "index": {
+      "size": 1,
+      "normalized": false,
+      "count": 1212,
+      "storage": "Uint16Array",
+      "hash": "f5ec7994aae09d1d27e64a2b5f295a4201af9ecca39d0a9ca1d5fd4c78c64b1e"
+    },
+    "groups": [],
+    "box": null,
+    "sphere": [
+      0,
+      0.11315006588120013,
+      0.016957297921180725,
+      0.294289002822463
+    ]
+  }
+}

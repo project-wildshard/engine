@@ -1,0 +1,77 @@
+{
+  "spawn": {
+    "eye": [
+      0,
+      22.963867328746414,
+      70
+    ],
+    "feet": [
+      0,
+      21.363867328746412,
+      70
+    ],
+    "yaw": 0,
+    "pitch": 2,
+    "mockup": "art/sunscar-dunes/round-2-dunes/C-dusk-signal-fire.jpg",
+    "frame": "Spawn: the crest, the signal tower far off"
+  },
+  "whip": {
+    "eye": [
+      0,
+      21.918243261176368,
+      66
+    ],
+    "feet": [
+      0,
+      20.318243261176367,
+      66
+    ],
+    "yaw": -20,
+    "pitch": -4,
+    "mockup": "",
+    "frame": "The bullwhip mid-crack"
+  },
+  "ray": {
+    "eye": [
+      0,
+      22.963867328746414,
+      70
+    ],
+    "feet": [
+      0,
+      21.363867328746412,
+      70
+    ],
+    "yaw": -3,
+    "pitch": 9,
+    "mockup": "",
+    "frame": "The dune ray against the dusk"
+  },
+  "quest": {
+    "eye": [
+      4,
+      20.558435838932063,
+      -63
+    ],
+    "feet": [
+      4,
+      18.95843583893206,
+      -63
+    ],
+    "yaw": 15,
+    "pitch": 22,
+    "mockup": "",
+    "frame": "Quest done: the signal fire lit"
+  },
+  "tower": {
+    "eye": [
+      8,
+      26.661264166119512,
+      -74
+    ],
+    "yaw": 180,
+    "pitch": -8,
+    "mockup": "",
+    "frame": "Signal tower"
+  }
+}

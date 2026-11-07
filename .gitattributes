@@ -1,0 +1,21 @@
+# Already-compressed binaries: skip git's delta search on commit / push (it finds nothing in them and costs CPU on
+# every push; E21). Keep them small at the source: preview images ≤ 250 KB (docs/process/STORAGE.md).
+*.png   binary -delta
+*.jpg   binary -delta
+*.jpeg  binary -delta
+*.webp  binary -delta
+*.ktx2  binary -delta
+*.glb   binary -delta
+*.bin   binary -delta
+*.hdr   binary -delta
+*.exr   binary -delta
+*.mp4   binary -delta
+*.mp3   binary -delta
+*.ogg   binary -delta
+*.wav   binary -delta
+*.woff2 binary -delta
+*.blend binary -delta
+*.blend1 binary -delta
+test/fixtures/** -whitespace
+public/** -whitespace
+*.patch -whitespace

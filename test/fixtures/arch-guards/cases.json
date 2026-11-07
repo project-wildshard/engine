@@ -1,0 +1,583 @@
+[
+  {
+    "id": "commons-format-contract",
+    "file": "src/commons/format-contract.ts",
+    "rule": "layer",
+    "code": "import { parseItems } from '@wildshard/format/items';",
+    "count": 0
+  },
+  {
+    "id": "commons-game-refusal",
+    "file": "src/commons/game-refusal.ts",
+    "rule": "layer",
+    "code": "import { declaredKitItemFamilies } from '@wildshard/game/plugin/weaponFamily';",
+    "count": 1
+  },
+  {
+    "id": "commons-engine-refusal",
+    "file": "src/commons/engine-refusal.ts",
+    "rule": "layer",
+    "code": "import { Scope } from '@wildshard/engine/app/scope';",
+    "count": 1
+  },
+  {
+    "id": "relative-deep",
+    "file": "src/game/relative-deep.ts",
+    "rule": "public-index",
+    "code": "import { x } from '../engine/world/Sky';",
+    "count": 1
+  },
+  {
+    "id": "relative-index",
+    "file": "src/game/relative-index.ts",
+    "rule": "layer",
+    "code": "import { x } from '../engine/index';",
+    "count": 0
+  },
+  {
+    "id": "relative-data",
+    "file": "src/shards/nalati-grasslands/relative-data.ts",
+    "rule": "layer",
+    "code": "import { x } from '../../engine/data';",
+    "count": 0
+  },
+  {
+    "id": "template-up",
+    "file": "src/engine/template-up.ts",
+    "rule": "layer",
+    "code": "void import(`../shards/${slug}/plugin`);",
+    "count": 1
+  },
+  {
+    "id": "template-aliased-up",
+    "file": "src/engine/template-aliased-up.ts",
+    "rule": "layer",
+    "code": "void import(`../shards/${slug}/plugin`);",
+    "count": 1
+  },
+  {
+    "id": "template-own",
+    "file": "src/shards/nalati-grasslands/template-own.ts",
+    "rule": "layer",
+    "code": "void import(`./models/${id}`);",
+    "count": 0
+  },
+  {
+    "id": "glob-up",
+    "file": "src/engine/glob-up.ts",
+    "rule": "layer",
+    "code": "const x = import.meta.glob('../shards/*/manifest.ts');",
+    "count": 1
+  },
+  {
+    "id": "glob-array",
+    "file": "src/sharddev/glob-array.ts",
+    "rule": "public-index",
+    "code": "const x = import.meta.glob(['../engine/world/*.ts', '../game/*.ts']);",
+    "count": 2
+  },
+  {
+    "id": "glob-own",
+    "file": "src/engine/glob-own.ts",
+    "rule": "layer",
+    "code": "const x = import.meta.glob('./world/*.ts');",
+    "count": 0
+  },
+  {
+    "id": "app-import",
+    "file": "src/engine/app-import.ts",
+    "rule": "layer",
+    "code": "import { x } from '../main';",
+    "count": 1
+  },
+  {
+    "id": "app-public",
+    "file": "src/appProbe.ts",
+    "rule": "layer",
+    "code": "import { x } from '@wildshard/engine';",
+    "count": 0
+  },
+  {
+    "id": "app-deep",
+    "file": "src/deepProbe.ts",
+    "rule": "public-index",
+    "code": "import { x } from '@wildshard/engine/world/Sky';",
+    "count": 1
+  },
+  {
+    "id": "literal-look",
+    "file": "src/game/literal-look.ts",
+    "rule": "no-level-identity",
+    "code": "activeLevel().kitLook === 'toon';",
+    "count": 1
+  },
+  {
+    "id": "reverse-identity",
+    "file": "src/game/reverse-identity.ts",
+    "rule": "no-level-identity",
+    "code": "'emberfall' === game.level.id;",
+    "count": 1
+  },
+  {
+    "id": "switch-style",
+    "file": "src/game/switch-style.ts",
+    "rule": "no-level-identity",
+    "code": "switch (manifest.biome) { case 'desert': break; }",
+    "count": 1
+  },
+  {
+    "id": "string-identity",
+    "file": "src/game/string-identity.ts",
+    "rule": "no-level-identity",
+    "code": "level['slug'].startsWith('pin');",
+    "count": 1
+  },
+  {
+    "id": "table-identity",
+    "file": "src/game/table-identity.ts",
+    "rule": "no-level-identity",
+    "code": "const TABLE = { a: 1 }; TABLE[level.id];",
+    "count": 1
+  },
+  {
+    "id": "alias-identity",
+    "file": "src/game/alias-identity.ts",
+    "rule": "no-level-identity",
+    "code": "const copy = activeLevel(); copy.style === 'pbr';",
+    "count": 1
+  },
+  {
+    "id": "style-tag",
+    "file": "src/game/style-tag.ts",
+    "rule": "no-level-identity",
+    "code": "level.tags.includes('ocean');",
+    "count": 1
+  },
+  {
+    "id": "capabilities",
+    "file": "src/game/capabilities.ts",
+    "rule": "no-level-identity",
+    "code": "level.mechanisms.includes('dayCycle'); level.ground.structures === true;",
+    "count": 0
+  },
+  {
+    "id": "strategy-data",
+    "file": "src/game/strategy-data.ts",
+    "rule": "no-level-identity",
+    "code": "const TABLE = level.looks; TABLE[level.kitLook];",
+    "count": 0
+  },
+  {
+    "id": "strike-capability",
+    "file": "src/game/strike-capability.ts",
+    "rule": "no-level-identity",
+    "code": "spec.tags.includes('cover.exempt');",
+    "count": 0
+  },
+  {
+    "id": "object-def",
+    "file": "src/game/object-def.ts",
+    "rule": "no-level-identity",
+    "code": "const d = live.def; d.look === 'plank';",
+    "count": 0
+  },
+  {
+    "id": "nonliteral-enum",
+    "file": "src/game/nonliteral-enum.ts",
+    "rule": "no-level-identity",
+    "code": "level.style === selectedStyle;",
+    "count": 0
+  },
+  {
+    "id": "identity-in-shard",
+    "file": "src/shards/nalati-grasslands/identity-in-shard.ts",
+    "rule": "no-level-identity",
+    "code": "activeLevel().kitLook === 'toon';",
+    "count": 0
+  },
+  {
+    "id": "slug-map",
+    "file": "src/game/slug-map.ts",
+    "rule": "no-shard-branch",
+    "code": "const x = { 'pine-hollow': 1 };",
+    "count": 1
+  },
+  {
+    "id": "slug-key",
+    "file": "src/game/slug-key.ts",
+    "rule": "no-shard-branch",
+    "code": "values['pine-hollow'];",
+    "count": 1
+  },
+  {
+    "id": "slug-data",
+    "file": "src/game/slug-data.ts",
+    "rule": "no-shard-branch",
+    "code": "const value = 'pine-hollow';",
+    "count": 0
+  },
+  {
+    "id": "slug-own",
+    "file": "src/shards/nalati-grasslands/slug-own.ts",
+    "rule": "no-shard-branch",
+    "code": "const x = { 'pine-hollow': 1 };",
+    "count": 0
+  },
+  {
+    "id": "window-cast",
+    "file": "src/shards/nalati-grasslands/window-cast.ts",
+    "rule": "shard-sandbox",
+    "code": "(window as Window)['__nalati'] = 1;",
+    "count": 1
+  },
+  {
+    "id": "global-read",
+    "file": "src/shards/nalati-grasslands/global-read.ts",
+    "rule": "shard-sandbox",
+    "code": "globalThis.document.title;",
+    "count": 1
+  },
+  {
+    "id": "assign-global",
+    "file": "src/shards/nalati-grasslands/assign-global.ts",
+    "rule": "shard-sandbox",
+    "code": "Object.assign(window, { __nalati: 1 });",
+    "count": 1
+  },
+  {
+    "id": "helper-input",
+    "file": "src/shards/nalati-grasslands/helper-input.ts",
+    "rule": "shard-sandbox",
+    "code": "scope.listen(window, 'keydown', fn);",
+    "count": 1
+  },
+  {
+    "id": "free-helper",
+    "file": "src/shards/nalati-grasslands/free-helper.ts",
+    "rule": "shard-sandbox",
+    "code": "listenDom(scope, document, 'pointermove', fn);",
+    "count": 1
+  },
+  {
+    "id": "generator-node-baker",
+    "file": "src/shards/nalati-grasslands/generators/bake-nalati-example.mjs",
+    "rule": "shard-sandbox",
+    "code": "globalThis.document.title;",
+    "count": 0
+  },
+  {
+    "id": "generator-ts-still-guarded",
+    "file": "src/shards/nalati-grasslands/generators/example.ts",
+    "rule": "shard-sandbox",
+    "code": "globalThis.document.title;",
+    "count": 1
+  },
+  {
+    "id": "owned-setting",
+    "file": "src/shards/nalati-grasslands/owned-setting.ts",
+    "rule": "shard-sandbox",
+    "code": "setting('nalatiHybrid');",
+    "count": 0
+  },
+  {
+    "id": "foreign-setting",
+    "file": "src/shards/nalati-grasslands/foreign-setting.ts",
+    "rule": "shard-sandbox",
+    "code": "setting('weather');",
+    "count": 1
+  },
+  {
+    "id": "dynamic-setting",
+    "file": "src/shards/nalati-grasslands/dynamic-setting.ts",
+    "rule": "shard-sandbox",
+    "code": "setting(key);",
+    "count": 1
+  },
+  {
+    "id": "own-asset",
+    "file": "src/shards/nalati-grasslands/own-asset.ts",
+    "rule": "shard-sandbox",
+    "code": "const x = '/assets/nalati/horse.glb';",
+    "count": 0
+  },
+  {
+    "id": "shared-asset",
+    "file": "src/shards/nalati-grasslands/shared-asset.ts",
+    "rule": "shard-sandbox",
+    "code": "const x = '/assets/tex/grass.jpg';",
+    "count": 0
+  },
+  {
+    "id": "foreign-asset",
+    "file": "src/shards/nalati-grasslands/foreign-asset.ts",
+    "rule": "shard-sandbox",
+    "code": "const x = '/assets/nine-dragon/roof.glb';",
+    "count": 1
+  },
+  {
+    "id": "dynamic-asset",
+    "file": "src/shards/nalati-grasslands/dynamic-asset.ts",
+    "rule": "shard-sandbox",
+    "code": "const x = `/assets/${slug}/roof.glb`;",
+    "count": 1
+  },
+  {
+    "id": "context-services",
+    "file": "src/shards/nalati-grasslands/context-services.ts",
+    "rule": "shard-sandbox",
+    "code": "ctx.debug.expose('animal', animal); ctx.scope.listen(button, 'pointerdown', fn);",
+    "count": 0
+  },
+  {
+    "id": "alias-global",
+    "file": "src/shards/nalati-grasslands/alias-global.ts",
+    "rule": "shard-sandbox",
+    "code": "const host = window; host.innerWidth;",
+    "count": 1
+  },
+  {
+    "id": "const-event",
+    "file": "src/shards/nalati-grasslands/const-event.ts",
+    "rule": "shard-sandbox",
+    "code": "const event = 'keyup'; scope.listen(document, event, fn);",
+    "count": 1
+  },
+  {
+    "id": "doc-alias",
+    "file": "src/shards/nalati-grasslands/doc-alias.ts",
+    "rule": "shard-sandbox",
+    "code": "const doc = document; listenDom(scope, doc, 'pointerdown', fn);",
+    "count": 1
+  },
+  {
+    "id": "owned-setting-const",
+    "file": "src/shards/nalati-grasslands/owned-setting-const.ts",
+    "rule": "shard-sandbox",
+    "code": "const KEY = 'nalatiHybrid'; setting(KEY);",
+    "count": 0
+  },
+  {
+    "id": "retry-public-index",
+    "file": "src/game/retry-public.ts",
+    "rule": "layer",
+    "code": "import { retried } from '@wildshard/engine/boot/retry';",
+    "count": 0
+  },
+  {
+    "id": "retry-deep-refused",
+    "file": "src/game/retry-deep.ts",
+    "rule": "public-index",
+    "code": "import { retried } from '@wildshard/engine/boot/retryInternals';",
+    "count": 1
+  },
+  {
+    "id": "retry-index-lookalike-refused",
+    "file": "src/game/retry-lookalike.ts",
+    "rule": "public-index",
+    "code": "import { retried } from '@wildshard/engine/boot/retry/private';",
+    "count": 1
+  },
+  {
+    "id": "ag23-unlayered-dir",
+    "file": "src/zznew/probe.ts",
+    "rule": "layer",
+    "code": "export const value = 1;",
+    "count": 1
+  },
+  {
+    "id": "ag23-import-unlayered",
+    "file": "src/engine/ag23-import.ts",
+    "rule": "layer",
+    "code": "import { value } from '../zznew/probe';\nexport const v = value;",
+    "count": 1
+  },
+  {
+    "id": "ag24-legacy-folder",
+    "file": "src/nalati/legacy.ts",
+    "rule": "no-shard-branch",
+    "code": "declare const m: { slug: string };\nexport const s = m.slug === 'pine-hollow';",
+    "count": 1
+  },
+  {
+    "id": "ag27-concat-import",
+    "file": "src/engine/ag27-concat.ts",
+    "rule": "layer",
+    "code": "export const load = () => import('../game/' + 'index');",
+    "count": 1
+  },
+  {
+    "id": "ag25-destructure",
+    "file": "src/game/ag25-destructure.ts",
+    "rule": "no-level-identity",
+    "code": "declare function activeLevel(): { kitLook: string };\nconst { kitLook } = activeLevel();\nexport const t = kitLook === 'toon';",
+    "count": 1
+  },
+  {
+    "id": "ag25-field-alias",
+    "file": "src/game/ag25-field-alias.ts",
+    "rule": "no-level-identity",
+    "code": "declare function activeLevel(): { kitLook: string };\nconst look = activeLevel().kitLook;\nexport const t = look === 'toon';",
+    "count": 1
+  },
+  {
+    "id": "ag25-any-receiver",
+    "file": "src/game/ag25-any-receiver.ts",
+    "rule": "no-level-identity",
+    "code": "declare const current: { kitLook: string };\nexport const t = current.kitLook === 'toon';",
+    "count": 1
+  },
+  {
+    "id": "ag25-const-string",
+    "file": "src/game/ag25-const-string.ts",
+    "rule": "no-level-identity",
+    "code": "declare const level: { kitLook: string };\nconst TOON = 'toon';\nexport const t = level.kitLook === TOON;",
+    "count": 1
+  },
+  {
+    "id": "ag25-list-includes",
+    "file": "src/game/ag25-list-includes.ts",
+    "rule": "no-level-identity",
+    "code": "declare const level: { kitLook: string };\nexport const t = ['toon', 'pbr'].includes(level.kitLook);",
+    "count": 1
+  },
+  {
+    "id": "ag25-map-get",
+    "file": "src/game/ag25-map-get.ts",
+    "rule": "no-level-identity",
+    "code": "declare const level: { id: string };\nconst BY = new Map([['x', 1]]);\nexport const v = BY.get(level.id);",
+    "count": 1
+  },
+  {
+    "id": "ag25-regex-test",
+    "file": "src/game/ag25-regex-test.ts",
+    "rule": "no-level-identity",
+    "code": "declare const level: { id: string };\nexport const t = /^pine/u.test(level.id);",
+    "count": 1
+  },
+  {
+    "id": "ag25-registry-lookup",
+    "file": "src/game/ag25-registry-lookup.ts",
+    "rule": "no-level-identity",
+    "code": "declare const level: { id: string };\ndeclare const registry: Map<string, number>;\nexport const v = registry.get(level.id);",
+    "count": 0
+  },
+  {
+    "id": "ag25-id-compare",
+    "file": "src/game/ag25-id-compare.ts",
+    "rule": "no-level-identity",
+    "code": "declare const level: { id: string };\ndeclare const other: { levelId: string };\nexport const t = other.levelId === level.id;",
+    "count": 0
+  },
+  {
+    "id": "ag26-document-body",
+    "file": "src/shards/nalati-grasslands/ag26-document-body.ts",
+    "rule": "shard-sandbox",
+    "code": "document.body.style.cursor = 'none';",
+    "count": 1
+  },
+  {
+    "id": "ag26-pointer-lock",
+    "file": "src/shards/nalati-grasslands/ag26-pointer-lock.ts",
+    "rule": "shard-sandbox",
+    "code": "export const locked = document.pointerLockElement !== null;\ndocument.exitPointerLock();",
+    "count": 2
+  },
+  {
+    "id": "ag26-dispatch",
+    "file": "src/shards/nalati-grasslands/ag26-dispatch.ts",
+    "rule": "shard-sandbox",
+    "code": "document.dispatchEvent(new CustomEvent('x'));",
+    "count": 1
+  },
+  {
+    "id": "ag26-bare-global",
+    "file": "src/shards/nalati-grasslands/ag26-bare-global.ts",
+    "rule": "shard-sandbox",
+    "code": "export const w = innerWidth + devicePixelRatio;\nexport const ua = navigator.userAgent;",
+    "count": 3
+  },
+  {
+    "id": "ag26-create-element",
+    "file": "src/shards/nalati-grasslands/ag26-create-element.ts",
+    "rule": "shard-sandbox",
+    "code": "export const el = document.createElement('div');\nexport const o = { location: 1 };",
+    "count": 0
+  },
+  {
+    "id": "lp3-game-slug",
+    "file": "src/game/lp3-slug.ts",
+    "rule": "shard-names",
+    "code": "export const s = 'pine-hollow';",
+    "count": 1
+  },
+  {
+    "id": "lp3-game-display",
+    "file": "src/game/lp3-display.ts",
+    "rule": "shard-names",
+    "code": "export const s = 'Respawning in Driftwood Isle';",
+    "count": 1
+  },
+  {
+    "id": "lp3-game-stem",
+    "file": "src/game/lp3-stem.ts",
+    "rule": "shard-names",
+    "code": "export const nalatiFlags: string[] = [];",
+    "count": 1
+  },
+  {
+    "id": "lp3-game-camel",
+    "file": "src/game/lp3-camel.ts",
+    "rule": "shard-names",
+    "code": "export const pineHollowMix = 1;",
+    "count": 1
+  },
+  {
+    "id": "lp4-content-name",
+    "file": "src/game/lp4-name.ts",
+    "rule": "shard-names",
+    "code": "export const where = 'Signal Dunes';",
+    "count": 1
+  },
+  {
+    "id": "lp3-comment-ok",
+    "file": "src/game/lp3-comment.ts",
+    "rule": "shard-names",
+    "code": "// Pine Hollow first used this\nexport const x = 1;",
+    "count": 0
+  },
+  {
+    "id": "lp3-common-words-ok",
+    "file": "src/game/lp3-common.ts",
+    "rule": "shard-names",
+    "code": "export const tree = 'pine'; export const log = 'driftwood';",
+    "count": 0
+  },
+  {
+    "id": "lp3-in-shard-ok",
+    "file": "src/shards/nalati-grasslands/lp3-own.ts",
+    "rule": "shard-names",
+    "code": "export const me = 'nalati-grasslands';",
+    "count": 0
+  },
+  {
+    "id": "engine-internal-shard",
+    "file": "src/shards/demo/plugin.ts",
+    "rule": "engine-internal",
+    "code": "import { configureLevel } from '@wildshard/engine/level/selection';\nimport { app } from '@wildshard/engine/app/runtime';\nexport const used = [configureLevel, app];\n",
+    "count": 1
+  },
+  {
+    "id": "engine-internal-game-ok",
+    "file": "src/game/session/demo.ts",
+    "rule": "engine-internal",
+    "code": "import { configureLevel } from '@wildshard/engine/level/selection';\nexport const used = configureLevel;\n",
+    "count": 0
+  },
+  {
+    "id": "shard-services-import",
+    "file": "src/shards/demo/world.ts",
+    "rule": "shard-services",
+    "code": "import { app } from '@wildshard/engine/app/runtime';\nimport { Rng } from '@wildshard/engine/core/rng';\nimport type { Scope } from '@wildshard/engine/app/scope';\nimport type { saves } from '@wildshard/engine/saves/runtime';\nexport const used: [unknown, unknown, Scope | null, unknown] = [app, Rng, null, null as unknown as typeof saves];\n",
+    "count": 1
+  }
+]

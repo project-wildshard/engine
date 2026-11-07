@@ -1,0 +1,801 @@
+{
+  "slug": "pine-hollow",
+  "entry": "runtime/headless.ts",
+  "compatible": false,
+  "scope": "Warden Hollow gameplay tape, not every Pine system",
+  "inputs": "19435ca7c4a20ca0f6e9f396503e1a1374dda6e94f40c491737280009da652c6",
+  "headless": {
+    "status": "passed",
+    "resumedFrom": "spawn",
+    "ticksExecuted": 31224,
+    "tick": 31224,
+    "alive": true,
+    "kingDefeated": true,
+    "dawn": true,
+    "hash": "d2970ffb681ef89b0039fad1e323b1755ac454b8549448fb8373070e5eafedca",
+    "pack": {
+      "counts": {
+        "amber-resin": 5
+      },
+      "order": [
+        "amber-resin"
+      ]
+    },
+    "resinCount": 2,
+    "facts": [
+      {
+        "name": "pine.feat.lanterns",
+        "entity": "lanterns:1",
+        "tick": 6839,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.resin",
+        "entity": "resin:1",
+        "tick": 10193,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.resin",
+        "entity": "resin:2",
+        "tick": 10796,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.lanterns",
+        "entity": "lanterns:2",
+        "tick": 12534,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.zipline",
+        "entity": "zipline:1",
+        "tick": 14161,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.bear2",
+        "entity": "bear2:1",
+        "tick": 19198,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.bear2",
+        "entity": "bear2:2",
+        "tick": 19240,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.lanterns",
+        "entity": "lanterns:3",
+        "tick": 20168,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.elk3",
+        "entity": "elk3:1",
+        "tick": 28654,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.thralls",
+        "entity": "thralls:1",
+        "tick": 28654,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.boar5",
+        "entity": "boar5:1",
+        "tick": 29371,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.thralls",
+        "entity": "thralls:2",
+        "tick": 29371,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.king",
+        "entity": "king:1",
+        "tick": 30504,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.quest",
+        "entity": "quest:1",
+        "tick": 31223,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      }
+    ],
+    "achievements": [
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.lanterns",
+        "title": "Wick Whisperer",
+        "count": 3,
+        "threshold": 3,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.resin",
+        "title": "Sticky Fingers",
+        "count": 2,
+        "threshold": 30,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.zipline",
+        "title": "Gravity's Favourite",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.bear2",
+        "title": "Unbearable",
+        "count": 2,
+        "threshold": 2,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.elk3",
+        "title": "Elk Yeah",
+        "count": 1,
+        "threshold": 3,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.thralls",
+        "title": "Moss Remover",
+        "count": 2,
+        "threshold": 10,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.boar5",
+        "title": "Bacon Procurement Officer",
+        "count": 1,
+        "threshold": 5,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.king",
+        "title": "Regicide, Rustic",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.quest",
+        "title": "Morning Person, Finally",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      }
+    ],
+    "rules": 19,
+    "gameplayEmissionProven": true,
+    "refusedWriteRetried": true,
+    "durableReload": true,
+    "duplicateStable": true,
+    "receipts": [
+      "pending",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "granted",
+      "duplicate"
+    ],
+    "legs": [
+      {
+        "leg": 0,
+        "kind": "go",
+        "tick": 2687,
+        "x": -10.357444774568513,
+        "y": 3.832903408155266,
+        "z": -34.31003610143671
+      },
+      {
+        "leg": 1,
+        "kind": "act",
+        "tick": 2704,
+        "x": -10.357444653785855,
+        "y": 3.833117006114639,
+        "z": -34.31003694835094
+      },
+      {
+        "leg": 2,
+        "kind": "act",
+        "tick": 2737,
+        "x": -11.613889565257754,
+        "y": 3.8326705586905385,
+        "z": -35.833059237134776
+      },
+      {
+        "leg": 3,
+        "kind": "go",
+        "tick": 3094,
+        "x": -0.14638585088255596,
+        "y": 1.1037264515882592,
+        "z": -10.53560554960849
+      },
+      {
+        "leg": 4,
+        "kind": "go",
+        "tick": 5423,
+        "x": -140.8949609707635,
+        "y": -2.897156415430131,
+        "z": 65.66328801028963
+      },
+      {
+        "leg": 5,
+        "kind": "act",
+        "tick": 5424,
+        "x": -140.89496166716478,
+        "y": -2.897088849628985,
+        "z": 65.66331006013557
+      },
+      {
+        "leg": 6,
+        "kind": "go",
+        "tick": 5537,
+        "x": -134.76572114966027,
+        "y": -3.0858470610721858,
+        "z": 62.00581353981748
+      },
+      {
+        "leg": 7,
+        "kind": "act",
+        "tick": 5538,
+        "x": -134.76571107721927,
+        "y": -3.086014771487739,
+        "z": 62.005742480181524
+      },
+      {
+        "leg": 8,
+        "kind": "go",
+        "tick": 5627,
+        "x": -142.00587280905845,
+        "y": -3.9861746415292734,
+        "z": 61.07318051917888
+      },
+      {
+        "leg": 9,
+        "kind": "act",
+        "tick": 5628,
+        "x": -142.0058690512753,
+        "y": -3.986361951730273,
+        "z": 61.07316184212128
+      },
+      {
+        "leg": 10,
+        "kind": "go",
+        "tick": 6838,
+        "x": -62.22236107459432,
+        "y": -1.6081413011572883,
+        "z": 102.37529582582088
+      },
+      {
+        "leg": 11,
+        "kind": "act",
+        "tick": 6839,
+        "x": -62.222389817055245,
+        "y": -1.6080568423869996,
+        "z": 102.37530916962974
+      },
+      {
+        "leg": 12,
+        "kind": "go",
+        "tick": 9635,
+        "x": 149.4259137630652,
+        "y": 0.10539470138040574,
+        "z": 141.89874789126668
+      },
+      {
+        "leg": 13,
+        "kind": "go",
+        "tick": 12134,
+        "x": 34.25362367308847,
+        "y": 57.47687752457815,
+        "z": 213.00783972426768
+      },
+      {
+        "leg": 14,
+        "kind": "act",
+        "tick": 12160,
+        "x": 35.22332537438231,
+        "y": 57.47331118791899,
+        "z": 214.03565892755876
+      },
+      {
+        "leg": 15,
+        "kind": "go",
+        "tick": 12533,
+        "x": 40.75616078112833,
+        "y": 46.28422918551232,
+        "z": 213.2031107399788
+      },
+      {
+        "leg": 16,
+        "kind": "act",
+        "tick": 12534,
+        "x": 40.75618492646825,
+        "y": 46.28404541571953,
+        "z": 213.20310653705963
+      },
+      {
+        "leg": 17,
+        "kind": "go",
+        "tick": 13176,
+        "x": 34.97007665238269,
+        "y": 57.47688233675577,
+        "z": 211.30069285084608
+      },
+      {
+        "leg": 18,
+        "kind": "act",
+        "tick": 14161,
+        "x": 4.097649562950047,
+        "y": 3.8562337561075606,
+        "z": 20.592000475384662
+      },
+      {
+        "leg": 19,
+        "kind": "ride",
+        "tick": 14161,
+        "x": 4.097649562950047,
+        "y": 3.8562337561075606,
+        "z": 20.592000475384662
+      },
+      {
+        "leg": 20,
+        "kind": "go",
+        "tick": 20167,
+        "x": 192.93441909721656,
+        "y": 9.008954961541129,
+        "z": 197.51823768127335
+      },
+      {
+        "leg": 21,
+        "kind": "act",
+        "tick": 20168,
+        "x": 192.9344190836566,
+        "y": 9.00899671751609,
+        "z": 197.51824010252696
+      },
+      {
+        "leg": 22,
+        "kind": "go",
+        "tick": 23854,
+        "x": 0.2797437503615754,
+        "y": 0.8634794346184052,
+        "z": -9.481265261809114
+      },
+      {
+        "leg": 23,
+        "kind": "go",
+        "tick": 24211,
+        "x": -9.034129232386277,
+        "y": 3.74615786716857,
+        "z": -34.652906900253384
+      },
+      {
+        "leg": 24,
+        "kind": "act",
+        "tick": 24226,
+        "x": -9.033205417435767,
+        "y": 3.745113586803548,
+        "z": -34.653244761333355
+      },
+      {
+        "leg": 25,
+        "kind": "wait",
+        "tick": 24499,
+        "x": -9.025772968796115,
+        "y": 3.7381933414038784,
+        "z": -34.6559582037268
+      },
+      {
+        "leg": 26,
+        "kind": "go",
+        "tick": 24820,
+        "x": -0.13885376558176787,
+        "y": 1.09865057410844,
+        "z": -10.506356407084851
+      },
+      {
+        "leg": 27,
+        "kind": "go",
+        "tick": 25189,
+        "x": 29.454479597951252,
+        "y": -1.7296591924656397,
+        "z": -2.154006188863306
+      },
+      {
+        "leg": 28,
+        "kind": "go",
+        "tick": 25583,
+        "x": 57.579905815864876,
+        "y": -1.7148233851718189,
+        "z": 11.636203040240915
+      },
+      {
+        "leg": 29,
+        "kind": "go",
+        "tick": 25924,
+        "x": 85.4880845104111,
+        "y": -0.25343736027081576,
+        "z": 15.922774365975172
+      },
+      {
+        "leg": 30,
+        "kind": "go",
+        "tick": 26336,
+        "x": 119.48022976561911,
+        "y": 0.9175037222434028,
+        "z": 12.070464060513885
+      },
+      {
+        "leg": 31,
+        "kind": "go",
+        "tick": 26800,
+        "x": 157.4628222961677,
+        "y": 3.1637208859887167,
+        "z": 6.099191770760925
+      },
+      {
+        "leg": 32,
+        "kind": "go",
+        "tick": 26942,
+        "x": 155.10493064902255,
+        "y": 3.427547112173336,
+        "z": -5.482911757321446
+      },
+      {
+        "leg": 33,
+        "kind": "go",
+        "tick": 27094,
+        "x": 151.16511961489448,
+        "y": 3.7767018333643207,
+        "z": -17.497210807294934
+      },
+      {
+        "leg": 34,
+        "kind": "wait",
+        "tick": 27094,
+        "x": 151.16511961489448,
+        "y": 3.7767018333643207,
+        "z": -17.497210807294934
+      },
+      {
+        "leg": 35,
+        "kind": "king",
+        "tick": 30504,
+        "x": 130.61786655315814,
+        "y": 3.777499236835295,
+        "z": -38.259110004781476
+      },
+      {
+        "leg": 36,
+        "kind": "wait",
+        "tick": 31223,
+        "x": 130.61785355186652,
+        "y": 3.7765944677443013,
+        "z": -38.259074573679676
+      }
+    ]
+  },
+  "replay": {
+    "status": "passed",
+    "checkpointCaptured": true,
+    "checkpointTick": 27851,
+    "suffixTicksExecuted": 1200,
+    "hash": "04f9ddbd51c5b1453e9bfbdb9a5d96ff554647d79891631d264375c458cc1245",
+    "replayHash": "04f9ddbd51c5b1453e9bfbdb9a5d96ff554647d79891631d264375c458cc1245",
+    "checkpoint": {
+      "state": "fight",
+      "phase": 1
+    },
+    "facts": [
+      "pine.feat.elk3/elk3:1",
+      "pine.feat.thralls/thralls:1"
+    ],
+    "restoredReemits": 0
+  },
+  "ledger": {
+    "status": "passed",
+    "facts": [
+      {
+        "name": "pine.feat.lanterns",
+        "entity": "lanterns:1",
+        "tick": 6839,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.resin",
+        "entity": "resin:1",
+        "tick": 10193,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.resin",
+        "entity": "resin:2",
+        "tick": 10796,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.lanterns",
+        "entity": "lanterns:2",
+        "tick": 12534,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.zipline",
+        "entity": "zipline:1",
+        "tick": 14161,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.bear2",
+        "entity": "bear2:1",
+        "tick": 19198,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.bear2",
+        "entity": "bear2:2",
+        "tick": 19240,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.lanterns",
+        "entity": "lanterns:3",
+        "tick": 20168,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.elk3",
+        "entity": "elk3:1",
+        "tick": 28654,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.thralls",
+        "entity": "thralls:1",
+        "tick": 28654,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.boar5",
+        "entity": "boar5:1",
+        "tick": 29371,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.thralls",
+        "entity": "thralls:2",
+        "tick": 29371,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.king",
+        "entity": "king:1",
+        "tick": 30504,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      },
+      {
+        "name": "pine.feat.quest",
+        "entity": "quest:1",
+        "tick": 31223,
+        "origin": {
+          "kind": "engine",
+          "source": "pine.progress"
+        }
+      }
+    ],
+    "achievements": [
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.lanterns",
+        "title": "Wick Whisperer",
+        "count": 3,
+        "threshold": 3,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.resin",
+        "title": "Sticky Fingers",
+        "count": 2,
+        "threshold": 30,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.zipline",
+        "title": "Gravity's Favourite",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.bear2",
+        "title": "Unbearable",
+        "count": 2,
+        "threshold": 2,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.elk3",
+        "title": "Elk Yeah",
+        "count": 1,
+        "threshold": 3,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.thralls",
+        "title": "Moss Remover",
+        "count": 2,
+        "threshold": 10,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.boar5",
+        "title": "Bacon Procurement Officer",
+        "count": 1,
+        "threshold": 5,
+        "earned": false
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.king",
+        "title": "Regicide, Rustic",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      },
+      {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.quest",
+        "title": "Morning Person, Finally",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      }
+    ],
+    "rules": 19,
+    "gameplayEmissionProven": true,
+    "refusedWriteRetried": true,
+    "durableReload": true,
+    "duplicateStable": true
+  },
+  "outcomeDifferences": [
+    "Native projectile gusts, rainy bolt flight, moving spread, longbow recovery and special-ammunition stacks/launch kinds are hosted; variable page-frame clocks and aimed/mounted input remain unproved. Stopped crossbow bolts are visual-only on the page.",
+    "All three NPC readings, completion flags, Brandt's once-only thanks, lodge rewards/streak and Mott's pack/ammunition/finish trades are hosted; named prompt commands still omit nearest/line-of-sight selection.",
+    "Resin walk-in takes, the eight carved tokens, lookout bench and seven-kind pack are hosted; hollow-log/islet secrets and journal discovery remain unhosted, so their ledger outcomes are absent.",
+    "Night-roaming thralls and the millrace combat/errand completion are hosted on the shared population law; page Math.random placement and variable-frame scheduling are not matched native inputs. Mill wheel/hinged-door access remains absent.",
+    "King victories pay three resin through the real pack; the first bow waits at the shared settled orb until in-range visible USE. Cross-prompt nearest selection and browser boss-save interoperability remain unproved.",
+    "Rain shelter goals use captured page crown cover and restored native continuation; variable page-frame weather/brain scheduling is not yet matched.",
+    "The page King record uses pine.bosses instead of host flags; browser-save interoperability for refights is not proved."
+  ],
+  "coverageGaps": [
+    "Alternate routes, other elite encounters and repeat fights lack their own uninterrupted recorded tapes.",
+    "Mott swaps and special-ammunition cycling/flight have native rule and restore fixtures, but no dedicated uninterrupted quest tape.",
+    "The recorded tape is standalone; grid entry walls are removed in a separate native entry proof, not a recorded grid quest tape."
+  ],
+  "open": [
+    "Native projectile gusts, rainy bolt flight, moving spread, longbow recovery and special-ammunition stacks/launch kinds are hosted; variable page-frame clocks and aimed/mounted input remain unproved. Stopped crossbow bolts are visual-only on the page.",
+    "All three NPC readings, completion flags, Brandt's once-only thanks, lodge rewards/streak and Mott's pack/ammunition/finish trades are hosted; named prompt commands still omit nearest/line-of-sight selection.",
+    "Resin walk-in takes, the eight carved tokens, lookout bench and seven-kind pack are hosted; hollow-log/islet secrets and journal discovery remain unhosted, so their ledger outcomes are absent.",
+    "Night-roaming thralls and the millrace combat/errand completion are hosted on the shared population law; page Math.random placement and variable-frame scheduling are not matched native inputs. Mill wheel/hinged-door access remains absent.",
+    "King victories pay three resin through the real pack; the first bow waits at the shared settled orb until in-range visible USE. Cross-prompt nearest selection and browser boss-save interoperability remain unproved.",
+    "Rain shelter goals use captured page crown cover and restored native continuation; variable page-frame weather/brain scheduling is not yet matched.",
+    "The page King record uses pine.bosses instead of host flags; browser-save interoperability for refights is not proved.",
+    "Alternate routes, other elite encounters and repeat fights lack their own uninterrupted recorded tapes.",
+    "Mott swaps and special-ammunition cycling/flight have native rule and restore fixtures, but no dedicated uninterrupted quest tape.",
+    "The recorded tape is standalone; grid entry walls are removed in a separate native entry proof, not a recorded grid quest tape."
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "isolatedDeclarations": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "outDir": ".tsc-layers/host",
+    "tsBuildInfoFile": ".tsc-layers/host.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./tsconfig.engine.json"
+    },
+    {
+      "path": "./tsconfig.game.json"
+    }
+  ],
+  "include": [
+    "src/*/host/**/*.ts",
+    "src/*/host/**/*.mts",
+    "src/*/engine/**/*.d.ts",
+    "src/*/game/**/*.merge.d.ts"
+  ],
+  "exclude": [
+    "src/*/host/**/*.test.ts"
+  ]
+}

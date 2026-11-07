@@ -1,0 +1,42 @@
+/* ─── the trader's counter (src/client/game/loot/ui/ShopPanel.ts, E314 stage 2; SF28 G87, the only look since G181) ─── prefix ws-shop- ───
+   Over the running world: a top bar ([× CLOSE] · "MAREN'S COUNTER / DRIFTWOOD ISLE"), the world and the trader left
+   visible in the middle, and the big-cards sheet at the bottom. Phone portrait first; with a mouse the sheet is a 440 px
+   column at the bottom centre. */
+.ws-shop { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 40); display: flex; flex-direction: column; justify-content: space-between; padding: calc(var(--ws-top) + 6px) 12px calc(12px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to bottom, rgba(6, 10, 18, 0.55), rgba(6, 10, 18, 0) 18%, rgba(6, 10, 18, 0) 38%, rgba(6, 10, 18, 0.5)); opacity: 0; pointer-events: none; transition: opacity 0.18s; font-family: var(--ws-mono); color: var(--ws-text); }
+.ws-shop.show { opacity: 1; pointer-events: auto; }
+.ws-shop button { appearance: none; -webkit-appearance: none; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* top bar */
+.ws-shop .ws-shop-top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.ws-shop .ws-shop-close { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 14px 6px 10px; background: rgba(8, 12, 20, 0.82); border: 1px solid var(--ws-cyan); color: #fff; font-family: var(--ws-display); font-weight: 700; font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; box-shadow: 0 0 16px rgba(143, 227, 255, 0.14); }
+.ws-shop .ws-shop-close i { display: block; width: 16px; height: 16px; color: var(--ws-cyan); }
+.ws-shop .ws-shop-close svg { display: block; width: 100%; height: 100%; }
+.ws-shop .ws-shop-close:active { background: rgba(143, 227, 255, 0.22); }
+.ws-shop .ws-shop-title { min-width: 0; text-align: center; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
+.ws-shop .ws-shop-title b { display: block; font-family: var(--ws-display); font-weight: 700; font-size: 20px; line-height: 1; letter-spacing: 0.22em; text-transform: uppercase; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-shop .ws-shop-title span { display: block; margin-top: 5px; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ws-cyan); }
+
+/* SF28, Jake's G87 big-cards kit (art/hud/round-19-ui-kit/B; Classic retired by G181). The header and the purse, a 3-up
+   grid of big item tiles (src/client/engine/ui/styles/itemcard.css) and one wide BUY bar, in the shard's accent */
+.ws-shop .ws-shop-big { --ws-shop-a: var(--ws-accent, var(--ws-cyan)); width: 100%; max-width: 440px; align-self: center; padding: 12px 12px 12px; background: rgba(8, 16, 24, 0.86); border-color: color-mix(in srgb, var(--ws-shop-a) 70%, transparent); }
+.ws-shop .ws-shop-big::before, .ws-shop .ws-shop-big::after { content: ''; position: absolute; width: 10px; height: 10px; pointer-events: none; }
+.ws-shop .ws-shop-big::before { left: -3px; top: -3px; border-left: 2px solid var(--ws-shop-a); border-top: 2px solid var(--ws-shop-a); }
+.ws-shop .ws-shop-big::after { right: -3px; bottom: -3px; border-right: 2px solid var(--ws-shop-a); border-bottom: 2px solid var(--ws-shop-a); }
+.ws-shop .ws-shop-bighead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 4px 10px; margin-bottom: 10px; border-bottom: 1px solid color-mix(in srgb, var(--ws-shop-a) 35%, transparent); }
+.ws-shop .ws-shop-bigwho { min-width: 0; font-family: var(--ws-mono); font-weight: 600; font-size: 15px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ws-shop-a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-shop .ws-shop-bigpurse { display: flex; align-items: center; gap: 7px; color: var(--ws-shop-a); }
+.ws-shop .ws-shop-bigpurse b { font-family: var(--ws-mono); font-weight: 600; font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+.ws-shop .ws-shop-ring { position: relative; display: inline-block; width: 18px; height: 18px; border: 2px solid currentColor; border-radius: 50%; box-sizing: border-box; }
+.ws-shop .ws-shop-ring::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: currentColor; }
+.ws-shop .ws-shop-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ws-shop .ws-shop-grid.dense { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ws-shop .ws-shop-grid > * { cursor: pointer; }
+.ws-shop .ws-shop-bigbuy { display: block; width: 100%; min-height: 50px; margin-top: 10px; padding: 8px 10px; border: 1px solid var(--ws-shop-a); background: color-mix(in srgb, var(--ws-shop-a) 10%, rgba(8, 16, 24, 0.9)); color: var(--ws-shop-a); font-family: var(--ws-mono); font-weight: 600; font-size: 15px; line-height: 1.2; letter-spacing: 0.2em; text-transform: uppercase; }
+.ws-shop .ws-shop-bigbuy.buy:active { background: color-mix(in srgb, var(--ws-shop-a) 30%, rgba(8, 16, 24, 0.9)); }
+.ws-shop .ws-shop-bigbuy.short, .ws-shop .ws-shop-bigbuy.owned { border-color: color-mix(in srgb, var(--ws-shop-a) 40%, transparent); color: var(--ws-text-dim); }
+.ws-shop .ws-shop-bigbuy.locked { color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.45); }
+.ws-shop .ws-shop-bigbuy small { display: block; margin-top: 4px; font-weight: 400; font-size: 10px; letter-spacing: 0.18em; color: var(--ws-text-dim); }
+
+@media (pointer: fine) {
+  .ws-shop .ws-shop-top { max-width: 440px; width: 100%; align-self: center; }
+}

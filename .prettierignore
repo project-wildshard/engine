@@ -1,0 +1,7 @@
+src/*/engine/
+src/*/game/
+src/*/host/
+src/client/app/
+src/test/engine/
+src/test/game/
+src/test/*.json

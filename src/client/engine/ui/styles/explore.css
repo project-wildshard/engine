@@ -1,0 +1,435 @@
+/* ─── Explore World — the viewer (src/client/engine/explore/Explore.ts; project/archive/2026-09-23-explore-world.md) ─── prefix ws-x- ───
+   an overlay on document.body over the live canvas: top bar (wordmark + EXPLORE tag, MODELS | WORLD tabs, ✕), the
+   p02 hub cards, the god-mode flight rail (▲ ▼ speed, the phone's FLY stick), one ✎ and a toast. Imported by the
+   lazy Explore chunk, so the title never pays for it. The canvas under it takes the desktop mouse (FreeCam). */
+.ws-x { position: fixed; inset: 0; z-index: calc(var(--ws-layer-hud) + 40); display: none; pointer-events: none; font-family: var(--ws-mono); color: var(--ws-text); user-select: none; -webkit-user-select: none; }
+.ws-x.show { display: block; }
+.ws-x button { font-family: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* top bar */
+.ws-x-top { position: absolute; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 14px; pointer-events: auto; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ws-x-brand { display: flex; align-items: center; gap: 10px; margin-right: auto; font-family: var(--ws-display); font-weight: 700; font-size: 18px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; }
+.ws-x-brand b { color: var(--ws-cyan); font-weight: 700; }
+.ws-x-brand i { font-style: normal; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.24em; padding: 3px 8px; color: var(--ws-amber); border: 1px solid rgba(255, 181, 71, 0.6); }
+.ws-x-tabs { display: flex; border: 1px solid var(--ws-cyan-line); }
+.ws-x-tabs button { padding: 7px 14px; background: none; border: 0; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-tabs button.on { color: var(--ws-cyan); background: rgba(143, 227, 255, 0.12); box-shadow: inset 0 -2px 0 var(--ws-cyan); }
+.ws-x-close { width: 34px; height: 34px; background: none; border: 1px solid var(--ws-cyan-line); font-size: 16px; }
+.ws-x[data-mode="hub"] .ws-x-tabs { visibility: hidden; }
+
+/* readout under the bar (world mode) */
+.ws-x-readout { position: absolute; white-space: pre; line-height: 1.6; left: 14px; top: calc(66px + env(safe-area-inset-top, 0px)); padding: 4px 9px; font-size: 10px; letter-spacing: 0.14em; color: #bfeeff; background: rgba(13, 27, 38, 0.62); border: 1px solid var(--ws-cyan-faint); border-top: 0; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.ws-x:not([data-mode="world"]) .ws-x-readout { display: none; }
+
+/* hub: Option A's equal cards over the orbiting island, as a scrolling list (E307): the shared cards, then the shard's own
+   playgrounds. The list sits on the bottom while it fits (its margin-top: auto) and scrolls under the top bar once it
+   does not; a 16 px gutter, no sideways scroll, iOS momentum (and [data-scroll], or index.html eats the touchmove) */
+.ws-x-hub { position: absolute; left: 0; right: 0; top: calc(64px + env(safe-area-inset-top, 0px)); bottom: 0; display: none; flex-direction: column; box-sizing: border-box; padding: 10px 16px max(28px, env(safe-area-inset-bottom, 0px)); overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; pointer-events: auto; }
+.ws-x-hub::-webkit-scrollbar { display: none; }
+.ws-x[data-mode="hub"] .ws-x-hub { display: flex; }
+.ws-x-hub-list { display: flex; flex-direction: column; gap: 14px; width: min(560px, 100%); margin: auto auto 0; }
+.ws-x-hub-heading[hidden] { display: none; }
+.ws-x-hub-level { margin-top: 8px; }
+.ws-x-hub-heading { align-self: flex-start; padding: 5px 8px; color: var(--ws-cyan); background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-faint); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; }
+.ws-x-card { position: relative; display: flex; flex: 0 0 auto; align-items: center; box-sizing: border-box; height: clamp(98px, 12dvh, 118px); gap: 16px; padding: 8px; text-align: left; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5); transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
+.ws-x-card[hidden] { display: none; }
+.ws-x-card:hover, .ws-x-card:focus-visible { border-color: var(--ws-cyan); box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5), 0 0 28px rgba(143, 227, 255, 0.3); outline: none; transform: translateY(-2px); }
+.ws-x-card .ws-x-card-art { align-self: stretch; flex: 0 0 40%; background-size: cover; background-position: center; border: 1px solid rgba(143, 227, 255, 0.25); }
+.ws-x-card .ws-x-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ws-x-card .ws-x-practice-art { background-position: center 53%; }
+/* a playground's placeholder art (E307) until it has its own: its verb's glyph, gold, on a dev measure tile (grey with a
+   1-cell grid and an orange band, as the level itself is drawn) */
+.ws-x-card .ws-x-pg-art { display: flex; align-items: center; justify-content: center; color: #ffc24a; background-color: #5d6268; background-image: linear-gradient(180deg, transparent 72%, rgba(226, 132, 58, 0.9) 72%, rgba(226, 132, 58, 0.9) 80%, transparent 80%), linear-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.13) 1px, transparent 1px); background-size: 100% 100%, 16px 16px, 16px 16px; background-position: 0 0, -1px -1px, -1px -1px; }
+.ws-x-card .ws-x-pg-art svg { width: 42%; max-width: 64px; height: auto; filter: drop-shadow(0 0 8px rgba(255, 194, 74, 0.45)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); }
+.ws-x-card b { font-family: var(--ws-display); font-weight: 700; font-size: 22px; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; }
+.ws-x-card b::after { content: ''; display: block; width: 30px; height: 2px; margin-top: 6px; background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); }
+.ws-x-card small { font-size: 11px; letter-spacing: 0.06em; line-height: 1.5; color: var(--ws-text-dim); }
+.ws-x-card .ws-x-card-go { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: 6px; border: 1px solid var(--ws-cyan); border-radius: 50%; color: var(--ws-cyan); font-size: 24px; }
+
+/* world mode: flight rail on the right edge, the phone's stick bottom-left, a keys hint on desktop */
+.ws-x-fly { display: none; }
+.ws-x[data-mode="world"] .ws-x-fly { display: block; }
+.ws-x-rail { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: auto; }
+.ws-x.touch .ws-x-rail { display: flex; }
+.ws-x.mapopen .ws-x-rail { top: calc(96px + env(safe-area-inset-top, 0px)); transform: none; } /* the map sheet has the lower half: the rail rides above it */
+.ws-x-btn { width: 56px; height: 56px; border-radius: 50%; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); font-size: 18px; color: #eaf8ff; touch-action: none; }
+.ws-x-btn.on { background: rgba(143, 227, 255, 0.28); border-color: var(--ws-cyan); }
+.ws-x-chip { padding: 8px 11px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; }
+.ws-x-hint { position: absolute; left: 50%; bottom: max(18px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 12px; font-size: 10px; letter-spacing: 0.12em; white-space: nowrap; color: var(--ws-text-dim); background: var(--ws-glass); border: 1px solid var(--ws-cyan-faint); }
+.ws-x.touch .ws-x-hint { display: none; }
+.ws-x-stick { position: absolute; left: max(22px, env(safe-area-inset-left, 0px)); bottom: max(24px, env(safe-area-inset-bottom, 0px)); width: 128px; height: 128px; border-radius: 50%; background: radial-gradient(circle, rgba(13, 27, 38, 0.2) 40%, rgba(13, 27, 38, 0.55)); border: 1px solid var(--ws-cyan-line); box-shadow: inset 0 0 18px rgba(143, 227, 255, 0.12); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); pointer-events: auto; touch-action: none; }
+.ws-x-stick i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(143, 227, 255, 0.22); border: 1px solid var(--ws-cyan); box-shadow: 0 0 14px rgba(143, 227, 255, 0.35); }
+.ws-x-stick b { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 9px; font-weight: 400; letter-spacing: 0.28em; text-transform: uppercase; color: #cfefff; pointer-events: none; }
+.ws-x-stick.on i { background: rgba(143, 227, 255, 0.4); }
+
+/* ✎ — one button, every mode */
+.ws-x-note { position: absolute; right: 14px; bottom: max(22px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; justify-content: center; width: 54px; height: 54px; border-radius: 50%; pointer-events: auto; background: rgba(143, 227, 255, 0.16); border: 1px solid var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.3); color: #fff; }
+.ws-x-note svg { width: 24px; height: 24px; }
+.ws-x[data-mode="hub"] .ws-x-note { display: none; }
+
+/* the one-time review password ask (D3: sending feedback is the gate) */
+.ws-x-unlock { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; gap: 10px; width: min(320px, calc(100% - 40px)); padding: 16px; pointer-events: auto; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+.ws-x-unlock b { font-family: var(--ws-display); font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase; }
+.ws-x-unlock input { padding: 10px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--ws-cyan-line); color: #fff; font: inherit; font-size: 14px; }
+.ws-x-unlock div { display: flex; gap: 8px; }
+.ws-x-unlock div button { flex: 1; padding: 9px; background: rgba(143, 227, 255, 0.14); border: 1px solid var(--ws-cyan-line); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
+.ws-x-unlock small { min-height: 1em; font-size: 10px; color: var(--ws-amber); }
+
+.ws-x-toast { position: absolute; left: 50%; top: calc(88px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -8px); padding: 8px 14px; font-size: 11px; letter-spacing: 0.08em; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); opacity: 0; transition: opacity 0.25s, transform 0.25s; }
+.ws-x-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* panes from other modules (Model Explorer …) share the overlay */
+.ws-x-pane { position: absolute; inset: 0; display: none; pointer-events: none; }
+.ws-x-pane.show { display: block; }
+
+/* A world can be built before anyone has registered a close-up specimen for its catalog. */
+.ws-x-empty-models .ws-x-empty-panel { position: absolute; left: 8px; right: 8px; top: calc(66px + env(safe-area-inset-top, 0px)); bottom: max(86px, calc(env(safe-area-inset-bottom, 0px) + 80px)); display: flex; flex-direction: column; align-items: center; padding: 18px; pointer-events: auto; text-align: center; background: rgba(6, 10, 18, 0.82); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.ws-x-empty-label { align-self: stretch; color: var(--ws-cyan); font-size: 10px; letter-spacing: 0.2em; text-align: left; text-transform: uppercase; }
+.ws-x-empty-count { align-self: stretch; display: flex; justify-content: space-between; margin-top: 14px; padding-bottom: 10px; color: var(--ws-text-dim); border-bottom: 1px solid var(--ws-cyan-line); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; }
+.ws-x-empty-symbol { display: grid; place-items: center; flex: 0 0 auto; width: min(44vw, 172px); aspect-ratio: 1; margin: auto 0 20px; color: var(--ws-cyan); border: 1px solid var(--ws-cyan-line); border-radius: 50%; box-shadow: 0 0 0 20px rgba(143, 227, 255, 0.035), inset 0 0 26px rgba(143, 227, 255, 0.08); font-size: 56px; }
+.ws-x-empty-panel h2 { margin: 0 0 12px; color: #fff; font-family: var(--ws-display); font-size: 23px; letter-spacing: 0.14em; line-height: 1.2; text-transform: uppercase; }
+.ws-x-empty-panel p { max-width: 290px; margin: 0 0 28px; color: var(--ws-text-dim); font-size: 12px; line-height: 1.6; }
+.ws-x-empty-panel button { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; width: 100%; min-height: 46px; padding: 0 13px; color: var(--ws-text); background: rgba(143, 227, 255, 0.12); border: 1px solid var(--ws-cyan); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; }
+.ws-x-empty-panel button span { color: var(--ws-cyan); font-size: 23px; }
+.ws-x-empty-panel small { margin: 16px 0 auto; color: var(--ws-text-dim); font-size: 10px; line-height: 1.5; }
+
+/* ─── Model Explorer (src/client/engine/explore/ModelExplorer.ts; mockups p04 catalog, p03 turntable) ─── */
+.ws-x-models .ws-x-catalog, .ws-x-models .ws-x-turntable { display: none; }
+.ws-x-models[data-view="catalog"] .ws-x-catalog { display: flex; }
+.ws-x-models[data-view="model"] .ws-x-turntable { display: block; }
+.ws-x-catalog { position: absolute; left: 12px; right: 12px; top: calc(66px + env(safe-area-inset-top, 0px)); bottom: max(86px, calc(env(safe-area-inset-bottom, 0px) + 80px)); flex-direction: column; gap: 10px; padding: 10px; pointer-events: auto; background: rgba(6, 10, 18, 0.72); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.ws-x-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.ws-x-filter button, .ws-x-views button, .ws-x-lights button { padding: 6px 11px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-filter button.on, .ws-x-views button.on, .ws-x-lights button.on { color: var(--ws-cyan); border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.14); }
+.ws-x-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-content: start; gap: 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; }
+.ws-x-model { display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 8px; text-align: left; background: var(--ws-glass-deep); border: 1px solid rgba(143, 227, 255, 0.2); }
+.ws-x-model:hover, .ws-x-model:focus-visible { border-color: var(--ws-cyan); outline: none; }
+.ws-x-model .ws-x-model-thumb { position: relative; display: block; aspect-ratio: 4 / 3; background: radial-gradient(circle at 50% 60%, rgba(143, 227, 255, 0.12), rgba(6, 10, 18, 0.6)); overflow: hidden; }
+.ws-x-model .ws-x-model-thumb canvas { display: block; width: 100%; height: 100%; }
+.ws-x-model b { padding: 2px 4px 0; font-family: var(--ws-display); font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; }
+.ws-x-model small { padding: 0 4px; font-size: 9px; letter-spacing: 0.12em; color: var(--ws-cyan-dim); }
+.ws-x-model-thumb .ws-progress { font-size: 9px; padding: 5px; }
+/* turntable: view + light chips up top, the sheet low */
+.ws-x-views, .ws-x-lights { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; pointer-events: auto; }
+.ws-x-views { top: calc(68px + env(safe-area-inset-top, 0px)); }
+.ws-x-lights { top: calc(104px + env(safe-area-inset-top, 0px)); }
+.ws-x-turntable.noclock .ws-x-lights { display: none; }
+.ws-x-sheet { position: absolute; left: 12px; right: 84px; bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + var(--ws-home, 0px)); display: flex; flex-direction: column; gap: 8px; max-width: 620px; padding: 10px 14px 12px; pointer-events: auto; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ws-x-sheet-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.ws-x-sheet-head .ws-x-back { padding: 4px 8px; background: none; border: 1px solid var(--ws-cyan-line); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-x-sheet-head b { font-family: var(--ws-display); font-size: 22px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; }
+.ws-x-sheet-head span { font-size: 11px; color: var(--ws-text-dim); }
+/* E181: PREV / NEXT walk the catalog's own order without going back to the grid; hidden when there is nowhere to step */
+.ws-x-sheet-head .ws-x-step { display: flex; flex: none; gap: 6px; margin-left: auto; }
+.ws-x-sheet-head .ws-x-step[hidden] { display: none; }
+.ws-x-sheet-head .ws-x-step button { width: 38px; height: 34px; padding: 0; background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font-size: 16px; line-height: 1; }
+.ws-x-sheet-head .ws-x-step button:active { background: rgba(143, 227, 255, 0.24); }
+.ws-x-sheet-head .ws-x-file { flex: 1 0 100%; }
+.ws-x-stats { font-size: 11px; letter-spacing: 0.14em; color: var(--ws-cyan); }
+.ws-x-actions { display: flex; gap: 8px; }
+.ws-x-actions button { padding: 8px 14px; background: rgba(143, 227, 255, 0.12); border: 1px solid var(--ws-cyan-line); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
+
+.ws-x-budget { position: relative; display: flex; align-items: center; height: 18px; border: 1px solid var(--ws-cyan-faint); background: rgba(0, 0, 0, 0.25); }
+.ws-x-budget i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(143, 227, 255, 0.55), rgba(143, 227, 255, 0.25)); }
+.ws-x-budget span { position: relative; padding: 0 8px; font-size: 9px; letter-spacing: 0.08em; color: var(--ws-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-x-tierlabel { position: fixed; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; padding: 4px 9px; pointer-events: none; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan); }
+.ws-x-tierlabel b { font-family: var(--ws-display); font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-x-tierlabel small { font-size: 9px; letter-spacing: 0.1em; color: var(--ws-text-dim); }
+
+/* creature viewer (X8; mockup p05): clips to watch, variants, skeleton, half speed — between the model and the sheet */
+.ws-x-creature { position: absolute; left: 12px; right: 12px; bottom: var(--ws-x-variant-bottom, max(206px, calc(env(safe-area-inset-bottom, 0px) + 200px))); display: none; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.ws-x-turntable.creature .ws-x-creature { display: flex; }
+.ws-x-turntable.variant .ws-x-creature { display: flex; }
+.ws-x-turntable.variant .ws-x-clips, .ws-x-turntable.variant .ws-x-skel, .ws-x-turntable.variant .ws-x-slow { display: none; }
+.ws-x-clips, .ws-x-creature-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; pointer-events: auto; }
+.ws-x-clips button, .ws-x-creature-row button, .ws-x-filter .ws-x-lineup { padding: 6px 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-clips button.on, .ws-x-creature-row button.on { color: var(--ws-cyan); border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.14); }
+.ws-x-variants { display: flex; flex: 1 1 auto; min-width: 0; gap: 4px; max-width: 100%; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; overscroll-behavior: contain; }
+.ws-x-variants button { flex: 0 0 auto; white-space: nowrap; }
+.ws-x-creature-row { flex-wrap: nowrap; justify-content: flex-start; width: 100%; max-width: 100%; }
+.ws-x-creature-row > button { flex: 0 0 auto; }
+.ws-x-clips { flex-wrap: nowrap; justify-content: flex-start; width: 100%; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; overscroll-behavior: contain; }
+.ws-x-clips button { flex: 0 0 auto; }
+.ws-x-variants button { padding: 6px 9px; background: var(--ws-glass-deep); border: 1px solid rgba(255, 181, 71, 0.4); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-variants button.on { color: var(--ws-amber); border-color: var(--ws-amber); }
+.ws-x-filter .ws-x-lineup { margin-left: auto; color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.5); }
+.ws-x-filter { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; overscroll-behavior: contain; }
+.ws-x-filter button { flex: 0 0 auto; }
+.ws-x-turntable.lineup .ws-x-inworld, .ws-x-turntable.lineup .ws-x-views button[data-v="tiers"] { display: none; }
+.ws-x-lineuplabel { padding: 3px 6px; }
+.ws-x-lineuplabel b { font-size: 11px; letter-spacing: 0.1em; }
+.ws-x-lineuplabel small { font-size: 8px; }
+.ws-x-lineuplabel.low { margin-top: -26px; } /* every other label sits a row higher so neighbours never overlap */
+.ws-x-rulemark { position: fixed; left: 0; top: 0; font-size: 9px; letter-spacing: 0.1em; color: var(--ws-cyan-dim); pointer-events: none; text-shadow: 0 1px 2px #000; }
+
+/* ─── X12 polish (target art/build-world/round-6-midway/07 + 06) ─── */
+/* the view / light chips: two glass segmented controls instead of rows of boxes */
+.ws-x-views, .ws-x-lights { gap: 0; padding: 3px; background: rgba(6, 12, 20, 0.72); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.ws-x-views button, .ws-x-lights button { background: none; border: 0; border-right: 1px solid rgba(143, 227, 255, 0.14); padding: 6px 11px; }
+.ws-x-views button:last-child, .ws-x-lights button:last-child { border-right: 0; }
+.ws-x-views button.on, .ws-x-lights button.on { background: rgba(143, 227, 255, 0.16); box-shadow: inset 0 -2px 0 var(--ws-cyan), 0 0 14px rgba(143, 227, 255, 0.18); }
+/* the sheet: a glass card, corner ticks, stat blocks, a slim labelled budget bar */
+.ws-x-sheet { background: linear-gradient(180deg, rgba(16, 36, 54, 0.82), rgba(5, 11, 19, 0.9)); border: 1px solid rgba(143, 227, 255, 0.32); box-shadow: 0 -1px 0 rgba(143, 227, 255, 0.25) inset, 0 18px 50px rgba(0, 0, 0, 0.55); }
+.ws-x-sheet::before, .ws-x-sheet::after { content: ''; position: absolute; width: 14px; height: 14px; border-color: var(--ws-cyan); border-style: solid; }
+.ws-x-sheet::before { left: -1px; top: -1px; border-width: 1px 0 0 1px; }
+.ws-x-sheet::after { right: -1px; bottom: -1px; border-width: 0 1px 1px 0; }
+/* E180 (Jake: "the corners cut"): the phone's own rounded screen corners sliced the square card. Round it — the bottom
+   more than the top, following the screen's curve on a touch device — lift it clear of the home-swipe strip, and bend
+   the corner brackets with it (the pause sheet's trick, gmenu.css E139). */
+.ws-x-sheet { --ws-x-rt: 12px; --ws-x-rb: 12px; border-radius: var(--ws-x-rt) var(--ws-x-rt) var(--ws-x-rb) var(--ws-x-rb); }
+@media (pointer: coarse) { .ws-x-sheet { --ws-x-rb: 26px; } }
+.ws-x-sheet::before { width: calc(var(--ws-x-rt) + 10px); height: calc(var(--ws-x-rt) + 10px); border-top-left-radius: var(--ws-x-rt); }
+.ws-x-sheet::after { width: calc(var(--ws-x-rb) + 10px); height: calc(var(--ws-x-rb) + 10px); border-bottom-right-radius: var(--ws-x-rb); }
+.ws-x-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 0; letter-spacing: 0; }
+.ws-x-stats span { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: rgba(143, 227, 255, 0.06); border: 1px solid rgba(143, 227, 255, 0.14); }
+.ws-x-stats i { font-style: normal; font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-stats b { font-family: var(--ws-display); font-size: 17px; font-weight: 700; letter-spacing: 0.06em; color: var(--ws-cyan); }
+.ws-x-budget { height: auto; flex-direction: column; align-items: stretch; gap: 4px; border: 0; background: none; }
+.ws-x-budget span { padding: 0; font-size: 8.5px; letter-spacing: 0.1em; color: var(--ws-text-dim); }
+.ws-x-budget-bar { position: relative; height: 4px; background: rgba(143, 227, 255, 0.1); }
+.ws-x-budget-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); }
+.ws-x-actions .ws-x-inworld { border-color: var(--ws-cyan); color: var(--ws-cyan); background: rgba(143, 227, 255, 0.1); }
+/* catalog tiles: glass with a glow, the thumbnail on a soft vignette */
+.ws-x-model { background: linear-gradient(180deg, rgba(18, 40, 60, 0.7), rgba(6, 12, 20, 0.88)); border-color: rgba(143, 227, 255, 0.22); transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
+.ws-x-model:hover, .ws-x-model:focus-visible { box-shadow: 0 0 18px rgba(143, 227, 255, 0.28); transform: translateY(-1px); }
+.ws-x-model .ws-x-model-thumb { box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.55); }
+
+/* ─── the selection card (src/client/engine/explore/Select.ts; mockups p09 / g09 / g13): anchored under the picked model ─── */
+.ws-x-select { position: absolute; left: 0; top: 0; display: none; flex-direction: column; gap: 3px; width: 200px; max-width: calc(100vw - 16px); padding: 9px 10px 10px; pointer-events: auto; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.25), 0 12px 40px rgba(0, 0, 0, 0.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ws-x-select.show { display: flex; }
+.ws-x:not([data-mode="world"]) .ws-x-select { display: none; }
+.ws-x-select b { font-family: var(--ws-display); font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-x-select small { font-size: 9px; letter-spacing: 0.04em; color: var(--ws-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-x-select-actions { display: grid; grid-template-columns: 1fr 38px; gap: 6px; margin-top: 6px; }
+.ws-x-select-actions button { padding: 8px 6px; background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; }
+.ws-x-select-actions .ws-x-open { grid-column: 1 / -1; color: var(--ws-cyan); border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.14); }
+.ws-x-select-dim { position: absolute; left: 0; top: 0; display: none; padding: 3px 8px; font-size: 10px; letter-spacing: 0.12em; white-space: nowrap; color: #eaf8ff; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); pointer-events: none; }
+.ws-x-select-dim.show { display: block; }
+.ws-x:not([data-mode="world"]) .ws-x-select-dim { display: none; }
+
+/* ─── the mini map (src/client/engine/explore/MiniMap.ts; mockups g11 / g12): a MAP button under the bar, a glass sheet ─── */
+.ws-x-mapbtn { position: absolute; right: 14px; top: calc(68px + env(safe-area-inset-top, 0px)); display: none; align-items: center; gap: 8px; padding: 8px 12px; pointer-events: auto; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #eaf8ff; }
+.ws-x-mapbtn.on { border-color: var(--ws-cyan); color: var(--ws-cyan); box-shadow: 0 0 14px rgba(143, 227, 255, 0.3); }
+.ws-x-mapbtn svg { width: 18px; height: 18px; }
+.ws-x[data-mode="world"] .ws-x-mapbtn { display: flex; }
+.ws-x-map { position: absolute; right: 14px; bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; width: min(440px, calc(100vw - 28px)); padding: 8px 14px 14px; pointer-events: none; visibility: hidden; transform: translateY(calc(100% + 24px)); transition: transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s 0.34s; background: linear-gradient(180deg, rgba(13, 27, 38, 0.92), rgba(8, 18, 28, 0.94)); border: 1px solid var(--ws-cyan); border-radius: 14px 14px 4px 4px; box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.5), 0 0 24px rgba(143, 227, 255, 0.18); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.ws-x-map.show { pointer-events: auto; visibility: visible; transform: none; transition: transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s; }
+.ws-x:not([data-mode="world"]) .ws-x-map { display: none; }
+.ws-x-map-grab { display: block; align-self: center; width: 46px; height: 4px; border-radius: 2px; background: rgba(143, 227, 255, 0.55); }
+.ws-x-map-head { display: flex; align-items: center; gap: 8px; }
+.ws-x-map-head > div { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.ws-x-map-head b { font-family: var(--ws-display); font-size: 24px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 0 14px rgba(143, 227, 255, 0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-x-map-head small { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-map-head button { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan-line); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; }
+.ws-x-map-head button svg { width: 16px; height: 16px; }
+.ws-x-map-head .ws-x-map-close { justify-content: center; width: 36px; padding: 0; font-size: 14px; }
+.ws-x-map-board { position: relative; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--ws-cyan-line); border-radius: 6px; background: #0b3448; cursor: crosshair; }
+.ws-x-map-board canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
+.ws-x-map-board::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 40px rgba(4, 14, 22, 0.55); }
+.ws-x-pin { position: absolute; z-index: calc(var(--ws-layer-hud) + 1); transform: translate(-9px, -50%); display: flex; align-items: center; gap: 0; padding: 0; background: none; border: 0; }
+.ws-x-pin i { position: relative; z-index: calc(var(--ws-layer-hud) + 1); flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%; background: #06121c; border: 3px solid var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, 0.7); }
+.ws-x-pin i::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #eaf8ff; }
+.ws-x-pin span { margin-left: -4px; padding: 3px 8px 3px 10px; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; color: #eaf8ff; background: rgba(8, 18, 28, 0.86); border: 1px solid var(--ws-cyan-line); border-radius: 0 4px 4px 0; }
+.ws-x-pin.flip { flex-direction: row-reverse; transform: translate(calc(-100% + 9px), -50%); }
+.ws-x-pin.flip span { margin: 0 -4px 0 0; padding: 3px 10px 3px 8px; border-radius: 4px 0 0 4px; }
+.ws-x-pin:hover span, .ws-x-pin:focus-visible span { border-color: var(--ws-cyan); color: var(--ws-cyan); }
+.ws-x-map-me { position: absolute; z-index: calc(var(--ws-layer-hud) + 2); width: 72px; height: 72px; pointer-events: none; filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.7)); }
+.ws-x-map-me svg { display: block; width: 100%; height: 100%; }
+.ws-x-map-north { position: absolute; left: 12px; bottom: 44px; display: flex; flex-direction: column; align-items: center; font-family: var(--ws-display); font-size: 15px; color: #eaf8ff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); pointer-events: none; }
+.ws-x-map-north svg { width: 12px; height: 12px; }
+.ws-x-map-scale { position: absolute; left: 12px; bottom: 10px; display: flex; justify-content: space-between; height: 22px; font-size: 9px; color: #eaf8ff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; }
+.ws-x-map-scale i { position: absolute; left: 0; right: 0; top: 0; height: 6px; border: 1.5px solid #eaf8ff; border-top: 0; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8)); }
+.ws-x-map-scale span { position: relative; top: 9px; width: 0; display: flex; justify-content: center; white-space: nowrap; }
+
+/* ─── compare with the mockup (src/client/engine/explore/Compare.ts; mockup p06): picker, then the mockup over the live frame ─── */
+.ws-x-comparebtn { position: absolute; right: 14px; top: calc(108px + env(safe-area-inset-top, 0px)); display: none; align-items: center; gap: 6px; padding: 7px 10px; pointer-events: auto; background: var(--ws-glass-deep); border: 1px solid rgba(255, 181, 71, 0.5); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-amber); }
+.ws-x-comparebtn svg { width: 18px; height: 18px; }
+.ws-x[data-mode="world"] .ws-x-comparebtn { display: flex; }
+.ws-x-picker { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; flex-direction: column; gap: 10px; width: min(460px, calc(100vw - 24px)); max-height: calc(100dvh - 92px); overflow-y: auto; padding: 12px; pointer-events: auto; background: var(--ws-glass-deep); border: 1px solid var(--ws-amber); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ws-x-picker.show { display: flex; }
+.ws-x-picker-head { display: flex; align-items: center; justify-content: space-between; }
+.ws-x-picker-head b { font-family: var(--ws-display); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; }
+.ws-x-picker-head button { width: 30px; height: 30px; background: none; border: 1px solid var(--ws-cyan-line); }
+.ws-x-picker-close { flex: 0 0 auto; }
+.ws-x-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ws-x-target { display: flex; flex-direction: column; gap: 5px; padding: 5px 5px 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--ws-cyan-line); text-align: left; }
+.ws-x-target:hover, .ws-x-target:focus-visible { border-color: var(--ws-amber); outline: none; }
+.ws-x-target .ws-x-target-img { position: relative; display: block; aspect-ratio: 720 / 925; }
+.ws-x-target-img img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.ws-x-target b { font-family: var(--ws-display); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
+.ws-x-compare { position: absolute; inset: 0; display: none; pointer-events: auto; background: #05080d; }
+.ws-x-compare.show { display: block; }
+.ws-x-compare-live, .ws-x-compare-target { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.ws-x-divider { position: absolute; top: 0; bottom: 0; width: 44px; transform: translateX(-50%); pointer-events: auto; touch-action: none; cursor: ew-resize; }
+.ws-x-divider::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: var(--ws-cyan); box-shadow: 0 0 12px var(--ws-cyan); }
+.ws-x-divider i { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan); }
+.ws-x-divider:focus-visible { outline: 2px solid #fff; outline-offset: -8px; }
+.ws-x-side { position: absolute; top: calc(76px + env(safe-area-inset-top, 0px)); padding: 4px 8px; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); }
+.ws-x-side-l { left: 12px; }
+.ws-x-side-r { right: 12px; color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.5); }
+.ws-x-compare-head { position: absolute; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; justify-content: space-between; min-height: 43px; gap: 12px; padding: 5px 8px 5px 12px; background: var(--ws-glass-deep); border: 1px solid var(--ws-amber); }
+.ws-x-compare-head b { font-family: var(--ws-display); font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ws-amber); }
+.ws-x-compare-head button { width: 32px; height: 32px; background: rgba(143, 227, 255, 0.1); border: 1px solid var(--ws-cyan-line); font-size: 15px; }
+.ws-x-compare-close { flex: 0 0 auto; }
+.ws-x.compare-open .ws-x-top, .ws-x.compare-open .ws-x-readout, .ws-x.compare-open .ws-x-fly, .ws-x.compare-open .ws-x-note, .ws-x.compare-open .ws-x-map, .ws-x.compare-open .ws-x-mapbtn, .ws-x.compare-open .ws-x-comparebtn { display: none; }
+
+/* phone portrait */
+@media (max-width: 700px) {
+  .ws-x-top { left: 8px; right: 8px; gap: 8px; padding: 6px 6px 6px 10px; }
+  .ws-x-brand { gap: 6px; font-size: 13px; letter-spacing: 0.1em; }
+  .ws-x-brand span { display: none; }
+  .ws-x-tabs button { padding: 7px 10px; font-size: 10px; letter-spacing: 0.14em; }
+  .ws-x-readout { top: calc(58px + env(safe-area-inset-top, 0px)); left: 10px; font-size: 9px; }
+  .ws-x-card { gap: 10px; }
+  .ws-x-card .ws-x-card-art { flex-basis: 35%; }
+  .ws-x-card b { font-size: 17px; letter-spacing: 0.12em; }
+  .ws-x-card small { font-size: 10px; }
+  .ws-x-card .ws-x-card-go { width: 32px; height: 32px; font-size: 20px; margin-right: 2px; }
+  .ws-x-catalog { left: 8px; right: 8px; top: calc(58px + env(safe-area-inset-top, 0px)); }
+  .ws-x-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .ws-x-model b { font-size: 11px; letter-spacing: 0.08em; }
+  .ws-x-views { top: calc(60px + env(safe-area-inset-top, 0px)); }
+  .ws-x-lights { top: calc(94px + env(safe-area-inset-top, 0px)); }
+  .ws-x-views button, .ws-x-lights button { padding: 6px 8px; font-size: 9px; letter-spacing: 0.1em; }
+  .ws-x-sheet { left: 8px; right: 76px; }
+  .ws-x-sheet-head b { font-size: 18px; }
+  .ws-x-creature { left: 8px; right: 8px; }
+  .ws-x-clips button, .ws-x-creature-row button, .ws-x-variants button { padding: 6px 7px; font-size: 9px; letter-spacing: 0.08em; }
+  .ws-x-map { left: 6px; right: 6px; bottom: max(6px, env(safe-area-inset-bottom, 0px)); width: auto; padding: 8px 12px 12px; }
+  .ws-x-map-head b { font-size: 20px; }
+  .ws-x-mapbtn { top: calc(62px + env(safe-area-inset-top, 0px)); right: 8px; }
+  .ws-x-comparebtn { top: calc(100px + env(safe-area-inset-top, 0px)); right: 8px; }
+  .ws-x-compare-head b { font-size: 13px; }
+  .ws-x-stats { font-size: 9px; letter-spacing: 0.08em; }
+}
+@media (max-width: 700px) {
+  .ws-x-brand::before { content: 'WILDSHARD'; color: var(--ws-cyan); }
+}
+
+/* ─── Set Explorer (src/client/engine/explore/SetExplorer.ts; E306 / E315 M7): the shard's sets as cards, then one set framed where it
+   stands — the real world from a 3/4 aerial, the set's bounds in cyan brackets, a bottom sheet with its members. Portrait
+   phone first: the list is one column with a 16 px gutter (8 px panel + 8 px padding), it scrolls with iOS momentum
+   ([data-scroll]), and the sheet leaves the ✎ its corner, like the Model Explorer's ─── */
+.ws-x-sets .ws-x-setlist, .ws-x-sets .ws-x-setsheet { display: none; }
+.ws-x-sets[data-view="list"] .ws-x-setlist, .ws-x-sets[data-view="set"] .ws-x-setsheet { display: flex; }
+.ws-x-setlist { position: absolute; left: 12px; right: 12px; top: calc(66px + env(safe-area-inset-top, 0px)); bottom: max(86px, calc(env(safe-area-inset-bottom, 0px) + 80px)); flex-direction: column; gap: 8px; padding: 10px; pointer-events: auto; background: rgba(6, 10, 18, 0.86); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ws-x-setlist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 7px; border-bottom: 1px solid var(--ws-cyan-faint); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-x-setlist-head span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-x-setlist-head b { flex: none; font-weight: 400; color: var(--ws-text-dim); }
+.ws-x-setlist-blurb { margin: 0; font-size: 10.5px; line-height: 1.5; letter-spacing: 0.04em; color: var(--ws-text-dim); }
+.ws-x-setcards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-content: start; gap: 10px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none; }
+.ws-x-setcards::-webkit-scrollbar { display: none; }
+/* a card: its aerial beside its name and size, its models as chips under both (10–20 a shard: compact, E315 M12) */
+.ws-x-set { display: grid; grid-template-columns: minmax(0, 44%) minmax(0, 1fr) auto; grid-template-areas: "thumb text go" "chips chips chips"; align-items: center; gap: 7px 10px; min-width: 0; padding: 5px 7px 8px 5px; text-align: left; background: linear-gradient(180deg, rgba(18, 40, 60, 0.7), rgba(6, 12, 20, 0.88)); border: 1px solid rgba(143, 227, 255, 0.22); transition: border-color 0.2s, box-shadow 0.2s; }
+.ws-x-set:hover, .ws-x-set:focus-visible { border-color: var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.28); outline: none; }
+.ws-x-set:disabled { opacity: 0.62; }
+.ws-x-set-thumb { grid-area: thumb; position: relative; display: block; aspect-ratio: 2 / 1; overflow: hidden; background: radial-gradient(circle at 50% 60%, rgba(143, 227, 255, 0.12), rgba(6, 10, 18, 0.6)); box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.55); }
+.ws-x-set-thumb canvas { display: block; width: 100%; height: 100%; }
+.ws-x-set-thumb i { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 6px; font-style: normal; font-size: 8.5px; letter-spacing: 0.12em; text-align: center; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-set-text { grid-area: text; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ws-x-set-text b { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-family: var(--ws-display); font-size: 14px; font-weight: 700; line-height: 1.2; letter-spacing: 0.1em; text-transform: uppercase; overflow-wrap: anywhere; color: #fff; }
+.ws-x-set-text small { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-x-set-text .ws-x-set-cost { color: var(--ws-cyan-dim); }
+.ws-x-set-go { grid-area: go; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--ws-cyan); border-radius: 50%; color: var(--ws-cyan); font-size: 18px; }
+.ws-x-setchips { grid-area: chips; display: flex; flex-wrap: wrap; gap: 4px; }
+.ws-x-setchip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 3px 6px 3px 3px; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ws-text); background: rgba(143, 227, 255, 0.06); border: 1px solid rgba(143, 227, 255, 0.16); }
+.ws-x-setchip-more { padding-left: 6px; color: var(--ws-text-dim); }
+.ws-x-setchip-pending { padding-left: 6px; color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.45); background: rgba(255, 181, 71, 0.06); }
+/* the orders (region · A–Z · most copies) and the region headers between the cards */
+.ws-x-setsort { display: flex; flex: none; gap: 4px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+.ws-x-setlist.few .ws-x-setsort { display: none; }
+.ws-x-setsort button { flex: none; padding: 6px 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-setsort button.on { color: var(--ws-cyan); border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.14); }
+.ws-x-setregion { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; padding: 8px 2px 4px; border-bottom: 1px solid var(--ws-cyan-faint); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-x-setregion b { font-weight: 400; color: var(--ws-text-dim); }
+.ws-x-setpending { flex: none; padding: 3px 2px 0; font-size: 9px; line-height: 1.45; letter-spacing: 0.04em; color: var(--ws-text-dim); }
+.ws-x-setpending b { font-weight: 400; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-amber); }
+.ws-x-setchip small { color: var(--ws-text-dim); letter-spacing: 0.04em; }
+.ws-x-setchip em, .ws-x-member-open em { flex: none; font-style: normal; padding: 1px 4px; font-size: 8px; letter-spacing: 0.12em; color: #06121c; background: var(--ws-cyan-dim); }
+.ws-x-setempty { display: flex; flex-direction: column; gap: 8px; padding: 36px 10px; text-align: center; }
+.ws-x-setempty b { font-family: var(--ws-display); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; }
+.ws-x-setempty small { font-size: 10.5px; line-height: 1.5; color: var(--ws-text-dim); }
+/* the hub's card: the World art under a dashed set outline until the shard has an aerial of its own */
+.ws-x-card .ws-x-sets-art { position: relative; }
+.ws-x-card .ws-x-sets-art::after { content: ''; position: absolute; inset: 20% 22%; border: 1px dashed rgba(143, 227, 255, 0.85); box-shadow: 0 0 10px rgba(143, 227, 255, 0.35), inset 0 0 10px rgba(143, 227, 255, 0.2); }
+
+/* a set, open: the sheet (the Model Explorer's glass card, corner ticks, rounded to the phone's corners) */
+.ws-x-setsheet { position: absolute; left: 12px; right: 84px; bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + var(--ws-home, 0px)); flex-direction: column; gap: 8px; max-width: 620px; height: 54dvh; box-sizing: border-box; padding: 10px 14px 12px; pointer-events: auto; background: linear-gradient(180deg, rgba(16, 36, 54, 0.84), rgba(5, 11, 19, 0.92)); border: 1px solid rgba(143, 227, 255, 0.32); box-shadow: 0 -1px 0 rgba(143, 227, 255, 0.25) inset, 0 18px 50px rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); --ws-x-srt: 12px; --ws-x-srb: 12px; border-radius: var(--ws-x-srt) var(--ws-x-srt) var(--ws-x-srb) var(--ws-x-srb); }
+@media (pointer: coarse) { .ws-x-setsheet { --ws-x-srb: 26px; } }
+.ws-x-setsheet::before, .ws-x-setsheet::after { content: ''; position: absolute; border-color: var(--ws-cyan); border-style: solid; pointer-events: none; }
+.ws-x-setsheet::before { left: -1px; top: -1px; width: calc(var(--ws-x-srt) + 10px); height: calc(var(--ws-x-srt) + 10px); border-width: 1px 0 0 1px; border-top-left-radius: var(--ws-x-srt); }
+.ws-x-setsheet::after { right: -1px; bottom: -1px; width: calc(var(--ws-x-srb) + 10px); height: calc(var(--ws-x-srb) + 10px); border-width: 0 1px 1px 0; border-bottom-right-radius: var(--ws-x-srb); }
+.ws-x-sethead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.ws-x-setback { flex: none; padding: 4px 8px; background: none; border: 1px solid var(--ws-cyan-line); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-x-setname { flex: 1 1 0; min-width: 0; font-family: var(--ws-display); font-size: 20px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-x-setstep { display: flex; flex: none; gap: 6px; }
+.ws-x-setstep[hidden] { display: none; }
+.ws-x-setstep button { width: 36px; height: 32px; padding: 0; background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font-size: 16px; line-height: 1; }
+.ws-x-setstep button:active { background: rgba(143, 227, 255, 0.24); }
+.ws-x-setfile { flex: 1 0 100%; font-size: 10px; letter-spacing: 0.02em; color: var(--ws-text-dim); overflow-wrap: anywhere; }
+.ws-x-setstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.ws-x-setstats span { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 5px 7px; background: rgba(143, 227, 255, 0.06); border: 1px solid rgba(143, 227, 255, 0.14); }
+.ws-x-setstats i { font-style: normal; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-x-setstats b { font-family: var(--ws-display); font-size: 16px; font-weight: 700; letter-spacing: 0.04em; color: var(--ws-cyan); white-space: nowrap; }
+.ws-x-setframe { min-height: 1em; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-setmembers { display: flex; flex: 1 1 auto; flex-direction: column; gap: 4px; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none; }
+.ws-x-setmembers::-webkit-scrollbar { display: none; }
+.ws-x-member { display: flex; flex: none; gap: 4px; }
+.ws-x-locate { display: flex; flex: 0 0 34px; align-items: center; justify-content: center; padding: 0; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.16); }
+.ws-x-locate i { width: 12px; height: 12px; border: 1.5px solid var(--ws-cyan-dim); border-radius: 50%; box-shadow: inset 0 0 0 2.5px rgba(6, 12, 20, 0.9), inset 0 0 0 6px var(--ws-cyan-dim); }
+.ws-x-member.on .ws-x-locate { border-color: var(--ws-amber); background: rgba(255, 181, 71, 0.14); }
+.ws-x-member.on .ws-x-locate i { border-color: var(--ws-amber); box-shadow: inset 0 0 0 2.5px rgba(6, 12, 20, 0.9), inset 0 0 0 6px var(--ws-amber); }
+.ws-x-setmembers-head { display: flex; justify-content: space-between; gap: 8px; padding: 0 30px 0 2px; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-member-open { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 2px 8px; padding: 5px 8px; text-align: left; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.16); }
+.ws-x-member-open:active { background: rgba(143, 227, 255, 0.18); }
+.ws-x-member-open:disabled { opacity: 0.55; }
+.ws-x-member-open b { min-width: 0; font-size: 11px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-x-member-open small { grid-column: 1 / span 2; font-size: 9px; line-height: 1.4; letter-spacing: 0.06em; color: var(--ws-text-dim); }
+.ws-x-member-open .ws-x-member-tris { grid-column: 3; grid-row: 1 / span 2; font-family: var(--ws-display); font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: var(--ws-cyan); }
+.ws-x-member-open span { grid-column: 4; grid-row: 1 / span 2; color: var(--ws-cyan); font-size: 17px; }
+.ws-x-member.on .ws-x-member-open { border-color: rgba(255, 181, 71, 0.5); }
+.ws-x-setactions { display: flex; gap: 8px; }
+.ws-x-setactions button { padding: 8px 14px; color: var(--ws-cyan); background: rgba(143, 227, 255, 0.1); border: 1px solid var(--ws-cyan); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
+/* the Model Explorer's card: PART OF — the sets this model is in, each a way into the Set Explorer */
+.ws-x-partof { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.ws-x-partof[hidden] { display: none; }
+.ws-x-partof i { font-style: normal; font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-x-partof span { display: contents; }
+.ws-x-partof button { padding: 4px 8px; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; color: var(--ws-cyan); background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); }
+@media (max-width: 700px) {
+  .ws-x-setlist { left: 8px; right: 8px; top: calc(58px + env(safe-area-inset-top, 0px)); padding: 8px; }
+  .ws-x-setcards { grid-template-columns: minmax(0, 1fr); }
+  .ws-x-setsheet { left: 8px; right: 76px; padding: 9px 11px 11px; }
+  .ws-x-setname { font-size: 17px; }
+  .ws-x-setstats b { font-size: 14px; }
+}
+
+/* ─── the Model Explorer's card at one height for every model (E315, Jake: "how do we make it a fixed-height card?") ───
+   every row is one line of a set height: the name (and ‹ ›) on the head row, cut with an ellipsis; the path on one line,
+   its folder giving way in the middle (tap it: the whole path); the stats; the budget; VIEW IN WORLD and PART OF on one
+   row, kept even when empty. It sits in the bottom third; the model renders in the band above (ModelExplorer.refit) */
+.ws-x-sheet { gap: 6px; padding: 9px 12px 10px; }
+.ws-x-sheet-head { flex-wrap: nowrap; align-items: center; gap: 8px; min-width: 0; height: 32px; }
+.ws-x-sheet-head .ws-x-back { flex: none; padding: 5px 7px; font-size: 9.5px; }
+.ws-x-sheet-head b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 19px; }
+.ws-x-sheet-head .ws-x-step { margin-left: 0; }
+.ws-x-sheet-head .ws-x-step button { height: 32px; }
+.ws-x-file { display: flex; flex: none; min-width: 0; height: 14px; padding: 0; background: none; border: 0; font-size: 10.5px; line-height: 14px; letter-spacing: 0.02em; text-align: left; color: var(--ws-text-dim); cursor: pointer; }
+.ws-x-file-dir { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-x-file-name { flex: none; white-space: nowrap; color: var(--ws-text); }
+.ws-x-stats span { box-sizing: border-box; height: 36px; justify-content: center; padding: 4px 7px; min-width: 0; }
+.ws-x-stats i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-x-stats b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-x-budget { flex: none; height: 16px; gap: 3px; }
+.ws-x-actions { flex: none; align-items: center; gap: 10px; height: 30px; min-width: 0; }
+.ws-x-actions .ws-x-inworld { flex: none; padding: 7px 11px; font-size: 10px; }
+.ws-x-actions .ws-x-inworld.off { visibility: hidden; }
+.ws-x-actions .ws-x-partof { flex: 1 1 auto; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+.ws-x-partof i { flex: none; }
+.ws-x-actions .ws-x-partof span { display: flex; gap: 4px; min-width: 0; overflow: hidden; }
+.ws-x-partof button { flex: none; }
+.ws-x-partof.none span::after { content: '—'; color: var(--ws-text-dim); }
+@media (max-width: 700px) {
+  .ws-x-sheet { padding: 8px 10px 9px; }
+  .ws-x-sheet-head b { font-size: 15px; letter-spacing: 0.1em; }
+}

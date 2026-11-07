@@ -1,0 +1,541 @@
+{
+  "sha": "3d7ae0e26bb33e24944f1a49328a08fba61ef1eb",
+  "version": {
+    "build": "3d7ae0e-mv04psp9",
+    "time": "2026-10-08T22:50:04.880Z"
+  },
+  "device": "iPhone 16 Pro",
+  "surface": "Chromium Metal, muted",
+  "pass": true,
+  "errors": [],
+  "reports": [],
+  "ask": "E435",
+  "row": "SF47-p",
+  "settings": {
+    "standalone": {
+      "developer": false
+    },
+    "grid": {
+      "developer": true
+    },
+    "tier": "phone",
+    "muted": true
+  },
+  "phases": [
+    {
+      "mode": "standalone",
+      "appState": "play",
+      "rows": [
+        {
+          "id": "crossbow",
+          "rowId": "weapon.crossbow",
+          "name": "Crossbow",
+          "context": "weapon.ranged",
+          "meta": "Hunting crossbow"
+        },
+        {
+          "id": "rifle",
+          "rowId": "weapon.lever",
+          "name": "Lever-action",
+          "context": "weapon.ranged",
+          "meta": "Lever-action"
+        },
+        {
+          "id": "bow",
+          "rowId": "weapon.longbow",
+          "name": "Warden's longbow",
+          "context": "weapon.bow",
+          "meta": "Warden's longbow"
+        }
+      ],
+      "quest": {
+        "id": "wardens-hollow",
+        "index": 0,
+        "objective": "Relight the pond lantern"
+      },
+      "killed": {
+        "kind": "deer",
+        "killed": true
+      },
+      "achievement": {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.deer5",
+        "title": "Antler Management",
+        "count": 5,
+        "threshold": 5,
+        "earned": true
+      },
+      "current": "crossbow",
+      "initialized": [
+        2,
+        3,
+        4,
+        5,
+        1
+      ],
+      "legacyAmmoUnchanged": true,
+      "legacyProgressCountersUnchanged": true,
+      "wornTitle": "king",
+      "lodge": {
+        "next": 3,
+        "slots": [
+          {
+            "serial": 0,
+            "kind": "species",
+            "target": "deer",
+            "have": 3
+          },
+          {
+            "serial": 1,
+            "kind": "rarity",
+            "target": "uncommon",
+            "have": 0
+          },
+          {
+            "serial": 2,
+            "kind": "thrall",
+            "target": "thrall",
+            "have": 0
+          }
+        ],
+        "claimed": 0,
+        "streak": 0,
+        "best": 0
+      }
+    },
+    {
+      "mode": "grid",
+      "appState": "play",
+      "rows": [
+        {
+          "id": "crossbow",
+          "rowId": "weapon.crossbow",
+          "name": "Crossbow",
+          "context": "weapon.ranged",
+          "meta": "Hunting crossbow"
+        },
+        {
+          "id": "rifle",
+          "rowId": "weapon.lever",
+          "name": "Lever-action",
+          "context": "weapon.ranged",
+          "meta": "Lever-action"
+        },
+        {
+          "id": "bow",
+          "rowId": "weapon.longbow",
+          "name": "Warden's longbow",
+          "context": "weapon.bow",
+          "meta": "Warden's longbow"
+        }
+      ],
+      "quest": {
+        "id": "wardens-hollow",
+        "index": 0,
+        "objective": "Relight the pond lantern"
+      },
+      "killed": {
+        "kind": "deer",
+        "killed": true
+      },
+      "achievement": {
+        "shard": "pine-hollow",
+        "id": "pine-hollow.deer5",
+        "title": "Antler Management",
+        "count": 5,
+        "threshold": 5,
+        "earned": true
+      },
+      "current": "crossbow",
+      "initialized": [
+        2,
+        3,
+        4,
+        5,
+        1
+      ],
+      "legacyAmmoUnchanged": true,
+      "legacyProgressCountersUnchanged": true,
+      "wornTitle": "king",
+      "lodge": {
+        "next": 3,
+        "slots": [
+          {
+            "serial": 0,
+            "kind": "species",
+            "target": "deer",
+            "have": 3
+          },
+          {
+            "serial": 1,
+            "kind": "rarity",
+            "target": "uncommon",
+            "have": 0
+          },
+          {
+            "serial": 2,
+            "kind": "thrall",
+            "target": "thrall",
+            "have": 0
+          }
+        ],
+        "claimed": 0,
+        "streak": 0,
+        "best": 0
+      }
+    }
+  ],
+  "crossing": {
+    "plan": {
+      "name": "pine-interior",
+      "from": "driftwood-isle",
+      "to": "pine-hollow",
+      "start": {
+        "x": 0,
+        "z": 230
+      },
+      "waypoints": [
+        {
+          "x": 0,
+          "z": 325
+        }
+      ],
+      "requiredResidents": [
+        "pine-hollow"
+      ],
+      "retiredResidents": [
+        "driftwood-isle"
+      ]
+    },
+    "elapsedSeconds": 23.98940000009537,
+    "traceSamples": 58,
+    "before": {
+      "inside": "driftwood-isle",
+      "feet": {
+        "x": 0,
+        "z": 230
+      },
+      "live": {
+        "live": {
+          "current": "driftwood-isle",
+          "worldFeet": {
+            "x": 0,
+            "y": 0.6666670322418211,
+            "z": 230
+          },
+          "crossings": 1,
+          "transitions": [
+            {
+              "from": null,
+              "to": "driftwood-isle"
+            }
+          ],
+          "residents": [
+            "driftwood-isle"
+          ],
+          "pending": [
+            "nalati-grasslands",
+            "pine-hollow",
+            "sunscar-dunes"
+          ],
+          "issues": {},
+          "gameplayReady": true,
+          "continuations": {
+            "entries": 0,
+            "storedChars": 0,
+            "capacityChars": 0,
+            "claimedBytes": 0
+          }
+        },
+        "crossing": {
+          "current": "driftwood-isle",
+          "target": "driftwood-isle",
+          "phase": "settled",
+          "issue": null
+        },
+        "stowed": false,
+        "renderOrigin": {
+          "x": 0,
+          "z": 0
+        },
+        "runtimeTiming": {
+          "current": null,
+          "completed": [
+            {
+              "instance": "driftwood-isle",
+              "hook": "beforeWorld",
+              "start": 3593.4000000953674,
+              "end": 3593.800000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "constructor",
+              "start": 3602.800000190735,
+              "end": 3602.800000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "world",
+              "start": 3616.4000000953674,
+              "end": 4363,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "afterWorld",
+              "start": 4363.60000038147,
+              "end": 4363.60000038147,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "kit",
+              "start": 4367.700000286102,
+              "end": 4368,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "afterKit",
+              "start": 4384.200000286102,
+              "end": 4479.200000286102,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "play",
+              "start": 4489.300000190735,
+              "end": 4555.700000286102,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "afterPlay",
+              "start": 4567.900000095367,
+              "end": 4568.400000095367,
+              "outcome": "done"
+            }
+          ]
+        },
+        "hoverCap": 14,
+        "homeActive": null
+      }
+    },
+    "after": {
+      "inside": "pine-hollow",
+      "feet": {
+        "x": 0,
+        "z": 323.69
+      },
+      "live": {
+        "live": {
+          "current": "pine-hollow",
+          "worldFeet": {
+            "x": -0.0010645282839163508,
+            "y": 0.4500002748238418,
+            "z": 323.68515998606017
+          },
+          "crossings": 3,
+          "transitions": [
+            {
+              "from": null,
+              "to": "driftwood-isle"
+            },
+            {
+              "from": "driftwood-isle",
+              "to": null
+            },
+            {
+              "from": null,
+              "to": "pine-hollow"
+            }
+          ],
+          "residents": [
+            "pine-hollow"
+          ],
+          "pending": [],
+          "issues": {},
+          "gameplayReady": true,
+          "continuations": {
+            "entries": 0,
+            "storedChars": 0,
+            "capacityChars": 0,
+            "claimedBytes": 0
+          }
+        },
+        "crossing": {
+          "current": "pine-hollow",
+          "target": "pine-hollow",
+          "phase": "settled",
+          "issue": null
+        },
+        "stowed": false,
+        "renderOrigin": {
+          "x": 0,
+          "z": 555
+        },
+        "runtimeTiming": {
+          "current": null,
+          "completed": [
+            {
+              "instance": "driftwood-isle",
+              "hook": "beforeWorld",
+              "start": 3593.4000000953674,
+              "end": 3593.800000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "constructor",
+              "start": 3602.800000190735,
+              "end": 3602.800000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "world",
+              "start": 3616.4000000953674,
+              "end": 4363,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "afterWorld",
+              "start": 4363.60000038147,
+              "end": 4363.60000038147,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "kit",
+              "start": 4367.700000286102,
+              "end": 4368,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "afterKit",
+              "start": 4384.200000286102,
+              "end": 4479.200000286102,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "play",
+              "start": 4489.300000190735,
+              "end": 4555.700000286102,
+              "outcome": "done"
+            },
+            {
+              "instance": "driftwood-isle",
+              "hook": "afterPlay",
+              "start": 4567.900000095367,
+              "end": 4568.400000095367,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "beforeWorld",
+              "start": 19571.5,
+              "end": 19571.800000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "constructor",
+              "start": 19575.300000190735,
+              "end": 19575.300000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "world",
+              "start": 19583.10000038147,
+              "end": 22689.300000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "afterWorld",
+              "start": 22689.800000190735,
+              "end": 22689.800000190735,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "kit",
+              "start": 22690.200000286102,
+              "end": 22903.200000286102,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "afterKit",
+              "start": 22917.5,
+              "end": 24544.60000038147,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "play",
+              "start": 24545.200000286102,
+              "end": 24972.900000095367,
+              "outcome": "done"
+            },
+            {
+              "instance": "pine-hollow",
+              "hook": "afterPlay",
+              "start": 24975.900000095367,
+              "end": 28095.10000038147,
+              "outcome": "done"
+            }
+          ]
+        },
+        "hoverCap": 3,
+        "homeActive": null
+      }
+    }
+  },
+  "map": {
+    "stamp": {
+      "version": 1,
+      "tilesHash": "52f9eae6b426a7844055453af2d6bfe5f43e30911f3aa78d781a0550888172e5",
+      "image": "/assets/pine-hollow/map/top.webp",
+      "size": 1000,
+      "metres": 500,
+      "north": "+z",
+      "east": "-x",
+      "style": "stylized:ground",
+      "bytes": 95318
+    },
+    "difference": {
+      "bytesBefore": 94854,
+      "bytesAfter": 95318,
+      "identical": false,
+      "meanAbs": 0.9757736666666667,
+      "changedChannels": 1446176,
+      "max": 88
+    }
+  },
+  "sourceBlobs": {
+    "src/shards/pine-hollow/shard.config.ts": "082cacafc152668d92b9a2f30aa2565b2b44eea0",
+    "src/shards/pine-hollow/data/items.ts": "9ecf0c3f360d953f3dbf3b456c9e6b3e8c681058",
+    "src/shards/pine-hollow/data/ledger.ts": "66984fe5848b7a6a9eff2cf2203cd0203451c20d",
+    "src/shards/pine-hollow/data/quests.ts": "b4d89ba2d6f795e053234189e3554f56f1fc256c",
+    "src/shards/pine-hollow/data/spawns.ts": "128109d04ce810910a4b998f1782afb5fffb7037",
+    "src/shards/pine-hollow/data/state.ts": "5f090be294e16d6f3d6325d31cc9cef36e83d1a3",
+    "src/shards/pine-hollow/runtime/facts.ts": "716d7d346c398194bb4817e97bb2cf7a9f495388",
+    "src/shards/pine-hollow/runtime/items.ts": "a48c2452f5ff1a09e891bb7310ea48ca8d2cc1d1",
+    "src/shards/pine-hollow/runtime/persistence.ts": "fc459db18c14b507c17afa80626ca7a9ff195cab",
+    "src/shards/pine-hollow/runtime/index.ts": "02b5ea0c627b415f4b20a43314e933430d16c262",
+    "src/shards/pine-hollow/runtime/antlerKing.ts": "e551a72e75d8050527a63513dc8314aae385d377",
+    "src/shards/pine-hollow/quest/index.ts": "1de146fe9c23fe373387b2270dc84718ce09a01f",
+    "src/shards/pine-hollow/loadout/loadout.ts": "ba4b96f4b4467f4ae76501cda39526fd68990243",
+    "src/shards/pine-hollow/combat/install.ts": "40315fb04990b1f39a4b90dd92b4dbf1e25f9986",
+    "test/shards/pine-hollow/hybrid.test.ts": "c5c136342d085f2548085864e9b789e05dc2e789",
+    "test/shards/pine-hollow/runtime-rows.test.ts": "09ed14501837c93fd12c8aa4d5b23de3f5269e80",
+    "test/shards/pine-hollow/runtime-loadout-save.test.ts": "29d4c96667a8dd48c85e068653b70ad14fee20fc"
+  }
+}

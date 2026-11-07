@@ -1,0 +1,411 @@
+{
+  "source": "a242b48db11c4f5535688c71f25111e907c32c05; original live builders, native terrain, Node arm64",
+  "rows": [
+    {
+      "name": "outcrops",
+      "meshes": [
+        {
+          "name": "nalati-outcrops",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 493896,
+              "hash": "56ba0875ed2c6d22625b5eb5b84f0206299a54005fabc0b6df8d90aa0c8b3315"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 493896,
+              "hash": "d01119fd26e258f619a178fc02984018825585f097b2bef1d6cd87c004a5042a"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 493896,
+              "hash": "feea0592a7f56b6051ed7ae004cfb835def68aead338115110b2c7b1edc87d78"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 348.91120594548755,
+            "center": [
+              -0.25815582275390625,
+              26.70662021636963,
+              0.00018310546875
+            ]
+          }
+        }
+      ],
+      "colliders": "4de0a7e0d9ff74ae0788ee6bd718206b84f36ca24b62f48ea58c03e0dfc5b2c7",
+      "pieces": "d0ab3797afa16f8a004f8b3c6196f5beaa9b94264032a19dc8c84f702525f91b"
+    },
+    {
+      "name": "roads",
+      "meshes": [
+        {
+          "name": "nalati-roads",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 1392,
+              "hash": "d5b63360be230e21b096f9282769a86c6a3463beee50ace03a38ec3ed85a01fc"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 1392,
+              "hash": "3def455c7ced4d9dd84bf0e9e33216ca54a25fc1c943b964ba7af69242fb800d"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 1392,
+              "hash": "42998aabf28ce0c921c9b85c4586a78825419240c75ce0034f127c72e2fcda42"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 176.82845968870842,
+            "center": [
+              -21.485366821289062,
+              12.487842559814453,
+              114.71329593658447
+            ]
+          }
+        },
+        {
+          "name": "nalati-roads-wood",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 45576,
+              "hash": "73ef9b47a2965f28c86cd76c3f49920de31f82bb96542b838d7e2c822c5684cb"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 45576,
+              "hash": "c5b2a75187e7c368e3fc1a0f2c8bd1316b663fc37b4e6edca840c58fbfccf47c"
+            },
+            {
+              "name": "uv",
+              "size": 2,
+              "count": 45576,
+              "hash": "b0f11f6c61f0cbaf872a73606cbeb917be08a20b5da296d72f77d9d45d302a0f"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 45576,
+              "hash": "cf9ca622c3ca66286a920d24a67724058d6a3e38e954ba7d8ea1e282813e8c10"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 183.31315969255363,
+            "center": [
+              -21.5,
+              11.302842140197754,
+              128.98238515853882
+            ]
+          }
+        }
+      ],
+      "colliders": "84f80322f54c9c4fed8f2f781faaa6d293332ce7f637f6f5d57b0f663106d518",
+      "pieces": "031f0a3186f0787d2cfc6ff6e30692114d675d09090d261a3b17ffcdb8646492"
+    },
+    {
+      "name": "watchtower",
+      "meshes": [
+        {
+          "name": "",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 19656,
+              "hash": "a268ffe906f0beea876c8c7698a375459d99e1d171680b6365940390f9ed1b62"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 19656,
+              "hash": "e8f09999db509e6896e6236f325370c84178d5580902246c991811be774add70"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 19656,
+              "hash": "a5e55d974bf03d89b9b2c721866cc3dc5cc545e6f090255f3f5d0cf105deef76"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 22.302855244399826,
+            "center": [
+              -196.5742416381836,
+              36.123260498046875,
+              -33.87492370605469
+            ]
+          }
+        }
+      ],
+      "colliders": "3675e035129d8042fd0e6a200f62b672464c368d28228418eacdc546e71ecdb8",
+      "pieces": "36f8c52944169e4bbb21df6d976c59868bf143f9b2dcc9c08102520da14f7d9f"
+    },
+    {
+      "name": "kokpar",
+      "meshes": [
+        {
+          "name": "",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 4176,
+              "hash": "de5c526596ed24a2c025cd099c977c80da9e4a41845778492da5d5aa7ced7f28"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 4176,
+              "hash": "c9fe14f53abfad47c0107987c813005fc4fcd6f7fb4beb543df3ae0e780cb86b"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 4176,
+              "hash": "8634437ccb00479c610331901f4cb2690bae0da313048427a9a48917fe233d63"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 36.78917592141405,
+            "center": [
+              -61.00000190734863,
+              25.90705394744873,
+              36.00000047683716
+            ]
+          }
+        }
+      ],
+      "colliders": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "pieces": "7013f32d47ca899a06eec0a44e90822dcfcc2995790e171ae265d41005b82f19"
+    },
+    {
+      "name": "dressing-statics",
+      "meshes": [
+        {
+          "name": "nalati-dress-props-3",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 25020,
+              "hash": "fbc22e75437c8a99d3bd722e717f72fdfc09c18829f2cfb2e0fa6432d6a9d777"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 25020,
+              "hash": "52bd5baf553a5d000760a8f7d7bdacb83775d0040f6780c62da3562950184894"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 25020,
+              "hash": "65b28053a4bdc2933fbd46c405a3a6e2aacaded683d8943d6d91120cd2b66f79"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 127.43724122870066,
+            "center": [
+              144.28427696228027,
+              13.620625495910645,
+              157.23009872436523
+            ]
+          }
+        },
+        {
+          "name": "nalati-dress-props-2",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 12072,
+              "hash": "6eaab406a134b675d0b2f7d3110d51ff5e4ee05ee0dc6bf47a92cf1faf08a66b"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 12072,
+              "hash": "3eb9628cce58bb919906ee8759b974fdcf96ea4e86b538dd89a97c8162af60f2"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 12072,
+              "hash": "2c6c26426d9afec0baf4d58815e08631aed0ae0f0cb5be7ed3fcd7ecee9698fd"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 136.86704610593677,
+            "center": [
+              -126.5786452293396,
+              19.57929039001465,
+              164.4856719970703
+            ]
+          }
+        },
+        {
+          "name": "nalati-dress-props-1",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 34338,
+              "hash": "d2013b4c924bdb3dca525d74af178a9bda43b00eaaa30cf153678aed811107c2"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 34338,
+              "hash": "557fcc98029775ec95e4d2cd9c4649ba3004063e0ba23b55ad4b7ad6a24aedf6"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 34338,
+              "hash": "b226075ac93cb25f6804dc48f3d62bf46e7d1c8337d80374f2b443f9d5e463bc"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 147.65140760751277,
+            "center": [
+              122.51545298099518,
+              29.948757708072662,
+              -44.27583885192871
+            ]
+          }
+        },
+        {
+          "name": "nalati-dress-props-0",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 19632,
+              "hash": "daffd826fd26bbb82a97974bf48f92d776006424633927456ae9d7aba3c653d8"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 19632,
+              "hash": "a4f605941dbbb9d08dcc3cc73bda646f23ca85a44845ceef6baf9e6f77052672"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 19632,
+              "hash": "d0699386b868f7f91b205a84eef5324dab351e5c836231c871e7d59778be600a"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 157.01316401449827,
+            "center": [
+              -102.99959802627563,
+              20.622117698192596,
+              -81.45620536804199
+            ]
+          }
+        },
+        {
+          "name": "nalati-dress-fences",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 37608,
+              "hash": "d4d2e07458f90e23fb92cec3547dbe29a732c94c4b55014a1cb71574a078ba86"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 37608,
+              "hash": "f64f03f410c08cbf0885f94eb7c9ef6669da5981d7a54e0be2f25b5df45fadd0"
+            },
+            {
+              "name": "uv",
+              "size": 2,
+              "count": 37608,
+              "hash": "8dba630ee2876f9f4f0dc51fb31903171aed4dc93c35600d00654a54e100617f"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 37608,
+              "hash": "cfc88e8003762eb9827affcbcc052d65cef18135c197b831a7f6534ece2d9539"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 55.19550816141572,
+            "center": [
+              49.54080867767334,
+              11.600515842437744,
+              114.97045135498047
+            ]
+          }
+        }
+      ],
+      "colliders": "4d5e4b3aaadffaa8120d50b0436269b20218e0abe20059f24a58c73ca19f8670",
+      "pieces": "4e28f7a77d52eccae9ec110f7e21f083a516e95e0f8d3d8412ccaf9737fef39f"
+    },
+    {
+      "name": "dressing-clutter",
+      "meshes": [
+        {
+          "name": "nalati-dress-camp-clutter",
+          "attrs": [
+            {
+              "name": "position",
+              "size": 3,
+              "count": 55992,
+              "hash": "4a54cb7aa4879de45549a1854286597326367cf8db1c61d0f6b427222f3f6212"
+            },
+            {
+              "name": "normal",
+              "size": 3,
+              "count": 55992,
+              "hash": "ded8abc699265704e180852def16a0434d876342c45cc06a916a4ff02c8d2067"
+            },
+            {
+              "name": "color",
+              "size": 3,
+              "count": 55992,
+              "hash": "06890374463928c096638a0f151f58619fb13d9a39cc32273962a2eea1494029"
+            }
+          ],
+          "index": null,
+          "sphere": {
+            "radius": 170.62123814688863,
+            "center": [
+              1.0637626647949219,
+              11.814679861068726,
+              97.07039642333984
+            ]
+          }
+        }
+      ],
+      "colliders": "f6072edaf30fc9661fd924a0bdf1bc576d60ee4ea0542d5b0af855ed0137bb7c",
+      "pieces": "cd17cc6e49abf70d33b51a79ad2bfd629777280c9939e5b9fdfa5a6acad36580"
+    }
+  ]
+}

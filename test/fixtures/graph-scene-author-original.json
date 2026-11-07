@@ -1,0 +1,47 @@
+[
+  {
+    "name": "pools",
+    "bytes": 2351,
+    "hash": "240f0f2891c71a85faf739e44bc80d27bd87dbf77411095f6278e0d90657b39b"
+  },
+  {
+    "name": "reef",
+    "bytes": 1190,
+    "hash": "93d2c6316993df5d4a076fe90d80bae6614e0b554a69d3adf4e841752429a206"
+  },
+  {
+    "name": "ocean",
+    "bytes": 30609,
+    "hash": "37b14a87db5e361f82d6547d1165e1511bb5f1db6638837bbf63e0ad4ff0567b"
+  },
+  {
+    "name": "cascade",
+    "bytes": 14110,
+    "hash": "99e303682e440d0366b2b910c44597fd2ed6b9982f125ae52702f7df55cd2664"
+  },
+  {
+    "name": "post",
+    "bytes": 9953,
+    "hash": "2a4758ffa4e3cf2a8b29516c5980cbaff828f1d8b735f588d760b2e44058bdd1"
+  },
+  {
+    "name": "cargo",
+    "bytes": 3631,
+    "hash": "3ab15d9fd182bdd1bb4d46b46211b6922306b295c4ff84489c1322123903d1f2"
+  },
+  {
+    "name": "reefModels",
+    "bytes": 4560,
+    "hash": "c1994c015faa68838449fc9d2326fa4f1e59fd85c577ad3a2455870aede44ac7"
+  },
+  {
+    "name": "spawns",
+    "bytes": 774,
+    "hash": "0f84e49813a09a945659728a2a75a1e6ef0c2a00a6270e73d375204ab62c3d92"
+  },
+  {
+    "name": "exchange",
+    "bytes": 1401,
+    "hash": "e10ea46ba667f1be2b498573ebee179954fb2d79260d53e5b55288fbc5e2a8c6"
+  }
+]

@@ -1,0 +1,151 @@
+{
+  "audit": {
+    "sourceRevision": "9c2ce301302cb030c780d0d560a968dff7150150",
+    "candidate": "Static-fabric tile port with approved portable-math collider epsilons and deliberate checkpoint recapture.",
+    "command": "node --experimental-transform-types --import ./scripts/sim-node-loader.mjs test/proof/nine-dragon-stack/run.mjs all",
+    "exitStatus": 0,
+    "scope": "Headless gameplay and durable ledger outcomes unchanged. Props binding and native continuation hashes follow the port; exact restored and shipping-worker suffixes pass.",
+    "runs": "Clean immediate parent 8aabadebe and defining 9c2ce3013 exports, admitted outputs restored only by catalogue SHA-256 pins. Current-head fixture checks retain exact equality."
+  },
+  "slug": "nine-dragon-stack",
+  "entry": "runtime/headless.ts",
+  "compatible": true,
+  "transitional": false,
+  "covers": [
+    "the Node-baked native colliders of the grid cell (fragment at +125 m, four landing decks open to the road, square slab, Well crossings and safety cap, placed models)",
+    "the player capsule walking those colliders from the declared spawn, by tick commands",
+    "the Jian as its declared row on the shipping swept melee clock (combo, one-deep queue, combo gap, cooldown, active windows), exact continuation",
+    "the portal-link entry proof: 23 lanes per deck and the format's checked transfer to the square and back (provePortalLinks)",
+    "portal rides during play on the page's own ride (world/portalRide.ts): walked into the square's ring and a deck's, held through the fade, the format's checked transfer under the dark, re-armed on stepping out, exact continuation mid-ride",
+    "the Jian's charged heavy on the tick protocol's HEAVY hold: a 40-tick charge from the square's arrival, released into one heavy swing on the same clock",
+    "the Fei Zhua on the page's own law (grapple/sim.ts over the 31 baked dragon hooks): aim as the phone's portrait camera, LOCK, JUMP; fire, bite, lift, zip, vault and settle on the player's capsule; the east tower's ledge from the arrival and exact continuation mid-zip in headless-runtime.test.ts",
+    "the ledger (data/ledger.ts): the ride home's landing in Lantern Square and the settled Well crossing emit their declared facts as committed effects; the platform Ledger grants each achievement once, durably, with no re-emission after a restore",
+    "the Well crossing (gates / fragments): over the square's west balustrade onto the south rim, seen past the rim's rail and the safety cap, the lifting zip over the parapet onto a crossing's deck; the safety cap's baked colliders off exactly while it flies (NdRuntime.guardOpen), closed again on the settle, exact continuation mid-crossing with the cap open (headless-runtime.test.ts)",
+    "shipping worker continuation from the mid-swing/portal and lifting-crossing checkpoints: each complete short suffix matches every canonical state and committed effect through transfer or settle"
+  ],
+  "open": [],
+  "notApplicable": [
+    "Jian contacts on real targets: Nine has no creatures; its row fires a zero-damage contact at nothing"
+  ],
+  "headless": {
+    "status": "passed",
+    "ticksExecuted": 1084,
+    "swings": 22,
+    "contacts": 22,
+    "effects": 2,
+    "facts": [
+      "nine-dragon-stack.lantern-square",
+      "nine-dragon-stack.well"
+    ],
+    "rides": [
+      "portal.square.north>portal.north",
+      "portal.north>portal.square.arrival"
+    ],
+    "grapple": {
+      "phases": [
+        "idle",
+        "fire",
+        "bite",
+        "lift",
+        "zip",
+        "vault",
+        "settle",
+        "idle"
+      ],
+      "capOpenTicks": 151,
+      "landed": {
+        "x": -8.532971600736104,
+        "y": 119.08614685795567,
+        "z": -20.667154578675955
+      }
+    },
+    "entries": {
+      "lanes": 92,
+      "steps": 15984,
+      "portalTransfers": 8
+    }
+  },
+  "replay": {
+    "status": "passed",
+    "ride": {
+      "status": "passed",
+      "checkpointCaptured": true,
+      "checkpoint": {
+        "tick": 400,
+        "swing": 1,
+        "swings": 14,
+        "rideClock": 0.2333
+      },
+      "suffixTicksExecuted": 60,
+      "ticksExecuted": 120,
+      "hash": "58a4fc3bbf18dbebf003615f1f8cc386554db777a663be4d25a353a8b6e2491a",
+      "replayHash": "58a4fc3bbf18dbebf003615f1f8cc386554db777a663be4d25a353a8b6e2491a",
+      "workerTicks": 60,
+      "workerExact": true
+    },
+    "crossing": {
+      "status": "passed",
+      "checkpointCaptured": true,
+      "checkpoint": {
+        "tick": 940,
+        "phase": "zip",
+        "lifts": true
+      },
+      "suffixTicksExecuted": 144,
+      "ticksExecuted": 288,
+      "hash": "dddea73614e518176bbd150b6bea9f29ce4c1d5e36e21b2a83f55478d03e6dff",
+      "replayHash": "dddea73614e518176bbd150b6bea9f29ce4c1d5e36e21b2a83f55478d03e6dff",
+      "workerTicks": 144,
+      "workerExact": true
+    }
+  },
+  "declarations": {
+    "sourceLoaded": true,
+    "quests": [],
+    "ledgerRules": [
+      "nine-dragon-stack.lantern-square",
+      "nine-dragon-stack.well"
+    ],
+    "runtimeBinds": [
+      "props",
+      "items",
+      "ledger",
+      "modes",
+      "clientChannels"
+    ]
+  },
+  "ledger": {
+    "status": "passed",
+    "rules": 2,
+    "facts": [
+      {
+        "name": "nine-dragon-stack.lantern-square",
+        "origin": "engine.portal.ride",
+        "tick": 522,
+        "entity": "portal.square.arrival"
+      },
+      {
+        "name": "nine-dragon-stack.well",
+        "origin": "engine.fei-zhua.crossing",
+        "tick": 1024,
+        "entity": "well"
+      }
+    ],
+    "achievements": [
+      {
+        "id": "nine-dragon-stack.lantern-square",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "nine-dragon-stack.well",
+        "count": 1,
+        "earned": true
+      }
+    ],
+    "durableReload": true,
+    "duplicateStable": true,
+    "restoredReemits": 0,
+    "gameplayEmissionProven": true
+  }
+}

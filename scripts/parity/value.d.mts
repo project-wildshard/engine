@@ -1,0 +1,11 @@
+export type Value = null | boolean | number | string | Value[] | {[key:string]:Value | undefined};
+export type RecordValue = Record<string, Value | undefined>;
+export function object(value: unknown): RecordValue;
+export function array(value: unknown): Value[];
+export function number(value: unknown): number;
+export function string(value: unknown): string;
+export function get(value: unknown, path: string): Value | undefined;
+export function set(value: RecordValue, path: string, next: Value): void;
+export function equal(a: unknown, b: unknown): boolean;
+export function flatten(value: unknown, prefix?: string): RecordValue;
+export function percentile(values: number[], fraction?: number): number;

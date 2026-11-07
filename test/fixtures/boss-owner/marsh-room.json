@@ -1,0 +1,153 @@
+{
+  "id": "marsh-vault",
+  "name": "The Reed Vault",
+  "file": "marsh/room.json",
+  "sealId": "marsh-vault-gate",
+  "sealName": "Reed Gate",
+  "origin": {
+    "x": 30,
+    "y": 20,
+    "z": 40
+  },
+  "halfWidth": 6,
+  "corridorHalfWidth": 1,
+  "corridorEnd": 12,
+  "doorHalfWidth": 0.9,
+  "doorHeight": 2,
+  "sandCells": 8,
+  "sandColor": "#a88c62",
+  "triangles": 111316,
+  "cover": {
+    "x": -2,
+    "z": 1,
+    "wid": 1,
+    "len": 2,
+    "plinthH": 0.3,
+    "h": 0.7
+  },
+  "pedestal": {
+    "x": 1,
+    "z": -4
+  },
+  "beams": [],
+  "collision": {
+    "boxes": [],
+    "descs": []
+  },
+  "markers": [
+    "statue:0",
+    "statue:1",
+    "statue:2",
+    "statue:3"
+  ],
+  "shafts": [
+    {
+      "id": "shaft:0",
+      "base": 0.38
+    },
+    {
+      "id": "shaft:1",
+      "base": 0
+    }
+  ],
+  "streams": [
+    {
+      "id": "stream:0",
+      "tell": "tell:0",
+      "x": -5.2,
+      "z": 3.4
+    },
+    {
+      "id": "stream:1",
+      "tell": "tell:1",
+      "x": 4.8,
+      "z": 4.6
+    },
+    {
+      "id": "stream:2",
+      "tell": "tell:2",
+      "x": -3.6,
+      "z": -5
+    },
+    {
+      "id": "stream:3",
+      "tell": "tell:3",
+      "x": 5.6,
+      "z": -3.2
+    },
+    {
+      "id": "stream:4",
+      "tell": "tell:4",
+      "x": -7,
+      "z": -0.6
+    },
+    {
+      "id": "stream:5",
+      "tell": "tell:5",
+      "x": 1.8,
+      "z": 6.6
+    },
+    {
+      "id": "stream:6",
+      "tell": "tell:6",
+      "x": 7.2,
+      "z": 1.2
+    },
+    {
+      "id": "stream:7",
+      "tell": "tell:7",
+      "x": -1.6,
+      "z": -6.8
+    }
+  ],
+  "lid": "lid",
+  "heap": "heap",
+  "sand": "sand",
+  "flames": "flames",
+  "rings": [
+    "ring:0",
+    "ring:1"
+  ],
+  "beam": "beam",
+  "line": "line",
+  "dome": "dome",
+  "arc": "arc",
+  "seal": "seal",
+  "glowColor": [
+    0.2,
+    0.8,
+    0.4
+  ],
+  "beamTop": [
+    -1.7,
+    6.2,
+    1.1
+  ],
+  "coverMotion": {
+    "closed": [
+      -2,
+      1.09,
+      1
+    ],
+    "slide": [
+      0.85,
+      0,
+      0.2
+    ],
+    "tip": [
+      0,
+      -0.75,
+      0
+    ],
+    "slideRotation": [
+      0,
+      0.06,
+      0
+    ],
+    "tipRotation": [
+      0,
+      0,
+      -1.15
+    ]
+  }
+}

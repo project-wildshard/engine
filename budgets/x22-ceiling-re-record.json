@@ -1,0 +1,15 @@
+{
+  "ask": "X22",
+  "approvedBy": "wildshard-new",
+  "approval": "Approved 2026-10-21 (X22): re-derive Nalati's desktop gpuMB ceiling from this recording; a gpuMB ceiling is a ratchet, not the limit (AGENTS.md), and 590.9 MB is far under Jake's 1.2 GB per shard. Leave the phone ceiling as is.",
+  "entries": [
+    {
+      "shard": "nalati-grasslands",
+      "tier": "desktop",
+      "metric": "gpuMB",
+      "source": "budgets/calibration-reports/nalati-grasslands-x22.desktop.json",
+      "commit": "9ec299a8fd2254f4592e3622a4d97dedd206eb7e",
+      "reason": "Desktop vertex buffers +3.6 MB since the 10-13 references (82,673,728 vs 79,056,466 buffer bytes; textures -0.5 MB, renderbuffers unchanged): one clean boot, no per-visit leak. The X22 one-pass record was refused solely by these three desktop gpuMB ratchets (590.9 vs 587.95 MB)."
+    }
+  ]
+}

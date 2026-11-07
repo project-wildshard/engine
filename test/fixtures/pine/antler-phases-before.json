@@ -1,0 +1,29 @@
+{
+  "source": "9f2ae70016948748626356e153b5dd05952f7726",
+  "path": "src/shards/pine-hollow/combat/antlerKing.ts",
+  "definition": {
+    "id": "antler-king",
+    "name": "THE ANTLER KING",
+    "title": "WARDEN OF PINE HOLLOW",
+    "retryTitle": "THE WARDEN STANDS",
+    "intro": 4.2,
+    "introShort": 1.4,
+    "phases": [
+      {
+        "at": 1,
+        "caption": "I · THE WARDEN",
+        "name": "The Warden"
+      },
+      {
+        "at": 0.6,
+        "caption": "II · LANTERNS FALL",
+        "name": "Lanterns Fall"
+      },
+      {
+        "at": 0.3,
+        "caption": "III · THE LAST LIGHT",
+        "name": "The Last Light"
+      }
+    ]
+  }
+}

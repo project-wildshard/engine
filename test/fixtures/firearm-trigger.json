@@ -1,0 +1,312 @@
+[
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": null,
+    "reserve": 0,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": null,
+    "reserve": 21,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": 0,
+    "reserve": 0,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": 0,
+    "reserve": 21,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": 1,
+    "reserve": 0,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": 1,
+    "reserve": 21,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": 7,
+    "reserve": 0,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": false,
+    "ammo": 7,
+    "reserve": 21,
+    "calls": [],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": null,
+    "reserve": 0,
+    "calls": [
+      "dry"
+    ],
+    "sinceEmpty": 0
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": null,
+    "reserve": 21,
+    "calls": [
+      "dry",
+      "reload"
+    ],
+    "sinceEmpty": 0
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": 0,
+    "reserve": 0,
+    "calls": [
+      "dry"
+    ],
+    "sinceEmpty": 0
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": 0,
+    "reserve": 21,
+    "calls": [
+      "dry",
+      "reload"
+    ],
+    "sinceEmpty": 0
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": 1,
+    "reserve": 0,
+    "calls": [
+      "fire",
+      "shot"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": 1,
+    "reserve": 21,
+    "calls": [
+      "fire",
+      "shot"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": 7,
+    "reserve": 0,
+    "calls": [
+      "fire",
+      "shot"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": false,
+    "ready": true,
+    "ammo": 7,
+    "reserve": 21,
+    "calls": [
+      "fire",
+      "shot"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": null,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": null,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": 0,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": 0,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": 1,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": 1,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": 7,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": false,
+    "ammo": 7,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": null,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": null,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": 0,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": 0,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": 1,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": 1,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": 7,
+    "reserve": 0,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  },
+  {
+    "reloading": true,
+    "ready": true,
+    "ammo": 7,
+    "reserve": 21,
+    "calls": [
+      "reload-trigger"
+    ],
+    "sinceEmpty": 99
+  }
+]

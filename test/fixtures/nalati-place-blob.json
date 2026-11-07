@@ -1,0 +1,13 @@
+{
+  "name": "world/places.bin",
+  "path": "blobs/bin/0e2ab3cedcd64ee9827e78a3534fd3a16e7eb861a42e23613f1b825adfbd40ea.bin",
+  "kind": "bin",
+  "hash": "0e2ab3cedcd64ee9827e78a3534fd3a16e7eb861a42e23613f1b825adfbd40ea",
+  "compressed": 11547006,
+  "decoded": 27039344,
+  "gpu": 0,
+  "triangles": 0,
+  "draws": 0,
+  "critical": false,
+  "dependencies": []
+}

@@ -1,0 +1,18 @@
+{
+  "sourceRevision": "8df5f74a8cc5f2c0baf9f6983b5a68001f6869d2",
+  "changes": "Import paths only; shipping policy bodies and native recipes unchanged. Test-only G112 replay oracles.",
+  "files": [
+    {
+      "fixture": "pack.ts",
+      "source": "src/shards/nalati-grasslands/runtime/packLegacy.ts",
+      "blob": "8f2f9421bc9c33b0a6c39f67dbd368301f2e38ed",
+      "sha256": "11e0b1ee4dbdb4c4b018658d1f830dd5b04c69c7f1a59cdd0b7565bc1f53fd80"
+    },
+    {
+      "fixture": "herd.ts",
+      "source": "src/shards/nalati-grasslands/runtime/herdLegacy.ts",
+      "blob": "2ff7f4a592579d8c1a41cc84ecabcf50d26c5e89",
+      "sha256": "f147145a6e5ad57c30b8609c14be2dff09721c3f9f1b54372f72b45d9befeb6f"
+    }
+  ]
+}

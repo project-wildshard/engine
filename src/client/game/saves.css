@@ -1,0 +1,34 @@
+/* pause ▸ Settings ▸ SAVES and the New game sheet (src/client/game/savesSettings.ts; SHARD-PLATFORM SF33b, Jake's pick G83) */
+.ws-saves-strip { flex: none; display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; margin: 0 0 6px; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.ws-saves-strip::-webkit-scrollbar { display: none; }
+.ws-saves-card { flex: 0 0 calc((100% - 16px) / 3); min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 5px 5px 6px; border: 1px solid var(--ws-cyan-line); background: rgba(143, 227, 255, 0.03); scroll-snap-align: start; }
+.ws-saves-thumb { position: relative; aspect-ratio: 16 / 11; background: #0b1420 center / cover no-repeat; }
+.ws-saves-here { position: absolute; top: 0; right: 0; padding: 2px 6px; background: var(--ws-cyan); color: #06121c; font: 700 8.5px/1.4 var(--ws-mono); font-style: normal; letter-spacing: 0.18em; }
+.ws-saves-name { margin: 6px 2px 4px; color: var(--ws-text); font: 500 9.5px/1.35 var(--ws-mono); letter-spacing: 0.12em; text-transform: uppercase; overflow-wrap: anywhere; }
+.ws-saves-line { margin: 0 2px; color: var(--ws-text-dim); font: 8.5px/1.6 var(--ws-mono); letter-spacing: 0.1em; overflow-wrap: anywhere; }
+.ws-saves-new { margin-top: auto; padding: 8px 0 7px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan); color: #fff; cursor: pointer; font: 500 9.5px/1 var(--ws-mono); letter-spacing: 0.2em; }
+.ws-saves-card > .ws-saves-line:nth-last-child(2) { margin-bottom: 8px; } /* the gap above NEW GAME; the buttons line up along the row */
+.ws-saves-new:active { background: rgba(143, 227, 255, 0.28); }
+
+.ws-saves-sheet { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; background: rgba(4, 7, 12, 0.5); opacity: 0; transition: opacity 0.16s; font-family: var(--ws-mono); color: var(--ws-text); }
+.ws-saves-sheet.show { opacity: 1; }
+.ws-saves-panel { position: relative; box-sizing: border-box; width: 100%; max-width: 560px; padding: 22px 18px calc(18px + env(safe-area-inset-bottom, 0px)); border: 1px solid var(--ws-cyan); border-bottom: none; background: rgba(8, 13, 22, 0.97); box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5); transform: translateY(24px); transition: transform 0.18s ease-out; }
+.ws-saves-sheet.show .ws-saves-panel { transform: none; }
+.ws-saves-cb { position: absolute; width: 10px; height: 10px; border: 0 solid var(--ws-cyan); }
+.ws-saves-cb.tl { top: 8px; left: 8px; border-top-width: 2px; border-left-width: 2px; }
+.ws-saves-cb.tr { top: 8px; right: 8px; border-top-width: 2px; border-right-width: 2px; }
+.ws-saves-cb.bl { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); left: 8px; border-bottom-width: 2px; border-left-width: 2px; }
+.ws-saves-cb.br { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); right: 8px; border-bottom-width: 2px; border-right-width: 2px; }
+.ws-saves-title { margin: 0 0 16px; text-align: center; font: 700 17px/1.2 var(--ws-display); letter-spacing: 0.22em; color: #fff; }
+.ws-saves-table { border: 1px solid var(--ws-cyan-line); }
+.ws-saves-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 12px 14px; font-size: 11px; letter-spacing: 0.18em; }
+.ws-saves-row + .ws-saves-row { border-top: 1px solid var(--ws-cyan-line); }
+.ws-saves-rowlab { color: var(--ws-text); }
+.ws-saves-rowval { color: var(--ws-cyan); text-align: right; }
+.ws-saves-kept { margin: 12px 2px 16px; color: var(--ws-cyan); font-size: 10.5px; letter-spacing: 0.16em; }
+.ws-saves-status { margin: -6px 2px 12px; color: var(--ws-amber); font-size: 10px; letter-spacing: 0.06em; }
+.ws-saves-status[hidden] { display: none; }
+.ws-saves-btn { display: block; width: 100%; margin-top: 10px; padding: 15px 0; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.05); border: 1px solid var(--ws-cyan); color: #fff; cursor: pointer; font: 700 15px/1 var(--ws-display); letter-spacing: 0.26em; }
+.ws-saves-btn.confirm { border-color: var(--ws-amber); }
+.ws-saves-btn:active { background: rgba(143, 227, 255, 0.24); }
+.ws-saves-btn:disabled { opacity: 0.5; }

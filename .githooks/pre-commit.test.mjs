@@ -78,9 +78,9 @@ describe('pre-commit hook', () => {
     const { commit } = sandbox();
     blocked(commit({ 'a.txt': 'a  \n' }, MSG), /whitespace/);
   });
-  test('refuses a blob over 1 MB, unless ALLOW_BIG=1', () => {
-    const big = { 'big.txt': 'x'.repeat(1024 * 1024 + 1) };
-    blocked(sandbox().commit(big, MSG), /over the 1 MB cap/);
+  test('refuses a blob over 25 MB, unless ALLOW_BIG=1', () => {
+    const big = { 'big.txt': 'x'.repeat(25 * 1024 * 1024 + 1) };
+    blocked(sandbox().commit(big, MSG), /over the 25 MB cap/);
     assert.equal(sandbox().commit(big, MSG, { env: { ALLOW_BIG: '1' } }).status, 0);
   });
   test('refuses a credential, unless ALLOW_SECRET=1', () => {

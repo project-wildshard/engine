@@ -1,0 +1,55 @@
+/* ─── the adventure layer (src/game/*/quest/*): the quest chip under the minimap, the NPC dialogue panel, the reward
+   caption ─── prefix ws-quest- ─── */
+
+/* ── the quest chip (E51, mockup G): ONE slim glass line under the minimap, right-aligned to its right edge (top / right set
+   from the minimap's rect in JS) — ◆ GLYPH SHARDS 0/3 | SEA CAVE 230 M ▲. The labels truncate with an ellipsis, the counter
+   and the distance never do. ── */
+.ws-quest-obj {
+  position: absolute; right: 22px; top: 230px; max-width: 340px; display: flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 4px 9px 4px 8px; font-family: var(--ws-mono); font-size: 10px; line-height: 1.2; letter-spacing: 0.12em; text-transform: uppercase; font-variant-numeric: tabular-nums; color: var(--ws-text);
+  background: var(--ws-glass); border: 1px solid var(--ws-cyan-line); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  opacity: 0; transform: translateX(8px); transition: opacity 0.35s, transform 0.35s; pointer-events: none;
+}
+.ws-quest-obj.show { opacity: 1; transform: none; }
+.ws-quest-obj.ws-quest-hide { opacity: 0; transition: opacity 1.2s; } /* the reward caption has the screen */
+.ws-quest-obj-dia { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: var(--ws-cyan); box-shadow: 0 0 7px rgba(143, 227, 255, 0.8); }
+.ws-quest-obj-goal, .ws-quest-obj-nav { display: flex; align-items: center; gap: 0.6em; min-width: 0; }
+.ws-quest-obj-goal { flex: 0 1 auto; }
+.ws-quest-obj-nav { flex: 0 1 auto; color: var(--ws-cyan); }
+.ws-quest-obj-label, .ws-quest-obj-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ws-quest-obj-count, .ws-quest-obj-dist { flex: none; }
+.ws-quest-obj-sep { flex: none; width: 1px; height: 11px; background: var(--ws-cyan-line); }
+.ws-quest-obj-arrow { flex: none; display: inline-block; font-size: 0.85em; transition: transform 0.2s linear; }
+.ws-quest-obj.pulse { animation: ws-quest-pulse 1.4s ease-out; }
+@keyframes ws-quest-pulse { 0% { box-shadow: 0 0 0 1px rgba(143, 227, 255, 0.9), 0 0 22px rgba(143, 227, 255, 0.65); border-color: var(--ws-cyan); } 100% { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.28); border-color: var(--ws-cyan-line); } }
+#hud.intro .ws-quest-obj { display: none; }
+
+/* ── dialogue: a glass panel above the touch bar / the bottom of the screen ── */
+.ws-quest-talk { position: absolute; z-index: calc(var(--ws-layer-hud) + 7); left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: min(92vw, 560px); transform: translate(-50%, 12px); opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; padding: 12px 16px 12px 16px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 14px 40px rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.ws-quest-talk.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
+.ws-quest-talk::before { content: ''; position: absolute; left: -1px; top: -1px; width: 18px; height: 18px; border-left: 1px solid var(--ws-cyan); border-top: 1px solid var(--ws-cyan); }
+.ws-quest-talk-name { font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-cyan); margin-bottom: 6px; }
+.ws-quest-talk-text { font-family: var(--ws-display); font-weight: 500; font-size: 18px; line-height: 1.3; color: var(--ws-text); min-height: 2.6em; }
+.ws-quest-talk-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); }
+.ws-quest-talk-foot b { color: var(--ws-cyan); font-weight: 400; }
+#hud.touch .ws-quest-talk-foot b { padding: 4px 10px; margin: -4px -6px -4px 0; border: 1px solid var(--ws-cyan-line); background: rgba(143, 227, 255, 0.08); }
+#hud.intro .ws-quest-talk { display: none; }
+
+/* ── the reward caption (the golden-hour view) ── */
+.ws-quest-reward { position: absolute; left: 0; right: 0; top: 22%; display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; transition: opacity 1.6s; pointer-events: none; text-align: center; }
+.ws-quest-reward.show { opacity: 1; }
+.ws-quest-reward-kicker { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--ws-cyan); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+.ws-quest-reward-title { font-family: var(--ws-display); font-weight: 700; font-size: 38px; letter-spacing: 0.08em; text-transform: uppercase; color: #fff4dc; text-shadow: 0 0 22px rgba(255, 190, 110, 0.6), 0 2px 4px rgba(0, 0, 0, 0.7); }
+.ws-quest-reward-sub { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+
+@media (max-width: 720px) {
+  .ws-quest-obj { max-width: 62vw; gap: 5px; padding: 3px 7px; font-size: 9px; letter-spacing: 0.06em; } /* G fits "GLYPH SHARDS 1/3 | SEA CAVE 230 M" whole at 390 px (~232 px) */
+  .ws-quest-obj-goal, .ws-quest-obj-nav { gap: 0.45em; }
+  .ws-quest-obj-dia { width: 6px; height: 6px; }
+  .ws-quest-obj-sep { height: 10px; }
+  .ws-quest-talk { bottom: calc(env(safe-area-inset-bottom, 0px) + 168px); padding: 10px 13px; }
+  .ws-quest-talk-text { font-size: 16px; }
+  .ws-quest-reward-title { font-size: 28px; }
+}
+/* a feature playground (src/playgrounds/, E307) is a dev level: no quest line over it */
+#hud.playground-active .ws-quest-obj { display: none; }

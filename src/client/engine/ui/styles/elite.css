@@ -1,0 +1,87 @@
+/* ─── named elites (src/client/engine/ui/EliteBar.ts, driven by src/client/game/Elite.ts): the named bar (over the head → pinned top-centre),
+   the NAMED ELITE NEARBY banner, the edge chevron, the minimap skulls ─── prefix ws-elite- ───
+   The boss bar's antique gold (boss.css), lighter and smaller (art/nalati-grasslands/round-2/4-named-elites/*.png). */
+.ws-elite {
+  --gold: #e9b44c; --gold-hi: #fff0b5; --gold-lo: #8a5a16;
+  --serif: 'Cinzel', 'Trajan Pro', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  position: absolute; inset: 0; pointer-events: none; z-index: calc(var(--ws-layer-hud) + 4);
+}
+#hud.intro .ws-elite { display: none; }
+
+/* ── the bar: over the head (translate3d set per frame, centred above the point) ── */
+.ws-elite-bar { position: absolute; left: 0; top: 0; width: 250px; margin: -64px 0 0 -125px; opacity: 0; transition: opacity 0.35s; will-change: transform; text-align: center; }
+.ws-elite-bar.show { opacity: 1; }
+.ws-elite-bar.show.dim { opacity: 0.22; } /* floating under the toast column (ToastStack's toastArea): the toasts read first */
+.ws-elite-bar.show.occluded { opacity: 0; } /* over its head, a wall between (Elite.ts host.canSee): never drawn through it */
+.ws-elite-name { font-family: var(--serif); font-weight: 700; font-size: 15px; letter-spacing: 0.24em; text-indent: 0.24em; color: #fbecc2; text-shadow: 0 1px 0 #3a2406, 0 0 8px rgba(0, 0, 0, 0.95); text-transform: uppercase; white-space: nowrap; }
+.ws-elite-epithet { margin-top: 1px; font-family: var(--serif); font-size: 9.5px; letter-spacing: 0.32em; text-indent: 0.32em; color: var(--gold); text-shadow: 0 0 6px rgba(0, 0, 0, 0.95); text-transform: uppercase; white-space: nowrap; }
+.ws-elite-frame { position: relative; display: flex; align-items: center; height: 20px; margin-top: 4px; }
+.ws-elite-skull { flex: 0 0 auto; display: block; width: 22px; height: 22px; color: var(--gold); filter: drop-shadow(0 1px 1px #000) drop-shadow(0 0 4px rgba(233, 180, 76, 0.5)); }
+.ws-elite-skull svg { width: 100%; height: 100%; display: block; }
+.ws-elite-track { position: relative; flex: 1 1 auto; height: 9px; margin-left: -3px; overflow: hidden; background: linear-gradient(180deg, #130905, #2a120a); border: 1.5px solid var(--gold); clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%); box-shadow: 0 0 0 1px #3a2406, 0 1px 6px rgba(0, 0, 0, 0.7); }
+.ws-elite-fill, .ws-elite-lag { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: 0 50%; }
+.ws-elite-fill { background: linear-gradient(180deg, #ff8a52 0%, #e0401f 50%, #a01c0e 100%); transition: transform 0.12s ease-out, background 0.3s; }
+.ws-elite-lag { background: rgba(255, 236, 190, 0.7); }
+.ws-elite-tick { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 2px; margin-left: -1px; background: var(--gold-hi); box-shadow: 0 0 0 1px rgba(20, 10, 2, 0.8); }
+.ws-elite-shimmer { position: absolute; inset: 0; opacity: 0; background: linear-gradient(100deg, rgba(255, 234, 160, 0) 25%, rgba(255, 238, 170, 0.95) 48%, rgba(255, 234, 160, 0) 70%); background-size: 240% 100%; }
+.ws-elite-bar.beat .ws-elite-shimmer { opacity: 1; animation: ws-elite-sheen 0.9s linear infinite; }
+.ws-elite-bar.broken .ws-elite-fill { background: linear-gradient(180deg, #9a958c, #5d5953); }
+.ws-elite-bar.broken .ws-elite-skull { color: #b9b3a6; }
+.ws-elite-caption { margin-top: 4px; font-family: var(--serif); font-weight: 700; font-size: 11px; letter-spacing: 0.44em; text-indent: 0.44em; color: #ffd9a0; text-shadow: 0 0 8px #000, 0 0 14px rgba(255, 120, 60, 0.6); opacity: 0; transition: opacity 0.25s; }
+.ws-elite-caption.show { opacity: 1; }
+.ws-elite-arrow { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: -6px 0 0 -4px; display: none; border-left: 12px solid var(--gold); border-top: 6px solid transparent; border-bottom: 6px solid transparent; transform-origin: 4px 6px; filter: drop-shadow(0 0 3px #000); }
+.ws-elite-bar.offscreen .ws-elite-arrow { display: block; }
+.ws-elite-bar.offscreen { width: 170px; margin-left: -85px; }
+.ws-elite-bar.offscreen .ws-elite-epithet, .ws-elite-bar.offscreen .ws-elite-frame { display: none; }
+@keyframes ws-elite-sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+/* ── pinned top-centre once the fight starts ── */
+.ws-elite-bar.pinned { left: 50%; top: 14px; width: min(40vw, 460px); margin: 0; transform: translateX(-50%) !important; }
+.ws-elite-bar.pinned .ws-elite-name { font-size: 20px; }
+.ws-elite-bar.pinned .ws-elite-epithet { font-size: 11px; }
+.ws-elite-bar.pinned .ws-elite-frame { height: 26px; }
+.ws-elite-bar.pinned .ws-elite-skull { width: 28px; height: 28px; }
+.ws-elite-bar.pinned .ws-elite-track { height: 12px; }
+
+/* ── the banner ── */
+.ws-elite-banner {
+  position: absolute; left: 50%; top: 14px; display: flex; align-items: center; gap: 12px; padding: 7px 22px 7px 14px; transform: translate(-50%, -12px); opacity: 0; transition: opacity 0.4s, transform 0.5s;
+  background: linear-gradient(180deg, rgba(14, 16, 22, 0.86), rgba(8, 10, 16, 0.8)); border: 1px solid var(--gold); box-shadow: 0 0 0 1px #2a1604, 0 0 22px rgba(233, 180, 76, 0.25), 0 8px 26px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
+}
+.ws-elite-banner.show { opacity: 1; transform: translate(-50%, 0); }
+.ws-elite-banner.below { top: 104px; }   /* under a pinned bar */
+.ws-elite-banner .ws-elite-skull { width: 30px; height: 30px; }
+.ws-elite-banner-text { display: flex; flex-direction: column; align-items: flex-start; }
+.ws-elite-banner-kicker { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.42em; color: #8fe3ff; text-shadow: 0 0 6px rgba(143, 227, 255, 0.5); }
+.ws-elite-banner-name { margin-top: 3px; font-family: var(--serif); font-weight: 700; font-size: 14px; letter-spacing: 0.16em; color: var(--gold); white-space: nowrap; text-shadow: 0 1px 0 #2a1604; }
+
+/* ── the edge chevron (a threat off screen: Qyran's stoop, a charge from behind) ── */
+.ws-elite-chevron { position: absolute; left: 0; top: 0; width: 0; height: 0; margin: -14px 0 0 -10px; opacity: 0; border-left: 26px solid #ffc24d; border-top: 14px solid transparent; border-bottom: 14px solid transparent; transform-origin: 10px 14px; filter: drop-shadow(0 0 8px rgba(255, 170, 60, 0.95)); transition: opacity 0.15s; }
+.ws-elite-chevron.show { opacity: 1; animation: ws-elite-pulse 0.4s ease-in-out infinite alternate; }
+@keyframes ws-elite-pulse { from { filter: drop-shadow(0 0 4px rgba(255, 170, 60, 0.7)); } to { filter: drop-shadow(0 0 14px rgba(255, 200, 90, 1)); } }
+
+/* ── the minimap skulls (a layer inside .ws-minimap: gold alive, pulsing engaged, grey + countdown ring dead) ── */
+.ws-elite-skulls { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; pointer-events: none; }
+/* a practice room's own map is up (the arena, a playground: Minimap.setRoom → .practice, E321): no lair of the shard's on it */
+.ws-minimap.practice .ws-elite-skulls { display: none; }
+.ws-elite-mapskull { --cd: 0deg; position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; display: none; color: #ffcf5a; filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 4px rgba(255, 190, 70, 0.6)); }
+.ws-elite-mapskull.show { display: block; }
+.ws-elite-mapskull svg { width: 100%; height: 100%; display: block; }
+/* .engaged pulses (ws-elite-pulse, 0.6 s ease-in-out alternate) — written by EliteBar.skulls with the game's frame, not as an
+   infinite CSS animation: on iOS that repainted the skull and re-composited the page at 60–120 Hz over the canvas (E142) */
+.ws-elite-mapskull.dead { color: #9c978d; }
+.ws-elite-mapskull.dead::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: conic-gradient(rgba(255, 207, 90, 0.9) var(--cd), rgba(255, 255, 255, 0.12) var(--cd)); -webkit-mask: radial-gradient(closest-side, transparent 78%, #000 82%); mask: radial-gradient(closest-side, transparent 78%, #000 82%); }
+
+@media (max-width: 700px) {
+  .ws-elite-bar { width: 210px; margin-left: -105px; }
+  /* the phone's top row is full (PAUSE, the fps line, the 34vw minimap): pinned under the minimap, full width, like the boss bar */
+  .ws-elite-bar.pinned { left: 12px; right: 12px; top: calc(var(--ws-top) + 34vw + 58px); width: auto; transform: none !important; }
+  .ws-elite-bar.pinned .ws-elite-name { font-size: 14px; letter-spacing: 0.16em; }
+  .ws-elite-bar.pinned .ws-elite-epithet { font-size: 9px; letter-spacing: 0.2em; }
+  .ws-elite-bar.pinned .ws-elite-skull { width: 22px; height: 22px; }
+  .ws-elite-banner { top: calc(var(--ws-top) + 34vw + 44px); padding: 6px 14px 6px 10px; width: min(88vw, 340px); box-sizing: border-box; }
+  .ws-elite-banner.below { top: calc(var(--ws-top) + 34vw + 128px); }
+  .ws-elite-banner-kicker { white-space: nowrap; }
+  .ws-elite-banner-name { font-size: 11px; letter-spacing: 0.1em; white-space: normal; line-height: 1.25; } /* the long ones wrap (ARGYMAQ THE UNBROKEN · STALLION OF THE HIGH CRAGS) */
+}

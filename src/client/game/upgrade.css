@@ -1,0 +1,12 @@
+/* G86 (temporary, Jake's pick A from art/menu/round-6-needs-upgrade): a shard whose shardfile needs a newer client keeps its
+   card, recognisable but dimmed: the picture desaturated, an amber NEEDS UPGRADE badge where LOAD sits, the subtitle
+   "BUILT FOR SHARDFILE V<n>", and ENTER WORLD disabled as NEEDS UPGRADE / YOUR SAVE IS KEPT (src/client/game/titleDeck.ts) */
+.ws-menu-card.ws-menu-card-upgrade .ws-menu-card-img { filter: grayscale(0.85) brightness(0.7); }
+.ws-menu-card.ws-menu-card-upgrade b { color: rgba(230, 242, 248, 0.7); }
+.ws-menu-card .ws-menu-card-tag.ws-menu-card-needs { color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.7); background: rgba(20, 13, 2, 0.82); box-shadow: 0 0 10px rgba(255, 181, 71, 0.3); filter: none; }
+/* G167 (art/grid/round-18-refused-cell CARD): a shard this session could not load wears the same dimmed card, an amber
+   UNAVAILABLE badge and its reason in amber under the name; ENTER WORLD reads UNAVAILABLE / YOUR SAVE IS KEPT */
+.ws-menu-card-unavailable .ws-menu-card-reason { color: var(--ws-amber); }
+.ws-menu-card.ws-menu-card-unavailable .ws-menu-card-img .ws-menu-card-tag.ws-menu-card-needs { left: 10px; right: auto; color: var(--ws-amber); border-color: rgba(255, 181, 71, 0.8); background: rgba(20, 13, 2, 0.86); }
+/* a filter on the picture would grey its amber badge too: the picture is dimmed by blending it to luminosity instead */
+.ws-menu-card.ws-menu-card-unavailable .ws-menu-card-img { filter: none; background-color: rgb(58, 64, 70); background-blend-mode: luminosity; }

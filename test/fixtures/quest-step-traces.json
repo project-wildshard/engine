@@ -1,0 +1,242 @@
+{
+  "pine-hollow": {
+    "frames": [
+      {
+        "flags": [],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":false,\"currentId\":\"pond\"}",
+        "objective": "Find the ranger at his cabin in the Hollow"
+      },
+      {
+        "flags": [
+          "talked:ranger"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":\"pond\"}",
+        "objective": "Relight the pond lantern"
+      },
+      {
+        "flags": [
+          "talked:ranger",
+          "lit:pond"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":\"ridge\"}",
+        "objective": "Relight the ridge lantern"
+      },
+      {
+        "flags": [
+          "talked:ranger",
+          "lit:pond",
+          "lit:ridge"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":\"zip\"}",
+        "objective": "Ride the zipline back to the Hollow"
+      },
+      {
+        "flags": [
+          "talked:ranger",
+          "lit:pond",
+          "lit:ridge",
+          "used:ph-zip"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":\"den\"}",
+        "objective": "Relight the den lantern"
+      },
+      {
+        "flags": [
+          "talked:ranger",
+          "lit:pond",
+          "lit:ridge",
+          "used:ph-zip",
+          "lit:den"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":\"stag\"}",
+        "objective": "Follow the Ghost Stag after dark"
+      },
+      {
+        "flags": [
+          "talked:ranger",
+          "lit:pond",
+          "lit:ridge",
+          "used:ph-zip",
+          "lit:den",
+          "followed:stag"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":\"king\"}",
+        "objective": "Face the Antler King"
+      },
+      {
+        "flags": [
+          "talked:ranger",
+          "lit:pond",
+          "lit:ridge",
+          "used:ph-zip",
+          "lit:den",
+          "followed:stag",
+          "dead:king"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":\"dawn\"}",
+        "objective": "Dawn over the Hollow"
+      },
+      {
+        "flags": [
+          "talked:ranger",
+          "lit:pond",
+          "lit:ridge",
+          "used:ph-zip",
+          "lit:den",
+          "followed:stag",
+          "dead:king",
+          "seen:dawn",
+          "quest:warden-done"
+        ],
+        "save": "{\"version\":1,\"id\":\"wardens-hollow\",\"started\":true,\"currentId\":null}",
+        "objective": "The Warden's Hollow — complete"
+      }
+    ],
+    "steps": [
+      {
+        "step": "pond",
+        "previous": null
+      },
+      {
+        "step": "ridge",
+        "previous": "pond"
+      },
+      {
+        "step": "zip",
+        "previous": "ridge"
+      },
+      {
+        "step": "den",
+        "previous": "zip"
+      },
+      {
+        "step": "stag",
+        "previous": "den"
+      },
+      {
+        "step": "king",
+        "previous": "stag"
+      },
+      {
+        "step": "dawn",
+        "previous": "king"
+      },
+      {
+        "step": null,
+        "previous": "dawn"
+      }
+    ],
+    "rewards": [
+      {
+        "fact": "pine.feat.quest"
+      }
+    ]
+  },
+  "driftwood-isle": {
+    "frames": [
+      {
+        "flags": [],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":false,\"currentId\":\"shards\"}",
+        "objective": "Find out who lit the fire on the plateau"
+      },
+      {
+        "flags": [
+          "talked:castaway"
+        ],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":true,\"currentId\":\"shards\"}",
+        "objective": "Recover the glyph shards · 0 / 3"
+      },
+      {
+        "flags": [
+          "talked:castaway",
+          "shard:lookout"
+        ],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":true,\"currentId\":\"shards\"}",
+        "objective": "Recover the glyph shards · 1 / 3"
+      },
+      {
+        "flags": [
+          "talked:castaway",
+          "shard:lookout",
+          "shard:wreck"
+        ],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":true,\"currentId\":\"shards\"}",
+        "objective": "Recover the glyph shards · 2 / 3"
+      },
+      {
+        "flags": [
+          "talked:castaway",
+          "shard:lookout",
+          "shard:wreck",
+          "shard:cave"
+        ],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":true,\"currentId\":\"shrine\"}",
+        "objective": "Set the shards in the Ring Shrine"
+      },
+      {
+        "flags": [
+          "talked:castaway",
+          "shard:lookout",
+          "shard:wreck",
+          "shard:cave",
+          "used:altar"
+        ],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":true,\"currentId\":\"captain\"}",
+        "objective": "Defeat the Drowned Captain"
+      },
+      {
+        "flags": [
+          "talked:castaway",
+          "shard:lookout",
+          "shard:wreck",
+          "shard:cave",
+          "used:altar",
+          "dead:captain"
+        ],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":true,\"currentId\":\"reward\"}",
+        "objective": "Stand in the ring"
+      },
+      {
+        "flags": [
+          "talked:castaway",
+          "shard:lookout",
+          "shard:wreck",
+          "shard:cave",
+          "used:altar",
+          "dead:captain",
+          "seen:reward",
+          "quest:driftwood-done"
+        ],
+        "save": "{\"version\":1,\"id\":\"sealed-ring\",\"started\":true,\"currentId\":null}",
+        "objective": "The Sealed Ring — complete"
+      }
+    ],
+    "steps": [
+      {
+        "step": "shards",
+        "previous": null
+      },
+      {
+        "step": "shrine",
+        "previous": "shards"
+      },
+      {
+        "step": "captain",
+        "previous": "shrine"
+      },
+      {
+        "step": "reward",
+        "previous": "captain"
+      },
+      {
+        "step": null,
+        "previous": "reward"
+      }
+    ],
+    "rewards": [
+      {
+        "fact": "driftwood.quest"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -1016,7 +1016,7 @@
+     if (!nolock) player.lock();
+   };
+   hud.onArena = () => { arena.enter(player, weapons); setAimTargets(arena.targets); minimap.setPracticeArena(chunk.spawn); menu.setPractice(true); };
+-  hud.onResume = enter;
++  hud.onResume = () => { enter(); player.velocity.set(0, 2, 0); };
+   hud.onExitToMenu = () => {
+     arena.exit(); playground?.exit(); playground = null; minimap.setPracticeArena(null); menu.setPractice(false); setAimTargets(painterly ? aimList : animals.animals); fromTitle = true; weapons.setEnabled(false); perf.setActive(false); audio.worldMuted = true; music.setState({ mode: 'menu' }); noteDisc.classList.remove('show');
+   };

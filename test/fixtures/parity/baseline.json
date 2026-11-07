@@ -1,0 +1,7 @@
+{
+  "boot": {"schema":1,"lane":"m5","shard":"pine-hollow","tier":"phone","renderer":"ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max)","errors":[],"systems":{"update":["physics.movers","animals"]},"scene":{"totals":{"mesh":100,"batched":0}},"render":{"programs":12},"saves":{"read":["local:ws.purse.v1"],"written":[]}},
+  "poses":[{"name":"gate","calls":100,"tris":10000,"pos":[0,1,0],"ssim":1}],
+  "walk":{"stuck":0,"legs":[{"name":"cabin-porch","end":{"x":-10,"y":3.8,"z":-34},"maxY":4,"stuck":[]}],"sounds":{"event":{"step":5},"ambient":["forest.thrall"]}},
+  "spread":{"poses.gate.calls":3,"poses.gate.tris":100,"poses.gate.pos":0.1,"walk.legs.cabin-porch.end.x":0.2},
+  "selfMin":{"gate":0.985}
+}

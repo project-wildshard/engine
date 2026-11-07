@@ -1,0 +1,672 @@
+{
+  "roots": [
+    {
+      "name": "nalati-outcrops",
+      "models": [
+        "nalati-grasslands/granite-outcrop",
+        "nalati-grasslands/rounded-boulder"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 2,
+          "name": "nalati-outcrops",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-crag-rock",
+      "models": [
+        "nalati-grasslands/crag-rock"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 3,
+          "name": "nalati-crag-rock-0",
+          "instances": null
+        },
+        {
+          "sourceMesh": 4,
+          "name": "nalati-crag-rock-1",
+          "instances": null
+        },
+        {
+          "sourceMesh": 5,
+          "name": "nalati-crag-rock-2",
+          "instances": null
+        },
+        {
+          "sourceMesh": 6,
+          "name": "nalati-crag-rock-3",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-camp",
+      "models": [
+        "nalati-grasslands/barrel",
+        "nalati-grasslands/camp-bench",
+        "nalati-grasslands/cart",
+        "nalati-grasslands/chest",
+        "nalati-grasslands/chopping-block",
+        "nalati-grasslands/corral",
+        "nalati-grasslands/eagle-perch",
+        "nalati-grasslands/feed-trough",
+        "nalati-grasslands/felt-rug",
+        "nalati-grasslands/firewood",
+        "nalati-grasslands/ground-saddle",
+        "nalati-grasslands/hay-pile",
+        "nalati-grasslands/hitching-rail",
+        "nalati-grasslands/kazan",
+        "nalati-grasslands/kumis-churn",
+        "nalati-grasslands/milk-cans",
+        "nalati-grasslands/perched-eagle",
+        "nalati-grasslands/ribbon-pole",
+        "nalati-grasslands/rug-line",
+        "nalati-grasslands/rug-rack",
+        "nalati-grasslands/saddle-rack",
+        "nalati-grasslands/stove",
+        "nalati-grasslands/water-trough",
+        "nalati-grasslands/yurt"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 7,
+          "name": "nalati-yard",
+          "instances": null
+        },
+        {
+          "sourceMesh": 8,
+          "name": "",
+          "instances": null
+        },
+        {
+          "sourceMesh": 9,
+          "name": "nalati-camp-felt",
+          "instances": null
+        },
+        {
+          "sourceMesh": 10,
+          "name": "nalati-camp-wood",
+          "instances": null
+        },
+        {
+          "sourceMesh": 11,
+          "name": "nalati-model-eagle",
+          "instances": {
+            "count": 1,
+            "capacity": 1
+          }
+        },
+        {
+          "sourceMesh": 12,
+          "name": "nalati-model-cauldron",
+          "instances": {
+            "count": 1,
+            "capacity": 1
+          }
+        },
+        {
+          "sourceMesh": 13,
+          "name": "nalati-model-firewood",
+          "instances": {
+            "count": 2,
+            "capacity": 2
+          }
+        },
+        {
+          "sourceMesh": 14,
+          "name": "nalati-model-chest",
+          "instances": {
+            "count": 2,
+            "capacity": 2
+          }
+        },
+        {
+          "sourceMesh": 15,
+          "name": "nalati-model-kumis-churn",
+          "instances": {
+            "count": 2,
+            "capacity": 2
+          }
+        },
+        {
+          "sourceMesh": 16,
+          "name": "nalati-model-saddle",
+          "instances": {
+            "count": 2,
+            "capacity": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-bridge",
+      "models": [
+        "nalati-grasslands/kunes-bridge"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 17,
+          "name": "nalati-bridge",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "",
+      "models": [
+        "nalati-grasslands/fence",
+        "nalati-grasslands/signpost"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 18,
+          "name": "nalati-roads",
+          "instances": null
+        },
+        {
+          "sourceMesh": 19,
+          "name": "nalati-signs",
+          "instances": null
+        },
+        {
+          "sourceMesh": 20,
+          "name": "nalati-roads-wood",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-summer-camp",
+      "models": [
+        "nalati-grasslands/barrel",
+        "nalati-grasslands/cart",
+        "nalati-grasslands/chest",
+        "nalati-grasslands/felt-rug",
+        "nalati-grasslands/kazan",
+        "nalati-grasslands/kurt-board",
+        "nalati-grasslands/ribbon-post",
+        "nalati-grasslands/tether-line",
+        "nalati-grasslands/yurt"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 21,
+          "name": "nalati-yard",
+          "instances": null
+        },
+        {
+          "sourceMesh": 22,
+          "name": "",
+          "instances": null
+        },
+        {
+          "sourceMesh": 23,
+          "name": "",
+          "instances": null
+        },
+        {
+          "sourceMesh": 24,
+          "name": "nalati-summer-wood",
+          "instances": null
+        },
+        {
+          "sourceMesh": 25,
+          "name": "nalati-model-cauldron",
+          "instances": {
+            "count": 1,
+            "capacity": 1
+          }
+        },
+        {
+          "sourceMesh": 26,
+          "name": "nalati-model-chest",
+          "instances": {
+            "count": 1,
+            "capacity": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-kurgans",
+      "models": [
+        "nalati-grasslands/fieldstone",
+        "nalati-grasslands/kurgan-entrance",
+        "nalati-grasslands/kurgan-kerb"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 27,
+          "name": "nalati-kurgans",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-eagle-rock",
+      "models": [
+        "nalati-grasslands/eagle-rock"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 28,
+          "name": "nalati-eagle-rock",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-cairn",
+      "models": [
+        "nalati-grasslands/wind-cairn"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 29,
+          "name": "nalati-cairn",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-crags",
+      "models": [
+        "nalati-grasslands/crag-ledge",
+        "nalati-grasslands/leopard-cave"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 30,
+          "name": "nalati-crags",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-watchtower",
+      "models": [
+        "nalati-grasslands/watchtower"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 31,
+          "name": "",
+          "instances": null
+        },
+        {
+          "sourceMesh": 32,
+          "name": "nalati-model-watchtower",
+          "instances": {
+            "count": 1,
+            "capacity": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "",
+      "models": [
+        "nalati-grasslands/fieldstone",
+        "nalati-grasslands/stone-step"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 31,
+          "name": "",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "",
+      "models": [
+        "nalati-grasslands/kokpar-goal",
+        "nalati-grasslands/kokpar-post"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 33,
+          "name": "",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-kokpar",
+      "models": [
+        "nalati-grasslands/kokpar-rider",
+        "nalati-grasslands/saddled-horse"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 33,
+          "name": "",
+          "instances": null
+        },
+        {
+          "sourceMesh": 34,
+          "name": "nalati-model-horse-saddled",
+          "instances": {
+            "count": 6,
+            "capacity": 6
+          }
+        },
+        {
+          "sourceMesh": 35,
+          "name": "nalati-kokpar-riders",
+          "instances": {
+            "count": 6,
+            "capacity": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-far-herds",
+      "models": [
+        "nalati-grasslands/herd-horse"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 36,
+          "name": "nalati-far-herd",
+          "instances": {
+            "count": 0,
+            "capacity": 80
+          }
+        },
+        {
+          "sourceMesh": 37,
+          "name": "nalati-far-herd",
+          "instances": {
+            "count": 0,
+            "capacity": 56
+          }
+        },
+        {
+          "sourceMesh": 38,
+          "name": "nalati-far-herd",
+          "instances": {
+            "count": 0,
+            "capacity": 56
+          }
+        },
+        {
+          "sourceMesh": 39,
+          "name": "nalati-far-herd",
+          "instances": {
+            "count": 0,
+            "capacity": 48
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-snow-lotus",
+      "models": [
+        "nalati-grasslands/snow-lotus"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 40,
+          "name": "nalati-model-snow-lotus",
+          "instances": {
+            "count": 52,
+            "capacity": 52
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-glacier",
+      "models": [
+        "nalati-grasslands/glacier-snout"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 41,
+          "name": "nalati-glacier",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-boulder",
+      "models": [
+        "nalati-grasslands/boulder"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 42,
+          "name": "nalati-dress-boulder",
+          "instances": {
+            "count": 0,
+            "capacity": 1267
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-boulder-tall",
+      "models": [
+        "nalati-grasslands/boulder"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 43,
+          "name": "nalati-dress-boulder-tall",
+          "instances": {
+            "count": 0,
+            "capacity": 633
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-slab",
+      "models": [
+        "nalati-grasslands/slab"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 44,
+          "name": "nalati-dress-slab",
+          "instances": {
+            "count": 0,
+            "capacity": 1579
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-stone",
+      "models": [
+        "nalati-grasslands/stone"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 45,
+          "name": "nalati-dress-stone",
+          "instances": {
+            "count": 0,
+            "capacity": 19791
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-juniper",
+      "models": [
+        "nalati-grasslands/juniper"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 46,
+          "name": "nalati-dress-juniper",
+          "instances": {
+            "count": 0,
+            "capacity": 278
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-rose",
+      "models": [
+        "nalati-grasslands/wild-rose"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 47,
+          "name": "nalati-dress-rose",
+          "instances": {
+            "count": 0,
+            "capacity": 136
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-willow",
+      "models": [
+        "nalati-grasslands/dwarf-willow"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 48,
+          "name": "nalati-dress-willow",
+          "instances": {
+            "count": 0,
+            "capacity": 230
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-lupin",
+      "models": [
+        "nalati-grasslands/lupin"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 49,
+          "name": "nalati-dress-lupin",
+          "instances": {
+            "count": 0,
+            "capacity": 2778
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-daisy",
+      "models": [
+        "nalati-grasslands/daisy"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 50,
+          "name": "nalati-dress-daisy",
+          "instances": {
+            "count": 0,
+            "capacity": 8811
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-reed",
+      "models": [
+        "nalati-grasslands/reed"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 51,
+          "name": "nalati-dress-reed",
+          "instances": {
+            "count": 0,
+            "capacity": 1050
+          }
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-statics",
+      "models": [
+        "nalati-grasslands/fallen-log",
+        "nalati-grasslands/fence",
+        "nalati-grasslands/ovoo",
+        "nalati-grasslands/sky-gateway",
+        "nalati-grasslands/stump",
+        "nalati-grasslands/viewpoint-pole"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 52,
+          "name": "nalati-dress-props-3",
+          "instances": null
+        },
+        {
+          "sourceMesh": 53,
+          "name": "nalati-dress-props-2",
+          "instances": null
+        },
+        {
+          "sourceMesh": 54,
+          "name": "nalati-dress-props-1",
+          "instances": null
+        },
+        {
+          "sourceMesh": 55,
+          "name": "nalati-dress-props-0",
+          "instances": null
+        },
+        {
+          "sourceMesh": 56,
+          "name": "nalati-dress-fences",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "name": "nalati-dress-camp-clutter",
+      "models": [
+        "nalati-grasslands/camp-clutter"
+      ],
+      "meshes": [
+        {
+          "sourceMesh": 57,
+          "name": "nalati-dress-camp-clutter",
+          "instances": null
+        }
+      ]
+    }
+  ],
+  "builds": [
+    {
+      "model": "nalati-grasslands/balbal",
+      "kind": "model",
+      "meshes": [
+        {
+          "sourceMesh": 0,
+          "name": "",
+          "instances": null
+        }
+      ]
+    },
+    {
+      "model": "nalati-grasslands/balbal",
+      "kind": "model",
+      "meshes": [
+        {
+          "sourceMesh": 1,
+          "name": "",
+          "instances": null
+        }
+      ]
+    }
+  ]
+}

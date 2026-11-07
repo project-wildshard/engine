@@ -1,0 +1,446 @@
+{
+  "audit": {
+    "sourceRevision": "00e7da5fbf89cf32395fdf32e602161399e107aa",
+    "candidate": "Current Nalati declared client channels; native gameplay remains partial.",
+    "command": "node --experimental-transform-types --import ./scripts/sim-node-loader.mjs test/proof/nalati-grasslands/run.mjs all",
+    "exitStatus": 1,
+    "scope": "Native boot, codec suffix, living-stallion taming, entry coverage and every missing gameplay row match the committed record. Only runtime bind metadata gains clientChannels.",
+    "runs": "Complete current partial witness on a clean committed source export; the intentional nonzero compatibility status is retained."
+  },
+  "slug": "nalati-grasslands",
+  "entry": "runtime/headless.ts",
+  "compatible": false,
+  "declarations": {
+    "sourceLoaded": true,
+    "ordinarySpawns": 0,
+    "scripts": 0,
+    "runtimeBinds": [
+      "quests",
+      "ledger",
+      "state",
+      "items",
+      "spawns",
+      "modes",
+      "clientChannels"
+    ],
+    "runtimeSpawns": {
+      "homes": [],
+      "bosses": [
+        {
+          "id": "nalati.golden-king",
+          "kind": "golden-king",
+          "look": "king",
+          "at": [
+            -40,
+            -95.6
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    "quests": [
+      "tulpar",
+      "golden-king",
+      "father-wind"
+    ],
+    "ledgerRules": [
+      {
+        "fact": "nalati.feat.storm-titan",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "storm-titan",
+            "title": "Partly Cloudy",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.golden-king",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "golden-king",
+            "title": "Grave Robber (Licensed)",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.aqbars",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "aqbars",
+            "title": "Crazy Cat Person",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.kokbori",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "kokbori",
+            "title": "Good Boy Denier",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.qyran",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "qyran",
+            "title": "Birdwatcher (Aggressive)",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.qara-batyr",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "qara-batyr",
+            "title": "Night Shift",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.argymaq",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "argymaq",
+            "title": "Horse Whisperer (Shouting)",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.tame",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "tame",
+            "title": "Stable Genius",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.kokpar",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "kokpar",
+            "title": "Varsity Goat Carrier",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.quest.tulpar",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.complete"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "tulpar",
+            "title": "Formerly On Foot",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.quest.golden-king",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.complete"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "chapter-king",
+            "title": "Honorary Balbal",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.quest.father-wind",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.complete"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "chapter-wind",
+            "title": "Weather Complainer (Successful)",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.wolf5",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "wolf5",
+            "title": "Pack Leader (Self-Appointed)",
+            "threshold": 5
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.wolf25",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "wolf25",
+            "title": "Not Afraid Of The Big Bad Anything",
+            "threshold": 25
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.alpha",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "alpha",
+            "title": "Sigma Grindset Survivor",
+            "threshold": 1
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.balbal5",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "balbal5",
+            "title": "Licensed Stonemason",
+            "threshold": 5
+          }
+        ]
+      },
+      {
+        "fact": "nalati.feat.ghost10",
+        "origin": {
+          "kind": "engine",
+          "source": "encounter.outcome"
+        },
+        "rewards": [
+          {
+            "kind": "achievement",
+            "id": "ghost10",
+            "title": "Ghost Rider (No Relation)",
+            "threshold": 10
+          }
+        ]
+      }
+    ]
+  },
+  "ledger": {
+    "status": "partial",
+    "rules": 17,
+    "facts": 17,
+    "achievements": [
+      {
+        "id": "storm-titan",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "golden-king",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "aqbars",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "kokbori",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "qyran",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "qara-batyr",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "argymaq",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "tame",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "kokpar",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "tulpar",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "chapter-king",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "chapter-wind",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "wolf5",
+        "count": 1,
+        "earned": false
+      },
+      {
+        "id": "wolf25",
+        "count": 1,
+        "earned": false
+      },
+      {
+        "id": "alpha",
+        "count": 1,
+        "earned": true
+      },
+      {
+        "id": "balbal5",
+        "count": 1,
+        "earned": false
+      },
+      {
+        "id": "ghost10",
+        "count": 1,
+        "earned": false
+      }
+    ],
+    "durableReload": true,
+    "refusedWriteRetried": true,
+    "duplicateStable": true,
+    "gameplayEmissionProven": false
+  },
+  "taming": {
+    "status": "partial",
+    "fixture": "one spawn beside the authored living stallion; no later placement or trust writes",
+    "livePrompt": true,
+    "rounds": 5,
+    "ticksExecuted": 8172,
+    "originalHiddenAlive": true,
+    "tulparAdopted": true,
+    "checkpointTick": 3875,
+    "suffixExact": true,
+    "open": [
+      "actual Argymaq breaking encounter",
+      "companion whistle/resting and global quest prompt ownership",
+      "taming quest/ledger facts"
+    ]
+  },
+  "entries": {
+    "lanes": 92,
+    "steps": 36896
+  },
+  "missing": [
+    "qyran",
+    "qara-and-night-roster",
+    "golden-king",
+    "storm-titan",
+    "taming",
+    "sabre-and-held-heavy",
+    "quests-and-gameplay-ledger"
+  ],
+  "headless": {
+    "status": "partial",
+    "stage": "gameplay-coverage",
+    "nativeBoot": true,
+    "actors": 35,
+    "colliders": 2696,
+    "ticksExecuted": 180,
+    "checkpointHash": "83b3be3200a83dffc026970f9a4c930eb57a83c00b18c96ff655598df86e0ccd"
+  },
+  "replay": {
+    "status": "partial",
+    "checkpointCaptured": true,
+    "codecByteExact": true,
+    "suffixTicksExecuted": 60,
+    "suffixHash": "73458795a0e4f54d1e9cb2e9fb5d977ff659b514fc57cc8bc00e5a69fe6c7c0b",
+    "wholeShard": false
+  }
+}

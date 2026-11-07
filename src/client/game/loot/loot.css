@@ -1,0 +1,19 @@
+/* ─── the purse on the HUD (src/game/loot/CoinChip.ts, E314 L1 board 1 A) ─── prefix ws-loot- ───
+   The coin chip, in VITALS' glass, on its own anchored spot (VITALS hide at full health, E319: the chip must not jump
+   with them): on touch in the layer, left under PAUSE at the status column's second row (the column's top + VITALS'
+   22 px + its 4 px gap); with a mouse over the VITALS panel, bottom-left. The "+n" floats up from a kill and fades. */
+.ws-loot-chip { position: relative; display: flex; align-items: center; gap: 6px; height: 22px; padding: 3px 10px 3px 7px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); pointer-events: none; white-space: nowrap; transform-origin: left center; }
+#hud > .ws-loot-chip { position: absolute; left: 22px; bottom: 92px; height: 28px; padding: 4px 12px 4px 9px; }
+.ws-touch > .ws-loot-chip { position: absolute; left: 12px; top: calc(var(--ws-top) + 56px); }
+#hud.intro .ws-loot-chip { opacity: 0; transition: opacity 0.4s; }
+.ws-loot-coin { display: block; flex: none; width: 14px; height: 14px; filter: drop-shadow(0 0 4px rgba(242, 196, 77, 0.55)); }
+.ws-loot-coin svg { display: block; width: 100%; height: 100%; }
+.ws-loot-num { font-family: var(--ws-display); font-weight: 700; font-size: 17px; line-height: 1; letter-spacing: 0.03em; color: #fff; font-variant-numeric: tabular-nums; }
+.ws-loot-chip.bump { animation: ws-loot-bump 0.32s ease-out; }
+.ws-loot-chip.bump .ws-loot-num { color: #ffe39a; transition: color 0.6s; }
+@keyframes ws-loot-bump { 0% { transform: scale(1); } 35% { transform: scale(1.14); border-color: rgba(242, 196, 77, 0.8); } 100% { transform: scale(1); } }
+
+.ws-loot-pop { position: absolute; left: 0; top: 0; z-index: calc(var(--ws-layer-hud) + 3); display: flex; align-items: center; gap: 4px; opacity: 0; pointer-events: none; transform: translate(-50%, -50%); font-family: var(--ws-display); font-weight: 700; font-size: 22px; line-height: 1; color: #ffe39a; text-shadow: 0 0 6px rgba(0, 0, 0, 0.8), 0 0 12px rgba(242, 196, 77, 0.5); white-space: nowrap; }
+.ws-loot-pop .ws-loot-coin { width: 16px; height: 16px; }
+.ws-loot-pop.show { animation: ws-loot-rise 1.3s ease-out forwards; }
+@keyframes ws-loot-rise { 0% { opacity: 0; transform: translate(-50%, -30%) scale(0.7); } 15% { opacity: 1; transform: translate(-50%, -60%) scale(1.1); } 70% { opacity: 1; transform: translate(-50%, -150%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -200%) scale(1); } }

@@ -1,0 +1,100 @@
+{
+  "spawn": {
+    "eye": [
+      0,
+      31.7,
+      -5.5
+    ],
+    "feet": [
+      0,
+      30,
+      -5.5
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "mockup": "art/far-reach/round-1-proposals/B-sky-reach.jpg",
+    "frame": "Spawn: Sunrest, the windmill isle across the gap"
+  },
+  "hover": {
+    "eye": [
+      12,
+      31.7,
+      -2.5
+    ],
+    "feet": [
+      12,
+      30,
+      -2.5
+    ],
+    "yaw": 80,
+    "pitch": -6,
+    "mockup": "",
+    "frame": "The hover bridge to the Roost"
+  },
+  "windmill": {
+    "eye": [
+      -6,
+      31.7,
+      -54
+    ],
+    "yaw": 10,
+    "pitch": 8,
+    "mockup": "",
+    "frame": "The windmill isle"
+  },
+  "roost": {
+    "eye": [
+      60,
+      35.7,
+      -6
+    ],
+    "yaw": -90,
+    "pitch": 0,
+    "mockup": "",
+    "frame": "The Roost, looking back"
+  },
+  "keeper": {
+    "eye": [
+      -54,
+      34.2,
+      -52
+    ],
+    "yaw": 200,
+    "pitch": 0,
+    "mockup": "",
+    "frame": "The keeper's isle and its notes"
+  },
+  "updraft": {
+    "eye": [
+      4,
+      32,
+      -74
+    ],
+    "yaw": 10,
+    "pitch": 12,
+    "mockup": "",
+    "frame": "The updraft to the high step"
+  },
+  "crown": {
+    "eye": [
+      0,
+      45.7,
+      -174
+    ],
+    "yaw": 0,
+    "pitch": 4,
+    "mockup": "",
+    "frame": "The storm crown"
+  },
+  "step": {
+    "eye": [
+      -69,
+      45.7,
+      -120
+    ],
+    "yaw": 20,
+    "pitch": 0,
+    "mockup": "",
+    "frame": "The high step and the crown bridge winch"
+  }
+}

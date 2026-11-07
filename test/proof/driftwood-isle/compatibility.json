@@ -1,0 +1,348 @@
+{
+  "slug": "driftwood-isle",
+  "entry": "sim/headless.ts",
+  "compatible": false,
+  "scope": "Real Sealed Ring, reef and spawn-to-zipline journeys, earned chest pack, Captain/swim and golden-hour reward carry continuations and emitted ledger facts; not whole-shard compatibility",
+  "inputs": "46258fc46080b1fa40214f8b7474068293ae0da100eac88c52c2cd7cd657de44",
+  "open": [
+    "Living creature rig volumes are reproduced; rendered ragdoll bodies and their contacts remain outside this witness.",
+    "Named target attacks and dialogue actions are bounded input ports; camera crosshair, hitstop and clang are not modeled.",
+    "Chest contents, pack restore, the reef swim/dive/treasure/surface continuation and the real spawn-to-lookout/zipline launch, carry and landing are reproduced; completion-card world freeze/resume and every sea-glass path remain outside this witness.",
+    "Ecology is bounded at 256 lifetime recipes; ship clock/contact and the page cosmetic/audio/rig work are outside this witness."
+  ],
+  "headless": {
+    "status": "passed",
+    "ticksExecuted": 10000,
+    "hash": "254e17ce9301d3f6c6afa07c885a16e99cd964fda57d21f7f2a0c4fc14c75957",
+    "entries": {
+      "lanes": 92,
+      "steps": 34118
+    },
+    "pack": {
+      "counts": {
+        "doubloon": 2
+      },
+      "order": [
+        "doubloon"
+      ]
+    },
+    "facts": [
+      {
+        "tick": 1129,
+        "effect": {
+          "kind": "fact",
+          "name": "driftwood.glass",
+          "actorId": "glass:1"
+        }
+      },
+      {
+        "tick": 1615,
+        "effect": {
+          "kind": "fact",
+          "name": "driftwood.glass",
+          "actorId": "glass:2"
+        }
+      },
+      {
+        "tick": 1893,
+        "effect": {
+          "kind": "fact",
+          "name": "driftwood.castaway",
+          "actorId": "castaway:1"
+        }
+      },
+      {
+        "tick": 5182,
+        "effect": {
+          "kind": "fact",
+          "name": "driftwood.glass",
+          "actorId": "glass:3"
+        }
+      },
+      {
+        "tick": 6397,
+        "effect": {
+          "kind": "fact",
+          "name": "driftwood.shards",
+          "actorId": "shards:1"
+        }
+      }
+    ],
+    "nativeActors": 34,
+    "alive": true
+  },
+  "replay": {
+    "status": "passed",
+    "resumedFrom": "captain",
+    "prefixTicks": 0,
+    "checkpointCaptured": true,
+    "checkpointTick": 18898,
+    "hp": 190,
+    "encounter": {
+      "boss": {
+        "state": "fight",
+        "phase": 0,
+        "checkpoint": 0,
+        "attempts": 1,
+        "t": 0,
+        "skipT": 0,
+        "short": false,
+        "saved": {
+          "defeated": false,
+          "rewardTaken": false,
+          "kills": 0
+        }
+      },
+      "attempt": true,
+      "waitForReturn": false
+    },
+    "suffixTicksExecuted": 945,
+    "hash": "fc5d2f72e2dfdc9f223befc0feecd3e6d01c0c468c83816109fe91d897894aae",
+    "replayHash": "fc5d2f72e2dfdc9f223befc0feecd3e6d01c0c468c83816109fe91d897894aae",
+    "effects": [
+      {
+        "tick": 19681,
+        "effect": {
+          "kind": "fact",
+          "name": "driftwood.quest",
+          "actorId": "quest:1"
+        }
+      },
+      {
+        "tick": 19681,
+        "effect": {
+          "kind": "fact",
+          "name": "driftwood.quest",
+          "actorId": "sealed-ring"
+        }
+      }
+    ],
+    "workerTicks": 60,
+    "workerExact": true,
+    "victory": true,
+    "reward": {
+      "elapsed": -2,
+      "player": {
+        "pitch": 0.6632251157578453,
+        "carried": true
+      }
+    }
+  },
+  "ledger": {
+    "status": "passed",
+    "resumedTick": 18898,
+    "ticksExecuted": 945,
+    "rules": 10,
+    "facts": [
+      {
+        "name": "driftwood.glass",
+        "tick": 1129,
+        "entity": "glass:1",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.glass",
+        "tick": 1615,
+        "entity": "glass:2",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.castaway",
+        "tick": 1893,
+        "entity": "castaway:1",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.glass",
+        "tick": 5182,
+        "entity": "glass:3",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.shards",
+        "tick": 6397,
+        "entity": "shards:1",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.sailor",
+        "tick": 10860,
+        "entity": "sailor:1",
+        "origin": {
+          "kind": "engine",
+          "source": "actor.died"
+        }
+      },
+      {
+        "name": "driftwood.shards",
+        "tick": 11276,
+        "entity": "shards:2",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.crab10",
+        "tick": 11798,
+        "entity": "crab10:1",
+        "origin": {
+          "kind": "engine",
+          "source": "actor.died"
+        }
+      },
+      {
+        "name": "driftwood.crab10",
+        "tick": 11853,
+        "entity": "crab10:2",
+        "origin": {
+          "kind": "engine",
+          "source": "actor.died"
+        }
+      },
+      {
+        "name": "driftwood.crab10",
+        "tick": 11910,
+        "entity": "crab10:3",
+        "origin": {
+          "kind": "engine",
+          "source": "actor.died"
+        }
+      },
+      {
+        "name": "driftwood.shards",
+        "tick": 13698,
+        "entity": "shards:3",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.glass",
+        "tick": 17374,
+        "entity": "glass:4",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      },
+      {
+        "name": "driftwood.quest",
+        "tick": 19681,
+        "entity": "quest:1",
+        "origin": {
+          "kind": "engine",
+          "source": "quest.progress"
+        }
+      }
+    ],
+    "achievements": [
+      {
+        "shard": "driftwood-isle",
+        "id": "glass",
+        "title": "Sea Glass Hoarder",
+        "count": 4,
+        "threshold": 15,
+        "earned": false
+      },
+      {
+        "shard": "driftwood-isle",
+        "id": "castaway",
+        "title": "Honorary Castaway",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      },
+      {
+        "shard": "driftwood-isle",
+        "id": "shards",
+        "title": "Keeper of the Ring",
+        "count": 3,
+        "threshold": 3,
+        "earned": true
+      },
+      {
+        "shard": "driftwood-isle",
+        "id": "sailor",
+        "title": "Deckhand's Nightmare",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      },
+      {
+        "shard": "driftwood-isle",
+        "id": "crab10",
+        "title": "Crabby",
+        "count": 3,
+        "threshold": 10,
+        "earned": false
+      },
+      {
+        "shard": "driftwood-isle",
+        "id": "quest",
+        "title": "Ringbearer",
+        "count": 1,
+        "threshold": 1,
+        "earned": true
+      }
+    ],
+    "gameplayEmissionProven": true,
+    "refusedWriteRetried": true,
+    "durableReload": true,
+    "duplicateStable": true
+  },
+  "reef": {
+    "status": "passed",
+    "journeyTicks": 10894,
+    "swimTicks": 9019,
+    "workerTicks": 60,
+    "restoreTick": 10939,
+    "suffixTicks": 137,
+    "workerExact": true,
+    "pack": {
+      "doubloon": 8
+    },
+    "surfaced": true,
+    "treasureCount": 1,
+    "durableReload": true,
+    "hash": "0a6728e1c503433efc064c913fdc578fb03b01704681b8b4feb94c1656ea6ffb"
+  },
+  "zipline": {
+    "status": "passed",
+    "approachedFromSpawn": true,
+    "resumedFrom": "lookout",
+    "prefixTicks": 0,
+    "checkpointCaptured": true,
+    "launchTick": 7120,
+    "launch": [
+      115.99101738130764,
+      34.079747203329,
+      58.26107189228139
+    ],
+    "restoreTick": 7218,
+    "suffixTicks": 182,
+    "workerTicks": 60,
+    "workerExact": true,
+    "landed": true,
+    "durableReload": true,
+    "ziplineCount": 1,
+    "hash": "59243699764aaa9378f9479cd51fc625b7f700eee014c2532acd479954e94fda",
+    "replayHash": "59243699764aaa9378f9479cd51fc625b7f700eee014c2532acd479954e94fda"
+  }
+}

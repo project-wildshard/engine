@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "isolatedDeclarations": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "outDir": ".tsc-layers/game",
+    "tsBuildInfoFile": ".tsc-layers/game.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./tsconfig.engine.json"
+    }
+  ],
+  "include": [
+    "src/client/game",
+    "src/shared/game",
+    "src/server/game",
+    "src/cook/game",
+    "src/*/game/**/*.json",
+    "src/*/engine/**/*.d.ts"
+  ],
+  "exclude": [
+    "src/*/game/**/*.test.ts",
+    "src/*/game/**/*.generated.json"
+  ],
+  "files": []
+}

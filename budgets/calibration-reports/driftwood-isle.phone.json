@@ -1,0 +1,72 @@
+{
+  "sha": "520693016a02dd13447c4fc1a9bbf7bf82d7aa67",
+  "recorded": "2026-10-01T22:12:44.493Z",
+  "boot": {
+    "shard": "driftwood-isle",
+    "tier": "phone",
+    "errors": [],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "browser": "153.0.8010.12",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3,
+      "touch": true
+    },
+    "gpuBytes": {
+      "total": 230096265
+    },
+    "render": {
+      "programs": 95
+    }
+  },
+  "poses": {
+    "pier": {
+      "calls": 223,
+      "tris": 1125728
+    },
+    "beach": {
+      "calls": 217,
+      "tris": 1065774
+    },
+    "wreck": {
+      "calls": 167,
+      "tris": 936154
+    }
+  },
+  "budgets": {
+    "pier": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 219.43689823150635
+      }
+    },
+    "beach": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 219.43689823150635
+      }
+    },
+    "wreck": {
+      "derived": {
+        "draws": 1174,
+        "tris": 18779873,
+        "programs": 148,
+        "gpuMB": null
+      },
+      "ceiling": {
+        "gpuMB": 219.43689823150635
+      }
+    }
+  }
+}

@@ -1,0 +1,411 @@
+{
+ "version": 1,
+ "slug": "thin-ice",
+ "size": 500,
+ "heightRange": [
+  -1.84,
+  58.84
+ ],
+ "catalogMode": "mixed",
+ "regions": [
+  {
+   "id": "sea",
+   "color": "#1f4e79",
+   "walkable": false,
+   "base": -6,
+   "desc": "open fjord water, deep blue"
+  },
+  {
+   "id": "ice",
+   "color": "#cfe8f3",
+   "walkable": true,
+   "base": 0.2,
+   "desc": "frozen fjord ice, walkable"
+  },
+  {
+   "id": "shore",
+   "color": "#c8b27a",
+   "walkable": true,
+   "base": 1.0,
+   "desc": "pebble shore and beaches"
+  },
+  {
+   "id": "village",
+   "color": "#8a6a4a",
+   "walkable": true,
+   "base": 3.0,
+   "desc": "flat village ground"
+  },
+  {
+   "id": "snow",
+   "color": "#f4f6f8",
+   "walkable": true,
+   "base": 8.0,
+   "desc": "rolling snowfields"
+  },
+  {
+   "id": "forest",
+   "color": "#2f5d3a",
+   "walkable": true,
+   "base": 10.0,
+   "desc": "pine forest on hills"
+  },
+  {
+   "id": "rock",
+   "color": "#7b7f86",
+   "walkable": false,
+   "base": 28.0,
+   "desc": "rocky highland and cliffs"
+  },
+  {
+   "id": "glacier",
+   "color": "#9fd6e0",
+   "walkable": true,
+   "base": 34.0,
+   "desc": "the glacier tongue"
+  },
+  {
+   "id": "path",
+   "color": "#5a3e2b",
+   "walkable": true,
+   "desc": "routes and the four entry roads (drawn over everything)"
+  }
+ ],
+ "places": [
+  {
+   "id": "landing",
+   "role": "spawn",
+   "x": -70,
+   "z": 215,
+   "r": 18,
+   "region": "shore"
+  },
+  {
+   "id": "village",
+   "role": "hub",
+   "x": -40,
+   "z": 110,
+   "r": 40,
+   "region": "village"
+  },
+  {
+   "id": "lighthouse",
+   "role": "landmark",
+   "x": -11,
+   "z": -214,
+   "r": 22,
+   "region": "rock"
+  },
+  {
+   "id": "spire",
+   "role": "boss",
+   "x": 37,
+   "z": -43,
+   "r": 28,
+   "region": "ice"
+  },
+  {
+   "id": "cave",
+   "role": "secret",
+   "x": -170,
+   "z": -60,
+   "r": 22,
+   "region": "rock"
+  },
+  {
+   "id": "tower",
+   "role": "objective",
+   "x": 175,
+   "z": 60,
+   "r": 20,
+   "region": "forest"
+  },
+  {
+   "id": "quarry",
+   "role": "arena",
+   "x": -150,
+   "z": 120,
+   "r": 30,
+   "region": "snow"
+  },
+  {
+   "id": "glacier",
+   "role": "objective",
+   "x": 140,
+   "z": -110,
+   "r": 40,
+   "region": "glacier"
+  },
+  {
+   "id": "spring",
+   "role": "camp",
+   "x": -200,
+   "z": -190,
+   "r": 12,
+   "region": "forest"
+  },
+  {
+   "id": "overlook",
+   "role": "vista",
+   "x": 200,
+   "z": -20,
+   "r": 14,
+   "region": "snow"
+  },
+  {
+   "id": "bayrun",
+   "role": "traversal",
+   "x": -60,
+   "z": -120,
+   "r": 16,
+   "region": "shore"
+  }
+ ],
+ "routes": [
+  {
+   "id": "south-entry",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       -70,
+       250
+      ],
+      [
+       -70,
+       215
+      ],
+      [
+       -55,
+       160
+      ],
+      [
+       -40,
+       110
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "west-entry-quarry-road",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       -250,
+       0
+      ],
+      [
+       -200,
+       40
+      ],
+      [
+       -150,
+       120
+      ],
+      [
+       -95,
+       118
+      ],
+      [
+       -40,
+       110
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "village-to-the-bay-junction",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       -40,
+       110
+      ],
+      [
+       -5,
+       60
+      ],
+      [
+       20,
+       20
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "junction-to-glacier-mouth",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       20,
+       20
+      ],
+      [
+       80,
+       -40
+      ],
+      [
+       140,
+       -110
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "east-entry",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       250,
+       -20
+      ],
+      [
+       200,
+       -20
+      ],
+      [
+       175,
+       60
+      ],
+      [
+       90,
+       40
+      ],
+      [
+       20,
+       20
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "north-entry",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       -60,
+       -250
+      ],
+      [
+       -60,
+       -200
+      ],
+      [
+       -60,
+       -120
+      ],
+      [
+       -20,
+       -50
+      ],
+      [
+       20,
+       20
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lighthouse-causeway",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       -60,
+       -200
+      ],
+      [
+       -11,
+       -214
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "west-trail",
+   "legs": [
+    {
+     "mode": "walk",
+     "pts": [
+      [
+       -60,
+       -120
+      ],
+      [
+       -170,
+       -60
+      ],
+      [
+       -200,
+       -190
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "gates": [
+  {
+   "edge": "S",
+   "x": -70,
+   "z": 250
+  },
+  {
+   "edge": "W",
+   "x": -250,
+   "z": 0
+  },
+  {
+   "edge": "E",
+   "x": 250,
+   "z": -20
+  },
+  {
+   "edge": "N",
+   "x": -60,
+   "z": -250
+  }
+ ],
+ "happenings": [
+  {
+   "id": "bell-tolls",
+   "x": 37,
+   "z": -43,
+   "signal": "ripples and a ring of cracks",
+   "seenFrom": [
+    "overlook",
+    "spring"
+   ]
+  },
+  {
+   "id": "crack-races",
+   "x": 60,
+   "z": 20,
+   "signal": "a white line and a boom",
+   "seenFrom": [
+    "village",
+    "landing"
+   ]
+  }
+ ],
+ "slots": []
+}

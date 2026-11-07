@@ -1,0 +1,86 @@
+[
+  {
+    "slot": "ghost-rider",
+    "length": 50976,
+    "hash": "9560941086752a170a60fa47556a45128744a1e800ba75106ecd1d6c8b4a7b4a",
+    "geometry": "e177e11dbb5d2f4d06ba86180e2adc8c6c59d3ca0c8a8a656e866165e8734614"
+  },
+  {
+    "slot": "ghost-captain",
+    "length": 53448,
+    "hash": "ccb1c9cdd22401ed2512d4700544b11bfff283cd6cf355e0d4037004b085adfb",
+    "geometry": "f4cdd47965c78934d628c484224bbd24a497251b7c2ac3d0298e68118b2ea585"
+  },
+  {
+    "slot": "shepherd-body",
+    "length": 90432,
+    "hash": "b970b7ae38e1889a6be8318635c716b00bb831558a22c8d34b5085e7e4a73976",
+    "geometry": "2a63ebb46b9113a1f91339ba3675bf78d0cee19893596f8556f9e23ebcc17b16"
+  },
+  {
+    "slot": "shepherd-arm",
+    "length": 9636,
+    "hash": "4871e6318c3e34feda0dc65eef983244b71cb8e783f3128c4067d58304157f82",
+    "geometry": "613d043c914f1cf9a82da22fe83685232c5b592609b1205b39eb0c18b960f2af"
+  },
+  {
+    "slot": "sign-labels:roads",
+    "length": 6400,
+    "hash": "729ed1ab92483f05fc4471f3a8c66e5bebf00961b658a7c4b3490a01512d7b64",
+    "geometry": "911d3d110d62d02d6a408364f54492741d07f20880993f16c072f004f664e842"
+  },
+  {
+    "slot": "sign-labels:specimen",
+    "length": 1200,
+    "hash": "d87f78e16b298db787e12aa2a9e0bebf63a289090209c136b3c915ffbae61dee",
+    "geometry": "1c886444d12d2d5456c453f0d93155aed95808a8cfab69f7bca3e898c83e2700"
+  },
+  {
+    "slot": "glacier-snout:world",
+    "length": 5148,
+    "hash": "eacec6ef3b6fb468753cde44bd82aa084aa8a0cb0ef16d4e46e93d6bd498540f",
+    "geometry": "411026dafbcb06eff0727bd306a63b9fa710c85451b24a4d7ccfd1b5571dde9b"
+  },
+  {
+    "slot": "glacier-snout:specimen",
+    "length": 5148,
+    "hash": "c612871bebe9bfb61ae952318c3ff97cf00e14aca43720a75ce205261cd9cb2c",
+    "geometry": "b43f3cf134ac88ba53e4751cc6a8b2e3183b445945a3f68d1392d33ba2d69499"
+  },
+  {
+    "slot": "dressing:phone:boulder",
+    "length": 15896,
+    "hash": "0b0553454fbd153506da4bc3b12f2aabba235ba456802d6a312bbb2d9e0bdcdc",
+    "geometry": "56c4980fcee794be13af99871ad913d83ff34d444c77df235683cb159f6f2a37"
+  },
+  {
+    "slot": "dressing:phone:boulder-tall",
+    "length": 15500,
+    "hash": "2098cdeda510664077a732c7a947ce1686538b1fde5373a57751b07dc2ed70a6",
+    "geometry": "d70481f45b933c70c5276a4e597696c867a8b0bc71e1fbc96e4163720db8dbf0"
+  },
+  {
+    "slot": "dressing:phone:slab",
+    "length": 17876,
+    "hash": "73f960dda72e7cfcc6392405d261747065f8a03b6024538aa05fef9d4f893828",
+    "geometry": "b4c14f1fad6b0c4520a22b594b211fb8eb59d851aaa9791f72bf81a6eefc3aa6"
+  },
+  {
+    "slot": "dressing:desktop:boulder",
+    "length": 34020,
+    "hash": "d15467a0a3e7b181b2f98ed37469960abd1c625962ec2d0ffd30b57856a409b9",
+    "geometry": "3bb848024990a7c1670d1031cc524c2a919066a4ebc7639427a5826549547b15"
+  },
+  {
+    "slot": "dressing:desktop:boulder-tall",
+    "length": 33932,
+    "hash": "1036e13c60a3e9bb6f21bd9fb4280238a3a63eeb93b5c2979129bd613ec212ae",
+    "geometry": "0ec92c2039b3ffb0b385b389798dec67739c079ff23ffd4707f891c48a3d81bb"
+  },
+  {
+    "slot": "dressing:desktop:slab",
+    "length": 38288,
+    "hash": "6052aa4d70602f4a940de323327421d6ff8af5270ac0e197d124b6612548e1a2",
+    "geometry": "1394bddb0f2dbaa9e74bcd675053b4abb1fee53099b79dc6f21f41cbc8622f1b"
+  }
+]

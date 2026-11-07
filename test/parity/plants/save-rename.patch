@@ -1,0 +1,11 @@
+--- a/src/game/loot/Purse.ts
++++ b/src/game/loot/Purse.ts
+@@ -13,7 +13,7 @@
+  */
+ import { readShard, writeShard } from './store';
+ 
+-const STORE = 'ws.purse.v1';
++const STORE = 'ws.purse.v9';
+ 
+ export class Purse {
+   private n: number;

@@ -1,0 +1,61 @@
+/* frame meter (src/client/engine/ui/Perf.ts) — one small line top-right on desktop; on phones a compact pill on PAUSE's row that opens a
+   details panel over the minimap (E47) */
+.ws-perf { position: fixed; right: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); z-index: calc(var(--ws-layer-hud) + 55); display: flex; align-items: baseline; gap: 5px; margin: 0; padding: 2px 5px; border: 0; appearance: none; -webkit-appearance: none; pointer-events: none; font-family: var(--ws-mono); font-size: 8px; letter-spacing: 0.04em; line-height: 1; text-align: left; color: rgba(196, 220, 232, 0.55); background: rgba(6, 10, 18, 0.45); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ws-perf b { font-family: var(--ws-mono); font-weight: 500; font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.85); }
+.ws-perf b::after { content: ' fps'; font-size: 8px; font-weight: 400; color: rgba(196, 220, 232, 0.55); }
+.ws-perf.slow b { color: #ffd27a; }
+.ws-perf.bad b { color: #ff7a6b; }
+.ws-perf.bad .ws-perf-ms, .ws-perf-live.bad span { color: #ff7a6b; }
+.ws-perf[hidden] { display: none; }
+/* QA11 (Jake, 2026-10-29: "don't show the FPS counter on the loading screen"): in play only, never on the title or a loading screen */
+:root:has(.ws-load, #hud.intro) .ws-perf, :root:has(.ws-load, #hud.intro) .ws-perf-panel { display: none; }
+.ws-perf .ws-perf-ms { display: none; }
+.ws-perf-panel { display: none; }
+@media (max-width: 700px) {
+  /* phone (E47): "59 fps 17 ms" in a glass pill the height of PAUSE, just right of it on the same row (PAUSE's 44 px hit
+     area ends 6 px past its edge, this pill starts 8 px past it). A tap opens the panel; the pill never passes a touch on. */
+  .ws-perf { left: 101px; right: auto; top: var(--ws-top); height: 24px; box-sizing: border-box; align-items: center; gap: 6px; padding: 0 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 8.5px; letter-spacing: 0.08em; pointer-events: auto; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-tap-highlight-color: transparent; transition: border-color 0.12s, background 0.12s; }
+  .ws-perf::after { content: ''; position: absolute; inset: -10px -4px -10px 0; } /* ≥ 44 px hit target */
+  .ws-perf * { pointer-events: none; }
+  .ws-perf .ws-perf-long { display: none; }
+  .ws-perf .ws-perf-ms { display: inline; color: var(--ws-text-dim); }
+  .ws-perf b { font-size: 10px; }
+  .ws-perf.open { border-color: var(--ws-cyan); background: rgba(13, 27, 38, 0.92); }
+  /* the details: dropped over the minimap (top-right), above everything; a tap on it or anywhere else closes it */
+  .ws-perf-panel.open { position: fixed; right: 12px; top: var(--ws-top); z-index: calc(var(--ws-layer-hud) + 56); display: block; box-sizing: border-box; width: max(38vw, 176px); padding: 8px 10px 6px; background: rgba(6, 10, 18, 0.92); border: 1px solid var(--ws-cyan); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(143, 227, 255, 0.18); font-family: var(--ws-mono); font-size: 9.5px; line-height: 1.2; color: var(--ws-text); font-variant-numeric: tabular-nums; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .ws-perf-panel .ws-perf-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; border-bottom: 1px solid rgba(143, 227, 255, 0.12); }
+  .ws-perf-panel .ws-perf-row:last-child { border-bottom: 0; }
+  .ws-perf-panel .ws-perf-head { position: sticky; top: -8px; z-index: calc(var(--ws-layer-hud) + 1); display: flex; justify-content: space-between; align-items: center; margin: -8px -10px 2px; padding: 6px 10px; background: rgba(6, 10, 18, 0.97); border-bottom: 1px solid var(--ws-cyan-line); }
+  .ws-perf-panel .ws-perf-head i { font-style: normal; font-size: 7.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-cyan); }
+  .ws-perf-panel .ws-perf-close { padding: 6px 12px; font-size: 9px; }
+  .ws-perf-panel .ws-perf-live { display: flex; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; margin-left: auto; margin-right: 10px; padding: 3px 8px; border: 1px solid var(--ws-cyan-line); background: rgba(13, 27, 38, 0.9); font-size: 8.5px; letter-spacing: 0.08em; color: var(--ws-text-dim); white-space: nowrap; }
+  .ws-perf-panel .ws-perf-live b { font-weight: 500; font-size: 11px; color: rgba(255, 255, 255, 0.9); }
+  .ws-perf-panel .ws-perf-live b::after { content: ' fps'; font-size: 8px; font-weight: 400; color: rgba(196, 220, 232, 0.55); }
+  .ws-perf-panel .ws-perf-live.slow b { color: #ffd27a; }
+  .ws-perf-panel .ws-perf-live.bad b { color: #ff7a6b; }
+  .ws-perf-panel .ws-perf-row i { font-style: normal; font-size: 7.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+  .ws-perf-panel .ws-perf-row span { white-space: nowrap; text-align: right; }
+  /* E142: the on-device probe (src/client/engine/ui/perfProbe.ts): its button, and its table under the rows (the panel widens for it) */
+  .ws-perf-panel .ws-perf-probe { appearance: none; -webkit-appearance: none; margin: 0; padding: 3px 8px; border: 1px solid var(--ws-cyan-line); background: rgba(13, 27, 38, 0.9); color: var(--ws-cyan); font: inherit; font-size: 8px; letter-spacing: 0.16em; touch-action: none; }
+  .ws-perf-panel .ws-perf-probe-out { margin: 4px 0 0; font: inherit; font-size: 8px; line-height: 1.35; white-space: pre; }
+  .ws-perf-panel .ws-perf-probe-out:empty { display: none; }
+  .ws-perf-panel.open.probed { width: min(94vw, 300px); }
+  /* E142 aggro-perf (src/client/engine/ui/perfHud.ts): the timing / counts block, the frame sparkline, REC 30 S + COPY — the panel is
+     wide enough for its 48-column lines; the recording's text is selectable (COPY's fallback) */
+  .ws-perf-panel.open { width: min(94vw, 300px); max-height: calc(100dvh - var(--ws-top) - 8px); overflow-y: auto; }
+  .ws-perf-panel .ws-perf-stats { margin: 4px 0 0; font: inherit; font-size: 7.5px; line-height: 1.32; white-space: pre; color: var(--ws-text); }
+  .ws-perf-panel .ws-perf-stats:empty { display: none; }
+  .ws-perf-panel .ws-perf-spark { display: block; width: 100%; height: 30px; margin: 4px 0 2px; background: rgba(143, 227, 255, 0.05); }
+  .ws-perf-panel .ws-perf-btn { appearance: none; -webkit-appearance: none; margin: 0 0 0 4px; padding: 3px 8px; border: 1px solid var(--ws-cyan-line); background: rgba(13, 27, 38, 0.9); color: var(--ws-cyan); font: inherit; font-size: 8px; letter-spacing: 0.16em; touch-action: none; }
+  .ws-perf-panel .ws-perf-rec-out { margin: 4px 0 0; font: inherit; font-size: 7px; line-height: 1.3; white-space: pre-wrap; word-break: break-all; -webkit-user-select: text; user-select: text; }
+  .ws-perf-panel .ws-perf-rec-out:empty { display: none; }
+  /* E142: the A/B switches — a lit one has that thing OFF */
+  .ws-perf-panel .ws-perf-abrow { flex-wrap: wrap; }
+  .ws-perf-panel .ws-perf-abs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+  .ws-perf-panel .ws-perf-ab { margin: 0; padding: 5px 7px; }
+  .ws-perf-panel .ws-perf-ab.off { background: var(--ws-cyan); color: #06121a; }
+}
+/* E350 F-J1: the PERF LAP's progress line (src/client/engine/ui/perfLap.ts) — top centre, under the safe area, over the HUD; the panel is
+   closed while the lap runs, so this is all it draws (one text write a second) */
+.ws-perf-lap-status { position: fixed; left: 50%; top: calc(var(--ws-top, 10px) + 34px); z-index: calc(var(--ws-layer-hud) + 57); transform: translateX(-50%); max-width: calc(100vw - 32px); box-sizing: border-box; padding: 5px 10px; border: 1px solid var(--ws-cyan-line, rgba(143, 227, 255, 0.4)); background: rgba(13, 27, 38, 0.8); font-family: var(--ws-mono, monospace); font-size: 9px; letter-spacing: 0.14em; line-height: 1.2; color: var(--ws-cyan, #8fe3ff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; font-variant-numeric: tabular-nums; }
+.ws-perf-lap-status[hidden] { display: none; }

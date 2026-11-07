@@ -1,0 +1,16 @@
+{
+  "shardSystems": {
+    "driftwood-isle": {
+      "fixed.post": {
+        "main.3": "shard.driftwood.bridge.capture"
+      },
+      "update": {
+        "engine.quest.installDriftwoodAdventure": "shard.driftwood.adventure",
+        "engine.quest.installDriftwoodAdventure.2": "shard.driftwood.adventure.2",
+        "engine.quest.installDriftwoodAdventure.3": "shard.driftwood.adventure.3",
+        "engine.quest.installDriftwoodAdventure.4": "shard.driftwood.adventure.4",
+        "loot": "game.loot"
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+/* ─── rotate gate (E38): the game is portrait-only on phones. A touch device held landscape gets this full-screen page
+   over EVERYTHING — the loading panel, the title, the world, every menu — and nothing underneath takes a touch or a
+   key (src/client/engine/ui/RotateGate.ts swallows input, pauses a running game and stops the frame loop). The markup lives in
+   index.html so it is there from the first bytes. Keyed on the POINTER, not on ?touch: a desktop is landscape by
+   nature and is never gated. The media query below and QUERY in RotateGate.ts must stay identical. prefix ws-rotate- ─── */
+.ws-rotate {
+  display: none; position: fixed; inset: 0; z-index: calc(var(--ws-layer-error) + 500); box-sizing: border-box;
+  align-items: center; justify-content: center;
+  padding: env(safe-area-inset-top, 0px) max(24px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(24px, env(safe-area-inset-left, 0px));
+  background: #070e16; color: var(--ws-text); font-family: var(--ws-mono);
+  pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+@media (orientation: landscape) and (pointer: coarse) and (min-aspect-ratio: 5/4) {
+  .ws-rotate { display: flex; }
+}
+.ws-rotate * { box-sizing: border-box; }
+
+/* the card: navy glass, 1 px cyan hairline, corner brackets top-left + bottom-right */
+.ws-rotate-panel {
+  position: relative; display: flex; align-items: center; gap: 30px; max-width: 560px; padding: 26px 34px 26px 28px;
+  background: rgba(13, 27, 38, 0.8); border: 1px solid var(--ws-cyan-line);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 10px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(143, 227, 255, 0.12);
+}
+.ws-rotate-panel::before, .ws-rotate-panel::after { content: ''; position: absolute; width: 18px; height: 18px; opacity: 0.9; }
+.ws-rotate-panel::before { left: -1px; top: -1px; border-left: 1px solid var(--ws-cyan); border-top: 1px solid var(--ws-cyan); }
+.ws-rotate-panel::after { right: -1px; bottom: -1px; border-right: 1px solid var(--ws-cyan); border-bottom: 1px solid var(--ws-cyan); }
+
+/* the glyph: a phone turning from landscape to upright, beside a quarter-turn arrow */
+.ws-rotate-glyph { flex: none; width: 92px; height: 92px; color: var(--ws-cyan); }
+.ws-rotate-glyph svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ws-rotate-glyph .ws-rotate-phone { transform-box: view-box; transform-origin: 46px 46px; animation: ws-rotate-turn 2.8s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+
+.ws-rotate-text { min-width: 0; }
+.ws-rotate-kicker { font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan-dim); }
+.ws-rotate-title {
+  margin: 8px 0 10px; font-family: var(--ws-display); font-weight: 700; font-size: 32px; line-height: 1;
+  letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
+}
+.ws-rotate-title b { color: var(--ws-cyan); font-weight: 700; }
+.ws-rotate-sub { font-size: 10px; line-height: 1.6; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text-dim); }
+
+/* a short landscape phone (~320 px tall): tighter card */
+@media (max-height: 340px) {
+  .ws-rotate-panel { gap: 20px; padding: 18px 24px 18px 20px; }
+  .ws-rotate-glyph { width: 70px; height: 70px; }
+  .ws-rotate-title { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-rotate-glyph .ws-rotate-phone { animation: none; }
+}
+
+@keyframes ws-rotate-turn {
+  0%, 22% { transform: rotate(-90deg); }
+  58%, 100% { transform: rotate(0deg); }
+}

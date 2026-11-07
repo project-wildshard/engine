@@ -1,0 +1,87 @@
+/* ─── minimap (src/client/engine/ui/Minimap.ts) ─── prefix ws-minimap- ─── the circular top-down map top-right, under the compass band (mockup B) */
+
+/* the circle: smoked glass, a cyan hairline rim, 8 ticks every 45° poking outward (a conic gradient masked to a thin ring) */
+.ws-minimap {
+  --ws-mm: 144px; /* the diameter: the corner BAG button (below) is sized from it */
+  position: absolute; right: 22px; top: 70px; width: var(--ws-mm); height: var(--ws-mm); border-radius: 50%; /* 80 % of the old 180 (E51) */
+  background: var(--ws-glass-deep);
+  border: 1px solid rgba(143, 227, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 10px 40px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(143, 227, 255, 0.12), 0 0 18px rgba(143, 227, 255, 0.12);
+  pointer-events: none; transition: opacity 0.6s ease 0.2s;
+}
+.ws-minimap::before { /* the ticks */
+  content: ''; position: absolute; inset: -8px; border-radius: 50%;
+  background: repeating-conic-gradient(from -1.25deg, var(--ws-cyan) 0 2.5deg, transparent 2.5deg 45deg);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px), #000 calc(100% - 1px), transparent 100%);
+  mask: radial-gradient(closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px), #000 calc(100% - 1px), transparent 100%);
+  opacity: 0.9; filter: drop-shadow(0 0 3px rgba(143, 227, 255, 0.6));
+}
+.ws-minimap .ws-minimap-canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; display: block; }
+/* "N" on the rim, in a small notch of dark glass so it reads over the map */
+.ws-minimap .ws-minimap-n {
+  position: absolute; left: 50%; top: 2px; transform: translateX(-50%);
+  font-family: var(--ws-display); font-weight: 700; font-size: 12px; line-height: 1; letter-spacing: 0.06em; color: var(--ws-cyan);
+  padding: 2px 4px 1px; background: rgba(6, 10, 18, 0.7); border-radius: 3px;
+  text-shadow: 0 0 6px rgba(143, 227, 255, 0.6);
+}
+/* (the heading readout that sat under the circle is gone, E51 — the quest chip takes its place, src/game/quest/QuestUI.ts) */
+
+.ws-minimap.hidden { display: none; }
+/* E183: hidden on the title, not just clear — Map.ts makes the minimap a z-6 button (pointer-events: auto inline), so at
+   opacity 0 it still took every tap on the right three quarters of EXPLORE WORLD, which sits over it; only the eye was left */
+#hud.intro .ws-minimap { opacity: 0; visibility: hidden; transition: opacity 0.4s; }
+
+/* phone: 27.2 % of the width (80 % of the old 34vw, E51), top-right at --ws-top */
+@media (max-width: 700px) {
+  .ws-minimap { --ws-mm: 27.2vw; right: 14px; top: var(--ws-top); } /* 80 % of 34vw (E51) */
+  .ws-minimap::before { inset: -6px; -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 7px), #000 calc(100% - 6px), #000 calc(100% - 1px), transparent 100%); mask: radial-gradient(closest-side, transparent calc(100% - 7px), #000 calc(100% - 6px), #000 calc(100% - 1px), transparent 100%); }
+  .ws-minimap .ws-minimap-n { font-size: 10px; top: 1px; padding: 1px 3px 1px; }
+}
+
+/* ── the BAG button (src/client/game/bag/BagButton.ts, E124): the piece that squares out the circle's top-right corner — straight top and
+   right edges just past the tick tips, a concave edge on the rim itself (round 12), the backpack in its widest part. The SVG box
+   starts at the circle's centre (left / bottom 50 %) and is 139 / 200 of the diameter: the 113-unit piece + a 26-unit hit
+   margin up and right (units: the radius is 100). Only the hit path takes pointers, so the map under the box stays the map. */
+.ws-minimap .ws-minimap-bag {
+  position: absolute; left: 50%; bottom: 50%; width: calc(var(--ws-mm) * 0.695); height: calc(var(--ws-mm) * 0.695);
+  margin: 0; padding: 0; border: 0; background: none; appearance: none; -webkit-appearance: none; pointer-events: none;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none;
+}
+.ws-minimap .ws-minimap-bag svg { display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+.ws-minimap .ws-minimap-bag-hit { fill: transparent; pointer-events: fill; }
+.ws-minimap .ws-minimap-bag-piece { fill: rgba(13, 27, 38, 0.84); pointer-events: none; transition: fill 0.12s; }
+.ws-minimap .ws-minimap-bag-edge {
+  fill: none; stroke: rgba(143, 227, 255, 0.55); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter;
+  pointer-events: none; transition: stroke 0.12s;
+}
+.ws-minimap .ws-minimap-bag-corner { fill: none; stroke: var(--ws-cyan); stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.ws-minimap .ws-minimap-bag-icon { pointer-events: none; filter: drop-shadow(0 0 3px rgba(143, 227, 255, 0.55)); }
+.ws-minimap .ws-minimap-bag-body { fill: var(--ws-cyan); }
+.ws-minimap .ws-minimap-bag-loop { fill: none; stroke: var(--ws-cyan); stroke-width: 4; stroke-linecap: round; }
+.ws-minimap .ws-minimap-bag-seam { fill: none; stroke: rgba(13, 27, 38, 0.9); stroke-width: 3.5; }
+/* pressed (a class: the minimap's pointerdown preventDefault keeps :active off on iOS) + keyboard focus */
+.ws-minimap .ws-minimap-bag.down .ws-minimap-bag-piece { fill: rgba(40, 92, 116, 0.92); }
+.ws-minimap .ws-minimap-bag.down .ws-minimap-bag-edge { stroke: var(--ws-cyan); }
+.ws-minimap .ws-minimap-bag.down .ws-minimap-bag-body { fill: #fff; }
+.ws-minimap .ws-minimap-bag.down .ws-minimap-bag-loop { fill: none; stroke: #fff; }
+.ws-minimap .ws-minimap-bag:focus-visible .ws-minimap-bag-edge { stroke: #fff; }
+/* with the button the NE tick (1–2 o'clock) goes — the piece sits on the rim there (round 12); the other seven stay */
+.ws-minimap.bag::before {
+  background: conic-gradient(from -1.25deg, var(--ws-cyan) 0 2.5deg, transparent 2.5deg 90deg, var(--ws-cyan) 90deg 92.5deg, transparent 92.5deg 135deg,
+    var(--ws-cyan) 135deg 137.5deg, transparent 137.5deg 180deg, var(--ws-cyan) 180deg 182.5deg, transparent 182.5deg 225deg, var(--ws-cyan) 225deg 227.5deg,
+    transparent 227.5deg 270deg, var(--ws-cyan) 270deg 272.5deg, transparent 272.5deg 315deg, var(--ws-cyan) 315deg 317.5deg, transparent 317.5deg 360deg);
+}
+/* phone: the square (the piece's straight edges, 13 / 200 of the diameter past the circle) lines up with PAUSE — its top on
+   --ws-top, its right edge 12 px in like PAUSE's left — so the circle steps ~7 px down and ~7 px left (`.bag`: only with the button) */
+@media (max-width: 700px) {
+  .ws-minimap.bag { right: calc(12px + var(--ws-mm) * 0.065); top: calc(var(--ws-top) + var(--ws-mm) * 0.065); }
+}
+
+/* the day badge (Minimap.showDayBadge — a shard's ChunkDef.hud.dayBadge; Nalati, N16 wave 6): the sun / moon on the rim at
+   4 o'clock, a small glass notch, no text; warm at dawn / golden / dusk */
+.ws-minimap-day { position: absolute; left: 93.3%; top: 75%; width: 17px; height: 17px; margin: -8.5px 0 0 -8.5px; padding: 2px; box-sizing: border-box; border-radius: 50%; background: rgba(6, 10, 18, 0.82); border: 1px solid var(--ws-cyan-line); pointer-events: none; }
+.ws-minimap.practice .ws-minimap-day { display: none; }
+.ws-minimap-day svg { display: block; width: 100%; height: 100%; fill: #ffd98a; stroke: #ffd98a; filter: drop-shadow(0 0 3px rgba(255, 196, 74, 0.6)); }
+.ws-minimap-day.moon svg { fill: #cfe3ff; stroke: none; filter: drop-shadow(0 0 3px rgba(207, 227, 255, 0.6)); }
+.ws-minimap-day[data-phase='golden'] svg, .ws-minimap-day[data-phase='dusk'] svg, .ws-minimap-day[data-phase='dawn'] svg { fill: #ffb45a; stroke: #ffb45a; }
+@media (min-width: 701px) { .ws-minimap-day { width: 22px; height: 22px; margin: -11px 0 0 -11px; padding: 3px; } }

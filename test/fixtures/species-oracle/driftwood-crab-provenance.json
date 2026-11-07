@@ -1,0 +1,7 @@
+{
+  "revision": "5206a41281771a40b0b2f73f65e40562474554ac",
+  "source": "src/shards/driftwood-isle/runtime/crabDecision.ts",
+  "sourceHash": "ceb78b90bdf8ffbacf15b038114987659f1a5274e2efd3f5c10c6ae020d5855e",
+  "fixture": "test/fixtures/species-oracle/driftwood-crab.ts",
+  "fixtureHash": "d23461777e867076636e3f735b90f536d444a30afbb0ac18bdd3b1acb474e6e2"
+}

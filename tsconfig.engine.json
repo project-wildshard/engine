@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "isolatedDeclarations": true,
+    "outDir": ".tsc-layers/engine",
+    "tsBuildInfoFile": ".tsc-layers/engine.tsbuildinfo"
+  },
+  "references": [],
+  "include": [
+    "src/client/engine",
+    "src/shared/engine",
+    "src/server/engine",
+    "budgets/desktop-reference.json"
+  ],
+  "exclude": [
+    "src/*/engine/**/*.test.ts"
+  ]
+}

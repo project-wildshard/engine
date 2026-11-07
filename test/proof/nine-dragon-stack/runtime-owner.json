@@ -1,0 +1,2974 @@
+{
+  "row": "SF51-p",
+  "ask": "E435",
+  "browserPin": "402b87c9f7ee13cd178349be9132ecc91019f986",
+  "standalonePassed": true,
+  "gridAdmissionPassed": false,
+  "gridGap": "SF51-g: Nine remains a far proxy until M3 admission is wired",
+  "attempts": [
+    {
+      "name": "nine-browser-proof",
+      "result": {
+        "sha": "402b87c9f7ee13cd178349be9132ecc91019f986",
+        "base": "http://127.0.0.1:4403",
+        "device": "iPhone 16 Pro",
+        "surface": "Chromium Metal, muted",
+        "developer": true,
+        "phases": [
+          {
+            "mode": "standalone",
+            "appState": "play",
+            "level": "nine-dragon-stack",
+            "rows": [
+              {
+                "id": "sword",
+                "rowId": "weapon.jian",
+                "name": "Neon Jian",
+                "context": "weapon.melee",
+                "meta": "Neon Jian"
+              }
+            ],
+            "tools": [
+              {
+                "id": "tool.hoverboard",
+                "rowId": "tool.hoverboard",
+                "name": "Hoverboard",
+                "actions": [
+                  "hover"
+                ],
+                "slot": "tool"
+              },
+              {
+                "id": "tool.fei-zhua",
+                "rowId": "tool.fei-zhua",
+                "name": "Fei Zhua",
+                "actions": [
+                  "lock",
+                  "jump"
+                ],
+                "slot": "offhand"
+              }
+            ],
+            "current": "sword",
+            "feet": {
+              "x": 0.9500003673921043,
+              "y": 125.00029999562685,
+              "z": 7.499999128356421
+            },
+            "grid": null,
+            "fatal": null
+          }
+        ],
+        "errors": [],
+        "reports": [],
+        "version": {
+          "build": "402b87c-mv072m0n",
+          "time": "2026-10-08T23:55:56.631Z"
+        },
+        "pass": false,
+        "failure": "page.evaluate: Error: Grid floor route nine-declared-entry timed out\n    at eval (eval at evaluate (:311:30), <anonymous>:36:70)\n    at runFloorGridRoute (/Users/raynos/projects/games/wildshard-singleplayer/scripts/frame-floor-grid.mjs:58:15)\n    at async file:///private/tmp/claude-501/sp-builders/sp-x4/nine-owner-browser.mjs:35:79"
+      }
+    },
+    {
+      "name": "nine-browser-grid-retry",
+      "result": {
+        "sha": "402b87c9f7ee13cd178349be9132ecc91019f986",
+        "base": "http://127.0.0.1:4403",
+        "device": "iPhone 16 Pro",
+        "surface": "Chromium Metal, muted",
+        "developer": true,
+        "phases": [],
+        "errors": [],
+        "reports": [],
+        "version": {
+          "build": "402b87c-mv072m0n",
+          "time": "2026-10-08T23:55:56.631Z"
+        },
+        "routeProgress": [
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 0,
+              "target": {
+                "x": 0,
+                "z": -277.5
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": -0.00046653684807795403,
+                  "y": 0.45018695698073463,
+                  "z": -267.0499598681781
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 1,
+              "target": {
+                "x": 277.5,
+                "z": -277.5
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 121.22388491523088,
+                  "y": 0.450000017619186,
+                  "z": -277.1007957188849
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 1,
+              "target": {
+                "x": 277.5,
+                "z": -277.5
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 270.6726388384086,
+                  "y": 0.4500000192567276,
+                  "z": -277.48255963907286
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 10.24,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 2,
+              "target": {
+                "x": 555,
+                "z": -277.5
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 405.10397385921897,
+                  "y": 0.45000007541569725,
+                  "z": -277.4988769154836
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 2,
+              "target": {
+                "x": 555,
+                "z": -277.5
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 551.4524139251989,
+                  "y": 0.4500000000000079,
+                  "z": -277.4999734199828
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 5.32,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 555.0086295052705,
+                  "y": 0.4572173950882373,
+                  "z": -298.35084810326344
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 554.909731565839,
+                  "y": 0.44029346465127384,
+                  "z": -298.3505907631309
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 554.8301613896737,
+                  "y": 0.44911563625196843,
+                  "z": -298.3506625784624
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 555.0144093410296,
+                  "y": 0.43589205387081376,
+                  "z": -298.3505130682982
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 555.0104854332044,
+                  "y": 0.42693041839209916,
+                  "z": -298.3504992546453
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 554.9837781724507,
+                  "y": 0.4544186307712636,
+                  "z": -298.3536288112385
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 555.043676208014,
+                  "y": 0.4422536598706247,
+                  "z": -298.3505767316031
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 554.9208737092149,
+                  "y": 0.4010890860819597,
+                  "z": -298.35377422224457
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 555.0311120601527,
+                  "y": 0.44409130283641085,
+                  "z": -298.35042912157706
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          },
+          {
+            "stop": {
+              "leg": "nine-declared-entry",
+              "phase": "travel",
+              "waypoint": 3,
+              "target": {
+                "x": 555,
+                "z": -315
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 554.9725749051647,
+                  "y": 0.44328171127859156,
+                  "z": -298.3505003389485
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 15,
+              "homeActive": null
+            }
+          }
+        ],
+        "diagnostic": {
+          "grid": {
+            "home": "driftwood-isle",
+            "inside": null,
+            "feet": {
+              "x": 554.97,
+              "z": -298.35
+            },
+            "cells": [
+              {
+                "instance": "pine-hollow",
+                "slug": "pine-hollow",
+                "cell": [
+                  0,
+                  1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "template-2",
+                "slug": "_template",
+                "cell": [
+                  1,
+                  1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "sunscar-dunes",
+                "slug": "sunscar-dunes",
+                "cell": [
+                  -1,
+                  0
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "driftwood-isle",
+                "slug": "driftwood-isle",
+                "cell": [
+                  0,
+                  0
+                ],
+                "shows": "frozen"
+              },
+              {
+                "instance": "nalati-grasslands",
+                "slug": "nalati-grasslands",
+                "cell": [
+                  1,
+                  0
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "far-reach",
+                "slug": "far-reach",
+                "cell": [
+                  0,
+                  -1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "nine-dragon-stack",
+                "slug": "nine-dragon-stack",
+                "cell": [
+                  1,
+                  -1
+                ],
+                "shows": "far proxy"
+              }
+            ],
+            "strips": 40,
+            "road": {
+              "segments": 24,
+              "junctions": 16,
+              "roundabouts": 4,
+              "signs": 124,
+              "lights": 364,
+              "draws": 3
+            },
+            "seams": {
+              "triangles": 97594,
+              "draws": 5,
+              "buckets": {
+                "ground": 82646,
+                "stone": 8408,
+                "rock": 5532,
+                "rail": 504,
+                "curtain": 504
+              }
+            },
+            "softWalls": {
+              "closed": 28
+            },
+            "shimmer": {
+              "borders": 28,
+              "status": null
+            },
+            "screens": {
+              "shown": [
+                {
+                  "instance": "nalati-grasslands",
+                  "status": "loading"
+                },
+                {
+                  "instance": "nine-dragon-stack",
+                  "status": "waiting"
+                },
+                {
+                  "instance": "far-reach",
+                  "status": "loading"
+                }
+              ],
+              "draws": 355
+            },
+            "plots": {
+              "plots": [
+                {
+                  "instance": "open-plot-nw",
+                  "visible": false,
+                  "entries": {
+                    "north": {
+                      "billboard": "sky-race",
+                      "demo": "alien-plain"
+                    },
+                    "east": {
+                      "billboard": "night-market",
+                      "demo": "desert-ruin"
+                    },
+                    "south": {
+                      "billboard": "frozen-lighthouse",
+                      "demo": "ink-valley"
+                    },
+                    "west": {
+                      "billboard": "canyon-railway",
+                      "demo": "sky-race"
+                    }
+                  }
+                },
+                {
+                  "instance": "open-plot-sw",
+                  "visible": true,
+                  "entries": {
+                    "north": {
+                      "billboard": "coral-reef",
+                      "demo": "night-market"
+                    },
+                    "east": {
+                      "billboard": "alien-plain",
+                      "demo": "frozen-lighthouse"
+                    },
+                    "south": {
+                      "billboard": "desert-ruin",
+                      "demo": "canyon-railway"
+                    },
+                    "west": {
+                      "billboard": "ink-valley",
+                      "demo": "coral-reef"
+                    }
+                  }
+                }
+              ],
+              "pictures": 8,
+              "draws": 18,
+              "triangles": 25872
+            },
+            "ringsReady": true,
+            "residentMB": 146.97,
+            "playingMB": 526.71,
+            "accountedBytes": 146968492,
+            "rings": {
+              "far": 7,
+              "l1": 0,
+              "l0": 0,
+              "refused": 0,
+              "inFlight": 0,
+              "queued": 0
+            },
+            "frame": {
+              "installed": true,
+              "faded": 3,
+              "owner": null,
+              "highway": 0.98,
+              "weights": {
+                "nine-dragon-stack": 0.02
+              },
+              "air": [
+                0.943,
+                0.56,
+                0.444
+              ],
+              "grade": [
+                -0.006,
+                0.805,
+                1.002,
+                0.951,
+                0.988,
+                1.071
+              ],
+              "roadSky": 0.98,
+              "skies": {},
+              "chain": {
+                "owner": null,
+                "weight": 0,
+                "lut": false,
+                "values": [
+                  0.3,
+                  0,
+                  0.2,
+                  0,
+                  0
+                ],
+                "post": [
+                  0.4,
+                  1,
+                  0.08,
+                  0.35,
+                  -1,
+                  -1
+                ],
+                "fx": {
+                  "carrier": null,
+                  "weight": 0,
+                  "vol": [
+                    0,
+                    0.55
+                  ],
+                  "chroma": 0,
+                  "grain": 0,
+                  "target": [
+                    1,
+                    1
+                  ],
+                  "depth": "scene",
+                  "sceneDepth": false
+                }
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 554.9725749051647,
+                  "y": 0.44328171127859156,
+                  "z": -298.3505003389485
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": null,
+                "phase": "settled",
+                "issue": null
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4838.699999809265,
+                    "end": 4839.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4841.599999904633,
+                    "end": 4841.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4854.400000095367,
+                    "end": 5612.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5613.400000095367,
+                    "end": 5613.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5621.300000190735,
+                    "end": 5621.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5637.699999809265,
+                    "end": 5734.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5744.599999904633,
+                    "end": 5809.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5826.800000190735,
+                    "end": 5827.199999809265,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 18.13,
+              "homeActive": null
+            },
+            "life": [
+              {
+                "instance": "template-2",
+                "creatures": 3,
+                "frozen": true,
+                "views": {
+                  "targets": 3,
+                  "posed": 3,
+                  "particles": 1,
+                  "capacity": 6,
+                  "tick": 9006
+                },
+                "failed": null
+              }
+            ]
+          },
+          "stop": {
+            "leg": "nine-declared-entry",
+            "phase": "travel",
+            "waypoint": 3,
+            "target": {
+              "x": 555,
+              "z": -315
+            }
+          }
+        },
+        "pass": false,
+        "failure": "page.evaluate: Error: Grid floor route nine-declared-entry timed out\n    at eval (eval at evaluate (:311:30), <anonymous>:36:70)\n    at runFloorGridRoute (/Users/raynos/projects/games/wildshard-singleplayer/scripts/frame-floor-grid.mjs:58:15)\n    at async file:///private/tmp/claude-501/sp-builders/sp-x4/nine-owner-browser.mjs:36:364"
+      }
+    },
+    {
+      "name": "nine-browser-admission",
+      "result": {
+        "sha": "402b87c9f7ee13cd178349be9132ecc91019f986",
+        "base": "http://127.0.0.1:4403",
+        "device": "iPhone 16 Pro",
+        "surface": "Chromium Metal, muted",
+        "developer": true,
+        "phases": [],
+        "errors": [],
+        "reports": [],
+        "version": {
+          "build": "402b87c-mv072m0n",
+          "time": "2026-10-08T23:55:56.631Z"
+        },
+        "diagnostic": {
+          "grid": {
+            "home": "driftwood-isle",
+            "inside": null,
+            "feet": {
+              "x": 0,
+              "z": -194
+            },
+            "cells": [
+              {
+                "instance": "pine-hollow",
+                "slug": "pine-hollow",
+                "cell": [
+                  0,
+                  1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "template-2",
+                "slug": "_template",
+                "cell": [
+                  1,
+                  1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "sunscar-dunes",
+                "slug": "sunscar-dunes",
+                "cell": [
+                  -1,
+                  0
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "driftwood-isle",
+                "slug": "driftwood-isle",
+                "cell": [
+                  0,
+                  0
+                ],
+                "shows": "playing"
+              },
+              {
+                "instance": "nalati-grasslands",
+                "slug": "nalati-grasslands",
+                "cell": [
+                  1,
+                  0
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "far-reach",
+                "slug": "far-reach",
+                "cell": [
+                  0,
+                  -1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "nine-dragon-stack",
+                "slug": "nine-dragon-stack",
+                "cell": [
+                  1,
+                  -1
+                ],
+                "shows": "far proxy"
+              }
+            ],
+            "strips": 40,
+            "road": {
+              "segments": 24,
+              "junctions": 16,
+              "roundabouts": 4,
+              "signs": 124,
+              "lights": 364,
+              "draws": 3
+            },
+            "seams": {
+              "triangles": 97594,
+              "draws": 5,
+              "buckets": {
+                "ground": 82646,
+                "stone": 8408,
+                "rock": 5532,
+                "rail": 504,
+                "curtain": 504
+              }
+            },
+            "softWalls": {
+              "closed": 24
+            },
+            "shimmer": {
+              "borders": 28,
+              "status": null
+            },
+            "screens": {
+              "shown": [
+                {
+                  "instance": "far-reach",
+                  "status": "loading"
+                },
+                {
+                  "instance": "nalati-grasslands",
+                  "status": "loading"
+                },
+                {
+                  "instance": "nine-dragon-stack",
+                  "status": "waiting"
+                }
+              ],
+              "draws": 13
+            },
+            "plots": {
+              "plots": [
+                {
+                  "instance": "open-plot-nw",
+                  "visible": false,
+                  "entries": {
+                    "north": {
+                      "billboard": "sky-race",
+                      "demo": "alien-plain"
+                    },
+                    "east": {
+                      "billboard": "night-market",
+                      "demo": "desert-ruin"
+                    },
+                    "south": {
+                      "billboard": "frozen-lighthouse",
+                      "demo": "ink-valley"
+                    },
+                    "west": {
+                      "billboard": "canyon-railway",
+                      "demo": "sky-race"
+                    }
+                  }
+                },
+                {
+                  "instance": "open-plot-sw",
+                  "visible": true,
+                  "entries": {
+                    "north": {
+                      "billboard": "coral-reef",
+                      "demo": "night-market"
+                    },
+                    "east": {
+                      "billboard": "alien-plain",
+                      "demo": "frozen-lighthouse"
+                    },
+                    "south": {
+                      "billboard": "desert-ruin",
+                      "demo": "canyon-railway"
+                    },
+                    "west": {
+                      "billboard": "ink-valley",
+                      "demo": "coral-reef"
+                    }
+                  }
+                }
+              ],
+              "pictures": 8,
+              "draws": 18,
+              "triangles": 25872
+            },
+            "ringsReady": true,
+            "residentMB": 491.5,
+            "playingMB": 909.14,
+            "accountedBytes": 491502986,
+            "rings": {
+              "far": 7,
+              "l1": 0,
+              "l0": 0,
+              "refused": 0,
+              "inFlight": 0,
+              "queued": 0
+            },
+            "frame": {
+              "installed": true,
+              "faded": 3,
+              "owner": "driftwood-isle",
+              "highway": 0,
+              "weights": {
+                "driftwood-isle": 1
+              },
+              "air": [
+                0.36,
+                0.7,
+                1
+              ],
+              "grade": [
+                0,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "roadSky": 0,
+              "skies": {
+                "driftwood-isle": {
+                  "weight": 1,
+                  "drawn": true,
+                  "bytes": 1720320,
+                  "reserved": 2752512
+                }
+              },
+              "chain": {
+                "owner": "driftwood-isle",
+                "weight": 1,
+                "lut": true,
+                "values": [
+                  0.3,
+                  0,
+                  0.2,
+                  0,
+                  0
+                ],
+                "post": [
+                  0.4,
+                  1,
+                  0.08,
+                  0.35,
+                  -1,
+                  -1
+                ],
+                "fx": {
+                  "carrier": null,
+                  "weight": 0,
+                  "vol": [
+                    0,
+                    0.55
+                  ],
+                  "chroma": 0,
+                  "grain": 0,
+                  "target": [
+                    1,
+                    1
+                  ],
+                  "depth": "scene",
+                  "sceneDepth": false
+                }
+              }
+            },
+            "live": {
+              "live": {
+                "current": "driftwood-isle",
+                "worldFeet": {
+                  "x": 0,
+                  "y": 1.2499999284744263,
+                  "z": -194
+                },
+                "crossings": 1,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  }
+                ],
+                "residents": [
+                  "driftwood-isle"
+                ],
+                "pending": [],
+                "issues": {},
+                "gameplayReady": false,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": "driftwood-isle",
+                "target": "nine-dragon-stack",
+                "phase": "blocked",
+                "issue": "Owned runtime crossing must commit onto the neutral road first"
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4981.60000038147,
+                    "end": 4982.200000286102,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4984.5,
+                    "end": 4984.60000038147,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4998,
+                    "end": 5783.900000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5784.800000190735,
+                    "end": 5784.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5785,
+                    "end": 5785.200000286102,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5797.800000190735,
+                    "end": 5892.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5902.5,
+                    "end": 5971.300000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 5983,
+                    "end": 5983.400000095367,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 14,
+              "homeActive": null
+            },
+            "life": [
+              {
+                "instance": "template-2",
+                "creatures": 3,
+                "frozen": true,
+                "views": {
+                  "targets": 3,
+                  "posed": 3,
+                  "particles": 0,
+                  "capacity": 6,
+                  "tick": 38
+                },
+                "failed": null
+              }
+            ]
+          }
+        },
+        "pass": false,
+        "failure": "page.waitForFunction: Timeout 180000ms exceeded.\n    at /private/tmp/claude-501/sp-builders/sp-x4/nine-owner-browser.mjs:38:16"
+      }
+    },
+    {
+      "name": "nine-browser-admission-road-first",
+      "result": {
+        "sha": "402b87c9f7ee13cd178349be9132ecc91019f986",
+        "base": "http://127.0.0.1:4403",
+        "device": "iPhone 16 Pro",
+        "surface": "Chromium Metal, muted",
+        "developer": true,
+        "phases": [],
+        "errors": [],
+        "reports": [],
+        "version": {
+          "build": "402b87c-mv072m0n",
+          "time": "2026-10-08T23:55:56.631Z"
+        },
+        "diagnostic": {
+          "grid": {
+            "home": "driftwood-isle",
+            "inside": null,
+            "feet": {
+              "x": 555,
+              "z": -315
+            },
+            "cells": [
+              {
+                "instance": "pine-hollow",
+                "slug": "pine-hollow",
+                "cell": [
+                  0,
+                  1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "template-2",
+                "slug": "_template",
+                "cell": [
+                  1,
+                  1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "sunscar-dunes",
+                "slug": "sunscar-dunes",
+                "cell": [
+                  -1,
+                  0
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "driftwood-isle",
+                "slug": "driftwood-isle",
+                "cell": [
+                  0,
+                  0
+                ],
+                "shows": "frozen"
+              },
+              {
+                "instance": "nalati-grasslands",
+                "slug": "nalati-grasslands",
+                "cell": [
+                  1,
+                  0
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "far-reach",
+                "slug": "far-reach",
+                "cell": [
+                  0,
+                  -1
+                ],
+                "shows": "far proxy"
+              },
+              {
+                "instance": "nine-dragon-stack",
+                "slug": "nine-dragon-stack",
+                "cell": [
+                  1,
+                  -1
+                ],
+                "shows": "far proxy"
+              }
+            ],
+            "strips": 40,
+            "road": {
+              "segments": 24,
+              "junctions": 16,
+              "roundabouts": 4,
+              "signs": 124,
+              "lights": 364,
+              "draws": 3
+            },
+            "seams": {
+              "triangles": 97594,
+              "draws": 5,
+              "buckets": {
+                "ground": 82646,
+                "stone": 8408,
+                "rock": 5532,
+                "rail": 504,
+                "curtain": 504
+              }
+            },
+            "softWalls": {
+              "closed": 28
+            },
+            "shimmer": {
+              "borders": 28,
+              "status": null
+            },
+            "screens": {
+              "shown": [
+                {
+                  "instance": "far-reach",
+                  "status": "loading"
+                },
+                {
+                  "instance": "nalati-grasslands",
+                  "status": "loading"
+                },
+                {
+                  "instance": "nine-dragon-stack",
+                  "status": "waiting"
+                }
+              ],
+              "draws": 376
+            },
+            "plots": {
+              "plots": [
+                {
+                  "instance": "open-plot-nw",
+                  "visible": false,
+                  "entries": {
+                    "north": {
+                      "billboard": "sky-race",
+                      "demo": "alien-plain"
+                    },
+                    "east": {
+                      "billboard": "night-market",
+                      "demo": "desert-ruin"
+                    },
+                    "south": {
+                      "billboard": "frozen-lighthouse",
+                      "demo": "ink-valley"
+                    },
+                    "west": {
+                      "billboard": "canyon-railway",
+                      "demo": "sky-race"
+                    }
+                  }
+                },
+                {
+                  "instance": "open-plot-sw",
+                  "visible": true,
+                  "entries": {
+                    "north": {
+                      "billboard": "coral-reef",
+                      "demo": "night-market"
+                    },
+                    "east": {
+                      "billboard": "alien-plain",
+                      "demo": "frozen-lighthouse"
+                    },
+                    "south": {
+                      "billboard": "desert-ruin",
+                      "demo": "canyon-railway"
+                    },
+                    "west": {
+                      "billboard": "ink-valley",
+                      "demo": "coral-reef"
+                    }
+                  }
+                }
+              ],
+              "pictures": 8,
+              "draws": 18,
+              "triangles": 25872
+            },
+            "ringsReady": true,
+            "residentMB": 146.97,
+            "playingMB": 526.71,
+            "accountedBytes": 146968492,
+            "rings": {
+              "far": 7,
+              "l1": 0,
+              "l0": 0,
+              "refused": 0,
+              "inFlight": 0,
+              "queued": 0
+            },
+            "frame": {
+              "installed": true,
+              "faded": 3,
+              "owner": "nine-dragon-stack",
+              "highway": 0,
+              "weights": {
+                "nine-dragon-stack": 1
+              },
+              "air": [
+                0.6,
+                0.56,
+                0.64
+              ],
+              "grade": [
+                -0.3,
+                1.05,
+                1.1,
+                1.02,
+                0.88,
+                1.1
+              ],
+              "roadSky": 0,
+              "skies": {},
+              "chain": {
+                "owner": null,
+                "weight": 0,
+                "lut": false,
+                "values": [
+                  0.3,
+                  0,
+                  0.2,
+                  0,
+                  0
+                ],
+                "post": [
+                  0.4,
+                  1,
+                  0.08,
+                  0.35,
+                  -1,
+                  -1
+                ],
+                "fx": {
+                  "carrier": null,
+                  "weight": 0,
+                  "vol": [
+                    0,
+                    0.55
+                  ],
+                  "chroma": 0,
+                  "grain": 0,
+                  "target": [
+                    1,
+                    1
+                  ],
+                  "depth": "scene",
+                  "sceneDepth": false
+                }
+              }
+            },
+            "live": {
+              "live": {
+                "current": null,
+                "worldFeet": {
+                  "x": 555,
+                  "y": 0.5,
+                  "z": -315
+                },
+                "crossings": 2,
+                "transitions": [
+                  {
+                    "from": null,
+                    "to": "driftwood-isle"
+                  },
+                  {
+                    "from": "driftwood-isle",
+                    "to": null
+                  }
+                ],
+                "residents": [],
+                "pending": [],
+                "issues": {
+                  "nine-dragon-stack": "nine-dragon-stack is not a shardfile shard (it stays a far proxy until M3)"
+                },
+                "gameplayReady": true,
+                "continuations": {
+                  "entries": 0,
+                  "storedChars": 0,
+                  "capacityChars": 0,
+                  "claimedBytes": 0
+                }
+              },
+              "crossing": {
+                "current": null,
+                "target": "nine-dragon-stack",
+                "phase": "blocked",
+                "issue": "nine-dragon-stack is not a shardfile shard (it stays a far proxy until M3)"
+              },
+              "stowed": false,
+              "renderOrigin": {
+                "x": 0,
+                "z": 0
+              },
+              "runtimeTiming": {
+                "current": null,
+                "completed": [
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "beforeWorld",
+                    "start": 4946.599999904633,
+                    "end": 4947.199999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "constructor",
+                    "start": 4950.099999904633,
+                    "end": 4950.099999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "world",
+                    "start": 4960.599999904633,
+                    "end": 5805.800000190735,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterWorld",
+                    "start": 5806.300000190735,
+                    "end": 5806.400000095367,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "kit",
+                    "start": 5811.900000095367,
+                    "end": 5812.199999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterKit",
+                    "start": 5828.199999809265,
+                    "end": 5925.599999904633,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "play",
+                    "start": 5936.099999904633,
+                    "end": 6013.699999809265,
+                    "outcome": "done"
+                  },
+                  {
+                    "instance": "driftwood-isle",
+                    "hook": "afterPlay",
+                    "start": 6031.199999809265,
+                    "end": 6031.599999904633,
+                    "outcome": "done"
+                  }
+                ]
+              },
+              "hoverCap": 14,
+              "homeActive": null
+            },
+            "life": [
+              {
+                "instance": "template-2",
+                "creatures": 3,
+                "frozen": true,
+                "views": {
+                  "targets": 3,
+                  "posed": 3,
+                  "particles": 2,
+                  "capacity": 6,
+                  "tick": 10814
+                },
+                "failed": null
+              }
+            ]
+          }
+        },
+        "pass": false,
+        "failure": "page.waitForFunction: Timeout 180000ms exceeded.\n    at /private/tmp/claude-501/sp-builders/sp-x4/nine-owner-browser.mjs:40:16"
+      }
+    }
+  ]
+}

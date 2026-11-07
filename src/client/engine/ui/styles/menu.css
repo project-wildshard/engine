@@ -1,0 +1,129 @@
+/* ─── title screen: the shard deck IS the menu (src/client/engine/ui/HUD.ts showIntro) ─── prefix ws-menu- ───
+   wordmark top-left, a snap carousel of shard cards low on the screen over the live world (neighbours peek in: swipe),
+   ENTER WORLD + EXPLORE WORLD side by side, a tiny SETTINGS row (src/client/game/titleDeck.ts, the one title deck — E318).
+   HUD.ts also toggles the state class `intro` on #hud while this screen is up. */
+.ws-menu { position: absolute; inset: 0; pointer-events: auto; display: flex; flex-direction: column; justify-content: space-between; transition: opacity 0.6s ease; overflow: hidden; }
+.ws-menu.hide { opacity: 0; pointer-events: none; }
+.ws-menu .ws-menu-hero { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 0); background-size: cover; background-position: center; opacity: 0; transition: opacity 0.35s ease; pointer-events: none; }
+.ws-menu .ws-menu-hero.show { opacity: 1; }
+/* E396: portrait heroes are shot at the iPhone PWA's own shape with the subject in the 8–46 % stage band above the card
+   (scripts/hero-shots.mjs); on a shorter or taller screen the crop comes 30 % from the sky, 70 % from the foreground */
+@media (orientation: portrait) { .ws-menu .ws-menu-hero { background-position: 50% 30%; } }
+/* a teaser's slideshow (HUD.ts startShots): the next screen fades in over the backdrop, then becomes it */
+/* its caption: a glass chip top-right (EXPLORE WORLD, which lives there, is off on a teaser); a tap skips ahead */
+.ws-menu::before { content: ''; position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 1); pointer-events: none; background: linear-gradient(180deg, rgba(6, 10, 18, 0.45) 0%, rgba(6, 10, 18, 0.05) 28%, rgba(6, 10, 18, 0.05) 50%, rgba(6, 10, 18, 0.7) 100%); }
+.ws-menu .ws-menu-head, .ws-menu .ws-menu-deck { position: relative; z-index: calc(var(--ws-layer-hud) + 2); }
+.ws-menu .ws-menu-head { padding: 34px 44px 0; }
+.ws-menu .ws-wordmark { text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6); }
+.ws-menu .ws-wordmark b { font-weight: 700; }
+.ws-menu .ws-wordmark::after { content: ''; display: block; width: 34px; height: 2px; margin-top: 10px; background: var(--ws-cyan); box-shadow: 0 0 10px var(--ws-cyan); }
+.ws-menu .ws-menu-recovery { box-sizing: border-box; max-width: min(440px, calc(100vw - 32px)); margin-top: 24px; padding: 10px 12px; border: 1px solid rgba(255, 181, 71, 0.55); background: rgba(13, 27, 38, 0.9); color: #f3e5cd; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); font: 11px/1.5 var(--ws-mono); white-space: pre-line; }
+/* deck: carousel + dots + enter + sound, centred in the lower half */
+.ws-menu .ws-menu-deck { --card-w: 420px; --card-gap: 18px; display: flex; flex-direction: column; align-items: center; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); } /* E146: clear of the iOS home-swipe edge, never on it */
+.ws-menu-cards { position: relative; width: 100%; padding: 12px 0; overflow: hidden; touch-action: none; cursor: grab; }
+.ws-menu-deck-track { display: flex; gap: var(--card-gap); will-change: transform; }
+.ws-menu-cards::-webkit-scrollbar { display: none; }
+.ws-menu-card { position: relative; flex: 0 0 var(--card-w); width: var(--card-w); padding: 0; margin: 0; text-align: center; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 12px 40px rgba(0, 0, 0, 0.45); color: var(--ws-text); cursor: pointer; font-family: var(--ws-mono); opacity: 0.55; transform: scale(0.94); transition: opacity 0.25s, transform 0.25s, border-color 0.25s, box-shadow 0.25s; -webkit-tap-highlight-color: transparent; }
+.ws-menu-card::before { content: ''; position: absolute; left: -1px; top: -1px; width: 18px; height: 18px; border-left: 1px solid var(--ws-cyan); border-top: 1px solid var(--ws-cyan); opacity: 0.8; z-index: calc(var(--ws-layer-hud) + 1); }
+.ws-menu-card.selected { opacity: 1; transform: none; border-color: var(--ws-cyan); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 28px rgba(143, 227, 255, 0.28); cursor: default; }
+.ws-menu-card:focus-visible { outline: none; border-color: var(--ws-cyan); }
+.ws-menu-card .ws-menu-card-img { display: block; position: relative; margin: 6px; aspect-ratio: 16 / 9; background-size: cover; background-position: center; border: 1px solid rgba(143, 227, 255, 0.18); }
+.ws-menu-card .ws-menu-card-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 10, 18, 0) 60%, rgba(6, 10, 18, 0.5) 100%); }
+/* a teaser card's picture follows its slideshow (HUD.ts nextShot): the next slide fades in over it, under the tag and the shade */
+.ws-menu-card .ws-menu-card-tag { position: absolute; right: 8px; top: 8px; z-index: calc(var(--ws-layer-hud) + 1); font-style: normal; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; padding: 3px 8px; color: var(--ws-cyan); border: 1px solid var(--ws-cyan-line); background: var(--ws-glass-deep); }
+.ws-menu-card .ws-menu-card-tag.ok { color: #7cf2a7; border-color: rgba(124, 242, 167, 0.6); box-shadow: 0 0 10px rgba(124, 242, 167, 0.3); }
+/* an experimental shard (ChunkDef.experimental): a hazard-taped amber band straight across the card image, sized off the card */
+.ws-menu-card .ws-menu-card-exp { position: absolute; left: 0; right: 0; top: 50%; z-index: calc(var(--ws-layer-hud) + 2); transform: translateY(-50%); padding: calc(var(--card-w) * 0.022 + 6px) 0; font-style: normal; font-family: var(--ws-display); font-weight: 700; font-size: calc(var(--card-w) * 0.085); line-height: 1; letter-spacing: 0.2em; text-indent: 0.2em; text-transform: uppercase; color: #140d02; background: var(--ws-amber); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 32px rgba(255, 181, 71, 0.45); }
+.ws-menu-card .ws-menu-card-exp::before, .ws-menu-card .ws-menu-card-exp::after { content: ''; position: absolute; left: 0; right: 0; height: calc(var(--card-w) * 0.012 + 3px); background: repeating-linear-gradient(-45deg, #140d02 0 8px, var(--ws-amber) 8px 16px); }
+.ws-menu-card .ws-menu-card-exp::before { top: 0; }
+/* EARLY ACCESS (ChunkDef.earlyAccess, Nalati): the same banner in the HUD's cyan — open to play, still being built */
+.ws-menu-card .ws-menu-card-exp.ws-menu-card-ea { color: #04121a; background: var(--ws-cyan); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 32px rgba(143, 227, 255, 0.45); }
+.ws-menu-card .ws-menu-card-exp.ws-menu-card-ea::before, .ws-menu-card .ws-menu-card-exp.ws-menu-card-ea::after { background: repeating-linear-gradient(-45deg, #04121a 0 8px, var(--ws-cyan) 8px 16px); }
+.ws-menu-card .ws-menu-card-exp::after { bottom: 0; }
+.ws-menu-card b { display: block; padding: 8px 12px 0; font-family: var(--ws-display); font-weight: 700; font-size: 24px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; line-height: 1.1; }
+.ws-menu-card small { display: block; padding: 4px 12px 12px; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-text-dim); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-menu-dots { display: flex; gap: 8px; margin-top: 6px; }
+.ws-menu-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(196, 220, 232, 0.35); cursor: pointer; transition: background 0.2s, box-shadow 0.2s; }
+.ws-menu-dots i.on { background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); }
+/* ENTER WORLD / EXPLORE WORLD: two compact buttons side by side under the deck (EXPLORE hides off Driftwood) */
+.ws-menu-modes { display: flex; gap: 10px; margin-top: 16px; width: var(--card-w); }
+.ws-menu-mode { min-height: 44px; touch-action: manipulation; flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 10px 10px 9px; background: rgba(143, 227, 255, 0.1); border: 1px solid var(--ws-cyan); color: #fff; cursor: pointer; pointer-events: auto; font-family: var(--ws-display); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(143, 227, 255, 0.22), inset 0 0 18px rgba(143, 227, 255, 0.08); transition: background 0.2s, box-shadow 0.2s, border-color 0.2s, color 0.2s; -webkit-tap-highlight-color: transparent; }
+.ws-menu-mode .ws-menu-mode-glyph { display: flex; color: var(--ws-cyan); }
+.ws-menu-mode .ws-menu-mode-glyph svg { width: 20px; height: 20px; }
+.ws-menu-mode b { font-weight: 700; font-size: 19px; letter-spacing: 0.2em; text-transform: uppercase; line-height: 1; white-space: nowrap; }
+.ws-menu-mode small { font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ws-cyan-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ws-menu-mode:hover, .ws-menu-mode:focus-visible { background: rgba(143, 227, 255, 0.22); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 32px rgba(143, 227, 255, 0.4); outline: none; }
+.ws-menu-mode:active { background: rgba(143, 227, 255, 0.3); }
+.ws-menu-mode.ws-menu-explore { background: rgba(255, 181, 71, 0.1); border-color: var(--ws-amber); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 181, 71, 0.18), inset 0 0 18px rgba(255, 181, 71, 0.07); }
+.ws-menu-mode.ws-menu-explore .ws-menu-mode-glyph { color: var(--ws-amber); }
+.ws-menu-mode.ws-menu-explore small { color: rgba(255, 181, 71, 0.75); }
+.ws-menu-mode.ws-menu-explore:hover, .ws-menu-mode.ws-menu-explore:focus-visible { background: rgba(255, 181, 71, 0.2); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 32px rgba(255, 181, 71, 0.35); }
+.ws-menu-mode.ws-menu-explore.off { display: none; }
+.ws-menu .ws-menu-row { display: flex; justify-content: center; gap: 22px; margin-top: 16px; }
+/* DEV (E140): SOUND's sibling — the same text + square; a button, so its chrome is reset. The padding / negative margin
+   give it a ~40 px tall tap target without moving the row */
+.ws-menu .ws-menu-settings { min-width: 44px; min-height: 44px; box-sizing: border-box; touch-action: manipulation; padding: 3px 9px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan-line); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan); pointer-events: auto; cursor: pointer; flex: none; white-space: nowrap; } /* main menu ▸ Settings (src/client/engine/ui/BootSettings.ts, E55) */
+
+/* ─── title screen on a phone-width viewport: the deck fills the lower third, world above ─── */
+@media (max-width: 700px) {
+  .ws-menu::before { background: linear-gradient(180deg, rgba(6, 10, 18, 0.55) 0%, rgba(6, 10, 18, 0.05) 30%, rgba(6, 10, 18, 0.05) 52%, rgba(6, 10, 18, 0.78) 100%); }
+  .ws-menu .ws-menu-head { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
+  .ws-menu .ws-wordmark { font-size: 13px; letter-spacing: 0.3em; line-height: 1.05; color: rgba(230, 242, 248, 0.85); font-weight: 600; }
+  .ws-menu .ws-wordmark b { display: block; font-size: 26px; letter-spacing: 0.12em; margin-top: 3px; }
+  .ws-menu .ws-wordmark::after { width: 26px; margin-top: 6px; }
+  .ws-menu .ws-menu-recovery { margin-top: 36px; font-size: 10px; line-height: 1.45; }
+  .ws-menu .ws-menu-deck { --card-w: 70vw; --card-gap: 12px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 60px); } /* E175: +20px on top of E146 — SETTINGS sat too close to the iOS app-switcher edge */
+  .ws-menu-cards { padding-top: 10px; padding-bottom: 10px; }
+  .ws-menu-card .ws-menu-card-img { margin: 5px; }
+  .ws-menu-card .ws-menu-card-tag { font-size: 8px; padding: 2px 6px; right: 6px; top: 6px; }
+  .ws-menu-card b { font-size: 16px; padding-top: 6px; }
+  .ws-menu-card small { font-size: 9px; letter-spacing: 0.05em; padding: 3px 10px 9px; }
+  .ws-menu-dots { margin-top: 2px; gap: 7px; }
+  .ws-menu-dots i { width: 6px; height: 6px; }
+  .ws-menu-modes { margin-top: 12px; gap: 8px; }
+  .ws-menu-mode { padding: 9px 6px 8px; }
+  .ws-menu-mode b { font-size: 16px; letter-spacing: 0.14em; }
+  .ws-menu .ws-menu-row { margin-top: 8px; }
+  .ws-menu .ws-menu-settings { font-size: 9px; }
+  .ws-menu .ws-menu-row { gap: 12px; align-items: center; padding: 0 14px; } /* SETTINGS alone on its row (E318: no SOUND, no DEV; the credits moved to Settings ▸ Credits, E64) */
+}
+
+/* ─── title screen on a landscape phone (iPhone ~402, Android ~360–411 CSS px tall): the desktop deck is ~530 px tall,
+   so ENTER WORLD fell below the screen. Size the card from the height instead: everything that isn't the card image
+   (wordmark, card labels, dots, ENTER, settings row) is ~255 px, the 16:9 image gets the rest. ─── */
+@media (orientation: landscape) and (max-height: 500px) {
+  .ws-menu .ws-menu-head { padding: calc(10px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-left, 0px)) 0; }
+  .ws-menu .ws-wordmark { font-size: 12px; letter-spacing: 0.3em; }
+  .ws-menu .ws-wordmark b { font-size: 24px; }
+  .ws-menu .ws-wordmark::after { margin-top: 5px; }
+  .ws-menu .ws-menu-deck { --card-w: calc((100vh - 255px) * 16 / 9 + 12px); --card-gap: 14px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 54px); } /* E175: +20px, as portrait */
+  .ws-menu-cards { padding-top: 6px; padding-bottom: 6px; }
+  .ws-menu-card b { font-size: 17px; padding-top: 5px; }
+  .ws-menu-card small { font-size: 9px; padding: 2px 10px 7px; }
+  .ws-menu-dots { margin-top: 2px; }
+  .ws-menu-modes { margin-top: 8px; }
+  .ws-menu-mode { padding: 7px 8px; }
+  .ws-menu-mode b { font-size: 16px; }
+  .ws-menu-mode small { display: none; }
+  .ws-menu .ws-menu-row { margin-top: 6px; }
+}
+
+/* ─── E137 (the user's pick B, 2026-09-25): ONE big ENTER WORLD banner under the deck; EXPLORE WORLD is a side mode in the
+   top-right corner under the build pill (src/client/engine/ui/styles/update.css), out of the thumb's reach ─── */
+.ws-menu .ws-menu-modes { justify-content: center; }
+.ws-menu .ws-menu-play { flex: 1 1 auto; flex-direction: row; gap: 14px; padding: 16px 14px 15px; position: relative; }
+.ws-menu .ws-menu-play b { font-size: 24px; letter-spacing: 0.22em; }
+.ws-menu .ws-menu-play small { position: absolute; left: 0; right: 0; bottom: 5px; }
+.ws-menu .ws-menu-play { padding-bottom: 22px; }
+.ws-menu .ws-menu-play .ws-menu-mode-glyph svg { width: 24px; height: 24px; }
+.ws-menu .ws-menu-head { position: relative; }
+.ws-menu .ws-menu-head .ws-menu-explore { position: fixed; z-index: calc(var(--ws-layer-hud) + 61); right: 44px; top: calc(40px + env(safe-area-inset-top, 0px)); flex: none; flex-direction: row; gap: 10px; padding: 8px 14px 8px 11px; }
+.ws-menu .ws-menu-head .ws-menu-explore .ws-menu-mode-glyph svg { width: 22px; height: 22px; }
+.ws-menu .ws-menu-explore-text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.ws-menu .ws-menu-head .ws-menu-explore b { font-size: 14px; letter-spacing: 0.2em; }
+.ws-menu .ws-menu-head .ws-menu-explore small { font-size: 8px; }
+@media (max-width: 700px) {
+  .ws-menu .ws-menu-play b { font-size: 20px; letter-spacing: 0.18em; }
+  .ws-menu .ws-menu-head .ws-menu-explore { right: 16px; top: calc(38px + env(safe-area-inset-top, 0px)); padding: 7px 11px 7px 9px; }
+  .ws-menu .ws-menu-head .ws-menu-explore b { font-size: 12px; letter-spacing: 0.16em; }
+}

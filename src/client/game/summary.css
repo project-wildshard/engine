@@ -1,0 +1,8 @@
+/* E357 J8: selected shard and Wildshard total, in the picked ledger style. */
+.ws-title-summary { box-sizing: border-box; width: min(420px, calc(100% - 32px)); margin-top: 12px; padding: 10px 12px; border: 1px solid var(--ws-cyan-line); background: var(--ws-glass-deep); color: var(--ws-text); font: 10px/1.6 var(--ws-mono); pointer-events: none; }
+.ws-title-summary[hidden] { display: none; }
+.ws-title-summary-line { letter-spacing: 0.06em; }
+.ws-title-summary-total { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--ws-cyan-line); color: var(--ws-cyan); font-weight: 500; letter-spacing: 0.1em; }
+@media (max-width: 700px) {
+  .ws-title-summary { width: calc(100% - 32px); margin-top: 8px; padding: 8px 10px; font-size: 9px; }
+}

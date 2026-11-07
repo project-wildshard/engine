@@ -1,0 +1,7 @@
+{
+  "sourceRevision": "bc7181016f8f91a863e9d932a9a79ee369670bff",
+  "source": "src/shards/nalati-grasslands/creatures/flock.ts",
+  "blob": "ebac0612c66c4cff362cc4809fc543b915c3783e",
+  "sha256": "cc0ab2c35a3c4253d658f8ce48df2add857420386bb2c0f3324efd5f4923eb24",
+  "changes": "The raw shipping source is byte-identical. The executable capture removes rendering/prey wrappers and binds observations through explicit ports; setup, decisions and movement are mechanically extracted."
+}

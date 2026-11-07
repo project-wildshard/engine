@@ -1,0 +1,7 @@
+{
+  "source": "src/shards/driftwood-isle/combat/strikes.ts",
+  "revision": "135097d3ab517713492a64950e083968248f47bb",
+  "sourceHash": "d30da1a2f484173cfbefca51c624b7c7517f0bddc1bd2d0a8c74d70582762a32",
+  "fixture": "test/fixtures/species/driftwood.ts",
+  "fixtureHash": "7b782cba7e6352084c36b3df738a508e88e9f125af885e70e6722cba3430073e"
+}

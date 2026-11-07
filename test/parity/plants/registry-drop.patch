@@ -1,0 +1,11 @@
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -347,7 +347,7 @@
+     await slice();
+     // the three jetties: three more placements of the pier model, pieces `jetty-0..2`
+     const jetties: Pier[] = [];
+-    if (sea) for (const [i, j] of JETTIES.entries()) { const jetty = new Pier(sky, { x: j.x, z: j.z, rot: j.rot, length: j.length, width: 3, deckY: sea.level + 1.2 }).place(registry, `jetty-${i}`); statics.push(...jetty.colliders); jetties.push(jetty); await slice(); }
++    if (sea) for (const [i, j] of JETTIES.entries()) { if (i === 0) continue; const jetty = new Pier(sky, { x: j.x, z: j.z, rot: j.rot, length: j.length, width: 3, deckY: sea.level + 1.2 }).place(registry, `jetty-${i}`); statics.push(...jetty.colliders); jetties.push(jetty); await slice(); }
+     await slice();
+     const AVOID = [{ x: HUT.x, z: HUT.z, r: 11 }, { x: LOOKOUT.x, z: LOOKOUT.z, r: 12 }, { x: SHRINE.x, z: SHRINE.z, r: 13 }, { x: WRECK.x, z: WRECK.z, r: 14 }];
+     // E315 M1: the hibiscus bush model (src/chunks/driftwood-isle/models/hibiscusBush.ts) placed through src/models/place.ts, which registers piece `bushes`

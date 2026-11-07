@@ -1,0 +1,182 @@
+[
+  {
+    "id": "budget-over",
+    "kind": "patch",
+    "shards": ["nine-dragon-stack"],
+    "patch": "budget-over.patch",
+    "expect": ["budgets.*.draws"]
+  },
+  {
+    "id": "render-throw",
+    "kind": "patch",
+    "shards": ["nine-dragon-stack"],
+    "patch": "render-throw.patch",
+    "expect": ["boot.errors"]
+  },
+  {
+    "id": "boot-throw",
+    "kind": "patch",
+    "shards": [
+      "pine-hollow"
+    ],
+    "patch": "boot-throw.patch",
+    "expect": [
+      "boot.errors"
+    ]
+  },
+  {
+    "id": "system-rename",
+    "kind": "patch",
+    "shards": "all",
+    "patch": "system-rename.patch",
+    "expect": [
+      "boot.systems"
+    ]
+  },
+  {
+    "id": "registry-drop",
+    "kind": "patch",
+    "shards": [
+      "driftwood-isle"
+    ],
+    "patch": "registry-drop.patch",
+    "expect": [
+      "boot.registry",
+      "boot.physics"
+    ]
+  },
+  {
+    "id": "census-drop",
+    "kind": "patch",
+    "shards": [
+      "nine-dragon-stack"
+    ],
+    "patch": "census-drop.patch",
+    "expect": [
+      "boot.scene.named",
+      "boot.scene.totals"
+    ]
+  },
+  {
+    "id": "look-fog",
+    "kind": "patch",
+    "shards": [
+      "nalati-grasslands"
+    ],
+    "patch": "look-fog.patch",
+    "expect": [
+      "poses.*.ssim"
+    ]
+  },
+  {
+    "id": "draw-add",
+    "kind": "patch",
+    "shards": [
+      "pine-hollow"
+    ],
+    "patch": "draw-add.patch",
+    "expect": [
+      "poses.gate.calls",
+      "boot.scene.totals"
+    ]
+  },
+  {
+    "id": "step-height",
+    "kind": "patch",
+    "shards": [
+      "nine-dragon-stack",
+      "pine-hollow"
+    ],
+    "patch": "step-height.patch",
+    "expect": [
+      "walk.stuck"
+    ]
+  },
+  {
+    "id": "sword-nohit",
+    "kind": "patch",
+    "shards": [
+      "driftwood-isle",
+      "nine-dragon-stack"
+    ],
+    "patch": "sword-nohit.patch",
+    "expect": [
+      "combat.swing"
+    ]
+  },
+  {
+    "id": "crossbow-weak",
+    "kind": "patch",
+    "shards": [
+      "pine-hollow"
+    ],
+    "patch": "crossbow-weak.patch",
+    "expect": [
+      "combat.shot"
+    ]
+  },
+  {
+    "id": "audio-drop",
+    "kind": "patch",
+    "shards": [
+      "driftwood-isle"
+    ],
+    "patch": "audio-drop.patch",
+    "expect": [
+      "boot.audio.requests"
+    ]
+  },
+  {
+    "id": "hud-hide",
+    "kind": "patch",
+    "shards": [
+      "driftwood-isle",
+      "pine-hollow",
+      "nalati-grasslands",
+      "nine-dragon-stack"
+    ],
+    "patch": "hud-hide.patch",
+    "expect": [
+      "boot.hud"
+    ]
+  },
+  {
+    "id": "save-rename",
+    "kind": "patch",
+    "shards": [
+      "driftwood-isle"
+    ],
+    "patch": "save-rename.patch",
+    "expect": [
+      "combat.loot",
+      "boot.saves"
+    ]
+  },
+  {
+    "id": "pause-drift",
+    "kind": "patch",
+    "shards": [
+      "driftwood-isle",
+      "pine-hollow",
+      "nalati-grasslands"
+    ],
+    "patch": "pause-drift.patch",
+    "expect": [
+      "pauseResume"
+    ]
+  },
+  {
+    "id": "metal-off",
+    "kind": "flag",
+    "shards": "all",
+    "flag": "--angle=swiftshader",
+    "expect": "exit3"
+  },
+  {
+    "id": "asset-case",
+    "kind": "linux",
+    "shards": [],
+    "patch": "asset-case.patch",
+    "expect": ["asset-case"]
+  }
+]

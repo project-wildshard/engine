@@ -1,0 +1,21 @@
+# Paths the Vercel CLI does not upload (`vercel deploy` from CI builds on Vercel from this filtered tree).
+# EVERY pattern is anchored with a leading `/`: an unanchored `art` matched src/explore/art/ at any depth, the remote
+# build never saw it and deploys f94c5da + e507b24 went red while CI (full tree) was green. Nothing under src/, public/,
+# api/ or scripts/ may ever be ignored. .githooks/pre-push (scripts/vercel-tree-gate.sh) enforces both before a push.
+/node_modules
+/dist
+/progress
+/sources
+/art
+/docs
+/api-tests
+/.git
+/ios
+/android
+/dist-native
+/dist-drafts
+/.native-build
+
+# E357 parity harness artifacts
+/test/parity
+/coverage/

@@ -1,0 +1,11 @@
+--- a/src/player/Crossbow.ts
++++ b/src/player/Crossbow.ts
+@@ -1228,7 +1228,7 @@
+     if (this.targets) {
+       const hit = this.targets.raycast(prev, _dir, wall ? wall.distance : segLen);
+       if (hit) {
+-        const killed = hit.animal.applyDamage(hit.animal.damageFor(hit.headshot, hit.point.distanceTo(this.game.camera.position)) * b.mod.damage(hit.animal.kind), hit.point, _dir);
++        const killed = hit.animal.applyDamage(hit.animal.damageFor(hit.headshot, hit.point.distanceTo(this.game.camera.position)) * b.mod.damage(hit.animal.kind) * 0.05, hit.point, _dir);
+         this.onHit?.(hit.animal.kind, hit.headshot, killed);
+         const frame = hit.animal.stuckFrame?.(hit.point) ?? null; // a practice dummy keeps the bolt, on the bone it hit
+         this.stopBolt(b, hit.point, _dir, 'flesh', frame !== null, STUCK_BURY, false, frame);

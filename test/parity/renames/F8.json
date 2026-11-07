@@ -1,0 +1,90 @@
+{
+  "systems": {
+    "fixed.post#2": "main.3",
+    "update#9": "engine.quest.installDriftwoodAdventure",
+    "update#10": "shard.driftwood-isle.installSpine",
+    "update#11": "shard.driftwood-isle.installTrader",
+    "update#12": "engine.quest.installDriftwoodAdventure.2",
+    "update#13": "shard.driftwood-isle.installGullGuide",
+    "update#14": "shard.driftwood-isle.installComplete",
+    "update#15": "shard.driftwood-isle.installFinale",
+    "update#16": "shard.driftwood-isle.installEcology",
+    "update#17": "engine.quest.installDriftwoodAdventure.3",
+    "update#18": "engine.quest.installDriftwoodAdventure.4",
+    "main": "main.frame",
+    "update#6": "shard.nalati-grasslands.installNalatiAdventure",
+    "update#4": "main.6"
+  },
+  "shardSystems": {
+    "driftwood-isle": {
+      "fixed.pre": {
+        "physics.bodies": "physics.bodies.pre"
+      },
+      "fixed.post": {
+        "physics.bodies": "physics.bodies.post",
+        "fixed.post#2": "main.3"
+      },
+      "update": {
+        "update#1": "main.1",
+        "update#2": "main.2",
+        "update#3": "main.4",
+        "update#5": "engine.player.for",
+        "update#8": "main.6",
+        "update#9": "engine.quest.installDriftwoodAdventure",
+        "update#10": "shard.driftwood-isle.installSpine",
+        "update#11": "shard.driftwood-isle.installTrader",
+        "update#12": "engine.quest.installDriftwoodAdventure.2",
+        "update#13": "shard.driftwood-isle.installGullGuide",
+        "update#14": "shard.driftwood-isle.installComplete",
+        "update#15": "shard.driftwood-isle.installFinale",
+        "update#16": "shard.driftwood-isle.installEcology",
+        "update#17": "engine.quest.installDriftwoodAdventure.3",
+        "update#18": "engine.quest.installDriftwoodAdventure.4",
+        "main": "main.frame"
+      }
+    },
+    "nalati-grasslands": {
+      "fixed.pre": {
+        "physics.bodies": "physics.bodies.pre"
+      },
+      "fixed.post": {
+        "physics.bodies": "physics.bodies.post"
+      },
+      "update": {
+        "update#2": "engine.player.for",
+        "update#5": "main.6",
+        "update#6": "shard.nalati-grasslands.installNalatiAdventure",
+        "update#8": "shard.nalati-grasslands.bind",
+        "main": "main.frame"
+      }
+    },
+    "nine-dragon-stack": {
+      "fixed.pre": {
+        "physics.bodies": "physics.bodies.pre"
+      },
+      "fixed.post": {
+        "physics.bodies": "physics.bodies.post"
+      },
+      "update": {
+        "update#3": "engine.player.for",
+        "update#8": "main.6",
+        "main": "main.frame"
+      }
+    },
+    "pine-hollow": {
+      "fixed.pre": {
+        "physics.bodies": "physics.bodies.pre"
+      },
+      "fixed.post": {
+        "physics.bodies": "physics.bodies.post"
+      },
+      "update": {
+        "update#1": "main.5",
+        "update#4": "main.6",
+        "update#5": "engine.player.for",
+        "update#8": "engine.compendium.installCompendium",
+        "main": "main.frame"
+      }
+    }
+  }
+}

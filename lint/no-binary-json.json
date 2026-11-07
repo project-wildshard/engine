@@ -1,0 +1,174 @@
+{
+  "schema": "no-binary-json/1",
+  "source": "39a06631e21ded8fe57bc347293060e444698ca5",
+  "files": {
+    "budgets/calibration-reports/far-reach.desktop.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    },
+    "budgets/calibration-reports/far-reach.phone.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    },
+    "budgets/calibration-reports/pine-hollow.desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 4
+    },
+    "budgets/calibration-reports/sunscar-dunes.desktop.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    },
+    "budgets/calibration-reports/sunscar-dunes.phone.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    },
+    "progress/glbytes/b7654ee72-pine-phone.json": {
+      "base64Chars": 133528,
+      "dataUris": 4
+    },
+    "progress/glbytes/f0ce33bd0-pine-phone.json": {
+      "base64Chars": 133528,
+      "dataUris": 4
+    },
+    "progress/memory/sf22a-default-g172-g180/pine-g180-ktx2/full-pose-gl.json": {
+      "base64Chars": 66764,
+      "dataUris": 2
+    },
+    "progress/memory/sf22a-pine-auto-bc7181016/full-pose-gl.json": {
+      "base64Chars": 66764,
+      "dataUris": 2
+    },
+    "progress/shard-platform/sf47/pine-retained-parity-3f9074092/historical-grid-assertions.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    },
+    "progress/texmem/after-img-driftwood-isle-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/after-img-pine-hollow-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/after-ktx2-driftwood-isle-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/after-ktx2-pine-hollow-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/before-driftwood-isle-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/before-driftwood-isle-phone.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/before-pine-hollow-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/before-pine-hollow-phone.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/e173-img-driftwood-isle-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/e173-img-pine-hollow-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/e173-ktx2-driftwood-isle-desktop.json": {
+      "base64Chars": 200268,
+      "dataUris": 0
+    },
+    "progress/texmem/e173-ktx2-pine-hollow-desktop.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/final-img-driftwood-isle-phone.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/final-img-pine-hollow-phone.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/final-ktx2-driftwood-isle-phone.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "progress/texmem/final-ktx2-pine-hollow-phone.json": {
+      "base64Chars": 133512,
+      "dataUris": 0
+    },
+    "public/shardfiles/_template/shard.json": {
+      "base64Chars": 0,
+      "dataUris": 1
+    },
+    "public/shardfiles/ink-cel-valley/shard.json": {
+      "base64Chars": 0,
+      "dataUris": 1
+    },
+    "public/shardfiles/pastel-plain/shard.json": {
+      "base64Chars": 0,
+      "dataUris": 1
+    },
+    "src/shards/_template/data/card.json": {
+      "base64Chars": 0,
+      "dataUris": 7
+    },
+    "src/shards/_template/data/rows.json": {
+      "base64Chars": 0,
+      "dataUris": 1
+    },
+    "src/shards/_template/manifest.json": {
+      "base64Chars": 0,
+      "dataUris": 7
+    },
+    "src/shards/ink-cel-valley/data/rows.json": {
+      "base64Chars": 0,
+      "dataUris": 1
+    },
+    "src/shards/ink-cel-valley/manifest.json": {
+      "base64Chars": 0,
+      "dataUris": 7
+    },
+    "src/shards/pastel-plain/data/rows.json": {
+      "base64Chars": 0,
+      "dataUris": 1
+    },
+    "src/shards/pastel-plain/manifest.json": {
+      "base64Chars": 0,
+      "dataUris": 7
+    },
+    "test/fixtures/originalBalbalRows.json": {
+      "base64Chars": 52932,
+      "dataUris": 0
+    },
+    "test/fixtures/shardfile/rows.json": {
+      "base64Chars": 0,
+      "dataUris": 1
+    },
+    "test/parity/baselines/gh-macos15/_template.phone.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    },
+    "test/parity/baselines/gh-macos15/far-reach.phone.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    },
+    "test/parity/baselines/gh-macos15/pine-hollow.phone.json": {
+      "base64Chars": 133512,
+      "dataUris": 4
+    },
+    "test/parity/baselines/gh-macos15/sunscar-dunes.phone.json": {
+      "base64Chars": 66756,
+      "dataUris": 2
+    }
+  }
+}

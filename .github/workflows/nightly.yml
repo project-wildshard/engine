@@ -1,0 +1,60 @@
+# Ring 2's clock, J66 and J167. Each night, move `nightly` to the newest main: that push runs deploy.yml, the whole pipeline on all 28
+# pinned heads. A green run tags that commit. A red one tags nothing, so production stays on the last good tag. There's no revert: J165
+# fixes forward. Real-GPU legs wait for the Mac mini (J169).
+#
+# GITHUB_TOKEN's pushes start no workflow, so the move needs an app's token, with contents and workflows write. Use a second app,
+# installed on this repo only: a leak of the org's app would reach every private repo (meta repo PUBLIC-READY.md, Jake decides). Only
+# `schedule` and `workflow_dispatch` reach that step, and neither runs for a fork.
+name: nightly
+
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: [deploy]
+    types: [completed]
+    branches: [nightly]
+
+permissions:
+  contents: read
+
+jobs:
+  advance:
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-workflows: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Move nightly to main, on a new commit only
+        run: |
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse --verify --quiet origin/nightly || true)" ]; then
+            echo 'No new commit since the last nightly'
+            exit 0
+          fi
+          git push --force origin HEAD:refs/heads/nightly
+
+  tag:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Tag the green commit
+        run: node scripts/nightly-tag.mjs

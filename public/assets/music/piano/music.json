@@ -1,0 +1,151 @@
+{
+  "style": "piano",
+  "model": "MiniMax-Music3",
+  "credit": "Music: MiniMax-Music3",
+  "slots": {
+    "pine": {
+      "calm": "pine-calm-923e0056.m4a",
+      "tension": "pine-tension-cc014e5b.m4a",
+      "bpm": 91.998,
+      "beatsPerBar": 4,
+      "loopStart": 6.757,
+      "loopEnd": 58.9322,
+      "duration": 61.5467
+    },
+    "island": {
+      "calm": "island-calm-05125ed8.m4a",
+      "tension": "island-tension-7faf0468.m4a",
+      "bpm": 76.781,
+      "beatsPerBar": 4,
+      "loopStart": 14.3035,
+      "loopEnd": 54.9384,
+      "duration": 58.0693
+    },
+    "title": {
+      "full": "title-3d1f713a.m4a",
+      "bpm": 75.666,
+      "beatsPerBar": 4,
+      "loopStart": 27.3995,
+      "loopEnd": 59.118,
+      "duration": 62.2933
+    }
+  },
+  "stings": {
+    "death": "sting-death-99b071e0.m4a",
+    "chunk": "sting-chunk-a4f2ffab.m4a",
+    "pickup": "sting-pickup-6ed91318.m4a"
+  },
+  "provenance": [
+    {
+      "file": "pine-calm-923e0056.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game soundtrack, ambient piano with a gentle groove. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn in an open-world adventure game - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a sparse, singable grand-piano melody with long rests, over soft string pads and a warm upright bass; a light, steady groove of brushed drums, soft kick and shaker runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: close-miked felt piano, natural wooden-room reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "calm: mix - drums - bass/2",
+      "gain_db": -0.1,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "pine-tension-cc014e5b.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game soundtrack, ambient piano with a gentle groove. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn in an open-world adventure game - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a sparse, singable grand-piano melody with long rests, over soft string pads and a warm upright bass; a light, steady groove of brushed drums, soft kick and shaker runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: close-miked felt piano, natural wooden-room reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "stem": "tension: drums + bass/2 (htdemucs), mono",
+      "gain_db": -0.1,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "island-calm-05125ed8.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game soundtrack, bright ambient piano with a light groove. BPM: 100. Key: D major. Instrumental only, no vocals, no choir. Setting: Driftwood Isle, a sunlit island of pale sand, driftwood and turquoise water in an open-world adventure game - wonder first, breezy adventure second, a little melancholy underneath. Arrangement: a sparkling, singable grand-piano melody in the upper register with open fifths, over airy pads, a round electric bass and a soft marimba ostinato; a steady light groove of rim clicks, shaker and soft kick runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: bright piano, wide airy reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 304,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-304",
+      "stem": "calm: mix - drums - bass/2",
+      "gain_db": -1.2,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "island-tension-7faf0468.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game soundtrack, bright ambient piano with a light groove. BPM: 100. Key: D major. Instrumental only, no vocals, no choir. Setting: Driftwood Isle, a sunlit island of pale sand, driftwood and turquoise water in an open-world adventure game - wonder first, breezy adventure second, a little melancholy underneath. Arrangement: a sparkling, singable grand-piano melody in the upper register with open fifths, over airy pads, a round electric bass and a soft marimba ostinato; a steady light groove of rim clicks, shaker and soft kick runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: bright piano, wide airy reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 304,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-304",
+      "stem": "tension: drums + bass/2 (htdemucs), mono",
+      "gain_db": -1.2,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "title-3d1f713a.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, cinematic piano. BPM: 92. Key: D major. Instrumental only, no vocals, no choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable grand-piano melody stated simply, then again fuller with warm strings, a cello counter-line, upright bass and a steady soft drum groove; it builds to a heartfelt climax and ends on a resolved final chord. Production: rich close piano, warm hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 304,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-304",
+      "gain_db": 0.9,
+      "limiter_ceiling_db": -2.0
+    },
+    {
+      "file": "sting-death-99b071e0.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, cinematic piano. BPM: 92. Key: D major. Instrumental only, no vocals, no choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable grand-piano melody stated simply, then again fuller with warm strings, a cello counter-line, upright bass and a steady soft drum groove; it builds to a heartfelt climax and ends on a resolved final chord. Production: rich close piano, warm hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 304,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-304",
+      "cut_from": "title at 69.06s (the final chord)",
+      "seconds": 4.5,
+      "gain_db": 10.9
+    },
+    {
+      "file": "sting-chunk-a4f2ffab.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game main title theme, cinematic piano. BPM: 92. Key: D major. Instrumental only, no vocals, no choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable grand-piano melody stated simply, then again fuller with warm strings, a cello counter-line, upright bass and a steady soft drum groove; it builds to a heartfelt climax and ends on a resolved final chord. Production: rich close piano, warm hall reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Solo]\n[Instrumental]\n[Outro]",
+      "seed": 304,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-304",
+      "cut_from": "title at 58.87s (a 8.5x swell on a downbeat)",
+      "seconds": 3.5,
+      "gain_db": 3.7
+    },
+    {
+      "file": "sting-pickup-6ed91318.m4a",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "diffusers": "0.40.0",
+      "prompt": "Genre: video game soundtrack, ambient piano with a gentle groove. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn in an open-world adventure game - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a sparse, singable grand-piano melody with long rests, over soft string pads and a warm upright bass; a light, steady groove of brushed drums, soft kick and shaker runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: close-miked felt piano, natural wooden-room reverb.",
+      "lyrics": "[Intro]\n[Instrumental]\n[Instrumental]\n[Solo]\n[Instrumental]",
+      "seed": 305,
+      "steps": 30,
+      "licence": "MiniMax-Music3 Community (UI credit, < $20M)",
+      "take": "minimax3-305",
+      "cut_from": "pine at 59.53s (its brightest onset)",
+      "seconds": 2.0,
+      "gain_db": 0.0
+    }
+  ]
+}

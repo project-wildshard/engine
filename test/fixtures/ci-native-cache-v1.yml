@@ -1,0 +1,359 @@
+# Reviewed d44 source excerpt; preserve native/fixtures boundary with its original following job.
+jobs:
+  native-escape:
+    needs: [prepare, fixtures]
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [escape-titan, stories-qara, chapter-one, native-routes]
+    env:
+      NATIVE_INPUT_PROOF: 'cache-v1'
+      WILDSHARD_GENERATE_CACHE: ${{ github.workspace }}/.cache/native-fixtures
+      WS_VITEST_MAX_WORKERS: '1'
+      VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      WS_TEST_PRODUCTS_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            /*
+            !/progress/
+            !/art/
+            !/sources/
+          sparse-checkout-cone-mode: false
+      - uses: pnpm/action-setup@v4
+        with: {version: 10}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: pnpm}
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-products
+      - name: Verify and restore exact-run native inputs and products
+        id: native-inputs
+        run: |
+          zstd -d --rm test-products.tar.zst
+          python3 scripts/ci-products.py unpack
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-fixtures
+          path: tmp/ci-native-fixtures
+      - name: Restore source-host native constructor inputs
+        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs restore
+      - name: Pre-read native Chrome (post-read warmed)
+        if: matrix.group == 'escape-titan'
+        run: |
+          mkdir -p tmp/ci-native-escape
+          node scripts/warm-native-chrome.mjs > tmp/ci-native-escape/warm-read.json
+          cat tmp/ci-native-escape/warm-read.json
+      - name: Run the original native Escape controls alone
+        if: matrix.group == 'escape-titan'
+        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/tooling/parity/browser-escape.test.mjs --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/results.json
+      - name: Run the complete Titan file without sibling workers
+        if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'escape-titan' }}
+        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/nalati-titan-verbs.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+      - name: Run independent native routes without sibling workers
+        if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'native-routes' }}
+        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/driftwood-optional-verbs.test.ts test/driftwood-trade-verbs.test.ts test/nalati-patrol-verbs.test.ts test/physics-nalati-headless.test.ts test/nalati-chapter-binding.test.ts test/nalati-discovery-verbs.test.ts test/native-runtime-observation.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+      - name: Run native story tapes without sibling workers
+        if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'stories-qara' }}
+        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/pine-quest-verbs.test.ts test/pine-door-continuation.test.ts test/driftwood-story-verbs.test.ts test/sky-progression-verbs.test.ts test/nalati-qara-verbs.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+      - name: Run the complete earned chapter-one tape alone
+        if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'chapter-one' }}
+        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/nalati-chapter-one.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json
+      - name: Publish exact failure paths
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failures-native-escape-${{ matrix.group }}
+          path: tmp/ci-failures/*.json
+          retention-days: 2
+          if-no-files-found: ignore
+      - name: Publish native control results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-escape-results-${{ matrix.group }}
+          path: |
+            tmp/ci-native-escape/results.json
+            tmp/ci-native-escape/sim-results.json
+            tmp/ci-native-escape/warm-read.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Native constructor inputs require this successful publisher. General CI7
+  # snapshots retain their behaviour fallback. The same existing job runs beside
+  # prepare (same checkout, cache and generation), so prepare's path is unchanged.
+  # Shards read these snapshots only when their generated tree hashes the same
+  # (scripts/ci-generated-manifest.sh); otherwise they compute, as off CI.
+  fixtures:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_COMPILE_CACHE: ${{ github.workspace }}/.cache/node-compile
+    steps:
+      - name: Admit optional fixtures for this prepare
+        id: admission
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+
+          def admit(data, run, attempt, sha):
+              if not isinstance(data, dict) or not isinstance(data.get('jobs'), list):
+                  raise ValueError('Missing job inventory')
+              jobs = data['jobs']
+              if type(data.get('total_count')) is not int or data['total_count'] != len(jobs):
+                  raise ValueError('Incomplete job inventory')
+              if any(not isinstance(job, dict) for job in jobs):
+                  raise ValueError('Malformed job inventory')
+              prepares = [job for job in jobs if job.get('name') == 'prepare']
+              if len(prepares) != 1:
+                  raise ValueError('Ambiguous prepare identity')
+              job = prepares[0]
+              if (type(job.get('run_id')) is not int or job['run_id'] != run
+                      or type(job.get('run_attempt')) is not int or job['run_attempt'] != attempt
+                      or job.get('head_sha') != sha):
+                  raise ValueError('Foreign prepare identity')
+              status, conclusion = job.get('status'), job.get('conclusion')
+              if status == 'completed' and conclusion in ('failure', 'cancelled', 'skipped'):
+                  return False, status, conclusion
+              if ((status == 'completed' and conclusion == 'success')
+                      or (status in ('queued', 'pending', 'waiting', 'in_progress') and conclusion is None)):
+                  return True, status, conclusion
+              raise ValueError('Uncertain prepare verdict')
+
+          try:
+              repo = os.environ['GITHUB_REPOSITORY']
+              run, attempt, sha = (os.environ[name] for name in
+                  ('GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_SHA'))
+              if (repo != 'Raynos/project-wildshard-singleplayer'
+                      or re.fullmatch(r'[1-9][0-9]*', run) is None
+                      or re.fullmatch(r'[1-9][0-9]*', attempt) is None
+                      or re.fullmatch(r'[a-f0-9]{40}', sha) is None):
+                  raise ValueError('Invalid fixture run identity')
+              event = os.environ['GITHUB_EVENT_NAME']
+              if event == 'pull_request':
+                  # Preserve the existing PR path: its checkout may be a merge
+                  # commit while the jobs API names the pull request's head.
+                  allowed, status, conclusion = True, 'pull_request', None
+              elif event == 'push':
+                  response = subprocess.run(['gh', 'api',
+                      f'repos/{repo}/actions/runs/{run}/attempts/{attempt}/jobs?per_page=100'],
+                      check=True, capture_output=True, text=True, timeout=30)
+                  allowed, status, conclusion = admit(json.loads(response.stdout), int(run), int(attempt), sha)
+              else:
+                  raise ValueError('Unknown fixture event')
+              decision = 'true' if allowed else 'false'
+              receipt = f'Optional fixtures: run {run} attempt {attempt}; prepare {status}/{conclusion}; run={decision}'
+              print(receipt)
+              with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as output:
+                  output.write(receipt + '\n')
+              with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
+                  output.write('run=' + decision + '\n')
+          except (KeyError, OSError, ValueError, subprocess.SubprocessError) as error:
+              print('::error::Optional fixture admission unavailable: ' + type(error).__name__, file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - uses: actions/checkout@v4
+        if: steps.admission.outputs.run == 'true'
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            /*
+            !/progress/
+            !/art/
+            !/sources/
+          sparse-checkout-cone-mode: false
+      - uses: pnpm/action-setup@v4
+        if: steps.admission.outputs.run == 'true'
+        with: {version: 10}
+      - uses: actions/setup-node@v4
+        if: steps.admission.outputs.run == 'true'
+        with: {node-version: 24, cache: pnpm}
+      - run: pnpm install --frozen-lockfile
+        if: steps.admission.outputs.run == 'true'
+      - name: Bind cache snapshot to source inputs
+        if: steps.admission.outputs.run == 'true'
+        id: inputs
+        run: echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      # Read-only: prepare alone saves this snapshot.
+      - uses: actions/cache/restore@v4
+        if: steps.admission.outputs.run == 'true'
+        with:
+          path: |
+            ~/.cache/wildshard/generate
+            ~/.cache/wildshard/gen
+            ~/.cache/wildshard/compiler-code/1
+            ~/.cache/wildshard/shardfiles
+            ~/.cache/wildshard/basis
+          key: preparation-v3-${{ runner.os }}-${{ runner.arch }}-node24-${{ steps.inputs.outputs.tree }}
+          restore-keys: |
+            preparation-v4-${{ runner.os }}-${{ runner.arch }}-node24-
+            preparation-v3-${{ runner.os }}-${{ runner.arch }}-node24-
+      - run: python3 scripts/ci-fail-fast.py -- node scripts/gen.mjs --reuse
+        if: steps.admission.outputs.run == 'true'
+      - name: Publish source-host native constructor inputs
+        if: steps.admission.outputs.run == 'true'
+        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/ci-native-fixtures.mjs build
+      - uses: actions/upload-artifact@v4
+        if: steps.admission.outputs.run == 'true'
+        with:
+          name: native-fixtures
+          path: tmp/ci-native-fixtures/native-fixtures.bundle.json
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
+      - name: Write exact-run fixture snapshots
+        if: steps.admission.outputs.run == 'true'
+        env:
+          WS_TEST_PRODUCTS_SHA: ${{ github.sha }}
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+          WS_VITEST_MAX_WORKERS: '3'
+        run: |
+          mkdir -p tmp/ci-fixtures
+          bash scripts/ci-generated-manifest.sh > tmp/ci-generated.sha256
+          if ! WS_FIXTURE_SNAPSHOT_WRITE="$PWD/tmp/ci-fixtures" pnpm exec vitest run --config scripts/vitest-fixture-snapshots.config.ts test/fixture-snapshots; then
+            echo '::warning::A fixture snapshot writer failed; shards compute that fixture'
+          fi
+          cp tmp/ci-generated.sha256 tmp/ci-fixtures/generated.sha256
+          tar -C tmp/ci-fixtures -cf - --exclude='*.partial' . | zstd --long=30 -3 -T0 -o test-fixtures.tar.zst
+      - uses: actions/upload-artifact@v4
+        if: steps.admission.outputs.run == 'true'
+        with:
+          name: test-fixtures
+          path: test-fixtures.tar.zst
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
+
+  behaviour:
+    needs: [prepare, fixtures]
+    # A failed or skipped fixtures job only costs speed: shards then compute.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && (github.event_name == 'push' || github.event_name == 'pull_request') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      # G678/SW9: every shard reports its own first failure in this run.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            /*
+            !/progress/
+            !/art/
+            !/sources/
+          sparse-checkout-cone-mode: false
+      - uses: pnpm/action-setup@v4
+        with: {version: 10}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: pnpm}
+      - run: pnpm install --frozen-lockfile
+      # Prepare publishes this small tool cache before the dependent matrix.
+      # Do not restore the full product cache or share mutable build owners.
+      - name: Restore the checked Basis compiler
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/wildshard/basis
+          key: basis-tool-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/sharddev/bake/basisTool.ts', 'src/sharddev/bake/basisToolInputs.ts') }}
+      # Transform bytes only: Vitest keys file contents, resolve/config and
+      # coverage, and checks the lockfile. Test bodies and setup still run.
+      - name: Restore Vitest transformed modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.vitest-cache
+          key: vitest-transform-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('pnpm-lock.yaml') }}-${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: vitest-transform-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('pnpm-lock.yaml') }}-${{ matrix.shard }}-
+      # Cache native checkpoint bytes only. Every consumer still checks its
+      # source/host key, all payload hashes and the normal recorded outcome.
+      - name: Restore content-addressed native witnesses
+        uses: actions/cache@v4
+        with:
+          # Complete key directories; never transfer live lock/reader owners.
+          path: |
+            ~/.cache/wildshard/generate/witness-*/[0-9a-f]*
+            !~/.cache/wildshard/generate/witness-*/*.lock
+            !~/.cache/wildshard/generate/witness-*/*.readers
+            !~/.cache/wildshard/generate/witness-*/evicting-*
+            ~/.cache/wildshard/generate/fixture-*/[0-9a-f]*
+            !~/.cache/wildshard/generate/fixture-*/*.lock
+            !~/.cache/wildshard/generate/fixture-*/*.readers
+            !~/.cache/wildshard/generate/fixture-*/evicting-*
+          key: native-witness-v2-${{ runner.os }}-${{ runner.arch }}-node24-${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: native-witness-v2-${{ runner.os }}-${{ runner.arch }}-node24-${{ matrix.shard }}-
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-products
+      - name: Verify and restore exact-run generated inputs and products
+        run: |
+          zstd -d --rm test-products.tar.zst
+          python3 scripts/ci-products.py unpack
+      - uses: actions/download-artifact@v4
+        with:
+          name: vitest-plan
+          path: tmp/ci-vitest
+      - uses: actions/download-artifact@v4
+        if: needs.fixtures.result == 'success'
+        continue-on-error: true
+        with:
+          name: test-fixtures
+      - name: Restore exact-run fixture snapshots
+        run: |
+          mkdir -p tmp/ci-fixtures
+          if [ -f test-fixtures.tar.zst ]; then
+            zstd -d --long=30 -c test-fixtures.tar.zst | tar -C tmp/ci-fixtures -xf -
+            rm test-fixtures.tar.zst
+          fi
+          if [ -f tmp/ci-fixtures/generated.sha256 ] && bash scripts/ci-generated-manifest.sh | cmp -s - tmp/ci-fixtures/generated.sha256; then
+            ls tmp/ci-fixtures
+          else
+            echo '::warning::Fixture snapshots do not match this generated tree; shards compute them'
+            rm -f tmp/ci-fixtures/*.v8
+          fi
+      # CI7: one duration-packed wave includes every product and source suite.
+      - run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run --config scripts/vitest-ci.config.ts --shard=${{ matrix.shard }}/12 --bail=0 --reporter=default --reporter=json --reporter=./scripts/vitest-timings.ts --outputFile=tmp/ci-vitest/results.json
+        env:
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+          WS_TEST_PRODUCTS_SHA: ${{ github.sha }}
+          WS_VITEST_MAX_WORKERS: '2'
+          WS_VITEST_PLAN: tmp/ci-vitest/plan.json
+          WS_FIXTURE_SNAPSHOTS: tmp/ci-fixtures
+          WS_VITEST_TIMINGS: tmp/ci-vitest/timings.json
+
+      - name: Publish exact failure paths
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failures-behaviour-${{ matrix.shard }}
+          path: tmp/ci-failures/*.json
+          if-no-files-found: ignore
+          retention-days: 2
+      - name: Publish measured file timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-times-${{ matrix.shard }}
+          path: |
+            tmp/ci-vitest/results.json
+            tmp/ci-vitest/timings.json
+          retention-days: 7
+          if-no-files-found: warn
+
+
+  # G989: software draw diagnostics allocate no runner on push. PRs retain
+  # the report after their required wave, without gating source/SIX/shipping.

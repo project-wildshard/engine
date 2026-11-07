@@ -1,0 +1,341 @@
+{
+  "test/cook-worker.test.ts": ["sunscar-dunes"],
+  "test/shard-stands-alone.test.ts": ["_template","blender-template","driftwood-isle","far-reach","ink-cel-valley","nalati-grasslands","nine-dragon-stack","open-plot-alien-plain","open-plot-clockwork-canyon","open-plot-coral-drift","open-plot-desert-ruin","open-plot-ember-forge","open-plot-fossil-badlands","open-plot-frostline-peaks","open-plot-jungle-ziggurat","open-plot-lantern-bayou","open-plot-mosslight-ruins","open-plot-night-market","open-plot-patchwork-fairground","open-plot-saltwind-lighthouse","open-plot-showcase-template","open-plot-sky-harbor","open-plot-sky-race","open-plot-starfall-observatory","open-plot-thin-ice","pastel-plain","pine-hollow","sunscar-dunes"],
+  "test/registered-quest-catalogues.test.ts": ["pine-hollow","nalati-grasslands"],
+  "test/registered-native-population.test.ts": ["driftwood-isle","pine-hollow"],
+  "test/shipped-graph-cost.test.ts": ["_template","blender-template","driftwood-isle","far-reach","ink-cel-valley","nalati-grasslands","nine-dragon-stack","open-plot-alien-plain","open-plot-clockwork-canyon","open-plot-coral-drift","open-plot-desert-ruin","open-plot-ember-forge","open-plot-fossil-badlands","open-plot-frostline-peaks","open-plot-jungle-ziggurat","open-plot-lantern-bayou","open-plot-mosslight-ruins","open-plot-night-market","open-plot-patchwork-fairground","open-plot-saltwind-lighthouse","open-plot-showcase-template","open-plot-sky-harbor","open-plot-sky-race","open-plot-starfall-observatory","open-plot-thin-ice","pastel-plain","pine-hollow","sunscar-dunes"],
+  "test/nalati-chapter-binding.test.ts": ["nalati-grasslands"],
+  "test/nalati-headless-population.test.ts": ["nalati-grasslands"],
+  "test/nine-headless-assembly.test.ts": ["nine-dragon-stack"],
+  "test/nalati-chapter-one.test.ts": ["nalati-grasslands"],
+  "test/signal-quest-verbs.test.ts": ["sunscar-dunes"],
+  "test/pine-quest-verbs.test.ts": ["pine-hollow"],
+  "test/nalati-ride-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-taming-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-name-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-weapon-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-titan-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-practice-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-flock-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-wolf-fight-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-qara-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-wolf-howl-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-sabre-contact-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-mounted-chain-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-mounted-lance-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-spear-contact-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-javelin-contact-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-world-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-stealth-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-awareness-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-discovery-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-patrol-intake.test.ts": ["nalati-grasslands"],
+  "test/nalati-patrol-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-chapter-verbs.test.ts": ["nalati-grasslands"],
+  "test/nalati-chapter-records.test.ts": ["nalati-grasslands"],
+  "test/nalati-kokpar-verbs.test.ts": ["nalati-grasslands"],
+  "test/driftwood-zipline-verbs.test.ts": ["driftwood-isle"],
+  "test/quest-view-port.test.ts": ["driftwood-isle"],
+  "test/driftwood-story-verbs.test.ts": ["driftwood-isle"],
+  "test/driftwood-optional-verbs.test.ts": ["driftwood-isle"],
+  "test/driftwood-trade-verbs.test.ts": ["driftwood-isle"],
+  "test/signal-verb-tape.test.ts": ["sunscar-dunes"],
+  "test/pine-door-continuation.test.ts": ["pine-hollow"],
+  "test/pine-door-verbs.test.ts": ["pine-hollow"],
+  "test/pine-ammunition-verbs.test.ts": ["pine-hollow"],
+  "test/nine-verb-tape.test.ts": ["nine-dragon-stack"],
+  "test/nine-walk-verbs.test.ts": ["nine-dragon-stack"],
+  "test/sky-quest-verbs.test.ts": ["far-reach"],
+  "test/sky-roost-verbs.test.ts": ["far-reach"],
+  "test/sky-progression-verbs.test.ts": ["far-reach"],
+  "test/headless-quest-verbs.test.ts": ["driftwood-isle", "far-reach", "nalati-grasslands"],
+  "test/ink-native-proof.test.ts": ["ink-cel-valley"],
+  "test/driftwood-trail-layout.test.ts": ["driftwood-isle"],
+  "test/driftwood-output.test.ts": ["driftwood-isle"],
+  "test/driftwood-mover-entry.test.ts": ["driftwood-isle"],
+  "test/driftwood-scene.test.ts": ["driftwood-isle"],
+  "test/driftwood-plan-rows.test.ts": ["driftwood-isle"],
+  "test/quest-continuation-product.test.ts": ["driftwood-isle"],
+  "test/quest-page-composition.test.ts": ["driftwood-isle"],
+  "test/pine-life-authoring.test.ts": ["pine-hollow"],
+  "test/pine-trade-catalogue.test.ts": ["pine-hollow"],
+  "test/driftwood-product-reads.test.ts": ["driftwood-isle"],
+  "test/nalati-dressing-inputs.test.ts": [],
+  "test/nalati-dressing-placement-program.test.ts": [],
+  "test/nalati-dressing-source.test.ts": [],
+  "test/nalati-native-dressing-reader.test.ts": [],
+  "test/nalati-place-construction.test.ts": [],
+  "test/nalati-places-program.test.ts": [],
+  "test/pine-contract-offers-product.test.ts": ["pine-hollow"],
+  "test/nalati-dressing-product.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/audio-scene-binary.test.ts": ["nalati-grasslands"],
+  "test/nalati-entry-construction.test.ts": ["nalati-grasslands"],
+  "test/nalati-boss-fights.test.ts": [],
+  "test/nalati-king-pose.test.ts": [],
+  "test/nalati-titan-decisions.test.ts": [],
+  "test/client-library-residency.test.ts": [],
+  "test/nalati-render-tiles.test.ts": [],
+  "test/native-roster-retirement.test.ts": [],
+  "test/cue-director.test.ts": [],
+  "test/navigation-arrival.test.ts": [],
+  "test/follow-trail.test.ts": [],
+  "test/pine-stag-walk.test.ts": [],
+  "test/boot-smoke-partition.test.ts": [],
+  "src/client/engine/entities/far-herd-upload.test.ts": [],
+  "test/hybrid-entry-preparation.test.ts": [],
+  "src/client/game/grid/memory-warning.test.ts": [],
+  "test/sdk-rigged-hull-files.test.ts": [],
+  "test/frame-floor-output-entry.test.ts": [],
+  "test/texture-scope-lifetime.test.ts": [],
+  "test/chapter-director-product.test.ts": [
+    "pine-hollow",
+    "driftwood-isle"
+  ],
+  "test/director-shipping-product.test.ts": [
+    "pine-hollow",
+    "driftwood-isle"
+  ],
+  "test/quest-message-rows.test.ts": [],
+  "test/npc-figure-rows.test.ts": [],
+  "test/product-in-look.test.ts": [
+    "driftwood-isle",
+    "pine-hollow"
+  ],
+  "test/authored-manifest.test.ts": [
+    "far-reach"
+  ],
+  "test/quadruped-rig-platform.test.ts": [],
+  "test/ambient-flock-host.test.ts": [],
+  "test/animal-model-preparation.test.ts": [],
+  "src/client/engine/core/ktx2-widen-etc2.test.ts": [],
+  "test/client-plan-boundary.test.ts": [],
+  "test/client-plan-platform.test.ts": [],
+  "test/pine-night-emits.test.ts": [
+    "pine-hollow"
+  ],
+  "src/server/game/plugin/creature-group-sampling.test.ts": [],
+  "test/contracts-platform.test.ts": [],
+  "test/world-scenes-platform.test.ts": [],
+  "test/scripts/skitterer-pack.test.ts": [
+    "sunscar-dunes"
+  ],
+  "test/nalati-spear-pool.test.ts": [],
+  "test/nalati-generation-order.test.ts": [],
+  "test/platform-json-code.test.ts": [],
+  "test/boss-fight-platform.test.ts": [],
+  "src/client/engine/app/parked-viewmodels.test.ts": [],
+  "src/sharddev/bake/whole-geometry-pacing.test.ts": [],
+  "test/hybrid-product-rows.test.ts": [
+    "far-reach",
+    "sunscar-dunes"
+  ],
+  "test/elite-encounters.test.ts": [
+    "pine-hollow",
+    "nalati-grasslands"
+  ],
+  "test/ground-borrowed-body.test.ts": [
+    "driftwood-isle",
+    "pine-hollow"
+  ],
+  "test/matriarch-borrowed-body.test.ts": [
+    "sunscar-dunes"
+  ],
+  "test/roc-borrowed-body.test.ts": [
+    "far-reach"
+  ],
+  "test/nalati-kurgan-fabric.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/nalati-headless-assembly.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/native-ground-assembly.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/nalati-strike-assembly.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/physics-headless.test.ts": ["driftwood-isle"],
+  "test/motion-replay.test.ts": ["driftwood-isle"],
+  "test/physics-shards-headless.test.ts": ["pine-hollow", "nine-dragon-stack", "sunscar-dunes", "far-reach", "blender-template"],
+  "test/physics-nalati-headless.test.ts": ["nalati-grasslands"],
+  "test/physics-open-plots-headless.test.ts": ["open-plot-frostline-peaks", "open-plot-lantern-bayou", "open-plot-ember-forge", "open-plot-mosslight-ruins", "open-plot-coral-drift"],
+  "test/shard-headless.test.ts": [
+    "_template",
+    "pastel-plain",
+    "driftwood-isle",
+    "pine-hollow",
+    "nalati-grasslands",
+    "nine-dragon-stack",
+    "sunscar-dunes",
+    "far-reach"
+  ],
+  "test/pine-npc-figure-product.test.ts": [
+    "pine-hollow"
+  ],
+  "test/scripts/_template-boss.test.ts": [
+    "_template"
+  ],
+  "test/scripts/far-reach-roc.test.ts": [
+    "far-reach"
+  ],
+  "test/scripts/ground-encounters.test.ts": [
+    "driftwood-isle",
+    "pine-hollow"
+  ],
+  "test/scripts/nine-casts.test.ts": [],
+  "test/scripts/nine-sign-atlas.test.ts": [],
+  "test/scripts/sunscar-matriarch.test.ts": [
+    "sunscar-dunes"
+  ],
+  "test/painted-look-rows.test.ts": [],
+  "test/held-arms-platform.test.ts": [],
+  "src/server/game/population/native-actor-interface.test.ts": [],
+  "test/population-platform.test.ts": [],
+  "test/quest-step-runner.test.ts": [],
+  "test/quest-step-traces.test.ts": [],
+  "test/quest-step-native-parity.test.ts": [
+    "driftwood-isle"
+  ],
+  "test/quest-step-pine-native-parity.test.ts": [
+    "pine-hollow"
+  ],
+  "test/held-equipment-platform.test.ts": [
+    "pine-hollow"
+  ],
+  "test/held-loadout-platform.test.ts": [
+    "pine-hollow"
+  ],
+  "test/collections-display.test.ts": [
+    "driftwood-isle",
+    "pine-hollow"
+  ],
+  "test/held-finishes-platform.test.ts": [
+    "pine-hollow"
+  ],
+  "test/driftwood-sword-scene.test.ts": [
+    "driftwood-isle"
+  ],
+  "test/nine-cloth-bake.test.ts": [],
+  "test/living-buildings-platform.test.ts": [],
+  "test/declared-audio-gameplay.test.ts": [],
+  "test/elites-platform.test.ts": [],
+  "test/keyed-sky-platform.test.ts": [],
+  "test/streamed-cover-platform.test.ts": [],
+  "test/toon-look-platform.test.ts": [],
+  "test/pine-quest-actions-product.test.ts": [
+    "pine-hollow",
+    "driftwood-isle"
+  ],
+  "test/world-scene-batch.test.ts": [],
+  "test/pine-crag-scenes.test.ts": [
+    "pine-hollow"
+  ],
+  "test/declared-input-platform.test.ts": [],
+  "test/driftwood-shore-boulders.test.ts": [
+    "driftwood-isle"
+  ],
+  "test/world-scene-baked-model.test.ts": [],
+  "test/pine-prop-product.test.ts": [
+    "pine-hollow"
+  ],
+  "test/driftwood-foliage-scenes.test.ts": [],
+  "test/quest-catalogue-sites.test.ts": [
+    "pine-hollow",
+    "driftwood-isle"
+  ],
+  "test/page-life.test.ts": [],
+  "test/world-scene-weld.test.ts": [],
+  "test/pine-building-owner.test.ts": [
+    "pine-hollow"
+  ],
+  "test/population-environment.test.ts": [],
+  "test/explorer-catalogue.test.ts": [
+    "far-reach",
+    "sunscar-dunes"
+  ],
+  "test/light-emitters.test.ts": [],
+  "test/eased-weather-fields.test.ts": [],
+  "test/signal-skirt-scene.test.ts": [],
+  "test/quest.test.ts": [],
+  "test/loot.test.ts": [],
+  "test/look-regressions.test.ts": [],
+  "test/grid-reentry.test.ts": [
+    "_template",
+    "blender-template",
+    "ink-cel-valley",
+    "pastel-plain",
+    "driftwood-isle",
+    "pine-hollow",
+    "nalati-grasslands",
+    "nine-dragon-stack",
+    "sunscar-dunes",
+    "far-reach"
+  ],
+  "test/sweep-guard.test.ts": [],
+  "test/nalati-kokpar.test.ts": [],
+  "test/nalati-people-loader.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/nalati-camp-fallback.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/quest-page-refs.test.ts": [],
+  "test/scene-motion-refs.test.ts": [],
+  "test/scene-buffers.test.ts": [],
+  "test/native-runtime-plan.test.ts": [
+    "far-reach",
+    "sunscar-dunes"
+  ],
+  "test/native-runtime-observation.test.ts": [
+    "far-reach",
+    "sunscar-dunes"
+  ],
+  "test/sampled-ambience.test.ts": [],
+  "test/quest-story.test.ts": ["driftwood-isle", "pine-hollow"],
+  "test/chapter-story.test.ts": ["nalati-grasslands", "driftwood-isle", "pine-hollow"],
+  "test/nalati-adventure-errors.test.ts": [],
+  "test/nalati-quest-content-product.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/nine-look-graphs.test.ts": [],
+  "test/nine-architecture-graphs.test.ts": [],
+  "test/practice-course-scene.test.ts": [],
+  "test/riding-platform.test.ts": [],
+  "test/boss-arena-room.test.ts": [],
+  "test/grapple-platform.test.ts": [],
+  "test/nalati-layout-bake.test.ts": [],
+  "test/data-map-painter.test.ts": [],
+  "test/template-map-generation.test.ts": [
+    "_template"
+  ],
+  "test/stealth-detection.test.ts": [],
+  "test/held-weapon-laws.test.ts": [],
+  "test/nalati-riding-rules.test.ts": [],
+  "test/nalati-roster-decisions.test.ts": [],
+  "test/nalati-startup.test.ts": [
+    "nalati-grasslands"
+  ],
+  "test/nalati-night-decisions.test.ts": [],
+  "test/audio-voice-patches.test.ts": [],
+  "test/field-presentation.test.ts": [],
+  "test/nalati-flock-view.test.ts": [],
+  "test/mover-carry.test.ts": [
+    "pine-hollow"
+  ],
+  "test/sky-prepared-model-product.test.ts": [
+    "far-reach"
+  ],
+  "test/nine-memory-floor.test.ts": [
+    "nine-dragon-stack"
+  ],
+  "test/pine-quest-content-product.test.ts": [
+    "pine-hollow"
+  ],
+  "test/audio-authoring.test.ts": [
+    "driftwood-isle",
+    "pine-hollow"
+  ]
+}

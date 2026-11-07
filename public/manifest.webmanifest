@@ -1,0 +1,21 @@
+{
+  "name": "Project Wildshard \u2014 Chunk Playtest",
+  "short_name": "Wildshard",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#34424f",
+  "theme_color": "#34424f",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

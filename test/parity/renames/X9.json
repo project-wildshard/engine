@@ -1,0 +1,6 @@
+{
+  "saves": {
+    "session:shardArrival.arena": "session:travel.handoff",
+    "wildshard.save.v2.session/shardArrival.arena": "wildshard.save.v2.session/travel.handoff"
+  }
+}

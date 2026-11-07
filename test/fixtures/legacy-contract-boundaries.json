@@ -1,0 +1,332 @@
+{
+  "draws": [
+    {
+      "serial": -1,
+      "offer": {
+        "serial": -1,
+        "kind": "species",
+        "target": "deer",
+        "have": 0,
+        "need": 3,
+        "title": "Venison for the lodge",
+        "goal": "Take 3 deer",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 0,
+      "offer": {
+        "serial": 0,
+        "kind": "species",
+        "target": "deer",
+        "have": 0,
+        "need": 3,
+        "title": "Venison for the lodge",
+        "goal": "Take 3 deer",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 0.5,
+      "offer": {
+        "serial": 0.5,
+        "kind": "elite",
+        "target": "imperial-bull",
+        "have": 0,
+        "need": 1,
+        "title": "A name on the board",
+        "goal": "Take the Imperial Bull",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 3
+            },
+            {
+              "id": "amber-resin",
+              "n": 4
+            }
+          ],
+          "bolts": 0
+        }
+      }
+    },
+    {
+      "serial": 1,
+      "offer": {
+        "serial": 1,
+        "kind": "rarity",
+        "target": "uncommon",
+        "have": 0,
+        "need": 2,
+        "title": "Something unusual",
+        "goal": "Take 2 uncommon animals",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 2
+            }
+          ],
+          "bolts": 0
+        }
+      }
+    },
+    {
+      "serial": 2,
+      "offer": {
+        "serial": 2,
+        "kind": "thrall",
+        "target": "thrall",
+        "have": 0,
+        "need": 3,
+        "title": "Cull the moss-grown",
+        "goal": "Put down 3 thralls",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 2
+            },
+            {
+              "id": "amber-resin",
+              "n": 3
+            }
+          ],
+          "bolts": 0
+        }
+      }
+    },
+    {
+      "serial": 17,
+      "offer": {
+        "serial": 17,
+        "kind": "species",
+        "target": "bear",
+        "have": 0,
+        "need": 1,
+        "title": "A bear too bold",
+        "goal": "Take 1 bear",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 100,
+      "offer": {
+        "serial": 100,
+        "kind": "elite",
+        "target": "ironhide",
+        "have": 0,
+        "need": 1,
+        "title": "A name on the board",
+        "goal": "Take Old Ironhide",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 3
+            },
+            {
+              "id": "amber-resin",
+              "n": 4
+            }
+          ],
+          "bolts": 0
+        }
+      }
+    },
+    {
+      "serial": 1000000,
+      "offer": {
+        "serial": 1000000,
+        "kind": "thrall",
+        "target": "thrall",
+        "have": 0,
+        "need": 3,
+        "title": "Cull the moss-grown",
+        "goal": "Put down 3 thralls",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 2
+            },
+            {
+              "id": "amber-resin",
+              "n": 3
+            }
+          ],
+          "bolts": 0
+        }
+      }
+    },
+    {
+      "serial": 3000001,
+      "offer": {
+        "serial": 3000001,
+        "kind": "species",
+        "target": "bear",
+        "have": 0,
+        "need": 1,
+        "title": "A bear too bold",
+        "goal": "Take 1 bear",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 4294967295,
+      "offer": {
+        "serial": 4294967295,
+        "kind": "species",
+        "target": "boar",
+        "have": 0,
+        "need": 3,
+        "title": "The rooting boar",
+        "goal": "Take 3 boar",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 4294967296,
+      "offer": {
+        "serial": 4294967296,
+        "kind": "species",
+        "target": "boar",
+        "have": 0,
+        "need": 3,
+        "title": "The rooting boar",
+        "goal": "Take 3 boar",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 9007199254740989,
+      "offer": {
+        "serial": 9007199254740989,
+        "kind": "species",
+        "target": "boar",
+        "have": 0,
+        "need": 3,
+        "title": "The rooting boar",
+        "goal": "Take 3 boar",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 9007199254740991,
+      "offer": {
+        "serial": 9007199254740991,
+        "kind": "species",
+        "target": "boar",
+        "have": 0,
+        "need": 3,
+        "title": "The rooting boar",
+        "goal": "Take 3 boar",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    },
+    {
+      "serial": 1.7976931348623157e+308,
+      "offer": {
+        "serial": 1.7976931348623157e+308,
+        "kind": "species",
+        "target": "boar",
+        "have": 0,
+        "need": 3,
+        "title": "The rooting boar",
+        "goal": "Take 3 boar",
+        "reward": {
+          "items": [
+            {
+              "id": "lodge-ribbon",
+              "n": 1
+            }
+          ],
+          "bolts": 10
+        }
+      }
+    }
+  ],
+  "loads": [
+    {
+      "saved": null,
+      "wire": "{\"next\":3,\"slots\":[{\"serial\":0,\"kind\":\"species\",\"target\":\"deer\",\"have\":0},{\"serial\":1,\"kind\":\"rarity\",\"target\":\"uncommon\",\"have\":0},{\"serial\":2,\"kind\":\"thrall\",\"target\":\"thrall\",\"have\":0}],\"claimed\":0,\"streak\":0,\"best\":0}"
+    },
+    {
+      "saved": "bad json",
+      "wire": "{\"next\":3,\"slots\":[{\"serial\":0,\"kind\":\"species\",\"target\":\"deer\",\"have\":0},{\"serial\":1,\"kind\":\"rarity\",\"target\":\"uncommon\",\"have\":0},{\"serial\":2,\"kind\":\"thrall\",\"target\":\"thrall\",\"have\":0}],\"claimed\":0,\"streak\":0,\"best\":0}"
+    },
+    {
+      "saved": "{\"next\":-8,\"slots\":[{\"serial\":0,\"kind\":\"species\",\"target\":\"deer\",\"have\":0.9},{\"serial\":1,\"kind\":\"rarity\",\"target\":\"uncommon\",\"have\":1.9},{\"serial\":2,\"kind\":\"thrall\",\"target\":\"thrall\",\"have\":2.9}],\"claimed\":-3,\"streak\":2.5,\"best\":4}",
+      "wire": "{\"next\":3,\"slots\":[{\"serial\":0,\"kind\":\"species\",\"target\":\"deer\",\"have\":0},{\"serial\":1,\"kind\":\"rarity\",\"target\":\"uncommon\",\"have\":1},{\"serial\":2,\"kind\":\"thrall\",\"target\":\"thrall\",\"have\":2}],\"claimed\":-3,\"streak\":2.5,\"best\":4}"
+    },
+    {
+      "saved": "{\"next\":1,\"slots\":[{\"serial\":0,\"kind\":\"missing\",\"target\":\"missing\",\"have\":9},{\"serial\":0,\"kind\":\"species\",\"target\":\"deer\",\"have\":-3},{\"serial\":0.5,\"kind\":\"species\",\"target\":\"boar\",\"have\":999}],\"claimed\":5,\"streak\":-1,\"best\":8}",
+      "wire": "{\"next\":1.5,\"slots\":[{\"serial\":0,\"kind\":\"species\",\"target\":\"deer\",\"have\":3},{\"serial\":0,\"kind\":\"species\",\"target\":\"deer\",\"have\":0},{\"serial\":0.5,\"kind\":\"species\",\"target\":\"boar\",\"have\":3}],\"claimed\":5,\"streak\":-1,\"best\":8}"
+    }
+  ]
+}

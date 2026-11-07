@@ -1,0 +1,98 @@
+[
+  {
+    "id": "effect.stun",
+    "kind": "timed",
+    "duration": 1.3,
+    "tags": [
+      "status.stun"
+    ],
+    "grants": [
+      "status.stun",
+      "state.stunned"
+    ],
+    "modifiers": [
+      {
+        "attr": "moveLocked",
+        "op": "override",
+        "value": 1
+      }
+    ],
+    "stacking": "refresh",
+    "cue": "cue.status.stun",
+    "icon": "status-stun"
+  },
+  {
+    "id": "effect.burn",
+    "kind": "timed",
+    "duration": 3,
+    "period": 0.5,
+    "tickDamage": 4,
+    "tags": [
+      "status.burn"
+    ],
+    "grants": [
+      "status.burn"
+    ],
+    "modifiers": [],
+    "stacking": "refresh",
+    "cue": "cue.status.burn",
+    "icon": "status-burn"
+  },
+  {
+    "id": "effect.poison",
+    "kind": "timed",
+    "duration": 6,
+    "period": 1,
+    "tickDamage": 3,
+    "tags": [
+      "status.poison"
+    ],
+    "grants": [
+      "status.poison"
+    ],
+    "modifiers": [],
+    "stacking": "refresh",
+    "cue": "cue.status.poison",
+    "icon": "status-poison"
+  },
+  {
+    "id": "effect.bleed",
+    "kind": "timed",
+    "duration": 4,
+    "period": 0.5,
+    "tickDamage": 2,
+    "tags": [
+      "status.bleed"
+    ],
+    "grants": [
+      "status.bleed"
+    ],
+    "modifiers": [],
+    "stacking": {
+      "max": 3
+    },
+    "cue": "cue.status.bleed",
+    "icon": "status-bleed"
+  },
+  {
+    "id": "effect.slow",
+    "kind": "timed",
+    "duration": 3,
+    "tags": [
+      "status.slow"
+    ],
+    "grants": [
+      "status.slow"
+    ],
+    "modifiers": [
+      {
+        "attr": "moveSpeedMul",
+        "op": "mul",
+        "value": 0.6
+      }
+    ],
+    "stacking": "refresh",
+    "cue": "cue.status.slow",
+    "icon": "status-slow"
+  }
+]

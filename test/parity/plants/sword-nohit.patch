@@ -1,0 +1,10 @@
+--- a/src/engine/combat/view/SweptMelee.ts
++++ b/src/engine/combat/view/SweptMelee.ts
+@@ -554,6 +554,7 @@
+     const dmg = Math.round(this.moveDamage(move));
+     const point = _hitPoint.copy(hit.point); // the raycast result object is reused by the next ray
+     const animal = hit.animal;
++    return;
+     const result = this.contact(hit.animal, dmg, point, _v1, _aimOrigin, `move.${move.name}`, true);
+     if (!result) return;
+     const killed = result.killed;

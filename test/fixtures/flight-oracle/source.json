@@ -1,0 +1,32 @@
+[
+  {
+    "name": "orbit",
+    "source": "src/shards/far-reach/species/driftRay.ts",
+    "revision": "beba33da8b720c2640e0cd99531be91efeaeedd2",
+    "blob": "c8438da232687072e9487afb6baa723e5b7cc67a",
+    "start": "/** The dive:",
+    "end": "const brains =",
+    "bodySha256": "e96b3278f1831602b16e84ad6815a5ad420b1c06aed88287e4b9909ad84c13db",
+    "fixtureSha256": "7ec8f06ee826e2e79a944e0f6485088200a4fd85daba89672f7587b18cd7f9d0"
+  },
+  {
+    "name": "patrol",
+    "source": "src/shards/sunscar-dunes/species/duneRay.ts",
+    "revision": "beba33da8b720c2640e0cd99531be91efeaeedd2",
+    "blob": "1cae7bd089ae3b3753a013d61898123acdd9ae8a",
+    "start": "/** The flight numbers",
+    "end": "const brains =",
+    "bodySha256": "1063c6c5c5ee80d67348dfb35aa41c16b40358c49d3b6cb21d7a00394d4c01d1",
+    "fixtureSha256": "ac209df7133a5218c7548abebb24273df25aa05a11fe9d1883f07092454b1a75"
+  },
+  {
+    "name": "burst",
+    "source": "src/shards/far-reach/species/galeWisp.ts",
+    "revision": "beba33da8b720c2640e0cd99531be91efeaeedd2",
+    "blob": "a7afdc8966c843bb427b55ad5f11829b9469c498",
+    "start": "/** The burst:",
+    "end": "const brains =",
+    "bodySha256": "c0395a5117795e2f6ed55fbcdd2ace43cead25217d78fa7bb89216987efccffa",
+    "fixtureSha256": "f9f6e331de8bf8c9c3c6863345c0f469d824a2ac80fa314c0554f8d088d5a8ba"
+  }
+]

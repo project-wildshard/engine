@@ -1,0 +1,11 @@
+--- a/src/boot/audioFiles.ts
++++ b/src/boot/audioFiles.ts
+@@ -81,7 +81,7 @@
+ /** the files of SFX set `set` for shard `slug` (URLs): all of them, but another shard's own sounds */
+ function sfxFilesFor(set: string, slug: string): string[] {
+   const m = SFX_MANIFESTS[set], skip = otherShardFiles(m, slug), dir = sfxDir(set);
+-  return filesOf(dir, m).filter((p) => !skip.has(p.slice(dir.length)));
++  return filesOf(dir, m).filter((p) => !skip.has(p.slice(dir.length)) && !(slug === 'driftwood-isle' && p.endsWith('bed-island-1-4611714d.m4a')));
+ }
+ /** the manifest without `drop`'s slots */
+ function withoutSlots(m: unknown, drop: readonly string[]): unknown {

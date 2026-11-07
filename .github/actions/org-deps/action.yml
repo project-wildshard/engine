@@ -1,0 +1,15 @@
+name: org-deps
+description: >-
+  Let pnpm read org git dependencies (github:project-wildshard/...). They are
+  public (J160, J163), so this needs no token: a runner has no SSH key, and
+  pnpm-lock.yaml can record them as git@github.com:..., so every URL form goes
+  to plain HTTPS. It takes no secret, and a fork's pull request runs it as is.
+runs:
+  using: composite
+  steps:
+    - name: Read org repos over HTTPS
+      shell: bash
+      run: |
+        base="https://github.com/project-wildshard/"
+        git config --global url."$base".insteadOf "git@github.com:project-wildshard/"
+        git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"

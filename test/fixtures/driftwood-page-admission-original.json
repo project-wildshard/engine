@@ -1,0 +1,22 @@
+[
+  {
+    "name": "life",
+    "bytes": 3230,
+    "hash": "5ef7e85027347e900d5feb12e167c0668e9b75207e30a5625cb278f7c06693c2"
+  },
+  {
+    "name": "story",
+    "bytes": 1387,
+    "hash": "87c6819b3132bfae764cb7e9370516d2c26dacf7789fe458b6fff3a0f39136c2"
+  },
+  {
+    "name": "director",
+    "bytes": 946,
+    "hash": "068422fe57f5a9f1112d97cecea8e6091425932c402b09567523457d2f8be0d9"
+  },
+  {
+    "name": "native",
+    "bytes": 1440,
+    "hash": "fa66e41aa80f2bb8c870829c077586376237271b33fdb9b61003e0e6283ef812"
+  }
+]
