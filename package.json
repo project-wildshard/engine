@@ -1,6 +1,6 @@
 {
   "name": "@wildshard/engine",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "The Wildshard engine: one repo with shared, client, server and cook code and three build targets (client, dedicated server, standalone listen server), shaped like Unreal or Source.",
   "type": "module",
