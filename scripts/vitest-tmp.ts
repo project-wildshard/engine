@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
@@ -12,6 +12,20 @@ interface VitestTempEnvironment extends NodeJS.ProcessEnv {
   WS_VITEST_TMP_DIR?: string;
 }
 
+/** A killed run never reaches its own cleanup, so a later one clears up, in the background, at most every ten minutes. */
+function sweepAfterKilledRuns(env: VitestTempEnvironment): void {
+  if (env.CI !== undefined || env.VITEST_TMP_ROOT !== undefined) return;
+  const stamp = fileURLToPath(new URL('../tmp/.temp-janitor-stamp', import.meta.url));
+  try {
+    if (Date.now() - statSync(stamp).mtimeMs < 600_000) return;
+  } catch { /* Never swept here. */ }
+  try {
+    writeFileSync(stamp, '');
+    spawn(process.execPath, [fileURLToPath(new URL('temp-janitor.mjs', import.meta.url))], { detached: true, stdio: 'ignore' })
+      .on('error', () => undefined).unref();
+  } catch { /* Housekeeping never fails a test run. */ }
+}
+
 /**
  * Keep Vitest's module cache out of $TMPDIR (docs/process/MACHINE.md "Disk and boot").
  *
@@ -23,6 +37,7 @@ interface VitestTempEnvironment extends NodeJS.ProcessEnv {
  * the whole `<pid>` dir is removed, with exit cleanup as a fallback for an early failure.
  */
 function temporaryRun(env: VitestTempEnvironment): { dir: string; cleanup: () => void } {
+  sweepAfterKilledRuns(env);
   const original = env.TMPDIR;
   const originalCompileCache = env.NODE_COMPILE_CACHE;
   const root = env.VITEST_TMP_ROOT ?? fileURLToPath(new URL('../tmp/vitest', import.meta.url));

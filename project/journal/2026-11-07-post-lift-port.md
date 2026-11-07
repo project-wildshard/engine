@@ -3,3 +3,7 @@
 Port 42c8182da0 (fix(test): cook crash proof writes no core) in source
 order. Keep the behavior and repoint the retained files and imports to
 engine's lifted layout.
+
+Port 1d9c456852 (fix(disk): sweep up after killed runs) in source order.
+Keep the behavior and repoint the retained files and imports to engine's
+lifted layout.
