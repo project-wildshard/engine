@@ -1,4 +1,6 @@
-import type {} from '../../src/client/game/equipmentTypes.merge';
+// oxlint-disable-next-line import/no-unassigned-import -- Declaration-only import merges the game's equipment vocabulary.
+import '../../src/client/game/equipmentTypes.merge';
+import type {CreatureRewardState} from '../../src/shared/game/saves';
 import type {EquipmentService} from '../../src/client/engine/combat/EquipmentService';
 import type {HeldLoadout} from '../../src/client/game/loadout/held';
 import type {HeldLauncher} from '../../src/client/game/weapons/heldLauncher';
@@ -31,7 +33,7 @@ export type WorkerWindow = typeof window & {
 
 export interface WorkerSaveDocument {
   keys: {
-    'creature-rewards'?: { data: { players: Record<string, import('../../src/shared/game/saves').CreatureRewardState> } };
+    'creature-rewards'?: { data: { players: Record<string, CreatureRewardState> } };
     continuation?: { data: { tick: number } };
   };
 }

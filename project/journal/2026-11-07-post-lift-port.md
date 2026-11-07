@@ -31,3 +31,29 @@ engine's lifted layout.
 Port d75b25e179 (fix: validate legacy rewards before welcome) in source
 order. Keep the behavior and repoint the retained files and imports to
 engine's lifted layout.
+
+The lifted scripts project checks every new helper, so give the three
+Pine browser proofs their actual page and worker contracts. Correct the
+fixture scope declaration to match its existing string namespace API.
+The Pine reward integration test uses a full pinned product: classify
+it in Ring 2, with full-suite coverage intact. Regenerate the admission
+revision after the retained shardfile runtime changes.
+
+All 26 touched runtime files match the source after path rewriting,
+ignoring one blank line and the lift's cross-side worker URL. Focused
+checks pass: cook worker 23, cleanup 8, riding 4, reward/wire/network 29.
+The source tree was read through committed objects only.
+
+The built iPhone-profile browser passes Pine economy 9/9 and durable
+reward crashes 7/7. The grid proof stops during boot on "Missing KTX
+2.0 identifier" before its reward checks; this needs a rendering owner.
+The unchanged 30 fps riding pilot falls in rounds four or five, while
+OFFER and trust work and the page reports no errors. Preserve the
+requested upstream runtime and record these optional proof limits.
+
+The inherited commit wrapper ran the hooks against a detached view,
+which engine's main-only hook correctly rejected. Commit named paths
+under the real checkout's lock and let Git run the installed hooks.
+Keep foreign stages intact and add new paths with intent-to-add. Two
+fixture checks prove selected-path isolation and hook rejection without
+moving HEAD. The wrapper adds no bypass or alternate hook dispatcher.
