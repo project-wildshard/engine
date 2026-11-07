@@ -171,7 +171,7 @@ export function installHomeKeeper(host: SimHost, spec: HomeKeeperSpec, saved?: R
     for (let i = 0; i < homeCount; i++) {
       const home = homes[i];
       if (home === undefined || home.wait <= 0) continue;
-      home.wait -= dt * roomRefillRate(host.players, home.x, home.z); // J109: faster with players near; one player's clock is plain dt
+      home.wait -= dt * roomRefillRate(host.players, home.x, home.z, host.parked); // J109: faster with players near; one player's clock is plain dt
       if (home.wait > 0) continue;
       freeBody(home);
       respawn(home);

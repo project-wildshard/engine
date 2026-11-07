@@ -13,7 +13,7 @@ import { isCosmetic, isOwnedId, Owned } from '../../../shared/game/loot/Owned';
 import { Purse } from '../../../shared/game/loot/Purse';
 import { installOwnedEffects } from '../loadout/ownedEffects';
 import { OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
-import { inventorySave, skinSave, compendiumSave, finishPickupSave, saveSlug, CreatureRewardSchema, creatureRewardSave, type CreatureRewardState } from '../../../shared/game/saves';
+import { inventorySave, ownedSave, purseSave, skinSave, compendiumSave, finishPickupSave, saveSlug, CreatureRewardSchema, creatureRewardSave, type CreatureRewardState } from '../../../shared/game/saves';
 
 /**
  * Creature rewards are persistent player data, independent of a world continuation. E7 supplies this from each
@@ -39,8 +39,18 @@ const REWARDS = 'owned.creature-rewards';
 /** A pack keeps what the server hands it: a slot limit is the giver's to check. */
 const KEEPS_ALL = { has: (): boolean => true, keeps: (): boolean => true, slots: () => Number.MAX_SAFE_INTEGER };
 
+/** Where one player's goods are kept. */
+export interface OwnedSlots {
+  readonly purse: Pick<typeof purseSave, 'read' | 'write'>;
+  readonly owned: Pick<typeof ownedSave, 'read' | 'write'>;
+  readonly inventory: Pick<typeof inventorySave, 'read' | 'write'>;
+}
+const SESSION_SLOTS: OwnedSlots = { purse: purseSave, owned: ownedSave, inventory: inventorySave };
+/** Each player's slots, where players keep their own (E7.4): */
+export type OwnedStores = (player: string) => OwnedSlots;
+
 /**
- * What the session's player holds in one shard: its purse, its pack and its gear, in the saves a page kept them in, which the
+ * What a player holds in one shard: its purse, its pack and its gear, in the saves a page kept them in, which the
  * server's session read in. Grants arrive as filings and purchases as acts, and clients read lines of it (J130: the server owns
  * these). A world whose quest keeps its own pack leaves its lines to that owner.
  */
@@ -52,12 +62,14 @@ export class PlayerOwned {
   private exchange: Exchange | null = null;
   private readonly finishIds = new Set<string>();
   private readonly purchases = new Map<number, number>();
-  constructor(readonly shard: string) {
-    this.purse = new Purse(shard); this.owned = new Owned(shard); this.slot = saveSlug(shard);
-    const saved = inventorySave.read(this.slot);
+  private readonly inventory: OwnedSlots['inventory'];
+  constructor(readonly shard: string, slots: OwnedSlots = SESSION_SLOTS, finishes: readonly string[] = []) {
+    this.purse = new Purse(shard, slots.purse); this.owned = new Owned(shard, slots.owned); this.slot = saveSlug(shard); this.inventory = slots.inventory;
+    const saved = slots.inventory.read(this.slot);
     this.counts = { ...saved.counts }; this.order = [...saved.order];
+    for (const id of finishes) this.finishIds.add(id);
   }
-  private savePack(): void { inventorySave.write({ counts: this.counts, order: this.order }, this.slot); }
+  private savePack(): void { this.inventory.write({ counts: this.counts, order: this.order }, this.slot); }
   count(id: string): number { return this.counts[id] ?? 0; }
   add(id: string, n = 1): boolean {
     if (!addInventory({ counts: this.counts, order: this.order }, KEEPS_ALL, id, n)) return false;
@@ -185,16 +197,28 @@ export class PlayerOwned {
   }
 }
 
+/** Who holds what in one world: one `PlayerOwned` a session, or one a player where each keeps their own. */
+export interface OwnedBook { readonly of: (player: string) => PlayerOwned; /** A player left: what they held stays in their store, and this forgets it. */ readonly drop: (player: string) => void }
+
 /** Put a world on the wire's owned rows. Any owner of a pack or a shop already in the world keeps them. A good of ammunition goes to the world's quiver, and a world with none has no room for it. */
-export function installPlayerOwned(host: SimHost, shard: string, economy: unknown, pack: boolean, source?: Shardfile, profiles?: CreatureRewardStore): PlayerOwned {
-  const owned = new PlayerOwned(shard), routes = actRoutes(host);
-  if (source !== undefined) installOwnedEffects(host, owned.owned, source);
-  if (source !== undefined) owned.creatures(host, source, profiles);
-  publishOwned(host, 'player', (_player, out) => { owned.read(out, pack); });
-  routes.wear = (_player, id) => { if (isOwnedId(id) && isCosmetic(id) && owned.owned.has(id)) owned.owned.toggleWorn(id); };
-  if (economy !== null && economy !== undefined && routes.buy === null) {
-    owned.trade(economy, new Map<string, unknown>([['skins', { owns: (id: string) => owned.owned.has(id), own: (id: string) => { owned.owned.grant(id); } }], ['ammo', { capacity: (kind: string, n: number) => heldAmmunition(host)?.room(kind, n) ?? false, addBolts: (n: number) => { heldAmmunition(host)?.addBolts(n); }, grant: (kind: string, n: number) => { heldAmmunition(host)?.add(kind, n); } }]]));
-    routes.buy = (_player, good) => { owned.buy(good); };
-  }
-  return owned;
+export function installPlayerOwned(host: SimHost, shard: string, economy: unknown, pack: boolean, stores?: OwnedStores, source?: Shardfile, profiles?: CreatureRewardStore): OwnedBook {
+  const routes = actRoutes(host), seats = new Map<string, PlayerOwned>(), shopped = economy !== null && economy !== undefined && routes.buy === null;
+  const open = (slots?: OwnedSlots): PlayerOwned => {
+    const owned = new PlayerOwned(shard, slots, Object.keys(source?.items.pickups ?? {}));
+    if (shopped) owned.trade(economy, new Map<string, unknown>([['skins', { owns: (id: string) => owned.owned.has(id), own: (id: string) => { owned.owned.grant(id); } }], ['ammo', { capacity: (kind: string, n: number) => heldAmmunition(host)?.room(kind, n) ?? false, addBolts: (n: number) => { heldAmmunition(host)?.addBolts(n); }, grant: (kind: string, n: number) => { heldAmmunition(host)?.add(kind, n); } }]]));
+    return owned;
+  };
+  const session = stores === undefined ? open() : null;
+  if (source !== undefined && session !== null) installOwnedEffects(host, session.owned, source);
+  if (source !== undefined) (session ?? new PlayerOwned(shard)).creatures(host, source, profiles);
+  const of = (player: string): PlayerOwned => {
+    if (session !== null) return session;
+    let seat = seats.get(player);
+    if (seat === undefined) { seat = open(stores?.(player)); seats.set(player, seat); }
+    return seat;
+  };
+  publishOwned(host, 'player', (player, out) => { of(player).read(out, pack); });
+  routes.wear = (player, id) => { const { owned } = of(player); if (isOwnedId(id) && isCosmetic(id) && owned.has(id)) owned.toggleWorn(id); };
+  if (shopped) routes.buy = (player, good) => { of(player).buy(good); };
+  return { of, drop: player => { seats.delete(player); } };
 }

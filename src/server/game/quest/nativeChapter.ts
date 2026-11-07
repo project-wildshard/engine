@@ -69,6 +69,7 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     seats.set(book.player, { clock, book, scope });
     book.part(`chapter:${policy.id}`, { read: () => clock.lane.snapshot(), write: saved => { clock.lane.restore(saved); } });
   });
+  books.lead.part(`chapter:${policy.id}`, { read: () => timeline.lane.snapshot(), write: saved => { timeline.lane.restore(saved); } });
   return { clock: timeline.lane, fast: timeline.fast, update: (dt, step, quest) => {
     timeline.update(dt, step);
     for (const [player, seat] of seats) {

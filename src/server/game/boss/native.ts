@@ -15,8 +15,8 @@ import { parseRoamingEncounter, NativeBossBindingSchema, type NativeBossBinding,
 import { groundBossDormant, createGroundBossFight, groundBossPresence, type GroundBossEnv, type GroundBossFight } from './roaming';
 import { roamingFightState, restoreRoamingFight } from './continuation';
 import { Lane } from '../../../shared/game/boss/lane';
-import { ROAMING_HAZARD_EVENTS, ROAMING_VIEW } from '../../../shared/game/shardfile/wirePrompts';
-import { sayFightView } from '@wildshard/engine/sim/shardRows';
+import { ROAMING_HAZARD_EVENTS, ROAMING_STANDING, ROAMING_VIEW } from '../../../shared/game/shardfile/wirePrompts';
+import { declareStandingLooks, sayFightView } from '@wildshard/engine/sim/shardRows';
 import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 import { itemPickupFloor, ITEM_PICKUP_HOVER } from '@wildshard/engine/world/interact/pickup';
 import { pickPrompt } from '@wildshard/engine/world/interact/prompts';
@@ -47,6 +47,7 @@ const LANE_STATES = ['none', 'tell', 'run', 'skid'] as const;
 
 function nativeGroundFight(host: SimHost, row: RoamingEncounterRow, program: SpeciesProgramData, binding: NativeBossBinding): { fight: GroundBossFight<NativeGroundBossBody>; own: { first: boolean; light: boolean }; waves:readonly {readonly r:number;readonly on:boolean;readonly delay:number}[] } {
   const own = { first: false, light: false }, roster = () => populationRoster(host, binding.population);
+  declareStandingLooks(host, ROAMING_STANDING);
   /** What a page on this server paints: the fight's own view calls, which are nothing here. */
   let tellTime = 0, telling = false, sealWas = 0, darkWas = 0;
   const ringing = new Set<number>();

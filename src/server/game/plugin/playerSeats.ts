@@ -13,6 +13,15 @@ function othersIn(value: unknown): { readonly lead: unknown; readonly others: Re
   return { lead, others: Object.fromEntries(Object.entries(others)) };
 }
 
+/** Every weapon's seats on a host, in install order, so one player's values can leave with them (E7.4). */
+const hostSeats = new WeakMap<SimHost, ((player: PlayerSim) => PlayerSeat)[]>();
+/** One player's value at each weapon, in install order. */
+export function exportSeats(host: SimHost, player: PlayerSim): SimValue[] { return (hostSeats.get(host) ?? []).map(seat => seat(player).snapshot()); }
+/** Put a player's weapon values back, on seats made for them if they have none yet. */
+export function importSeats(host: SimHost, player: PlayerSim, values: readonly unknown[]): void {
+  for (const [index, seat] of (hostSeats.get(host) ?? []).entries()) { const value = values[index]; if (value !== undefined) seat(player).restore(value); }
+}
+
 /**
  * P1-E3.5: a weapon serves every player, so what a weapon remembers lives in a seat per player. The host's first player sits
  * from install (`first`: its save, its frame, and whatever else stays one-player); another player gets a seat on its first tick and loses it when it leaves. One adapter holds them: alone, its value is the
@@ -27,6 +36,7 @@ export function playerSeats<S extends PlayerSeat>(host: SimHost, make: (player: 
     if (seat === undefined) { seat = make(player, false); others.set(player.id, seat); }
     return seat;
   };
+  hostSeats.set(host, [...hostSeats.get(host) ?? [], of]);
   return { lead, of,
     step: dt => {
       lead.step(dt);

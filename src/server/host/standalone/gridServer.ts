@@ -14,13 +14,10 @@ import type { NetTickInput } from '@wildshard/engine/net/room';
 import { groups } from '@wildshard/engine/physics/groups';
 import { NearColliders, solidReach } from '@wildshard/engine/physics/nearColliders';
 import { stripCollider } from '@wildshard/engine/physics/stripColliders';
-import { addEdgeWalls } from '@wildshard/engine/physics/terrain';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { createSimHost, type SimHost, type SimLevel } from '@wildshard/engine/sim';
 import { bootTask, bootWork } from '@wildshard/engine/boot/timing';
 import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
-import { actRoutes } from '@wildshard/engine/sim/actRoutes';
-import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
 import { questBooks } from '@wildshard/engine/quest/players';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
@@ -30,36 +27,20 @@ import type { SaveStore } from '@wildshard/engine/saves/store';
 import type { Transport } from '@wildshard/engine/net/transport';
 import { GridAssembly, type GridCell, type GridPoint } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
-import { carryRefusedSave, importPageProgress } from '@wildshard/engine/game/grid/durability';
 import { heldArmsOf } from '@wildshard/engine/game/weapons/nativeHeld';
 import { gridRecovery } from '@wildshard/engine/game/grid/recovery';
-import { regionalRuntimeCheckpoint } from '@wildshard/engine/game/grid/runtimeCheckpoint';
 import { GridRoom } from '@wildshard/engine/game/grid/room';
 import { commandsOf, GridNetRooms } from '@wildshard/engine/game/grid/roomNet';
-import { GridSimulation, type GridResident } from '@wildshard/engine/game/grid/simulation';
-import { bindShardfileSim, createShardfileSim, HOST_PROBE, type ShardfileSimPorts, type ShardfileSimulation } from '@wildshard/engine/game/plugin/simulation';
-import { installRoomRespawn } from '@wildshard/engine/game/roomRespawn';
-import { hasNativeAssembly } from '@wildshard/engine/game/shardfile/nativeAssembly';
-import { installDeclaredClimate } from '@wildshard/engine/game/shardfile/declaredClimate';
+import { GridSimulation } from '@wildshard/engine/game/grid/simulation';
+import { HOST_PROBE } from '@wildshard/engine/game/plugin/simulation';
 import { landedBy } from '@wildshard/engine/combat/damageBook';
-import { installPlayerOwned, type PlayerOwned } from '@wildshard/engine/game/loot/playerOwned';
-import { QUEST_OWNED } from '@wildshard/engine/game/quest/nativeComposition';
-import { shardRows } from '@wildshard/engine/sim/shardRows';
-import { createQuestLedger } from '@wildshard/engine/game/quest/ledger';
-import { serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
-import { createTrustedHeadlessResident, type HeadlessRuntimeInput } from '../headlessRuntime';
-import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
+import type { HeadlessRuntimeInput } from '../headlessRuntime';
+import { actRoutes } from '@wildshard/engine/sim/actRoutes';
+import { FALL_FLOOR, openCellWorld, type CellWorld, type CellWorldOptions } from './cellWorld';
+import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
 import { cellDocuments, CONTINUATION, ContinuationSlots, SITE, siteDocuments, type SavedContinuation, type SavedSite } from './continuation';
-import { FallFloor } from './fallFloor';
 import { ledgerFilings } from './ledgerFilings';
-import { netBuys, netWorldInput, stepResident } from '../../../shared/host/standalone/netInput';
-import { STORY_ACT } from '@wildshard/engine/net/acts';
-import { installServerChapters } from '@wildshard/engine/game/quest/serverChapters';
-import { installServerDoors } from '@wildshard/engine/game/quest/serverDoors';
-import { pageOpenDoors } from '@wildshard/engine/game/shardfile/buildingDoor';
-import { pageRuntimeState } from '@wildshard/engine/game/shardfile/runtimeState';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
-import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 
 /** Worlds the worker holds beside the road, and so what a crossroads costs a phone (E5.2b, J68): the one its player stands in. */
 export const STANDALONE_RESIDENTS = 1;
@@ -67,27 +48,12 @@ export const STANDALONE_RESIDENTS = 1;
 const ROAD_HALF_SIZE = 2000, ROAD_SPEED = 8;
 /** A capsule's stand above its ground: one set down touching it cannot leave. */
 const ROAD_SKIN = 0.02;
-/** Below this a player has left a cell's world: what a page's grid recovery falls back to where a shard declares no floor. */
-const FALL_FLOOR = -CHUNK_HALF;
-/** A cell's fall recovery, off what its shard declares. */
-const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor => new FallFloor(Math.max(FALL_FLOOR, input.shard.manifest?.bounds?.floor ?? FALL_FLOOR), lone, host.level.player.at);
 /** A cell wall's thickness and half its height. */
 const WALL = 0.5, WALL_HEIGHT = 30;
 /** How far out from a cell's edge its wall stands. */
 const WALL_OFF = 2;
 const ROAD: SimLevel = { version: SIM_API_VERSION, id: 'grid-road', seed: 1, ground: { size: ROAD_HALF_SIZE * 2, height: FALL_FLOOR }, player: { at: { x: 0, y: 0, z: 0 }, yaw: 0, speed: ROAD_SPEED }, entities: [], quests: [], weapon: HOST_PROBE };
 
-/** One world the worker has open: its host, and how it takes a tick and reports what the tick granted. */
-interface CellWorld extends GridResident {
-  /** Take over a page's progress in this cell, or what a save this build refused still says, in a world made fresh for it. False keeps the fresh world. */
-  readonly adopt: (refused: SimSnapshot | undefined) => boolean;
-  readonly effects: () => readonly HeadlessEffect[];
-  readonly step: (inputs: readonly NetTickInput[]) => void;
-  readonly fact: (name: string, entity: string) => { readonly id: string; readonly status: 'granted' | 'duplicate' | 'pending' } | null;
-  /** What the player holds in this shard. */
-  readonly owned: PlayerOwned;
-  readonly fall: FallFloor;
-}
 /** What the grid needs of its host. */
 export interface GridServerOptions {
   readonly slug: string; readonly build: string; readonly book: LedgerBook; readonly saves: SaveStore; readonly storage: ForwardedStorage; readonly savePrefix: string;
@@ -141,24 +107,6 @@ function addCellWalls(road: SimHost, cells: readonly GridCell[]): void {
       world.createCollider(R.ColliderDesc.cuboid(hx, WALL_HEIGHT, hz).setTranslation(origin.x + x, WALL_HEIGHT, origin.z + z).setCollisionGroups(groups('WORLD')));
   });
 }
-/** The four slabs around a cell, in its own coordinates. A restored world has them already: its save holds its colliders. */
-/** A lone cell has the walls a shard's own page stands inside. */
-function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics); }); }
-
-/** A cell with no native plan: a data shard, which any host can run from its output. */
-async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], lone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined }> {
-  await Promise.resolve();
-  const { shard, assets, rapier } = input;
-  const ports: ShardfileSimPorts = { rapier,
-    quest: { fact: (name, actorId) => { effects.push({ kind: 'fact', name, actorId }); }, coins: (amount, actorId) => { effects.push({ kind: 'coins', amount, actorId }); } } };
-  const fresh = createShardfileSim(shard, assets, ports);
-  if (snapshot === undefined) { if (lone) addLoneWalls(fresh.host); return { host: fresh.host, sim: () => fresh, dispose: () => { fresh.dispose(); } }; }
-  const { level } = fresh.host; fresh.dispose();
-  const installed: { value?: ReturnType<typeof bindShardfileSim> } = {};
-  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); });
-  return { host, sim: () => installed.value, dispose: () => { (installed.value ?? { dispose: () => { host.dispose(); } }).dispose(); } };
-}
-
 /** The one client this worker serves is on the wire as the host's own player. A room with more players keeps this seat. */
 const SESSION_PLAYER = 'actor.player';
 function sessionPlayer(host: SimHost): PlayerSim {
@@ -176,28 +124,6 @@ function capture(host: SimHost): string {
   near?.suspend();
   try { return serializeSimSnapshot(snapshotSimHostBytes(host)); } finally { near?.resume(position.x, position.z); }
 }
-
-/** How far past a place's own radius a client's word for it holds: it saw it a frame ago, and the server is a command behind. */
-const SEEN_SLACK = 1.5;
-/** A named place is the page's to notice, and the server's to check. One the page resolves against a placed object has no world position here, so its word stands: a `seen:` flag draws a map, and pays nothing. */
-function bindDiscovery(host: SimHost, places: readonly PlaceArea[]): void {
-  const areas = new Map(places.map(place => [`seen:${place.id}`, place]));
-  actRoutes(host).seen = (player, flag) => {
-    const area = areas.get(flag), feet = host.players.get(player)?.position;
-    if (feet === undefined || (area !== undefined && Math.hypot(feet.x - area.x, feet.z - area.z) > area.r * SEEN_SLACK)) return;
-    const books = questBooks(host);
-    books.claim([flag]); books.of(player).flags.set(flag);
-  };
-}
-
-/** What the player holds in a cell. A shard with goods sells them here. */
-function ownedOf(host: SimHost, input: HeadlessRuntimeInput): PlayerOwned {
-  const economy = input.shard.rows.loot.find(row => row.economy !== undefined)?.economy, sold = economy !== undefined && 'exchange' in economy ? economy.exchange : undefined;
-  return installPlayerOwned(host, input.shard.identity.slug, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED), input.shard);
-}
-
-/** Whether this output runs on the trusted headless owner. */
-const nativeCell = (input: HeadlessRuntimeInput): boolean => input.product !== undefined && (hasNativeAssembly(input.product) || input.product.has('sim/runtime-plan'));
 
 /** The worker's grid: the road, whichever cell its player is in, and the room each is on the wire through. */
 export class StandaloneGrid {
@@ -244,17 +170,18 @@ export class StandaloneGrid {
     const firstSlug = site === null ? home.slug : assembly.cell(site).slug, first = await bootTask('server:product-inputs', () => options.load(firstSlug)), { rapier } = first, lent = new Map([[firstSlug, first]]);
     let resumed: SavedContinuation | undefined;
     const input = (cell: GridCell): Promise<HeadlessRuntimeInput> => { const held = lent.get(cell.slug); lent.clear(); return held === undefined ? options.load(cell.slug) : Promise.resolve(held); };
+    const cellOptions: CellWorldOptions = { saves, lone: options.lone === true };
     const open = async (cell: GridCell, cached: SimSnapshot | undefined): Promise<CellWorld> => {
       const source = await input(cell);
-      if (cached !== undefined) return StandaloneGrid.world(cell, source, cached, options);
+      if (cached !== undefined) return openCellWorld(cell, source, cached, cellOptions);
       const held = slots(cell.instance), rows = held.candidates();
       for (const row of rows) {
-        try { const world = await StandaloneGrid.world(cell, source, row.saved.snapshot, options); held.restored(row); resumed = row.saved; return world; }
+        try { const world = await openCellWorld(cell, source, row.saved.snapshot, cellOptions); held.restored(row); resumed = row.saved; return world; }
         catch (error) { held.setAside(row); options.refused?.(error); }
       }
       // A later build can refuse a whole world over one thing it changed. The player's progress is still in there, and goes on from a fresh world.
       const refused = rows.map(row => ({ row, saved: readableSnapshot(row.saved.snapshot) })).find(row => row.saved !== undefined);
-      const world = await StandaloneGrid.world(cell, source, undefined, options, refused?.saved);
+      const world = await openCellWorld(cell, source, undefined, cellOptions, refused?.saved);
       try { if (!world.adopt(refused?.saved)) options.refused?.(new Error(`Saved progress in ${cell.instance} would not restore`)); }
       catch (error) { options.refused?.(error); }
       resumed = refused?.row.saved;
@@ -300,48 +227,6 @@ export class StandaloneGrid {
     return road;
   }
 
-  private static async world(cell: GridCell, input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, options: GridServerOptions, refused?: SimSnapshot): Promise<CellWorld> {
-    const declared = new Set(input.shard.ledger.map(row => row.fact)), placed = { id: cell.instance, shard: input.shard.identity.slug };
-    const ledger = createQuestLedger(options.saves, input.shard, cell.instance), fact: CellWorld['fact'] = (name, entity) => declared.has(name) ? ledger(name, entity) : null;
-    if (nativeCell(input)) {
-      // J68: a native assembly keeps its ground whole and its solids as data. A saved world holds none of them, so a throwaway fresh one lists them.
-      const near = input.product !== undefined && hasNativeAssembly(input.product) ? new NearColliders() : undefined, around = near === undefined ? { room: true } : { room: true, near };
-      if (near !== undefined && snapshot !== undefined) (await bootTask('server:restore-collision-inventory', () => createTrustedHeadlessResident(input, undefined, around))).dispose();
-      // A world with no save of its own takes the page's: the flags and records its fights read as they install.
-      const page = snapshot === undefined ? { flags: [...new Set([...[input.shard.identity.slug, cell.instance].flatMap(level => pageSavedFlags(level)), ...refused?.flags ?? []])], state: pageRuntimeState(options.saves, cell.instance) } : undefined;
-      const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createTrustedHeadlessResident(input, snapshot, page === undefined ? around : { ...around, page })), { host } = resident;
-      bindDiscovery(host, input.product === undefined ? [] : await serverPlaces(input.product)); await installServerChapters(host, input.product, input.shard, resident.fact); await installServerDoors(host, input.product, snapshot === undefined ? pageOpenDoors(options.saves, placed) : undefined);
-      if (snapshot === undefined && options.lone === true) addLoneWalls(host);
-      host.respawn.served = true; actRoutes(host).introLocks = true;
-      const owned = ownedOf(host, input);
-      return { host, owned, fall: fallFloorOf(input, host, options.lone === true), dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,
-        adopt: () => { regionalRuntimeCheckpoint(options.saves, placed, input.shard.identity.revision).restore({ animals: [...host.entities.values()] }); return true; }, step: inputs => {
-        const player = sessionPlayer(host);
-        near?.update(player.position.x, player.position.z);
-        stepResident(resident, player.id, inputs);
-      } };
-    }
-    const effects: HeadlessEffect[] = [], { host, dispose, sim } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects, options.lone === true));
-    installRoomRespawn(host, []);
-    installDeclaredClimate(host, input.shard.rows);
-    bindDiscovery(host, input.product === undefined ? [] : await serverPlaces(input.product));
-    host.respawn.served = true; actRoutes(host).introLocks = true;
-    return { host, owned: ownedOf(host, input), fall: fallFloorOf(input, host, options.lone === true), dispose, fact, effects: () => effects, adopt: saved => { const held = sim(); return held === undefined || (saved === undefined ? importPageProgress(options.saves, placed, input.shard, held) : carryRefusedSave(input.shard, held, saved)); }, step: inputs => {
-      effects.length = 0;
-      // A data shard's prompts answer whoever stands at them; an id they don't offer that player is dropped, since an input may not end the server.
-      const routes = actRoutes(host);
-      for (const { player, acts } of inputs) for (const act of acts) {
-        const claim = act.kind === 'interact' ? routes.claims.get(act.id) : undefined;
-        if (act.kind === 'interact' && act.id.startsWith('seen:') && routes.seen !== null) routes.seen(player, act.id);
-        else if (act.kind === 'interact' && act.id.startsWith(STORY_ACT)) routes.story?.(player, act.id.slice(STORY_ACT.length));
-        else if (claim !== undefined) claim(player);
-        else if (act.kind === 'interact' && sim()?.selectedInteraction(player) === act.id) sim()?.interact(act.id, player);
-        else if (act.kind !== 'climate' && act.kind !== 'buy' && act.kind !== 'board' && act.kind !== 'wear') routes.refused++;
-      }
-      host.step(commandsOf(inputs));
-    } };
-  }
-
   private step(site: string | null, inputs: readonly NetTickInput[]): boolean {
     const started = this.options.now(), world = site === null ? undefined : this.worlds.get(site);
     const routes = actRoutes(this.grid.hostOf(site));
@@ -358,8 +243,8 @@ export class StandaloneGrid {
   private filings(site: string | null, first: string): ReturnType<typeof ledgerFilings> {
     const world = site === null ? undefined : this.worlds.get(site);
     if (world === undefined) return [];
-    const filings = ledgerFilings(world.host, first, world.effects(), world.fact);
-    for (const filing of filings) world.owned.file(filing);
+    const filings = ledgerFilings(world.host, first, world.effects(), (name, entity, player) => player === first ? world.fact(name, entity, player) : null);
+    for (const filing of filings) world.owned.of(filing.player).file(filing);
     return filings;
   }
   /** Worlds held beside the road. */

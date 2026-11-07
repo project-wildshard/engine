@@ -55,7 +55,7 @@ export class NativeReturns {
     const elapsed = this.now - this.check, { players } = this.host;
     this.check = this.now;
     // J109: more players near an entry bring its deadline forward by the time they saved; one player moves nothing
-    if (players.size > 1) for (const entry of this.queue.pending) entry.due -= (roomRefillRate(players, entry.x, entry.z) - 1) * elapsed;
+    if (players.size > 1) for (const entry of this.queue.pending) entry.due -= (roomRefillRate(players, entry.x, entry.z, this.host.parked) - 1) * elapsed;
     const first = this.host.nearestPlayer({ x: 0, y: 0, z: 0 }).position;
     return this.queue.take(this.now, first.x, first.z, this.host.dayClock?.night ?? 0, (x, z) => nearestPosition(players.values(), x, z, first));
   }

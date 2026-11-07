@@ -58,6 +58,8 @@ export class Ledger {
   }
   /** Includes pending in-memory saves, following SaveStore's offline fallback; receipts distinguish durability. */
   state(): LedgerState { return this.slot.read(); }
+  /** Inspect the saved slot before a dedicated host permits any fallback or write. */
+  get admitted(): boolean { const status = this.slot.status?.(); return status === 'absent' || status === 'valid'; }
   /** Facts offered so far (recorded or not): a checkpoint that skips idle writes treats any as a change. */
   get recordCount(): number { return this.records; }
   /** A grant still waits for a durable write. */

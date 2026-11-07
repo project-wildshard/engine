@@ -3,6 +3,9 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../ledger';
 import type { RuntimeFacts } from '../plugin/runtimeRows';
 
+/** Check the profile slot without invoking its fresh-state fallback or granting a fact. */
+export function admittedQuestLedger(saves: SaveStore): boolean { return new Ledger(saves, [], [], []).admitted; }
+
 /** One declared ledger over the caller's original SaveStore and placement.
  * Runtime adapters and native page features share this exact grant owner. */
 export function createQuestLedger(saves: SaveStore, source: Pick<Shardfile, 'identity' | 'ledger'>, instance: string): RuntimeFacts {

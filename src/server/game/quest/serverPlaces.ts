@@ -10,18 +10,23 @@ const Row = v.object({ id: v.string(), label: v.string(), r: finite, x: v.option
 const File = v.object({ places: v.optional(v.array(Row)) });
 
 /**
- * A shard's named places, for the server's respawn (J107). A place the page resolves against a placed scene object has no
- * world position here, and is left out: a player who reaches only those goes back to the spawn.
+ * Every authored discovery. Scene-relative places have no server position, but remain valid names.
+ * Only those authored names may use the page's distance assertion.
  */
-export async function serverPlaces(product: Pick<ShardProduct, 'hasFile' | 'json'>): Promise<readonly PlaceArea[]> {
+export async function serverDiscoveries(product: Pick<ShardProduct, 'hasFile' | 'json'>): Promise<readonly { readonly id: string; readonly area: PlaceArea | null }[]> {
   for (const name of PLACE_FILES) {
     if (!product.hasFile(name)) continue;
     const { places } = v.parse(File, await product.json<unknown>(name));
     if (places === undefined) continue;
-    return places.flatMap(({ id, label, r, x, z, at }) => {
+    return places.map(({ id, label, r, x, z, at }) => {
       const area = x !== undefined && z !== undefined ? { x, z } : at?.poi === 'world' ? { x: at.x, z: at.z } : null;
-      return area === null ? [] : [{ id, label, r, ...area }];
+      return { id, area: area === null ? null : { id, label, r, ...area } };
     });
   }
   return [];
+}
+
+/** Positioned discoveries used for respawn; scene-relative discoveries remain in the admission allowlist. */
+export async function serverPlaces(product: Pick<ShardProduct, 'hasFile' | 'json'>): Promise<readonly PlaceArea[]> {
+  return (await serverDiscoveries(product)).flatMap(row => row.area === null ? [] : [row.area]);
 }

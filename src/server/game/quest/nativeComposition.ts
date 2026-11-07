@@ -46,6 +46,8 @@ export function nativeQuestPromptRoster(host: SimHost, id: string): readonly Hea
   if (host.scope.disposed || roster === undefined) throw new Error('Missing native quest prompt roster');
   return roster;
 }
+/** Every quest's prompts on a host: what a room reads a seller from (E7.7). */
+export function nativeQuestPrompts(host: SimHost): readonly HeadlessPrompt[] { return [...promptLoans.get(host)?.values() ?? []].flat(); }
 const MAX_BODIES = 64;
 const finite = v.pipe(v.number(), v.finite()), xyz = { x: finite, y: finite, z: finite };
 const Row = v.strictObject({ id: v.string(), kind: v.string(), ...xyz, yaw: finite, prompt: v.optional(v.strictObject(xyz)),
@@ -330,6 +332,18 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
 
   seats.set(books.lead.player, { rules: indexed, transitions, dialogue, roster: promptRoster, gear: { body: traveller, board, trader, reward, ammunition, state, get skins() { return finishes; }, claim: useBoard, seen: flags,
     riding: () => cables.state(cableId).riding } });
+  // E7.4: the lead's owners under the seats' own names, so what a player carries out of a room reads back on either kind of seat.
+  const leadParts = books.lead;
+  leadParts.part(`cable:${rows.step}`, { read: () => JSON.stringify(cables.snapshot(cableId)), write: saved => { cables.restore(cableId, JSON.parse(saved)); } });
+  leadParts.part(`gear:${rows.step}`, { read: () => JSON.stringify({ iron: state.iron, rewardOwned: state.rewardOwned, skins: [...finishes] }), write: saved => {
+    const value = v.parse(SeatGearSaved, JSON.parse(saved)); state.iron = value.iron; state.rewardOwned = value.rewardOwned; finishes = new Set(value.skins);
+  } });
+  if (board !== null) leadParts.part(`board:${rows.step}`, { read: () => JSON.stringify(board.snapshot()), write: saved => { board.prepareRestore(JSON.parse(saved))(); } });
+  if (trader !== null) leadParts.part(`trader:${rows.step}`, { read: () => JSON.stringify(trader.snapshot()), write: saved => { trader.prepareRestore(JSON.parse(saved))(); } });
+  if (reward !== null) leadParts.part(`reward:${rows.step}`, { read: () => JSON.stringify(reward.snapshot()), write: saved => { reward.restore(JSON.parse(saved)); } });
+  if (ammunition !== null) leadParts.part(`ammo:${rows.step}`, { read: () => JSON.stringify(ammunition.snapshot()), write: saved => { ammunition.restoreSeat(v.parse(NativeAmmunitionSavedSchema, JSON.parse(saved))); } });
+  leadParts.part(`pack:${rows.step}`, { read: () => JSON.stringify(pack.snapshot()), write: saved => { pack.restore(JSON.parse(saved)); } });
+  if (dialogue !== null) leadParts.part(`reading:${rows.step}`, { read: () => JSON.stringify(dialogue.active ? dialogue.snapshot() : null), write: saved => { dialogue.prepareRestore(JSON.parse(saved))(); } });
   books.install(book => {
     const body = need(host.players.get(book.player), 'seated body'), seat = entry.seat(book.player, rows.transitions);
     const ride = cables.seat(cableId, body, seat.flags);

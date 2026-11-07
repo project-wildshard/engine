@@ -15,6 +15,8 @@ import type { HeldRead } from '../../../shared/host/standalone/heldReads';
 function heldBytes(url: URL): Promise<Response | undefined> | undefined {
   return typeof caches === 'undefined' ? undefined : caches.match(url.href, { ignoreSearch: true, ignoreVary: true });
 }
+/** Where server bytes come from, with a verified part hash when available. */
+export type ServerRead = (url: URL, path: string, hash?: string) => Promise<Uint8Array>;
 /** The network's answer, or offline what the device holds: a level the player has been to boots with no link. Every byte is verified after this. */
 async function serverBytes(url: URL, path: string): Promise<Uint8Array> {
   const response = await bootTask(`server:fetch-headers:${path}`, () => fetch(url)).catch(() => undefined);
@@ -35,17 +37,21 @@ async function serverBytes(url: URL, path: string): Promise<Uint8Array> {
   });
 }
 
-/** This build's server book. The worker runs from its build's folder (`/b/<build>/standalone/`), which says whose it is. */
-async function serverBook(root: string): Promise<ServerPackBook> {
+/** The worker runs from its build's folder (`/b/<build>/standalone/`), which says whose it is. */
+function workerBuild(): string {
   const build = /^\/b\/([^/]+)\//u.exec(globalThis.location.pathname)?.[1];
   if (build === undefined) throw new Error('The server worker runs outside a build folder');
+  return build;
+}
+/** This build's server book. */
+async function serverBook(root: string, build: string, read: ServerRead): Promise<ServerPackBook> {
   const path = serverPackBookPath(build);
-  return readServerPackBook(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await serverBytes(new URL(`/${path}`, root), path))));
+  return readServerPackBook(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read(new URL(`/${path}`, root), path))));
 }
 
 /** C2: the road's collision from this build's grid pack: nothing a page reads, and no shard's. */
 export async function fetchGridCollision(base: string): Promise<readonly GridCollisionStrip[]> {
-  const root = new URL(base, globalThis.location.href).href, { grid } = await serverBook(root);
+  const root = new URL(base, globalThis.location.href).href, { grid } = await serverBook(root, workerBuild(), serverBytes);
   if (grid === undefined) return [];
   const body = await serverBytes(new URL(grid.url, root), grid.url), file = (path: string): Uint8Array => {
     const bytes = serverPackFile(grid, body, path);
@@ -58,7 +64,7 @@ export async function fetchGridCollision(base: string): Promise<readonly GridCol
 /** C2: reads a server file from its product's pack, fetching the book once and a part only for a file it holds. The browser
  *  undoes `br`. A read file is copied out and its part left to the collector: a phone's worker shouldn't hold a level's worth
  *  of them, and reading one again is a cache hit. */
-function serverPackReader(root: string, slug: string): (path: string) => Promise<Uint8Array> {
+function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead): (path: string) => Promise<Uint8Array> {
   const opening = new Map<string, Promise<Uint8Array>>(), opened = new Map<string, WeakRef<Uint8Array>>();
   let book: Promise<ServerPackBook> | undefined;
   const body = (part: ServerPackPart): Promise<Uint8Array> => {
@@ -66,12 +72,12 @@ function serverPackReader(root: string, slug: string): (path: string) => Promise
     if (kept !== undefined) return Promise.resolve(kept);
     const waiting = opening.get(part.url);
     if (waiting !== undefined) return waiting;
-    const read = serverBytes(new URL(part.url, root), part.url).then(bytes => { opened.set(part.url, new WeakRef(bytes)); return bytes; }).finally(() => { opening.delete(part.url); });
+    const read = source(new URL(part.url, root), part.url, part.hash).then(bytes => { opened.set(part.url, new WeakRef(bytes)); return bytes; }).finally(() => { opening.delete(part.url); });
     opening.set(part.url, read);
     return read;
   };
   return async path => {
-    const pack = (await (book ??= serverBook(root))).shards[slug];
+    const pack = (await (book ??= serverBook(root, build(), source))).shards[slug];
     if (pack === undefined) throw new Error(`No server pack for ${slug}`);
     const part = serverPackPart(pack, path), bytes = part === undefined ? undefined : serverPackFile(part, await body(part), path);
     if (bytes === undefined) throw new Error(`Missing server input ${path}`);
@@ -83,16 +89,20 @@ function serverPackReader(root: string, slug: string): (path: string) => Promise
  * P1-E5.2: the worker's product reader, loadHeadlessProduct over `fetch`. It verifies the same index, sizes and SHA-256
  * addresses with the same checks; only where the bytes come from differs.
  */
-export async function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead): Promise<HeadlessRuntimeInput> {
-  const root = new URL(base, globalThis.location.href).href, slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
+export function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead): Promise<HeadlessRuntimeInput> {
+  return readServerProduct(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held);
+}
+/** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. */
+export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead): Promise<HeadlessRuntimeInput> {
+  const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
   // C2: all of it is in the pack this build's book names, the server class only there (J91). The page lends what it holds
   // (DL25), so that moves no bytes. A host with no book, or one offline after a new build, reads what the device kept.
-  const serverFile = serverPackReader(root, slug);
+  const serverFile = serverPackReader(root, slug, build, source);
   const read = async (path: string): Promise<Uint8Array> => {
     if (path.startsWith('server/')) return serverFile(path);
     const url = new URL(path, root), lent = await held?.(url.href);
     if (lent !== undefined && lent !== null) return new Uint8Array(lent);
-    return serverFile(path).catch(() => serverBytes(url, path));
+    return serverFile(path).catch(() => source(url, path));
   };
   const input: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read('shard.json')));
   if (!isOutputIndex(input)) throw new Error('Standalone needs a format-2 output');

@@ -13,7 +13,8 @@ import { parseBossProfile } from '@wildshard/format/bossProfiles';
 import type { PhasedBossFight } from '../plugin/bossPhase';
 import { installBossRow } from '../shardfile/bossRow';
 import { sandWireName, type ArenaRoomGround } from '../../../shared/game/boss/arenaGround';
-import { publishWorldState, sayFightView } from '@wildshard/engine/sim/shardRows';
+import { declareStandingLooks, publishWorldState, sayFightView } from '@wildshard/engine/sim/shardRows';
+import { ARENA_STANDING } from '../../../shared/game/shardfile/wirePrompts';
 import { ArenaPortalLaw, type ArenaPortalEntrance } from '../../../shared/game/boss/arenaPortal';
 import type { ArenaRoomPortalRows, BoundedArenaFight } from '../../../shared/game/boss/arenaRoomRows';
 import type { BossBounty } from './bounty';
@@ -85,6 +86,7 @@ export function installArenaRoom<A extends ArenaRoomBody>(host: SimHost, rows: A
     const player = party.nearest(body === null ? at : body.position);
     return { position: player.position, dash: (x, z, seconds) => { player.dashAt(x, z, seconds); }, health: player.health };
   };
+  declareStandingLooks(host, ARENA_STANDING);
   const { phased: fight, script } = arenaRoomFight<A>({
     room: { floorHeightAt: (x, z) => ground.floorAt(x, z), addSand: (...pile) => { ground.addSand(...pile); }, clearSand: () => { ground.clearSand(); },
       drainSand: (dt, rate) => { ground.drainSand(dt, rate); }, inChamber: p => ground.inChamber(p), setSealed: on => { sealWanted = on; seal(); } },

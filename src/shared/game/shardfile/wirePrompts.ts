@@ -1,9 +1,18 @@
+import type { StandingLook } from '@wildshard/engine/sim/shardRows';
+
 /** What a page's traversal prompts name on the wire: a server has no prompt row for these, so both sides spell the id from a row they each hold. */
 export const carryPrompt = (mover: string, end: number): string => `${mover}.ride.${String(end)}`;
 /** The view call a boss's strike goes by, with its id behind it: a page's telegraph has no body of its own to read one off. */
 export const BOSS_STRIKE = 'boss.strike.';
 /** What a roaming boss's fight tells its views, by name: a page on a server steps no fight. */
 export const ROAMING_VIEW = { light: 'roaming.light', roar: 'roaming.roar', burst: 'roaming.burst', hazard: 'roaming.hazard', add: 'roaming.add', ring: 'roaming.ring', tell: 'roaming.tell', tellOff: 'roaming.tell.off', lane: 'roaming.lane', room: 'roaming.room', rig: 'roaming.rig', struck: 'roaming.struck' } as const;
+/** A roaming fight's looks that stand once said. The rest come every tick while they last, or are cues that must not replay (FLIP-6). */
+export const ROAMING_STANDING: readonly StandingLook[] = [{ name: ROAMING_VIEW.room }];
+/** An arena fight's looks that stand once said, by the names its data binds. Rings, pours and sweeps are said every tick while they last. */
+export const ARENA_STANDING: readonly StandingLook[] = [
+  { name: 'arena.lid.open' }, { name: 'arena.shaft', slotted: true }, { name: 'adds.spot', slotted: true }, { name: 'boss.glow' }, { name: 'victory.heap' },
+  { name: 'arena.shield', endedBy: ['arena.fx.hide'] }, { name: 'arena.shield.at', endedBy: ['arena.fx.hide'] }, { name: 'strike.arc', endedBy: ['strike.arc.off', 'arena.fx.hide'] },
+];
 /** What an open arena's fight tells its views, by name: a page on a server steps no fight, so it draws what these say. */
 export const OPEN_ARENA_VIEW = { look: 'open-arena.look', tell: 'open-arena.tell', whirl: 'open-arena.whirl', fire: 'open-arena.fire', cells: 'open-arena.cells' } as const;
 /** A tell's calls, as `OPEN_ARENA_VIEW.tell` numbers them. */

@@ -125,6 +125,7 @@ export function playerInteractionRules(host: Pick<SimHost, 'flags' | 'quests' | 
     const own = new InteractionRules(book.flags, rules.data); held.set(book.player, own);
     if (rules.data.marks.length > 0) book.part(`marks:${rules.data.rows[0]?.id ?? ''}`, { read: () => own.snapshot(), write: saved => { own.restore(saved); } });
   });
+  if (rules.data.marks.length > 0) books.lead.part(`marks:${rules.data.rows[0]?.id ?? ''}`, { read: () => rules.snapshot(), write: saved => { rules.restore(saved); } });
   const read = (player: string): InteractionRules => {
     books.of(player);
     const own = held.get(player); if (own === undefined) throw new Error(`Unknown interaction player ${player}`); return own;

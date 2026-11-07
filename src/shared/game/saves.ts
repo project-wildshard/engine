@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { saves } from '@wildshard/engine/saves/runtime';
-import type { SaveSlot, SaveStorage } from '@wildshard/engine/saves/store';
+import type { SaveKeyDef, SaveSlot, SaveStore, SaveStorage } from '@wildshard/engine/saves/store';
 import { inventoryKey, purseKey } from './localSaveKeys';
 
 const finite = v.pipe(v.number(), v.finite());
@@ -10,7 +10,9 @@ const define = <S extends v.GenericSchema>(key: string, schema: S, initial: () =
 export const progressSave: SaveSlot<{ counts: Record<string, number>; earned: string[]; title: string | null; playS: number; }> = define('progress', v.object({ counts: numbers, earned: strings, title: v.nullable(v.string()), playS: v.optional(finite, 0) }), () => ({ counts: {}, earned: [], title: null, playS: 0 }));
 export const inventorySave: SaveSlot<{ counts: Record<string, number>; order: string[]; }> = saves.define(inventoryKey);
 export const purseSave: SaveSlot<number> = saves.define(purseKey);
-export const ownedSave: SaveSlot<{ owned: string[]; worn: string[]; }> = define('owned', v.object({ owned: strings, worn: strings }), () => ({ owned: [], worn: [] }));
+const OwnedSchema = v.object({ owned: strings, worn: strings });
+const ownedKey: SaveKeyDef<{ owned: string[]; worn: string[]; }> = { key: 'owned', scope: 'shard', version: 1, schema: OwnedSchema, initial: () => ({ owned: [], worn: [] }) };
+export const ownedSave: SaveSlot<{ owned: string[]; worn: string[]; }> = saves.define(ownedKey);
 export const bountySave: SaveSlot<Record<string, number>> = define('bounty', numbers, () => ({}));
 export const compendiumSave: SaveSlot<Record<string, { s: number; n: number; t: number; b: number; }>> = define('compendium', v.record(v.string(), v.object({ s: finite, n: finite, t: finite, b: finite })), () => ({}));
 export const bossesSave: SaveSlot<Record<string, { defeated: boolean; rewardTaken: boolean; kills: number; }>> = define('bosses', v.record(v.string(), v.object({ defeated: v.boolean(), rewardTaken: v.boolean(), kills: finite })), () => ({}));
@@ -34,7 +36,13 @@ export const CreatureRewardSchema: v.GenericSchema<unknown, CreatureRewardState>
 });
 const CreatureRewards = v.strictObject({ legacyOwner: v.nullable(v.string()), players: v.record(v.string(), CreatureRewardSchema) });
 /** The first local device alone may inherit old shard-wide saves. Other devices start with their own record. */
-export const creatureRewardSave: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = define('creature-rewards', CreatureRewards, () => ({ legacyOwner: null, players: {} }));
+const creatureRewardsKey: SaveKeyDef<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = { key: 'creature-rewards', scope: 'shard', version: 1, schema: CreatureRewards, initial: () => ({ legacyOwner: null, players: {} }) };
+export const creatureRewardSave: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = saves.define(creatureRewardsKey);
+
+/** What a player holds in their own store, including authoritative creature rewards. */
+export function playerSlots(store: SaveStore): { purse: SaveSlot<number>; inventory: SaveSlot<{ counts: Record<string, number>; order: string[]; }>; owned: SaveSlot<{ owned: string[]; worn: string[]; }>; rewards: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> } {
+  return { purse: store.define(purseKey), inventory: store.define(inventoryKey), owned: store.define(ownedKey), rewards: store.define(creatureRewardsKey) };
+}
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 /** A save file carries the local owner's rewards, not their device identity. On restore that record belongs to this
