@@ -4,6 +4,7 @@
  * inventory's checklist (docs/design/webgpu-port-inventory.md), not every module that is handed the renderer.
  * No TSL, no WebGPURenderer (X6).
  */
+import { clearCreationErrors } from './contextErrors';
 import * as THREE from 'three';
 import { installGpuLabels, labelledCreation } from './gpuLabels';
 import { installFrameCounter } from './frameCounter';
@@ -32,6 +33,7 @@ export function probeRenderer(): Renderer {
 
 /** Create the client renderer and install upload observation before native shadow-cache ownership. */
 export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2RenderingContext, ownership: { assets: AssetService; scope: Scope; uploads: UploadOwnership }): Renderer {
+  clearCreationErrors(context);
   installDoubleElements();
   installSkinnedSortSpheres();
   const stopJournal = installDiagnosticJournal(context);

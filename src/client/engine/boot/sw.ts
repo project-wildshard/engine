@@ -235,10 +235,11 @@ function version(): Promise<SwVersion | null> {
 }
 
 /** A stale chunk may reload only after the matching new worker owns its next document.
- * Discovery, install and activation follow actual worker state; retirement cancels them. */
+ * Discovery, install and activation follow actual worker state; retirement cancels them.
+ * A first visit has no controller, but its worker has gone active behind it and would serve the reload, so what counts is that worker. */
 export function refreshWorkerForChunkRecovery(build: string, allowed: () => boolean = () => true): Promise<boolean> {
   if (!allowed()) return Promise.resolve(false);
-  if (!sw || !swAllowed() || sw.controller === null) return Promise.resolve(true);
+  if (!sw || !swAllowed()) return Promise.resolve(true);
   const container = sw;
   return new Promise<boolean>(resolve => {
     const owner = pageScope.child('stale-chunk-worker'), tracked = new Set<ServiceWorker>();
@@ -256,7 +257,10 @@ export function refreshWorkerForChunkRecovery(build: string, allowed: () => bool
         if (worker.state === 'activated') { finish(true); return; }
         // DL1: an installed update holds only its shell; recovery activates it only once its code is held.
         if (!await precached(worker)) { finish(false); return; }
-        if (owner.disposed || worker.state !== 'installed' || !allowed()) { finish(false); return; }
+        // The state moved during that wait. A worker no client held back goes on by itself, and `statechange` above finishes this once it's active.
+        const state = worker.state as ServiceWorkerState;
+        if (owner.disposed || state === 'redundant' || !allowed()) { finish(false); return; }
+        if (state !== 'installed') return;
         owner.listen(container, 'controllerchange', () => { if (container.controller === worker) finish(true); });
         // oxlint-disable-next-line unicorn/require-post-message-target-origin -- ServiceWorker messages have no targetOrigin.
         worker.postMessage({ type: 'SKIP_WAITING' });
@@ -270,12 +274,16 @@ export function refreshWorkerForChunkRecovery(build: string, allowed: () => bool
     void container.getRegistration().then(async registration => {
       if (owner.disposed) return undefined;
       if (registration === undefined) { finish(true); return undefined; }
-      const active = container.controller;
-      if (active !== null && (await buildOf(active))?.startsWith(`${build}-`) === true) { finish(allowed()); return undefined; }
+      const active = container.controller ?? registration.active;
+      if (active === null) { finish(true); return undefined; }
+      if ((await buildOf(active))?.startsWith(`${build}-`) === true) { finish(allowed()); return undefined; }
       const observe = (): void => { track(registration.installing ?? registration.waiting); };
       owner.listen(registration, 'updatefound', observe);
       observe(); await registration.update(); observe();
-      if (registration.installing === null && registration.waiting === null) finish(false);
+      if (registration.installing !== null || registration.waiting !== null) return undefined;
+      // With no client to hold it back, a new worker can be active before `update` answers.
+      const landed = registration.active;
+      finish(landed !== null && (await buildOf(landed))?.startsWith(`${build}-`) === true && allowed());
       return undefined;
     }).catch(() => { finish(false); });
   });

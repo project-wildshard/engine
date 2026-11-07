@@ -43,11 +43,12 @@ export function watchStuckStep(started: Promise<unknown>, ports: StuckStepPorts,
 export interface StuckCard { readonly dataset: Readonly<Record<string, string | undefined>> }
 /** The loading card's progress: its step (`data-step`), and a signature that changes whenever the step, the setup share,
  *  the verified bytes read, the files done or the bytes streamed (`data-streamed-bytes`: a part's chunks as they arrive,
- *  before its members verify, src/client/game/boot/spawnDownload.ts) do. No card: the boot is still in its modules. */
+ *  before its members verify, src/client/game/boot/spawnDownload.ts) do, and each beat of a wait for a seat in a full world
+ *  (`data-seat-wait`, J178: that wait is the world's, and no hang). No card: the boot is still in its modules. */
 export function progressOfCard(card: StuckCard | null): { readonly step: string; readonly signature: string } {
   if (card === null) return { step: 'modules', signature: 'modules' };
   const data = card.dataset, step = data['step'] ?? 'modules';
-  return { step, signature: [step, data['setup'] ?? '', data['readBytes'] ?? '', data['spawnFilesDone'] ?? '', data['streamedBytes'] ?? ''].join('|') };
+  return { step, signature: [step, data['setup'] ?? '', data['readBytes'] ?? '', data['spawnFilesDone'] ?? '', data['streamedBytes'] ?? '', data['seatWait'] ?? ''].join('|') };
 }
 
 /** The fatal modal's line for a stuck or failed boot: the step it stopped on, then what happened. */

@@ -27,8 +27,9 @@ export function soakInspector(url, Socket = WebSocket) {
     }
     if (message.method) for (const listener of listeners.get(message.method) ?? []) listener(message.params);
   };
-  ws.on('message', data => {
-    const message = JSON.parse(String(data));
+  ws.on('message', (/** @type {import('ws').RawData} */ data) => {
+    const bytes = Array.isArray(data) ? Buffer.concat(data) : data instanceof ArrayBuffer ? Buffer.from(data) : data;
+    const message = JSON.parse(bytes.toString('utf8'));
     if (message.method === 'Target.targetCreated' && message.params.targetInfo.type === 'page') admitTarget(message.params.targetInfo.targetId);
     else if (message.method === 'Target.didCommitProvisionalTarget') admitTarget(message.params.newTargetId);
     else if (message.method === 'Target.dispatchMessageFromTarget') receive(JSON.parse(message.params.message));

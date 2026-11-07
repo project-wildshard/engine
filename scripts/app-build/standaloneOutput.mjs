@@ -20,7 +20,7 @@ export async function writeStandaloneOutput(outDir, buildId, root) {
       outDir: resolve(outDir), emptyOutDir: false, assetsDir: directory, target: 'es2022', sourcemap: false, reportCompressedSize: false,
       rolldownOptions: {
         // identity and storage: what a page entry installs, in the shell's own module graph, for a page that isn't this bundle
-        input: { shell: resolve(root, 'src/client/host/standalone/shell.ts'), identity: resolve(root, 'src/client/app/identity.ts'), storage: resolve(root, 'src/client/engine/saves/view/storage.ts') },
+        input: { shell: resolve(root, 'src/client/host/standalone/shell.ts'), online: resolve(root, 'src/client/host/online/shell.ts'), identity: resolve(root, 'src/client/app/identity.ts'), storage: resolve(root, 'src/client/engine/saves/view/storage.ts') },
         preserveEntrySignatures: 'strict',
         output: { entryFileNames: `${directory}/[name].js` },
       },

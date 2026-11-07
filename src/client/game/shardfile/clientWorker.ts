@@ -4,21 +4,24 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { LiveGridWire } from '../grid/liveSession';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
-import { Vector3 } from 'three';
+import { Vector3, type Object3D } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { importPageSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import { syncPageRewards } from '../../../shared/game/saves';
+import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
 import { countedWait } from '@wildshard/engine/boot/waits';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import type { NetClient } from '@wildshard/engine/net/client';
 import type { NetCombatEvent } from '@wildshard/engine/net/messages';
 import type { DeathCause } from '@wildshard/engine/combat/pipeline';
+import { deviceIdentity, type NetIdentity } from '@wildshard/engine/net/identity';
 import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
 import type { PredictedRow } from '@wildshard/engine/net/predictionWorld';
 import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
+import type { OtherPlayers } from '@wildshard/engine/net/otherPlayers';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { RowBodiesView } from '@wildshard/engine/entities/RowBodies';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
@@ -63,6 +66,8 @@ export interface WorkerItemRow { readonly id: string; readonly ranged?: { readon
 export interface WorkerClientPorts {
   readonly slug: string;
   readonly player: Player; readonly physics: Physics;
+  /** Where another player's body stands. */
+  readonly scene: Object3D;
   /** The page's creature manager: its views draw rows, and its own population is retired. */
   readonly animals: Creatures;
   readonly grid: WorkerClientGrid | null;
@@ -88,7 +93,11 @@ export interface WorkerClientPorts {
   readonly linkBodies?: () => Promise<void>;
 }
 interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell }
-interface Shell { pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
+/** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
+interface BuildWorld { readonly release: string; readonly key: string }
+/** E7.2d: the page's seat in the one world, in a shell of the same shape. */
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; failed: (message: string) => void }) => Promise<Shell> }
+interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
 /** How long the card waits for the server's first rows, and how often it looks. A server that has booted says them in a tick. */
@@ -123,7 +132,7 @@ export interface WorkerClientReport {
 }
 /** A fight as a proof reads it: its row, where its body stands and the server's name for it. */
 export type WorkerClientFight = EncounterRow & { readonly at: { readonly x: number; readonly y: number; readonly z: number } | null; readonly name: string | null };
-declare global { interface Window { __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
+declare global { interface Window { __onlinePlayers?: () => OtherPlayers['shown']; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
 
 /** The page's pose inputs, as acts short enough to go. */
 function poseActs(names: ReadonlySet<string>): readonly string[] {
@@ -220,13 +229,22 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const environment = await bootTask('server:storage-module', () => import(/* @vite-ignore */ `${root}/storage.js`)) as { installBrowserSaveEnvironment: () => void };
   environment.installBrowserSaveEnvironment();
   const { startStandalone } = await bootTask('server:shell-module', () => import(/* @vite-ignore */ `${root}/shell.js`)) as ShellModule;
-  // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
-  await bootTask('server:previous-session-close', () => closing); // the previous world may still be saving
-  const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase())), { savePrefix } = appIdentity();
-  const page = saveEnvironment().storage('shard');
-  if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
-  // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
-  const shell = startStandalone({ slug, base: `/shardfiles/${slug}/`, build, savePrefix, ...ports.grid === null ? { lone: true as const } : {}, held: url => { card.add(); return spawnHeldBytes(url); }, ...saves }), { client } = shell;
+  const { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
+  const standalone = async (): Promise<Shell> => {
+    // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
+    await bootTask('server:previous-session-close', () => closing); // a world a session just left may still be saving into what this one reads
+    const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase()));
+    if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
+    // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
+    return startStandalone({ slug, base: `/shardfiles/${slug}/`, build, savePrefix, ...ports.grid === null ? { lone: true as const } : {}, held: url => { card.add(); return spawnHeldBytes(url); }, ...saves });
+  };
+  // E7.2d: a build stamped with a world puts a one-shard page in it, and nothing else does (no URL switches). Everything below runs the same on either.
+  const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
+    const { startOnline } = await bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as OnlineModule;
+    return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name), failed: message => { showError(message); } });
+  };
+  const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
+  const shell = await (world !== undefined && ports.grid === null && page !== null ? online(world, page) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
   let ended = false, leaves = (): void => undefined;
   // Settings stops a server before it touches what the server saves: that stop must not save.
@@ -308,6 +326,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const day = ports.day(); if (day !== null) wirePage.dayPassed(day);
   });
   const { restored } = await bootTask('server:await-booted', () => shell.booted);
+  // E7.6: only a world has anyone else in it.
+  let others: OtherPlayers | null = null;
+  if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope);
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
   bootMark('server:ready-send'); shell.ready();
   const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
@@ -355,6 +376,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     said = poseInputNames.size; saidCell = cell;
     for (const names of poseActs(poseInputNames)) client.act({ kind: 'pose', seq: 0, names });
   };
+  // A new link is told every value again, and a new room has heard no page name its inputs.
+  scope.onDispose(client.onRejoin(() => { poses.clear(); said = 0; }));
   scope.onDispose(client.onView(({ name, args }) => {
     if (!name.startsWith(NET_POSE)) return;
     const dot = name.lastIndexOf('.'), id = name.slice(NET_POSE.length, dot), field = name.slice(dot + 1), [value = 0] = args;
@@ -387,6 +410,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     if (arrows !== undefined && arrows !== arrowsSaid) { arrowsSaid = arrows; ports.weapons.mirrorArrows(arrows - 1); }
     bindMount(); offerMounts(); seatMount(); bindClaw();
     const shown = showRows(client, net, ports, bodies, renderTick, dt, row, near, rideable);
+    others?.frame(renderTick, dt);
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
     report.rows = animals === null ? [...client.entities.values()].filter(info => info.cls.cls === ANIMAL_CLASS.cls).length : shown; // a data cell's life draws them
     if (!quiet()) net.present(dt);
@@ -398,7 +422,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     report.missed = predictor.missed; report.corrections = predictor.corrections; report.correctionsPerMinute = predictor.corrections / seconds * 60; report.worstOffset = net.worstOffset; report.queue = predictor.pending;
     report.replaysPerFrame = predictor.replays / report.frames; report.delayMs = client.clock.delayMs; report.jitterMs = client.clock.jitterMs;
     report.refused = net.attacks.refused; report.attacks = net.attacks.pending; report.held = net.heldSlot;
-    if (report.closed === null && client.closed !== null && !ended && client.closed !== 'reload') showError(`The game's server stopped (${client.closed})`);
+    if (report.closed === null && client.closed !== null && !ended && client.closed !== 'reload' && shell.redials !== true) showError(`The game's server stopped (${client.closed})`);
     report.dropped = client.dropped; report.closed = client.closed; report.x = player.position.x; report.z = player.position.z;
     const { latest } = client;
     if (latest !== null) { const { px, pz, hp } = client.owner(latest); report.cell = latest.cell; report.serverX = Number(px); report.serverZ = Number(pz); report.hp = Number(hp); attributes.health = Math.max(1, report.hp); }
@@ -417,6 +441,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     sample(now);
   });
   window.__workerClient = () => ({ ...report });
+  window.__onlinePlayers = () => others?.shown ?? [];
   window.__workerClientHits = by => { shell.hardHits(by); };
   window.__workerClientFlag = flag => { shell.raise(flag); };
   window.__workerClientTravel = to => { travel({ to, mode: 'enter' }); };

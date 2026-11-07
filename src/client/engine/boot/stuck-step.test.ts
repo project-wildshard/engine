@@ -49,7 +49,16 @@ test('a start that settles, resolved or thrown, ends the watch without a stall',
 test('the card gives the step and a signature of its progress; no card is still the modules', () => {
   expect(progressOfCard(null)).toEqual({ step: 'modules', signature: 'modules' });
   const card = { dataset: { step: 'world.props', setup: '40', readBytes: '1000', spawnFilesDone: '3', streamedBytes: '4096' } };
-  expect(progressOfCard(card)).toEqual({ step: 'world.props', signature: 'world.props|40|1000|3|4096' });
+  expect(progressOfCard(card)).toEqual({ step: 'world.props', signature: 'world.props|40|1000|3|4096|' });
+});
+
+test('a wait for a seat in a full world is no hang, and the watch stands once it ends', () => {
+  const dataset: Record<string, string> = { step: 'server', seatWait: '0' };
+  const h = harness(() => progressOfCard({ dataset }));
+  watchStuckStep(never, h.ports, 60_000);
+  for (let s = 0; s < 180; s += 5) { h.tick(5000); dataset['seatWait'] = String(s); }
+  expect(h.stalls).toEqual([]);
+  h.tick(61_000); expect(h.stalls).toEqual([['server', 60_000]]);
 });
 
 test('a part streaming for minutes before its first member verifies is progress, not a stall', () => {

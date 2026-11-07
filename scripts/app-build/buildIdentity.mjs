@@ -24,7 +24,7 @@ export const codeDirectory = (build) => `b/${build}`;
 
 /** Stamp before executable module scripts, without changing the bundle's URLs.
  * @param {string} html @param {string} build
- * @param {{validator: string, verdicts: readonly unknown[]}} [facts] */
+ * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string}}} [facts] */
 export function stampBuildHtml(html, build, facts) {
   if (build.length === 0 || !/^[\w.-]+$/u.test(build)) throw new Error('Invalid document build identity');
   if (html.includes('globalThis.__WS_BUILD_ID__=')) throw new Error('Duplicate document build identity');
@@ -37,7 +37,8 @@ export function stampBuildHtml(html, build, facts) {
   const end = heads[0].index + heads[0][0].length;
   if (facts !== undefined && (!/^[a-f0-9]{64}$/u.test(facts.validator) || !Array.isArray(facts.verdicts))) throw new Error('Invalid document admission facts');
   const admission = facts === undefined ? '' : `globalThis.__WS_SHARDFILE_VALIDATOR__=${JSON.stringify(facts.validator)};globalThis.__WS_SHARDFILE_VERDICTS__=${JSON.stringify(facts.verdicts).replaceAll('<', String.raw`\u003c`)};`;
-  return `${source.slice(0, end)}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${admission}</script>${source.slice(end)}`;
+  const world = facts?.world === undefined ? '' : `globalThis.__WS_WORLD__=${JSON.stringify(facts.world).replaceAll('<', String.raw`\u003c`)};`;
+  return `${source.slice(0, end)}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${admission}${world}</script>${source.slice(end)}`;
 }
 
 /** Plain post-bundle step, before the service worker hashes the final HTML.
