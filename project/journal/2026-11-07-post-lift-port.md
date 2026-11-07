@@ -11,3 +11,7 @@ lifted layout.
 Port 77eadd5ac8 (fix(pine): restore economy and journal parity) in
 source order. Keep the behavior and repoint the retained files and
 imports to engine's lifted layout.
+
+Port aa3388c7b2 (fix(riding): restore server taming and calls) in source
+order. Keep the behavior and repoint the retained files and imports to
+engine's lifted layout.

@@ -96,9 +96,7 @@ export class MountCompanions<A extends CompanionActor, P extends CompanionPrompt
         if (m.restT <= 0) a.hp = a.maxHp;
       } else if (ports.ridden() !== a && m.comeT > 0) {
         m.comeT -= dt;
-        const d = Math.hypot(p.x - a.position.x, p.z - a.position.z);
-        if (d > 3.2) { a.state = d > 12 ? 'flee' : 'wander'; a.setMotion(Math.atan2(p.x - a.position.x, p.z - a.position.z), d > 25 ? speeds.gallop * 0.85 : d > 8 ? speeds.canter * 0.7 : speeds.walk, 2.5); }
-        else { m.comeT = 0; a.setMotion(Math.atan2(p.x - a.position.x, p.z - a.position.z), 0, 2); a.state = 'idle'; a.mem['toss'] = 1; }
+        if (advanceCompanionCall(a, p, speeds)) m.comeT = 0;
       } else if (ports.ridden() !== a) {
         if (a.speed < 0.1) a.state = Math.sin(ports.now() * 0.2 + a.seed * 9) > 0.1 ? 'graze' : 'idle';
         a.lookTarget.copy(p); a.lookWeight = a.position.distanceTo(p) < 6 && a.state !== 'graze' ? 0.6 : 0;
@@ -122,4 +120,16 @@ export function companionToName<A extends CompanionActor, P extends CompanionPro
     if (distance < best && distance < 1e12) { best = distance; nearest = { actor: a, row }; }
   }
   return nearest;
+}
+
+/** One called horse's original steering law. True once it stands within 3.2 m of its player. */
+export function advanceCompanionCall(a: CompanionActor, p: Vector3, speeds: MountProfile['speeds']): boolean {
+  const d = Math.hypot(p.x - a.position.x, p.z - a.position.z);
+  if (d > 3.2) {
+    a.state = d > 12 ? 'flee' : 'wander';
+    a.setMotion(Math.atan2(p.x - a.position.x, p.z - a.position.z), d > 25 ? speeds.gallop * 0.85 : d > 8 ? speeds.canter * 0.7 : speeds.walk, 2.5);
+    return false;
+  }
+  a.setMotion(Math.atan2(p.x - a.position.x, p.z - a.position.z), 0, 2); a.state = 'idle'; a.mem['toss'] = 1;
+  return true;
 }

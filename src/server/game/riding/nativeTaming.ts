@@ -9,10 +9,12 @@ import { bondedMountRoster } from './roster';
 import { mountedPlayerOf, type NativeMountedPlayer } from './native';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { TamingSession,type TamingPrograms } from '../../../shared/game/riding/taming';
-import type { TamingBindingProfile, TamingObservation } from '../../../shared/game/riding/bindingTypes';
+import { RIDING_ACT, RIDING_ROW, type TamingBindingProfile, type TamingObservation } from '../../../shared/game/riding/bindingTypes';
 import { createNativeCreaturePoses, type NativeCreaturePoseRecipe } from '../../../shared/game/plugin/animation';
 import { numericCreaturePose } from '../../../shared/game/plugin/channelPrograms';
 import { poseRidingEnvelopes, type RidingPresentationRows } from '../../../shared/game/riding/presentation';
+import { publishOwned } from '@wildshard/engine/sim/shardRows';
+import { advanceCompanionCall } from '../../../shared/game/riding/companions';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 
 /** Engine-owned tick input, shared by native modes; authors supply only rows. */
@@ -48,6 +50,7 @@ export interface NativeTamingOwner {
 }
 const finite = v.pipe(v.number(), v.finite());
 const SessionRows = { law: v.string(), bond: v.nullable(v.string()),
+  calling: v.exactOptional(v.pipe(finite, v.minValue(0), v.maxValue(30))),
   pitch: v.pipe(finite, v.minValue(-Math.PI / 2), v.maxValue(Math.PI / 2)), shake: finite, roll: finite };
 const SessionSaved = v.strictObject(SessionRows);
 const Saved = v.strictObject({ version: v.literal(1), ...SessionRows,
@@ -60,6 +63,8 @@ interface TamingSeat {
   readonly player: PlayerSim; readonly law: TamingSession<AnimalSim, HerdBrain<AnimalSim>>;
   /** One frame: `read` says the tick tape speaks for this player. */
   readonly tick: (dt: number, read: boolean) => void;
+  readonly shake: number; readonly roll: number;
+  readonly holdOffer: (held: boolean) => void; readonly whistle: () => void;
   readonly save: () => { [Key in keyof v.InferOutput<typeof SessionSaved>]: v.InferOutput<typeof SessionSaved>[Key] };
   readonly load: (saved: v.InferOutput<typeof SessionSaved>, horses: readonly AnimalSim[]) => void;
 }
@@ -96,7 +101,7 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   const sessionFor = (player: PlayerSim): TamingSeat => {
   const known = sessions.get(player.id); if (known?.player === player) return known;
   const mounted = mountedPlayerOf(host, player.id); if (mounted === undefined) throw new Error('Missing native mounted owner');
-  let bond: string | null = null, pitch = 0, offer = false, lean = 0, shake = 0, roll = 0;
+  let bond: string | null = null, pitch = 0, offer = false, heldOffer = false, calling = 0, lean = 0, shake = 0, roll = 0;
   const camera = new Vector3(), eye = new Vector3(), hurtDir = new Vector3(), mine = new Set<string>();
   const law = new TamingSession<AnimalSim, HerdBrain<AnimalSim>>({
     profile: rows.binding,
@@ -122,7 +127,7 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   },host.scope);
   const candidates = [law.interactable], namePoint = new Vector3();
   // ride.ts chooses among registered mounts, taming, then the nearest rail NAME action, before main's LOS selector.
-  // Companion whistle/resting and the global quest prompt list stay explicit unhosted gameplay requirements.
+  // Companion rest/bolt and the global quest prompt list remain separate requirements.
   const selectedTaming = (): boolean => {
     if (mounted.mountables.length > 64) throw new Error('native mountable prompt bound exceeded');
     let best = Infinity, taming = false, naming: AnimalSim | null = null, nameDistance = Infinity;
@@ -145,8 +150,11 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     return taming;
   };
   const originalUpdate = law.update.bind(law);
-  const session: TamingSeat = { player, law, tick: (dt, read) => {
-    offer = false; lean = 0; let mount = false;
+  const session: TamingSeat = { player, law, get shake() { return shake; }, get roll() { return roll; }, holdOffer: held => { heldOffer = held; }, whistle: () => {
+    const horse = law.companion;
+    if (!mounted.mounted && horse !== null && horse.mem['whistle'] === 1 && mounted.canRide(horse.entityId) && horse.position.distanceTo(player.position) < 150) calling = 30;
+  }, tick: (dt, read) => {
+    offer = heldOffer; lean = 0; let mount = false;
     if (read) {
       const commands = context.commands(); if (commands.length > 4096) throw invalidInput;
       for (let i = 0; i < 4096; i++) {
@@ -164,13 +172,19 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     if (press !== undefined) { offer = press.offer ?? offer; lean = press.lean ?? lean; pitch = press.pitch ?? pitch; mount = press.mount ?? mount; }
     camera.copy(player.position); camera.y += rows.eye;
     originalUpdate(dt);
+    const companion = law.companion;
+    if (calling > 0) {
+      if (companion === null || !companion.alive || mounted.mounted) calling = 0;
+      else { calling = Math.max(0, calling - dt); if (advanceCompanionCall(companion, player.position, mounted.speeds)) calling = 0; }
+    }
     if (mount && selectedTaming()) {
       setPromptSight(law.interactable, { body: law.promptHorse, slack: 0.5 });
       eye.copy(camera);
       if (pickPrompt(candidates, eye, host.physics) === law.interactable) law.startBreaking();
     }
-  }, save: () => ({ law: law.snapshot(), bond, pitch, shake, roll }), load: (saved, horses) => {
+  }, save: () => ({ law: law.snapshot(), bond, pitch, shake, roll, ...(calling > 0 ? { calling } : {}) }), load: (saved, horses) => {
     law.restore(saved.law, horses);
+    calling = saved.calling ?? 0; heldOffer = false;
     bond = saved.bond; pitch = saved.pitch; shake = saved.shake; roll = saved.roll;
     mine.clear(); if (law.bonded !== null) { mine.add(law.bonded); mounted.claim(law.bonded); }
   } };
@@ -244,6 +258,26 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     pending.set(id, { ...pending.get(id), ...press });
   } });
   const net = actRoutes(host);
+  const seatFor = (id: string): TamingSeat | undefined => { const player = host.players.get(id); return player === undefined ? undefined : sessionFor(player); };
+  net.claims.set(RIDING_ACT.offer, id => { seatFor(id)?.holdOffer(true); });
+  net.claims.set(RIDING_ACT.release, id => { seatFor(id)?.holdOffer(false); });
+  net.claims.set(RIDING_ACT.whistle, id => { seatFor(id)?.whistle(); });
+  publishOwned(host, rows.step, (id, out) => {
+    const seat = sessions.get(id); if (seat === undefined) return;
+    const { law: owner } = seat, { view, interactable } = owner;
+    const put = (key: string, value: number): void => { out.set(`${RIDING_ROW}${key}`, value); };
+    put('phase', ['wild', 'breaking', 'bonded'].indexOf(owner.phase) + 1);
+    put('trust', view.trust === null ? 0 : view.trust + 1); put('alert', view.alert); put('round', view.round ?? 0);
+    put('balance', view.balance); put('danger', Number(view.danger)); put('offer', Number(view.offer));
+    put('beaten', Number(interactable.label === rows.binding.labels.breaking)); put('radius', interactable.radius); put('upgraded', Number(owner.upgraded));
+    put('shake', seat.shake); put('roll', seat.roll);
+    for (const [key, point] of [['prompt', interactable.position], ['ear', view.ear]] as const) {
+      put(`${key}.on`, Number(point !== null));
+      if (point !== null) { put(`${key}.x`, point.x); put(`${key}.y`, point.y); put(`${key}.z`, point.z); }
+    }
+    if (owner.promptHorse !== null) put(`stallion:${owner.promptHorse.entityId}`, 1);
+    if (owner.companion !== null && owner.companion.alive) put(`companion:${owner.companion.entityId}`, Number(owner.companion.mem['whistle'] === 1));
+  });
   net.ride = (id, action) => {
     const seat = mountedPlayerOf(host, id);
     if (action === 'dismount') { seat?.dismount(); return; }
@@ -252,7 +286,7 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     pending.set(id, { ...pending.get(id), [action]: true });
   };
   net.mountable = id => { for (const player of host.players.keys()) if (mountedPlayerOf(host, player)?.mountables.some(horse => horse.entityId === id) === true) return true; return false; };
-  net.lean = (id, lean, pitch) => { if (sessions.has(id)) pending.set(id, { ...pending.get(id), lean, pitch }); };
+  net.lean = (id, lean, pitch) => { if (seatFor(id) !== undefined) pending.set(id, { ...pending.get(id), lean, pitch }); };
   installed.set(host, law); return law;
 }
 

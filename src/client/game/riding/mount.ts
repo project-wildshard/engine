@@ -216,7 +216,7 @@ export class Mount extends MountedBody {
     this.camYaw = this.player.yaw; this.camPitch = this.player.pitch;
   }
   whistle(): Animal | null {
-    if (this.horse !== null) return null;
+    if (this.horse !== null || this.wire !== null) return null;
     return this.companions.whistle(this.player.position, (a) => this.canRide(a.entityId));
   }
   panic(x: number, z: number, secs: number): boolean {
@@ -238,7 +238,7 @@ export class Mount extends MountedBody {
     if (Math.abs(angDiff(p.yaw, this.camYaw)) > 1e-4 || Math.abs(p.pitch - this.camPitch) > 1e-4) this.lookIdle = 0;
     else this.lookIdle += dt;
     const used = this.consumedCommand, frame = this.reinsFrame;
-    used.steer.keyX = frame.turn; used.steer.keyY = frame.forward;
+    used.steer.keyX = this.breaking ? Number(this.input?.held('lean.right') === true) - Number(this.input?.held('lean.left') === true) : frame.turn; used.steer.keyY = frame.forward;
     used.steer.stickX = frame.touchX; used.steer.stickY = frame.touchY;
     used.sprint = frame.gallop; used.jump = this.wire === null ? frame.jump : used.jump || frame.jump;
     if (this.wire === null) this.read(dt, this.reinsFrame);
@@ -312,6 +312,7 @@ export class Mount extends MountedBody {
   }
   private land(): void { this.landBody(this.bodyWorld); }
   update(dt: number): void {
+    if (this.wire !== null) return;
     this.companions.update(dt, this.player.position, { ridden: () => this.horse, now: () => this.ctx.app.clock.now,
       throwRider: () => { this.dismount(true); this.hurt(); },
       bolted: (m) => { this.events.push({ kind: 'bolt', horse: m.a.entityId, name: m.name }); } });

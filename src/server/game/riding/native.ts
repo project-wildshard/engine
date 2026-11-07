@@ -13,6 +13,8 @@ import { tagOf } from '@wildshard/engine/physics/surface';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 
+type MountedWorldSpeeds = ConstructorParameters<typeof MountedBody>[0];
+
 const num = v.pipe(v.number(), v.finite()), triple = v.tuple([num, num, num]);
 const handle = v.nullable(v.pipe(num, v.minValue(0)));
 const MotorState = v.strictObject({ version: v.literal(1), colliderHandle: v.pipe(num, v.minValue(0)),
@@ -30,6 +32,8 @@ const Saved = v.strictObject({ version: v.literal(1), ...SeatRows, poses: v.pipe
 export interface NativeMountedPlayer {
   readonly player: PlayerSim;
   readonly body: MountedBody; readonly rider: MountedRider;
+  /** Admitted gait speeds for authoritative companion calls. */
+  readonly speeds: MountedWorldSpeeds;
   readonly mounted: boolean; readonly horse: AnimalSim | null;
   readonly mount: (id: string, breaking?: boolean) => boolean;
   /** J108: this horse is this player's own; nobody else may ride it. */
@@ -247,7 +251,7 @@ export function installMountedPlayer(host: SimHost, profile: unknown, pondBlock?
     body.feet.set(x, heightAt(x, z), z); body.settleBody(); body.landBody(world);
     body.eyeY = body.feet.y; player.yaw = yaw - Math.PI; body.yawRate = 0;
   };
-  const seat: Seat = { player, body, rider, get horse() { return horse; }, get mounted() { return horse !== null; }, mount, dismount, phase, mountables, claim: id => { owners.set(id, player.id); },
+  const seat: Seat = { player, body, rider, speeds: rows.speeds, get horse() { return horse; }, get mounted() { return horse !== null; }, mount, dismount, phase, mountables, claim: id => { owners.set(id, player.id); },
     addMountable: id => { addMountable(id); owners.set(id, player.id); }, removeMountable: id => { removeMountable(id); owners.delete(id); },
     canRide: id => accepts(id, false), teleport,
     observe: dt => {

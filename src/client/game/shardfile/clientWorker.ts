@@ -233,6 +233,17 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     }
   };
   net.bindRide({ enter: handle => { const body = bodies.get(handle)?.body; if (body !== undefined) mount?.enter(body.entityId); }, leave: () => { mount?.leave(); } });
+  // Adoption and a restored ride can arrive before their row has made a page
+  // body. The reliable relation remains until dismount; finish seating it as
+  // soon as the manager has materialized that body.
+  const seatMount = (): void => {
+    const own = client.welcome?.handle;
+    if (mount === null || own === undefined) return;
+    const under = client.riders.get(own), body = under === undefined ? null : bodies.get(under)?.body;
+    if (body === undefined || mount.horse === body) return;
+    mount.leave();
+    if (body !== null) mount.enter(body.entityId);
+  };
   // J116: a hook tool's claw reads this player's rows, so it waits for the server to name them. A grid cell holds its own tool.
   let clawed: GrappleTool | null = null;
   const bindClaw = (): void => {
@@ -340,7 +351,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     sayPoseInputs(); syncCreatures(client, animals, bodies, retired, spawnMs, poses);
     const arrows = client.owned.get(OWNED_ROW.arrows); // plus one, so an empty quiver is a line too
     if (arrows !== undefined && arrows !== arrowsSaid) { arrowsSaid = arrows; ports.weapons.mirrorArrows(arrows - 1); }
-    bindMount(); offerMounts(); bindClaw();
+    bindMount(); offerMounts(); seatMount(); bindClaw();
     const shown = showRows(client, net, ports, bodies, renderTick, dt, row, near, rideable);
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
     report.rows = animals === null ? [...client.entities.values()].filter(info => info.cls.cls === ANIMAL_CLASS.cls).length : shown; // a data cell's life draws them

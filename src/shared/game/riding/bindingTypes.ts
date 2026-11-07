@@ -36,3 +36,8 @@ export interface TamingBindingProfile {
   fields: { upgraded: string; horseUpgraded: string; candidateUpgraded: string };
   labels: { mount: string; breaking: string; trust: string; start: string; thrown: string; bonded: readonly [string, string] };
 }
+
+/** Existing interaction acts carry held OFFER edges and a companion call without a format revision. */
+export const RIDING_ACT = { offer: 'ride.offer.start', release: 'ride.offer.stop', whistle: 'ride.whistle' } as const;
+/** Private owner lines: numeric gauges, prompt coordinates and identities encoded in line names. */
+export const RIDING_ROW = 'ride.';

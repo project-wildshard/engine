@@ -18,9 +18,10 @@ import type { InputService } from '@wildshard/engine/input/InputService';
 import type { LevelContext } from '@wildshard/engine/level/context';
 import type { Player } from '@wildshard/engine/player/Player';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
-import { TamingSession, type TamingPrograms } from '../../../shared/game/riding/taming';
-import type { TamingObservation } from '../../../shared/game/riding/bindingTypes';
+import type { TamingPrograms } from '../../../shared/game/riding/taming';
+import { RIDING_ACT, RIDING_ROW, type TamingObservation } from '../../../shared/game/riding/bindingTypes';
 import { Mount } from './mount';
+import { wirePage } from '../shardfile/wirePage';
 import { enteredMount } from '../../../shared/game/riding/entered';
 import { RidingControlsSchema, PageTamingBindingSchema, ClientRidingSessionSchema, cleanMountName, type RidingControls, type MountProfile } from '@wildshard/format/riding';
 import { playerModes } from '@wildshard/engine/player/modes';
@@ -61,56 +62,46 @@ export interface PageTamingOwner {
   update: (dt: number) => void; noteEvent: (name: string, x: number, z: number) => void; noteShot: (x: number, z: number) => void;
   startBreaking: () => void; forceBreak: () => void; setInput: (input: InputService | null) => void; drainEvents: () => PageTamingEvent[];
 }
-/** Client-only native effect adapter. Placement, persisted bond values, labels and
- * upgrade appearance are rows; the existing engine actors own their real rigs. */
-export function createPageTaming(ctx: LevelContext, player: Player, animals: RowBodiesView, mount: Mount, rows: PageTamingRows, owners: PageRidingOwners): PageTamingOwner {
+/** Follow authoritative taming observations and send input through the existing wire.
+ * The server owns trust, breaking, adoption and the saved bond. */
+export function createPageTaming(ctx: LevelContext, _player: Player, _animals: RowBodiesView, mount: Mount, rows: PageTamingRows, owners: PageRidingOwners): PageTamingOwner {
   const profile = v.parse(PageTamingBindingSchema, rows.binding);
-  const colour = v.parse(v.tuple([v.number(), v.number(), v.number()]), rows.adopted.upgrade.colour);
-  const herds = ridingHerds(owners, rows.herds), wind = owners.wind;
-  let events: PageTamingEvent[] = [];
-  const law = new TamingSession<Animal, HerdBrain<Animal>>({ profile, programs: rows.programs,
-    bond: { read: () => rows.savedBond, write: value => { events.push({ kind: 'bond', value }); } }, player,
-    mount: { get mounted() { return mount.mounted; }, get horse() { return mount.horse; },
-      get breakShake() { return mount.breakShake; }, set breakShake(value) { mount.breakShake = value; },
-      get breakRoll() { return mount.breakRoll; }, set breakRoll(value) { mount.breakRoll = value; },
-      mount: (actor, breaking) => mount.mount(actor.entityId, breaking), dismount: thrown => { mount.dismount(thrown); },
-      addMountable: (actor, name) => { mount.addMountable(actor.entityId, name); }, removeMountable: actor => { mount.removeMountable(actor.entityId); } },
-    hud: { offer: false, lean: 0 }, herds: () => herds, rest: rows.rest, wind: () => { if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Missing riding wind'); return wind; }, random: () => ctx.app.rng.stream('gameplay').next(),
-    hideStallion: actor => { actor.hidden = true; actor.mesh.visible = false; actor.position.y = -1e4; },
-    retireBonded: actor => {
-      actor.hidden = true; actor.mesh.visible = false; actor.alive = false; actor.position.y = -1e4;
-      const index = animals.animals.indexOf(actor); if (index !== -1) animals.animals.splice(index, 1); actor.mesh.removeFromParent();
-    },
-    spawnBonded: (x, z, yaw, upgraded) => {
-      const actor = animals.spawn(rows.adopted.kind, x, z, yaw, rows.adopted.variant);
-      actor.place(x, z, yaw); actor.position.y = terrainHeight(x, z); actor.mem['whistle'] = 1;
-      if (upgraded) {
-        const appearance = rows.adopted.upgrade; actor.scale = appearance.scale; actor.mesh.scale.setScalar(appearance.scale);
-        for (const material of Array.isArray(actor.mesh.material) ? actor.mesh.material : [actor.mesh.material])
-          if (material instanceof THREE.MeshLambertMaterial) material.color.setRGB(...colour);
-      }
-      return actor;
-    },
-    hurt: amount => {
-      const target = ctx.app.player; if (target === null) return;
-      ctx.app.combat.hit({ source: 'env', sourceTags: ['env.ride'], target, amount, throughWalls: true, point: player.position,
-        dir: new THREE.Vector3(), cause: { kind: 'env.ride', label: rows.thrownLabel, text: rows.thrownLabel } });
-    }, toast: text => { events.push({ kind: 'notice', text }); },
-  },ctx.scope);
-  law.input = ctx.app.input;
-  law.onBonded = actor => { events.push({ kind: 'bonded', actor: actor.entityId }); };
-  law.onBreaking = on => {
-    if (rows.breakingContext !== undefined) { if (on) ctx.app.input.push(rows.breakingContext, ctx.scope); else ctx.app.input.pop(rows.breakingContext); }
-    if (rows.stowOnBreaking === true && ctx.app.equipment !== null) ctx.app.equipment.stowed = on;
-    events.push({ kind: 'breaking', on });
+  ridingHerds(owners, rows.herds);
+  let input: InputService | null = ctx.app.input, offering = false, breaking = false;
+  const read = (key: string): number => wirePage.line(`${RIDING_ROW}${key}`);
+  const body = (key: string): Animal | null => {
+    for (const [name, value] of wirePage.client?.owned ?? []) if (value > 0 && name.startsWith(`${RIDING_ROW}${key}:`)) return wirePage.namedBody(name.slice(RIDING_ROW.length + key.length + 1));
+    return null;
   };
-  ctx.scope.onDispose(() => { law.input = null; });
-  return { get phase() { return law.phase; }, get companion() { return law.companion; }, get upgraded() { return law.upgraded; },
-    get promptHorse() { return law.promptHorse; }, view: law.view, interactable: law.interactable,
-    update: dt => { law.update(dt); }, noteEvent: (name, x, z) => { law.noteEvent(name, x, z); }, noteShot: (x, z) => { law.noteShot(x, z); },
-    startBreaking: () => { law.startBreaking(); }, forceBreak: () => { law.forceBreak(); }, setInput: input => { law.input = input; },
-    drainEvents: () => { const out = events; events = []; return out; } };
+  const ear = new THREE.Vector3(), view: TamingObservation = { trust: null, alert: 0, ear: null, round: null, balance: 0, danger: false, offer: false };
+  const start = (): void => { wirePage.client?.act({ kind: 'ride', seq: 0, action: 'mount' }); };
+  const interactable = { position: new THREE.Vector3(0, -1e4, 0), radius: 0, label: profile.labels.mount, onInteract: start };
+  return {
+    get phase() { return read('phase') === 2 ? 'breaking' : read('phase') === 3 ? 'bonded' : 'wild'; },
+    get companion() { return body('companion'); }, get promptHorse() { return body('stallion'); }, get upgraded() { return read('upgraded') === 1; },
+    view, interactable,
+    update: () => {
+      const held = input?.held('ride.offer') === true;
+      if (offering !== held && wirePage.client !== null) { offering = held; wirePage.send(held ? RIDING_ACT.offer : RIDING_ACT.release); }
+      const nextBreaking = read('phase') === 2;
+      if (nextBreaking !== breaking) {
+        breaking = nextBreaking;
+        if (rows.breakingContext !== undefined) { if (breaking) ctx.app.input.push(rows.breakingContext, ctx.scope); else ctx.app.input.pop(rows.breakingContext); }
+        if (rows.stowOnBreaking === true && ctx.app.equipment !== null) ctx.app.equipment.stowed = breaking;
+      }
+      mount.breaking = breaking; mount.breakShake = read('shake'); mount.breakRoll = read('roll');
+      view.trust = read('trust') > 0 ? read('trust') - 1 : null; view.alert = read('alert'); view.round = read('round') || null;
+      view.balance = read('balance'); view.danger = read('danger') === 1; view.offer = read('offer') === 1;
+      view.ear = read('ear.on') === 1 ? ear.set(read('ear.x'), read('ear.y'), read('ear.z')) : null;
+      interactable.radius = read('radius'); interactable.position.set(read('prompt.x'), read('prompt.y'), read('prompt.z'));
+      interactable.label = read('beaten') === 1 ? profile.labels.breaking : profile.labels.mount;
+      const companion = body('companion'); if (companion !== null) companion.mem['whistle'] = 1;
+    },
+    noteEvent: () => undefined, noteShot: () => undefined, startBreaking: start, forceBreak: start,
+    setInput: next => { input = next; }, drainEvents: () => [],
+  };
 }
+
 /** Labels, the hitch point and the admitted guest are shard data. */
 export interface RidingActionRows {
   herds: string; program: unknown; rail: { x: number; z: number }; tagRange: number; tagHeight: number;
@@ -263,7 +254,7 @@ function bindRidingControls(ctx: LevelContext, mount: Mount, taming: PageTamingO
   let mounted=mount.mounted;
   ctx.system({id:'game.riding.input',phase:'input',before:['engine.player.input'],run:()=>{
     if(mounted!==mount.mounted){mounted=mount.mounted;if(mounted)input.push(rows.mounted,ctx.scope);else{input.pop(rows.breaking);input.pop(rows.mounted);if(ctx.app.equipment!==null)ctx.app.equipment.stowed=false;}}
-    if(input.consume('ride.whistle'))mount.whistle();
+    if(input.consume('ride.whistle'))wirePage.send(RIDING_ACT.whistle);
     if(input.consume('ride.gallop'))mount.gallopTap();
     if(input.consume('ride.horseTab')&&!mount.breaking)mount.dismount();
   }});
