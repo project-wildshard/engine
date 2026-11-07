@@ -6,7 +6,7 @@ import { saveFixtureCode } from './debug-settings.mjs';
 export function resetFrameFloorDebug() {
   for (const scope of ['global', 'device', 'session']) {
     const storage = scope === 'session' ? sessionStorage : localStorage;
-    const name = `wildshard.save.v2.${scope}`;
+    const name = `wildshard.save.v2@1.${scope}`;
     /** @type {{keys?: Record<string, unknown>}} */
     const document = JSON.parse(storage.getItem(name) ?? '{"keys":{}}');
     const keys = document.keys ?? {};
@@ -28,8 +28,8 @@ export function frameFloorSettingsCode(settings) {
  * @param {boolean} developer
  * @param {Record<string, string>} deviceSaves */
 export function assertFrameFloorFixture(settings, developer, deviceSaves) {
-  const global = JSON.parse(localStorage.getItem('wildshard.save.v2.global') ?? '{}');
-  const device = JSON.parse(localStorage.getItem('wildshard.save.v2.device') ?? '{}');
+  const global = JSON.parse(localStorage.getItem('wildshard.save.v2@1.global') ?? '{}');
+  const device = JSON.parse(localStorage.getItem('wildshard.save.v2@1.device') ?? '{}');
   if (Object.entries(settings).some(([key, value]) => global.keys?.settings?.data?.[key] !== value)
     || device.keys?.devMode?.data !== developer
     || Object.entries(deviceSaves).some(([key, value]) => device.keys?.[key]?.data !== value)) {
@@ -67,8 +67,8 @@ export function traceFrameFloorFixtureWrites() {
   let lastState = '';
   const snapshot = () => {
     try {
-      const global = JSON.parse(Reflect.apply(get.value, localStorage, ['wildshard.save.v2.global']) ?? '{}');
-      const device = JSON.parse(Reflect.apply(get.value, localStorage, ['wildshard.save.v2.device']) ?? '{}');
+      const global = JSON.parse(Reflect.apply(get.value, localStorage, ['wildshard.save.v2@1.global']) ?? '{}');
+      const device = JSON.parse(Reflect.apply(get.value, localStorage, ['wildshard.save.v2@1.device']) ?? '{}');
       return { settings: global.keys?.settings !== undefined, gfx: global.keys?.gfx !== undefined,
         developer: device.keys?.devMode !== undefined };
     } catch { return { unavailable: true }; }
@@ -77,7 +77,7 @@ export function traceFrameFloorFixtureWrites() {
     const state = snapshot(); lastState = JSON.stringify(state);
     if (rows.length < 64) rows.push({ operation, key, sourcePath, at: performance.now(), state, stack: new Error('Fixture storage transition').stack?.slice(0, 1600) ?? '' });
   };
-  const named = key => key === 'wildshard.save.v2.global' || key === 'wildshard.save.v2.device';
+  const named = key => key === 'wildshard.save.v2@1.global' || key === 'wildshard.save.v2@1.device';
   const getWrapper = function getWrapper(...args) {
     const result = Reflect.apply(get.value, this, args);
     if (this === localStorage && named(args[0]) && JSON.stringify(snapshot()) !== lastState) record('getItem-transition', args[0]);

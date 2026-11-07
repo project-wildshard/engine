@@ -22,3 +22,9 @@ against old-epoch reward documents: no reward or finish is copied.
 The full push hook exposed three checkpoint fixture readers using the old
 namespace. Those proofs now seed the release epoch. The other full-run
 failures were the fixture-writer and discovery fixes already committed.
+
+The second full gate found five stale phone/Safari helper expectations.
+All remaining active script progress readers now use epoch 1 together:
+frame-floor preparation and diagnostics, phone bootstrap, memory rulers,
+loading, public grid and physics/parity diagnostics. Stable identity stays
+under its original key. Historical fixture/oracle data stays epoch zero.

@@ -143,7 +143,7 @@ try {
       if (typeof f0 === 'number' && typeof f1 === 'number') { const fps = (f1 - f0) / ((t1 - t0) / 1000); windows.push(Math.round(fps * 10) / 10); write({ kind: 'fps', fps }); console.error(`  fps ${fps.toFixed(1)}`); }
       f0 = f1; t0 = t1;
     }
-    const lowPower = await tryEval('JSON.stringify({ dpr: devicePixelRatio, quality: JSON.parse(localStorage.getItem("wildshard.save.v2.global") || "{}").keys?.settings?.data?.quality ?? null })');
+    const lowPower = await tryEval('JSON.stringify({ dpr: devicePixelRatio, quality: JSON.parse(localStorage.getItem("wildshard.save.v2@1.global") || "{}").keys?.settings?.data?.quality ?? null })');
     console.log(`fps windows (10 s): ${windows.join(' · ')}  ${lowPower ?? ''}`);
     write({ kind: 'fps-summary', windows, context: lowPower });
   }

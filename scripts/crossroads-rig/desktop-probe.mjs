@@ -87,8 +87,8 @@ async function probe(target) {
       await page.goto(`${BASE}/?chunk=${target.slug}&skipintro=1&nolock=1&mute=1&touch=1&tier=phone`, { waitUntil: 'commit', timeout: 180_000 });
       await page.waitForFunction(() => Boolean(window.__wildshard?.world) && !document.querySelector('.ws-load'), null, { timeout: 300_000, polling: 250 });
       const witness = await page.evaluate(() => ({ build: window.__wildshard?.boot?.build,
-        settings: JSON.parse(localStorage.getItem('wildshard.save.v2.global') ?? '{}').keys?.settings?.data ?? {},
-        device: Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem('wildshard.save.v2.device') ?? '{}').keys ?? {}).map(([key, value]) => [key, value.data])) }));
+        settings: JSON.parse(localStorage.getItem('wildshard.save.v2@1.global') ?? '{}').keys?.settings?.data ?? {},
+        device: Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem('wildshard.save.v2@1.device') ?? '{}').keys ?? {}).map(([key, value]) => [key, value.data])) }));
       if (witness.build !== VERSION.build || Object.entries(DEVICE_SAVES).some(([key, value]) => witness.device[key] !== value)) throw new Error('Wrong build or missing device fixture in desktop memory run');
       if (Object.entries(SETTINGS).some(([key, value]) => witness.settings[key] !== value)) throw new Error('Missing global Settings fixture in desktop memory run');
       mark('loaded');

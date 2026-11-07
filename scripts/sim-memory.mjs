@@ -242,10 +242,10 @@ async function oneRun(udid, run, opts) {
     };
     result.identity = await checkIdentity();
     if (opts.locations && !(await evaluate('Boolean(window.__wildshardHarness)'))) throw new Error('location sampling requires harness pins injected before boot');
-    result.settings = JSON.parse(await evaluate('JSON.stringify(JSON.parse(localStorage.getItem("wildshard.save.v2.global") ?? "{}").keys?.settings?.data ?? {})'));
+    result.settings = JSON.parse(await evaluate('JSON.stringify(JSON.parse(localStorage.getItem("wildshard.save.v2@1.global") ?? "{}").keys?.settings?.data ?? {})'));
     result.texturePolicy = JSON.parse(await evaluate('JSON.stringify(window.__ws_prefetch?.state.tex ?? null)'));
     if (Object.entries(settings).some(([key, value]) => result.settings[key] !== value)) throw new Error('Debug settings fixture did not survive the cold load');
-    result.deviceSaves = JSON.parse(await evaluate('JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem("wildshard.save.v2.device") ?? "{}").keys ?? {}).map(([key, value]) => [key, value.data])))'));
+    result.deviceSaves = JSON.parse(await evaluate('JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem("wildshard.save.v2@1.device") ?? "{}").keys ?? {}).map(([key, value]) => [key, value.data])))'));
     if (Object.entries(deviceSaves).some(([key, value]) => result.deviceSaves[key] !== value)) throw new Error('Device Debug fixture did not survive the cold load');
     say(`verified runtime ${result.identity.build}/${result.identity.shard}`);
     await settle();

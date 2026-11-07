@@ -116,7 +116,7 @@ export async function capture(browser,url,opts) {
     if((opts.settings?.time??'midday')!=='live'&&clockWitness.clock&&!clockWitness.clock.paused)throw new Error('Parity requested frozen time but the live clock is running');
     writeFileSync(join(opts.out,`${opts.shard}.${opts.tier}.settings.json`),JSON.stringify({requested:{time:'midday',weather:'clear',...opts.settings},...clockWitness},null,2));
     if(opts.settings){
-      const saved=object(await page.evaluate(()=>JSON.parse(localStorage.getItem('wildshard.save.v2.global')??'{}')));
+      const saved=object(await page.evaluate(()=>JSON.parse(localStorage.getItem('wildshard.save.v2@1.global')??'{}')));
       const observed=object(get(saved,'keys.settings.data'));
       if(Object.entries(opts.settings).some(([key,value])=>observed[key]!==value))throw new Error('Debug setting fixture did not survive boot');
       result.debugSettings=Object.fromEntries(Object.keys(opts.settings).map((key)=>[key,observed[key]]));

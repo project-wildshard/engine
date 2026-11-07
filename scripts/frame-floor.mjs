@@ -280,8 +280,8 @@ function status() {
 }
 function metadata() {
   const w = window.__wildshard.world, g = w.game, gl = g.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
-  const saved = JSON.parse(localStorage.getItem('wildshard.save.v2.global') ?? '{}');
-  const deviceSaved = JSON.parse(localStorage.getItem('wildshard.save.v2.device') ?? '{}');
+  const saved = JSON.parse(localStorage.getItem('wildshard.save.v2@1.global') ?? '{}');
+  const deviceSaved = JSON.parse(localStorage.getItem('wildshard.save.v2@1.device') ?? '{}');
   return { renderer: ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER)),
     entrySettle: performance.getEntriesByName('wildshard.entry.programs-settled')[0]?.detail ?? null, entryControls: performance.getEntriesByName('wildshard.grid.entry-policy')[0]?.startTime ?? null,
     viewport: [innerWidth, innerHeight], devicePixelRatio, renderScale: g.renderer.getPixelRatio(), canvas: [g.canvas.width, g.canvas.height], developer: Object.hasOwn(document.documentElement.dataset,'dev'),
@@ -796,7 +796,7 @@ async function measureShard(driver, shard, deadline) {
   } catch (error) {
     console.error(`${surface} ${shard}: ${errorText(error)}`);
     let diagnosticError;
-    const diagnostic = await driver.evaluate(`(() => { const app = window.__wildshard?.world?.game?.app; const saved = JSON.parse(localStorage.getItem('wildshard.save.v2.device') ?? '{}'); return { documentOrigin: performance.timeOrigin, lastEnd: saved.keys?.['life.lastEnd']?.data, lastUnload: saved.keys?.['life.lastUnload']?.data, url: location.href, readyState: document.readyState, state: app?.state, modal: document.querySelector('#wserr .msg')?.textContent, stack: document.querySelector('#wserr pre')?.textContent, loading: document.querySelector('.ws-load')?.textContent?.slice(-3000), bootTrace: saved.keys?.['boot.trace']?.data, systems: app ? Object.values(app.systemsByPhase()).flat().map(system => system.id) : [], console: window.__frameFloorConsole ?? [], resources: performance.getEntriesByType('resource').slice(-20).map(row => ({ name: row.name, duration: row.duration })) }; })()`).catch(diagnosticFailure => { diagnosticError = errorText(diagnosticFailure); return null; });
+    const diagnostic = await driver.evaluate(`(() => { const app = window.__wildshard?.world?.game?.app; const saved = JSON.parse(localStorage.getItem('wildshard.save.v2@1.device') ?? '{}'); return { documentOrigin: performance.timeOrigin, lastEnd: saved.keys?.['life.lastEnd']?.data, lastUnload: saved.keys?.['life.lastUnload']?.data, url: location.href, readyState: document.readyState, state: app?.state, modal: document.querySelector('#wserr .msg')?.textContent, stack: document.querySelector('#wserr pre')?.textContent, loading: document.querySelector('.ws-load')?.textContent?.slice(-3000), bootTrace: saved.keys?.['boot.trace']?.data, systems: app ? Object.values(app.systemsByPhase()).flat().map(system => system.id) : [], console: window.__frameFloorConsole ?? [], resources: performance.getEntriesByType('resource').slice(-20).map(row => ({ name: row.name, duration: row.duration })) }; })()`).catch(diagnosticFailure => { diagnosticError = errorText(diagnosticFailure); return null; });
     const lastRoute = driver.progress(), runtimeFailure = gridFloorRuntimeFailure(lastRoute, diagnostic ?? { documentOrigin: error?.documentOrigin });
     measurement = { shard, complete: runtimeFailure !== null, pass: false, seconds: (Date.now() - start) / 1000, error: errorText(error),
       ...(error?.entryReadFailures === undefined ? {} : { entryReadFailures: error.entryReadFailures }), ...(diagnosticError === undefined ? {} : { diagnosticError }),

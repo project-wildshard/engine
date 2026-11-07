@@ -152,7 +152,7 @@ async function seedVariantFixtures(target) {
 async function activationWitness(page, shard) {
   const witness = await page.evaluate(() => ({
     systems: Object.values(window.__wildshard.world.game.app.systemsByPhase()).flat().map((system) => system.id),
-    deviceSaves: Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem('wildshard.save.v2.device') ?? '{}').keys ?? {}).map(([key, value]) => [key, value.data])),
+    deviceSaves: Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem('wildshard.save.v2@1.device') ?? '{}').keys ?? {}).map(([key, value]) => [key, value.data])),
   }));
   for (const [key, value] of Object.entries(DEVICE_SAVES)) if (witness.deviceSaves[key] !== value) throw new Error(`Device fixture missing: ${key}`);
   for (const expected of EXPECTED_SYSTEMS.filter((row) => row.shard === shard)) if (witness.systems.includes(expected.id) !== expected.present) throw new Error(`Activation witness failed: ${expected.id} expected ${expected.present ? 'on' : 'off'}`);

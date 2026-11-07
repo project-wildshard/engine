@@ -133,7 +133,7 @@ if (mode === 'cold') {
   }
 }
 // mute with the game's own volume setting (no URL switch on the player's path)
-await page.evaluate(`(() => { const n='wildshard.save.v2.global'; const d=JSON.parse(localStorage.getItem(n)||'{"keys":{}}'); d.keys ??= {}; const s=d.keys.settings?.data ?? {}; d.keys.settings={v:1,data:{...s,volume:0}}; localStorage.setItem(n, JSON.stringify(d)); return true; })()`);
+await page.evaluate(`(() => { const n='wildshard.save.v2@1.global'; const d=JSON.parse(localStorage.getItem(n)||'{"keys":{}}'); d.keys ??= {}; const s=d.keys.settings?.data ?? {}; d.keys.settings={v:1,data:{...s,volume:0}}; localStorage.setItem(n, JSON.stringify(d)); return true; })()`);
 await page.evaluate(levelDownloadFixtures(LEVEL_DOWNLOAD).map(saveFixtureCode).join(';'));
 for (const [key, data] of Object.entries(DEVICE_SAVES)) await page.evaluate(saveFixtureCode({ scope: 'device', key, data }));
 page.close(); page = null;

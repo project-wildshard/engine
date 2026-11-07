@@ -48,7 +48,7 @@ export async function measureCleanHeap(base,shard) {
     const idle=await cdp.send('HeapProfiler.stopSampling'),seconds=(performance.now()-start)/1000;
     const ended=new Promise(resolve=>{cdp.once('Tracing.tracingComplete',resolve);});
     await cdp.send('Tracing.end');await ended;cdp.off('Tracing.dataCollected',receive);
-    const clean=v.parse(v.object({pins:v.boolean(),developer:v.boolean(),href:v.string()}),await page.evaluate(`({pins:window.__wildshardHarness!==undefined,developer:JSON.parse(localStorage.getItem('wildshard.save.v2.device')??'{"keys":{}}').keys?.devMode?.data===true,href:location.href})`));
+    const clean=v.parse(v.object({pins:v.boolean(),developer:v.boolean(),href:v.string()}),await page.evaluate(`({pins:window.__wildshardHarness!==undefined,developer:JSON.parse(localStorage.getItem('wildshard.save.v2@1.device')??'{"keys":{}}').keys?.devMode?.data===true,href:location.href})`));
     if(clean.pins||clean.developer||new URL(clean.href).searchParams.get('chunk')!==shard)throw new Error('Heap clean-path admission failed');
     if(errors.length>0)throw new Error(errors.join('\n'));
     if(await version()!==build)throw new Error('Heap reading source changed during measurement');

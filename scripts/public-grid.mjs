@@ -29,8 +29,8 @@ export function publicGridPlans(state) {
 /** Serialized read-only witness: effective mode, catalogue, runtime residents and the platform's own refusal receipt. */
 export function readPublicGridWitness() {
   const grid = window.__wildshard.shard.grid;
-  const device = JSON.parse(localStorage.getItem('wildshard.save.v2.device') ?? '{}');
-  const session = JSON.parse(sessionStorage.getItem('wildshard.save.v2.session') ?? '{}');
+  const device = JSON.parse(localStorage.getItem('wildshard.save.v2@1.device') ?? '{}');
+  const session = JSON.parse(sessionStorage.getItem('wildshard.save.v2@1.session') ?? '{}');
   const state = grid.state();
   return {developer:Object.hasOwn(document.documentElement.dataset,'dev'),savedDeveloper:device.keys?.devMode?.data,
     state,refusals:session.keys?.shardRefusals?.data ?? {},homeResidency:grid.residency().home,

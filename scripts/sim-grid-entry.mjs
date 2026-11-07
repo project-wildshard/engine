@@ -165,7 +165,7 @@ const READ = `JSON.stringify({ origin: performance.timeOrigin, documentToken: wi
   world: (()=>{const w=window.__wildshard?.world;return w?{entered:w.hud?.entered??null,paused:w.hud?.paused??null,frameGate:w.game.frameGate()}:null;})(),
   loaderVisible: [...document.querySelectorAll('.ws-load,.ws-resume.show')].some(panel=>getComputedStyle(panel).display!=='none'&&Number(getComputedStyle(panel).opacity)>.05),
   bootEntry: performance.getEntriesByName('wildshard.grid.entry-policy', 'mark').at(-1)?.detail ?? null,
-  recovery: (()=>{try{const d=JSON.parse(localStorage.getItem('wildshard.save.v2.device')||'{}').keys??{},s=JSON.parse(sessionStorage.getItem('wildshard.save.v2.session')||'{}').keys??{};return {end:d['life.lastEnd'],arrival:s.titleArrival,backup:d['titleArrival.once'],travel:s['travel.handoff'],grid:s['grid.recovery.once'],gridBackup:d['grid.recovery.once'],guard:d['grid.recovery.guard']};}catch(error){return {error:String(error)};}})(),
+  recovery: (()=>{try{const d=JSON.parse(localStorage.getItem('wildshard.save.v2@1.device')||'{}').keys??{},s=JSON.parse(sessionStorage.getItem('wildshard.save.v2@1.session')||'{}').keys??{};return {end:d['life.lastEnd'],arrival:s.titleArrival,backup:d['titleArrival.once'],travel:s['travel.handoff'],grid:s['grid.recovery.once'],gridBackup:d['grid.recovery.once'],guard:d['grid.recovery.guard']};}catch(error){return {error:String(error)};}})(),
   worker: {controller: navigator.serviceWorker?.controller?.state ?? null, waiting: window.__ws_sw?.waiting?.state ?? null} })`;
 
 /** Raw 48 x 88 RGB frames of the video between two times (seconds), 30 fps. */
@@ -286,7 +286,7 @@ async function run(mode, index, target) {
     return { regs: regs.length, caches: keys.length, markers, http, usage: (await navigator.storage.estimate()).usage };
   }`) });
   else log(file, { ev: 'warm-keys', r: await settle(`async () => ({ caches: (await caches.keys()).length, usage: (await navigator.storage.estimate()).usage, sw: (await navigator.serviceWorker.getRegistrations()).length })`) });
-  log(file, { ev: 'volume', r: await page.evaluate(`JSON.parse(localStorage.getItem('wildshard.save.v2.global') || '{}').keys?.settings?.data?.volume ?? null`) });
+  log(file, { ev: 'volume', r: await page.evaluate(`JSON.parse(localStorage.getItem('wildshard.save.v2@1.global') || '{}').keys?.settings?.data?.volume ?? null`) });
   const recorder = spawn('xcrun', ['simctl', 'io', udid, 'recordVideo', '--codec=h264', '--force', video], { stdio: ['ignore', 'pipe', 'pipe'] });
   const recordingAt = await new Promise(resolve => {
     const on = data => { if (/Recording started/iu.test(String(data))) resolve(Date.now()); };
@@ -345,7 +345,7 @@ async function run(mode, index, target) {
       if (typeof candidate !== 'string' || !candidate.startsWith(`${nextVersion.build}-`)) throw new Error(`New deployment worker is not waiting before the grid tap: ${String(candidate).slice(0, 200)}`);
       log(file, {ev: 'upgrade-waiting', build: candidate});
     }
-    timingBefore = shard === undefined ? null : JSON.parse(await page.evaluate(`JSON.stringify((${compiledTimingHistory.toString()})(() => localStorage.getItem('wildshard.save.v2.device'), ${JSON.stringify(shard)}))`));
+    timingBefore = shard === undefined ? null : JSON.parse(await page.evaluate(`JSON.stringify((${compiledTimingHistory.toString()})(() => localStorage.getItem('wildshard.save.v2@1.device'), ${JSON.stringify(shard)}))`));
     await gesture(`(() => { sessionStorage.setItem('sim.tap', String(performance.timeOrigin + performance.now())); setTimeout(() => document.querySelector('${button}').click(), 0); return true; })()`);
     const tapAt = Date.now(); log(file, { ev: 'tap', at: tapAt });
     await sleep(300);
@@ -418,7 +418,7 @@ async function run(mode, index, target) {
       try { return new URL(name).origin === new URL(compiled.href).origin; } catch { return false; }
     }))];
     const cachedBodies = await settle(`async () => (${cachedBodyEvidence.toString()})(${JSON.stringify(observedUrls)}, ${JSON.stringify(`/shardfiles/${shard}/shard.json`)})`, 10000);
-    const timingAfter = JSON.parse(await page.evaluate(`JSON.stringify((${compiledTimingHistory.toString()})(() => localStorage.getItem('wildshard.save.v2.device'), ${JSON.stringify(shard)}))`));
+    const timingAfter = JSON.parse(await page.evaluate(`JSON.stringify((${compiledTimingHistory.toString()})(() => localStorage.getItem('wildshard.save.v2@1.device'), ${JSON.stringify(shard)}))`));
     const receipts = transport.receipts.filter(row => row.endedAt >= compiled.origin && row.endedAt <= compiled.origin + compiled.accuracy.readyAt);
     const result = { mode, run: index, shard, href: compiled.href, document, timingHistory: {before: timingBefore, after: timingAfter}, accuracy: compiled.accuracy, measures: compiled.measures,
       download: downloadEvidence(compiled.accuracy.samples), steps: stepEvidence(compiled.accuracy.samples), stepBoundaries: stepBoundaryEvidence(compiled.accuracy.final), admissionFrames: admissionFrameEvidence(compiled.accuracy.admissionFrames), transportUnits: transportEvidence(receipts), cachedBodies, transportReceipts: receipts, htmlFixtures: transport.htmlFixtures,

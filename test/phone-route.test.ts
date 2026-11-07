@@ -145,8 +145,8 @@ test('a pre-world failure preserves loading rows and native timings without muta
 test('phone bootstrap persists numeric mute after a caller replaces settings',()=>{
   const stored=new Map<string,string>();
   const localStorage={getItem:(key:string)=>stored.get(key)??null,setItem:(key:string,value:string)=>{stored.set(key,value);}};
-  runInNewContext(phoneBootstrap('localStorage.setItem("wildshard.save.v2.global",JSON.stringify({keys:{settings:{v:1,data:{tier:"phone",volume:0.8}}}}));'),{window:{},location:{href:'http://localhost/'},localStorage,crypto:{randomUUID:()=> 'new-document'}});
-  const saved:unknown=JSON.parse(stored.get('wildshard.save.v2.global')??'null');
+  runInNewContext(phoneBootstrap('localStorage.setItem("wildshard.save.v2@1.global",JSON.stringify({keys:{settings:{v:1,data:{tier:"phone",volume:0.8}}}}));'),{window:{},location:{href:'http://localhost/'},localStorage,crypto:{randomUUID:()=> 'new-document'}});
+  const saved:unknown=JSON.parse(stored.get('wildshard.save.v2@1.global')??'null');
   expect(saved).toMatchObject({keys:{settings:{data:{tier:'phone',volume:0}}}});
 });
 

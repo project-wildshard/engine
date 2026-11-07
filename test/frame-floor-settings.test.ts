@@ -28,19 +28,19 @@ function storage(): Pick<Storage, 'getItem' | 'setItem'> {
   return { getItem: key => data.get(key) ?? null, setItem: (key, value) => { data.set(key, value); } };
 }
 function read(saved: Pick<Storage, 'getItem'>, scope: string): unknown {
-  return JSON.parse(saved.getItem(`wildshard.save.v2.${scope}`) ?? '{}') as unknown;
+  return JSON.parse(saved.getItem(`wildshard.save.v2@1.${scope}`) ?? '{}') as unknown;
 }
 
 test('isolates successive Safari picks and clears omitted core and shard Debug rows', () => {
   const localStorage = storage(), sessionStorage = storage();
-  localStorage.setItem('wildshard.save.v2.global', JSON.stringify({ reset: 2, keys: {
+  localStorage.setItem('wildshard.save.v2@1.global', JSON.stringify({ reset: 2, keys: {
     settings: { v: 1, data: { graphMaterials: 'on', weather: 'rain' } }, hints: { v: 1, data: ['keep'] },
   } }));
-  localStorage.setItem('wildshard.save.v2.device', JSON.stringify({ keys: {
+  localStorage.setItem('wildshard.save.v2@1.device', JSON.stringify({ keys: {
     'debug.gridBootPrograms': { v: 1, data: 'pine-hollow' },
     'debug.plugin.pine-hollow.ring': { v: 1, data: 'on' }, devMode: { v: 1, data: true },
   } }));
-  sessionStorage.setItem('wildshard.save.v2.session', JSON.stringify({ keys: {
+  sessionStorage.setItem('wildshard.save.v2@1.session', JSON.stringify({ keys: {
     'debug.future': { v: 1, data: 'on' }, continuation: { v: 1, data: { score: 42 } },
   } }));
   const context = { localStorage, sessionStorage };
@@ -122,15 +122,15 @@ test('fixture provenance identifies deletion, bounds records and restores native
   const localStorage = new MemoryStorage(), nativeSet = Object.getOwnPropertyDescriptor(MemoryStorage.prototype, 'setItem')?.value;
   const window = new EventTarget(), context = { Storage: MemoryStorage, localStorage, window, URL, performance: { now: () => 7 } };
   runInNewContext(`(${traceFrameFloorFixtureWrites.toString()})()`, context);
-  localStorage.setItem('wildshard.save.v2.global', JSON.stringify({ keys: { settings: { v: 1, data: { tier: 'phone' } } } }));
+  localStorage.setItem('wildshard.save.v2@1.global', JSON.stringify({ keys: { settings: { v: 1, data: { tier: 'phone' } } } }));
   localStorage.setItem('player.secret', 'never retained');
-  localStorage.removeItem('wildshard.save.v2.global');
-  localStorage.setItem('wildshard.save.v2.global', '{"keys":{"settings":{"v":1,"data":{}}}}');
-  localStorage.externalRemove('wildshard.save.v2.global');
-  expect(localStorage.getItem('wildshard.save.v2.global')).toBeNull();
+  localStorage.removeItem('wildshard.save.v2@1.global');
+  localStorage.setItem('wildshard.save.v2@1.global', '{"keys":{"settings":{"v":1,"data":{}}}}');
+  localStorage.externalRemove('wildshard.save.v2@1.global');
+  expect(localStorage.getItem('wildshard.save.v2@1.global')).toBeNull();
   window.dispatchEvent(Object.assign(new Event('storage'), { storageArea: localStorage,
-    key: 'wildshard.save.v2.global', url: 'http://localhost/other.html?private=never-retained' }));
-  for (let i = 0; i < 80; i++) localStorage.setItem('wildshard.save.v2.device', '{"keys":{}}');
+    key: 'wildshard.save.v2@1.global', url: 'http://localhost/other.html?private=never-retained' }));
+  for (let i = 0; i < 80; i++) localStorage.setItem('wildshard.save.v2@1.device', '{"keys":{}}');
   const result: unknown = runInNewContext('window.__frameFloorFixtureWrites.finish()', context);
   expect(result).toMatchObject({ final: { settings: false }, restored: true });
   expect(runInNewContext('window.__frameFloorFixtureWrites.finish().rows', context)).toEqual(expect.arrayContaining([
