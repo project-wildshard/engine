@@ -11,3 +11,7 @@ Legacy fixture tests explicitly retain epoch zero. Snapshot format stays 3.
 
 The previously unhomed wire shop test now runs against engine's pinned
 Driftwood product instead of importing shard author source.
+
+Browser fixture writers now seed epoch 1 alongside the updated readers.
+The standalone real-IDB proof has an explicit .proof.mjs name, keeping its
+node:test runner out of Vitest discovery and all commit/push test hooks.

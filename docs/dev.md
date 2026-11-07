@@ -20,8 +20,6 @@ Run from the repo root.
 - `pnpm md:wrap`: rewraps Markdown prose to ~72 columns.
 - `src/scripts/ask-new.sh "<Jake's words>"`: opens an ask (`docs/tasks/asks/README.md`).
 
-## Layout
-
 ## Progress epochs
 
 `AppIdentity.saveEpoch` isolates a progress generation. `savePrefix` must be
@@ -34,7 +32,9 @@ match the active epoch before any write or server stop. Keep the root
 and publishes it in `version.json`. Snapshot format versions are separate.
 
 Run the real storage boundary proof explicitly:
-`scripts/browser-lane.sh node --test test/save-epoch-browser.test.mjs`.
+`scripts/browser-lane.sh node --test test/save-epoch-browser.proof.mjs`.
+
+## Layout
 
 The root stays thin: README.md and AGENTS.md (humans only), CLAUDE.md
 (`@AGENTS.md`), package.json, pnpm-lock.yaml, .npmrc, .gitignore,
