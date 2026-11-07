@@ -19,8 +19,6 @@ const starter = (id, script, input, output, source) => ({
   generate: async root => ({ [output]: (await import(pathToFileURL(`${root}/${script}`).href))[source]() }),
 });
 
-const MANIFEST_INPUTS = ['src/**/*.ts', 'src/**/*.tsx', 'src/**/*.mjs', 'src/**/*.js', 'src/**/package.json', 'src/shards/*/manifest.json', 'src/shards/*/outputs.json', 'src/shards/*/{data,boot}/*.json', 'tsconfig*.json', 'scripts/gen-shards.mjs', 'scripts/shard-outputs.mjs', 'scripts/authored-manifest.mjs', 'scripts/generated-source.mjs', 'lint/generated-source-debt.json', 'lint/generated-import-debt.json', 'scripts/manifest-static-imports.mjs', 'scripts/manifest-art-inputs.json'];
-
 /** @type {readonly SourceGenerator[]} */
 export const SOURCE_GENERATORS = [
   {
@@ -32,48 +30,8 @@ export const SOURCE_GENERATORS = [
   starter('starter-weapons', 'scripts/gen-starter-weapons.mjs', 'src/shared/game/weapons/starterBow.json', 'src/shared/game/weapons/starter.generated.ts', 'starterWeaponsTableSource'),
   starter('starter-bag', 'scripts/gen-starter-bag.mjs', 'src/shared/game/bag/starterItems.json', 'src/shared/game/bag/starter.generated.ts', 'starterBagTableSource'),
   starter('starter-effects', 'scripts/gen-starter-effects.mjs', 'src/shared/game/systems/effects/starterRows.json', 'src/client/game/systems/effects/starter.generated.ts', 'starterEffectsTableSource'),
-  {
-    id: 'shard-list',
-    outputs: ['src/client/app/shards.generated.ts'],
-    inputs: ['src/shards/*/manifest.ts', 'src/shards/*/manifest.json', 'src/shards/*/outputs.json', 'src/shared/game/grid/singleplayer.json', 'scripts/gen-shards.mjs', 'scripts/shard-outputs.mjs', 'scripts/authored-manifest.mjs', 'scripts/generated-source.mjs', 'lint/generated-source-debt.json', 'lint/generated-import-debt.json'],
-    committed: true,
-    note: 'literal composition imports derive from authored declarations; no discovery contents or products are read',
-    generate: async root => ({ 'src/client/app/shards.generated.ts': (await import(pathToFileURL(`${root}/scripts/gen-shards.mjs`).href)).shardSource(root) }),
-  },
-  {
-    id: 'manifest-closure',
-    outputs: ['src/server/game/shard/manifest-closure.generated.json'],
-    inputs: MANIFEST_INPUTS,
-    committed: true,
-    note: 'walks authored runtime edges and declared program-art inputs without any discovery output or product',
-    generate: async root => ({ 'src/server/game/shard/manifest-closure.generated.json': `${JSON.stringify((await import(pathToFileURL(`${root}/scripts/gen-shards.mjs`).href)).manifestClosure(root), null, 2)}\n` }),
-  },
-  {
-    id: 'boot-audio',
-    outputs: ['src/client/game/boot/audio.generated.ts'],
-    inputs: ['public/assets/music/*/music.json', 'public/assets/sfx/*/sfx.json', 'scripts/app-build/gen.ts'],
-    committed: true,
-    generate: async root => ({ 'src/client/game/boot/audio.generated.ts': (await import(pathToFileURL(`${root}/scripts/app-build/gen.ts`).href)).audioTableSource(root) }),
-  },
-  {
-    id: 'boot-tables',
-    outputs: ['src/client/game/boot/bytes.generated.ts', 'src/client/game/boot/versions.generated.ts'],
-    inputs: ['scripts/boot-publication.generated.json', 'scripts/boot-publication.mjs'],
-    committed: true,
-    note: 'plain tables of the successful artifact publisher\'s committed byte and content-version facts',
-    generate: async root => {
-      const sources = (await import(pathToFileURL(`${root}/scripts/boot-publication.mjs`).href)).bootPublicationTableSources(root);
-      return { 'src/client/game/boot/bytes.generated.ts': sources['src/client/game/boot/bytes.generated.ts'], 'src/client/game/boot/versions.generated.ts': sources['src/client/game/boot/versions.generated.ts'] };
-    },
-  },
-  {
-    id: 'packs',
-    outputs: ['src/client/game/boot/packs.generated.ts'],
-    inputs: ['scripts/boot-publication.generated.json', 'scripts/boot-publication.mjs'],
-    committed: true,
-    note: 'plain source formatting of the complete published part inventory; no pack/blob/native work during source generation',
-    generate: async root => ({ 'src/client/game/boot/packs.generated.ts': (await import(pathToFileURL(`${root}/scripts/boot-publication.mjs`).href)).bootPublicationTableSources(root)['src/client/game/boot/packs.generated.ts'] }),
-  },
+  // Shard composition and runtime closure belong to sharddev's product build.
+  // Pin installation and gen:inputs own boot audio and transport tables.
   {
     id: 'ktx2',
     outputs: ['src/client/engine/boot/ktx2.generated.ts'],

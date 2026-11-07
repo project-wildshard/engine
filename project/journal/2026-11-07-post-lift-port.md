@@ -71,3 +71,19 @@ remove the detached view and alternate pre-commit dispatcher. Verify
 unchanged hook files, named stages and working inputs under the lock.
 The candidate-generation regression and both boundary checks now pass
 together: three tests in 1.65 seconds. No hook is disabled or skipped.
+
+Source main advanced with cross-browser reward transfer during the
+first gate. Include that port too. Type its real Settings download and
+upload proof; let the caller select an external scratch root and remove
+only the proof's own generated download directory afterward. Its 27
+focused save/reward/page tests, full typecheck and full lint pass.
+
+The restored generator found stale lift entries: shard composition and
+closure call gen-shards, which belongs to sharddev and is absent here.
+Boot audio and transport tables come from pins and gen:inputs, not the
+old publication source rows. Keep engine's source-only producers in the
+registry. All eight remaining source tables match HEAD byte for byte.
+
+Port 23a5c1072e (fix(saves): carry rewards across browsers) in source
+order. Keep the behavior and repoint the retained files and imports to
+engine's lifted layout.
