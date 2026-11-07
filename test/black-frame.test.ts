@@ -53,7 +53,7 @@ test('a black boot frame fails with its checkpoint and retained observation', as
   expect(frames).toEqual([{label:'SHARD SELECT',width:780,height:1688,pixels:100,darkShare:.95}]);
   expect(capture).toHaveBeenCalledOnce();
   expect(capture.mock.calls[0]?.[0]).toBe(page);
-  expect(capture.mock.calls[0]?.slice(1)).toEqual(['SHARD SELECT',11000]);
+  expect(capture.mock.calls[0]?.slice(1)).toEqual(['SHARD SELECT',31000]);
   expect(screenshot).not.toHaveBeenCalled();
   expect(evaluate).toHaveBeenCalledExactlyOnceWith(screenshotPixels,[1,2,3]);
 });

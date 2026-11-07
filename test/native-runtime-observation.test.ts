@@ -9,7 +9,9 @@ import { productHeadlessSections } from '../src/shared/host/headlessSections';
 import { HeadlessSimulation } from '../src/server/host/headless';
 import { OBSERVATION_TICKS } from '../src/shared/host/headlessObservation';
 
-it.each(['far-reach', 'sunscar-dunes'])('%s offline observation retains all ticks and the complete restored continuation', async slug => {
+// CI completed all 240 reference checkpoints plus restore/suffix in 31.6 s.
+// This is an outer proof budget, independent of the runtime tick watchdog.
+it.for(['far-reach', 'sunscar-dunes'])('%s offline observation retains all ticks and the complete restored continuation', {timeout: 60_000}, async (slug, {signal, onTestFinished}) => {
   const started = performance.now();
   const stage = (name: string): void => { console.info('native-observation-stage', JSON.stringify({ slug, name, milliseconds: performance.now() - started })); };
   const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile;
@@ -18,10 +20,17 @@ it.each(['far-reach', 'sunscar-dunes'])('%s offline observation retains all tick
   const assets = new Map(await Promise.all(descriptor.index.files.map(async file =>
     [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(await readFile(`${directory}/${file.path}`))] as const)));
   const options = { deadline: 'advisory' as const, sections: productHeadlessSections(product) };
+  const owned = new Set<HeadlessSimulation>();
+  onTestFinished(async () => { await Promise.all([...owned].map(sim => sim.dispose())); });
+  const create = async (snapshot?: string): Promise<HeadlessSimulation> => {
+    const sim = await HeadlessSimulation.create(shard, assets, snapshot, options);
+    if (signal.aborted) { await sim.dispose(); signal.throwIfAborted(); }
+    owned.add(sim); return sim;
+  };
   stage('product-ready');
-  const observed = await HeadlessSimulation.create(shard, assets, undefined, options);
+  const observed = await create();
   stage('observed-ready');
-  const control = await HeadlessSimulation.create(shard, assets, undefined, options);
+  const control = await create();
   stage('control-ready');
   try {
     const initial = observed.checkpoint;
@@ -39,7 +48,7 @@ it.each(['far-reach', 'sunscar-dunes'])('%s offline observation retains all tick
     }
     expect(report.commit).toEqual(last);
     expect(observed.checkpoint).toEqual(last);
-    const restored = await HeadlessSimulation.create(shard, assets, report.commit.snapshot, options);
+    const restored = await create(report.commit.snapshot);
     stage('restored-ready');
     try {
       for (let tick = 0; tick < 10; tick++) expect(await restored.step()).toEqual(await control.step());

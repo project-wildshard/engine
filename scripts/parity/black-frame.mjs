@@ -40,7 +40,10 @@ export async function captureBootFrame(page, label, deadline, frames, capture = 
   const started = performance.now();
   console.log(`boot-capture ${JSON.stringify({ label, stage: 'screenshot-roundtrip', state: 'start', ms: 0 })}`);
   let state = 'refused';
-  const captureDeadline = Math.min(deadline, Date.now() + 10000);
+  // Software-composited phone captures on CI spent >10 s reaching a frame,
+  // then 7.4 s in native PNG capture. Keep one bounded attempt within the
+  // existing boot deadline; this is tooling time, never a gameplay allowance.
+  const captureDeadline = Math.min(deadline, Date.now() + 30000);
   const bytes = await (async () => { try {
     const captured = await capture(page, label, captureDeadline);
     state = 'complete'; return captured;

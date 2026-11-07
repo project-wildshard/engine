@@ -1,4 +1,5 @@
-import {test, expect} from 'vitest';
+import {beforeAll, test, expect} from 'vitest';
+import {nativeChromeExecutable, warmNativeChrome} from '../../../scripts/warm-native-chrome.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The original trusted-input assertion must execute in a real, leased browser and isolated child.
 import {execFileSync, spawnSync, spawn} from 'node:child_process';
 
@@ -14,6 +15,11 @@ import {createServer} from 'node:net';
 import {once} from 'node:events';
 import {nativeSocketTemporary} from '../../fixtures/native-socket-temp.mjs';
 import {drainNativeBrowser} from '../../fixtures/native-browser-drain.mjs';
+
+// Singleplayer prepared these exact executable/resource pages before its
+// isolated Escape job. The lift kept the helper but lost that workflow step.
+// Keep cold file I/O outside the original 10 s endpoint / 25 s child clocks.
+beforeAll(async () => { await warmNativeChrome(nativeChromeExecutable()); });
 
 /** @param {number | undefined} pid */
 function stopFixturePid(pid) {
