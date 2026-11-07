@@ -23,3 +23,7 @@ engine's lifted layout.
 Port 40e08ff28d (fix: isolate Pine rewards by player) in source order.
 Keep the behavior and repoint the retained files and imports to engine's
 lifted layout.
+
+Port e554c9de59 (fix: persist rewards by device identity) in source
+order. Keep the behavior and repoint the retained files and imports to
+engine's lifted layout.

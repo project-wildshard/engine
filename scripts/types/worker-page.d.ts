@@ -28,3 +28,10 @@ export type WorkerWindow = typeof window & {
   __workerClientBot: (id: string, x: number, y: number, z: number) => { press: (id: string) => void; end: () => void };
   __workerClientSave: () => Promise<void>;
 };
+
+export interface WorkerSaveDocument {
+  keys: {
+    'creature-rewards'?: { data: { players: Record<string, import('../../src/shared/game/saves').CreatureRewardState> } };
+    continuation?: { data: { tick: number } };
+  };
+}

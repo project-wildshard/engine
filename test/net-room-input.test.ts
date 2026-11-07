@@ -16,7 +16,7 @@ const roundTrip = (input: NetCommand): NetCommand | undefined => {
   const bytes = encodeCommands(new BitWriter(), { ackFrame: 0, commands: [input] }, id => ids.indexOf(id));
   return decodeCommands(new Uint8Array(bytes), handle => ids[handle])?.commands[0];
 };
-const routes = (extra: Partial<ActRoutes>): ActRoutes => ({ time: null, inside: null, tied: null, interactions: new Map(), poseInputs: new Set<string>(), equip: null, lock: null, ride: null, mountable: null, story: null, bonded: null, lean: null, launcher: null, seen: null, buy: null, board: null, wear: null, climate: null, claims: new Map(), skipHeld: false, refused: 0, ...extra });
+const routes = (extra: Partial<ActRoutes>): ActRoutes => ({ identities: new Map(), time: null, inside: null, tied: null, interactions: new Map(), poseInputs: new Set<string>(), equip: null, lock: null, ride: null, mountable: null, story: null, bonded: null, lean: null, launcher: null, seen: null, buy: null, board: null, wear: null, climate: null, claims: new Map(), skipHeld: false, refused: 0, ...extra });
 
 test('every button survives the wire, LOCK with them', () => {
   const buttons = Object.values(NET_BUTTONS).reduce((all, bit) => all | bit, 0);

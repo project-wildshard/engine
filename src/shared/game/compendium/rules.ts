@@ -91,7 +91,7 @@ export class CompendiumRules {
   /** Authoritative kill totals, idempotently merged with page-owned discovery. */
   mirrorKills(id: string, taken: number, best: number): void {
     if (taken <= 0) return;
-    this.advance(id, 'taken', stats => { stats.t = taken; stats.b = best; });
+    this.advance(id, 'taken', stats => { stats.t = Math.max(stats.t, taken); stats.b = Math.max(stats.b, best); });
   }
 
   // ── the game's events ──

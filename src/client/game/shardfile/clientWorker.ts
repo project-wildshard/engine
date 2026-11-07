@@ -8,6 +8,7 @@ import type { Vector3 } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { importPageSaves, openIndexedSaves, SERVER_SAVES, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
+import { syncPageRewards } from '../../../shared/game/saves';
 import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
 import { countedWait } from '@wildshard/engine/boot/waits';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -206,7 +207,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   await closing; // a world a session just left may still be saving into what this one reads
   const saves = await openIndexedSaves(SERVER_SAVES), { savePrefix } = appIdentity();
   const page = saveEnvironment().storage('shard');
-  if (page !== null) await importPageSaves(saves, page, savePrefix);
+  if (page !== null) { await importPageSaves(saves, page, savePrefix); await syncPageRewards(saves, page, savePrefix); }
   // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
   const shell = startStandalone({ slug, base: `/shardfiles/${slug}/`, build, savePrefix, ...ports.grid === null ? { lone: true as const } : {}, held: url => { card.add(); return spawnHeldBytes(url); }, ...saves }), { client } = shell;
   void shell.booted.catch(() => undefined);

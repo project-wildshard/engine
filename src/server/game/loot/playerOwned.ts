@@ -1,5 +1,4 @@
 import * as v from 'valibot';
-import { landedBy } from '@wildshard/engine/combat/damageBook';
 import { questBooks } from '@wildshard/engine/quest/players';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { LedgerFiling } from '@wildshard/engine/net/ledgerBook';
@@ -13,13 +12,27 @@ import { Exchange } from '../../../shared/game/loot/exchange';
 import { isCosmetic, isOwnedId, Owned } from '../../../shared/game/loot/Owned';
 import { Purse } from '../../../shared/game/loot/Purse';
 import { OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
-import { inventorySave, skinSave, compendiumSave, finishPickupSave, saveSlug } from '../../../shared/game/saves';
+import { inventorySave, skinSave, compendiumSave, finishPickupSave, saveSlug, CreatureRewardSchema, creatureRewardSave, type CreatureRewardState } from '../../../shared/game/saves';
 
-const finite = v.pipe(v.number(), v.finite());
-const CreatureRewards = v.record(v.string(), v.strictObject({
-  finishes: v.array(v.string()), pending: v.record(v.string(), v.strictObject({ x: finite, y: finite, z: finite })),
-  journal: v.record(v.string(), v.strictObject({ s: finite, n: finite, t: finite, b: finite })),
-}));
+/**
+ * Creature rewards are persistent player data, independent of a world continuation. E7 supplies this from each
+ * authenticated player's OwnedSlots/PlayerDoc and flushes changes through its durable player-save path.
+ *
+ * NetWorld.identified binds a seat on hello and room handoff. The local worker accepts its device hello, while E7
+ * must bind the verified session identity, reject a hello that changes it, and clear the binding when a seat is released.
+ * Reconnect, another seat, room handoff, process restart and empty-cell retirement must keep the same player record.
+ * The default local store and legacy shard-wide fallback are not dedicated-server identity or persistence services.
+ *
+ * Local workers write device-keyed creature-rewards on every kill/claim. Only the first local device inherits old
+ * shard-wide saves and the old lead reward continuation. Old non-lead seat-only rows have no proven device binding;
+ * migrating those on E7 requires a verified historical mapping, never the current occupant of the former seat.
+ * syncPageRewards reconciles current cosmetics/discovery across localStorage and IndexedDB before boot; the
+ * dedicated adapter instead reads its authoritative player document. J105 pays every meaningful contributor.
+ */
+export interface CreatureRewardStore {
+  read: (identity: string) => CreatureRewardState | null;
+  write: (identity: string, state: CreatureRewardState) => boolean;
+}
 const REWARDS = 'owned.creature-rewards';
 
 /** A pack keeps what the server hands it: a slot limit is the giver's to check. */
@@ -59,65 +72,88 @@ export class PlayerOwned {
     else if (filing.grant === 'item') { if (this.finishIds.has(filing.name)) return; if (isOwnedId(filing.name)) this.owned.grant(filing.name); else this.add(filing.name, filing.amount); }
   }
   /** Death rewards belong to the server, including a drop no page has drawn yet. */
-  creatures(host: SimHost, source: Shardfile): void {
-    const pickups = source.items.pickups ?? {}, slot = this.slot, lead = questBooks(host).lead.player;
-    // The continuation owns each seat. Old saves have no row: only the lead inherits the page's legacy progress.
-    const rewards = v.parse(CreatureRewards, host.slots.questState[REWARDS] ?? {});
-    host.slots.questState[REWARDS] = rewards;
-    const seat = (player: string): v.InferOutput<typeof CreatureRewards>[string] => {
-      rewards[player] ??= player === lead
-        ? { finishes: skinSave.read(slot).owned, pending: finishPickupSave.read(slot), journal: compendiumSave.read(slot) }
-        : { finishes: [], pending: {}, journal: {} };
-      return rewards[player];
+  creatures(host: SimHost, source: Shardfile, profiles?: CreatureRewardStore): void {
+    const pickups = source.items.pickups ?? {}, slot = this.slot, lead = questBooks(host).lead.player, routes = actRoutes(host);
+    const rewards = new Map<string, CreatureRewardState>();
+    const persist = (identity: string, state: CreatureRewardState): void => {
+      if (profiles !== undefined) { if (!profiles.write(identity, state)) throw new Error('Creature rewards could not be saved'); return; }
+      const saved = creatureRewardSave.read(slot);
+      saved.players[identity] = state;
+      if (!creatureRewardSave.write(saved, slot)) throw new Error('Creature rewards could not be saved');
     };
-    const legacy = seat(lead);
-    // Confirmed page progress can be newer than the last periodic continuation (e.g. a tab closed after a claim).
-    legacy.finishes = [...new Set([...legacy.finishes, ...skinSave.read(slot).owned])];
-    for (const [id, saved] of Object.entries(compendiumSave.read(slot))) {
-      const stats = legacy.journal[id];
-      legacy.journal[id] = stats === undefined ? saved : { s: Math.max(stats.s, saved.s), n: Math.max(stats.n, saved.n),
-        t: Math.max(stats.t, saved.t), b: Math.max(stats.b, saved.b) };
-    }
-    for (const id of legacy.finishes) delete legacy.pending[id];
+    // The seat is only a route. Every read/write resolves the current persistent identity, so reuse cannot lend its rewards.
+    const seat = (player: string): { identity: string; state: CreatureRewardState } | null => {
+      const identity = routes.identities.get(player); if (identity === undefined) return null;
+      const cached = rewards.get(identity); if (cached !== undefined) return { identity, state: cached };
+      const saved = creatureRewardSave.read(slot), stored = profiles === undefined ? saved.players[identity] : profiles.read(identity);
+      const state: CreatureRewardState = stored === undefined || stored === null ? { finishes: [], pending: {}, journal: {} } : v.parse(CreatureRewardSchema, stored);
+      // Only this device may import historical shard-wide progress. E7 profiles never inherit an arbitrary world seat.
+      if (profiles === undefined && (saved.legacyOwner === identity || saved.legacyOwner === null && player === lead)) {
+        if (saved.legacyOwner === null) {
+          saved.legacyOwner = identity;
+          if (!creatureRewardSave.write(saved, slot)) throw new Error('Creature reward owner could not be saved');
+        }
+        const old = v.safeParse(CreatureRewardSchema, host.slots.questState[REWARDS] !== undefined
+          ? v.parse(v.record(v.string(), CreatureRewardSchema), host.slots.questState[REWARDS])[lead] : undefined);
+        const historical = old.success ? old.output : undefined;
+        state.finishes = [...new Set([...state.finishes, ...historical?.finishes ?? [], ...skinSave.read(slot).owned])];
+        state.pending = { ...historical?.pending, ...finishPickupSave.read(slot), ...state.pending };
+        for (const [id, entry] of [...Object.entries(historical?.journal ?? {}), ...Object.entries(compendiumSave.read(slot))]) {
+          const stats = state.journal[id];
+          state.journal[id] = stats === undefined ? entry : { s: Math.max(stats.s, entry.s), n: Math.max(stats.n, entry.n),
+            t: Math.max(stats.t, entry.t), b: Math.max(stats.b, entry.b) };
+        }
+      }
+      for (const id of state.finishes) delete state.pending[id];
+      rewards.set(identity, state); persist(identity, state);
+      return { identity, state };
+    };
     for (const id of Object.keys(pickups)) this.finishIds.add(id);
     const journals = source.rows.compendiums.flatMap(row => 'kind' in row ? row.entries : []);
     const deaths = new Set<string>();
     for (const id of Object.keys(pickups)) actRoutes(host).claims.set(`finish.claim.${id}`, player => {
-      const state = seat(player), at = state.pending[id], feet = host.players.get(player)?.position;
+      const owner = seat(player); if (owner === null) return;
+      const { state, identity } = owner, at = state.pending[id], feet = host.players.get(player)?.position;
       if (at === undefined || feet === undefined || Math.hypot(feet.x - at.x, feet.z - at.z) > 4 || Math.abs(feet.y - at.y) > 6) return;
       if (!state.finishes.includes(id)) state.finishes.push(id);
       delete state.pending[id];
-      if (player === lead) finishPickupSave.write(state.pending, slot);
+      persist(identity, state);
     });
-    host.events.on('actor.died', ({ actor, req }) => {
+    host.events.on('actor.died', ({ actor }) => {
       const body = host.entities.get(actor.id);
       if (body === undefined || deaths.has(actor.id)) return;
       deaths.add(actor.id);
-      const player = landedBy(req, host.players);
-      if (player === null) return;
-      const { journal, pending, finishes } = seat(player);
+      // Read before personal loot consumes DamageBook at its default-order death listener (J105).
+      const eligible = host.damage.meaningful(actor.id);
       const matched = journals.filter(entry => entry.match?.kind === body.kind && (entry.match.variants === undefined || entry.match.variants.includes(body.variant)));
       const mass = matched.find(entry => entry.massKg !== undefined)?.massKg ?? 0;
-      for (const entry of matched) {
-        const stats = journal[entry.id] ?? { s: 0, n: 0, t: 0, b: 0 };
-        journal[entry.id] = { ...stats, s: 3, t: stats.t + 1, b: Math.max(stats.b, Math.round(mass * body.scale * body.scale * body.scale)) };
-      }
-      if ([...encounterRows(host).values()].some(read => { const row = read(); return row.kind === 'elite' && row.body === actor.id; })) return;
-      for (const [id, row] of Object.entries(pickups)) {
-        const death = row.death;
-        if (death === undefined || death.kind !== body.kind || death.variant !== undefined && death.variant !== body.variant || finishes.includes(id) || pending[id] !== undefined) continue;
-        const at = { x: body.position.x, y: body.position.y, z: body.position.z }, toward = death.towardPlayer;
-        if (toward !== undefined) {
-          const feet = host.players.get(player)?.position ?? body.position, distance = Math.hypot(at.x - feet.x, at.z - feet.z), ratio = distance > toward.epsilon ? Math.min(1, toward.distance / distance) : 0;
-          at.x = feet.x + (at.x - feet.x) * ratio; at.z = feet.z + (at.z - feet.z) * ratio;
+      const elite = [...encounterRows(host).values()].some(read => { const row = read(); return row.kind === 'elite' && row.body === actor.id; });
+      for (const player of eligible) {
+        const owner = seat(player); if (owner === null) continue;
+        const { state, identity } = owner, { journal, pending, finishes } = state;
+        for (const entry of matched) {
+          const stats = journal[entry.id] ?? { s: 0, n: 0, t: 0, b: 0 };
+          journal[entry.id] = { ...stats, s: 3, t: stats.t + 1, b: Math.max(stats.b, Math.round(mass * body.scale * body.scale * body.scale)) };
         }
-        if (death.floor !== 'source') at.y = Math.max(at.y, host.groundHeightAt(at.x, at.z));
-        pending[id] = at; if (player === lead) finishPickupSave.write(pending, slot);
+        for (const [id, row] of Object.entries(pickups)) {
+          const death = row.death;
+          if (elite || death === undefined || death.kind !== body.kind || death.variant !== undefined && death.variant !== body.variant || finishes.includes(id) || pending[id] !== undefined) continue;
+          const at = { x: body.position.x, y: body.position.y, z: body.position.z }, toward = death.towardPlayer;
+          if (toward !== undefined) {
+            const feet = host.players.get(player)?.position ?? body.position, distance = Math.hypot(at.x - feet.x, at.z - feet.z), ratio = distance > toward.epsilon ? Math.min(1, toward.distance / distance) : 0;
+            at.x = feet.x + (at.x - feet.x) * ratio; at.z = feet.z + (at.z - feet.z) * ratio;
+          }
+          if (death.floor !== 'source') at.y = Math.max(at.y, host.groundHeightAt(at.x, at.z));
+          pending[id] = at;
+        }
+        persist(identity, state);
       }
-    }, host.scope);
+    }, host.scope, { order: -10 });
+    host.events.on('actor.died', ({ actor }) => { host.damage.forget(actor.id); }, host.scope, { order: 10 });
     host.onStep('owned.creatures', () => { for (const id of deaths) if (host.entities.get(id)?.alive === true) deaths.delete(id); });
     publishOwned(host, 'creature-rewards', (player, out) => {
-      const { finishes, pending, journal } = seat(player);
+      const owner = seat(player); if (owner === null) return;
+      const { finishes, pending, journal } = owner.state;
       for (const id of finishes) if (this.finishIds.has(id)) out.set(`${OWNED_ROW.finish}${id}`, 1);
       for (const [id, at] of Object.entries(pending)) if (!finishes.includes(id)) {
         out.set(`${OWNED_ROW.drop}${id}`, 1);
@@ -150,9 +186,9 @@ export class PlayerOwned {
 }
 
 /** Put a world on the wire's owned rows. Any owner of a pack or a shop already in the world keeps them. A good of ammunition goes to the world's quiver, and a world with none has no room for it. */
-export function installPlayerOwned(host: SimHost, shard: string, economy: unknown, pack: boolean, source?: Shardfile): PlayerOwned {
+export function installPlayerOwned(host: SimHost, shard: string, economy: unknown, pack: boolean, source?: Shardfile, profiles?: CreatureRewardStore): PlayerOwned {
   const owned = new PlayerOwned(shard), routes = actRoutes(host);
-  if (source !== undefined) owned.creatures(host, source);
+  if (source !== undefined) owned.creatures(host, source, profiles);
   publishOwned(host, 'player', (_player, out) => { owned.read(out, pack); });
   routes.wear = (_player, id) => { if (isOwnedId(id) && isCosmetic(id) && owned.owned.has(id)) owned.owned.toggleWorn(id); };
   if (economy !== null && economy !== undefined && routes.buy === null) {

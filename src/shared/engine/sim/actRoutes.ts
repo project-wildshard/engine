@@ -6,6 +6,8 @@ import type { SimHost } from '../../../server/engine/sim';
 export interface InteractRoute { readonly actorId: string; readonly value: number }
 /** Where a net act lands in a host's tick commands. A shard's systems file these as they install; a room only reads them. */
 export interface ActRoutes {
+  /** Session seats to persistent player identities. Standalone accepts its device hello; dedicated hosts must bind verified identities. */
+  readonly identities: Map<string, string>;
   /** Interaction row id to its tick command. A row a lash runs is not here: no client asks for it by name. */
   readonly interactions: Map<string, InteractRoute>;
   /** The script actor a player's loadout picks its slot from, on a shard with a native loadout. */
@@ -63,6 +65,6 @@ const routes = new WeakMap<SimHost, ActRoutes>();
 /** One host's routes (P1-E5.2c). */
 export function actRoutes(host: SimHost): ActRoutes {
   let held = routes.get(host);
-  if (held === undefined) { held = { interactions: new Map(), poseInputs: new Set<string>(), time: null, equip: null, lock: null, ride: null, mountable: null, lean: null, launcher: null, seen: null, story: null, bonded: null, inside: null, tied: null, buy: null, board: null, wear: null, climate: null, claims: new Map(), skipHeld: false, refused: 0 }; routes.set(host, held); }
+  if (held === undefined) { held = { identities: new Map(), interactions: new Map(), poseInputs: new Set<string>(), time: null, equip: null, lock: null, ride: null, mountable: null, lean: null, launcher: null, seen: null, story: null, bonded: null, inside: null, tied: null, buy: null, board: null, wear: null, climate: null, claims: new Map(), skipHeld: false, refused: 0 }; routes.set(host, held); }
   return held;
 }

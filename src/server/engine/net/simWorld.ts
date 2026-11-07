@@ -14,6 +14,7 @@ import { NET_POSE, shardRows, type FightViewCall } from '../../../shared/engine/
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetRefs } from '../../../shared/engine/net/schema';
 import type { NetPlayer, NetTickInput, NetVisitor, NetWorld } from './room';
+import type { NetIdentity } from '../../../shared/engine/net/identity';
 /** Metres from a player a body's pose inputs are worth saying, the smallest move worth a call, and how many values a room recalls. */
 const POSE_REACH = 80, POSE_STEP = 1 / 32, POSE_MEMORY = 8192;
 
@@ -21,6 +22,8 @@ const emptyPose = (): AnimalPoseSample => ({ attackT: -1, attackDur: 1, groundY:
 
 /** P1-E5.2: a SimHost as a NetWorld. Reads only; the sim classes do not change. */
 export class SimNetWorld implements NetWorld {
+  /** A device hello is sufficient for a local worker. E7 must override this with its authenticated seat-to-player binding. */
+  identified(seat: string, identity: NetIdentity): void { actRoutes(this.host).identities.set(seat, identity.player); }
   readonly player: NetPlayer;
   private readonly host: SimHost;
   private readonly pose: AnimalPoseSample = emptyPose();
