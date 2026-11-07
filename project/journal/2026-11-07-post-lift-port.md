@@ -27,3 +27,7 @@ lifted layout.
 Port e554c9de59 (fix: persist rewards by device identity) in source
 order. Keep the behavior and repoint the retained files and imports to
 engine's lifted layout.
+
+Port d75b25e179 (fix: validate legacy rewards before welcome) in source
+order. Keep the behavior and repoint the retained files and imports to
+engine's lifted layout.

@@ -41,11 +41,11 @@ beforeAll(async () => {
   input = { product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
   rosterStep = (await product.json('actors/roster.json') as { step: string }).step;
 });
-async function boot(storage: PageStorage, lone?: true, identity?: string) {
+async function boot(storage: PageStorage, lone?: true, identity?: string, refused?: (error: unknown) => void) {
   const control = new MessageChannel(), game = new MessageChannel();
   let grid: StandaloneGrid | undefined;
   const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input), strips: bakedGridCollision,
-    onSaveRefused: error => { throw error; }, proof: { booted: value => { grid = value; } } });
+    onSaveRefused: refused ?? (error => { throw error; }), proof: { booted: value => { grid = value; } } });
   const shell = connectStandalone({ slug: 'pine-hollow', base: '/shards/pine-hollow/', build: 'test', savePrefix: PREFIX, storage, ...(identity === undefined ? {} : { identity: { player: identity, name: identity } }), ...(lone === undefined ? {} : { lone }) }, control.port2, game.port2, () => { server.dispose(); });
   const booted = await shell.booted;
   if (grid === undefined) throw new Error('No worker world');
@@ -67,6 +67,48 @@ async function copyPage(page: PageStorage, worker: PageStorage): Promise<void> {
   const target = { storage: worker, write: (key: string, value: string | null) => { if (value === null) worker.removeItem(key); else worker.setItem(key, value); return Promise.resolve(true); } };
   await importPageSaves(target, page, PREFIX); await syncPageRewards(target, page, PREFIX);
 }
+
+test('a malformed historical reward book falls back before the player is welcomed', async () => {
+  const worker = new PageStorage(), first = await boot(worker, true);
+  try {
+    await turn(); first.grid.open(); first.grid.tick(); first.grid.tick(); await turn();
+    expect((await first.shell.save()).ok).toBe(true);
+    first.grid.host.slots.questState['owned.creature-rewards'] = { 'actor.player': 1 };
+    first.grid.tick(); first.grid.tick();
+    expect((await first.shell.save()).ok).toBe(true);
+  } finally { first.shell.dispose(); }
+  const rejected: unknown[] = [], again = await boot(worker, true, undefined, error => { rejected.push(error); });
+  try {
+    expect(rejected, 'an invalid historical row must be refused during world loading').toHaveLength(1);
+    await turn(); again.grid.open(); again.grid.tick(); again.grid.tick(); await turn();
+    expect(again.booted.restored).toBe(true);
+    expect(again.shell.client.closed).toBeNull();
+  } finally { again.shell.dispose(); }
+});
+
+test('a historical seat-keyed continuation migrates only its local lead to a device profile', async () => {
+  const worker = new PageStorage(), first = await boot(worker, true, 'device-a');
+  const historical = { finishes: ['ghost-stag'], pending: { 'ghost-stag': { x: 5, y: 0, z: -225 }, ironhide: { x: 8, y: 0, z: -220 } },
+    journal: { 'ghost-stag': { s: 3, n: 5, t: 7, b: 500 } } };
+  try {
+    // The previous release kept this book in the world; no new player record has been published yet.
+    first.grid.host.slots.questState['owned.creature-rewards'] = { 'actor.player': historical, 'seat-b': historical };
+    expect((await first.shell.save()).ok).toBe(true);
+  } finally { first.shell.dispose(); }
+  const again = await boot(worker, true, 'device-a'), link = directLoopback(), bot = new NetClient(link.client);
+  try {
+    await turn(); again.grid.open(); again.grid.tick(); again.grid.tick(); await turn();
+    expect(again.booted.restored).toBe(true);
+    expect(again.shell.client.owned.get('finish.ghost-stag')).toBe(1);
+    expect(again.shell.client.owned.get('finish-drop.ironhide')).toBe(1);
+    expect(again.shell.client.owned.has('finish-drop.ghost-stag')).toBe(false);
+    expect(again.shell.client.owned.get('journal.ghost-stag.taken')).toBe(8);
+    again.grid.join({ join: 'seat-b', x: 5, y: 0, z: -225 }, link.server);
+    bot.hello('test', { player: 'device-b', name: 'B' }); link.pump(); again.grid.tick(); again.grid.tick(); link.pump();
+    expect(bot.owned.has('finish.ghost-stag'), 'an old seat row cannot prove the current occupant owned it').toBe(false);
+    expect(bot.owned.has('journal.ghost-stag.taken')).toBe(false);
+  } finally { bot.dispose(); again.shell.dispose(); }
+});
 
 test('device rewards survive an empty world and follow the owner into another seat', async () => {
   const worker = new PageStorage();
@@ -129,6 +171,7 @@ test('J105 pays meaningful contributors, including when a tiny last hit comes fr
     expect(cb.owned.get('finish-drop.ghost-stag')).toBe(1);
     expect(cb.owned.get('finish-drop.ghost-stag.x'), 'Pine’s declared drop stays at its source, not the lead').toBeCloseTo(body.position.x);
     expect(ca.owned.has('finish-drop.ghost-stag'), 'owned finishes cannot drop again').toBe(false);
+    expect((await first.shell.save()).ok).toBe(true);
     expect(onPage(worker, () => creatureRewardSave.read('pine-hollow').players['pine-a']?.pending['ghost-stag'])).toBeUndefined();
   } finally { ca.dispose(); cb.dispose(); first.shell.dispose(); }
 });
@@ -154,6 +197,7 @@ test('two stores merge later page progress, clean owned pending drops and keep n
     expect(next.shell.client.owned.get('journal.ghost-stag.taken')).toBe(13);
     expect(next.shell.client.owned.has('finish-drop.ghost-stag')).toBe(false);
     expect(next.shell.client.owned.get('finish-drop.ironhide'), 'later legacy pending rewards merge too').toBe(1);
+    expect((await next.shell.save()).ok).toBe(true);
     expect(onPage(worker, () => creatureRewardSave.read('pine-hollow').players['device-a']?.pending['ghost-stag']), 'exports must not retain owned pending rewards').toBeUndefined();
     const legacy = onPage(worker, () => ({ skins: skinSave.read('pine-hollow'), journal: compendiumSave.read('pine-hollow'), pending: finishPickupSave.read('pine-hollow') }));
     next.grid.join({ join: 'seat-b', x: 100, y: 0, z: -225 }, link.server);
@@ -170,6 +214,7 @@ test('two stores merge later page progress, clean owned pending drops and keep n
     next.grid.place({ x, y, z, yaw: 0 }, 'seat-b');
     bot.act({ kind: 'interact', seq: 0, id: 'finish.claim.ghost-stag' }); link.pump(); next.grid.tick(); next.grid.tick(); link.pump();
     expect(bot.owned.get('finish.ghost-stag')).toBe(1);
+    expect((await next.shell.save()).ok).toBe(true);
     expect(onPage(worker, () => ({ skins: skinSave.read('pine-hollow'), journal: compendiumSave.read('pine-hollow'), pending: finishPickupSave.read('pine-hollow') }))).toEqual(legacy);
   } finally { bot.dispose(); next.shell.dispose(); }
 });

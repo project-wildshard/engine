@@ -74,6 +74,8 @@ export class PlayerOwned {
   /** Death rewards belong to the server, including a drop no page has drawn yet. */
   creatures(host: SimHost, source: Shardfile, profiles?: CreatureRewardStore): void {
     const pickups = source.items.pickups ?? {}, slot = this.slot, lead = questBooks(host).lead.player, routes = actRoutes(host);
+    // Validate historical world data during installation, where the continuation loader can reject it and fall back.
+    const historical = profiles === undefined ? v.parse(v.record(v.string(), CreatureRewardSchema), host.slots.questState[REWARDS] ?? {})[lead] : undefined;
     const rewards = new Map<string, CreatureRewardState>();
     const persist = (identity: string, state: CreatureRewardState): void => {
       if (profiles !== undefined) { if (!profiles.write(identity, state)) throw new Error('Creature rewards could not be saved'); return; }
@@ -93,9 +95,6 @@ export class PlayerOwned {
           saved.legacyOwner = identity;
           if (!creatureRewardSave.write(saved, slot)) throw new Error('Creature reward owner could not be saved');
         }
-        const old = v.safeParse(CreatureRewardSchema, host.slots.questState[REWARDS] !== undefined
-          ? v.parse(v.record(v.string(), CreatureRewardSchema), host.slots.questState[REWARDS])[lead] : undefined);
-        const historical = old.success ? old.output : undefined;
         state.finishes = [...new Set([...state.finishes, ...historical?.finishes ?? [], ...skinSave.read(slot).owned])];
         state.pending = { ...historical?.pending, ...finishPickupSave.read(slot), ...state.pending };
         for (const [id, entry] of [...Object.entries(historical?.journal ?? {}), ...Object.entries(compendiumSave.read(slot))]) {
