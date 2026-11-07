@@ -20,6 +20,8 @@ export interface AppIdentity {
   readonly saveFormat: string;
   /** a downloaded file's name prefix (`<slug>-save-<date>.json`) */
   readonly fileSlug: string;
+  /** Rebind a portable document's player data to the importing device, keeping its identity. */
+  readonly importPlayerDocument?: (document: unknown, player: string) => Promise<unknown>;
   /** where the page exposes the probe to capture and test scripts */
   readonly exposeProbe: (probe: EngineProbe) => void;
   /** the harness pins a test or capture script set before the boot, when there are any */

@@ -1,6 +1,8 @@
 // J130: where a server's saves live on a page. A session outgrows localStorage at its first cell, so the server's documents
 // are in IndexedDB; this file is also what Settings reaches for them, because New Game and export must see what the server saw.
 import type { ImportReport, SaveStorage } from '../../../shared/engine/saves/store';
+import { installedIdentity } from '../../../shared/engine/app/identity';
+import { deviceIdentity } from '../../../shared/engine/net/identity';
 
 /** A server's saves on a page: the same documents localStorage would hold. */
 export interface IndexedSaves { readonly storage: SaveStorage; readonly write: (key: string, value: string | null) => Promise<boolean> }
@@ -123,7 +125,9 @@ export async function importServerSaves(json: string, prefix: string, format: st
   if (value['server'] !== true) return importPageFile(json, prefix, page);
   stopServer();
   const saves = await openIndexedSaves(SERVER_SAVES), rows = Object.entries(value['docs']);
-  const wrote = await Promise.all(rows.map(([scope, doc]) => saves.write(`${prefix}${scope}`, JSON.stringify(doc))));
+  const app = installedIdentity(), rebind = app?.savePrefix === prefix ? app.importPlayerDocument : undefined;
+  const player = rebind === undefined ? null : deviceIdentity(saves.storage, prefix).player;
+  const wrote = await Promise.all(rows.map(async ([scope, doc]) => saves.write(`${prefix}${scope}`, JSON.stringify(rebind === undefined || player === null ? doc : await rebind(doc, player)))));
   await saves.write(IMPORTED, '1');
   return { imported: rows.flatMap(([scope], index) => wrote[index] === true ? [scope] : []), skipped: rows.flatMap(([scope], index) => wrote[index] === true ? [] : [{ key: scope, reason: 'Storage unavailable or full' }]) };
 }

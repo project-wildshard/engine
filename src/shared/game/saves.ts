@@ -32,9 +32,24 @@ export const CreatureRewardSchema: v.GenericSchema<unknown, CreatureRewardState>
   finishes: v.array(v.string()), pending: v.record(v.string(), v.strictObject({ x: finite, y: finite, z: finite })),
   journal: v.record(v.string(), v.strictObject({ s: finite, n: finite, t: finite, b: finite })),
 });
+const CreatureRewards = v.strictObject({ legacyOwner: v.nullable(v.string()), players: v.record(v.string(), CreatureRewardSchema) });
 /** The first local device alone may inherit old shard-wide saves. Other devices start with their own record. */
-export const creatureRewardSave: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = define('creature-rewards', v.strictObject({ legacyOwner: v.nullable(v.string()),
-  players: v.record(v.string(), CreatureRewardSchema) }), () => ({ legacyOwner: null, players: {} }));
+export const creatureRewardSave: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = define('creature-rewards', CreatureRewards, () => ({ legacyOwner: null, players: {} }));
+
+const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+/** A save file carries the local owner's rewards, not their device identity. On restore that record belongs to this
+ * device. Other players stay separate; unsupported records stay intact for a later reader. Re-import replaces, never adds. */
+export function rebindCreatureRewards(document: unknown, player: string): unknown {
+  if (!record(document) || !record(document['keys'])) return document;
+  const keys = document['keys'], entry = keys['creature-rewards'];
+  if (!record(entry) || entry['v'] !== 1) return document;
+  const parsed = v.safeParse(CreatureRewards, entry['data']);
+  if (!parsed.success || parsed.output.legacyOwner === null || parsed.output.legacyOwner === player) return document;
+  const { legacyOwner, players } = parsed.output, owned = players[legacyOwner];
+  if (!Object.hasOwn(players, legacyOwner) || owned === undefined) return document;
+  const rebound = { ...players, [player]: owned }; delete rebound[legacyOwner];
+  return { ...document, keys: { ...keys, 'creature-rewards': { ...entry, data: { legacyOwner: player, players: rebound } } } };
+}
 
 const ProgressDocument = v.object({ keys: v.record(v.string(), v.unknown()), reset: v.optional(finite) });
 const SkinEntry = v.object({ v: v.literal(1), data: v.object({ owned: strings, worn: v.record(v.string(), v.string()) }) });

@@ -7,6 +7,8 @@ import { exportServerSaves, importServerSaves, openIndexedSaves, SERVER_SAVES, s
 import { installAppIdentity } from '../src/shared/engine/app/identity';
 import { installSaveEnvironment } from '../src/shared/engine/saves/environment';
 import { SaveStore, type SaveStorage } from '../src/shared/engine/saves/store';
+import { deviceIdentity } from '../src/shared/engine/net/identity';
+import { WILDSHARD_IDENTITY } from '../src/client/game/identity';
 
 /** The little of IndexedDB a save store uses: one object store of strings, every transaction committing on the next task. */
 function fakeIndexedDb(): { rows: Map<string, string>; api: unknown } {
@@ -49,6 +51,50 @@ test('an export carries the server\'s documents, and an import puts them back wh
 test('a file of another format changes nothing', async () => {
   const report = await importServerSaves(JSON.stringify({ format: 'other', server: true, docs: { global: {} } }), 'ws.', 'wildshard', NO_PAGE);
   expect(report.skipped).toEqual([{ key: '*', reason: 'Unknown save format' }]); expect(fake.rows.size).toBe(0);
+});
+
+test.each([false, true])('a real save export restores owned progress on import (new browser: %s)', async fresh => {
+  installAppIdentity(WILDSHARD_IDENTITY);
+  const { savePrefix: prefix, saveFormat: format } = WILDSHARD_IDENTITY;
+  const source = await openIndexedSaves(SERVER_SAVES), original = deviceIdentity(source.storage, prefix).player;
+  const reward = { finishes: ['ghost-stag'], pending: { 'wolf-pack': { x: 1, y: 2, z: 3 } }, journal: { 'ghost-stag': { s: 1, n: 2, t: 1, b: 0 } } };
+  const peer = { finishes: ['peer-finish'], pending: {}, journal: {} };
+  await source.write(`${prefix}pine-hollow`, JSON.stringify({ reset: 4, keys: {
+    'creature-rewards': { v: 1, data: { legacyOwner: original, players: { [original]: reward, peer } } },
+    skins: { v: 1, data: { owned: ['ghost-stag'], worn: {} } },
+  } }));
+  await source.write(`${prefix}standalone-lone-pine-hollow`, '{"tick":123}');
+  const file = await exportServerSaves(prefix, format);
+  expect(file).not.toContain(`device:${prefix}identity`);
+  if (fresh) fake.rows.clear();
+  const destination = await openIndexedSaves(SERVER_SAVES), identity = deviceIdentity(destination.storage, prefix).player;
+  expect(identity === original).toBe(!fresh);
+  for (let round = 0; round < 2; round++) {
+    const report = await importServerSaves(file, prefix, format, NO_PAGE);
+    expect(report.skipped).toEqual([]);
+    expect(JSON.parse(fake.rows.get(`${prefix}pine-hollow`) ?? 'null')).toEqual({ reset: 4, keys: {
+      'creature-rewards': { v: 1, data: { legacyOwner: identity, players: { [identity]: reward, peer } } },
+      skins: { v: 1, data: { owned: ['ghost-stag'], worn: {} } },
+    } });
+    expect(fake.rows.get(`${prefix}standalone-lone-pine-hollow`)).toBe('{"tick":123}');
+    expect(deviceIdentity((await openIndexedSaves(SERVER_SAVES)).storage, prefix).player).toBe(identity);
+  }
+});
+
+test.each([
+  { v: 2, data: { legacyOwner: 'old', players: { old: 'future' } } },
+  { v: 1, data: { legacyOwner: 'old', players: {} } },
+  { v: 1, data: { legacyOwner: 'toString', players: {} } },
+  { v: 1, data: { legacyOwner: 'old', players: { old: { finishes: [] } } } },
+  { v: 1, data: { legacyOwner: null, players: {} } },
+])('import preserves an unsupported or unowned reward record: %j', async entry => {
+  installAppIdentity(WILDSHARD_IDENTITY);
+  const { savePrefix: prefix, saveFormat: format } = WILDSHARD_IDENTITY, source = await openIndexedSaves(SERVER_SAVES);
+  const document = { keys: { 'creature-rewards': entry } };
+  await source.write(`${prefix}pine-hollow`, JSON.stringify(document));
+  const file = await exportServerSaves(prefix, format); fake.rows.clear();
+  expect((await importServerSaves(file, prefix, format, NO_PAGE)).skipped).toEqual([]);
+  expect(JSON.parse(fake.rows.get(`${prefix}pine-hollow`) ?? 'null')).toEqual(document);
 });
 
 class PageStorage implements SaveStorage {

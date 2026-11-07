@@ -12,6 +12,7 @@ export const WILDSHARD_IDENTITY: AppIdentity = {
   savePrefix: 'wildshard.save.v2.',
   saveFormat: 'wildshard.save',
   fileSlug: 'wildshard',
+  importPlayerDocument: async (document, player) => (await import('../../shared/game/saves')).rebindCreatureRewards(document, player),
   exposeProbe: (probe) => { window.__wildshard = probe; },
   harness: () => (typeof window === 'undefined' ? undefined : window.__wildshardHarness),
   errorReportOrigins: ['https://wildshard-singleplayer.vercel.app'],
