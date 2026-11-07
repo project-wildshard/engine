@@ -1,3 +1,4 @@
+import { skinSave } from '../../../shared/game/saves';
 import { isJsonData } from '@wildshard/format/json';
 import { parseNativeQuestComposition, type NativeQuestCompositionRows } from '@wildshard/format/nativeQuestComposition';
 import { nativeQuestChannels } from './nativeInputs';
@@ -123,7 +124,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   interface SeatGear {
     readonly body: PlayerSim; readonly board: ContractBoard | null; readonly trader: Exchange | null; readonly reward: QuestRewardController | null;
     readonly ammunition: ReturnType<typeof nativeHeldAmmunition> | null; readonly state: { iron: boolean; rewardOwned: boolean };
-    readonly claim: (value: number) => void; readonly riding: () => boolean; readonly seen: Flags;
+    readonly skins: ReadonlySet<string>; readonly claim: (value: number) => void; readonly riding: () => boolean; readonly seen: Flags;
   }
   /** One player's place at the composition. The lead's are the composition's own owners. */
   interface QuestSeat {
@@ -133,7 +134,8 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   const seats = new Map<string, QuestSeat>();
   const seatOf = (player: string): QuestSeat => { books.of(player); return need(seats.get(player), 'player seat'); };
   const gearOf = (player: string): SeatGear => seatOf(player).gear;
-  const state = { iron: false, pickup: false, rewardOwned: false }; let finishes = new Set<string>();
+  const state = { iron: false, pickup: false, rewardOwned: false }; let finishes = new Set(skinSave.read(ports.source.identity.slug).owned.filter(id => rows.board?.ids.includes(id)));
+  const purchases = new Map<string, Map<number, number>>();
   const population = rows.acquisition === undefined ? null : mixedPopulation(host, rows.acquisition.population);
   const equipment = rows.acquisition === undefined ? null : nativeMeleeItem(host, rows.acquisition.equipment);
   const finale = rows.reward === undefined ? null : nativeStageLane(host, rows.reward.director);
@@ -190,14 +192,22 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   const graph = entry.install(commandOwners());
   // Every prompt with an act answers a client by name: a sword or a cable is a command too, not only the graph's rows.
   publishOwned(host, QUEST_OWNED, (player, out) => {
+    for (const [good, count] of purchases.get(player) ?? []) out.set(`${OWNED_ROW.purchase}${String(good)}`, count);
     if (player === books.lead.player) for (const [id, count] of Object.entries(pack.snapshot().counts)) out.set(`${OWNED_ROW.item}${id}`, count);
-    const owner = seats.get(player)?.gear.board; if (owner !== null && owner !== undefined) boardLines(owner.current, out);
+    const gear = seats.get(player)?.gear;
+    if (gear !== undefined) { for (const id of gear.skins) out.set(`${OWNED_ROW.finish}${id}`, 1); if (gear.state.rewardOwned && rows.board !== undefined) out.set(`${OWNED_ROW.finish}${rows.board.finish}`, 1); }
+    const owner = gear?.board; if (owner !== null && owner !== undefined) boardLines(owner.current, out);
   });
   if (rows.board !== undefined) actRoutes(host).board = (player, op, slot) => {
     const gear = gearOf(player), reach = { x: gear.body.position.x, y: gear.body.position.y + rows.eye, z: gear.body.position.z };
     gear.board?.use(CONTRACT_ACTION.open, reach); eye.set(reach.x, reach.y, reach.z); gear.claim((op === 'claim' ? CONTRACT_ACTION.claim0 : CONTRACT_ACTION.tear0) + slot); gear.board?.use(CONTRACT_ACTION.close, reach);
   };
-  if (rows.trade !== undefined) actRoutes(host).buy = (player, good) => { const { trader: seat } = gearOf(player); if (seat !== null) { seat.open(); try { seat.use(good); } finally { seat.close(); } } };
+  if (rows.trade !== undefined) actRoutes(host).buy = (player, good) => {
+    const { trader: seat } = gearOf(player); if (seat === null) return;
+    seat.open();
+    try { if (seat.use(good)) { const bought = purchases.get(player) ?? new Map<number, number>(); bought.set(good, (bought.get(good) ?? 0) + 1); purchases.set(player, bought); } }
+    finally { seat.close(); }
+  };
   const interactions = actRoutes(host).interactions, promptActor = ports.source.questHost?.graph.actor;
   if (promptActor !== undefined) for (const prompt of promptRoster ?? []) if (typeof prompt.id === 'string' && prompt.act !== null && !interactions.has(prompt.id)) interactions.set(prompt.id, { actorId: promptActor, value: prompt.act });
   // A page names its cable by mode: that's the id both sides read from their own rows.
@@ -209,7 +219,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     ['ammo', { capacity: (kind: string, n: number) => need(quiver ?? undefined, 'ammunition').room(kind, n),
       addBolts: (n: number) => { bolts?.addBolts(n); },
       grant: (kind: string, n: number) => { need(quiver ?? undefined, 'ammunition').add(kind, n); } }]]));
-  const trader = traderFor(pack, skin => skin === rows.trade?.finish && state.rewardOwned || finishes.has(skin), skin => { finishes.add(skin); }, ammunition, launcher?.kind === 'bolt' ? launcher.item : null);
+  const trader = traderFor(pack, skin => skin === rows.trade?.finish && state.rewardOwned || finishes.has(skin), skin => { finishes.add(skin); const saved = skinSave.read(ports.source.identity.slug); skinSave.write({ ...saved, owned: [...new Set([...saved.owned, skin])] }, ports.source.identity.slug); }, ammunition, launcher?.kind === 'bolt' ? launcher.item : null);
   const initialTrader = trader?.snapshot();
   const steps = rows.effects === undefined ? null : new QuestStepRunner(ports.steps);
   if (steps !== null) books.claim(steps.writes);
@@ -318,14 +328,14 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
       ] } } : {}) };
   }
 
-  seats.set(books.lead.player, { rules: indexed, transitions, dialogue, roster: promptRoster, gear: { body: traveller, board, trader, reward, ammunition, state, claim: useBoard, seen: flags,
+  seats.set(books.lead.player, { rules: indexed, transitions, dialogue, roster: promptRoster, gear: { body: traveller, board, trader, reward, ammunition, state, get skins() { return finishes; }, claim: useBoard, seen: flags,
     riding: () => cables.state(cableId).riding } });
   books.install(book => {
     const body = need(host.players.get(book.player), 'seated body'), seat = entry.seat(book.player, rows.transitions);
     const ride = cables.seat(cableId, body, seat.flags);
     if (rider !== null && body.hasMotor) holdCarried(body, ride, seat.flags);
     const held = rows.ammunition === undefined ? null : need(ammunition ?? undefined, 'ammunition').of(body), own = { iron: false, rewardOwned: false }, skins = new Set<string>();
-    const gear: SeatGear = { body, board: boardFor(), reward: rows.reward === undefined ? null : rewardFor(ride, undefined, seat.flags), ammunition: held, state: own, seen: seat.flags,
+    const gear: SeatGear = { body, board: boardFor(), reward: rows.reward === undefined ? null : rewardFor(ride, undefined, seat.flags), ammunition: held, state: own, skins, seen: seat.flags,
       trader: traderFor(seat.pack, skin => skin === rows.trade?.finish && own.rewardOwned || skins.has(skin), skin => { skins.add(skin); }, held, launcher?.kind === 'bolt' ? seatedBolt(launcher.item, body) : null),
       riding: () => cables.seatState(cableId, book.player).riding,
       claim: value => {
@@ -397,7 +407,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
       skins: v.pipe(v.array(v.picklist(ids)), v.maxLength(ids.length), v.check(skins => new Set(skins).size === skins.length)) }));
     part('trader', () => trader.active || finishes.size > 0 ? { modal: trader.snapshot(), skins: [...finishes] } : undefined, value => {
       const saved = v.parse(schema, value), restore = trader.prepareRestore(saved?.modal ?? initialTrader);
-      return () => { restore(); finishes = new Set(saved?.skins); };
+      return () => { restore(); finishes = new Set([...skinSave.read(ports.source.identity.slug).owned.filter(id => ids.includes(id)), ...saved?.skins ?? []]); };
     });
   }
   if (ammunition !== null) part('ammunition', () => ammunition.changed ? ammunition.snapshot() : undefined,

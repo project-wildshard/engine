@@ -30,6 +30,12 @@ export interface WireHoldings {
   /** The shard these lines are this page's for, on a grid page that holds several: the entered one's reach the page. */
   readonly shard?: string;
   readonly purse?: Pick<Purse, 'mirror'>; readonly inventory?: Pick<Inventory, 'mirror'>; readonly gear?: Pick<Owned, 'grant' | 'worn' | 'toggleWorn'>; readonly board?: Pick<ContractBoard, 'mirror'>;
+  /** Kill totals from the server; discoveries remain the page's. */
+  readonly journal?: { readonly mirrorKills: (id: string, taken: number, best: number) => void };
+  /** Pending finish pickups, with their authoritative positions. */
+  readonly drops?: (lines: ReadonlyMap<string, number>) => void;
+  /** The weapon finishes the server says this player owns. */
+  readonly finishes?: { readonly own: (id: string) => void };
   /** A story's channel the server said for this player's eyes: its toast, its reading, its sting. */
   readonly said?: (channel: string) => void;
 }
@@ -87,6 +93,7 @@ export class WirePage {
   private readonly skyWords = new Map<ClimateWord['op'], ClimateWord>();
   private dayRow: number | undefined;
   private readonly holdings = new Set<WireHoldings>();
+  private readonly purchases = new Map<number, { before: number; confirmed: () => void }>();
   private ownedAt = -1;
   private readonly said = new Map<string, number>();
   /** What a page does to a body its own population spawns, for the rows `manager` draws: until `scope` ends. */
@@ -115,7 +122,7 @@ export class WirePage {
     for (const use of this.waiting) use(client);
     this.waiting.clear();
   }
-  unbind(): void { this.client = null; this.press = () => undefined; this.act = () => undefined; this.dayRow = undefined; this.stop = () => undefined; this.encounterRows = null; this.heads = () => false; this.seeded = null; this.books.clear(); this.feeds.clear(); this.movers.clear(); }
+  unbind(): void { this.client = null; this.press = () => undefined; this.act = () => undefined; this.dayRow = undefined; this.stop = () => undefined; this.encounterRows = null; this.heads = () => false; this.seeded = null; this.purchases.clear(); this.books.clear(); this.feeds.clear(); this.movers.clear(); }
   /** A setting's weather or a dev's jump: the server's sky takes it. Only a mode outlives its world. */
   climate(word: ClimateWord): void {
     if (word.op !== 'force') this.skyWords.set(word.op, word);
@@ -142,13 +149,19 @@ export class WirePage {
     for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.item)) pack.set(name.slice(OWNED_ROW.item.length), value);
     const contracts = boardFromLines(owned), news: string[] = [];
     for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.said) && this.said.get(name) !== value) { this.said.set(name, value); news.push(name.slice(OWNED_ROW.said.length)); }
-    for (const { shard, purse, inventory, gear, board, said } of this.holdings) {
-      if (shard !== undefined && shard !== level) continue;
+    for (const { shard, purse, inventory, gear, board, finishes, journal, drops, said } of this.holdings) {
+      if (shard !== undefined && level !== null && shard !== level) continue;
       purse?.mirror(owned.get(OWNED_ROW.coins) ?? 0); inventory?.mirror(pack);
       for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.owned)) { const id = name.slice(OWNED_ROW.owned.length); gear?.grant(id); if (isOwnedId(id) && isCosmetic(id) && gear?.worn(id) !== (value === WORN_LINE)) gear?.toggleWorn(id); }
+      if (journal !== undefined) for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.journal) && name.endsWith('.taken')) {
+        const id = name.slice(OWNED_ROW.journal.length, -'.taken'.length); journal.mirrorKills(id, value - 1, (owned.get(`${OWNED_ROW.journal}${id}.best`) ?? 1) - 1);
+      }
+      drops?.(owned);
+      if (finishes !== undefined) for (const [name] of owned) if (name.startsWith(OWNED_ROW.finish)) finishes.own(name.slice(OWNED_ROW.finish.length));
       if (board !== undefined && contracts !== null) board.mirror(contracts);
       if (said !== undefined) for (const channel of news) said(channel);
     }
+    for (const [good, pending] of this.purchases) if ((owned.get(`${OWNED_ROW.purchase}${String(good)}`) ?? 0) > pending.before) { this.purchases.delete(good); pending.confirmed(); }
   }
   /** A room's drifts as the server's rows have them: what this page's player walks on is what the server's does. */
   sandInto(ground: ArenaRoomGround, room: string): void {
@@ -163,8 +176,11 @@ export class WirePage {
   wear(id: string): void { this.act({ kind: 'wear', seq: 0, id }); }
   /** A hand on the contract board: the server checks it and pays. */
   contract(op: 'claim' | 'tear', slot: number): void { this.act({ kind: 'board', seq: 0, op, slot }); }
-  /** Buy a good of this shard's exchange: the server checks it and takes the price. */
-  buy(good: number): void { this.act({ kind: 'buy', seq: 0, good }); }
+  /** Buy a good; feedback waits until the server confirms the grant and its holdings have been mirrored. */
+  buy(good: number, confirmed?: () => void): void {
+    if (confirmed !== undefined) this.purchases.set(good, { before: this.line(`${OWNED_ROW.purchase}${String(good)}`), confirmed });
+    this.act({ kind: 'buy', seq: 0, good });
+  }
   /** One press of a prompt the server knows by this id. */
   send(id: string): void { this.press(id); }
   /** A quest view for `def`, over this player's rows. */

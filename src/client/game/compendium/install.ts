@@ -1,4 +1,5 @@
 import { bagMenu } from '../bag/tabs';
+import { wirePage } from '../shardfile/wirePage';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import type { ShardContext } from "../plugin/context";
 import { installEnteredRuntimeService, retainsRuntimeServices } from "../shard/retainedHooks";
@@ -103,8 +104,8 @@ export function installCompendium(host: CompendiumHost): { state: CompendiumStat
     if (onWall) wall?.refresh(); // taken: the mount goes up; discovered: the chalk name replaces ???
     if (to !== 'discovered') disc.classList.add('new');
   };
-  // a kill, through the combat pipeline's event (no chained onKill: E357 AG19)
-  app.events.on('actor.died', ({ actor }) => { const a = host.animals.animals.find((x) => x.combatActor() === actor); if (a !== undefined) tracker.killed(a); }, journal.scope);
+  // Kill totals come from the server; the page keeps polling discoveries.
+  wirePage.hold({ shard: host.chunkId.replace(/^chunk:\/\/local\//u, ''), journal: state }, journal.scope);
   const eye = { position: { x: 0, y: 0, z: 0 }, forward: { x: 0, y: 0, z: -1 } };
   host.game.onUpdate((dt) => {
     disc.classList.toggle('show', hud.entered && host.touchUi() && !menu.isOpen);
@@ -159,10 +160,7 @@ function installRetainedCompendium(host: CompendiumHost, context: ShardContext, 
       if ((def.trophies ?? []).some((trophy) => trophy.entry === entry.id)) wall?.refresh();
       if (to !== 'discovered') disc.classList.add('new');
     };
-    context.app.events.on('actor.died', ({ actor }) => {
-      const animal = host.animals.animals.find((value) => value.combatActor() === actor);
-      if (animal !== undefined) tracker.killed(animal);
-    }, scope);
+    wirePage.hold({ shard: context.manifest.slug, journal: state }, scope);
     context.app.addSystem({ id: `game.compendium.${context.manifest.slug}`, phase: 'update', run: (dt) => {
       disc.classList.toggle('show', hud.entered && host.touchUi() && !menu.isOpen);
       if (!hud.entered) return;

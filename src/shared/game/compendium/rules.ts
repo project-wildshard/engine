@@ -88,6 +88,12 @@ export class CompendiumRules {
     return this.advance(id, 'taken', (s) => { s.t++; if (kg > s.b) s.b = Math.round(kg); });
   }
 
+  /** Authoritative kill totals, idempotently merged with page-owned discovery. */
+  mirrorKills(id: string, taken: number, best: number): void {
+    if (taken <= 0) return;
+    this.advance(id, 'taken', stats => { stats.t = taken; stats.b = best; });
+  }
+
   // ── the game's events ──
   animalNear(kind: string, variant?: string): void { for (const e of this.matching(kind, variant)) this.discover(e.id); }
   animalSpotted(kind: string, variant?: string): void { for (const e of this.matching(kind, variant)) this.see(e.id); }

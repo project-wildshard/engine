@@ -1,7 +1,7 @@
 import type {BrowserContext, Page} from 'playwright';
 
 export interface SaveFixture {
-  readonly scope: 'device' | 'session' | 'global';
+  readonly scope: string;
   readonly key: string;
   readonly data: unknown;
   readonly merge?: boolean;

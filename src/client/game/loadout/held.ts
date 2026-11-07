@@ -1,3 +1,5 @@
+import { wirePage } from '../shardfile/wirePage';
+import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import type { CombatCueOpts } from '@wildshard/engine/combat/cues';
 import * as THREE from 'three';
 import { LoadoutSchema, type LoadoutRows } from '@wildshard/format/loadout';
@@ -121,7 +123,7 @@ export function installHeldLoadout(context: ShardContext, input: unknown): HeldL
     applyBolt(); dirty = true;
     if (!quiet) { hud.toast(message(row.text.selected, ammoFor(kind).row.name, count)); audio.weaponSwap(); }
   };
-  const cycleBolt = (): void => { selectBolt(quiver.next()); };
+  const cycleBolt = (): void => { weapons.interact('quest.ammo.cycle'); };
   crossbow.ammoSelect = cycleBolt;
   const addAmmo = (kind: string, count: number): void => {
     if (kind === row.firearm.ammo) { rifle.addRounds(count); return; }
@@ -175,8 +177,18 @@ export function installHeldLoadout(context: ShardContext, input: unknown): HeldL
     get bolt() { return quiver.selected; }, get hasRifle() { return owned.has(row.firearm.owned); },
     onPlayerDeath: () => { if (quiver.selected !== base) selectBolt(base, true); },
     update: dt => {
-        quiver.stash(live());
-      if (quiver.selected !== base && live() <= 0 && !crossbow.state.loaded && !crossbow.state.reloading) {
+      const lines = wirePage.client?.owned;
+      if (lines !== undefined) {
+        for (const kind of kinds) { const n = lines.get(`${OWNED_ROW.ammo}${kind}`); if (n !== undefined) quiver.counts[kind] = n - 1; }
+        const selected = kinds.find(kind => lines.has(`${OWNED_ROW.selectedAmmo}${kind}`));
+        if (selected !== undefined) {
+          quiver.selected = selected; crossbow.state.bolts = quiver.counts[selected] ?? 0;
+        }
+        const cartridges = lines.get(`${OWNED_ROW.ammo}${row.firearm.ammo}`);
+        if (cartridges !== undefined) rifle.state.reserve = Math.max(0, cartridges - 1 - rifle.state.ammo);
+      }
+      quiver.stash(live());
+      if (wirePage.client === null && quiver.selected !== base && live() <= 0 && !crossbow.state.loaded && !crossbow.state.reloading) {
         const was = quiver.selected; selectBolt(base, true); hud.toast(message(row.text.spent, ammoFor(was).row.name, live()));
       }
       applyBolt();

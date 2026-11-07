@@ -1,5 +1,7 @@
 /** Client-only entered equipment/pickup/collection owners driven by JSON rows. */
 import { Vector3 } from 'three';
+import { wirePage } from '../shardfile/wirePage';
+import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { perfLap } from '@wildshard/engine/core/perfLap';
 import { practiceRoom } from '@wildshard/engine/core/practiceRoom';
 import { isDev } from '@wildshard/engine/core/devMode';
@@ -7,7 +9,6 @@ import * as v from 'valibot';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { WeaponPickup } from '@wildshard/engine/player/WeaponPickup';
 import { applySkin, clearSkin, type SkinId } from '@wildshard/engine/player/Skins';
-import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { RangedPageSchema, type RangedPageRows } from '@wildshard/format/rangedPage';
 import { forestPage } from '../shardfile/forestPage';
 import { HeldFinishes } from './finishes';
@@ -26,7 +27,7 @@ import { installEnteredRuntimeService } from '../shard/retainedHooks';
 import type { ShardContext } from '../plugin/context';
 import { finishForestPageAudio } from '../audio/forestPage';
 import { declaredLootEconomy } from '../../../shared/game/shard/declaredRows';
-import { registerLootTable, rollLoot } from '../loot/tables';
+import { registerLootTable } from '../loot/tables';
 import { readLootTables } from '../../../shared/game/loot/tableRows';
 import type { DeclaredAmbience } from '@wildshard/engine/audio/declaredAmbience';
 
@@ -69,17 +70,24 @@ export async function installRangedPage(ctx: ShardContext, input: unknown): Prom
   for (const table of readLootTables(economy.tables)) registerLootTable(table, ctx.scope);
   const pickups = ctx.product.section('combat/items').items.pickups;
   if (pickups === undefined) throw new Error('Ranged page requires declared finish pickups');
+  const claims = new Set<SkinId>();
+  const taken = (id: SkinId): void => { const skin = HeldFinishes.current(ctx.manifest.slug).get(id), label = rows.drops.labels[skin.weapon];
+    if (label === undefined) throw new Error('Missing declared pickup family label');
+    wearSkin(skin); if (skin.weapon === slots.firearm.slot) { weapons.unlock(slots.firearm.slot); weapons.select(slots.firearm.slot); }
+    audio.hitMarker(); hud.toast(`${skin.name} ${label} — ${skin.blurb}`);
+  };
   const drops = new ClaimedPickupRoster<SkinId>(pickups, { scene: game.scene, has: id => skins.has(id), random: () => ctx.app.rng.stream('loot').next(), visualRandom: random(rows.drops.stream),
     model: id => { const skin = HeldFinishes.current(ctx.manifest.slug).get(id), model = skin.weapon === slots.firearm.slot ? rifle.displayModel() : launcher.displayModel(); applySkin(model, skin, sky); return model; },
     enter: (_id, drop) => { runtime.interactables.push(drop.interactable); },
-    take: id => { const skin = HeldFinishes.current(ctx.manifest.slug).get(id), label = rows.drops.labels[skin.weapon];
-      if (label === undefined) throw new Error('Missing declared pickup family label');
-      skins.own(skin.id); wearSkin(skin); if (skin.weapon === slots.firearm.slot) { weapons.unlock(slots.firearm.slot); weapons.select(slots.firearm.slot); }
-      audio.hitMarker(); hud.toast(`${skin.name} ${label} — ${skin.blurb}`); },
+    take: id => { claims.add(id); wirePage.send(`finish.claim.${id}`); },
   });
-  ctx.on('actor.died', ({ actor }) => { const body = animals.animals.find(candidate => candidate.combatActor() === actor); if (body === undefined) return;
-    const drop = drops.death(body, player.position, rollLoot('finish-drops', body).map(reward => reward.item)); if (drop === null || runtime.hooks.isElite?.(body) === true) return;
-    drop.at.y = Math.max(drop.at.y, terrainHeight(drop.at.x, drop.at.z)); drops.spawn(drop.id, drop.at, true); });
+  wirePage.hold({ shard: ctx.manifest.slug, drops: lines => {
+    for (const id of Object.keys(pickups)) {
+      if (lines.has(`${OWNED_ROW.finish}${id}`) && claims.delete(id)) taken(id);
+      if (!lines.has(`${OWNED_ROW.drop}${id}`) || drops.drops.has(id) || skins.has(id)) continue;
+      drops.spawn(id, new Vector3(lines.get(`${OWNED_ROW.drop}${id}.x`) ?? 0, lines.get(`${OWNED_ROW.drop}${id}.y`) ?? 0, lines.get(`${OWNED_ROW.drop}${id}.z`) ?? 0), true);
+    }
+  } }, ctx.scope);
   const loadout = installHeldLoadout(ctx, slots), pickup = rows.drops.rifle;
   const rifleDrop = ctx.scope.run(() => new WeaponPickup({ scene: game.scene, item: rifle.displayModel(), position: new Vector3(...pickup.at), tier: 'common', prompt: pickup.label, scale: pickup.scale, random: random(rows.drops.rifleStream) }));
   runtime.interactables.push(rifleDrop.interactable); rifleDrop.onNear = inside => { audio.pickupHum(inside); };

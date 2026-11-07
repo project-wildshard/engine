@@ -192,7 +192,7 @@ function bindDiscovery(host: SimHost, places: readonly PlaceArea[]): void {
 /** What the player holds in a cell. A shard with goods sells them here. */
 function ownedOf(host: SimHost, input: HeadlessRuntimeInput): PlayerOwned {
   const economy = input.shard.rows.loot.find(row => row.economy !== undefined)?.economy, sold = economy !== undefined && 'exchange' in economy ? economy.exchange : undefined;
-  return installPlayerOwned(host, input.shard.identity.slug, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED));
+  return installPlayerOwned(host, input.shard.identity.slug, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED), input.shard);
 }
 
 /** Whether this output runs on the trusted headless owner. */

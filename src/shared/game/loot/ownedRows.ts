@@ -1,7 +1,7 @@
 import type { Board } from '../quest/contracts';
 
 /** The lines a client reads of what its player holds: the purse's coins, a pack's item by id, gear by id. */
-export const OWNED_ROW = { coins: 'coins', item: 'item.', owned: 'own.', board: 'board.', slot: 'board|', said: 'said.', prop: 'story.prop', tie: 'arena.tie', arrows: 'held.arrows' } as const;
+export const OWNED_ROW = { coins: 'coins', item: 'item.', owned: 'own.', board: 'board.', slot: 'board|', said: 'said.', prop: 'story.prop', tie: 'arena.tie', arrows: 'held.arrows', ammo: 'ammo.', selectedAmmo: 'ammo|', finish: 'finish.', drop: 'finish-drop.', journal: 'journal.', purchase: 'bought.' } as const;
 /** A gear line's value when the cosmetic is on. */
 export const WORN_LINE = 2;
 /** A contract board's numbers, and a line per slot naming its contract, whose value is how much of it is done, plus one so none reads 0. */

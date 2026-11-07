@@ -159,9 +159,8 @@ export function installQuestShop(ctx: ShardContext, input: unknown): () => ShopP
     panel.onBuy = good => {
       const selected = index(good);
       if (!panel.isOpen || selected < 0) return false;
-      const bought = exchange.check(selected).ok; if (bought) wirePage.buy(selected);
+      const bought = exchange.check(selected).ok; if (bought) wirePage.buy(selected, () => { if (!ctx.scope.disposed) for (const effect of feedback.get(good.id) ?? []) effect(); });
       if (!bought) return false;
-      for (const effect of feedback.get(good.id) ?? []) effect();
       return true;
     };
     stall.shop = panel; panel.scope.onDispose(() => { if (stall.shop === panel) stall.shop = null; }); return panel;

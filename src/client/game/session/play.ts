@@ -247,6 +247,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   applyTravelCarry(boot.handoff, inventory);
   game.levelScope.onDispose(bindTravelInventory({ shard: chunk.slug, inventory, rows: boot.items }));
   const skins = new SkinLocker(chunk.slug, boot.skins, ctx.product.has('state/migrations') ? ctx.product.section('state/migrations').migrations : []);                          // legendary skins owned / worn (persisted; wired below)
+  wirePage.hold({ shard: chunk.slug, finishes: skins }, game.levelScope);
   const menu = new GameMenu({
     levelName: chunk.name,
     fullMap,

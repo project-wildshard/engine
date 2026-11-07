@@ -4,6 +4,10 @@ import { otherCombatFrame, readNativeRangedItem, seatedBolt, seatedBow, seatedCy
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { parseItems } from '@wildshard/format/items';
+import { publishOwned } from '@wildshard/engine/sim/shardRows';
+import { actRoutes } from '@wildshard/engine/sim/actRoutes';
+import { questBooks } from '@wildshard/engine/quest/players';
+import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { AmmoPouch } from '../../../shared/game/loadout/pouch';
 
 const stack = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0));
@@ -59,6 +63,11 @@ export class NativeHeldAmmunition {
     for (const kind of this.rows.pouch.kinds) this.quiver.counts[kind] = v.parse(stack, saved[kind]);
     this.quiver.selected = selected; this.frame.ammo = selected;
   }
+  /** Every live and parked stack, including an empty one, for the owning page. */
+  lines(out: Map<string, number>): void {
+    out.set(`${OWNED_ROW.selectedAmmo}${this.selected}`, 1);
+    for (const kind of [...this.rows.pouch.kinds, this.rows.firearm.ammo, this.rows.bow.ammo]) out.set(`${OWNED_ROW.ammo}${kind}`, this.count(kind) + 1);
+  }
   get selected(): string { return this.quiver.selected; }
   count(kind: string): number {
     return kind === this.rows.firearm.ammo ? this.ports.lever.store.reserve + this.ports.lever.act.rounds
@@ -107,6 +116,12 @@ export class NativeHeldAmmunition {
 export function installNativeHeldAmmunition(host: SimHost, input: unknown, itemRows: unknown): NativeHeldAmmunition {
   if (owners.has(host)) throw new Error('Duplicate native ammunition owner');
   const owner = new NativeHeldAmmunition(host, input, itemRows);
+  const pouch = (player: string): NativeHeldAmmunition | null => {
+    if (player === questBooks(host).lead.player) return owner;
+    const body = host.players.get(player); return body === undefined ? null : owner.of(body);
+  };
+  publishOwned(host, 'ammunition', (player, out) => { pouch(player)?.lines(out); });
+  actRoutes(host).claims.set('quest.ammo.cycle', player => { pouch(player)?.cycle(); });
   owners.set(host, owner); host.scope.onDispose(() => { owners.delete(host); });
   return owner;
 }

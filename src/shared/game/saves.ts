@@ -17,3 +17,8 @@ export const bossesSave: SaveSlot<Record<string, { defeated: boolean; rewardTake
 export const elitesSave: SaveSlot<Record<string, { timer: number; discovered: boolean; skinTaken: boolean; kills: number; retired: boolean; }>> = define('elites', v.record(v.string(), v.object({ timer: finite, discovered: v.boolean(), skinTaken: v.boolean(), kills: finite, retired: v.boolean() })), () => ({}));
 /** Legacy actor APIs accept strings until their shard phase; normalize the old identifier at this boundary. */
 export function saveSlug(id: string): string { return id.replace(/^chunk:\/\/local\//u, ''); }
+
+/** Weapon finishes retain their pre-flip save document and version. */
+export const skinSave: SaveSlot<{ owned: string[]; worn: Record<string, string> }> = define('skins', v.object({ owned: strings, worn: v.record(v.string(), v.string()) }), () => ({ owned: [], worn: {} }));
+/** Unclaimed authoritative finish drops survive a reload. */
+export const finishPickupSave: SaveSlot<Record<string, { x: number; y: number; z: number }>> = define('finish-pickups', v.record(v.string(), v.object({ x: finite, y: finite, z: finite })), () => ({}));
