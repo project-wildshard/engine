@@ -31,8 +31,8 @@ const scripts = existsSync(pkgPath) ? (JSON.parse(readFileSync(pkgPath, 'utf8'))
 if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budget.mjs'))) {
   // Own the lane before generation/static work too; no sibling push races these outputs.
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-  const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--', process.execPath, '.githooks/push-checks.mjs'],
-    { cwd: pkgDir, env: { ...env, WS_PUSH_GATE_PROFILE: 'full-v1' }, stdio: 'inherit' });
+  const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--checkout-scope', '--', process.execPath, '.githooks/push-checks.mjs'],
+    { cwd: pkgDir, env: { ...env, WS_PUSH_GATE_PROFILE: 'full-v1', WS_CPU_ADMISSION: '1' }, stdio: 'inherit' });
   process.on('SIGINT', () => child.kill('SIGINT'));
   process.on('SIGTERM', () => child.kill('SIGTERM'));
   const code = await new Promise(resolveCode => {

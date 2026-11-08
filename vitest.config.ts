@@ -27,5 +27,5 @@ export default defineConfig(withTestEnvironments({
     server: { deps: { external: [/\/scripts\/(?:built-product|bake-input-hashes)\.mjs$/u], inline: [/@wildshard\/format/u] } },
     include: ['src/{client,shared,server,cook}/{engine,game,host}/**/*.test.ts', 'src/client/app/**/*.test.ts', 'src/test/{engine,game}/**/*.test.ts', 'test/**/*.test.ts', 'test/**/*.test.mjs'],
     exclude: ['**/node_modules/**', ...quarantined, ...(existsSync('test/lift-pending.json') ? JSON.parse(readFileSync('test/lift-pending.json', 'utf8')) as string[] : []), ...(process.env.WILDSHARD_RING === '1' ? JSON.parse(readFileSync('test/pins/ring-2-tests.json', 'utf8')) as string[] : [])],
-    setupFiles: ['test/setup.ts'], restoreMocks: true },
+    setupFiles: ['scripts/vitest-cpu.ts','test/setup.ts'], restoreMocks: true },
 }));

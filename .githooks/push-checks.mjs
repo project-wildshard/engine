@@ -11,6 +11,11 @@ import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proo
  * @param {{name:string,commands:string[][]}[]} tasks
  * @param {{cwd?:string,env?:NodeJS.ProcessEnv,graceMs?:number}} [options] */
 export async function parallelChecks(tasks,options={}) {
+  if(options.env?.WS_CPU_ADMISSION==='1')tasks=tasks.map(task=>({...task,commands:task.commands.map(command=>{
+    if(task.name.startsWith('vitest'))return command; // Actual files own their grants.
+    const slots=command.includes('--builders')?PUSH_BUDGET.builders:task.name.startsWith('lint')?2:1;
+    return ['python3',resolve('scripts/cpu-admission.py'),'run','--slots',String(slots),'--',...command];
+  })}));
   const active=new Set(),results=[],started=Date.now(),grace=options.graceMs??1500;
   let refused=false;
   const signal=(group,name)=>{if(typeof group!=='number')return;try{process.kill(-group,name);}catch(error){if(error.code!=='ESRCH')throw error;}};

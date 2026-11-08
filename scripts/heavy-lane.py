@@ -5,6 +5,7 @@ import contextlib
 from datetime import datetime, timezone
 import fcntl
 import json
+import hashlib
 import math
 import os
 from pathlib import Path
@@ -48,6 +49,8 @@ def read_entry(path):
 
 def queue_timeout(root, entry):
     slots = set(slot for resource in entry['resources'] for slot in (BUILD_SLOTS if resource == 'build' else (resource,)))
+    if 'full-test' in slots:
+        slots.update(path.name[:-len('.active.json')] for path in root.glob('full-test-*.active.json'))
     holders = [holder(slot, read_entry(root / (slot + '.active.json'))) for slot in sorted(slots)]
     queued = read_entry(root / 'queue.json').get('queue', [])
     holders.extend('queue head ' + holder('/'.join(row['resources']), row) for row in queued
@@ -95,8 +98,16 @@ def inherited(root, resources):
     if not token:
         return False
     family = ancestors()
-    return all(any(owns(root, slot, token, family) for slot in BUILD_SLOTS) if resource == 'build'
-               else owns(root, resource, token, family) for resource in resources)
+    view = Path(os.environ.get('WS_HEAVY_ROOT', str(root)))
+    return all(any(owns(view, slot, token, family) for slot in BUILD_SLOTS) if resource == 'build'
+               else owns(view, resource, token, family) for resource in resources)
+
+
+def conflicts(a, b):
+    common = set(a['resources']).intersection(b['resources'])
+    if common == {'full-test'} and a.get('checkout') and b.get('checkout') and a['checkout'] != b['checkout']:
+        return False
+    return bool(common)
 
 
 def owns(root, resource, token, family):
@@ -184,10 +195,21 @@ def acquire(root, entry, deadline=None):
         for previous in ordered:
             if previous['token'] == entry['token']:
                 break
-            if set(previous['resources']).intersection(entry['resources']):
+            if conflicts(previous, entry):
                 return None
         held, leases = [], []
         for resource in sorted(entry['resources']):
+            if resource == 'full-test' and entry.get('checkout'):
+                barrier = (root / 'full-test.lock').open('a+')
+                try:
+                    fcntl.flock(barrier, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    barrier.close()
+                    for fd in held:
+                        fd.close()
+                    return None
+                held.append(barrier)
+                resource = 'full-test-' + hashlib.sha256(entry['checkout'].encode()).hexdigest()[:16]
             slots = BUILD_SLOTS if resource == 'build' else (resource,)
             selected = None
             for slot in slots:
@@ -274,7 +296,8 @@ def terminate(child):
 def status(root):
     with scheduler(root) as state:
         active = []
-        for resource in LANES:
+        scoped = tuple(path.name[:-len('.active.json')] for path in root.glob('full-test-*.active.json'))
+        for resource in (*LANES, *scoped):
             with (root / (resource + '.lock')).open('a+') as fd:
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -330,11 +353,14 @@ def main():
     parser.add_argument('kind', choices=[*RESOURCES, 'status'])
     parser.add_argument('--quiet', action='store_true', help='log output; print only a verdict or failing tail')
     parser.add_argument('--background', action='store_true', help='yield unattended generation/builds with utility QoS')
+    parser.add_argument('--checkout-scope', action='store_true', help='one coordinated push per checkout, with shared CPU admission')
     parser.add_argument('--max', type=float, default=30, help='owned command timeout in minutes; queue time is separate')
     argv = sys.argv[1:]
     separator = argv.index('--') if '--' in argv else len(argv)
     command = argv[separator + 1:]
     args = parser.parse_args(argv[:separator])
+    if args.checkout_scope and args.kind != 'full-test':
+        parser.error('checkout scope is only valid for a coordinated full-test gate')
     if args.background:
         os.environ['WS_HEAVY_BACKGROUND'] = '1'
     root = Path(os.environ.get('WS_HEAVY_SCHEDULER_ROOT', os.environ.get('WS_HEAVY_ROOT', str(Path.home() / '.wildshard-heavy-lanes')))).resolve()
@@ -377,6 +403,10 @@ def main():
              'resources': resources, 'priority': 1,
              'cwd': os.getcwd(), 'command': command, 'queuedAt': time.time(),
              'lane': os.environ.get('SERVE_OWNER') or os.environ.get('HERDR_PANE_ID') or os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CODEX_SESSION_ID') or 'unknown'}
+    if args.checkout_scope:
+        if os.environ.get('WS_CPU_ADMISSION') != '1':
+            parser.error('checkout-scoped pushes require CPU admission')
+        entry['checkout'] = str(Path.cwd().resolve())
     held, child, started, load, code = None, None, None, None, 130
     deadline = time.monotonic() + WAIT_SECONDS
     def interrupted(_signal, _frame):
