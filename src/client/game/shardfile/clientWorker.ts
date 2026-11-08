@@ -139,7 +139,6 @@ function poseActs(names: ReadonlySet<string>): readonly string[] {
 interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number }
 /** Every creature on this page is a row: a new one spawns through the real manager, one the server dropped retires. */
 function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map<number, RowBody>, retired: Map<string, number>, spawnMs: Map<string, number>, poses: ReadonlyMap<string, Record<string, number>>): void {
-  for (const [handle, { body, manager }] of bodies) if (!client.entities.has(handle)) { manager.retire(body); bodies.delete(handle); }
   if (animals === null) return;
   for (const [handle, info] of client.entities) {
     if (info.cls.cls !== ANIMAL_CLASS.cls || bodies.has(handle)) continue; // the shell's bundle has its own copy of the class
@@ -381,6 +380,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
       else if (event.kind === 'reward') { if (event.item !== undefined) entry.manager.presentReward?.(entry.body, client.welcome?.player ?? '', event.item); }
       else entry.manager.presentDeath?.(entry.body, new Vector3(...event.dir), event.impulse, event.tick, event.by === client.welcome?.handle);
     }
+    // A parked page can hear death and despawn before its next frame. Keep the
+    // known body until those queued contacts have presented, then retire it.
+    for (const [handle, { body, manager }] of bodies) if (!client.entities.has(handle)) { manager.retire(body); bodies.delete(handle); }
     const arrows = client.owned.get(OWNED_ROW.arrows); // plus one, so an empty quiver is a line too
     if (arrows !== undefined && arrows !== arrowsSaid) { arrowsSaid = arrows; ports.weapons.mirrorArrows(arrows - 1); }
     bindMount(); offerMounts(); seatMount(); bindClaw();
