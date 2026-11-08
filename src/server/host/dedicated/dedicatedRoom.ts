@@ -166,7 +166,8 @@ export class DedicatedRoom {
     player.netName = entry.name;
     if (lead) player.resetPose(stand, spawn.yaw);
     book.seat(body, doc?.ledger ?? { serial: 0, rows: [] });
-    try { if (doc !== null) importPlayer(this.host, player, doc); }
+    // Bind owned modifiers to the fresh body baseline before restoring its already modified health.
+    try { this.cell.owned.of(body); if (doc !== null) importPlayer(this.host, player, doc); }
     catch (error) {
       // No save or live link is installed on a failed continuation. Keep the durable copies intact.
       this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.seat(body, { serial: 0, rows: [] });
