@@ -185,7 +185,7 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
   const copy = async (key: string, root: string): Promise<void> => { mkdirSync(dirname(join(root, key)), {recursive: true}); writeFileSync(join(root, key), await need(key)); };
   try {
     for (const head of heads) {
-      const body = Object.hasOwn(client, head.slug) ? undefined : await store.get(indexKey(build, head.hash));
+      const body = Object.keys(client).some(slug => bareSlug(slug) === bareSlug(head.slug)) ? undefined : await store.get(indexKey(build, head.hash));
       if (body === undefined) continue;
       const index = JSON.parse(new TextDecoder().decode(body)) as CookIndex;
       for (const row of index.manifests) await copy(row.url.slice(1), scratch);

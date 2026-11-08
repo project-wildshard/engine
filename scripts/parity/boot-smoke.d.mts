@@ -39,3 +39,6 @@ export function discoverCatalogue(browser: Browser, base: string): Promise<{slug
 export function bootRoadCompletionState(): unknown;
 /** Preserve the original error as cause and bound a failed-page diagnostic to 1000 ms. */
 export function bootRoadFailure(read:()=>Promise<unknown>, primary:unknown):Promise<Error>;
+
+/** Run an actual built title through gameplay; reused by the cooked-store proof. */
+export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy",out:string,shard?:string,developer?:boolean):Promise<{elapsedMs:number;frame:number}>;

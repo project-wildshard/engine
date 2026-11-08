@@ -1,0 +1,47 @@
+# J186: report-only soak through 2026-11-15; no new release or hook gate.
+# Cold q11 cooking plus a clean build exceeds ten seconds: Ring 2.
+name: engine-boundaries
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '43 5 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: engine-boundaries-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  report:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: node scripts/pins.ts install --ring 1
+      - run: pnpm gen:inputs
+      - name: Real worker, hostile peers, and restore continuation
+        run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/net-hostile-play.test.ts test/pinned-restore-play.test.ts
+        env:
+          WS_VITEST_MAX_WORKERS: '2'
+          NET_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
+      - run: pnpm exec playwright install --with-deps chromium
+      # The wire proof currently exposes missing recorded programs on Blender.
+      # Renderer ownership is Opus; keep the red reproduction available manually.
+      - name: Cook, attach, and play the same bytes
+        if: github.event_name == 'workflow_dispatch'
+        run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: engine-boundaries
+          path: tmp/engine-boundaries
+          retention-days: 7
+      - name: Remove this run's output
+        if: always()
+        run: node -e "require('node:fs').rmSync('tmp/engine-boundaries', {recursive:true,force:true})"

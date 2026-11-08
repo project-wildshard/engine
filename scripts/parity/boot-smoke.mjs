@@ -400,7 +400,10 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     else faults.push(`Game error report: ${JSON.stringify(report)}`);
   });
   page.on('pageerror', error => faults.push(`pageerror: ${error.message}`));
-  page.on('console', message => { if (message.type() === 'error') faults.push(`console: ${message.text()} ${JSON.stringify(message.location())}`); });
+  page.on('console', message => {
+    if (message.type() === 'error' || /\brefused\b/iu.test(message.text()))
+      faults.push(`console ${message.type()}: ${message.text()} ${JSON.stringify(message.location())}`);
+  });
   page.on('crash', () => faults.push('Page crashed'));
   page.on('response', response => { if (response.status() >= 400) faults.push(`HTTP ${response.status()}: ${response.url()}`); });
   // Remember a transient fatal even if the UI later removes it or the grid navigates to a new document.
@@ -504,9 +507,12 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   } catch (error) {
     await page.screenshot({ path: join(out, `${receipt}-failure.jpg`), type: 'jpeg', quality: 70 }).catch(() => undefined);
     const observation = await page.evaluate(bootObservation).catch(() => null);
+    const loading = await page.evaluate(() => ({ text: document.querySelector('.ws-load')?.textContent,
+      pending: Reflect.get(document.querySelector('.ws-load') ?? {}, Symbol.for('engine.loading.snapshot')),
+      resources: performance.getEntriesByType('resource').map(row => row.toJSON()) })).catch(() => null);
     gameplayFrames.final = observation?.frame ?? null;
     phases.failedMs = Date.now() - started;
-    writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify({ mode, phases, frames, gameplayFrames, gridWaits: gridWaits.samples, elapsedMs: Date.now() - started, faults, reports, lifecycleReports, gridNavigationObserved, error: String(error), observation }, null, 2)}\n`);
+    writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify({ mode, phases, frames, gameplayFrames, gridWaits: gridWaits.samples, elapsedMs: Date.now() - started, faults, reports, lifecycleReports, gridNavigationObserved, error: String(error), observation, loading }, null, 2)}\n`);
     throw error;
   } finally { await context.close(); }
 }
