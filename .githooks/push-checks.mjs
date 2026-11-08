@@ -5,6 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE} from '../scripts/push-budget.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
+import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 
 /** Run actual process groups, drain each one, and never start a later step after failure.
  * @param {{name:string,commands:string[][]}[]} tasks
@@ -59,14 +60,25 @@ async function main(){
   Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');
   const began=Date.now();
   const selection=pushSelection(env.WS_PUSH_REFS);
+  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,selection);
   console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths`);
+  if(proof!==null){
+    console.error(`  - exact-tree green reuse: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
+    return;
+  }
+  const record=seconds=>{
+    const after=capturePushTree(PUSH_PROFILE,env);
+    if(context!==null&&after?.tree===context.tree&&after.runtime===context.runtime){
+      const recorded=writePushProof(context,selection,seconds);console.error(`  - saved exact-tree proof run ${recorded.run} (${selection.mode})`);
+    }
+  };
   console.error(`  - full push budget ${JSON.stringify(PUSH_BUDGET)}; nice ${getPriority()}; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
   if(selection.mode==='docs'){
     const result=await parallelChecks([
       {name:'lint (docs-only)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
       {name:'format:check (docs-only; history scan already green)',commands:[['pnpm','run','--silent','format:check']]},
     ],{env});
-    console.error(`  - docs-only push lane ${result.ok?'green':'RED'} in ${result.seconds.toFixed(1)} s`);process.exitCode=result.ok?0:1;return;
+    console.error(`  - docs-only push lane ${result.ok?'green':'RED'} in ${result.seconds.toFixed(1)} s`);if(result.ok)record(result.seconds);process.exitCode=result.ok?0:1;return;
   }
   const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
   if(!generated.ok){process.exitCode=1;return;}
@@ -82,6 +94,7 @@ async function main(){
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);
   console.error(`  - push lane ${result.ok?'green':'RED'} in ${seconds.toFixed(1)} s; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
+  if(result.ok)record(seconds);
   process.exitCode=result.ok?0:1;
 }
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)await main();
