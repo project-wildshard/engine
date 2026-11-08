@@ -94,7 +94,8 @@ jobs:
   tests:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # The explicit wall gate still fails at five minutes; reserve diagnostic time.
+    timeout-minutes: 7
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -103,6 +104,8 @@ jobs:
       WS_CI_PLAN: tmp/engine-ci/plan.json
       WS_CI_SHARD: ${{ matrix.shard }}
     steps:
+      - name: Start the fixed five-minute shard wall budget
+        run: echo "WS_CI_SHARD_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
@@ -114,7 +117,8 @@ jobs:
           name: engine-ci-plan
           path: tmp/engine-ci
       - run: pnpm pins && pnpm gen:inputs
-      - run: node scripts/engine-ci-shard.mjs
+      - name: Run the shard within its remaining five-minute budget
+        run: node scripts/ci-shard-wall.mjs -- node scripts/engine-ci-shard.mjs
       - name: Retain actual membership, budget and timing evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -122,6 +126,10 @@ jobs:
           name: engine-ci-${{ matrix.shard }}
           path: tmp/engine-ci
           retention-days: 7
+
+      - name: Record the named shard wall-budget verdict
+        if: always()
+        run: node scripts/ci-shard-wall.mjs --check
 
   e2e:
     needs: changes

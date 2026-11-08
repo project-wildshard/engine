@@ -17,7 +17,8 @@ const schema=v.object({version:v.literal(1),sha:v.string(),ring:v.picklist(['ful
 export type EnginePlan=v.InferOutput<typeof schema>;
 interface PlanEnvironment extends NodeJS.ProcessEnv {WILDSHARD_RING?:string}
 const weightsSchema=v.record(v.string(),number);
-const metadata=v.object({full:v.object({run:v.string(),wallSeconds:number,fileSeconds:number}),ring1:v.object({run:v.string(),wallSeconds:number,fileSeconds:number})});
+const timingSource=v.object({run:v.string(),wallSeconds:number,fileSeconds:number,calibration:v.optional(v.object({factor:number,setupSeconds:number}))});
+const metadata=v.object({full:timingSource,ring1:timingSource});
 const digest=(files:readonly string[]):string=>createHash('sha256').update(JSON.stringify([...files].sort())).digest('hex');
 
 /** Discover configured paths, without collecting or executing a test. */
@@ -53,7 +54,7 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
   const cost=new Map(units.map(file=>[file,weights.get(file)??fallback]));
   const sum=(members:readonly string[]):number=>members.reduce((total,file)=>total+(weights.get(file)??fallback),0);
   for(const group of nativeGroups){units.push(group.name);cost.set(group.name,2*sum(group.files));}
-  const factor=2*source.wallSeconds/source.fileSeconds,setupSeconds=40;
+  const factor=source.calibration?.factor??2*source.wallSeconds/source.fileSeconds,setupSeconds=source.calibration?.setupSeconds??40;
   const shards=(count:number):EnginePlan['shards']=>packShards(units,cost,count,0).map((members,index)=>{
     const native=members.flatMap(name=>nativeGroups.find(group=>group.name===name)?.files??[]);
     const ordinary=members.filter(name=>!name.startsWith('@native:'));
@@ -63,8 +64,10 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
   const curve=Array.from({length:12},(_,index)=>({count:index+1,seconds:Math.max(...shards(index+1).map(shard=>shard.expectedSeconds)),gain:0}));
   const first=curve[0]?.seconds??0,best=Math.min(...curve.map(row=>row.seconds));
   for(const row of curve)row.gain=first===best?1:(first-row.seconds)/(first-best);
-  const selected=curve.find(row=>row.gain>=.9&&row.seconds<=300);
-  if(selected===undefined)throw new Error('No shard count meets 90% gain and the five-minute budget; optimize the measured floor');
+  // Keep a full minute (20 percent) below the five-minute wall gate, including
+  // measured setup/import/admission costs rather than only test-body seconds.
+  const selected=curve.find(row=>row.gain>=.9&&row.seconds<=240);
+  if(selected===undefined)throw new Error('No shard count meets 90% gain with 20% five-minute headroom; optimize the measured floor');
   return {version:1,sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),ring,files:[...files],inventoryHash:digest(files),
     unknown:files.filter(file=>baseline[file]===undefined),count:selected.count,setupSeconds,factor,curve,shards:shards(selected.count)};
 }

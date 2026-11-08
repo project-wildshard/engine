@@ -9,8 +9,9 @@ import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proo
 
 /** Run actual process groups, drain each one, and never start a later step after failure.
  * @param {{name:string,commands:string[][]}[]} tasks
- * @param {{cwd?:string,env?:NodeJS.ProcessEnv,graceMs?:number}} [options] */
+ * @param {{cwd?:string,env?:NodeJS.ProcessEnv,graceMs?:number,timeoutMs?:number}} [options] */
 export async function parallelChecks(tasks,options={}) {
+  if(options.timeoutMs!==undefined&&(!Number.isFinite(options.timeoutMs)||options.timeoutMs<=0))throw new Error('Invalid owned command deadline');
   if(options.env?.WS_CPU_ADMISSION==='1')tasks=tasks.map(task=>({...task,commands:task.commands.map(command=>{
     if(task.name.startsWith('vitest'))return command; // Actual files own their grants.
     const slots=command.includes('--builders')?PUSH_BUDGET.builders:task.name.startsWith('lint')?2:1;
@@ -31,6 +32,8 @@ export async function parallelChecks(tasks,options={}) {
     for(const child of active){child.groups=groups(child);for(const group of child.groups)signal(group,'SIGTERM');child.escalation=setTimeout(()=>{for(const group of child.groups)signal(group,'SIGKILL');},grace);}
   };
   const interrupted=()=>stop();process.on('SIGINT',interrupted);process.on('SIGTERM',interrupted);
+  let timedOut=false;
+  const deadline=options.timeoutMs===undefined?undefined:setTimeout(()=>{timedOut=true;stop();},options.timeoutMs);
   try {
     await Promise.all(tasks.map(async task=>{
       const at=Date.now();let output='',code=0;
@@ -53,8 +56,8 @@ export async function parallelChecks(tasks,options={}) {
       console.error(`  - ${task.name} ${code===0?'green':'RED'} in ${seconds.toFixed(1)} s`);
       if(process.env.GITHUB_ACTIONS)console.log('::endgroup::');
     }));
-  } finally {process.off('SIGINT',interrupted);process.off('SIGTERM',interrupted);}
-  return {ok:!refused&&results.every(row=>row.code===0),seconds:(Date.now()-started)/1000,results};
+  } finally {clearTimeout(deadline);process.off('SIGINT',interrupted);process.off('SIGTERM',interrupted);}
+  return {ok:!refused&&results.every(row=>row.code===0),seconds:(Date.now()-started)/1000,results,timedOut};
 }
 
 async function main(){
