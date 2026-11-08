@@ -1214,6 +1214,7 @@
     "src/server/host/standalone/gridServer.ts": "server",
     "src/server/host/standalone/ledgerFilings.ts": "server",
     "src/server/host/standalone/serverHost.ts": "server",
+    "src/server/host/standalone/serverRuntime.ts": "server",
     "src/server/host/standalone/serverProduct.ts": "server",
     "src/server/host/standalone/serverWorker.ts": "server",
     "src/server/host/tickWorkerHost.ts": "server",

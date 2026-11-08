@@ -12,7 +12,7 @@ import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMessage, type ShellMessage } from '@wildshard/format/standaloneControl';
 import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace } from '../../../shared/host/standalone/harnessPlace';
-import type { ServerWorkerStart } from '../../../server/host/standalone/serverWorker';
+import type { ServerWorkerStart } from '../../../server/host/standalone/serverRuntime';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
 
 /** What the server should run and where the page keeps saves. */
@@ -140,6 +140,10 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
 /** Start the standalone target: the server always in a module worker, with no main-thread fallback (J49). */
 export function startStandalone(config: StandaloneConfig): StandaloneShell {
   const worker = new Worker(new URL('../../../server/host/standalone/serverWorker.ts', import.meta.url), { type: 'module', name: 'standalone-server' });
+  const bootstrapScope = new Scope('standalone.bootstrap');
+  bootstrapScope.listen(worker, 'message', (event: MessageEvent<unknown>) => {
+    if (typeof event.data === 'object' && event.data !== null && '__engineWorkerBoot' in event.data) bootMark('server:worker-bootstrap-ready');
+  });
   const control = new MessageChannel(), game = new MessageChannel(), harness = new MessageChannel(), reads = config.held === undefined ? undefined : new MessageChannel();
   // C3: the page's catalogue, read at boot, is the worker's too; it has no document to read it from. So are its build's
   // verdicts, which a worker's reads ask for as the page's do (they are stamped into the document, and into nothing else).
@@ -150,5 +154,5 @@ export function startStandalone(config: StandaloneConfig): StandaloneShell {
   // The worker sits beside this module, so an emitted module's `/b/<build>/` folder is the server's real build (J57).
   const served = /^\/b\/([\w.-]+)\//u.exec(new URL(import.meta.url).pathname)?.[1];
   const refused = (): void => { void import('@wildshard/engine/boot/browserChunkRecovery').then(recovery => recovery.reloadRefusedBuild()); };
-  return connectStandalone({ refused, ...served === undefined ? {} : { serverBuild: served }, ...config }, control.port1, game.port1, () => { reads?.port1.close(); harness.port1.close(); worker.terminate(); }, harness.port1);
+  return connectStandalone({ refused, ...served === undefined ? {} : { serverBuild: served }, ...config }, control.port1, game.port1, () => { bootstrapScope.dispose(); reads?.port1.close(); harness.port1.close(); worker.terminate(); }, harness.port1);
 }

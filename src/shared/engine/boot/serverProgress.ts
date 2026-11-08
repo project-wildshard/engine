@@ -3,7 +3,7 @@ import type { BootTiming } from './timing';
 /** Guaranteed boundaries of the standalone launch; optional file counts never
  * become a guessed denominator. The stage itself owns the final completion. */
 const MILESTONES = ['server:shell-module', 'server:indexed-saves-open',
-  'server:product-inputs', 'server:world-boot'] as const;
+  'server:worker-runtime-import', 'server:product-inputs', 'server:world-boot'] as const;
 
 /** Read the current launch only. Failed operations and a previous worker cannot
  * earn credit. The same worker records already feed Copy diagnostics. */

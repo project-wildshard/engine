@@ -468,7 +468,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
 }
 
 async function guarded(ports: WorkerClientPorts): Promise<void> {
-  const card = countedWait('Server world', 'files'); // from the first module, so loading the server's code is on the card too
+  const card = countedWait('Worker boot', 'files'); // completed worker tasks and verified inputs own its progress
   try { await startWorkerClient(ports, card); }
   catch (error) { console.error('[worker client]', error); showError(`The game's server didn't start (${String(error)})`, error instanceof Error ? error.stack ?? '' : ''); }
   finally { card.end(); }

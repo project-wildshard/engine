@@ -66,7 +66,7 @@ export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { l
     // QA8: WebKit only (finish.ts linkWorldUnderLoader); it carries no bar share, so other engines' bars are unchanged
     step('spawnPrograms', 'Spawn program links'), { ...step('worldPrograms', 'World program links'), weight: 0.01 },
     // DL21: the server's boot, on J130's row and after the flip on every page; no bar share, so a page with no server is unchanged
-    { ...step('server', 'Server world'), weight: 0.01 }, leaf('audio')],
+    { ...step('server', 'Worker boot'), weight: 0.01 }, leaf('audio')],
     ignored: native ? [] : BOOT_STEPS.filter(key => !selected.has(key)) }, id === 'shardfile' && !native);
 }
 

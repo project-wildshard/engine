@@ -51,6 +51,17 @@ if(expectedBuild!==undefined) {
     try {
       const context = await browser.newContext({...devices['iPhone 16 Pro'], deviceScaleFactor:2});
       await saveFixture(context, {scope:'device',key:'devMode',data:true});
+      if(process.argv.includes('--worker-bootstrap')) await context.addInitScript(()=>{
+        /** @type {{label:string,steps:number,files:number,bytes:number}[]} */ const samples=[];
+        Reflect.set(window,'__workerBootProof',samples);
+        const observer=new MutationObserver(()=>{
+          const card=document.querySelector('.ws-load'),row=card?.querySelector('[data-key="server"]');
+          if(!(card instanceof HTMLElement)||row===null||row===undefined)return;
+          const sample={label:row.textContent??'',steps:Number(card.dataset.serverSteps??0),files:Number(card.dataset.serverFiles??0),bytes:Number(card.dataset.serverBytes??0)};
+          if(samples.length<1000&&JSON.stringify(sample)!==JSON.stringify(samples.at(-1)))samples.push(sample);
+        });
+        observer.observe(document,{childList:true,subtree:true,characterData:true,attributes:true});
+      });
       if(serverNetwork) await context.addInitScript(()=>{
         const post=Reflect.get(Worker.prototype,'postMessage');
         // Exercise a real server cache miss by withholding only its optional
@@ -69,7 +80,8 @@ if(expectedBuild!==undefined) {
       let delayed = false;
       if (delayKind && !swDelay && delayKind!=='server') await context.route('**/*',async route => {
         const path = new URL(route.request().url()).pathname;
-        const match = delayKind === 'worker' ? /serverWorker[^/]*\.js$/u.test(path)
+        const match = delayKind === 'worker-runtime' ? /serverRuntime[^/]*\.js$/u.test(path)
+          : delayKind === 'worker' ? /serverWorker[^/]*\.js$/u.test(path)
           : delayKind === 'server' ? /\/spawn\/server-.*\.json$/u.test(path)
           : delayKind === 'styles' ? path.endsWith('.css')
           : delayKind === 'tables' ? /tables.*\.json$/u.test(path)
@@ -149,6 +161,13 @@ if(expectedBuild!==undefined) {
       assert.equal(Object.keys(timing.overflow??{}).length,0,'bounded collector overflowed');
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
       const operations=new Set(timing.entries.map(row=>row.operation));
+      if(process.argv.includes('--worker-bootstrap')) {
+        assert.ok(operations.has('server:worker-bootstrap-ready'),'actual bootstrap receipt absent');
+        assert.ok(timing.entries.some(row=>row.operation==='server:worker-runtime-import'&&row.result==='complete'&&row.end!==null),'actual runtime import never completed');
+        const samples=/** @type {{label:string,steps:number,files:number,bytes:number}[]} */(await page.evaluate(()=>Reflect.get(window,'__workerBootProof')));
+        assert.ok(samples.some(row=>row.label.includes('Worker boot')&&row.steps>0&&row.files>0&&row.bytes>0),`Worker boot lacks real visible work/verified inputs: ${JSON.stringify(samples)}`);
+        console.log(`${name}: Worker boot real visible samples=${samples.length}, steps=${Math.max(...samples.map(row=>row.steps))}`);
+      }
       const ordinary=timing.entries.filter(row=>row.operation==='worker:message-receive').length;
       const received=Object.entries(timing.counters).filter(([key,row])=>key.endsWith(':messages-received')&&row.unit==='messages').reduce((sum,[,row])=>sum+row.loaded,0);
       if(grid) {
@@ -220,7 +239,7 @@ if(expectedBuild!==undefined) {
       }
       if(delayKind) {
         assert.ok(delayed||proxy?.matched(),`${delayKind} route never matched`);
-        const operation=delayKind==='sw-open'?'sw:cache-open':delayKind==='sw-put'?'sw:body-and-cache-publication':delayKind==='worker'?'worker:fetch-evaluate-start':delayKind==='server'?'server:world-boot':delayKind==='styles'?'wait:Startup stylesheets':delayKind==='tables'?'app:tables-import-and-prepare':'app:document-and-module-graph';
+        const operation=delayKind==='sw-open'?'sw:cache-open':delayKind==='sw-put'?'sw:body-and-cache-publication':delayKind==='worker-runtime'?'server:worker-runtime-import':delayKind==='worker'?'worker:fetch-evaluate-start':delayKind==='server'?'server:world-boot':delayKind==='styles'?'wait:Startup stylesheets':delayKind==='tables'?'app:tables-import-and-prepare':'app:document-and-module-graph';
         assert.ok(timing.entries.some(row=>row.operation===operation && row.end!==null && row.end-row.start>=delayMs-100),`${operation}: injected delay lost`);
       }
       assert.equal(faults.length,0,faults.join('\n'));
