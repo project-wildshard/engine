@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Plugin } from 'vitest/config';
 import type { VitestPluginContext } from 'vitest/node';
@@ -15,6 +15,17 @@ export function resolutionKey(root: string): string {
   for (const layer of existsSync(source) ? readdirSync(source).sort() : []) {
     const manifest = resolve(source, layer, 'package.json');
     if (existsSync(manifest)) hash.update(`${layer}\0`).update(readFileSync(manifest));
+  }
+  // J196 local aliases deliberately leave the root lock/manifests unchanged.
+  // Cached callers hold resolved addresses and dependency export maps too.
+  const pkg=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8')) as {dependencies?:Record<string,string>;devDependencies?:Record<string,string>;optionalDependencies?:Record<string,string>};
+  const dependencies=new Set([...Object.keys(pkg.dependencies??{}),...Object.keys(pkg.devDependencies??{}),...Object.keys(pkg.optionalDependencies??{})]);
+  for(const name of [...dependencies].sort()){
+    const directory=resolve(root,'node_modules',name),manifest=resolve(directory,'package.json');
+    hash.update(`dependency:${name}\0`);
+    if(existsSync(manifest))hash.update(realpathSync(directory)).update('\0').update(readFileSync(manifest));
+    else hash.update('missing');
+    hash.update('\0');
   }
   return hash.digest('hex');
 }
