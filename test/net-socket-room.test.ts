@@ -136,21 +136,28 @@ test('a client that stops reading is closed at 256 KB and the room keeps ticking
     await Promise.all([raw, never.raw].map(socket => new Promise(resolve => { socket.once('message', resolve); })));
     raw.pause(); never.raw.pause();
     const pings = setInterval(() => { raw.send(encodePing(0, 0)); never.raw.send(encodePing(0, 0)); }, 500);
-    let reason: string | null = null, ticks = 0, closedAtTick = -1;
+    let reason: string | null = null, otherReason: string | null = null, ticks = 0, closedAtTick = -1;
     stuckEnd.onClose(said => { reason = said; closedAtTick = ticks; });
+    never.end.onClose(said => { otherReason = said; });
     const framesBefore = room.stats.frames;
-    while (reason === null && ticks < 200_000) {
+    // Independent kernel send buffers need not cross the stall boundary in
+    // the same tick. Both actual transports must leave before counting one.
+    while ((reason === null || otherReason === null) && ticks < 200_000) {
       for (let view = 0; view < 64; view++) sayFightView(host, `load.${String(view)}`, [ticks, 2, 3, 4, 5, 6, 7, 8]);
       room.tick(); ticks++;
       await new Promise(resolve => { setImmediate(resolve); });
     }
     clearInterval(pings);
     expect(reason).toBe('stalled');
+    expect(otherReason).toBe('stalled');
     console.info(`stalled client: closed at ${String(stuckEnd.stalledAt)} bytes waiting after ${String(closedAtTick)} ticks, ${String(stuckEnd.skippedFrames)} frames skipped, ${stuckEnd.stats.lossPct.toFixed(1)}% loss, sent ${String(stuckEnd.stats.sentBytes)}`);
     expect(stuckEnd.stalledAt).toBeGreaterThan(STALL_CLOSE_BYTES);
     expect(stuckEnd.stalledAt).toBeLessThan(STALL_CLOSE_BYTES + 32 * 1024);
     expect(stuckEnd.skippedFrames, `frames stop first, at ${String(FRAME_SKIP_BYTES)}`).toBeGreaterThan(0);
     expect(stuckEnd.stats.lossPct).toBeGreaterThan(0);
+    expect(never.end.stalledAt).toBeGreaterThan(STALL_CLOSE_BYTES);
+    expect(never.end.stalledAt).toBeLessThan(STALL_CLOSE_BYTES + 32 * 1024);
+    expect(never.end.skippedFrames).toBeGreaterThan(0);
     const tickNow = host.state.tick, frames = room.stats.frames, seen = reader.latest?.tick ?? 0;
     expect(frames).toBeGreaterThan(framesBefore);
     for (let tick = 0; tick < 30; tick++) { for (let view = 0; view < 64; view++) sayFightView(host, `load.${String(view)}`, [ticks + tick, 2, 3, 4, 5, 6, 7, 8]); room.tick(); await settled([healthy]); }
