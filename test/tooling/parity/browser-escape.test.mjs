@@ -19,7 +19,10 @@ import {drainNativeBrowser} from '../../fixtures/native-browser-drain.mjs';
 // Singleplayer prepared these exact executable/resource pages before its
 // isolated Escape job. The lift kept the helper but lost that workflow step.
 // Keep cold file I/O outside the original 10 s endpoint / 25 s child clocks.
-beforeAll(async () => { await warmNativeChrome(nativeChromeExecutable()); });
+// Reading the complete installed binary/resources can exceed Vitest's default
+// 10 s hook on a cold shared runner. Bound only that disk preparation at 60 s;
+// the actual endpoint, child-process and trusted-input clocks stay unchanged.
+beforeAll(async () => { await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
 
 /** @param {number | undefined} pid */
 function stopFixturePid(pid) {
