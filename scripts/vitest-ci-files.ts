@@ -4,6 +4,11 @@ export const CI_NATIVE_GROUPS = {
   'escape-titan': [
     'test/tooling/parity/browser-escape.test.mjs',
     'test/nalati-titan-verbs.test.ts',
+    'test/engine-rule-successors.test.ts',
+  ],
+  'network-rewards': [
+    'test/net-fuzz.test.ts',
+    'test/pine-rewards.test.ts',
   ],
   'native-routes': [
     'test/driftwood-optional-verbs.test.ts',
