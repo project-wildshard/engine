@@ -17,3 +17,11 @@ Unmeasured files now reserve their actual acceptance bound,60seconds,
 instead of a tiny median. Their paths remain explicitly unmeasured; this
 is a conservative bound, not a fabricated duration. No file/shard cap,
 actual membership, native group, quarantine or case assertion changes.
+
+Post-split exact1b5e705 CI42501721151 and Ring142501721107 are green,
+but CI job walls still reach252s. Refresh again from those actual complete
+receipts rather than the earlier over-budget file. Full1,162files total
+1718.371file-s: seven models247.370s, eight225.198s/95.45percent gain.
+Ring1's1,085files select six209.800s/90.91percent gain. Unknown future
+files retain the honest60s acceptance bound. Hosted headroom remains to
+be observed after this refreshed dispatch lands.

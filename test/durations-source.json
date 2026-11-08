@@ -1,25 +1,25 @@
 {
   "full": {
-    "run": "42500064468",
-    "sha": "17f1a6e52e4803ce46a64990bba26acbbb2d1b25",
-    "wallSeconds": 245,
-    "fileSeconds": 1719.332435312002,
+    "run": "42501721151",
+    "sha": "1b5e70576bbb17bca297c7e35a167e70fe2c79a2",
+    "wallSeconds": 245.741,
+    "fileSeconds": 1718.371002223001,
     "calibration": {
       "factor": 1.35,
       "setupSeconds": 70
     },
-    "basis": "Complete module diagnostics for 1161 files after E7. All assertions pass; dedicated-hold independently refuses the unchanged sixty-second file cap. One platform-skipped module contributes its measured preparation only."
+    "basis": "Complete module diagnostics for 1162 files after the real hold split; exact workflow green. Wall is maximum explicit first-step receipt before artifact upload, not total GitHub job time. One platform-skipped module contributes its observed preparation only."
   },
   "ring1": {
-    "run": "42500064545",
-    "sha": "17f1a6e52e4803ce46a64990bba26acbbb2d1b25",
-    "wallSeconds": 183,
-    "fileSeconds": 1302.4175510260018,
+    "run": "42501721107",
+    "sha": "1b5e70576bbb17bca297c7e35a167e70fe2c79a2",
+    "wallSeconds": 166.003,
+    "fileSeconds": 1238.3574388939994,
     "calibration": {
       "factor": 1.35,
       "setupSeconds": 70
     },
-    "basis": "Complete module diagnostics for 1084 files after E7. All assertions pass; dedicated-hold independently refuses the unchanged sixty-second file cap. One platform-skipped module contributes its measured preparation only."
+    "basis": "Complete module diagnostics for 1085 files after the real hold split; exact workflow green. Wall is maximum explicit first-step receipt before artifact upload, not total GitHub job time. One platform-skipped module contributes its observed preparation only."
   },
   "additionalGreenRuns": [
     "42497139602",

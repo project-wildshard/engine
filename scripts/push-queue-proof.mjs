@@ -21,7 +21,8 @@ try{
  writeFileSync(join(repo,'value.json'),'{"value":1}');execFileSync('pnpm',['install','--lockfile-only'],{cwd:repo,stdio:'pipe'});
  git(['add','.gitignore','.githooks/pre-push','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','prepare-tools.mjs','gate.mjs','value.json']);git(['commit','--quiet','-m','base']);git(['config','core.hooksPath','.githooks']);
  execFileSync(process.execPath,['prepare-tools.mjs'],{cwd:repo});git(['push','--quiet','origin','main']);
- const script=resolvePath('scripts/push-queue.mjs'),queue=join(work,'queue'),jobs=[],commits=[];
+ const script=resolvePath('scripts/push-queue.mjs'),queue=join(work,'queue'),jobs=[];
+ /** @type {string[]} */ const commits=[];
  for(const value of [2,3,-1,4]){
   writeFileSync(join(repo,'value.json'),JSON.stringify({value}));git(['commit','--quiet','-m',`value ${value}`,'--','value.json']);
   commits.push(git(['rev-parse','HEAD']));
