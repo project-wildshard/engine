@@ -77,6 +77,12 @@ server pack book before a sitting can move. This CI job does not cook or
 publish packs, configure tunnels, change CORS, run setup, or prove the
 VPS transition. Those remain the E7 plan's external work.
 
+For that coordinated page build, set `WS_BUILD_ID` to the full source SHA
+when invoking `scripts/build-app.mjs`; use the identical SHA with
+`scripts/build-server.mjs --build`. `version.json`, the document stamp,
+the server bundle and the signed release then name one build. Without
+an explicit value, page builds retain their short-SHA plus timestamp ID.
+
 ## Local proof
 
 `node scripts/vitest-tmp.ts run test/server-release-ci.test.ts` generates

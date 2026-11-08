@@ -9,9 +9,14 @@ export const BUILD_ID_EXPRESSION = '(globalThis.__WS_BUILD_ID__ ?? "")';
 export const VALIDATOR_EXPRESSION = 'globalThis.__WS_SHARDFILE_VALIDATOR__';
 export const VERDICTS_EXPRESSION = 'globalThis.__WS_SHARDFILE_VERDICTS__';
 
-/** Short git sha + build time: unique per build, so a build folder is never written twice. Vercel CLI builds have no git
- * checkout. build-app mints it first, because the bundler names the folder and version.json serves the same id. */
+/** An explicit WS_BUILD_ID coordinates a page with a dedicated server release. Otherwise mint a short git sha + build
+ * time. build-app chooses it first, because the bundler names the folder and version.json serves the same id. */
 export function newBuildId() {
+  const requested = process.env.WS_BUILD_ID;
+  if (requested !== undefined) {
+    if (!/^\w[\w.-]*$/u.test(requested)) throw new Error('Invalid WS_BUILD_ID');
+    return requested;
+  }
   let sha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7);
   try { sha ||= execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { /* not a git checkout */ }
   return `${sha || 'b'}-${Date.now().toString(36)}`;
