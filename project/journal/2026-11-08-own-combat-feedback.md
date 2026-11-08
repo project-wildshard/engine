@@ -34,3 +34,8 @@ The SR4 diagnostic now activates its fresh browser tab and waits for
 the real worker hook before unpausing and waiting for frames. Earlier
 crash timeouts had a proof readiness ambiguity. No readiness wire or
 UI was changed on that evidence. Codex-port owns the combined push.
+
+Engine-only 9059d6ba175e subsequently landed after its full normal
+hook passed in 877 seconds, scan zero findings. Codex-port has the
+confirmed hash and the explicit remaining S1/death-order gaps. This
+documentation receipt changes no SR source or wire fields.
