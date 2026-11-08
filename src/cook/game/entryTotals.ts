@@ -29,6 +29,8 @@ const schema = v.object({common: files, client: files, grid: files,
 interface Address {readonly url: string; readonly bytes: number}
 /** What a build's half of the manifests needs from the app: the page's own tables and names, which no cook owns. */
 export interface BuildHalf {
+  readonly preparationOnly?: boolean;
+  readonly rendererRevision?: string;
   readonly cacheName: string;
   readonly gpuFiles: Parameters<typeof standInRefs>[0];
   /** The boot tables' common and pack sources, as `assetTables.mjs` bakes them. */
@@ -179,7 +181,8 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     const product = join(root, 'out', directory), index = parseOutputIndex(JSON.parse(readFileSync(join(product, 'shard.json'), 'utf8')));
     if (index.runtime !== null && (!('kind' in index.runtime) || index.runtime.kind !== 'client-plan')) continue;
     // C1: the shard half comes from the shardfile alone, one tarball per product, and its parts from the shard's own cook.
-    const half = shardHalf(openShardfile(productTarball(product)), wireBytes, undefined, directory), {sections} = half.shard;
+    const half = shardHalf(openShardfile(productTarball(product), {preparationOnly: build.preparationOnly === true,
+      ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision})}), wireBytes, undefined, directory), {sections} = half.shard;
     const shardRows = {phone: {entry: half.productRows('phone', 'entry'), whole: half.productRows('phone', 'whole')},
       desktop: {entry: half.productRows('desktop', 'entry'), whole: half.productRows('desktop', 'whole')}};
     for (const [url, member] of await cookParts(output, half, [{tier: 'phone', rows: shardRows.phone.whole}, {tier: 'desktop', rows: shardRows.desktop.whole}], encoder)) cooked.set(url, member);

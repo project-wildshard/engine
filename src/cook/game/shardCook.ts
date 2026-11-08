@@ -14,6 +14,8 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {assetIdentities, identityFiles, resolveFenceReads, sectionRefs} from './fenceReads';
 import {COOK_DATA_PATH, readCookData, type CookData, type CookMount} from '@wildshard/format/cookData';
+import {requireCookPreparation} from '@wildshard/format/cookPreparation';
+import {rendererRevision} from '../../../scripts/renderer-revision.mjs';
 import {assembleOutputShardfile, parseOutputIndex, type OutputIndex} from '@wildshard/format/outputIndex';
 import {SPAWN_PART_ALIGN, readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnPart} from '../../shared/game/shardfile/spawnManifest';
 import type {Shardfile} from '@wildshard/format/shardSchema';
@@ -38,6 +40,7 @@ const CONTENT_NAMED = /\/[a-f0-9]{64}\.[a-z0-9]+$/u;
 
 /** A shardfile opened from its tarball, every read checked against its index. */
 export interface OpenShardfile {
+  readonly preparationOnly?: boolean;
   readonly slug: string;
   readonly index: OutputIndex;
   readonly source: Shardfile;
@@ -47,7 +50,11 @@ export interface OpenShardfile {
   readonly read: (path: string) => Uint8Array;
 }
 
-export function openShardfile(tarball: Uint8Array): OpenShardfile {
+function parsedCook(bytes: Uint8Array, slug: string): CookData {
+  try { return readCookData(JSON.parse(new TextDecoder().decode(bytes))); }
+  catch (cause) { throw new Error(`Invalid cook preparation for ${slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`, {cause}); }
+}
+export function openShardfile(tarball: Uint8Array, options: Readonly<{preparationOnly?: boolean; renderer?: string}> = {}): OpenShardfile {
   const files = readTar(tarball);
   const read = (path: string): Uint8Array => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path} in the shardfile`); return bytes; };
   const header = read('shard.json'), raw: unknown = JSON.parse(new TextDecoder().decode(header)), index = parseOutputIndex(raw);
@@ -57,16 +64,23 @@ export function openShardfile(tarball: Uint8Array): OpenShardfile {
     if (bytes.length !== row.bytes || sha256(bytes) !== row.hash) throw new Error('Spawn section differs from index');
     sections.set(row.name, JSON.parse(new TextDecoder().decode(bytes)));
   }
-  const cookBytes = index.cook === undefined ? undefined : read(COOK_DATA_PATH);
+  const cookBytes = index.cook === undefined ? undefined : files.get(COOK_DATA_PATH);
+  if (index.cook !== undefined && cookBytes === undefined) throw new Error(`Missing cook preparation for ${index.identity.slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
   if (cookBytes !== undefined && (cookBytes.length !== index.cook?.bytes || sha256(cookBytes) !== index.cook.hash)) {
     throw new Error(`Stale cook preparation bytes for ${index.identity.slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
   }
-  const cook = cookBytes === undefined ? undefined : readCookData(JSON.parse(new TextDecoder().decode(cookBytes)));
+  const cook = cookBytes === undefined ? undefined : parsedCook(cookBytes, index.identity.slug);
   for (const mount of cook?.mounts ?? []) {
-    const bytes = read(mount.path);
-    if (bytes.length !== mount.bytes || sha256(bytes) !== mount.hash) throw new Error(`Stale cook preparation mount ${mount.url}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
+    const bytes = files.get(mount.path);
+    if (bytes === undefined || bytes.length !== mount.bytes || sha256(bytes) !== mount.hash) throw new Error(`Stale cook preparation mount ${mount.url}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
   }
-  return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read};
+  if (options.preparationOnly !== true) {
+    requireCookPreparation(index, cook, sha256);
+    if (cook?.version === 3 && cook.renderer !== (options.renderer ?? rendererRevision())) {
+      throw new Error(`Stale renderer preparation for ${index.identity.slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
+    }
+  }
+  return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read, preparationOnly: options.preparationOnly === true};
 }
 
 /** Each string's first place in the sections (`world/scenes:libraries.24.tiles.0.files.3.file`), in section order: a
@@ -89,8 +103,13 @@ const downloaded = (shard: OpenShardfile): readonly CookMount[] => (shard.cook?.
 /** D5: a stale hint warns and costs seconds; it never refuses a cook. Asset identities here name only this shard's
  *  mounts: one that names an engine file belongs to the app build's half. */
 function fenceHints(shard: OpenShardfile, warn: (line: string) => void): {readonly hashes: ReadonlySet<string>; readonly mounts: readonly string[]} {
+  if (shard.preparationOnly === true) return {hashes: new Set(), mounts: []};
   const reads = shard.cook?.fence;
   if (reads === undefined) return {hashes: new Set(), mounts: []};
+  if (shard.cook?.version === 3 || shard.cook?.version === 2) {
+    const hashes = new Set(reads);
+    return {hashes, mounts: downloaded(shard).filter(row => hashes.has(row.hash)).map(row => row.url)};
+  }
   const resolved = resolveFenceReads({version: 1, files: reads.filter(row => !row.startsWith('asset'))}, shard.index.files, shard.sections);
   const stale = resolved.unresolved.filter(row => !row.startsWith('ref:'));
   if (stale.length > 0) warn(`${shard.slug}: ${stale.length} fence reads this revision no longer has (${stale.slice(0, 3).join(', ')})`);
@@ -129,7 +148,7 @@ export interface ShardHalf {
  *  product is served; a catalogue names it by slug, and today's `_template` folder is the one that differs (`template`). */
 export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (line: string) => void = () => undefined, folder: string = shard.slug): ShardHalf {
   const prefix = `/shardfiles/${folder}/`, {index, source, sections} = shard, named = namedPlaces(sections);
-  const fence = fenceHints(shard, warn), fenceSet = shard.cook?.packs === 'fence';
+  const fence = fenceHints(shard, warn), fenceSet = shard.preparationOnly !== true && shard.cook?.packs === 'fence';
   // S3: a shard's `fence` set is a phone's recorded reads, so a desktop always lists its whole level.
   const wholeSet = (tier: CookTier, set: CookSet): boolean => set === 'whole' && (!fenceSet || tier === 'desktop');
   const sources = new Map<string, () => Uint8Array>(), stableKeys = new Map<string, string>(), rows = new Map<string, SpawnFile>();

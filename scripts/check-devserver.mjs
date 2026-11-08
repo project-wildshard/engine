@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /** A production build's flag file says DEVSERVER is off and no bundle keeps an unsubstituted DEVSERVER define (the
  *  flag file is scripts/build-app.mjs's, from the build's mode; the bundle takes the mode from the __DEVSERVER__ define). */
 export function assertProductionBuild(directory) {
+  const version=resolve(directory,'version.json');
+  if (existsSync(version) && JSON.parse(readFileSync(version,'utf8')).preparationOnly === true) throw new Error('Preparation-only preview cannot be released');
   const flags = JSON.parse(readFileSync(resolve(directory, 'build-flags.json'), 'utf8'));
   if (flags?.devserver !== false) throw new Error('Production build has DEVSERVER enabled or no false build flag');
   const walk = (path) => {

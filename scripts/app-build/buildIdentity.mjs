@@ -49,6 +49,7 @@ export function stampBuildDocuments(directory, facts) {
   /** @type {unknown} */
   const version = JSON.parse(readFileSync(resolve(directory, 'version.json'), 'utf8'));
   if (typeof version !== 'object' || version === null || !('build' in version) || typeof version.build !== 'string') throw new Error('Missing document build identity');
+  if (version.rendererRevision !== undefined && (typeof version.rendererRevision !== 'string' || !/^[a-f0-9]{64}$/u.test(version.rendererRevision))) throw new Error('Invalid renderer identity');
   const documents = new Set(['index.html']);
   const manifest = resolve(directory, '.vite/manifest.json');
   if (existsSync(manifest)) {
@@ -64,6 +65,7 @@ export function stampBuildDocuments(directory, facts) {
   }
   for (const name of documents) {
     const path = resolve(directory, name);
-    writeFileSync(path, stampBuildHtml(readFileSync(path, 'utf8'), version.build, facts));
+    const html=stampBuildHtml(readFileSync(path, 'utf8'), version.build, facts);
+    writeFileSync(path, version.rendererRevision === undefined ? html : html.replace('<script>globalThis.__WS_BUILD_ID__=',`<script>globalThis.__WS_RENDERER_REVISION__=${JSON.stringify(version.rendererRevision)};globalThis.__WS_BUILD_ID__=`));
   }
 }
