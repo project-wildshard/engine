@@ -34,3 +34,7 @@ are closed. Opus still owns displaying the notice/knockdown flash from
 the existing wire contract; this lane adds no view or layout. Types,
 lint, side inventory and the eligible focused checks pass. Publication
 awaits the engine-test-only push, then SR1–SR8 ship together.
+
+The full script lint subsequently required dot notation for the typed
+stampede sound-log field. That spelling is corrected without changing
+the six real audio assertions or runtime behavior.

@@ -47,7 +47,7 @@ export async function run(browser,phone,base) {
       if(await page.evaluate(()=>{const seen=Reflect.get(window,'__repairSignals');return seen.signals.includes('stampede')&&seen.knockdowns>0&&seen.sounds.length>0;}))break;
     }
     return await page.evaluate(()=>{
-      const seen=Reflect.get(window,'__repairSignals'),r=Reflect.get(window,'__workerClient')?.(),audio=Reflect.get(window,'__wildshard').sounds().event;return {ok:seen.signals.includes('stampede')&&seen.sounds.length>0&&seen.knockdowns>0&&seen.notices.includes('Stampede!')&&seen.notices.includes('Knocked down!')&&(audio['stampede']??0)>0,...seen,audio,hits:r?.hits,arrows:r?.owned['held.arrows'],falls:r?.falls,hp:r?.hp,held:Reflect.get(window,'__wildshard').requireWorld().game.app.equipment?.current.id,closed:r?.closed};
+      const seen=Reflect.get(window,'__repairSignals'),r=Reflect.get(window,'__workerClient')?.(),audio=Reflect.get(window,'__wildshard').sounds().event;return {ok:seen.signals.includes('stampede')&&seen.sounds.length>0&&seen.knockdowns>0&&seen.notices.includes('Stampede!')&&seen.notices.includes('Knocked down!')&&(audio.stampede??0)>0,...seen,audio,hits:r?.hits,arrows:r?.owned['held.arrows'],falls:r?.falls,hp:r?.hp,held:Reflect.get(window,'__wildshard').requireWorld().game.app.equipment?.current.id,closed:r?.closed};
     });
   } finally {await context.close();}
 }
