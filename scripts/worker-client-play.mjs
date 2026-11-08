@@ -67,6 +67,7 @@ export async function play(browser, phone, base, only = '') {
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }
   if (runs('hurt')) { const { hurt } = await import('./worker-client-hurt.mjs'); await hurt(browser, phone, base, step); }
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }
+  if (runs('grid-entry')) { const { gridEntry } = await import('./worker-client-grid-entry.mjs'); await gridEntry(browser, phone, base, step); }
   if (runs('death')) { const { driftwoodDeath } = await import('./worker-client-death.mjs'); await driftwoodDeath(browser, phone, base, step); }
   if (runs('creature-hit')) { const { creatureHit } = await import('./worker-client-repairs.mjs'); await creatureHit(browser, phone, base, step); }
   if (runs('creature-hit') || runs('creature-returns')) { const { creatureReturns } = await import('./worker-client-returns.mjs'); await creatureReturns(browser, phone, base, step); }
