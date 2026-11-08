@@ -1216,9 +1216,11 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
   for (const [i, job] of jobs.entries()) {
     // Job discovery and other builders may already have spent this drawn frame. Compile is atomic: don't start it
     // on a stale local slice, and don't append first-use/link preparation after a compile has consumed the budget.
-    // Another queued warm-up can spend the frame while this wait is pending.
-    // Recheck on delivery instead of admitting every waiter behind one draw.
-    while (nativeBudgetSpent(sliceMs)) { await pause(); checkCurrent(); tFrame = performance.now(); programsAtFrame = programCount(renderer); nativeInSlice = false; settledInFrame = 0; }
+    // A completed draw can itself consume the shared budget (notably on
+    // SwiftShader). Yield once, then admit this one atomic job: rechecking in
+    // a loop can starve tile publication forever while frames keep drawing.
+    // The post-job budget and program cap still end the slice before more work.
+    if (nativeBudgetSpent(sliceMs)) await pauseIssue();
     checkCurrent();
     // Resolve earlier ready links in this frame's spare issue time. Waiting
     // until a compile spends the slice left every first-use query for a
