@@ -34,20 +34,56 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - run: bash scripts/ring1.sh static
+      - run: pnpm test:kit
 
-  tests:
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Each native proof also starts worker threads; match ci's bounded outer pool.
-    env:
-      WS_VITEST_MAX_WORKERS: '2'
-      WS_TEST_QUARANTINE: blocking
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - run: bash scripts/ring1.sh tests
+      - id: plan
+        run: node scripts/engine-ci-plan.ts --ring=1
+      - run: node test/vitest-sharding.test.ts --ring=1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ring1-test-plan
+          path: tmp/engine-ci/plan.json
+          retention-days: 7
+
+  tests:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      WILDSHARD_RING: '1'
+      WS_TEST_QUARANTINE: blocking
+      WS_CI_PLAN: tmp/engine-ci/plan.json
+      WS_CI_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ring1-test-plan
+          path: tmp/engine-ci
+      - run: node scripts/pins.ts install --ring 1
+      - run: pnpm gen:inputs
+      - run: node scripts/engine-ci-shard.mjs
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ring1-tests-${{ matrix.shard }}
+          path: tmp/engine-ci
+          retention-days: 7
 
   quarantine:
     continue-on-error: true
