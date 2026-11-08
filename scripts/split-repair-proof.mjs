@@ -9,11 +9,13 @@ const preview=await serve(arg('root',process.cwd()),'',true);
 try {
   const {run}=await import(`./split-repair-${flow}.mjs`);
   for(const name of ['chromium','webkit']) {
+    for(let sample=0;sample<samples;sample++) {
     const browser=await (name==='chromium'?chromium:webkit).launch(name==='chromium'?{args:['--mute-audio','--use-angle=metal','--ignore-gpu-blocklist']}:{});
-    try {for(let sample=0;sample<samples;sample++) {
+    try {
       const result=await run(browser,devices['iPhone 16 Pro'],preview.url);
       console.log(JSON.stringify({flow,browser:name,sample:sample+1,...result}));
       assert.equal(result.ok,!red,red?'regression was not reproduced':'real play failed');
-    }} finally {await browser.close();}
+    } finally {await browser.close();}
+    }
   }
 } finally {preview.close();}

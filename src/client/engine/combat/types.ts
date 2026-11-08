@@ -3,6 +3,8 @@ import type { Matrix4, Vector3 } from 'three';
 /** Optional attachment transform; rendering adapters own the scene object behind it. */
 export interface TargetFrame { readonly matrixWorld: Matrix4 }
 export interface TargetAnimal {
+  /** Ambient presentation owns this target; it has no replicated damage row. */
+  readonly presentationOnly?: boolean;
   hitFlash?: (strength: number) => void;
   applyDamage: (amount: number, point: Vector3, dir: Vector3) => boolean;
   damageFor: (headshot: boolean, dist: number) => number;

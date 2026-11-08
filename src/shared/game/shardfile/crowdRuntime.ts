@@ -131,6 +131,7 @@ export class CrowdPrey {
 /** Spatial and damage projection of an existing crowd owner. Rows specify local
  * hit spheres and the prey anchor; this host never advances flock decisions. */
 class CrowdMembers {
+  readonly presentationOnly: boolean = false;
   readonly n: number;
   private readonly targetPose: FlockPose = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, phase: 0, graze: 0, dead: false, deathTime: 0, scale: 1, wool: 0 };
   constructor(protected readonly controller: Pick<FlockBrain, 'n' | 'readPose' | 'kill'>,
@@ -179,6 +180,8 @@ export class CrowdTargets extends CrowdMembers {
 
 /** Actual native foragers use the same hit-sphere and weapon projection as flock members. */
 export class ForagerTargets extends CrowdMembers {
+  /** Ambient page foragers have no corresponding replicated damage body. */
+  override readonly presentationOnly: boolean = true;
   constructor(population: ForagerPopulation, targets: { readonly preyY: number; readonly hits: readonly (readonly number[])[] }, scale: number) {
     if (!(population instanceof ForagerPopulation) || Object.getPrototypeOf(population) !== ForagerPopulation.prototype || !(scale > 0) || !Number.isFinite(scale)) throw new Error('Missing native forager owner or scale');
     super({ n: population.rows.length, kill: index => { population.kill(index); }, readPose: (index, out) => {
@@ -235,7 +238,8 @@ export class CrowdWeaponTarget<T extends CrowdMembers> {
   constructor(private readonly roster: CrowdRoster<T>,input:unknown){
     if(!(roster instanceof CrowdRoster)||Object.getPrototypeOf(roster)!==CrowdRoster.prototype)throw new Error('Missing native crowd roster');
     const rows=parse(CrowdWeaponTargetSchema,input);
-    this.animal={kind:rows.kind,position:new Vector3(),alive:true,damageFor:()=>rows.damage,applyDamage:()=>{
+    const local = (): boolean => this.pending?.flock.presentationOnly === true;
+    this.animal={get presentationOnly(){return local();},kind:rows.kind,position:new Vector3(),alive:true,damageFor:()=>rows.damage,applyDamage:()=>{
       if(this.pending!==null)this.pending.flock.kill(this.pending.index);this.pending=null;this.animal.alive=false;return true;
     }};
     this.result={animal:this.animal,point:new Vector3(),distance:0,headshot:false};

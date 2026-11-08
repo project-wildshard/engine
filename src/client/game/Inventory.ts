@@ -1,5 +1,5 @@
-import { ITEMS } from '../../shared/game/bag/itemCatalog';
-import { WeightedTable, type WeightedRow } from '@wildshard/engine/ai/weighted';
+import { ITEMS, isItemId } from '../../shared/game/bag/itemCatalog';
+import { harvestDrops } from '../../shared/game/harvest';
 import type { IconId } from '@wildshard/engine/ui/icons';
 import { findTitleManifest } from './shard/titleList';
 import { findShard } from './shard/registry';
@@ -38,18 +38,9 @@ export type ItemId = 'venison' | 'deer-hide' | 'boar-meat' | 'boar-hide' | 'boar
   // good, a ribbon is what a lodge contract pays
   | 'amber-resin' | 'lodge-ribbon';
 
-/** Every eligible harvest row drops once, in the original pack order. */
-const HARVEST: Readonly<Record<string, readonly WeightedRow<ItemId, string>[]>> = {
-  deer: [{ item: 'venison', weight: 1 }, { item: 'deer-hide', weight: 1 }, { item: 'antlers', weight: 1, when: (v) => /stag|ghost/.test(v) }],
-  boar: [{ item: 'boar-meat', weight: 1 }, { item: 'boar-hide', weight: 1 }, { item: 'boar-tusk', weight: 1, when: (v) => v !== 'sow' }],
-  elk: [{ item: 'elk-meat', weight: 1 }, { item: 'elk-hide', weight: 1 }, { item: 'antlers', weight: 1, when: (v) => /bull|imperial/.test(v) }],
-  bear: [{ item: 'bear-pelt', weight: 1 }, { item: 'bear-claw', weight: 1 }],
-  crab: [{ item: 'crab-meat', weight: 1 }, { item: 'crab-claw', weight: 1 }, { item: 'crab-shell', weight: 1, when: (v) => v === 'big' }],
-  monkey: [{ item: 'coconut', weight: 1 }, { item: 'silver-fur', weight: 1, when: (v) => v === 'elder' }, { item: 'monkey-fur', weight: 1, when: (v) => v !== 'elder' }],
-};
 /** what a carcass of (kind, variant) yields when harvested */
 export function harvestOf(kind: string, variant?: string): ItemId[] {
-  return new WeightedTable({ mode: 'each', rows: HARVEST[kind] ?? [] }).roll(variant ?? '', () => 0).flatMap((drop) => Array.from({ length: drop.count }, () => drop.item));
+  return harvestDrops(kind, variant).filter(isItemId);
 }
 
 export const PACK_SLOTS: 12 = DEFAULT_PACK_SLOTS;

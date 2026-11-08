@@ -4,7 +4,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { execFileSync } from 'node:child_process';
 // The same native continuation a saved worker writes, with only the starting payment supplied by the fixture.
-export const paidSave = () => JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
+export const paidSave = (variant = 'ghost') => JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
   import { readFileSync } from 'node:fs';
   import { resolve } from 'node:path';
   import { readBuiltShardfile } from './scripts/built-product.mjs';
@@ -21,10 +21,10 @@ export const paidSave = () => JSON.parse(execFileSync(process.execPath, ['--expe
   creditNativeInventory(live.host, 'pack', { item: 'amber-resin', count: 30 });
   creditNativeInventory(live.host, 'pack', { item: 'bear-pelt', count: 2 });
   const roster = await product.json('actors/roster.json');
-  const target = populationRoster(live.host, roster.step).spawn('deer', 5, -225, 0, 'ghost');
+  const target = populationRoster(live.host, roster.step).spawn('deer', 5, -225, 0, process.argv[1] ?? 'ghost');
   const snapshot = serializeSimSnapshot(snapshotSimHostBytes(live.host)); live.dispose();
   console.log(JSON.stringify({ save: { tick: 0, snapshot }, target: { id: target.entityId, x: target.position.x, y: target.position.y, z: target.position.z, scale: target.scale } }));
-`], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }).trim());
+`, variant], { cwd: process.env.PINE_PROOF_ENGINE_ROOT ?? process.cwd(), encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }).trim());
 /** @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base @param {import('./types/worker-page').ProofStep} step */
 export async function pineEconomy(browser, phone, base, step) {
   const context = await browser.newContext(phone), page = await context.newPage(), errors = /** @type {string[]} */ ([]);

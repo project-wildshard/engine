@@ -57,6 +57,11 @@ export class NativeHeldAmmunition {
     const pouch = new NativeHeldAmmunition(this.host, this.input, this.itemRows, player);
     this.others.set(player.id, { body: player, pouch }); return pouch;
   }
+  /** Refill the lead or another live seat without sharing their pouch. */
+  refillFor(id: string, kind: string): void {
+    if (id === questBooks(this.host).lead.player) this.refill(kind);
+    else { const player = this.host.players.get(id); if(player!==undefined)this.of(player).refill(kind); }
+  }
   /** A seated pouch's own continuation: its weapon saves apart and may come back later, so the stacks stand alone. */
   restoreSeat(saved: Record<string, string | number>): void {
     const selected = v.parse(v.picklist(this.rows.pouch.kinds), saved['selected']);
@@ -87,6 +92,13 @@ export class NativeHeldAmmunition {
     if (n === null) return;
     state.quiver = n; state.loaded = n > 0 && state.loaded;
     this.frame.ammo = kind;
+  }
+  /** Restore the fallback stack through its actual live weapon at respawn. */
+  refill(kind: string): void {
+    this.loadKind(kind);
+    const missing = this.rows.pouch.capacity - this.count(kind);
+    if (missing > 0) this.add(kind, missing);
+    this.quiver.stash(this.ports.crossbow.state.quiver);
   }
   cycle(): void { this.loadKind(this.quiver.next()); }
   /** Stash/fall back after the native weapon update, at the same point as the page. */

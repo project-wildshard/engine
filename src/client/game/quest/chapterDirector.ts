@@ -71,7 +71,7 @@ export async function installChapterWakeEncounter(ctx: ShardContext, input: unkn
   ctx.scope.onDispose(flags.onChange(cues));
   ctx.app.encounters.register({ id: rows.encounter.id, displayName: rows.encounter.name }, ctx.scope);
   ctx.app.encounters.boss(rows.encounter.id, encounter, ctx.scope);
-  ctx.on('player.died', () => { if (rowBar !== null) { fell = true; return; } encounter.onPlayerDeath(world.player.position); present(); });
+  ctx.on('player.died', () => { if (rowBar !== null) { fell = true; rowBar.playerDied(); return; } encounter.onPlayerDeath(world.player.position); present(); });
   cues();
   ctx.system({ id: rows.systems.encounter, phase: 'update', before: rows.systems.before,
     run: dt => { if (rowBar !== null) { rowBar.draw(wirePage.encounters(), dt); return; } bar.update(dt); encounter.update(observation()); present(); } });

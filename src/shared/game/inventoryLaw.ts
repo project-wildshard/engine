@@ -60,10 +60,17 @@ export function nativeInventorySchema<K extends string>(profile: NativeInventory
       && (!profile.counts.complete || state.order.every(id => state.counts[id] !== undefined)), profile.restoreError));
 }
 interface NativePackBinding {
+  readonly keeps: (item: string) => boolean;
   readonly grant: (item: string, count: number) => boolean;
   readonly debit: (item: string, count: number) => boolean;
 }
 const nativePacks = new WeakMap<SimHost, Map<string, NativePackBinding>>();
+/** Whether an entered native owner registered this pack. */
+export function hasNativeInventory(host: SimHost, id: string): boolean { return nativePacks.get(host)?.has(id) === true; }
+/** Whether this registered pack admits a harvest kind, without changing it. */
+export function nativeInventoryKeeps(host: SimHost, id: string, item: string): boolean {
+  return nativePacks.get(host)?.get(id)?.keeps(item) === true;
+}
 /** Credit the existing pack through its authored admission law; full packs return false. */
 export function creditNativeInventory(host: SimHost, id: string, row: { readonly item: string; readonly count: number }): boolean {
   const pack = nativePacks.get(host)?.get(id); if (pack === undefined) throw new Error('Missing native inventory');
@@ -93,6 +100,7 @@ export class NativeInventory<K extends string> {
       if (packs.has(inventoryId)) throw new Error('Duplicate native inventory');
       const kind = v.picklist(profile.kinds);
       packs.set(inventoryId, {
+        keeps: item => profile.kinds.some(entry => entry === item),
         grant: (item, count) => this.add(v.parse(kind, item), count),
         debit: (item, count) => this.take(v.parse(kind, item), count),
       });

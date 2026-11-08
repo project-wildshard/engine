@@ -98,6 +98,7 @@ const engaged = (state: string): boolean => state === 'intro' || fighting(state)
  */
 export class BossRowBar {
   private state = 'dormant'; private shown = 0; private attempts = 1; private won = false; private held = 0; private seen = false;
+  private deathNoted = false;
   private readonly bar: BossPresentation;
   private readonly card: BossBarCard;
   private readonly drop: RowReward | null;
@@ -105,6 +106,12 @@ export class BossRowBar {
   constructor(bar: BossPresentation, card: BossBarCard, drop: BossRowDrop | null = null, voice: BossRowVoice = {}) { this.bar = bar; this.card = card; this.drop = drop === null ? null : new RowReward(drop); this.voice = voice; }
   /** The phase the fight stands in: a score's phase lookup reads this, since the page's script never leaves its first. */
   get phase(): number { return this.shown; }
+  /** Own-player death can arrive between an armed row and its next intro.
+   * Record it once even when presentation never samples that terminal row. */
+  playerDied(): void {
+    if (!engaged(this.state) || this.deathNoted) return;
+    this.deathNoted = true; this.voice.attempt?.('died');
+  }
   /** The player pressed the reward. */
   pressed(): void { this.drop?.pressed(); }
   draw(rows: readonly EncounterRow[], dt: number): void {
@@ -128,8 +135,9 @@ export class BossRowBar {
   private enter(state: string, was: string, row: EncounterRow | undefined, moment: boolean): void {
     const { bar, card, voice } = this, phases = card.phases.slice(1).map(phase => phase.at);
     if (was === 'intro') voice.lock?.(false);
-    if (engaged(was) && !engaged(state)) voice.attempt?.(state === 'victory' ? 'won' : state === 'armed' ? 'died' : 'left');
+    if (engaged(was) && !engaged(state) && !this.deathNoted) voice.attempt?.(state === 'victory' ? 'won' : state === 'armed' ? 'died' : 'left');
     if (state === 'intro') {
+      this.deathNoted = false;
       this.shown = row?.phase ?? 0;
       voice.lock?.(true);
       bar.showNameCard(card.name, card.title, this.attempts > 1 || this.won);

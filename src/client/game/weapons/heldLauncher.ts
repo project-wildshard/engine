@@ -342,7 +342,7 @@ export class HeldLauncher<P extends HeldLauncherProfile = HeldLauncherProfile> e
   }
 
   private boltHit(bolt: Bolt, hit: TargetHit, direction: THREE.Vector3): void {
-    if (bolt.shot !== 0) { this.stopBolt(bolt, hit.point, direction, 'flesh', false, this.profile.bury, true); return; } // the server's to settle
+    if (bolt.shot !== 0 && hit.animal.presentationOnly !== true) { this.stopBolt(bolt, hit.point, direction, 'flesh', false, this.profile.bury, true); return; } // replicated bodies are the server's to settle
     const damage = bolt.mod.damage, scale = damage.kinds?.[hit.animal.kind] ?? damage.default;
     const killed = hit.animal.applyDamage(hit.animal.damageFor(hit.headshot, hit.point.distanceTo(this.player.position)) * scale * (this.profile.damageScale ?? 1), hit.point, direction);
     this.onHit?.(hit.animal.kind, hit.headshot, killed);

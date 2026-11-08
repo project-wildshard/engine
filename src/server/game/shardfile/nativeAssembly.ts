@@ -16,6 +16,7 @@ import { readPatrolIntake } from '../boss/patrolNative';
 import { readSlotIntake } from '../boss/slotsNative';
 import { readWindIntake } from '../boss/windEliteNative';
 import { withEncounters, type EncounterIntake } from '../population/encounterIntake';
+import { installNativeHarvest } from '../loot/harvest';
 import { prepareReturns } from './nativeRuntimeLoans';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 
@@ -96,5 +97,6 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     lendReturns(host);
     const run: AssemblyRun<C> = { host, context, input: null, day: null };
     for (const step of steps) step(run);
+    installNativeHarvest(host);
   } };
 }

@@ -71,6 +71,15 @@ export async function play(browser, phone, base, only = '') {
     await step('perks: real elite roar projects its timed stun', () => stun(browser, phone, base));
     return steps;
   }
+  if (only === 'pine-writes') {
+    const { run } = await import('./split-repair-pine-writes.mjs');
+    const { run: hare } = await import('./split-repair-hare.mjs');
+    const { run: loss } = await import('./split-repair-wake-loss.mjs');
+    await step('Pine: harvest persists and respawn refills authority', () => run(browser, phone, base));
+    await step('Pine: a real wired bolt retires an ambient hare', () => hare(browser, phone, base));
+    await step('Pine: a real boss death records lost', () => loss(browser, phone, base));
+    return steps;
+  }
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }
   if (runs('hurt')) { const { hurt } = await import('./worker-client-hurt.mjs'); await hurt(browser, phone, base, step); }
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }

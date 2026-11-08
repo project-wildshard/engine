@@ -256,7 +256,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'ammunition': {
       const held = product.section('held/loadout');
-      return run => { const ammunition = installNativeHeldAmmunition(run.host, held, shard.items); run.host.onStep(row.step, () => { ammunition.update(); }, undefined, 'afterBodies'); run.host.events.on('player.died', () => { ammunition.loadKind(row.refill); }, run.host.scope); run.ammunition = ammunition; };
+      return run => { const ammunition = installNativeHeldAmmunition(run.host, held, shard.items); run.host.onStep(row.step, () => { ammunition.update(); }, undefined, 'afterBodies'); run.host.events.on('player.respawned', ({player}) => { if(player!==undefined)ammunition.refillFor(player,row.refill); }, run.host.scope); run.ammunition = ammunition; };
     }
     case 'boss.ground': {
       const encounter = await readAssemblyInput<{ profile: unknown }>(product, row.encounter), program = need(product.section('actors/species-programs').program, 'Native boss needs its decision programme');

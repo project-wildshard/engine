@@ -4,6 +4,7 @@ import type { Vector3 } from 'three';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
+import { harvestDrops } from '../../../shared/game/harvest';
 import { STORY_ACT, type NetRoomAct } from '@wildshard/engine/net/acts';
 import { DAY_ROW } from '@wildshard/engine/sim/shardRows';
 import type { DayCycleClock } from '@wildshard/engine/world/dayCycle';
@@ -183,6 +184,18 @@ export class WirePage {
   }
   /** One press of a prompt the server knows by this id. */
   send(id: string): void { this.press(id); }
+  /** Use a server carcass; only its confirmed grant indices reach presentation. */
+  harvest(scope: Scope, id: string, kind: string, variant: string, confirmed: (items: readonly string[]) => void): void {
+    const client = this.client;if(client === null)return;
+    const entity = [...client.entities.values()].find(info => this.rowBody(info.handle)?.entityId === id);
+    if(entity === undefined)return;
+    const word = `harvest.${entity.id}`, drops = harvestDrops(kind, variant);
+    const off = client.onView(view => {
+      if(view.name !== word)return;
+      off();confirmed(view.args.flatMap(index => {const item = drops[index];return item === undefined ? [] : [item];}));
+    });
+    scope.onDispose(off);this.send(word);
+  }
   /** A quest view for `def`, over this player's rows. */
   quest(def: QuestDef): QuestView {
     const feed = this.feeds.get(def.id) ?? new QuestViewFeed([def], { quests: this.quests, phased: this.heard });

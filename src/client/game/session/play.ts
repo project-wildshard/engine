@@ -58,10 +58,10 @@ import { bindTravelInventory, applyTravelCarry } from '../travel/travel';
 import * as THREE from 'three';
 import { BagButton } from '../bag/BagButton';
 import { Progress } from '../Progress';
-import { Inventory } from '../Inventory';
+import { Inventory, type ItemId } from '../Inventory';
 import { legacyHomeCheckpoint } from '../grid/homeCheckpoint';
 import { initialGridReload, plannedGridReload } from '../../../shared/game/grid/recovery';
-import { ITEMS } from '../../../shared/game/bag/itemCatalog';
+import { ITEMS, isItemId } from '../../../shared/game/bag/itemCatalog';
 import { LastPlace, placeName } from '@wildshard/engine/quest/lastPlace';
 import { shardCompleteUp } from '../complete/ShardComplete';
 import type { loadoutStage } from './loadout';
@@ -655,12 +655,17 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
       const selectedCarcass = carcass;
       harvested.add(selectedCarcass);
       const drops = inventory.harvest(carcass.kind, carcass.variant); // Pine Hollow: only what Mott takes (E314 C)
-      const give = (): void => {
-        const got = drops.filter((id) => inventory.add(id)); // the toast names only what went in
+      const show = (got: readonly ItemId[]): void => {
         const said = `${got.map((id) => ITEMS[id].label).join(' + ') || 'Nothing'} harvested · ${inventory.total} in the pack`, first = got[0];
         if (first === undefined) hud.toast(said);
         else hud.pickupCard({ name: got.map((id) => ITEMS[id].label).join(' + '), icon: ITEMS[first].icon, detail: `${inventory.total} in the pack` });
         audio.hitMarker();
+      };
+      const give = (): void => {
+        if(wirePage.client !== null && wirePage.line('harvest.enabled') > 0) {
+          wirePage.harvest(game.levelScope, selectedCarcass.entityId, selectedCarcass.kind, selectedCarcass.variant,
+            got => { show(got.filter(isItemId)); });
+        } else show(drops.filter(id => inventory.add(id)));
       };
       if (boot.runtime.hooks.harvest) boot.runtime.hooks.harvest(selectedCarcass, give, () => { harvested.delete(selectedCarcass); }); // PH-F2: the skinning beat, then the drops; the carcass stays for the ravens
       else { give(); carcass.fadeOut(); }
