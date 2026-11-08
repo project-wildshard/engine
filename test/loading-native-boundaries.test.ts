@@ -39,7 +39,10 @@ it('publishes the measured cold entry boundaries without timing-based credit', (
       expect(row.startedAt).toBe(starts[index]);
       expect(row.setupAtStart, row.key).toBeTypeOf('number');
       if (row.setupAtStart === undefined || row.startedAt === undefined) throw new Error(`Missing boundary ${row.key}`);
-      expect(row.setupAtStart, row.key).toBe(Math.floor((index + 1) / loadingPath('shardfile').steps.length * 100));
+      // LS7: every row before this one is complete, each by its measured-seconds share
+      const steps = loadingPath('shardfile').steps, before = steps.slice(0, steps.findIndex(step => step.key === row.key));
+      const share = (rows: readonly {weight: number}[]): number => rows.reduce((sum, step) => sum + step.weight, 0);
+      expect(row.setupAtStart, row.key).toBe(Math.floor(share(before) / share(steps) * 100));
     }
     data.end();
   } finally {

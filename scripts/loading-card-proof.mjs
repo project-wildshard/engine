@@ -138,6 +138,13 @@ try {
       const log = await page.evaluate(() => Reflect.get(window, '__barLog'));
       const readyAt = await page.evaluate(() => Reflect.get(window, '__readyAt'));
       if (process.argv.includes('--dump')) writeFileSync(join(out, `${tag}-timing.json`), JSON.stringify(await page.evaluate(() => Reflect.get(window, '__bootTiming')?.read()), null, 1));
+      // LS7: each Load row's own measured ms (the card's timeline, exclusive of nested work), the source of its bar weight
+      if (process.argv.includes('--dump')) writeFileSync(join(out, `${tag}-rows.json`), JSON.stringify(await page.evaluate(() => {
+        const card = document.querySelector('.ws-load');
+        /** @type {{path?: string, rows?: {key: string, state: string, ms: number, weight?: number}[]} | undefined} */
+        const snapshot = card === null ? undefined : Reflect.get(card, Symbol.for('engine.loading.snapshot'));
+        return { path: snapshot?.path, rows: (snapshot?.rows ?? []).map(({ key, state, ms, weight }) => ({ key, state, ms, weight })) };
+      }), null, 1));
       const counts = await page.evaluate(() => Reflect.get(window, '__countLog'));
       const lastCount = counts.at(-1);
       const measured = lastCount !== undefined && lastCount.startBytes > 0 && lastCount.startTotal >= lastCount.startBytes
