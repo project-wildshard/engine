@@ -107,7 +107,7 @@ jobs:
           path: tmp/quarantine
           retention-days: 7
 
-  products:
+  cook-step:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -115,8 +115,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: bash scripts/ring1.sh products
+      - run: bash scripts/ring1.sh cook-step
         env:
           RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
       - name: Keep the recorded baseline
@@ -133,3 +132,14 @@ jobs:
           name: ring-step-linux
           path: tmp/ring-cook/step.json
           retention-days: 7
+
+  build-boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: bash scripts/ring1.sh build-boot
