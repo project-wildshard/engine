@@ -14,7 +14,7 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   /** @param {string[]} args */
   const git=args=>execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
   if(git(['status','--porcelain','--untracked-files=normal'])!=='')return null;
-  const excluded=/^(?:WS_PUSH_REFS|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
+  const excluded=/^(?:WS_PUSH_REFS|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
   const runtime=createHash('sha256').update(JSON.stringify({profile,node:process.versions,platform:process.platform,arch:process.arch,environment})).digest('hex');
   const tree=git(['rev-parse','HEAD^{tree}']),commit=git(['rev-parse','HEAD']);
