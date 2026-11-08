@@ -60,6 +60,8 @@ export class HeadlessSimulation {
   step(sources: readonly HeadlessCommandSource[] = []): Promise<HeadlessTickCommit> { return this.runner.step(sources); }
   /** Fixed terminal data-only offline CPU/fuel observation with full initial/final saves. */
   observe(): Promise<HeadlessObservationReport> { return this.runner.observe(); }
+  /** Fixed offline observations and the complete entry proof, in one resident. */
+  validate(): ReturnType<TickWorkerHost['validate']> { return this.runner.validate(); }
   /** Terminal fixed-tick verb tape; observations do not grant a continuation. */
   verbTape(plan:HeadlessTapePlan):Promise<HeadlessTapeReport>{return this.runner.verbTape(plan);}
   /** One offline tape part and checked commit. All parts share one resident and aggregate allowance; only later parts or finish may follow. */
@@ -116,16 +118,18 @@ export async function measureSimulation(shard: Shardfile, assets: ReadonlyMap<st
   }
   const sim = await HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', sections: supplied });
   try {
-    const report = await sim.observe(), measured = report.samples.slice(WARMUP_TICKS);
-    const scripts = measured.map(row => row.scriptMicros), windowP95: number[] = [];
-    for (let window = 0; window < WINDOWS; window++) windowP95.push(p95(scripts.slice(window * WINDOW_TICKS, (window + 1) * WINDOW_TICKS).sort((a, b) => a - b)));
-    return summarizeObservations(measured.map(row => row.tickMicros), report.samples.map(row => row.fuelUsed), scripts, windowP95);
+    return summarizeReport(await sim.observe());
   } finally { await sim.dispose(); }
+}
+function summarizeReport(report: HeadlessObservationReport): SimulationObservations {
+  const measured = report.samples.slice(WARMUP_TICKS), scripts = measured.map(row => row.scriptMicros), windowP95: number[] = [];
+  for (let window = 0; window < WINDOWS; window++) windowP95.push(p95(scripts.slice(window * WINDOW_TICKS, (window + 1) * WINDOW_TICKS).sort((a, b) => a - b)));
+  return summarizeObservations(measured.map(row => row.tickMicros), report.samples.map(row => row.fuelUsed), scripts, windowP95);
 }
 /** Offline admission proves bounded execution and entries; wall timing is advisory. The independent request watchdog still bounds a broken worker. */
 export async function validateSimulation(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections?: ReadonlyMap<string, unknown>): Promise<{ ticks: number; lanes: number; steps: number; liftRides?: number; liftCalls?: number; portalTransfers?: number } & SimulationObservations> {
   const sim = await HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', ...(sections === undefined ? {} : { sections }) });
-  try { const observed = await observeSteps(sim); return { ...await sim.finish(), ...observed }; }
+  try { const {observation, proof} = await sim.validate(); return {...proof, ...summarizeReport(observation)}; }
   finally { await sim.dispose(); }
 }
 

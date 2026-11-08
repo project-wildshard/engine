@@ -215,8 +215,18 @@ export class TickWorkerHost {
     }catch(error){this.fail(error instanceof Error?error:new Error(String(error)));throw error;}
     finally{this.streamStarted=0n;this.streamReject=undefined;void (async()=>{try{await iterator.return?.();}catch{ /* Producer cleanup cannot replace the original failure. */ }})();}
   }
-  async finish(): Promise<v.InferOutput<typeof proofSchema>> {
-    if (this.finished) throw new Error('Headless validation already finished');
+  /** Observe all fixed ticks, then prove entries in that same resident. Only
+   * this terminal composition may finish an observed worker; ordinary observe
+   * and every continuation retain their existing terminal guards. */
+  async validate(): Promise<{observation: HeadlessObservationReport; proof: v.InferOutput<typeof proofSchema>}> {
+    const observation = await this.observe();
+    return {observation, proof: await this.finishProof()};
+  }
+  finish(): Promise<v.InferOutput<typeof proofSchema>> {
+    if (this.finished) return Promise.reject(new Error('Headless validation already finished'));
+    return this.finishProof();
+  }
+  private async finishProof(): Promise<v.InferOutput<typeof proofSchema>> {
     await this.initialized(); if (this.closed || this.pending !== undefined || this.streamStarted!==0n) throw new Error('Headless worker unavailable or busy');
     this.finished = true;
     const result = this.wait();
