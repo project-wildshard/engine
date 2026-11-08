@@ -27,7 +27,7 @@ await build({ entryPoints: { main: join(DEDICATED, 'main.ts'), cellWorker: join(
   logLevel: 'warning', plugins: [rapier], banner, define: { __BUILD_ID__: JSON.stringify(values.build) }, external: ['pg-native'] });
 mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, 'bundle.json'), JSON.stringify({ engineBuild: values.build }));
-cpSync(join(ROOT, 'public/assets/physics/rapier.wasm'), join(OUT, 'rapier.wasm'));
+cpSync(require.resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm'), join(OUT, 'rapier.wasm'));
 cpSync(join(DEDICATED, 'saves/migrations'), join(OUT, 'migrations'), { recursive: true });
 console.log(`server target: ${OUT}`);
 if (values.tar !== undefined) {
