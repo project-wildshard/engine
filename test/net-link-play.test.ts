@@ -43,12 +43,13 @@ for(const profile of [{rtt:0,jitter:0,loss:0,reorder:0},{rtt:124,jitter:30,loss:
       const passing=():void=>{clock+=1000/60;up.advance(1000/60);down.advance(1000/60);link.pump();};
       client.hello();for(let tick=0;tick<90;tick++){passing();room.tick();}
       expect(client.latest).not.toBeNull();const start=lead.position.clone();predicting=true;
-      for(let tick=0;tick<120;tick++){
-        hold();const command={viewTick:0,steer:{keyX:0,keyY:1,stickX:0,stickY:0},yaw:0,pitch:0,buttons:0};
+      for(let tick=0;tick<165;tick++){
+        hold();const command={viewTick:0,steer:{keyX:0,keyY:tick<120?1:0,stickX:0,stickY:0},yaw:product.shardfile.spawn.yaw,pitch:0,buttons:0};
         if(!predictor.full){const seq=client.command(command);predictor.step({...command,seq});}
         client.flush();passing();room.tick();
       }
-      expect(lead.position.distanceTo(start)).toBeGreaterThan(2);
+      expect(lead.position.distanceTo(start)).toBeGreaterThan(6);
+      expect(body.position.distanceTo(lead.position)).toBeLessThan(.25);
       // A metre is an overt player-visible teleport on this dry walking line.
       // This uses the predictor's public report, not its queue or saved-state layout.
       expect(predictor.missed.gap).toBeLessThan(1);
