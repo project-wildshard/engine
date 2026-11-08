@@ -21,7 +21,8 @@ function observed(operation) {
   return timing?.entries.some(row=>row.operation===operation) ?? false;
 }
 const root = resolvePath(option('root') ?? '.'), expectedAbsent = process.argv.includes('--expect-absent');
-const delayKind = option('delay'), delayMs = 1250;
+const delayKind = option('delay'), delayMs = Number(option('delay-ms')??1250);
+assert.ok(Number.isFinite(delayMs)&&delayMs>0&&delayMs<=60000,'delay-ms must be 1..60000');
 const handoff=process.argv.includes('--handoff');
 const serverNetwork=process.argv.includes('--server-network');
 const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'sunscar-dunes':'template');
@@ -30,7 +31,8 @@ const controlled = option('sw') === 'warm' || swDelay;
 const preview = await serve(root, '', true);
 const proxy=delayKind!==undefined && (swDelay||delayKind==='server')?await bootTimingDelay(preview.url,delayKind,delayMs):undefined;
 try {
-  for (const name of ['chromium','webkit']) {
+  const pick=option('browser')??'both';assert.ok(['both','chromium','webkit'].includes(pick));
+  for (const name of ['chromium','webkit'].filter(browserName=>pick==='both'||pick===browserName)) {
     const engine=name==='chromium'?chromium:webkit;
     const browser = await engine.launch({headless:true, ...(name === 'chromium' ? {args:['--mute-audio']} : {})});
     try {
@@ -81,7 +83,7 @@ try {
         await context.close();continue;
       }
       await page.waitForFunction(observed,'app:first-game-step-end',{timeout:60000});
-      await page.waitForFunction(observed,'app:loader-complete',{timeout:30000});
+      await page.waitForFunction(observed,'app:loader-complete',{timeout:120000});
       if(controlled) {
         await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
         // A new-build book/table miss with all the immutable product bodies held.
@@ -94,21 +96,23 @@ try {
         });
         await page.reload({waitUntil:'domcontentloaded',timeout:30000});
         await page.waitForFunction(observed,'app:first-game-step-end',{timeout:60000});
-        await page.waitForFunction(observed,'app:loader-complete',{timeout:30000});
+        await page.waitForFunction(observed,'app:loader-complete',{timeout:120000});
       }
       const timing=await page.evaluate(snapshot);
       assert.ok(timing);
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
       const operations=new Set(timing.entries.map(row=>row.operation));
+      const failures=timing.entries.filter(row=>row.operation.endsWith(':failure')).map(row=>row.detail.message);
       for (const operation of ['app:html-script-start','app:collector-installed','app:shell-dom-ready','app:entry-body',
         'app:loading-adopt','worker:module-body','worker:code-ready','worker:configuration-received',
-        'server:world-boot','server:booted-send','server:booted-receive','app:first-game-step-end']) {
-        assert.ok(operations.has(operation),`${name}: missing ${operation}`);
+        'server:world-boot','server:booted-send','server:booted-receive','app:first-game-step-end','app:loader-complete']) {
+        assert.ok(operations.has(operation),`${name}: missing ${operation}; failures=${JSON.stringify(failures)}; page=${faults.join(';')}`);
       }
-      const end=timing.entries.find(row=>row.operation==='app:first-game-step-end')?.end;
+      const end=timing.entries.find(row=>row.operation==='app:loader-complete')?.end;
+      const firstStep=timing.entries.find(row=>row.operation==='app:first-game-step-end')?.end;
       const entryStart=timing.entries.find(row=>row.operation==='app:entry-body')?.start;
       assert.ok(typeof end==='number' && typeof entryStart==='number');
-      const spans=timing.entries.filter(row=>row.end!==null && row.end>row.start && row.start<end)
+      const spans=timing.entries.filter(row=>row.end!==null && row.end>row.start && row.start<end && row.result!=='unresolved-at-loader-complete')
         .map(row=> /** @type {[number,number,string]} */ ([Math.max(0,row.start),Math.min(end,row.end??end),row.operation])).sort((a,b)=>a[0]-b[0]);
       let through=0,maxGap=0;
       for(const [start,finish] of spans){maxGap=Math.max(maxGap,start-through);through=Math.max(through,finish);}
@@ -146,7 +150,7 @@ try {
         return probe?.world ? probe.requireWorld().game.renderer.info.render.frame : 0;
       });
       assert.ok(renderFrame>0,'real world did not render');
-      console.log(`${name}: PASS first-step=${Math.round(end)}ms unnamed=${Math.round(maxGap)}ms entries=${timing.entries.length} resources=${timing.resources.length} atomic=${timing.counters['atomic:completed']?.loaded} byteStreams=${bytes.length} chunks=${bytes.reduce((sum,[,row])=>sum+row.events,0)} delay=${delayKind??'none'} frame=${renderFrame}`);
+      console.log(`${name}: PASS first-step=${Math.round(firstStep??0)}ms loader-complete=${Math.round(end)}ms unnamed=${Math.round(maxGap)}ms entries=${timing.entries.length} resources=${timing.resources.length} atomic=${timing.counters['atomic:completed']?.loaded} byteStreams=${bytes.length} chunks=${bytes.reduce((sum,[,row])=>sum+row.events,0)} delay=${delayKind??'none'} frame=${renderFrame}`);
       await context.close();
     } finally {await browser.close();}
   }
