@@ -151,22 +151,23 @@ const CONTEXT_CATALOGUES=4;
  * storage deletion alone does not collect the previous document's Wasm banks.
  * Faults and document provenance remain shared across every group.
  * @param {import('playwright').Browser} browser @param {string} base */
-export async function openExplorerSession(browser,base){
+export async function openExplorerSession(browser,base,isolated=false){
   /** @type {string[]} */ const faults=[];
   /** @type {{previous:number|undefined}} */ const lifetime={previous:undefined};
   let generation=1,used=0,busy=false,closed=false;
-  /** @type {Awaited<ReturnType<typeof openExplorerContext>>|undefined} */ let active=await openExplorerContext(browser,base,faults,lifetime,generation);
+  const limit=isolated?1:CONTEXT_CATALOGUES;
+  /** @type {Awaited<ReturnType<typeof openExplorerContext>>|undefined} */ let active=await openExplorerContext(browser,base,faults,lifetime,generation,isolated);
   const retire=async()=>{const previous=active;active=undefined;try{await previous?.close();}catch(error){closed=true;throw error;}};
   return {sweep:async(/** @type {string} */slug,/** @type {string} */out)=>{
     if(closed)throw new Error('Explorer session is closed');
     if(busy)throw new Error('Explorer session already owns a catalogue');
     busy=true;const started=Date.now();
     try{
-      if(used===CONTEXT_CATALOGUES){
+      if(used===limit){
         const replace=async()=>{
           await retire();if(closed)throw new Error('Explorer session is closed');
           generation++;
-          const next=await openExplorerContext(browser,base,faults,lifetime,generation);
+          const next=await openExplorerContext(browser,base,faults,lifetime,generation,isolated);
           if(closed){await next.close();throw new Error('Explorer session is closed');}
           active=next;used=0;
         };
@@ -183,20 +184,22 @@ export async function openExplorerSession(browser,base){
  * the original independent input fixtures without accumulating world bodies.
  * @param {import('playwright').Browser} browser @param {string} base
  * @param {string[]} faults @param {{previous:number|undefined}} lifetime
- * @param {number} generation */
-async function openExplorerContext(browser,base,faults,lifetime,generation){
+ * @param {number} generation @param {boolean} isolated */
+async function openExplorerContext(browser,base,faults,lifetime,generation,isolated){
   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
   try{
     // The existing harness identity suppresses telemetry without request
     // routing, which would disable the native HTTP cache for every asset.
     await context.addInitScript({content:`if(location.origin===${JSON.stringify(new URL(base).origin)}){localStorage.clear();sessionStorage.clear();performance.setResourceTimingBufferSize(8000);performance.addEventListener('resourcetimingbufferfull',()=>{Reflect.set(window,'__explorerTimingFull',true);});${saveFixtureCode({scope:'device',key:'devMode',data:true})};${harnessPinCode({lane:'explorer-smoke'})};}`});
     const page=await context.newPage();
-    const storage=await context.newCDPSession(page);
+    // WebKit has no CDP. An isolated session owns a fresh context for exactly
+    // one catalogue, so retirement replaces all origin storage natively.
+    const storage=isolated?null:await context.newCDPSession(page);
     const reset=async()=>{
       // Leaving first retires the old world's dedicated workers and prevents
       // them from publishing into the store after its deletion has completed.
       await page.goto('about:blank',{waitUntil:'domcontentloaded',timeout:30000});
-      await storage.send('Storage.clearDataForOrigin',{origin:new URL(base).origin,
+      await storage?.send('Storage.clearDataForOrigin',{origin:new URL(base).origin,
         storageTypes:'cache_storage,indexeddb,local_storage,service_workers,file_systems,websql,storage_buckets,cookies,shared_storage,interest_groups'});
     };
     page.on('pageerror',error=>faults.push(error.message));
@@ -204,15 +207,15 @@ async function openExplorerContext(browser,base,faults,lifetime,generation){
     page.on('console',message=>{if(message.type()==='error')faults.push(message.text());});
     page.on('response',response=>{if(response.status()>=400)faults.push(`HTTP ${response.status()}: ${response.url()}`);});
     return {sweep:async(/** @type {string} */slug,/** @type {string} */out,/** @type {number} */catalogue,/** @type {number} */started)=>{
-      await sweepPage(page,faults,base,slug,out,lifetime,reset,{generation,catalogue,maxCatalogues:CONTEXT_CATALOGUES},started);
+      await sweepPage(page,faults,base,slug,out,lifetime,reset,{generation,catalogue,maxCatalogues:isolated?1:CONTEXT_CATALOGUES},started);
     },close:()=>context.close()};
   }catch(error){await context.close();throw error;}
 }
 
 /** Preserve the one-case entry point for focused callers.
- * @param {import('playwright').Browser} browser @param {string} base @param {string} slug @param {string} out */
-export async function sweepExplorer(browser,base,slug,out){
-  const session=await openExplorerSession(browser,base);
+ * @param {import('playwright').Browser} browser @param {string} base @param {string} slug @param {string} out @param {boolean} [isolated] */
+export async function sweepExplorer(browser,base,slug,out,isolated=false){
+  const session=await openExplorerSession(browser,base,isolated);
   try{await session.sweep(slug,out);}finally{await session.close();}
 }
 

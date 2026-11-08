@@ -354,8 +354,11 @@ export function spawnOverhead() {
 
 /** `developer`: a standalone case with Developer on, for a shard that is still Developer-only (Signal Dunes: SF57's composer
  * coverage broke its boot on main, 9fb0cca1d, and no public case could see it).
- * @param {import('playwright').Browser} browser @param {string} base @param {'standalone'|'grid'|'public-policy'} mode @param {string} out @param {string} [shard] @param {boolean} [developer] */
-export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle', developer = false) {
+ * `arrival` consumes the real travel handoff for a grid-only product with no picker card.
+ * @param {import('playwright').Browser} browser @param {string} base @param {'standalone'|'grid'|'public-policy'|'arrival'} mode @param {string} out @param {string} [shard] @param {boolean} [developer]
+ * @param {((page:import('playwright').Page)=>Promise<void>)|null} [afterGameplay]
+ * @param {((context:import('playwright').BrowserContext)=>Promise<void>)|null} [configureContext] */
+export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle', developer = false, afterGameplay = null, configureContext = null) {
   // CI's macOS runner renders the phone tier at ~0.3 fps, so a case needs more than a minute of wall clock.
   const started = Date.now();
   let deadline = started + 150000;
@@ -364,6 +367,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   const receipt = mode !== 'grid' && shard !== 'driftwood-isle' ? shard : mode;
   /** @type {Record<string, number>} */ const phases = {};
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+  if (configureContext !== null) await configureContext(context);
   // Both ordinary documents read the same device choice. Standalone proves the public default too.
   await saveFixture(context, { scope: 'device', key: 'devMode', data: mode === 'grid' || developer });
   // Existing probe permission for the one initial road pose; no scheduler or service is replaced.
@@ -421,6 +425,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     for (const [key, value] of Object.entries({ tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0' })) url.searchParams.set(key, value);
     if (mode !== 'grid') url.searchParams.set('chunk', shard);
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    if (mode !== 'arrival') {
     await until(page, faults, async observed => await page.locator('.ws-main-logo').isVisible() && !(await page.locator('.ws-load').isVisible()) && titleCaptureReady(observed, mode === 'grid'), 'rendered usable title with completed warm-up', deadline);
     phases.titleMs = Date.now() - started;
     await observeTitleCapture(page, join(out, `${receipt}-title`), () => captureBootFrame(page, 'title', deadline, frames));
@@ -461,6 +466,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
         page.locator('.ws-main-grid').click(),
       ]);
     }
+    }
     let revealSkipped = false;
     const gameplay = async (/** @type {boolean} */ requireRings) => {
       const value = await page.evaluate(bootObservation);
@@ -470,7 +476,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
         revealSkipped = await page.locator('.ws-grid-reveal').dispatchEvent('pointerdown').then(() => true, () => false);
       }
       if (!value.ready) return false;
-      if (mode === 'standalone') return value.shard === shard && value.grid === null;
+      if (mode === 'standalone' || mode === 'arrival') return value.shard === shard && value.grid === null;
       const grid = value.grid;
       if (typeof grid !== 'object' || grid === null || !('home' in grid) || typeof grid.home !== 'string' || grid.home.length === 0 ||
         !('inside' in grid) || grid.home !== grid.inside || (requireRings && (!('ringsReady' in grid) || grid.ringsReady !== true)) ||
@@ -502,6 +508,8 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     const road = mode === 'grid' ? await bootSignalRoad(page, faults, frames, roadDeadline) : null;
     const result = { mode, phases, frames, gameplayFrames, gridWaits: gridWaits.samples, templateRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
     if (faults.length > 0 || result.fatal.length > 0) throw new Error(JSON.stringify(result));
+    if (afterGameplay !== null) await afterGameplay(page);
+    if (faults.length > 0) throw new Error(JSON.stringify(faults));
     writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify(result, null, 2)}\n`);
     return result;
   } catch (error) {

@@ -1,60 +1,130 @@
-# Ring 2's clock, J66 and J167. Each night, move `nightly` to the newest main: that push runs deploy.yml, the whole pipeline on all 28
-# pinned heads. A green run tags that commit. A red one tags nothing, so production stays on the last good tag. There's no revert: J165
-# fixes forward. Real-GPU legs wait for the Mac mini (J169).
-#
-# GITHUB_TOKEN's pushes start no workflow, so the move needs an app's token, with contents and workflows write. Use a second app,
-# installed on this repo only: a leak of the org's app would reach every private repo (meta repo PUBLIC-READY.md, Jake decides). Only
-# `schedule` and `workflow_dispatch` reach that step, and neither runs for a fork.
+# Ring 2 / J167: one exact main SHA, all pinned heads, no deployment or app token.
+# Promotion owns tags (J184); a red or incomplete verdict holds the tag.
 name: nightly
-
 on:
   schedule:
     - cron: '17 7 * * *'
   workflow_dispatch:
-  workflow_run:
-    workflows: [deploy]
-    types: [completed]
-    branches: [nightly]
-
 permissions:
   contents: read
-
+  actions: read
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  advance:
-    if: github.event_name != 'workflow_run'
-    runs-on: ubuntu-latest
+  plan:
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
-      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        id: app-token
-        with:
-          client-id: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
-          private-key: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-workflows: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
-          fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
-      - name: Move nightly to main, on a new commit only
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      - run: node --test scripts/nightly.proof.ts
+      - id: plan
+        run: echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
+  tests:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/pins
+          key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
+      - run: node scripts/pins.ts install
+      - run: pnpm gen:inputs
+      - run: node scripts/nightly.ts tests
+        env:
+          WS_FULL_SUITE: '1'
+          NET_FUZZ_SEEDS: ${{ github.run_id }}
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nightly-tests
+          path: tmp/nightly/reports/tests.json
+          if-no-files-found: error
+          retention-days: 7
+  heads:
+    needs: plan
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.browser }} heads ${{ matrix.group }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/pins
+          key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm build:game
+        env:
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      - name: Cold cook and real phone UI on each pinned head
+        run: scripts/browser-lane.sh node scripts/nightly-heads.ts "${BROWSER}" "${GROUP}"
+        env:
+          BROWSER: ${{ matrix.browser }}
+          GROUP: ${{ matrix.group }}
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nightly-heads-${{ matrix.browser }}-${{ matrix.group }}
+          path: tmp/nightly/reports/heads-*.json
+          if-no-files-found: error
+          retention-days: 7
+  report:
+    if: always()
+    needs: [plan, tests, heads]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: nightly-*
+          merge-multiple: true
+          path: tmp/nightly/reports
+      - name: Read the previous completed nightly, including red runs
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$(git rev-parse HEAD)" = "$(git rev-parse --verify --quiet origin/nightly || true)" ]; then
-            echo 'No new commit since the last nightly'
-            exit 0
+          mkdir -p tmp/nightly/reports
+          previous=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/nightly.yml/runs?branch=main&status=completed&per_page=1" --jq '.workflow_runs[0].id // empty') || echo '::warning::Previous run lookup unavailable'
+          if [ -n "$previous" ]; then
+            gh run download "$previous" --name nightly-verdict --dir tmp/nightly/baseline || echo '::warning::Previous verdict unavailable; summary will say so'
           fi
-          git push --force origin HEAD:refs/heads/nightly
-
-  tag:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Refuse a red or incomplete night (J167)
+        if: always()
+        run: node scripts/nightly.ts report tmp/nightly/reports tmp/nightly/baseline/verdict.json
+      - name: Publish the per-head verdict
+        if: always()
+        run: cat tmp/nightly/reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-      - name: Tag the green commit
-        run: node scripts/nightly-tag.mjs
+          name: nightly-verdict
+          path: |
+            tmp/nightly/reports/verdict.json
+            tmp/nightly/reports/summary.md
+          if-no-files-found: error
+          retention-days: 7

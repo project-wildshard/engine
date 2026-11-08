@@ -1,7 +1,7 @@
 # Ring 1: what a push must pass. It tests products, not repos: pinned Template 1, Template 2 and Sunscar Dunes in full, and server
 # slices of the other five. No shard repo is linked and no secret is read. A fork's pull request runs only once Jake approves it: that's
 # the repo's Actions setting (J160), not this file.
-# Meta repo docs/plans/TEST-COVERAGE-PLAN.md. Ring 2 is deploy.yml, on the nightly branch.
+# Meta repo docs/plans/TEST-COVERAGE-PLAN.md. Ring 2 is nightly.yml, scheduled directly on main.
 name: ring-1
 
 on:

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// J66: a green nightly tags HEAD with the next patch version. Run only after a green Ring 2, so a red night never reaches this (J167).
+// Optional promotion helper. The schedule never tags; J184 leaves promotion in charge.
+// J167: require the downloaded exact-SHA green nightly verdict before any network/write.
 // A commit that already has a version tag is left alone: an unchanged tree needs no second release.
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import {plan, read, requireGreen} from './nightly-model.ts';
 
 /** @param {...string} args */
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
@@ -16,6 +18,9 @@ export function nextTag(tags) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const report = process.argv.find(arg => arg.startsWith('--report='))?.slice(9);
+  if (report === undefined) throw new Error('J167: tag held; pass --report=<downloaded nightly verdict.json>');
+  requireGreen(/** @type {import('./nightly-model.ts').Verdict} */ (read(report)), plan());
   git('fetch', '--tags', 'origin');
   if (git('tag', '--points-at', 'HEAD').split('\n').some((tag) => /^v\d/u.test(tag))) console.log('This commit is already tagged');
   else {

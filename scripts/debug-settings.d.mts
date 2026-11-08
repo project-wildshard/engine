@@ -16,6 +16,7 @@ export function developerSettings(target: InitTarget, picks: Readonly<Record<str
 export function hideDeveloperOverlays(): void;
 export function harnessPinCode(pins: Readonly<Record<string, unknown>>): string;
 export function harnessPins(target: InitTarget, pins: Readonly<Record<string, unknown>>): Promise<void>;
+export function levelDownloadFixtures(data: 'packs' | 'shardfile'): SaveFixture[];
 export function saveFixtureCode(fixture: SaveFixture): string;
 export function fixtureStorage(scope: SaveFixture['scope']): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export function fixtureStorageCode(scope: SaveFixture['scope']): string;
