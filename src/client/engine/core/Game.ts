@@ -158,20 +158,41 @@ export interface EntryPreparation {
   stalled?: string;
 }
 
-/** LS7: resolve once the GPU has completed every command submitted before the call (a WebGL2 fence, polled without
- *  blocking once per painted frame). WebGL1 or a lost context falls back to one frame. */
-async function gpuCompleted(gl: WebGLRenderingContext | WebGL2RenderingContext, frame: () => Promise<void>): Promise<void> {
-  const sync = 'fenceSync' in gl && !gl.isContextLost() ? gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) : null;
-  if (sync === null || !('fenceSync' in gl)) { await frame(); return; }
-  gl.flush();
-  try {
-    for (;;) {
-      await frame();
-      if (gl.isContextLost()) return;
-      const status = gl.clientWaitSync(sync, 0, 0);
-      if (status !== gl.TIMEOUT_EXPIRED) return;
+/** LS7: GPU units in flight, each counted as its WebGL2 fence signals. The next unit is submitted before the last fence
+ *  resolves (at most `depth` in flight), so the GPU never idles through the frame the fence poll waits for; the poll is
+ *  non-blocking, once per painted frame. WebGL1 or a lost context counts a unit after one frame. `mark` runs a callback
+ *  in order once every unit before it has completed, with no GPU work of its own. */
+class FencedUnits {
+  private readonly queue: { readonly unit: boolean; readonly sync: WebGLSync | null; readonly done: () => void }[] = [];
+  private readonly gl: WebGLRenderingContext | WebGL2RenderingContext;
+  private readonly frame: () => Promise<void>;
+  private readonly depth: number;
+  constructor(gl: WebGLRenderingContext | WebGL2RenderingContext, frame: () => Promise<void>, depth = 2) {
+    this.gl = gl; this.frame = frame; this.depth = depth;
+  }
+  /** After a unit's commands are submitted: fence them; wait only while `depth` units are in flight. */
+  async submit(done: () => void): Promise<void> {
+    const gl = this.gl;
+    const sync = 'fenceSync' in gl && !gl.isContextLost() ? gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) : null;
+    gl.flush();
+    this.queue.push({ unit: true, sync, done });
+    while (this.queue.length >= this.depth) await this.poll();
+  }
+  mark(done: () => void): void { this.queue.push({ unit: false, sync: null, done }); this.settle(false); }
+  async drain(): Promise<void> { while (this.queue.length > 0) await this.poll(); }
+  private async poll(): Promise<void> { await this.frame(); this.settle(true); }
+  private settle(framed: boolean): void {
+    const gl = this.gl;
+    for (let head = this.queue[0]; head !== undefined; head = this.queue[0]) {
+      if (head.unit) {
+        if (head.sync === null || !('clientWaitSync' in gl) || gl.isContextLost()) { if (!framed) return; }
+        else if (gl.clientWaitSync(head.sync, 0, 0) === gl.TIMEOUT_EXPIRED) return;
+      }
+      this.queue.shift();
+      if (head.sync !== null && 'deleteSync' in gl) gl.deleteSync(head.sync);
+      head.done();
     }
-  } finally { gl.deleteSync(sync); }
+  }
 }
 
 export class Game {
@@ -1215,13 +1236,14 @@ export class Game {
    * The first frames, as a step: every visible drawable's first draw (its pipelines, buffers and shadow-depth variants)
    * a slice at a time into a 1×1 scissor, then the world draw, the warm turns, and the full composer one pass at a time
    * (screen-quad shaders compileAsync cannot reach). LS7 (J188): each unit is counted only once a GPU fence says the GPU
-   * finished it, and the next waits for that, so the loading bar moves on completed work. Unsplit, the world draw and the
+   * finished it, so the loading bar moves on completed work; the next unit is already submitted by then (FencedUnits),
+   * so the fences cost the GPU no idle frames (waiting on each one cost about 1.5 s on Sunscar Dunes). Unsplit, the world draw and the
    * composer draw were each one GPU flush: 2.0 s and 3.3 s on Sunscar Dunes in headless Chromium (SwiftShader), with
    * the page's main thread blocked in the canvas read-back for both.
    */
   async firstFrame(onProgress?: (done: number, total: number, detail: string) => void): Promise<void> {
     const frame = (): Promise<void> => new Promise((resolve) => { this.engineScope.raf(() => { this.engineScope.timeout(0, resolve); }); }); // rAF alone resumes before the paint
-    const completed = (): Promise<void> => gpuCompleted(this.renderer.getContext(), frame);
+    const units = new FencedUnits(this.renderer.getContext(), frame);
     // Large instanced worlds may request culling before the first draw and fewer warm views.
     const tracedBoot = bootTraceActive();
     const checkpoint = (operation: string): void => { if (tracedBoot) recordGpuCheckpoint(this.renderer, operation); };
@@ -1248,39 +1270,42 @@ export class Game {
     if (target !== null) {
       const { warmParkedDraws } = await import('../render/parkedDraws');
       checkpoint(`shadow-maps:allocated:${String(this.allocateShadowMaps(this.camera))}`);
-      let submitted = 0, slicesDone = 0, all = 0;
+      let submitted = 0, drew = false, slicesDone = 0, all = 0;
       checkpoint('world-pipelines:before');
       await warmParkedDraws(this.renderer, this.rootScene, this.camera, target, this.rootScene, () => !this.engineScope.disposed,
+        // a pause after a drawn slice fences it; the bounds pauses before the first slice only yield a frame
         async () => {
-          await completed();
-          slicesDone = Math.min(slicesDone + 1, slices);
-          onProgress?.(slicesDone, total(), `${String(slicesDone)} / ${String(slices)} world slices · ${String(submitted)} / ${String(all)} draws warmed`);
+          if (!drew) { await frame(); return; }
+          drew = false;
+          const warmed = submitted, of = all;
+          await units.submit(() => {
+            slicesDone = Math.min(slicesDone + 1, slices);
+            onProgress?.(slicesDone, total(), `${String(slicesDone)} / ${String(slices)} world slices · ${String(warmed)} / ${String(of)} draws warmed`);
+          });
         },
         { onPlan: (_original, selected) => { slices = selected; onProgress?.(0, total(), `0 / ${String(selected)} world slices`); },
-          onProgress: (done, count) => { submitted = done; all = count; } });
-      checkpoint('world-pipelines:completed');
+          onProgress: (done, count) => { drew ||= done > submitted; submitted = done; all = count; } });
+      checkpoint('world-pipelines:submitted');
     }
     const drawables = slices;
-    onProgress?.(drawables, total(), 'world + shadows');
+    units.mark(() => { onProgress?.(drawables, total(), 'world + shadows'); });
     checkpoint('world:before');
-    await this.fencedDraw(this.camera, target, completed, drawUnits(drawables, 'world + shadows'));
-    checkpoint('world:completed');
+    await this.fencedDraw(this.camera, target, units, drawUnits(drawables, 'world + shadows'));
+    checkpoint('world:submitted');
     // E153: the world once facing each way, so a turn finds every pipeline built (warmTurn)
     const yaws = this.warmTurnYaws();
     for (let k = 1; k <= yaws.length; k++) {
       const label = `world, turned ${String(k * 360 / WARM_TURNS)}°`;
-      onProgress?.(drawables + k * perDraw, total(), label);
-      await this.warmTurn(yaws[k - 1] ?? 0, target, completed, drawUnits(drawables + k * perDraw, label));
+      await this.warmTurn(yaws[k - 1] ?? 0, target, units, drawUnits(drawables + k * perDraw, label));
     }
     const postFrom = drawables + perDraw * (1 + warmTurns);
-    onProgress?.(postFrom, total(), `post pass 0 / ${String(postUnits)}`);
     this.lookStrategy?.frame?.(0.016, 0);
     checkpoint('post:before');
     if (!splitPost) {
       if (tracedBoot) traceBootPasses(this.composer.passes, checkpoint, () => { this.composer.render(0.016); });
       else this.composer.render(0.016);
       checkpoint('post:submitted');
-      await completed();
+      await units.submit(() => { onProgress?.(postFrom + 1, total(), 'post chain'); });
     } else {
       // EffectComposer.render's own loop (postprocessing 6.39: render, depth blit, swap), a pass per completed fence
       const composer = this.composer, renderer = this.renderer;
@@ -1294,10 +1319,10 @@ export class Game {
         }
         if (pass.needsSwap) [input, output] = [output, input];
         checkpoint(`pass:${String(i)}:${pass.name}:submitted`);
-        await completed();
-        onProgress?.(postFrom + i + 1, total(), `post pass ${String(i + 1)} / ${String(postUnits)} · ${pass.name}`);
+        await units.submit(() => { onProgress?.(postFrom + i + 1, total(), `post pass ${String(i + 1)} / ${String(postUnits)} · ${pass.name}`); });
       }
     }
+    await units.drain();
     checkpoint('post:completed');
   }
 
@@ -1338,7 +1363,7 @@ export class Game {
    * nothing), then the view with those maps held. The same maps and the same view as one `render`; on Sunscar Dunes in
    * headless Chromium the unsplit first draw was one 1.75–2.1 s GPU flush.
    */
-  private async fencedDraw(cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, completed: () => Promise<void>,
+  private async fencedDraw(cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, units: FencedUnits,
     onUnit: (done: number, detail: string) => void): Promise<void> {
     const r = this.renderer, map = r.shadowMap;
     const flags = this.shadowCasters(cam).map(({ shadow }) => ({ shadow, auto: shadow.autoUpdate }));
@@ -1360,8 +1385,7 @@ export class Game {
           r.setScissor(canvasScissor); r.setScissorTest(canvasScissorTest);
           r.setRenderTarget(prev, face, mip);
         }
-        await completed();
-        onUnit(i + 1, `shadow map ${String(i + 1)} / ${String(flags.length)}`);
+        await units.submit(() => { onUnit(i + 1, `shadow map ${String(i + 1)} / ${String(flags.length)}`); });
       }
       // every map due this pose is drawn: the view draws with them held
       for (const { shadow } of flags) { shadow.autoUpdate = false; shadow.needsUpdate = false; }
@@ -1373,8 +1397,7 @@ export class Game {
       for (const { shadow, auto } of flags) { shadow.autoUpdate = auto; shadow.needsUpdate = false; }
       map.autoUpdate = mapAuto; map.needsUpdate = false;
     }
-    await completed();
-    onUnit(flags.length + 1, 'view');
+    await units.submit(() => { onUnit(flags.length + 1, 'view'); });
   }
 
   /** The yaws (radians, from where the player looks) the first frame's warm turns draw: the boot's shader warm-up links
@@ -1391,7 +1414,7 @@ export class Game {
    * play — the waterfall behind the pier, a caster's depth variant in a cascade: 25–35 ms hitches on the M5 with a cold
    * shader cache, several times that on a phone. Four quarter-turns at 100° cover the circle.
    */
-  private async warmTurn(turn: number, target: THREE.WebGLRenderTarget | null, completed: () => Promise<void>,
+  private async warmTurn(turn: number, target: THREE.WebGLRenderTarget | null, units: FencedUnits,
     onUnit: (done: number, detail: string) => void): Promise<void> {
     const cam = this.camera, sky = this._sky;
     const q = cam.quaternion.clone(), fov = cam.fov, aspect = cam.aspect;
@@ -1402,7 +1425,7 @@ export class Game {
       cam.updateMatrixWorld(true);
       sky?.warmShadows();
       // the boot's loop has not started: nothing else draws or moves the camera while the turn's units wait on the GPU
-      await this.fencedDraw(cam, target, completed, onUnit);
+      await this.fencedDraw(cam, target, units, onUnit);
     } finally {
       cam.quaternion.copy(q); cam.fov = fov; cam.aspect = aspect; cam.updateProjectionMatrix(); cam.updateMatrixWorld(true);
       sky?.csm.updateFrustums();

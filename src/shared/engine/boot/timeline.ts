@@ -6,6 +6,8 @@ export interface LoadingStep { key: string; label: string; weight: number; alias
 export interface LoadingPath { id: string; steps: readonly LoadingStep[]; ignored?: readonly string[] }
 export interface LoadingRow {
   key: string; label: string; number: number; state: 'todo' | 'on' | 'ok'; ms: number; detail: string; fraction?: number;
+  /** The step's share of the Load bar (its path weight), present when it is not 1. */
+  weight?: number;
   /** First accounted start on the monotonic timeline clock, not a paint timestamp. */
   startedAt?: number;
   /** Last completed wall boundary; ms remains exclusive of nested work. */
@@ -154,6 +156,7 @@ export class LoadingTimeline {
       const result: LoadingRow = { key, label: step?.label ?? key, number: index + 1,
         state: running.has(key) ? 'on' : row?.started ? 'ok' : 'todo', ms: row?.ms ?? 0, detail: row?.detail ?? '' };
       if (row?.fraction !== undefined) result.fraction = row.fraction;
+      if (step.weight !== 1) result.weight = step.weight;
       if (row?.startedAt !== undefined) result.startedAt = row.startedAt;
       if (row?.endedAt !== undefined) result.endedAt = row.endedAt;
       if (row?.setupAtStart !== undefined) result.setupAtStart = row.setupAtStart;

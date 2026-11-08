@@ -36,8 +36,10 @@ export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { l
     step('readyFrame', 'First drawn frames and minimap'),
     // QA8: WebKit only (finish.ts linkWorldUnderLoader); it carries no bar share, so other engines' bars are unchanged
     step('spawnPrograms', 'Spawn program links'), { ...step('worldPrograms', 'World program links'), weight: 0.01 },
-    // DL21: the server's boot, on J130's row and after the flip on every page; no bar share, so a page with no server is unchanged
-    { ...step('server', 'Server world'), weight: 0.01 }, leaf('audio')],
+    // DL21: the server's boot, on J130's row and after the flip on every page. LS7 (J188): its share is its measured
+    // seconds, as steps.ts's rows are: 1.86 s on Sunscar Dunes and on the template (phone tier, 4x CPU, Chromium,
+    // loading-card-proof --throttle --dump, 2026-11-08), so its 48 / 81 reported server steps move the bar
+    { ...step('server', 'Server world'), weight: 1.9 }, leaf('audio')],
     ignored: native ? [] : BOOT_STEPS.filter(key => !selected.has(key)) };
 
 }
