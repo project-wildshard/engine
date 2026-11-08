@@ -92,3 +92,16 @@ All seven native lifecycle paths now pass in each browser. Independent
 wrappers forward real fenceSync/deleteSync calls and track actual
 handles, rather than trusting the class census. Every case ends with
 zero live handles; failure paths credit no successful callback.
+
+Persistent Chromium also stops 81.3 m short with the same pre-hook
+world/metadata wait. Production 044c064 / engine v0.1.1 traverses the
+same route on both browsers; its Ember hash equals b1e6fdb's. This
+narrows a real candidate regression; no persistence or hold fix is
+claimed. J189 is diagnosing the await without source changes.
+
+Persistent WebKit earns the real Ember save, and fresh/saved/missing-art
+name/art plus actual entered pose pass, with zero unearned bar moves.
+The first two have zero page errors; an extra title reload in the
+missing-art scenario emits two native Context is stopped errors. No
+exception is filtered. Whole saved-place acceptance remains red.
+Publication remains held, with the complete normal gate run dry.
