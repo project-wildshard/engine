@@ -225,22 +225,28 @@ const ringOf = (name: string): Ring => {
 
 /** What a server reads of a head, as a tarball of its own: a slice proves a host on real data with none of the art. It holds no
  *  receipt and isn't a product a page can open, so no build reads it. */
-async function slice(): Promise<void> {
+async function slice(check = false): Promise<void> {
   const { serverRows, openShardfile } = await import('../src/cook/game/shardCook.ts');
   const { writeTar } = await import('@wildshard/format/tar');
   const { shards } = readJson(PINS) as PinFile, rows: Slice[] = [];
+  const existing = existsSync(SLICES) ? (readJson(SLICES) as {slices: readonly Slice[]}).slices : [];
   for (const slug of ringOf('1').slices) {
     const pin = shards.find(row => row.slug === slug);
     if (pin === undefined) throw new Error(`Not pinned: ${slug}`);
     const shard = openShardfile(await tarball(pin)), files = new Map<string, Uint8Array>();
     for (const row of serverRows(shard)) files.set(row.path, shard.read(row.path));
     const bytes = writeTar(files), hash = sha256(bytes);
-    mkdirSync(CACHE, { recursive: true });
-    writeFileSync(join(CACHE, `${hash}.tar`), bytes);
+    if (check) {
+      const prior = existing.find(row => row.slug === slug);
+      if (prior?.from !== pin.hash || prior.hash !== hash) throw new Error(`${slug}: slice differs from a fresh cook; re-cut with node scripts/pins.ts slice`);
+    } else {
+      mkdirSync(CACHE, { recursive: true });
+      writeFileSync(join(CACHE, `${hash}.tar`), bytes);
+    }
     rows.push({ slug, from: pin.hash, hash, bytes: bytes.length, files: files.size });
     console.log(`${slug}: ${(pin.bytes / 1e6).toFixed(1)} MB head, ${(bytes.length / 1e6).toFixed(1)} MB slice, ${files.size} files`);
   }
-  writeFileSync(SLICES, json({ slices: rows }));
+  if (!check) writeFileSync(SLICES, json({ slices: rows }));
   console.log(`${rows.length} slices, ${(rows.reduce((sum, row) => sum + row.bytes, 0) / 1e6).toFixed(1)} MB`);
 }
 
@@ -261,6 +267,7 @@ function ringCatalogue(slugs: readonly string[]): void {
 
 async function installRing(name: string): Promise<void> {
   const { readTar } = await import('@wildshard/format/tar');
+  const { checkSlice } = await import('./slice-inputs.ts');
   const ring = ringOf(name), started = performance.now();
   await install(ring.products);
   // A tree that held every head keeps none of the others: their mounts just left public/.
@@ -273,7 +280,9 @@ async function installRing(name: string): Promise<void> {
   const { slices } = readJson(SLICES) as { slices: readonly Slice[] };
   let bytes = 0;
   for (const row of slices.filter(({ slug }) => ring.slices.includes(slug))) {
+    if (row.from !== (readJson(PINS) as PinFile).shards.find(pin => pin.slug === row.slug)?.hash) throw new Error(`${row.slug}: slice belongs to another head; re-cut with node scripts/pins.ts slice`);
     const body = await tarball(row, false), target = join(SLICED, row.slug);
+    checkSlice(body, row.slug);
     bytes += body.length;
     for (const [path, file] of readTar(body)) {
       if (path.endsWith('/')) continue;
@@ -309,6 +318,7 @@ if (command === 'refresh') await refresh();
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1');
 else if (command === 'install') await install(rest);
 else if (command === 'slice') await slice();
+else if (command === 'verify-slices') await slice(true);
 else if (command === 'keep') await keep(rest[0] ?? 'tmp/pins-release');
 else if (command === 'status') status();
-else throw new Error('usage: pins.ts refresh | install [slug...] | install --ring 1 | slice | keep <dir> | status');
+else throw new Error('usage: pins.ts refresh | install [slug...] | install --ring 1 | slice | verify-slices | keep <dir> | status');

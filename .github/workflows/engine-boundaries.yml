@@ -24,6 +24,10 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - run: node scripts/pins.ts install --ring 1
       - run: pnpm gen:inputs
+      # Ring 2: re-cutting five large raw heads is outside Ring 1.
+      - name: Re-cut the pinned server slices
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: node scripts/pins.ts verify-slices
       - name: Real worker, hostile peers, and restore continuation
         run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/net-hostile-play.test.ts test/pinned-restore-play.test.ts test/released-save-play.test.ts
         env:
