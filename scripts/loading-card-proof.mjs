@@ -26,6 +26,8 @@ function recordBars() {
   /** @type {import('./loading-bar-rule.mjs').BarRow[]} */
   const rows = [];
   Reflect.set(window, '__barLog', rows);
+  /** @type {{t: number, startBytes: number, startTotal: number, startFiles: number, serverSteps: number, serverFiles: number, serverBytes: number}[]} */
+  const counts = []; Reflect.set(window, '__countLog', counts);
   // Every realm's counters: the worker's boundaries and streamed bytes are real events too.
   const counters = () => {
     const timing = Reflect.get(window, '__bootTiming');
@@ -51,8 +53,13 @@ function recordBars() {
     const card = document.querySelector('.ws-load');
     if (!(card instanceof HTMLElement)) { requestAnimationFrame(watch); return; }
     const seen = new Map();
-    let step = '', ready = false;
+    let step = '', ready = false, previousCount = '';
     const sample = () => {
+      const reading = { startBytes: Number(card.dataset.startBytes ?? 0), startTotal: Number(card.dataset.startTotalBytes ?? 0),
+        startFiles: Number(card.dataset.startFiles ?? 0), serverSteps: Number(card.dataset.serverSteps ?? 0),
+        serverFiles: Number(card.dataset.serverFiles ?? 0), serverBytes: Number(card.dataset.serverBytes ?? 0) };
+      const identity = JSON.stringify(reading);
+      if (identity !== previousCount) { previousCount = identity; counts.push({ t: performance.now(), ...reading }); }
       const now = card.dataset.step ?? '';
       if (now !== step) { step = now; rows.push({ t: performance.now(), bar: 'step', pct: 0, step, ...counters() }); }
       if (!ready && Object.hasOwn(card.dataset, 'ready')) { ready = true; Reflect.set(window, '__readyAt', performance.now()); }
@@ -63,7 +70,7 @@ function recordBars() {
         rows.push({ t: performance.now(), bar, pct, step, ...counters() });
       }
     };
-    new MutationObserver(sample).observe(card, { subtree: true, attributes: true, attributeFilter: ['style', 'data-step', 'data-ready'] });
+    new MutationObserver(sample).observe(card, { subtree: true, attributes: true, attributeFilter: ['style', 'data-step', 'data-ready', 'data-start-bytes', 'data-start-files', 'data-server-steps', 'data-server-files', 'data-server-bytes'] });
     sample();
   };
   document.addEventListener('DOMContentLoaded', watch, { once: true });
@@ -92,7 +99,7 @@ try {
         await cdp.send('Network.enable');
         await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8 * 8, uploadThroughput: 750e3 / 8 });
       }
-      const tag = `${name}${throttle ? '-throttled' : ''}${arrival === undefined ? '' : '-arrival'}`;
+      const tag = `${name}${throttle && name === 'chromium' ? '-throttled' : ''}${arrival === undefined ? '' : '-arrival'}`;
       await page.goto(`${preview.url}/?chunk=${encodeURIComponent(shard)}&tier=phone&mute=1&nolock=1&sw=0`, { waitUntil: 'commit', timeout: 30000 });
       if (arrival !== undefined) {
         // The first frame: the inline card before any module, then the adopted card must keep the same name and art.
@@ -131,20 +138,26 @@ try {
       const log = await page.evaluate(() => Reflect.get(window, '__barLog'));
       const readyAt = await page.evaluate(() => Reflect.get(window, '__readyAt'));
       if (process.argv.includes('--dump')) writeFileSync(join(out, `${tag}-timing.json`), JSON.stringify(await page.evaluate(() => Reflect.get(window, '__bootTiming')?.read()), null, 1));
-      report.push({ tag, faults, log, readyAt });
+      const counts = await page.evaluate(() => Reflect.get(window, '__countLog'));
+      const lastCount = counts.at(-1);
+      const measured = lastCount !== undefined && lastCount.startBytes > 0 && lastCount.startTotal >= lastCount.startBytes
+        && lastCount.serverSteps > 0 && lastCount.serverFiles > 0 && lastCount.serverBytes > 0;
+      console.log(`${tag}: measured counts ${measured ? 'ok' : 'FAILED'} ${JSON.stringify(lastCount)}`);
+      if (!measured) faults.push('Start code bytes or Server internal work counts absent');
+      report.push({ tag, faults, log, readyAt, counts });
       await context.close();
     } finally { await browser.close(); }
   }
 } finally { preview.close(); }
 let failed = false;
-for (const { tag, faults, log, readyAt } of report) {
+for (const { tag, faults, log, readyAt, counts } of report) {
   // The rule's window opens when the first card paints a bar, before any module (the inline Start counter).
   const opened = log[0]?.t ?? 0, { stalls, backwards } = barStalls(log, opened, readyAt), untraced = untracedChanges(log);
   console.log(`${tag}: ready ${(readyAt / 1000).toFixed(1)} s, ${log.filter((/** @type {{bar: string}} */ row) => row.bar !== 'step').length} bar changes, `
     + `${stalls.length} stalls over 2 s, ${backwards.length} backwards, ${untraced.length} untraced, faults ${faults.length}${faults.length > 0 ? `: ${faults.join(' | ')}` : ''}`);
   for (const stall of stalls) console.log(`  stall ${(stall.ms / 1000).toFixed(1)} s at ${(stall.from / 1000).toFixed(1)} s: needs finer feedback in ${stall.stages.join(' > ') || 'unnamed'}`);
   for (const row of untraced) console.log(`  untraced ${row.bar} -> ${row.pct}% at ${(row.t / 1000).toFixed(2)} s (${row.step})`);
-  writeFileSync(join(out, `${tag}-bars.json`), JSON.stringify({ readyAt, stalls, backwards, untraced, log }));
+  writeFileSync(join(out, `${tag}-bars.json`), JSON.stringify({ readyAt, stalls, backwards, untraced, log, counts }));
   failed ||= backwards.length > 0 || untraced.length > 0 || faults.length > 0 || process.argv.includes('--strict') && stalls.length > 0;
 }
 if (failed) process.exitCode = 1;
