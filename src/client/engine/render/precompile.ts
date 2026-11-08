@@ -32,6 +32,9 @@ let censusSlot = 0;
 // Weak identities only: a target becomes known after its own completed-draw
 // barrier, not merely because another concurrent warm-up allocated it.
 const fencedTargets = new WeakMap<Renderer, WeakMap<THREE.WebGLRenderTarget, object>>();
+// Admission revisions distinguish a draw that already spent the budget from
+// another warm-up which issued atomic work while this caller was yielding.
+const issuedCompileWork = new WeakMap<Renderer, number>();
 
 /**
  * Shader precompile for the `shaders` boot step (project/archive/2026-09-22-load-perf.md §P2.3, Status table).
@@ -1216,11 +1219,16 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
   for (const [i, job] of jobs.entries()) {
     // Job discovery and other builders may already have spent this drawn frame. Compile is atomic: don't start it
     // on a stale local slice, and don't append first-use/link preparation after a compile has consumed the budget.
-    // A completed draw can itself consume the shared budget (notably on
-    // SwiftShader). Yield once, then admit this one atomic job: rechecking in
-    // a loop can starve tile publication forever while frames keep drawing.
-    // The post-job budget and program cap still end the slice before more work.
-    if (nativeBudgetSpent(sliceMs)) await pauseIssue();
+    // A completed draw can itself consume the shared budget (SwiftShader).
+    // If no warm-up issued work while we yielded, admit one atomic job even
+    // after that slow draw. Otherwise recheck the shared budget, so expensive
+    // queued warm-ups cannot all join the same spent frame. The post-job
+    // budget and program cap still end this caller's slice before more work.
+    while (nativeBudgetSpent(sliceMs)) {
+      const beforeIssue = issuedCompileWork.get(renderer) ?? 0;
+      await pauseIssue();
+      if ((issuedCompileWork.get(renderer) ?? 0) === beforeIssue) break;
+    }
     checkCurrent();
     // Resolve earlier ready links in this frame's spare issue time. Waiting
     // until a compile spends the slice left every first-use query for a
@@ -1236,6 +1244,7 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     // crossing's later passes re-ran ~1,300 such jobs, each still spending part of a slice
     if (i < jobs.length - 1 && repeatsCompiled(renderer, job, camera)) { repeatJobs++; onProgress?.(i + 1, total(), `${materials} materials · ${i + 1} / ${jobs.length} batches · ${mode}`); continue; }
     const jobStart = performance.now(); issuedPrograms.clear();
+    issuedCompileWork.set(renderer, (issuedCompileWork.get(renderer) ?? 0) + 1);
     if (job.rt !== null && !watchedTargets.has(job.rt)) {
       const target = job.rt; watchedTargets.add(target);
       observer.listenOnceEmitter(target, 'dispose', () => { preparedTargets.delete(target); watchedTargets.delete(target); });

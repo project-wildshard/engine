@@ -123,3 +123,12 @@ or stall exception makes that trace a strict green. The starvation fix
 allows its actual Ember tile preparation and crossing to finish. This
 does not change the four calibrated strict-case verdicts or claim the
 older uncatalogued template renderer path is fixed.
+
+The whole gate caught a separate shared-frame fairness regression in
+the first grid scheduling repair. Its forward correction retains all
+101 existing precompile assertions and passes them. Fresh strict runs
+on that correction also pass: Dunes Chromium/WebKit 23.8/3.4 s and
+installed _template 13.7/3.2 s, with the same zero-finding conditions.
+Default SwiftShader and WebKit again cross actual Ember and resume its
+earned save. No fence lifecycle or measured weight changed to obtain
+these results. Publication still requires the complete normal rerun.
