@@ -841,7 +841,7 @@ function holdUnlisted(ready: Promise<void>): void {
 }
 export function currentSpawnDownload(): SpawnDownload | undefined { return current?.download; }
 
-const mb = (bytes: number): string => `${(bytes / 1_000_000).toFixed(bytes >= 10_000_000 ? 1 : 2)} MB`;
+const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1);
 /** Paint only the existing card's numbers/text, before engine imports. The
  * composition root unsubscribes when Loading adopts this same download. */
 export function paintSpawnDownload(download: SpawnDownload, root: HTMLElement): () => void {
@@ -856,7 +856,9 @@ export function paintSpawnDownload(download: SpawnDownload, root: HTMLElement): 
     root.dataset['streamedBytes'] = String(row.streamedBytes ?? row.completedBytes);
     const fact = root.querySelector('[data-el="dlFact"]'), pct = root.querySelector('[data-el="dlPct"]'), bar = root.querySelector<HTMLElement>('[data-el="dlBar"]');
     const text = row.wire ?? row;
-    if (fact !== null) fact.textContent = `Spawn view · ${mb(text.completedBytes)}${row.complete ? '' : ` of ${mb(text.totalBytes)}`} · ${mb(text.cachedBytes)} from cache`;
+    // LS2: the card's one size number, as Loading's loadingDownloadText writes it once it adopts this download
+    if (fact !== null) fact.textContent = row.complete ? `${mb(Math.max(0, text.completedBytes - text.cachedBytes))} MB downloaded, ${mb(text.cachedBytes)} MB from cache`
+      : `${mb(text.completedBytes)} of ${mb(text.totalBytes)} MB`;
     if (pct !== null) pct.textContent = percent === null ? '—' : String(percent);
     if (bar !== null) bar.style.width = `${percent ?? 0}%`;
   });

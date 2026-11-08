@@ -1,19 +1,20 @@
 import { uiScope, mountUi } from './ownership';
 import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 import {app} from '../app/runtime';
 import { engineString } from '../../../shared/engine/strings';
 import { saveStorage } from '../saves/slots';
 import { formatMB, type ProgressView } from '../boot/plan';
 import { bootWaits, loadingStepWaits, STAGE_READS } from '../../../shared/engine/boot/waits';
 import { TIER } from '../core/tier';
-import { loadShellTemplate, stopShellClock } from '../boot/shell';
+import { loadShellTemplate, START_STEPS, stopShellClock } from '../boot/shell';
 import { appIdentity } from '../../../shared/engine/app/identity';
 import { recordBootCheckpoint, recordBootProgress, startBoot } from '../boot/bootTrace';
 import { adoptLoadingWait } from '../boot/download';
 import { beginLoadingWait, reportLoadingWait, finishLoadingWait, loadingWaitState } from '../../../shared/engine/boot/loadingWaits';
-import { loadingDownloadText, loadingDownloadFraction, loadingPrefetchFraction, loadingPrefetchText, type LoadingPrefetchSnapshot, type LoadingDownloadSnapshot } from '../boot/loadingDownloadText';
+import { loadingCacheText, loadingDownloadText, loadingDownloadFraction, loadingPrefetchFraction, loadingPrefetchText, type LoadingPrefetchSnapshot, type LoadingDownloadSnapshot } from '../boot/loadingDownloadText';
 import { LoadingTimeline, installLoadingTimeline, type LoadingPath, type LoadingRow, type LoadingGap } from '../../../shared/engine/boot/timeline';
-import {combinedLoadingFraction, loadingFraction} from '../boot/weights';
+import {loadingFraction} from '../boot/weights';
 import { isDev, onDev } from '../core/devMode';
 import { getSetting, onSetting } from './Settings';
 import { listenTap } from '../input/dom';
@@ -23,7 +24,6 @@ import { markReload } from '../boot/lastEnd';
 import './loading.css';
 
 const savedStorage = saveStorage('session');
-
 /**
  * Loading screen in the Wildshard staging identity — a painter of the boot plan's view
  * (src/client/engine/boot/plan.ts) and nothing else: two tracks (DOWNLOAD bytes read / declared, SETUP
@@ -35,13 +35,51 @@ const savedStorage = saveStorage('session');
  * Only the existing hold-at-completion setting is Developer-only.
  */
 type TimelineSnapshot = ReturnType<LoadingTimeline['snapshot']>;
-type ElKey = 'clock' | 'dlFact' | 'dlPct' | 'dlBar' | 'pfRow' | 'pfFact' | 'pfPct' | 'suFact' | 'suPct' | 'suBar' | 'rows' | 'foot' | 'slug' | 'tier' | 'bar' | 'line' | 'diagnostics' | 'retry';
+type ElKey = 'clock' | 'kicker' | 'stHead' | 'stFact' | 'stPct' | 'stBar' | 'stRows' | 'dlHead' | 'dlFact' | 'dlPct' | 'dlBar' | 'dlRows' | 'pfRow' | 'pfFact' | 'pfPct'
+  | 'suHead' | 'suFact' | 'suPct' | 'suBar' | 'suRows' | 'foot' | 'slug' | 'tier' | 'retry';
+/** LS2 (J188, density 2): three phases that add up to the total. Start runs from the tap until this panel adopts the
+ *  card (the game's own code), Download until the spawn download closes, Load until the world is ready. */
+export type LoadingPhase = 'start' | 'download' | 'load';
+const PHASES: readonly LoadingPhase[] = ['start', 'download', 'load'];
 
 /** Write text only when it changed: an unchanged textContent write still dirties layout. */
 const set = (el: HTMLElement, text: string): void => { if (el.textContent !== text) el.textContent = text; };
 /** The same for a `data-*` attribute: the plan republishes on every byte chunk and sub-step, and every attribute write
  *  (even an unchanged one) invalidates style and queues a mutation record (SF67). */
 const setData = (el: HTMLElement, key: string, value: string): void => { if (el.dataset[key] !== value) el.dataset[key] = value; };
+const mb = (bytes: number): string => `${(bytes / 1_000_000).toFixed(1)} MB`;
+/** LS3: every write of a bar uses one precision, so two writers of the same reading can never step it back. */
+const barWidth = (fraction: number): string => `${(Math.floor(Math.max(0, Math.min(1, fraction)) * 1000) / 10).toFixed(1)}%`;
+/** LS2: the ready card's three phase times in tenths that add up to its clock's tenths (largest remainder). */
+export function phaseTenths(parts: readonly number[], total: number): number[] {
+  const want = Math.round(Math.max(0, total) / 100), raw = parts.map(ms => Math.max(0, ms) / 100);
+  const shown = raw.map(Math.floor);
+  const order = raw.map((value, index) => ({ index, rest: value - Math.floor(value) })).sort((a, b) => b.rest - a.rest);
+  for (let left = want - shown.reduce((sum, value) => sum + value, 0), at = 0; left > 0 && order.length > 0; left--, at++) {
+    const pick = order[at % order.length];
+    if (pick !== undefined) shown[pick.index] = (shown[pick.index] ?? 0) + 1;
+  }
+  return shown;
+}
+/** Write a bar only when its reading changed. */
+const setBar = (el: HTMLElement, fraction: number): void => { const width = barWidth(fraction); if (el.style.width !== width) el.style.width = width; };
+const seconds = (ms: number): string => Number.isFinite(ms) ? `${(Math.max(0, ms) / 1000).toFixed(1)} s` : '—';
+interface LogRow { readonly label: string; readonly detail: string; readonly ms: number }
+/** One fixed log (Start's and Download's rows): written only where the text changed. */
+function paintLog(log: HTMLElement, rows: readonly LogRow[]): void {
+  while (log.children.length > rows.length) log.lastElementChild?.remove();
+  while (log.children.length < rows.length) { const d = document.createElement('div'); d.className = 'ok'; d.innerHTML = engineString('s_a9fadf880555'); log.append(d); }
+  rows.forEach((row, index) => {
+    const el = log.children[index] as HTMLElement;
+    set(el.children[0] as HTMLElement, row.label); set(el.children[1] as HTMLElement, row.detail);
+    set(el.children[2] as HTMLElement, Number.isFinite(row.ms) ? seconds(row.ms) : '');
+  });
+}
+/** The tap is the user activation the clipboard needs (iOS Safari 13.4+); a refusal says so on the button. */
+async function copyText(text: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+}
+
 
 /** Renderer-independent admission facts; the caller owns its phases and actual byte counter. */
 export interface LoadingAdmission {
@@ -69,14 +107,16 @@ export class Loading {
   private readonly clockScope = this.scope.child('clock');
   private view: ProgressView | null = null;
   private dirty = false;
-  private lastFrameAt = performance.now();
-  private lastDiagnosticAt = 0;
   private lastPaintAt = 0;
   private lastPaintStep = '';
-  private longestPauseMs = 0;
-  private longestPauseAt = '';
-  private lastFrameStep = '';
   private textureBytes = 0;
+  /** Page-axis ends of Start and Download, and the ready time: the phases' exclusive wall segments. */
+  private startEndAt = Number.NaN;
+  private downloadEndAt = Number.NaN;
+  private readyAt = Number.NaN;
+  /** Phases the player opened by tapping; the running phase is always open. */
+  private readonly opened = new Set<LoadingPhase>();
+  private copyButton: HTMLButtonElement | null = null;
   private readonly attempt: number;
   private admission: LoadingAdmission | null = null;
   private prefetchSource: (() => LoadingPrefetchSnapshot | null) | undefined;
@@ -93,7 +133,6 @@ export class Loading {
   private completion: Promise<void> | undefined;
   private playPicked = false;
   private shownSetup = 0;
-  private paintedDownload = 0;
   /** whether any transfer fact (a source with declared files or bytes, or its completion) has been painted */
   private downloadKnown = false;
   private readonly admissionPhases = new Set<string>();
@@ -108,7 +147,6 @@ export class Loading {
     app.ui.bindPresentation(this.scope);app.ui.holdCovered(this.scope);
     this.scoped = mode.scoped === true;
     if (!this.scoped) startBoot({ id: chunk.id, name: chunk.name }, TIER === 'phone' && chunk.trace === true);
-    const nav: { hardwareConcurrency?: number | undefined } = navigator; // Safari < 15.4 has no hardwareConcurrency
     // index.html paints this panel from its first bytes (src/client/engine/boot/shell.ts): adopt it; a page without it gets a fresh one
     const shell = this.scoped ? null : document.querySelector<HTMLElement>('.ws-load[data-shell]');
     if (shell) { stopShellClock(); this.root = shell; delete shell.dataset['shell']; mountUi(shell, this.scope, document.body); }
@@ -138,12 +176,18 @@ export class Loading {
     this.scope.onDispose(() => {this.stopDownloadSource?.();});
     const tagline = this.root.querySelector('.ws-load-tagline'); if (tagline === null) throw new Error('Loading: no tagline'); tagline.textContent = appIdentity().tagline;
     const el = (key: ElKey): HTMLElement => { const e = this.root.querySelector<HTMLElement>(`[data-el="${key}"]`); if (!e) throw new Error(`Loading: no [data-el="${key}"]`); return e; };
-    this.els = { slug: el('slug'), tier: el('tier'), clock: el('clock'), dlFact: el('dlFact'), dlPct: el('dlPct'), dlBar: el('dlBar'), pfRow: el('pfRow'), pfFact: el('pfFact'), pfPct: el('pfPct'), suFact: el('suFact'), suPct: el('suPct'), suBar: el('suBar'), rows: el('rows'), foot: el('foot'), bar: el('bar'), line: el('line'), diagnostics: el('diagnostics'), retry: el('retry') };
+    const keys: readonly ElKey[] = ['clock', 'kicker', 'stHead', 'stFact', 'stPct', 'stBar', 'stRows', 'dlHead', 'dlFact', 'dlPct', 'dlBar', 'dlRows', 'pfRow', 'pfFact', 'pfPct',
+      'suHead', 'suFact', 'suPct', 'suBar', 'suRows', 'foot', 'slug', 'tier', 'retry'];
+    this.els = Object.fromEntries(keys.map(key => [key, el(key)])) as Record<ElKey, HTMLElement>;
+    set(this.els.kicker, engineString('s_loading_kicker'));
+    // Density 2: only the running phase shows its rows; a tap on a phase opens (or closes) the others.
+    for (const [phase, head] of [['start', this.els.stHead], ['download', this.els.dlHead], ['load', this.els.suHead]] as const) {
+      listenTap(this.scope, head, () => { if (this.opened.has(phase)) this.opened.delete(phase); else this.opened.add(phase); this.paintPhases(); });
+    }
     this.els.retry.onclick = null; // Adopt the inline retry without keeping its document-only handler.
     set(this.els.retry, engineString('s_loading_retry'));
     listenTap(this.scope, this.els.retry, () => { if (this.retryWait === null) return; if (this.retryNavigation) markReload('loading wait retry'); this.retryWait(); });
     this.els.slug.textContent = chunk.name;
-    this.els.tier.textContent = engineString('s_783b614ae363', [TIER, Math.round(innerWidth * devicePixelRatio), Math.round(innerHeight * devicePixelRatio), nav.hardwareConcurrency ?? engineString('s_8a8de823d5ed'), navigator.serviceWorker?.controller ? engineString('s_5c75b0e90774') : '']);
     const key = 'loadAttempt';
     let attempt = 1;
     try {
@@ -157,11 +201,19 @@ export class Loading {
     } catch { /* a storage-denied PWA still gets the loader */ }
     this.attempt = attempt;
     const earlyTiming = bootTiming(); if (earlyTiming !== undefined) earlyTiming.attemptCount = attempt;
-    this.rowsEl = this.els.rows;
+    set(this.els.tier, this.tierText());
+    this.rowsEl = this.els.suRows;
+    // Start ends here: the game's own code owns the card. A scoped (mid-play) load has no Start.
+    this.root.querySelector<HTMLElement>('[data-phase="start"]')?.toggleAttribute('hidden', this.scoped);
+    this.startEndAt = this.scoped ? this.t0 : diagnosticNow();
+    if (!this.scoped) this.paintStart();
+    this.root.querySelector<HTMLElement>('[data-phase="download"]')?.toggleAttribute('hidden', this.scoped);
     if (!this.scoped) {
       const hold = holdLoadingSwitch(this.scope); hold.classList.add('ws-load-hold');
       this.root.querySelector('.ws-load-body')?.append(hold);
     }
+    set(this.els.suFact, engineString('s_loading_waiting'));
+    this.paintPhases();
     this.tickClock();
     this.clockScope.interval(CLOCK_MS, () => { this.tickClock(); });
   }
@@ -172,11 +224,12 @@ export class Loading {
   /** Adopt one manifest operation and retire this panel's old receipt observer. */
   setDownloadSource(source: LoadingDownloadSource): Promise<void> {
     if (this.downloadSource === source) return source.ready;
+    this.root.querySelector<HTMLElement>('[data-phase="download"]')?.removeAttribute('hidden');
     this.stopDownloadSource?.();
     this.downloadSource = source;
     this.stopDownloadSource = source.subscribe(() => {
       const fraction = this.paintDownloads();
-      set(this.els.dlPct, this.downloadPct(fraction)); this.els.dlBar.style.width = `${fraction * 100}%`;
+      set(this.els.dlPct, this.downloadPct(fraction)); setBar(this.els.dlBar, fraction);
       this.dirty = true;
     });
     return source.ready;
@@ -221,7 +274,7 @@ export class Loading {
   scopedFail(reason: string): void {
     if (!this.scoped) throw new Error('Loading: scopedFail is for a scoped (mid-play) load');
     this.admission = { phase: this.phaseKey, detail: reason, bytesRead: 0, bytesTotal: 0, filesDone: 0, filesTotal: 0 };
-    this.failedReason = reason; setData(this.root, 'failed', 'true'); set(this.els.foot, reason); this.dirty = true;
+    this.failedReason = reason; setData(this.root, 'failed', 'true'); set(this.els.foot, reason); this.dirty = true; this.showCopy();
   }
 
   /** Explain module/tier/SW waits before the first source denominator is known. */
@@ -256,7 +309,7 @@ export class Loading {
     const pct = (f: number): string => String(Math.floor(f * 100));
     this.paintDownloadCounters(transfer);
     setData(this.root, 'setup', pct(v.setup));
-    if (v.error) { this.els.foot.textContent = v.error; this.paintNow(); }
+    if (v.error) { this.els.foot.textContent = v.error; this.paintNow(); this.showCopy(); }
     else if (v.done) this.paintNow();
   }
 
@@ -268,22 +321,15 @@ export class Loading {
     const v = this.view;
     if (!v) { this.paintAdmissionNow(timeline); return; }
     this.dirty = false;
-    // the tier line once a frame, not on every published view (it reads the viewport, which may rotate)
-    const hardware: { hardwareConcurrency?: number | undefined } = navigator;
-    set(this.els.tier, engineString('s_783b614ae363', [TIER, Math.round(innerWidth * devicePixelRatio), Math.round(innerHeight * devicePixelRatio), hardware.hardwareConcurrency ?? engineString('s_8a8de823d5ed'), navigator.serviceWorker?.controller ? engineString('s_5c75b0e90774') : '']));
+    set(this.els.tier, this.tierText());
     const pct = (f: number): string => String(Math.floor(f * 100));
     const download = this.paintDownloads();
     setData(this.root, 'setup', pct(v.setup));
     set(this.els.dlPct, this.downloadPct(download));
     set(this.els.suPct, pct(v.setup));
-    const dl = `${(download * 100).toFixed(1)}%`, su = `${(v.setup * 100).toFixed(1)}%`;
-    if (this.els.dlBar.style.width !== dl) this.els.dlBar.style.width = dl;
-    if (this.els.suBar.style.width !== su) this.els.suBar.style.width = su;
-    // Both phases use the same two-track model; neither can complete the player bar alone.
-    const all = combinedLoadingFraction(download, v.setup), allW = `${(all * 100).toFixed(1)}%`;
-    if (this.els.bar.style.width !== allW) this.els.bar.style.width = allW;
-    set(this.els.line, this.finished ? engineString('s_5fa7aac5375c') : engineString('s_bf5e849564ae', [v.worldBytesReady ? 'Building the world' : engineString('s_37b345555d7e'), pct(all)]));
+    setBar(this.els.dlBar, download); setBar(this.els.suBar, v.setup);
     this.paintRows(timeline);
+    this.paintPhases();
   }
 
   private paintAdmissionNow(timeline: TimelineSnapshot): void {
@@ -295,10 +341,10 @@ export class Loading {
     setData(this.root, 'download', String(Math.floor(download * 100)));
     setData(this.root, 'setup', String(Math.floor(setup * 100)));
     set(this.els.dlPct, this.downloadPct(download)); set(this.els.suPct, String(Math.floor(setup * 100)));
-    this.els.dlBar.style.width = `${download * 100}%`; this.els.suBar.style.width = `${setup * 100}%`;
-    this.els.bar.style.width = `${combinedLoadingFraction(download, setup) * 100}%`;
-    set(this.els.suFact, p.detail); set(this.els.line, p.detail);
+    setBar(this.els.dlBar, download); setBar(this.els.suBar, setup);
+    set(this.els.suFact, p.detail);
     this.paintRows(timeline);
+    this.paintPhases();
   }
 
   private downloadProgress(): LoadingDownloadSnapshot & {readonly fraction: number} {
@@ -317,12 +363,7 @@ export class Loading {
   private paintBoundarySetup(): void {
     const setup = this.setupProgress(), pct = String(Math.floor(setup * 100));
     setData(this.root, 'setup', pct); set(this.els.suPct, pct);
-    const width = `${setup * 100}%`, combined = combinedLoadingFraction(this.paintedDownload, setup);
-    if (this.els.suBar.style.width !== width) this.els.suBar.style.width = width;
-    const allWidth = `${combined * 100}%`;
-    if (this.els.bar.style.width !== allWidth) this.els.bar.style.width = allWidth;
-    if (this.view !== null) set(this.els.line, this.finished ? engineString('s_5fa7aac5375c')
-      : engineString('s_bf5e849564ae', [this.view.worldBytesReady ? 'Building the world' : engineString('s_37b345555d7e'), String(Math.floor(combined * 100))]));
+    setBar(this.els.suBar, setup);
   }
 
   /** Publish each cheap progress tuple together, even between throttled paints. */
@@ -348,11 +389,12 @@ export class Loading {
   private paintDownloads(): number {
     const transfer = this.downloadProgress();
     this.downloadKnown = transfer.complete || transfer.progressKnown !== false && (transfer.totalBytes > 0 || transfer.filesTotal > 0);
-    this.paintedDownload = transfer.fraction;
     this.paintDownloadCounters(transfer);
     const prefetch = this.prefetchSource?.() ?? null;
     setData(this.root, 'prefetch', prefetch === null ? '' : JSON.stringify(prefetch));
-    set(this.els.dlFact, loadingDownloadText(transfer));
+    if (transfer.complete && !(this.downloadEndAt >= 0)) this.downloadEndAt = Math.max(diagnosticNow(), this.startEndAt);
+    set(this.els.dlFact, this.downloadEndAt >= 0 ? this.phaseDone(this.downloadEndAt - this.startEndAt) : loadingDownloadText(transfer));
+    this.paintDownloadRows(transfer);
     this.els.pfRow.hidden = prefetch === null;
     if (prefetch !== null) { set(this.els.pfFact, loadingPrefetchText(prefetch)); set(this.els.pfPct, String(Math.floor(loadingPrefetchFraction(prefetch) * 100))); }
     return transfer.fraction;
@@ -377,7 +419,9 @@ export class Loading {
       for (const gap of timeline.gaps) if (gap.after === row.key) shown.push(gap);
     }
     const quick = shown.filter(row => 'key' in row && (row.state === 'ok' || this.finished) && row.ms < 500);
-    const visible = shown.filter(row => row.ms >= 500);
+    // Rows run in step order (QA 3): a gap sits after its step; the quick steps' total closes the list.
+    const order = (row: LoadingRow | LoadingGap): number => 'number' in row ? row.number : row.after === null ? 0 : timeline.rows.find(step => step.key === row.after)?.number ?? 0;
+    const visible = shown.filter(row => row.ms >= 500).sort((x, y) => order(x) - order(y));
     if (quick.length > 0) visible.push({ label: engineString('s_loading_quick_steps', [quick.length]), state: 'ok', ms: quick.reduce((sum, row) => sum + row.ms, 0), after: null });
     while (this.rowsEl.children.length > visible.length) this.rowsEl.lastElementChild?.remove();
     this.paintedRows.length = visible.length;
@@ -395,7 +439,7 @@ export class Loading {
       const el = this.rowsEl.children[i] as HTMLElement;
       const cls = r.state === 'on' ? 'on' : 'ok';
       if (el.className !== cls) el.className = cls;
-      set(el.children[0] as HTMLElement, engineString('s_dd0d06d0c0aa', ['number' in r ? engineString('s_loading_step_label', [r.number, r.label]) : r.label]));
+      set(el.children[0] as HTMLElement, r.label);
       set(el.children[1] as HTMLElement, 'detail' in r ? r.detail : '');
       setData(el, 'key', 'key' in r ? r.key : 'gap');
       setData(el, 'ms', String(r.ms));
@@ -408,16 +452,6 @@ export class Loading {
 
   private tickClock(): void {
     const now = performance.now();
-    // A gap here includes synchronous JS, style/layout, GC and a suspended tab. It is not CPU percentage.
-    const pauseMs = now - this.lastFrameAt - CLOCK_MS;
-    if (document.visibilityState === 'visible' && pauseMs > this.longestPauseMs) {
-      this.longestPauseMs = pauseMs;
-      this.longestPauseAt = this.lastFrameStep;
-    }
-    this.lastFrameAt = now;
-    if (this.view) this.lastFrameStep = `${this.view.label}${this.view.detail ? `: ${this.view.detail}` : ''}`;
-    else if (this.admission) this.lastFrameStep = this.admission.detail;
-    if (now - this.lastDiagnosticAt > 250) { this.paintDiagnostics(); this.lastDiagnosticAt = now; }
     // The clock is one text node, sampled at its displayed precision without another animation-frame chain.
     const s = (now - this.clockT0) / 1000;
     set(this.els.clock, engineString('s_c0951c6055b1', [String(Math.floor(s / 60)).padStart(2, '0'), (s % 60).toFixed(1).padStart(4, '0')]));
@@ -435,6 +469,7 @@ export class Loading {
 
   private paintWaiting(timeline: TimelineSnapshot): void {
     if (this.view?.error || this.failedReason !== null) return;
+    if (this.finished) { set(this.els.foot, ''); this.els.retry.hidden = true; setData(this.root, 'stalled', 'false'); return; }
     const pending = this.scoped ? [] : loadingStepWaits(bootWaits(), timeline.display, timeline.current, this.timeline.waitOwner).filter(wait => wait.id !== this.waitId);
     const files = pending.filter(wait => wait.kind === 'file');
     // The outer admission promise has no file identity. Let the current
@@ -474,16 +509,111 @@ export class Loading {
       ? `No reported progress for ${(quietMs / 1000).toFixed(1)} s · ${detail}` : detail);
   }
 
-  /** Estimated scene texture allocation; render targets and the browser's own surfaces are outside this estimate. */
-  setTextureBytes(bytes: number): void { this.textureBytes = bytes; this.paintDiagnostics(); }
+  /** Estimated scene texture allocation; it goes in Copy diagnostics, never on the card (LS2 removed the memory lines). */
+  setTextureBytes(bytes: number): void { this.textureBytes = bytes; }
 
-  private paintDiagnostics(): void {
-    const mem: unknown = Reflect.get(performance, 'memory');
-    const heap: unknown = typeof mem === 'object' && mem !== null ? Reflect.get(mem, 'usedJSHeapSize') : undefined;
-    const js = typeof heap === 'number' && Number.isFinite(heap) ? engineString('s_77edeca5d621', [Math.round(heap / 1048576)]) : engineString('s_80ff86e39352');
-    const tex = this.textureBytes > 0 ? engineString('s_d28268aeb36d', [Math.round(this.textureBytes / 1048576)]) : '';
-    const pause = this.longestPauseMs >= 100 ? engineString('s_f72e3c1c062c', [(this.longestPauseMs / 1000).toFixed(1)]) : engineString('s_911a92a8de1f');
-    set(this.els.diagnostics, engineString('s_d6331a58cb42', [this.attempt, js, tex, pause, this.longestPauseAt ? engineString('s_46a39d7c2bfd', [this.longestPauseAt]) : '']));
+  /** The kept facts (LS2): tier, visit and attempt. A page a service worker already controls is a return visit. */
+  private tierText(): string {
+    return engineString('s_loading_tier', [TIER, engineString(navigator.serviceWorker?.controller ? 's_loading_return_visit' : 's_loading_first_visit'), this.attempt]);
+  }
+
+  private phaseDone(ms: number): string { return engineString('s_loading_done', [seconds(ms)]); }
+
+  /** The three exclusive wall segments; they add up to the total (LS2). NaN for a phase not finished yet. */
+  phaseTimes(): { readonly start: number; readonly download: number; readonly load: number; readonly total: number } {
+    const end = this.readyAt >= 0 ? this.readyAt : diagnosticNow();
+    const download = this.downloadSource === undefined && this.readyAt >= 0 ? this.readyAt : this.downloadEndAt;
+    return { start: this.startEndAt - this.clockT0, download: download - this.startEndAt,
+      load: this.readyAt - Math.max(this.startEndAt, download), total: end - this.clockT0 };
+  }
+
+  private runningPhase(): LoadingPhase | null {
+    if (this.finished) return null;
+    if (!(this.startEndAt >= 0)) return 'start';
+    if (!(this.downloadEndAt >= 0) && (this.downloadSource !== undefined || !this.scoped)) return 'download';
+    return 'load';
+  }
+
+  /** Start's rows: LS1's named boundaries from the tap to this adoption, each the wall time since the one before. */
+  private paintStart(): void {
+    set(this.els.stFact, this.phaseDone(this.startEndAt - this.clockT0)); set(this.els.stPct, '100'); setBar(this.els.stBar, 1);
+    const timing = bootTiming();
+    if (timing === undefined) return;
+    const rows: LogRow[] = [];
+    const responseEnd = timing.navigation?.['responseEnd'];
+    let previous = this.clockT0;
+    if (typeof responseEnd === 'number' && responseEnd > 0) { rows.push({ label: engineString('s_loading_start_page'), detail: '', ms: responseEnd - previous }); previous = responseEnd; }
+    for (const [operation, label] of START_STEPS) {
+      const at = timing.entries.find(row => row.operation === operation && row.end !== null && row.result === 'complete')?.end;
+      if (typeof at !== 'number' || at < previous) continue;
+      rows.push({ label, detail: '', ms: at - previous }); previous = at;
+    }
+    if (this.startEndAt > previous) rows.push({ label: engineString('s_loading_start_handoff'), detail: '', ms: this.startEndAt - previous });
+    const files = timing.resources.filter(row => row['realm'] === 'page' && typeof row['responseEnd'] === 'number' && row['responseEnd'] <= this.startEndAt);
+    const bytes = files.reduce((sum, row) => sum + (typeof row['transferSize'] === 'number' ? row['transferSize'] : 0), 0);
+    rows.push({ label: engineString('s_loading_files'), detail: engineString('s_loading_start_files', [files.length, mb(bytes)]), ms: Number.NaN });
+    paintLog(this.els.stRows, rows);
+  }
+
+  private paintDownloadRows(row: LoadingDownloadSnapshot): void {
+    if (row.totalBytes === 0 && row.filesTotal === 0 && !row.complete) { paintLog(this.els.dlRows, []); return; }
+    paintLog(this.els.dlRows, [
+      { label: engineString('s_loading_files'), detail: engineString('s_loading_files_of', [row.filesDone, row.filesTotal]), ms: Number.NaN },
+      { label: loadingCacheText(row), detail: '', ms: Number.NaN },
+    ]);
+  }
+
+  /** Density 2: only the running phase shows its rows; a tapped phase opens too. The ready card opens Load. */
+  private paintPhases(): void {
+    const running = this.runningPhase();
+    for (const phase of PHASES) {
+      const el = this.root.querySelector<HTMLElement>(`.ws-load-phase[data-phase="${phase}"]`);
+      if (el === null) continue;
+      const open = phase === running || this.opened.has(phase) || running === null && phase === 'load';
+      if (Object.hasOwn(el.dataset, 'open') !== open) { if (open) el.dataset['open'] = ''; else delete el.dataset['open']; }
+      setData(el, 'state', phase === running ? 'on' : running === null || PHASES.indexOf(phase) < PHASES.indexOf(running) ? 'ok' : 'todo');
+    }
+    const times = this.phaseTimes();
+    if (!this.finished || !(times.load >= 0)) return;
+    // The ready card's phases add up to its clock: Start + Download + Load = the total it shows (LS2).
+    const scoped = this.scoped, parts = scoped ? [times.load] : [times.start, Math.max(0, times.download), times.load];
+    const tenths = phaseTenths(parts, times.total), done = (value: number | undefined): string => engineString('s_loading_done', [`${((value ?? 0) / 10).toFixed(1)} s`]);
+    if (scoped) set(this.els.suFact, done(tenths[0]));
+    else { set(this.els.stFact, done(tenths[0])); set(this.els.dlFact, done(tenths[1])); set(this.els.suFact, done(tenths[2])); }
+    for (const [key, ms] of Object.entries(times)) setData(this.root, `${key}Ms`, String(Math.round(ms)));
+  }
+
+  /** LS4: everything the card leaves out, for Jake to paste. The full LS1 timeline rides at the end. */
+  diagnosticsText(): string {
+    const timing = bootTiming()?.read(), transfer = this.downloadProgress(), times = this.phaseTimes();
+    const all = this.timeline.snapshot();
+    const lines = [
+      `Wildshard boot diagnostics · ${new Date().toISOString()}`,
+      `${this.els.slug.textContent ?? ''} · build ${timing?.build ?? 'unknown'} · ${this.tierText()} · ${innerWidth}x${innerHeight} @${devicePixelRatio}x`,
+      `total ${seconds(times.total)} · start ${seconds(times.start)} · download ${seconds(times.download)} · load ${seconds(times.load)}${this.finished ? '' : ' · not ready'}`,
+      `download ${loadingCacheText(transfer)} · files ${transfer.filesDone} of ${transfer.filesTotal} · ${transfer.complete ? 'complete' : 'open'}${transfer.error === null ? '' : ` · error ${transfer.error}`}`,
+      `scene textures ~${Math.round(this.textureBytes / 1048576)} MiB${this.failedReason === null && !this.view?.error ? '' : ` · failed: ${this.failedReason ?? this.view?.error ?? ''}`}`,
+      'load rows:',
+      ...all.rows.map(row => `  ${row.number}. ${row.label} · ${row.state} · ${Math.round(row.ms)} ms${row.detail ? ` · ${row.detail}` : ''}`),
+      ...all.gaps.map(gap => `  gap ${gap.label} · ${gap.state} · ${Math.round(gap.ms)} ms`),
+      'timeline (LS1):',
+      JSON.stringify(timing ?? null),
+    ];
+    return lines.join('\n');
+  }
+
+  /** LS4 (J188): Copy diagnostics replaces Hold at loading screen once the game is ready, and after a failure. */
+  private showCopy(): void {
+    if (this.copyButton !== null || this.scope.disposed) return;
+    const body = this.root.querySelector<HTMLElement>('.ws-load-body');
+    if (body === null) return;
+    this.root.querySelector('.ws-load-hold')?.remove();
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'ws-load-copy'; button.textContent = engineString('s_loading_copy');
+    body.append(button); this.copyButton = button;
+    listenTap(this.scope, button, () => {
+      void copyText(this.diagnosticsText()).then(ok => { set(button, engineString(ok ? 's_loading_copied' : 's_loading_copy_failed')); return undefined; });
+    });
   }
 
   /**
@@ -504,10 +634,14 @@ export class Loading {
     }
     bootMark('app:control-ready');
     this.tickClock(); this.clockScope.dispose();
+    this.readyAt = diagnosticNow(); if (!(this.downloadEndAt >= 0) && this.downloadSource !== undefined) this.downloadEndAt = this.readyAt;
     this.finished = true; finishLoadingWait(this.waitId); this.phase?.end(); this.phase = undefined;
+    set(this.els.kicker, engineString('s_loading_ready_kicker'));
     if (this.view !== null) this.paint(this.view);
     else this.dirty = true;
     this.paintNow();
+    // LS2: the ready card drops the step footer; an error keeps its reason there.
+    if (!this.view?.error && this.failedReason === null) set(this.els.foot, '');
     this.completion = this.holdRequested
       ? this.waitForPlay().then(() => this.fade()) : this.fade();
     if (!this.scoped) void this.completion.then(() => { bootTiming()?.finish(); return undefined; }, () => { bootMark('app:loader-failed'); return undefined; });
@@ -525,6 +659,7 @@ export class Loading {
     const foot = this.root.querySelector('.ws-load-foot');
     if (body === null || foot === null) throw new Error('Loading: missing completed body or footer');
     body.dataset['scroll'] = 'true';
+    this.showCopy();
     this.root.insertBefore(play, foot);
     return new Promise<void>((resolve, reject) => {
       let waiting = true;

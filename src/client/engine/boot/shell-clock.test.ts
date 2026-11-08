@@ -23,7 +23,7 @@ test('the static card counts from the title tap and names the shard, its tier an
     at: performance.timeOrigin - 1500 }));
   startShellClock(owner, 'driftwood-isle');
   expect(field('slug')).toBe('Driftwood Isle'); expect(field('tier')).toBe('phone');
-  expect(field('dlFact')).toBe('Downloading game code');
+  expect(field('stFact')).toBe('Downloading game code');
   // Loading adopts this start, so its clock continues from the tap.
   expect(document.querySelector<HTMLElement>('.ws-load')?.dataset['clockStartedAt']).toBe('-1500');
   expect(field('clock')).toMatch(/^00:0[1-9]\.\d$/u);

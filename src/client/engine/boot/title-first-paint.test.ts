@@ -80,7 +80,8 @@ test('a selected shard keeps its existing loader and does not preload the title 
 test('public first paint and admitted loading keep every detailed progress field visible', () => {
   const window = firstDocument('?chunk=driftwood-isle'), root = window.document.querySelector('.ws-load[data-shell]');
   if (!(root instanceof window.HTMLElement)) throw new Error('Missing public loading shell');
-  const detailed = ['.ws-load-clock', '.ws-load-meta', '.ws-load-track', '.ws-load-log', '.ws-load-diagnostics', '.ws-load-foot'];
+  // LS2 (J188): the three phases replace the two tracks, the memory/CPU diagnostics line and the simple bar's line
+  const detailed = ['.ws-load-clock', '.ws-load-meta', '[data-phase="start"]', '[data-phase="download"]', '[data-phase="load"]', '.ws-load-foot'];
   const visible = (): void => {
     expect(Object.hasOwn(window.document.documentElement.dataset, 'dev')).toBe(false);
     for (const selector of detailed) {
@@ -93,9 +94,7 @@ test('public first paint and admitted loading keep every detailed progress field
   const style = window.document.createElement('style');
   style.textContent = readFileSync('src/client/engine/ui/loading.css', 'utf8'); window.document.head.append(style);
   delete root.dataset['shell']; visible();
-  const simple = root.querySelector('.ws-load-simple');
-  if (!(simple instanceof window.HTMLElement)) throw new Error('Missing compatibility progress field');
-  expect(window.getComputedStyle(simple).display).toBe('none');
+  for (const dead of ['.ws-load-simple', '.ws-load-diagnostics', '[data-el="line"]']) expect(root.querySelector(dead)).toBeNull();
 });
 
 test('RL3: a page whose entry graph never arrived reloads once at 12 s; a running slow boot, the title or the card never', () => {

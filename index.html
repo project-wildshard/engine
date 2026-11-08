@@ -299,6 +299,9 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 .ws-load .ws-load-hold.on .ws-gmenu-pill { background: rgba(143, 227, 255, 0.28); border-color: var(--ws-cyan); box-shadow: 0 0 12px rgba(143, 227, 255, 0.35), inset 0 0 6px rgba(143, 227, 255, 0.25); }
 .ws-load .ws-load-hold.on .ws-gmenu-pill::after { transform: translateX(20px); background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); }
 .ws-load .ws-load-hold[hidden] { display: none; }
+/* LS4 (J188): Copy diagnostics takes Hold's place once the game is ready, the same box with its label centred */
+.ws-load .ws-load-copy { flex: none; display: block; width: calc(100% - 32px); max-width: 560px; min-height: 52px; padding: 12px 16px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan-line); background: var(--ws-glass-deep); color: #fff; font: 12px var(--ws-mono); letter-spacing: 0.22em; text-transform: uppercase; text-align: center; cursor: pointer; touch-action: manipulation; }
+.ws-load .ws-load-copy:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
 .ws-load .ws-load-retry { flex: none; min-height: 44px; padding: 8px 16px; border: 1px solid var(--ws-cyan); color: var(--ws-cyan); background: var(--ws-glass-deep); font: 12px var(--ws-mono); cursor: pointer; }
 .ws-load .ws-load-retry[hidden] { display: none; }
 .ws-load .ws-load-foot { align-items: center; gap: 12px; }
@@ -321,24 +324,35 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 .ws-load .ws-load-title { display: flex; align-items: baseline; }
 .ws-load .ws-load-title b { margin-left: 6px; }
 .ws-load .ws-load-clock { margin-left: auto; font-family: var(--ws-mono); font-size: 13px; letter-spacing: 0.08em; color: var(--ws-cyan); font-weight: 400; }
-.ws-load .ws-load-track { margin-top: 12px; }
+/* LS2 (J188, density 2): Start, Download and Load. Only the running phase shows its rows; a tap on a head opens the others. */
+.ws-load .ws-load-phase { margin-top: 14px; }
+.ws-load .ws-load-phase[hidden] { display: none; }
+.ws-load .ws-load-phase > .ws-load-track-row { width: 100%; margin: 0 0 7px; padding: 0; border: 0; background: none; appearance: none; -webkit-appearance: none; color: inherit; font: inherit; font-size: 10.5px; text-align: left; cursor: pointer; touch-action: manipulation; }
+.ws-load .ws-load-phase > .ws-load-track-row .ws-load-track-name::before { content: '▸'; display: inline-block; width: 1.4em; font-size: 0.8em; }
+.ws-load .ws-load-phase[data-open] > .ws-load-track-row .ws-load-track-name::before { content: '▾'; }
+.ws-load .ws-load-phase[data-state='on'] .ws-load-track-name { color: var(--ws-cyan); }
+.ws-load .ws-load-phase[data-state='on'] .ws-load-track-fact { color: #fff; }
+.ws-load .ws-load-phase:not([data-open]) .ws-load-log, .ws-load .ws-load-phase:not([data-open]) .ws-load-grid { display: none; }
+.ws-load .ws-load-title .ws-load-kicker { flex: none; white-space: nowrap; }
+.ws-load .ws-load-title b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-load .ws-load-clock { flex: none; padding-left: 10px; }
 .ws-load .ws-load-track-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; }
 .ws-load .ws-load-grid { margin: 8px 0 0; }
 .ws-load .ws-load-track-row[hidden] { display: none; }
-.ws-load .ws-load-track-name { width: 78px; color: var(--ws-cyan-dim); flex: none; }
+.ws-load .ws-load-track-name { width: 96px; color: var(--ws-cyan-dim); flex: none; white-space: nowrap; }
 .ws-load .ws-load-track-fact { flex: 1; color: var(--ws-text-dim); text-transform: none; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-load .ws-load-track-pct { color: #fff; font-family: var(--ws-display); font-size: 18px; letter-spacing: 0.04em; width: 44px; text-align: right; flex: none; }
 .ws-load .ws-load-track-pct::after { content: '%'; font-size: 11px; margin-left: 2px; color: var(--ws-text-dim); }
-.ws-load .ws-load-log { margin-top: 14px; min-height: 96px; }
-.ws-load .ws-load-log div { display: flex; gap: 10px; align-items: baseline; font-size: 9.5px; letter-spacing: 0.08em; line-height: 1.7; color: rgba(196, 220, 232, 0.45); }
+.ws-load .ws-load-log { margin-top: 10px; min-height: 0; }
+.ws-load .ws-load-log:empty { display: none; }
+.ws-load .ws-load-log div { display: flex; gap: 10px; align-items: baseline; font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.75; color: rgba(196, 220, 232, 0.7); }
 .ws-load .ws-load-log div.on { color: var(--ws-cyan-dim); }
 .ws-load .ws-load-log .ws-load-row-label { flex: none; }
 .ws-load .ws-load-log .ws-load-row-detail { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgba(196, 220, 232, 0.6); }
 .ws-load .ws-load-log div.on .ws-load-row-detail { color: #fff; }
-.ws-load .ws-load-diagnostics { margin-top: 12px; padding-top: 9px; border-top: 1px solid rgba(143, 227, 255, 0.18); color: var(--ws-cyan-dim); font-size: 10px; line-height: 1.5; white-space: pre-line; font-variant-numeric: tabular-nums; }
 .ws-load .ws-load-log .ws-load-row-ms { flex: none; font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
 @media (max-width: 600px) {
-  .ws-load .ws-load-track-name { width: 64px; }
+  .ws-load .ws-load-track-name { width: 88px; }
   .ws-load .ws-load-track-fact { font-size: 10px; }
   .ws-load .ws-load-log { min-height: 0; }
 }
@@ -355,11 +369,10 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
   .ws-load .ws-load-meta { grid-template-columns: 1fr; margin: 10px 0 12px; }
   .ws-load .ws-load-meta div { font-size: 10.5px; }
   .ws-load .ws-load-foot { padding: 0 16px calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 8.5px; letter-spacing: 0.14em; }
+  .ws-load .ws-load-hold, .ws-load .ws-load-copy { width: 100%; }
 }
 
 /* G846: everyone sees the detailed progress; only the hold control is Developer-only. */
-.ws-load .ws-load-simple { display: none; }
-.ws-load .ws-load-line { margin-top: 9px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-text-dim); font-variant-numeric: tabular-nums; }
 /* </inline-shell-css> */
       html, body { margin: 0; width: 100%; height: 100%; background: #0b1622; }
       /* First document pixels need neither the extracted stylesheet nor a module: the card above is Loading's own CSS (DL21). */
@@ -443,22 +456,26 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 </div>
 <div class="ws-load-body">
 <div class="ws-glass ws-load-panel">
-<div class="ws-load-title"><span class="ws-load-kicker">Loading chunk ·</span><b data-el="slug"></b><span class="ws-load-clock" data-el="clock">00:00.0</span></div>
-<div class="ws-load-simple"><div class="ws-load-bar"><div class="ws-load-fill" data-el="bar"></div></div><div class="ws-load-line" data-el="line">Loading</div></div>
+<div class="ws-load-title"><span class="ws-load-kicker" data-el="kicker">Loading</span><b data-el="slug"></b><span class="ws-load-clock" data-el="clock">00:00.0</span></div>
 <div class="ws-load-meta ws-load-meta-1">
 <div><span>tier</span><span data-el="tier"></span></div>
 </div>
-<div class="ws-load-track">
-<div class="ws-load-track-row"><span class="ws-load-track-name">download</span><span class="ws-load-track-fact" data-el="dlFact">—</span><span class="ws-load-track-pct" data-el="dlPct">—</span></div>
-<div class="ws-load-bar"><div class="ws-load-fill" data-el="dlBar"></div></div>
+<div class="ws-load-phase" data-phase="start" data-state="on" data-open>
+<button type="button" class="ws-load-track-row" data-el="stHead"><span class="ws-load-track-name">start</span><span class="ws-load-track-fact" data-el="stFact">—</span><span class="ws-load-track-pct" data-el="stPct">—</span></button>
+<div class="ws-load-bar"><div class="ws-load-fill" data-el="stBar" data-phase-bar="start"></div></div>
+<div class="ws-load-log" data-el="stRows"></div>
+</div>
+<div class="ws-load-phase" data-phase="download">
+<button type="button" class="ws-load-track-row" data-el="dlHead"><span class="ws-load-track-name">download</span><span class="ws-load-track-fact" data-el="dlFact">—</span><span class="ws-load-track-pct" data-el="dlPct">—</span></button>
+<div class="ws-load-bar"><div class="ws-load-fill" data-el="dlBar" data-phase-bar="download"></div></div>
+<div class="ws-load-log" data-el="dlRows"></div>
 <div class="ws-load-track-row ws-load-grid" data-el="pfRow" hidden><span class="ws-load-track-name">grid</span><span class="ws-load-track-fact" data-el="pfFact">—</span><span class="ws-load-track-pct" data-el="pfPct">0</span></div>
 </div>
-<div class="ws-load-track">
-<div class="ws-load-track-row"><span class="ws-load-track-name">setup</span><span class="ws-load-track-fact" data-el="suFact">—</span><span class="ws-load-track-pct" data-el="suPct">0</span></div>
-<div class="ws-load-bar"><div class="ws-load-fill" data-el="suBar"></div></div>
+<div class="ws-load-phase" data-phase="load">
+<button type="button" class="ws-load-track-row" data-el="suHead"><span class="ws-load-track-name">load</span><span class="ws-load-track-fact" data-el="suFact">—</span><span class="ws-load-track-pct" data-el="suPct">0</span></button>
+<div class="ws-load-bar"><div class="ws-load-fill" data-el="suBar" data-phase-bar="load"></div></div>
+<div class="ws-load-log" data-el="suRows"></div>
 </div>
-<div class="ws-load-log" data-el="rows"></div>
-<div class="ws-load-diagnostics" data-el="diagnostics">Memory: checking · CPU: checking</div>
 </div>
 </div>
 <div class="ws-load-foot"><span data-el="foot"></span><button type="button" class="ws-load-retry" data-el="retry" hidden>Retry</button></div></div>
@@ -489,7 +506,20 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
         const start = found ? Math.min(0, found.at - performance.timeOrigin) : 0, clock = field('clock');
         card.dataset.clockStartedAt = String(start); if (found?.name) field('slug').textContent = found.name; if (found?.tier) field('tier').textContent = found.tier;
         const paint = () => { const s = (performance.now() - start) / 1000; clock.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + (s % 60).toFixed(1).padStart(4, '0'); };
-        paint(); const tick = setInterval(() => { if (card.hasAttribute('data-shell')) paint(); else clearInterval(tick); }, 100);
+        // LS2/LS3: Start's bar takes one share per completed LS1 boundary of START_STEPS (src/client/engine/boot/shell.ts),
+        // never time; its fact counts the page's finished files and their bytes from the same collector.
+        const steps = ['app:document-and-module-graph', 'app:page-entry-import', 'app:tables-import-and-prepare', 'app:tier-menu-download-imports', 'app:three-import', 'app:main-import', 'app:selected-discovery'];
+        const startFact = field('stFact'), startPct = field('stPct'), startBar = field('stBar');
+        const startPaint = () => {
+          const t = window.__bootTiming; if (!t) return;
+          const done = steps.filter(op => t.entries.some(e => e.operation === op && e.end !== null && e.result === 'complete'));
+          const pct = String(Math.floor(done.length / steps.length * 100));
+          if (startPct.textContent !== pct) { startPct.textContent = pct; startBar.style.width = pct + '%'; }
+          let files = 0, bytes = 0; for (const r of t.resources) if (r.realm === 'page') { files++; bytes += r.transferSize || 0; }
+          if (files > 0) startFact.textContent = files + ' files · ' + (bytes / 1e6).toFixed(1) + ' MB';
+          card.dataset.step = 'start.' + (steps.find(op => !done.includes(op)) || 'hand-off');
+        };
+        paint(); startPaint(); const tick = setInterval(() => { if (card.hasAttribute('data-shell')) { paint(); startPaint(); } else clearInterval(tick); }, 100);
       } catch { /* the module's clock (shell.ts startShellClock) still runs */ } })();
     </script>
     <!-- rotate gate (E38): portrait only on phones — a touch device held landscape sees only this (rotate.css, src/client/engine/ui/RotateGate.ts) -->

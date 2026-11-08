@@ -41,14 +41,15 @@ it('closes the manifest at its own ready barrier without counting later work', a
     loading.waiting('Prepared entry content');
     now = 400; vi.advanceTimersByTime(100);
     expect(loading.root.dataset['download']).toBe('99');
-    expect(loading.root.querySelector('[data-el="dlFact"]')?.textContent).toBe('Spawn view · 52.0 MB of 52.0 MB · 51.6 MB from cache');
+    expect(loading.root.querySelector('[data-el="dlFact"]')?.textContent).toBe('52.0 of 52.0 MB');
     files.write(52_000_000, 51_600_000, true); const done = loading.done();
     expect(loading.root.dataset['download']).toBe('100');
     expect(loading.root.dataset['readBytes']).toBe('52000000');
     expect(loading.root.dataset['pendingBytes']).toBe('0');
     expect(loading.root.dataset['readsClosed']).toBe('true');
     loading.paintAdmission({phase: 'later', detail: 'Later work', bytesRead: 1_000_000, bytesTotal: 1_000_000, filesDone: 1, filesTotal: 1});
-    expect(loading.root.querySelector('[data-el="dlFact"]')?.textContent).toBe('Spawn view · 52.0 MB · 51.6 MB from cache');
+    expect(loading.root.querySelector('[data-el="dlFact"]')?.textContent).toMatch(/^Done · \d+\.\d s$/u);
+    expect(loading.root.querySelector('[data-el="dlRows"]')?.textContent).toContain('0.4 MB downloaded, 51.6 MB from cache');
     await vi.advanceTimersByTimeAsync(317); await done;
   } finally { loading.scope.dispose(); }
 });
@@ -109,8 +110,8 @@ it('publishes completed step credit before the next step records its visible set
     if (timeline === undefined) throw new Error('Missing timeline');
     expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('33');
     expect(timeline.snapshot().rows[1]?.setupAtStart).toBe(33);
-    expect(Number.parseFloat(loading.root.querySelector<HTMLElement>('[data-el="bar"]')?.style.width ?? ''))
-      .toBeCloseTo(50 / 3);
+    expect(Number.parseFloat(loading.root.querySelector<HTMLElement>('[data-el="suBar"]')?.style.width ?? ''))
+      .toBeCloseTo(100 / 3, 1);
     now = 2600; loading.endAdmission();
     const world = timeline.begin('world');
     expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('66');
@@ -218,7 +219,7 @@ it('retains a completed short step start even when it finished before the first 
       startedAt: 120, setupAtStart, ms: 0, state: 'ok',
     });
     expect(loading.root.querySelector('[data-key="admission"]')).toBeNull();
-    expect(loading.root.querySelector('[data-el="rows"]')?.textContent).toContain('2 quick steps');
+    expect(loading.root.querySelector('[data-el="suRows"]')?.textContent).toContain('2 quick steps');
     world.end();
   } finally { loading.scope.dispose(); }
 });
@@ -234,7 +235,7 @@ it('groups only completed sub-500ms steps and keeps the exact 500ms boundary vis
     // WebKit can still have a short external finalizer at completed-panel paint.
     const tail = timeline.begin('quick');
     const completed = loading.done();
-    const rows = [...loading.root.querySelectorAll<HTMLElement>('[data-el="rows"] > div')];
+    const rows = [...loading.root.querySelectorAll<HTMLElement>('[data-el="suRows"] > div')];
     expect(rows).toHaveLength(2);
     expect(rows[0]?.dataset['key']).toBe('slow'); expect(rows[0]?.dataset['ms']).toBe('500');
     expect(rows[1]?.textContent).toContain('2 quick steps'); expect(rows[1]?.dataset['ms']).toBe('599');
@@ -309,11 +310,11 @@ it('shows a controlling worker instead of assuming an offline cache from the API
   try {
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { controller: null } });
     const noController = new Loading({ id: 'worker', name: 'Worker' }, { scoped: true });
-    expect(noController.root.querySelector('[data-el="tier"]')?.textContent).not.toMatch(/worker ready|offline cache/);
+    expect(noController.root.querySelector('[data-el="tier"]')?.textContent).toContain('first visit');
     noController.scope.dispose();
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { controller: {} } });
     const controlled = new Loading({ id: 'worker', name: 'Worker' }, { scoped: true });
-    expect(controlled.root.querySelector('[data-el="tier"]')?.textContent).toContain('worker ready');
+    expect(controlled.root.querySelector('[data-el="tier"]')?.textContent).toContain('return visit');
     controlled.scope.dispose();
   } finally {
     Reflect.set(window, '__ws_sw', old);
@@ -490,7 +491,7 @@ it('keeps the complete file list fixed before the second dependency arrives', ()
     expect(loading.root.dataset['pendingBytes']).toBe('30');
     expect(loading.root.dataset['declaredBytes']).toBe('40');
     now = 400; vi.advanceTimersByTime(100);
-    expect(loading.root.querySelector<HTMLElement>('[data-el="bar"]')?.style.width).toBe('12.5%');
+    expect(loading.root.querySelector<HTMLElement>('[data-el="dlBar"]')?.style.width).toBe('25.0%');
     files.write(40, 40, true);
     loading.paint(view);
     expect(loading.root.dataset['download']).toBe('100');
@@ -511,7 +512,7 @@ it('paints download bars and facts from the same fresh cache snapshot', () => {
     expect(loading.root.dataset['pendingBytes']).toBe('0');
     expect(loading.root.querySelector('[data-el="dlPct"]')?.textContent).toBe('100');
     expect(loading.root.querySelector<HTMLElement>('[data-el="dlBar"]')?.style.width).toBe('100.0%');
-    expect(loading.root.querySelector('[data-el="dlFact"]')?.textContent).toContain('from cache');
+    expect(loading.root.querySelector('[data-el="dlRows"]')?.textContent).toContain('from cache');
     expect(loading.root.dataset['spawnFilesDone']).toBe('2');
   } finally { loading.scope.dispose(); }
 });
@@ -545,12 +546,13 @@ it('ends a scoped cell step immediately when fading without a boot-plan view', a
     now = 201;
     const finished = loading.done();
     expect(loading.root.dataset['setup']).toBe('100');
-    expect(loading.root.querySelector<HTMLElement>('[data-el="bar"]')?.style.width).toBe('100%');
+    expect(Number.parseFloat(loading.root.querySelector<HTMLElement>('[data-el="suBar"]')?.style.width ?? '')).toBe(100);
     expect(loading.root.classList.contains('hide')).toBe(false);
     await vi.advanceTimersByTimeAsync(17);
     expect(loading.root.classList.contains('hide')).toBe(false);
     expect(loading.root.dataset['step']).toBe('gap');
-    expect(loading.root.querySelector('[data-el="foot"]')?.textContent).toBe(`Now working on: ${loading.root.querySelector('[data-el="suFact"]')?.textContent}`);
+    // LS2: the finished Load head reads its own wall time; the footer keeps naming the last step
+    expect(loading.root.querySelector('[data-el="suFact"]')?.textContent).toMatch(/^Done · \d+\.\d s$/u);
     await vi.advanceTimersByTimeAsync(300); await finished;
     expect(loading.scope.disposed).toBe(true);
   } finally { loading.scope.dispose(); }

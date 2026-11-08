@@ -23,7 +23,7 @@ test('one manifest owns the bar; plan completion and later work cannot complete 
     state = {...state, complete: true}; notify(); complete(); await pending;
     expect(loading.root.dataset['download']).toBe('100'); expect(loading.root.dataset['readBytes']).toBe('4');
     expect(loading.root.dataset['readCachedBytes']).toBe('4');
-    expect(loading.root.querySelector('[data-el="dlFact"]')?.textContent).toContain('from cache');
+    expect(loading.root.querySelector('[data-el="dlRows"]')?.textContent).toContain('from cache');
     loading.scope.dispose(); state = {...state, completedBytes: 0}; notify();
     expect(loading.root.dataset['readBytes']).toBe('4');
   } finally {loading.scope.dispose();}

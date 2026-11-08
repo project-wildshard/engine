@@ -25,10 +25,18 @@ export interface LoadingDownloadSnapshot {
 export function loadingDownloadFraction(row: LoadingDownloadSnapshot): number {
   return row.complete ? 1 : row.totalBytes === 0 ? 0 : Math.min(0.999, row.completedBytes / row.totalBytes);
 }
+const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1);
+/** LS2's one size number on the Download head: what arrived of the whole, then the cache split once it closes. */
 export function loadingDownloadText(row: LoadingDownloadSnapshot): string {
   const text = row.wire ?? row;
   // DL21: wire bytes still arriving count as they stream (decoded reads already credit per chunk)
-  return `Spawn view · ${formatMB(text.completedBytes + (row.wire?.arrivingBytes ?? 0))}${row.complete ? '' : ` of ${formatMB(text.totalBytes)}`} · ${formatMB(text.cachedBytes)} from cache`;
+  if (!row.complete && text.totalBytes === 0) return 'Waiting';
+  return row.complete ? loadingCacheText(row) : `${mb(text.completedBytes + (row.wire?.arrivingBytes ?? 0))} of ${mb(text.totalBytes)} MB`;
+}
+/** "2.2 MB downloaded, 20.9 MB from cache": the network's share and the cache's share of the same bytes. */
+export function loadingCacheText(row: LoadingDownloadSnapshot): string {
+  const text = row.wire ?? row;
+  return `${mb(Math.max(0, text.completedBytes - text.cachedBytes))} MB downloaded, ${mb(text.cachedBytes)} MB from cache`;
 }
 
 /** The grid prefetch's own row: disk bytes against the set discovered so far (a finished run with every product read is 1). */

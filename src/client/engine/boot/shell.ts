@@ -21,25 +21,38 @@ const shellHtml = (tagline: string): string => `<div class="ws-load-head">
 </div>
 <div class="ws-load-body">
 <div class="ws-glass ws-load-panel">
-<div class="ws-load-title"><span class="ws-load-kicker">Loading chunk ·</span><b data-el="slug"></b><span class="ws-load-clock" data-el="clock">00:00.0</span></div>
-<div class="ws-load-simple"><div class="ws-load-bar"><div class="ws-load-fill" data-el="bar"></div></div><div class="ws-load-line" data-el="line">Loading</div></div>
+<div class="ws-load-title"><span class="ws-load-kicker" data-el="kicker">Loading</span><b data-el="slug"></b><span class="ws-load-clock" data-el="clock">00:00.0</span></div>
 <div class="ws-load-meta ws-load-meta-1">
 <div><span>tier</span><span data-el="tier"></span></div>
 </div>
-<div class="ws-load-track">
-<div class="ws-load-track-row"><span class="ws-load-track-name">download</span><span class="ws-load-track-fact" data-el="dlFact">—</span><span class="ws-load-track-pct" data-el="dlPct">—</span></div>
-<div class="ws-load-bar"><div class="ws-load-fill" data-el="dlBar"></div></div>
+<div class="ws-load-phase" data-phase="start" data-state="on" data-open>
+<button type="button" class="ws-load-track-row" data-el="stHead"><span class="ws-load-track-name">start</span><span class="ws-load-track-fact" data-el="stFact">—</span><span class="ws-load-track-pct" data-el="stPct">—</span></button>
+<div class="ws-load-bar"><div class="ws-load-fill" data-el="stBar" data-phase-bar="start"></div></div>
+<div class="ws-load-log" data-el="stRows"></div>
+</div>
+<div class="ws-load-phase" data-phase="download">
+<button type="button" class="ws-load-track-row" data-el="dlHead"><span class="ws-load-track-name">download</span><span class="ws-load-track-fact" data-el="dlFact">—</span><span class="ws-load-track-pct" data-el="dlPct">—</span></button>
+<div class="ws-load-bar"><div class="ws-load-fill" data-el="dlBar" data-phase-bar="download"></div></div>
+<div class="ws-load-log" data-el="dlRows"></div>
 <div class="ws-load-track-row ws-load-grid" data-el="pfRow" hidden><span class="ws-load-track-name">grid</span><span class="ws-load-track-fact" data-el="pfFact">—</span><span class="ws-load-track-pct" data-el="pfPct">0</span></div>
 </div>
-<div class="ws-load-track">
-<div class="ws-load-track-row"><span class="ws-load-track-name">setup</span><span class="ws-load-track-fact" data-el="suFact">—</span><span class="ws-load-track-pct" data-el="suPct">0</span></div>
-<div class="ws-load-bar"><div class="ws-load-fill" data-el="suBar"></div></div>
+<div class="ws-load-phase" data-phase="load">
+<button type="button" class="ws-load-track-row" data-el="suHead"><span class="ws-load-track-name">load</span><span class="ws-load-track-fact" data-el="suFact">—</span><span class="ws-load-track-pct" data-el="suPct">0</span></button>
+<div class="ws-load-bar"><div class="ws-load-fill" data-el="suBar" data-phase-bar="load"></div></div>
+<div class="ws-load-log" data-el="suRows"></div>
 </div>
-<div class="ws-load-log" data-el="rows"></div>
-<div class="ws-load-diagnostics" data-el="diagnostics">Memory: checking · CPU: checking</div>
 </div>
 </div>
 <div class="ws-load-foot"><span data-el="foot"></span><button type="button" class="ws-load-retry" data-el="retry" hidden>Retry</button></div>`;
+
+/** LS2: Start's named LS1 boundaries, in order, from the document to the game's code adopting the card. index.html's
+ * data-loading-clock script counts the same operations (test/loading-card.test.ts keeps the two lists equal): Start's bar
+ * moves only when one of them completes, never on time. */
+export const START_STEPS: readonly (readonly [operation: string, label: string])[] = [
+  ['app:document-and-module-graph', 'Code'], ['app:page-entry-import', 'Entry'], ['app:tables-import-and-prepare', 'Tables'],
+  ['app:tier-menu-download-imports', 'Tier and menu'], ['app:three-import', 'Renderer'], ['app:main-import', 'Game code'],
+  ['app:selected-discovery', 'World choice'],
+];
 
 /** Runtime shell markup: the caller fills the identity tagline through textContent. */
 export const loadShellTemplate = (): string => shellHtml('');
@@ -83,7 +96,7 @@ export function startShellClock(owner: Scope, slug: string): void {
   const arrival = arrivalCard(slug), started = arrival === null ? 0 : Math.min(0, Math.max(-60_000, arrival.at - performance.timeOrigin));
   if (!inline) root.dataset['clockStartedAt'] = String(started);
   const field = (name: string): HTMLElement | null => root.querySelector<HTMLElement>(`[data-el="${name}"]`);
-  const slugField = field('slug'), tierField = field('tier'), clock = field('clock'), fact = field('dlFact');
+  const slugField = field('slug'), tierField = field('tier'), clock = field('clock'), fact = field('stFact');
   if (slugField !== null && slugField.textContent === '') slugField.textContent = arrival?.name ?? slug.replaceAll('-', ' ');
   if (tierField !== null && tierField.textContent === '' && arrival?.tier !== undefined) tierField.textContent = arrival.tier;
   if (fact !== null && fact.textContent === '—') fact.textContent = engineString('s_loading_code');
