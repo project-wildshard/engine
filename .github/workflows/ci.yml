@@ -79,6 +79,8 @@ jobs:
         run: node scripts/engine-ci-plan.ts
       - name: Prove actual phase discovery and hostile-plan refusal
         run: node test/vitest-sharding.test.ts
+      - name: Prove actual planned dispatch and unplanned-file refusal
+        run: node scripts/engine-order-proof.mjs
       - name: Prove an actual over-budget file refuses
         run: node scripts/engine-ci-proof.mjs && node scripts/engine-ci-proof.mjs tmp/engine-ci-budget-proof --import
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

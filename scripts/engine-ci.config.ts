@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs';
 import {defineConfig} from 'vitest/config';
 import base from '../vitest.config.ts';
 import {readEnginePlan} from './engine-ci-plan.ts';
+import {EngineCISequencer} from './engine-ci-sequencer.ts';
 
 const {WS_CI_PLAN:filename,WS_CI_SHARD:index,WS_CI_PHASE:phase}=process.env;
 if(filename===undefined||index===undefined||(phase!=='native'&&phase!=='ordinary'))throw new Error('Missing exact CI shard/phase');
@@ -12,4 +13,4 @@ const files=shard[phase];
 if(files.length===0)throw new Error('An empty phase must not run Vitest');
 for(const file of files)readFileSync(file);
 // oxlint-disable-next-line import/no-default-export -- Vitest's config entry point.
-export default defineConfig({...base,test:{...base.test,include:files,maxWorkers:phase==='native'?1:2,isolate:true,pool:'forks'}});
+export default defineConfig({...base,test:{...base.test,include:files,maxWorkers:phase==='native'?1:2,isolate:true,pool:'forks',sequence:{sequencer:EngineCISequencer}}});
