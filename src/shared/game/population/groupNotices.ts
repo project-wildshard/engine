@@ -2,7 +2,7 @@
  * The wild groups' notices, renderer-free (CI12: the Nalati tape reads the same "The wolves howl…" text the page toasts): a
  * creature signal raises its admitted notice row's text, and a knockdown its own, each at most once per its `every`
  * seconds (one cooldown per signal name, and one for 'knockdown'). `bindPageGroups` toasts what it answers, in the page's
- * order; a native host answers with its own clock.
+ * order; the network view supplies its authoritative tick clock.
  *
  *   const notices = new GroupNotices(rows.effects);   notices.signal('howl', now) → 'The wolves howl in the hills' | null
  */

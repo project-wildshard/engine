@@ -8,7 +8,9 @@ const flow=arg('only','perks'), samples=Number(arg('samples','3')), red=process.
 const preview=await serve(arg('root',process.cwd()),'',true);
 try {
   const {run}=await import(`./split-repair-${flow}.mjs`);
-  for(const name of ['chromium','webkit']) {
+  const pick=arg('browser','both');
+  if(!['both','chromium','webkit'].includes(pick))throw new Error('Unknown proof browser');
+  for(const name of ['chromium','webkit'].filter(engineName=>pick==='both'||pick===engineName)) {
     for(let sample=0;sample<samples;sample++) {
     const browser=await (name==='chromium'?chromium:webkit).launch(name==='chromium'?{args:['--mute-audio','--use-angle=metal','--ignore-gpu-blocklist']}:{});
     try {

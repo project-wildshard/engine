@@ -4,7 +4,7 @@
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { PopulationEffectsSchema } from '@wildshard/format/creatures';
-import { GroupNotices } from '../src/server/game/population/groupNotices';
+import { GroupNotices } from '../src/shared/game/population/groupNotices';
 
 const effects = v.parse(PopulationEffectsSchema, { notices: [{ signal: 'howl', text: 'The wolves howl in the hills', every: 20 }, { signal: 'raid', text: 'Wolves at the flock!', every: 6 }],
   knockdown: { speed: 9, min: 2, max: 6, seconds: .6, text: 'Knocked down!', every: 3 } });

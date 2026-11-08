@@ -1,6 +1,7 @@
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { buildYield } from '@wildshard/engine/core/workSlice';
 import { wind } from '@wildshard/engine/world/steppeWind';
+import { installPopulationSignals } from './signals';
 import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
 import type { RayTargets } from '@wildshard/engine/combat/targets';
 import type { SpeciesActorsFileRows } from '@wildshard/format/speciesBookRows';
@@ -134,7 +135,7 @@ export async function installClientWildlife(ctx: ShardContext, feature: ClientFe
   // The one programme this population consumes: placement's, on the level.
   if (ReturnProgram.prepareMemory(rows.admission, world.game.levelScope)) await buildYield(world.game.levelScope);
   if (ctx.scope.disposed || ctx.scope.disposing || ctx.game.runtime !== runtime || runtime.world !== world) throw new Error('Wildlife owner left during memory preparation');
-  installEnteredService(ctx, scope => { pageAir.enter(scope, rows.groups, wetBlock); });
+  installEnteredService(ctx, scope => { pageAir.enter(scope, rows.groups, wetBlock); installPopulationSignals(ctx,scope,rows.groups.effects); });
   const page = await ctx.product.json<SpeciesActorsFileRows>(feature.crowd.json);
   if (page.parts.length === 0 || page.parts.length !== page.pivots.length || page.radius <= 0 || page.draws.length !== 1) throw new Error('Invalid crowd body joints or bound');
   const draws = fixedDraws(ctx.product, page.draws), template = draws.handle(feature.crowd.binary);

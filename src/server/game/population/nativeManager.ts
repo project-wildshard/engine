@@ -7,6 +7,7 @@ import { ForagerPopulation } from '@wildshard/engine/ai/ambientForager';
 import { GrassField } from '../../../shared/game/systems/looks/grassField';
 import { TrampleField } from '../../../shared/game/systems/looks/trampleField';
 import { knockdownVelocity, PopulationRelations } from './relations';
+import { installPopulationSignals } from './signals';
 import { Vector3 } from 'three';
 import { AggressionDirector } from '@wildshard/engine/ai/director';
 import type { PackBrain } from '@wildshard/engine/ai/pack';
@@ -351,6 +352,7 @@ export class NativeWildlifeFrame {
   knockdown(x: number, z: number, strength: number): void {
     const row=this.rows.knockdown;knockdownVelocity(row,x,z,strength,this.knocked);
     this.host.nearestPlayer({x,y:this.host.playerFocus.y,z}).dashAt(this.knocked.x,this.knocked.z,row.seconds);
+    this.host.events.emit('creature.knockdown',{x,z,strength});
   }
   snapshot(): { wild: { init: boolean; x: number; z: number; v: number; at: number; company?: Record<string, WildlifeGait> }; flocks: string[]; marmots: ReturnType<ForagerPopulation['snapshot']> } {
     const company = Object.fromEntries([...this.company].map(([id, { x, z, v: speed, at }]) => [id, { x, z, v: speed, at: at ?? 0 }]));
@@ -409,6 +411,7 @@ export class NativeWildEnvironment extends WildSenses {
   protected senses(): ReturnProgram { return this.author; }
   bind(host: SimHost, frame: NativeWildlifeFrame): void {
     if (this.host !== null || !(frame instanceof NativeWildlifeFrame)) throw new Error('Invalid native world binding'); this.host = host; this.frame = frame;
+    installPopulationSignals(host);
   }
   grassStandingAt(x: number, z: number): number { return this.field.baseHeightAt(x,z); }
   grassHeightAt(x: number, z: number): number { return this.field.baseHeightAt(x,z)*(1-this.rows.flatten*this.trampleField.amountAt(x,z)); }
