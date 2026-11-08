@@ -64,7 +64,6 @@ function earned(source) {
       :Math.floor(1000*(source.total===0?0:Math.min(.999,source.done/source.total)))/10;
   }
   if (source.kind !== 'load' || source.rows === undefined) return null;
-  if (source.complete === true) return 100;
   if (source.configured !== true) return 0;
   let done = 0, total = 0;
   for (const row of source.rows) {
@@ -89,6 +88,10 @@ export function untracedChanges(log) {
   for (const row of [...log].sort((a,b)=>a.t-b.t)) {
     if (row.bar === 'step') continue;
     let expected = row.source?.kind === row.bar ? earned(row.source) : null;
+    // The real control-ready boundary earns the final 100. Its synchronous
+    // handoff may first publish one last exact row-derived fraction before
+    // closing the parent stage. Both are earned; intermediate guesses are not.
+    if(row.bar==='load'&&row.source?.kind==='load'&&row.source.complete===true&&row.pct===100)expected=100;
     if (expected !== null && row.bar === 'load') {
       expected = Math.max(held.get(row.bar) ?? 0, expected); held.set(row.bar,expected);
     }

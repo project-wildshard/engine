@@ -42,3 +42,10 @@ test('J188: an initial positive reading must be earned by its own producer', () 
   const bad={...good,pct:51};expect(untracedChanges([bad])).toEqual([bad]);
   const unrelated={...good,bar:'load'};expect(untracedChanges([unrelated])).toEqual([unrelated]);
 });
+
+test('J188: control-ready retains exact row credit until its final completion paint',()=>{
+  const source={kind:'load',configured:true,complete:true,rows:[{state:'ok',weight:998},{state:'on',weight:2}]};
+  expect(untracedChanges([row(0,'load',99.8,{source}),row(1,'load',100,{source})])).toEqual([]);
+  const guessed=row(0,'load',99.9,{source});expect(untracedChanges([guessed])).toEqual([guessed]);
+  const premature=row(0,'load',100,{source:{...source,complete:false}});expect(untracedChanges([premature])).toEqual([premature]);
+});
