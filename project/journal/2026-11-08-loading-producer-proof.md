@@ -51,3 +51,11 @@ an exact installed slug before boot, and defaults to _template. This
 is not a fix or a green claim for that legacy rendering path.
 Verified server-input byte units and URL-ID correlations are retained
 in safe diagnostics; private input URLs remain omitted.
+
+Full lint, format and type checks were rerun over the complete stack
+without bypass. Source-free scoped/ordinary and held-ready phase
+accounting plus privacy, bar-rule and fence regressions pass: four
+files, 22 cases in 752 ms. The full normal pre-push remains required.
+Origin advanced by six test/cook commits while this lane proved UI;
+they must be integrated before publication, preserving their remote
+pack-origin transport correction.
