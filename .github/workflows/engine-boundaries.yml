@@ -28,6 +28,9 @@ jobs:
       - name: Re-cut the pinned server slices
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: node scripts/pins.ts verify-slices
+      - name: Measure native play after host installation
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: node --experimental-transform-types --import ./scripts/bake-loader.mjs scripts/host-activity.ts tmp/engine-boundaries/host-activity.json
       - name: Real worker, hostile peers, and restore continuation
         run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/cook-hostile-pins.test.ts test/net-hostile-play.test.ts test/net-link-play.test.ts test/pinned-restore-play.test.ts test/released-save-play.test.ts
         env:
