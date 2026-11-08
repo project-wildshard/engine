@@ -33,6 +33,7 @@ import { runtimePacksOn } from '@wildshard/engine/boot/loadingPacks';
 import {installEntryDownloadTap} from '../shardfile/entryTransport';
 import {setting, savedSetting, settingFromUrl} from '@wildshard/engine/ui/Settings';
 import {gridMode, DEVSERVER} from './menu';
+import {holdLeaving} from '@wildshard/engine/boot/lastEnd';
 
 /** Files in flight at once: the page's own reads keep most of the pipe. */
 const CONCURRENCY = 2;
@@ -265,6 +266,9 @@ export function startTitlePrefetch(target: string, flow: 'client' | 'grid' = 'cl
   const preferred = futureTier(), tier = preferred === 'auto' ? TIER : preferred;
   setSpawnPacks(runtimePacksOn()); // DL16: the title's read-ahead follows Debug ▸ Loading & memory ▸ Level download
   const held = prefetchSpawnDownload(target, tier, flow, gridKey); if (held === null) return null;
+  // The title has no session saver. Reuse the existing navigation handoff so
+  // its non-abortable Cache API reads finish before location.replace.
+  holdLeaving(held.drain);
   const stopTap = installEntryDownloadTap((slug, selectedFlow) => {
     const picked = futureTier(), selectedTier = picked === 'auto' ? TIER : picked;
     // Auto desktop still needs its actual GPU pick. Never paint a guessed tier.

@@ -9,6 +9,17 @@ Remove enumeration and keep that authoritative per-member validation.
 The first candidate exposed the second native census, Cache.matchAll,
 in the same title read-ahead at pagehide. Remove that native bulk path
 as well; requested files still receive their individual cache checks.
+Full Ember cold return then reproduced the same error with individual
+Cache.match calls still running. The title now stops read-ahead and drains
+its owned native calls through the existing leaveSaved handoff before
+navigation. Its four-second navigation bound is unchanged. Cancellation
+also prevents a late packs-book reply from opening a new cache, and stops
+post-cancel manifest work and the next member lookup batch.
+
+A focused title boundary test holds the native read across cancellation:
+the download rejects immediately, leaving waits for the read, and no
+subsequent native read or network request starts. All 45 focused checks
+pass in 2.70 seconds. The full Ember repeat remains required.
 
 The candidate's real Chromium one-byte quota override produced the
 native QuotaExceededError and still reached Nalati's completed card,

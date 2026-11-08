@@ -275,6 +275,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   const keepCopy = async (write: SpawnDownloadPorts['store'], url: string, response: Response): Promise<boolean> => {
     let retained = false;
     try {
+      controller.signal.throwIfAborted();
       if (write === undefined || cacheWriteDenied) return false;
       await write(url, response); retained = true; return true;
     } catch (failure) {
@@ -337,6 +338,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   const work = (async () => {
     try {
       const manifestURL = new URL(address.url, packs).href, held = await ports.cached(manifestURL);
+      controller.signal.throwIfAborted();
       const {bytes, copy} = await readSpawnFile(manifestURL, address.bytes, ports, controller.signal, undefined, held);
       if (bytes.length !== address.bytes) {void copy?.body?.cancel().catch(() => undefined); throw new Error('Spawn manifest size differs');}
       const text = new TextDecoder().decode(bytes);
@@ -421,6 +423,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         if (await heldMember(await ports.cached(file.url), file.bytes)) { looked(file); return; }
         heldFiles.delete(file.url); unfit.add(file.url);
       }));
+      controller.signal.throwIfAborted();
       const rest = files.filter(file => !heldFiles.has(file.url) && !unfit.has(file.url));
       const present = heldFiles.size > 0 && rest.length <= 64 ? undefined : await ports.present?.(rest.map(file => file.url)).catch(() => undefined);
       // Bulk native metadata avoids hundreds of cache IPC calls. Unmapped
@@ -601,6 +604,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
 }
 
 let current: {key: string; download: SpawnDownload; foreground: boolean} | undefined;
+const nativeCacheWork = new Set<Promise<unknown>>();
 /** DL20: each download's settled outcome and whether it was ever a boot's own (foreground): a boot's download is reported
  *  once, when both hold (a completed title prefetch is adopted after it settled). Queued until a sink is installed. */
 const settledAs = new WeakMap<SpawnDownload, SpawnOutcome>(), foregroundDownloads = new WeakSet<SpawnDownload>(), reported = new WeakSet<SpawnDownload>();
@@ -680,11 +684,15 @@ export function startSpawnDownload(slug: string, flow: 'client' | 'grid', tier: 
 }
 /** Title read-ahead borrows this same manifest operation. Leaving the title
  * cancels only an unadopted prefetch, never a tap's foreground download. */
-export function prefetchSpawnDownload(slug: string, tier: 'phone' | 'desktop', flow: 'client' | 'grid' = 'client', mode = '000'): {download: SpawnDownload; stop: () => void} | null {
+export function prefetchSpawnDownload(slug: string, tier: 'phone' | 'desktop', flow: 'client' | 'grid' = 'client', mode = '000'): {download: SpawnDownload; stop: () => void; drain: () => Promise<void>} | null {
   if (current?.foreground === true) return null;
   const download = spawnDownload(slug, flow, tier, mode, false);
-  return download === null ? null : {download, stop: () => {
+  const stop = (): void => {
     if (current?.download === download && !current.foreground) {download.cancel(); current = undefined;}
+  };
+  return download === null ? null : {download, stop, drain: async () => {
+    stop();
+    while (nativeCacheWork.size > 0) await Promise.allSettled(nativeCacheWork);
   }};
 }
 const get = (value: unknown, key: string): unknown => typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
@@ -765,25 +773,33 @@ async function readHeldParts(response: Response | undefined): Promise<HeldParts>
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string[]] =>
     /^[a-f0-9]{64}$/u.test(entry[0]) && Array.isArray(entry[1]) && entry[1].every(url => typeof url === 'string')));
 }
+// Cache API operations have no AbortSignal. A title's navigation explicitly
+// stops its producer and drains these calls before destroying their context.
+function nativeCacheCall<T>(read: () => Promise<T>): Promise<T> {
+  const work = read(); nativeCacheWork.add(work);
+  void work.then(() => nativeCacheWork.delete(work), () => nativeCacheWork.delete(work));
+  return work;
+}
 function downloadPorts(cacheName: unknown, packs: boolean): SpawnDownloadPorts {
-  const store = typeof caches === 'undefined' ? null : typeof cacheName === 'string' ? caches.open(cacheName) : null;
+  const store = typeof caches === 'undefined' ? null : typeof cacheName === 'string' ? nativeCacheCall(() => caches.open(cacheName)) : null;
   const controller = navigator.serviceWorker?.controller;
   return {
     fetch: (url, signal, init) => downloadFetch()(url, {...init, signal}),
-    cached: async url => typeof caches === 'undefined' ? undefined : store === null ? caches.match(url, {ignoreVary: true}) : (await store).match(url, {ignoreVary: true}),
+    cached: url => nativeCacheCall(async () => typeof caches === 'undefined' ? undefined : store === null ? caches.match(url, {ignoreVary: true}) : (await store).match(url, {ignoreVary: true})),
     // Native bulk enumeration can outlive a title navigation in WebKit.
     // Each requested member retains its own authoritative cache check.
-    ...(store === null || controller !== undefined && controller !== null ? {} : {store: async (url: string, response: Response) => {await (await store).put(url, response);}}),
-    ...(store === null || !packs ? {} : {packs: true, keep: async (url: string, response: Response) => {await (await store).put(url, response);}}),
+    ...(store === null || controller !== undefined && controller !== null ? {} : {store: (url: string, response: Response) => nativeCacheCall(async () => {await (await store).put(url, response);})}),
+    ...(store === null || !packs ? {} : {packs: true, keep: (url: string, response: Response) => nativeCacheCall(async () => {await (await store).put(url, response);})}),
     ...(packs ? {whole: true} : {}),
     ...(store === null || !packs ? {} : {held: {
-      read: async () => readHeldParts(await (await store).match(HELD_PARTS)),
-      write: async (index: HeldParts) => {await (await store).put(HELD_PARTS, Response.json(index));},
+      read: () => nativeCacheCall(async () => readHeldParts(await (await store).match(HELD_PARTS))),
+      write: (index: HeldParts) => nativeCacheCall(async () => {await (await store).put(HELD_PARTS, Response.json(index));}),
     }}),
   };
 }
 /** A download whose manifest is known only after the packs book arrives; until then its progress is unknown. */
-function lateDownload(inner: Promise<SpawnDownload>): SpawnDownload {
+function lateDownload(start: (signal: AbortSignal) => Promise<SpawnDownload>): SpawnDownload {
+  const controller = new AbortController(), inner = start(controller.signal);
   let resolved: SpawnDownload | undefined, failure: string | null = null, cancelled = false;
   const listeners = new Map<(snapshot: SpawnDownloadSnapshot) => void, () => void>();
   let markStopped = (_reason: unknown): void => undefined;
@@ -813,7 +829,7 @@ function lateDownload(inner: Promise<SpawnDownload>): SpawnDownload {
       return () => {listeners.get(listener)?.(); listeners.delete(listener);};
     },
     resolve: url => resolved?.resolve(url) ?? new URL(url, document.baseURI).href,
-    cancel: () => {cancelled = true; resolved?.cancel(); markStopped(new DOMException('Spawn download cancelled', 'AbortError')); for (const off of listeners.values()) off(); listeners.clear();}};
+    cancel: () => {cancelled = true; controller.abort(); resolved?.cancel(); markStopped(new DOMException('Spawn download cancelled', 'AbortError')); for (const off of listeners.values()) off(); listeners.clear();}};
 }
 function spawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string, foreground: boolean): SpawnDownload | null {
   partTier = tier; installMemberLayer();
@@ -828,12 +844,13 @@ function spawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'd
   // fails the download (admission waits on it and refuses control with the reason); it never runs the default set and
   // reports it complete, which would break the whole-level rule (sp-x9's review of 40bc516d5c).
   const download = !packsOn ? downloadSpawnManifest(selected.address, downloadPorts(selected.cacheName, false), document.baseURI, selected.base)
-    : lateDownload((async () => {
+    : lateDownload(async signal => {
       const address = bookSelection(await readPacksBook(), slug, flow, tier, mode);
+      signal.throwIfAborted();
       if (address === null) throw new Error(`Packs book has no ${flow} entry for ${slug} (${tier}, ${mode})`);
       if (address.url === selected.address.url) throw new Error('Packs book names the default manifest');
       return downloadSpawnManifest(address, downloadPorts(selected.cacheName, true), document.baseURI, selected.base);
-    })());
+    });
   current?.download.cancel(); current = {key, download, foreground};
   trackOutcome(download, slug, packsOn);
   if (foreground) { markForeground(download); holdUnlisted(download.ready); }
