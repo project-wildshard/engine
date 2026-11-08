@@ -1,7 +1,7 @@
 import { beginNavigationShell } from '@wildshard/engine/boot/shell';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { registerBeforeReload, type LastEnd } from '@wildshard/engine/boot/lastEnd';
-import { freshPageArrival, pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
+import { arrivalArt, freshPageArrival, pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { saves } from '@wildshard/engine/saves/runtime';
 import type { SaveStore } from '@wildshard/engine/saves/store';
@@ -12,7 +12,7 @@ import { gridRecovery, recoveryCatalogue, type GridRecoveryRecord } from '../../
 import { setPageMode } from '../../../shared/game/grid/pageMode';
 import { pageGridCells as gridCells } from '../../../shared/game/grid/cellEvents';
 import type { PageMode } from '../plugin/context';
-import { findTitleManifest } from '../shard/titleList';
+import { findTitleManifest, type TitleManifest } from '../shard/titleList';
 import { travel, travelSlot } from '../travel/travel';
 import { startEntryDownload } from '../shardfile/entryTransport';
 import { startGridStripDownload } from './entryDownloads';
@@ -48,21 +48,33 @@ export function startGridEntryContent(home: string): void {
   startGridStripDownload(gridMode(DEVSERVER), home, 'mesh');
 }
 
+/** LS6 (J190): a grid tap resumes at the last durable place, so its card shows that cell's name and placeholder art;
+ * a fresh save shows the home's. A cell with no art in this build shows none rather than another place's. */
+export function gridDestination(place: { readonly slug: string } | null, home: Pick<TitleManifest, 'name' | 'card'>,
+  find: (slug: string) => Pick<TitleManifest, 'name' | 'card'> | undefined = findTitleManifest): { readonly name: string; readonly art: string } {
+  const row = place === null ? home : find(place.slug) ?? null;
+  if (row === null) return { name: place?.slug.replaceAll('-', ' ') ?? home.name, art: '' };
+  const art = row.card?.portrait ?? '';
+  return { name: row.name, art: arrivalArt(art) ? art : '' };
+}
+
 /** Paint the loading shell before the title's durable handoff and fresh-page navigation. */
 export function enterGrid(): void {
   if (navigating !== null && !navigating.disposed) return;
   const home = gridHome();
   const target = findTitleManifest(home.slug);
   if (target === undefined) throw new Error(`The grid's home cell names no shard: ${home.slug}`);
+  const shown = gridDestination(gridRecovery(saves).lastPlace(new GridAssembly(gridMode(DEVSERVER))), target);
+  document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
   startEntryDownload(target.slug, 'grid');
   titlePrefetchChoice(saves).remember(target.slug, 'grid');
   startGridStripDownload(gridMode(DEVSERVER), home.instance, 'metadata');
-  navigating = beginNavigationShell(target.name, pageScope, () => {
+  navigating = beginNavigationShell(shown.name, pageScope, () => {
     // A deliberate new player attempt starts a new guard window; automatic reloads cannot clear it.
     if (!gridRecovery(saves).clearLoop()) throw new Error('Grid recovery guard could not be cleared');
     clearGridRecovery();
     pageGridIntents().set({ instance: home.instance, slug: target.slug });
-    travel({ to: target.slug, mode: 'enter' });
+    travel({ to: target.slug, mode: 'enter', shown });
   }, document.querySelector<HTMLButtonElement>('.ws-main-grid'));
 }
 

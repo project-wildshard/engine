@@ -187,7 +187,8 @@ export class Loading {
     this.els.retry.onclick = null; // Adopt the inline retry without keeping its document-only handler.
     set(this.els.retry, engineString('s_loading_retry'));
     listenTap(this.scope, this.els.retry, () => { if (this.retryWait === null) return; if (this.retryNavigation) markReload('loading wait retry'); this.retryWait(); });
-    this.els.slug.textContent = chunk.name;
+    // LS6: an adopted card already names the arrival's destination (a grid tap resumes at its last place); keep it.
+    if (shell === null || this.els.slug.textContent === '') this.els.slug.textContent = chunk.name;
     const key = 'loadAttempt';
     let attempt = 1;
     try {

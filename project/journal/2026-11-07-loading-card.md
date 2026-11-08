@@ -36,7 +36,8 @@ counter, step or producer report under them. The manual proof
 
 Once ready (or after a failure) Copy diagnostics takes Hold's place. It
 copies the phase times, tier, attempt, cache split, every Load row and the
-full LS1 timeline. Clipboard API first, a selected text area on refusal.
+full LS1 timeline through the Clipboard API; a refusal says so on the
+button. Real boots copied all 497 (Chromium) and 499 (WebKit) entries.
 
 ## What the real boots say (LS3)
 
@@ -48,3 +49,13 @@ traced to an event. Shader compile and the first frame report no finer
 progress, so that stage needs it. On Jake's phone the long stretches were
 Start's imports and Server world; these local boots are too fast to show
 them, so the phone's Copy diagnostics is the next reading.
+
+## LS6, the destination's art (J190)
+
+A grid tap resumes at `grid.last-played`, so `enterGrid` names that cell
+and carries its card portrait in the title arrival (`art`, a same-origin
+path or empty for none). The inline clock paints it from the first frame
+and Loading keeps the arrival's name when it adopts the card. A fresh
+save shows the home's. The engine's ring build has no grid home, so the
+real boots seed the arrival a grid tap writes; the place-to-arrival step
+is a unit test.

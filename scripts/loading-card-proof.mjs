@@ -16,7 +16,9 @@ import { barStalls, untracedChanges } from './loading-bar-rule.mjs';
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
 const root = resolvePath(option('root') ?? '.'), shard = option('shard') ?? 'template';
 const out = resolvePath(option('out') ?? 'tmp/loading-card'), throttle = process.argv.includes('--throttle');
-const grid = process.argv.includes('--grid'), only = option('browser');
+const only = option('browser');
+// LS6: --arrival='<name>|<art>' seeds the title tap's arrival the way a grid tap with a saved place writes it.
+const arrival = option('arrival')?.split('|');
 mkdirSync(out, { recursive: true });
 
 /** Browser-side recorder: one row per bar change, with the LS1 counters at that moment. */
@@ -79,6 +81,8 @@ try {
       await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
       await debugSettings(context, { holdLoading: true });
       await context.addInitScript(recordBars);
+      if (arrival !== undefined) await saveFixture(context, { scope: 'session', key: 'titleArrival', once: 'ls6-arrival',
+        data: JSON.stringify({ slug: shard, mode: 'enter', at: Date.now(), name: arrival[0], art: arrival[1] ?? '', tier: 'phone' }) });
       const page = await context.newPage();
       /** @type {string[]} */ const faults = [];
       page.on('pageerror', error => faults.push(error.message));
@@ -88,13 +92,42 @@ try {
         await cdp.send('Network.enable');
         await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8 * 8, uploadThroughput: 750e3 / 8 });
       }
-      const tag = `${name}${throttle ? '-throttled' : ''}${grid ? '-grid' : ''}`;
-      await page.goto(`${preview.url}/?chunk=${encodeURIComponent(shard)}&tier=phone&mute=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const tag = `${name}${throttle ? '-throttled' : ''}${arrival === undefined ? '' : '-arrival'}`;
+      await page.goto(`${preview.url}/?chunk=${encodeURIComponent(shard)}&tier=phone&mute=1&nolock=1&sw=0`, { waitUntil: 'commit', timeout: 30000 });
+      if (arrival !== undefined) {
+        // The first frame: the inline card before any module, then the adopted card must keep the same name and art.
+        await page.waitForSelector('.ws-load[data-shell] [data-el="slug"]', { timeout: 30000 });
+        await page.screenshot({ path: join(out, `${tag}-first.png`) });
+        const first = await page.evaluate(() => ({ name: document.querySelector('[data-el="slug"]')?.textContent, art: document.documentElement.style.getPropertyValue('--ws-load-portrait') }));
+        console.log(`${tag}: first frame ${JSON.stringify(first)}`);
+        if (first.name !== arrival[0] || !first.art.includes(arrival[1] ?? '')) faults.push(`first frame shows ${JSON.stringify(first)}`);
+      }
       await page.waitForFunction(() => document.querySelector('.ws-load:not([data-shell])') !== null, null, { timeout: 60000 });
       await page.screenshot({ path: join(out, `${tag}-loading.png`) });
       await page.waitForSelector('.ws-load[data-ready]', { timeout: 120000 });
       await page.waitForTimeout(300);
       await page.screenshot({ path: join(out, `${tag}-ready.png`) });
+      if (arrival !== undefined) {
+        const kept = await page.evaluate(() => document.querySelector('[data-el="slug"]')?.textContent);
+        if (kept !== arrival[0]) faults.push(`adopted card renamed the destination to ${kept}`);
+      }
+      // LS4: Copy diagnostics copies the full LS1 timeline.
+      const copied = await page.evaluate(async () => {
+        /** @type {string[]} */ const texts = [];
+        const original = navigator.clipboard.writeText.bind(navigator.clipboard);
+        navigator.clipboard.writeText = text => { texts.push(text); return original(text).catch(() => undefined); };
+        const button = document.querySelector('.ws-load-copy');
+        if (!(button instanceof HTMLElement)) return { ok: false, reason: 'no Copy diagnostics button', label: '' };
+        button.click();
+        await new Promise(resolve => { setTimeout(resolve, 300); });
+        const text = texts[0] ?? '', json = text.slice(text.indexOf('timeline (LS1):\n') + 16);
+        const timing = Reflect.get(window, '__bootTiming')?.read();
+        const parsed = JSON.parse(json);
+        return { ok: parsed.entries.length > 100 && parsed.entries.length <= timing.entries.length && document.querySelector('.ws-load[data-ready]') !== null,
+          reason: `${parsed.entries.length} entries copied of ${timing.entries.length}`, label: button.textContent, head: text.split('\n').slice(0, 4).join(' / ') };
+      });
+      console.log(`${tag}: copy ${copied.ok ? 'ok' : 'FAILED'} · ${copied.reason} · button "${copied.label}" · ${copied.head ?? ''}`);
+      if (!copied.ok) faults.push(`copy diagnostics: ${copied.reason}`);
       const log = await page.evaluate(() => Reflect.get(window, '__barLog'));
       const readyAt = await page.evaluate(() => Reflect.get(window, '__readyAt'));
       if (process.argv.includes('--dump')) writeFileSync(join(out, `${tag}-timing.json`), JSON.stringify(await page.evaluate(() => Reflect.get(window, '__bootTiming')?.read()), null, 1));

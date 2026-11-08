@@ -19,8 +19,11 @@ export const arrivalTier: { current: 'phone' | 'desktop' } = {
 const KEY = 'titleArrival';
 const BACKUP_KEY = 'titleArrival.once';
 const MAX_AGE_MS = 60_000;
+/** LS6: arrival art is a same-origin asset path or empty (none), never a URL a stored value could point elsewhere. */
+const ARRIVAL_ART = /^(?:\/(?!\/)[\w./-]+\.(?:jpg|png|webp))?$/u;
+export function arrivalArt(value: unknown): value is string { return typeof value === 'string' && ARRIVAL_ART.test(value); }
 
-interface StoredArrival extends TitleArrival { at: number; name?: string; tier?: string; timing?: Readonly<Record<string, unknown>> }
+interface StoredArrival extends TitleArrival { at: number; name?: string; tier?: string; art?: string; timing?: Readonly<Record<string, unknown>> }
 
 /** A one-shot handoff must be fresh when this document arrives, before cold
  * modules or world admission run. Later reloads still use their own start.
@@ -48,7 +51,8 @@ function valid(raw: string | null, slug: string): TitleArrival | null {
 }
 
 /** Optional display metadata lets the first HTML paint name the destination before application modules arrive. */
-export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: string }): void {
+/** LS6: `art` is the destination's own placeholder art (a same-origin path), or '' for none: the card's first frame shows it. */
+export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: string; art?: string }): void {
   bootMark('app:navigation-decision', {slug: arrival.slug});
   const timing = bootTiming();
   const raw = JSON.stringify({ ...arrival, at: Date.now(), ...(timing === undefined ? {} : {timing: {
@@ -76,15 +80,16 @@ export function pendingTitleArrival(slug: string): TitleArrival | null {
 }
 
 /** DL21: the fresh arrival's display facts and tap time for the receiving document's first card, without consuming it. */
-export function arrivalCard(slug: string): { name: string | undefined; tier: string | undefined; at: number } | null {
+export function arrivalCard(slug: string): { name: string | undefined; tier: string | undefined; art: string | undefined; at: number } | null {
   for (const read of [() => saveStorage('session').getItem(KEY), () => saveStorage('device').getItem(BACKUP_KEY)]) {
     let raw: string | null = null;
     try { raw = read(); } catch { continue; }
     if (raw === null || valid(raw, slug) === null) continue;
     const value: unknown = JSON.parse(raw);
     if (typeof value !== 'object' || value === null) continue;
-    const at: unknown = Reflect.get(value, 'at'), name: unknown = Reflect.get(value, 'name'), tier: unknown = Reflect.get(value, 'tier');
-    if (typeof at === 'number') return { name: typeof name === 'string' ? name : undefined, tier: typeof tier === 'string' ? tier : undefined, at };
+    const at: unknown = Reflect.get(value, 'at'), name: unknown = Reflect.get(value, 'name'), tier: unknown = Reflect.get(value, 'tier'), art: unknown = Reflect.get(value, 'art');
+    if (typeof at === 'number') return { name: typeof name === 'string' ? name : undefined, tier: typeof tier === 'string' ? tier : undefined,
+      art: arrivalArt(art) ? art : undefined, at };
   }
   return null;
 }

@@ -99,6 +99,7 @@ export function startShellClock(owner: Scope, slug: string): void {
   const slugField = field('slug'), tierField = field('tier'), clock = field('clock'), fact = field('stFact');
   if (slugField !== null && slugField.textContent === '') slugField.textContent = arrival?.name ?? slug.replaceAll('-', ' ');
   if (tierField !== null && tierField.textContent === '' && arrival?.tier !== undefined) tierField.textContent = arrival.tier;
+  if (!inline && arrival?.art !== undefined) document.documentElement.style.setProperty('--ws-load-portrait', arrival.art === '' ? 'none' : `url("${arrival.art}")`);
   if (fact !== null && fact.textContent === '—') fact.textContent = engineString('s_loading_code');
   if (inline) return;
   const tick = (): void => { if (clock !== null) clock.textContent = clockText(diagnosticNow() - started); };

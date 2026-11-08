@@ -10,7 +10,8 @@ import type { Inventory, ItemId } from '../Inventory';
 import { isItemId, ITEMS } from '../../../shared/game/bag/itemCatalog';
 import type { ItemRow } from '../../../shared/game/bag/items';
 
-export interface TravelRequest { to: ShardSlug; mode: 'enter' | 'explore' | 'arena'; arrive?: SpawnPose }
+/** `shown` (LS6): what the receiving card names and paints when the page loads one place and plays another (the grid). */
+export interface TravelRequest { to: ShardSlug; mode: 'enter' | 'explore' | 'arena'; arrive?: SpawnPose; shown?: { readonly name: string; readonly art: string } }
 export interface TravelHandoff {
   v: 1; from: ShardSlug | null; to: ShardSlug; mode: TravelRequest['mode'];
   arrive: SpawnPose | null; carry: readonly { id: ItemId; count: number }[]; at: number;
@@ -71,7 +72,8 @@ function navigate(request: TravelRequest): void {
   navigateNow(request);
 }
 function navigateNow(request: TravelRequest): void {
-  setTitleArrival({ slug: request.to, mode: request.mode, name: findTitleManifest(request.to)?.name ?? request.to, tier: arrivalTier.current });
+  setTitleArrival({ slug: request.to, mode: request.mode, name: request.shown?.name ?? findTitleManifest(request.to)?.name ?? request.to, tier: arrivalTier.current,
+    ...(request.shown === undefined ? {} : { art: request.shown.art }) });
   const url = new URL(location.href);
   url.searchParams.set('chunk', request.to);
   for (const name of ['at', 'glreload', 'x', 'z', 'yaw', 'pitch', 'explore', 'cam', 'model', 'skipintro', 'tour', 'quest', 'drop']) url.searchParams.delete(name);
