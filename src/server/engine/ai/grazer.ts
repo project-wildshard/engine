@@ -417,6 +417,8 @@ export class GrazerBrain<A extends AnimalSim> extends GroupBrain<A> {
     readonly replyChannels: readonly string[];
     readonly contextFields: readonly string[];
     readonly referenceFields: readonly (readonly [string,string])[];
+    /** Only frozen, plain admitted declarations can keep their reset plan. */
+    readonly resets: readonly { readonly name: string; readonly value: GroupBankValueV2 }[] | undefined;
   } | undefined;
   private readonly guestPlans=new Map<A,{readonly values:readonly number[];applied:boolean}>();
   private readonly guestLoans:(HerdGuestLoan<A>|undefined)[]=[];
@@ -470,7 +472,12 @@ export class GrazerBrain<A extends AnimalSim> extends GroupBrain<A> {
     this.guest = {program,prepare:program.prepareGroup,bindings,shape,rows,scope:loans.scope,group:loans.group,handle:loans.handle,
       player:loans.player,actors:loans.actors,codec:new GroupBankV2(shape.bank),
       replyChannels:[...new Set(['reply',...shape.columns.flatMap(row=>row.source.kind==='result'&&row.source.channel!=='foal'&&row.source.channel!=='mother'?[row.source.channel]:[])])],
-      contextFields:shape.bank.filter(row=>row.name.startsWith('context.')).map(row=>row.name),referenceFields:Object.entries(rows.references??{})};
+      contextFields:shape.bank.filter(row=>row.name.startsWith('context.')).map(row=>row.name),referenceFields:Object.entries(rows.references??{}),
+      resets:Object.getPrototypeOf(shape.bank)===Array.prototype&&Object.isFrozen(shape.bank)&&isJsonData(shape.bank)
+        &&shape.bank.every(row=>Object.isFrozen(row)&&(row.kind!=='enum'||Object.isFrozen(row.values)))
+        ?shape.bank.filter(row=>!herdGuestPublished.includes(row.name)&&!row.name.startsWith('context.')&&row.name!=='slot'&&row.name!=='body')
+          .map(row=>({name:row.name,value:row.kind==='boolean'?false:row.kind==='reference'?null:row.kind==='enum'?row.values[0]??'':0}))
+        :undefined};
   }
   private validateHerdGuest():void {
     const binding=this.guest;
@@ -518,10 +525,19 @@ export class GrazerBrain<A extends AnimalSim> extends GroupBrain<A> {
     }
     const argumentHandle=actor===undefined?0:byBody.get(actor)?.handle;
     if(argumentHandle===undefined)throw new Error('Missing herd guest argument');
-    const native=this.captureHerdGuestState(),reset:Record<string,GroupBankValueV2>={slot:Math.max(0,slot),body};
-    for(const row of binding.shape.bank)if(!Object.hasOwn(native,row.name)&&!row.name.startsWith('context.')&&row.name!=='slot'&&row.name!=='body'){
-      const value=row.kind==='boolean'?false:row.kind==='reference'?null:row.kind==='enum'?row.values[0]??'':0;
-      if(!Object.is(buffer.values[row.name],value))reset[row.name]=value;
+    const reset:Record<string,GroupBankValueV2>={slot:Math.max(0,slot),body};
+    // These names belong to the admitted bank, not the changing world. Avoid
+    // capturing every native scalar just to ask which temporary words reset.
+    // Custom readers and mutable declarations retain their original live path.
+    if(binding.resets!==undefined&&this.captureHerdGuestState===GrazerBrain.prototype.captureHerdGuestState
+      &&this.herdGuestScalars===GrazerBrain.prototype.herdGuestScalars){
+      for(const row of binding.resets)if(!Object.is(buffer.values[row.name],row.value))reset[row.name]=row.value;
+    }else{
+      const native=this.captureHerdGuestState();
+      for(const row of binding.shape.bank)if(!Object.hasOwn(native,row.name)&&!row.name.startsWith('context.')&&row.name!=='slot'&&row.name!=='body'){
+        const value=row.kind==='boolean'?false:row.kind==='reference'?null:row.kind==='enum'?row.values[0]??'':0;
+        if(!Object.is(buffer.values[row.name],value))reset[row.name]=value;
+      }
     }
     binding.codec.update(buffer.bank,reset,binding.group,references);
     const random=this.herdPorts.sharedRng();

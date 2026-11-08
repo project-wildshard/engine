@@ -47,6 +47,9 @@ jobs:
           node scripts/pins.ts install
           pnpm build:game
           node --import ./scripts/bake-loader.mjs scripts/catalogue-all-heads.ts dist
+      - name: Check the full Nalati server herd tick budget
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
