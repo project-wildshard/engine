@@ -4,6 +4,10 @@
 import {readFileSync,readdirSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Check immutable public fixture bytes against their pin.
 import {createHash} from 'node:crypto';
+// oxlint-disable-next-line import/no-nodejs-modules -- Large public fixture pins are prepared before tests, outside git blobs.
+import {homedir} from 'node:os';
+// oxlint-disable-next-line import/no-nodejs-modules -- Resolve the normal immutable pin cache.
+import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep real released saves small without changing their bytes.
 import {brotliDecompressSync} from 'node:zlib';
 import {expect,test} from 'vitest';
@@ -17,7 +21,7 @@ import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
 import {builtProduct,runtimeAssets} from './fixtures/engine-lift/product';
 
-interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number}
+interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
 const fixtures=readdirSync('test/pins/saves').filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`test/pins/saves/${name}`,'utf8')) as ReleasedSave);
 const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')) as {shards:{slug:string;hash:string}[]};
 const epoch=JSON.parse(readFileSync('save-epoch.json','utf8')) as {saveEpoch:number};
@@ -25,7 +29,7 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save resumes in pla
   const {slug}=fixture;
   expect(fixture.shardfile).toBe(pins.shards.find(row=>row.slug===slug)?.hash);
   expect(fixture.saveEpoch).toBe(epoch.saveEpoch);
-  const bytes=readFileSync(`test/pins/saves/${fixture.file}`);
+  const bytes=readFileSync(fixture.remote===true?join(process.env['WILDSHARD_PIN_CACHE']??join(homedir(),'.cache/wildshard/pins'),fixture.file):`test/pins/saves/${fixture.file}`);
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(fixture.sha256);
   const saved=brotliDecompressSync(bytes).toString('utf8');
   const directory=builtProduct(slug==='template'?'_template':slug),product=await loadHeadlessProduct(directory),shard=product.shardfile;

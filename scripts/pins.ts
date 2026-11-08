@@ -54,6 +54,29 @@ const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes)
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 
+/** Large real release saves use the same immutable public mirror as shard pins. */
+async function installSaves(only: readonly string[] = []): Promise<void> {
+  const directory = 'test/pins/saves';
+  if (!existsSync(directory)) return;
+  for (const name of readdirSync(directory).filter(name => name.endsWith('.json'))) {
+    const row = readJson(join(directory, name)) as {slug: string; file: string; remote?: boolean; sha256: string; bytes: number};
+    if (row.remote !== true || (only.length > 0 && !only.includes(row.slug))) continue;
+    if (!/^[a-f0-9]{64}$/u.test(row.sha256) || row.file !== `${row.sha256}.save.br`
+      || !Number.isSafeInteger(row.bytes) || row.bytes <= 0 || row.bytes > 32 * 1024 * 1024) throw new Error(`${row.slug}: invalid save pin`);
+    const file = join(CACHE, row.file);
+    if (existsSync(file)) {
+      const held = readFileSync(file);
+      if (held.length === row.bytes && sha256(held) === row.sha256) continue;
+    }
+    const body = await fetched(`${MIRROR}/${row.file}`, row.slug, row.sha256);
+    if (body === undefined || body.length !== row.bytes) throw new Error(`${row.slug}: mirror has no matching released save`);
+    mkdirSync(CACHE, {recursive: true});
+    const part = `${file}.${process.pid}`;
+    writeFileSync(part, body); renameSync(part, file);
+    console.log(`${row.slug}: installed released save, ${body.length} bytes`);
+  }
+}
+
 async function getJson(path: string): Promise<unknown> {
   const response = await fetch(`${API}${path}`);
   if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
@@ -214,6 +237,7 @@ async function install(only: readonly string[]): Promise<void> {
   const paths = [...published.keys()].sort((a, b) => a.localeCompare(b));
   writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
   exclude(paths);
+  await installSaves(pins.map(row => row.slug));
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
 }
 
@@ -291,6 +315,7 @@ async function installRing(name: string): Promise<void> {
     }
   }
   ringCatalogue(ring.products);
+  await installSaves(ring.slices);
   const { shards } = readJson(PINS) as PinFile, products = shards.filter(row => ring.products.includes(row.slug)).reduce((sum, row) => sum + row.bytes, 0);
   console.log(`ring ${name}: ${((products + bytes) / 1e6).toFixed(1)} MB, products ${(products / 1e6).toFixed(1)}, slices ${(bytes / 1e6).toFixed(1)}, in ${((performance.now() - started) / 1000).toFixed(1)}s`);
 }
@@ -319,6 +344,7 @@ else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1
 else if (command === 'install') await install(rest);
 else if (command === 'slice') await slice();
 else if (command === 'verify-slices') await slice(true);
+else if (command === 'install-saves') await installSaves(rest);
 else if (command === 'keep') await keep(rest[0] ?? 'tmp/pins-release');
 else if (command === 'status') status();
-else throw new Error('usage: pins.ts refresh | install [slug...] | install --ring 1 | slice | verify-slices | keep <dir> | status');
+else throw new Error('usage: pins.ts refresh | install [slug...] | install --ring 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');

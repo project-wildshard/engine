@@ -37,7 +37,7 @@
   "test/native-quest-composition.test.ts": ["driftwood-isle"],
   "test/quest-mechanics.test.ts": [],
   "test/cook-worker.test.ts": ["sunscar-dunes"],
-  "test/released-save-play.test.ts": ["_template", "blender-template", "sunscar-dunes", "far-reach", "driftwood-isle", "pine-hollow", "nine-dragon-stack"],
+  "test/released-save-play.test.ts": ["_template", "blender-template", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],
   "test/cook-refusals.test.ts": ["_template"],
   "test/net-hostile-play.test.ts": ["sunscar-dunes", "pine-hollow"],
   "test/pinned-restore-play.test.ts": ["_template", "blender-template", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],

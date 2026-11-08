@@ -1,0 +1,16 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "nalati-grasslands",
+  "shardfile": "bc6e2b7a18ed6c12789f05141efce427df068bbd1fffd0354a2b9243a3d94526",
+  "tick": 30,
+  "position": [
+    0.3590410107281059,
+    0.020098859081917914,
+    230.20518215559423
+  ],
+  "file": "aa96f2980ef0cc80db1b0cfbf02235649546a5b486f5f71c1f34c9008573edbe.save.br",
+  "sha256": "aa96f2980ef0cc80db1b0cfbf02235649546a5b486f5f71c1f34c9008573edbe",
+  "bytes": 9565519,
+  "remote": true
+}
