@@ -1,6 +1,7 @@
 import { app } from '../app/runtime';
 import { engineString } from '../../../shared/engine/strings';
 import { Scope } from '../../../shared/engine/app/scope';
+import { FencedUnits } from '../render/fencedUnits';
 import { FrameDrawRanges, type FrameDrawRange } from '../render/frameDrawRange';
 import { installBrowserScopeEnvironment } from '../app/view/scopeEnvironment';
 import {pagePresentation} from '../app/view/presentation';
@@ -156,43 +157,6 @@ export interface EntryPreparation {
   stages: { phase: string; elapsedMs: number; units: number; endAt: number }[];
   /** D196: the stage a warm-up stall ended the wait in (the entry revealed with what had linked), else absent */
   stalled?: string;
-}
-
-/** LS7: GPU units in flight, each counted as its WebGL2 fence signals. The next unit is submitted before the last fence
- *  resolves (at most `depth` in flight), so the GPU never idles through the frame the fence poll waits for; the poll is
- *  non-blocking, once per painted frame. WebGL1 or a lost context counts a unit after one frame. `mark` runs a callback
- *  in order once every unit before it has completed, with no GPU work of its own. */
-class FencedUnits {
-  private readonly queue: { readonly unit: boolean; readonly sync: WebGLSync | null; readonly done: () => void }[] = [];
-  private readonly gl: WebGLRenderingContext | WebGL2RenderingContext;
-  private readonly frame: () => Promise<void>;
-  private readonly depth: number;
-  constructor(gl: WebGLRenderingContext | WebGL2RenderingContext, frame: () => Promise<void>, depth = 2) {
-    this.gl = gl; this.frame = frame; this.depth = depth;
-  }
-  /** After a unit's commands are submitted: fence them; wait only while `depth` units are in flight. */
-  async submit(done: () => void): Promise<void> {
-    const gl = this.gl;
-    const sync = 'fenceSync' in gl && !gl.isContextLost() ? gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) : null;
-    gl.flush();
-    this.queue.push({ unit: true, sync, done });
-    while (this.queue.length >= this.depth) await this.poll();
-  }
-  mark(done: () => void): void { this.queue.push({ unit: false, sync: null, done }); this.settle(false); }
-  async drain(): Promise<void> { while (this.queue.length > 0) await this.poll(); }
-  private async poll(): Promise<void> { await this.frame(); this.settle(true); }
-  private settle(framed: boolean): void {
-    const gl = this.gl;
-    for (let head = this.queue[0]; head !== undefined; head = this.queue[0]) {
-      if (head.unit) {
-        if (head.sync === null || !('clientWaitSync' in gl) || gl.isContextLost()) { if (!framed) return; }
-        else if (gl.clientWaitSync(head.sync, 0, 0) === gl.TIMEOUT_EXPIRED) return;
-      }
-      this.queue.shift();
-      if (head.sync !== null && 'deleteSync' in gl) gl.deleteSync(head.sync);
-      head.done();
-    }
-  }
 }
 
 export class Game {
@@ -1242,8 +1206,13 @@ export class Game {
    * the page's main thread blocked in the canvas read-back for both.
    */
   async firstFrame(onProgress?: (done: number, total: number, detail: string) => void): Promise<void> {
-    const frame = (): Promise<void> => new Promise((resolve) => { this.engineScope.raf(() => { this.engineScope.timeout(0, resolve); }); }); // rAF alone resumes before the paint
-    const units = new FencedUnits(this.renderer.getContext(), frame);
+    // every wait here, fence or frame, settles when the game's scope is disposed; the finally releases every queued sync
+    const units = new FencedUnits(this.renderer.getContext(), this.engineScope);
+    try { await this.firstFrameUnits(units, onProgress); } finally { units.dispose(); }
+  }
+
+  private async firstFrameUnits(units: FencedUnits, onProgress?: (done: number, total: number, detail: string) => void): Promise<void> {
+    const frame = (): Promise<void> => units.frame(); // rAF alone resumes before the paint
     // Large instanced worlds may request culling before the first draw and fewer warm views.
     const tracedBoot = bootTraceActive();
     const checkpoint = (operation: string): void => { if (tracedBoot) recordGpuCheckpoint(this.renderer, operation); };
