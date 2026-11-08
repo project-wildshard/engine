@@ -1,6 +1,6 @@
 import {packsBookPath, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
-import { bootProgress } from '@wildshard/engine/boot/timing';
+import { bootProgress,bootTiming } from '@wildshard/engine/boot/timing';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -845,6 +845,7 @@ const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1);
 /** Paint only the existing card's numbers/text, before engine imports. The
  * composition root unsubscribes when Loading adopts this same download. */
 export function paintSpawnDownload(download: SpawnDownload, root: HTMLElement): () => void {
+  const timing=bootTiming();if(timing!==undefined)(timing.work??={}).download=download.snapshot;
   return download.subscribe(row => {
     const percent = row.complete ? 100 : row.progressKnown === false || row.totalBytes === 0 ? null : Math.min(99, Math.floor(row.completedBytes / row.totalBytes * 100));
     root.dataset['download'] = percent === null ? '' : String(percent); root.dataset['entryDownloadBytes'] = String(row.totalBytes);

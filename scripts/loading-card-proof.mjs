@@ -50,7 +50,7 @@ function recordBars() {
     if(bar==='start')return start();
     if(bar==='download'){
       const row=t?.work?.download?.();
-      return row===undefined?undefined:{kind:'download',done:row.completedBytes,total:row.totalBytes,complete:row.complete};
+      return row===undefined?undefined:{kind:'download',done:row.completedBytes,total:row.totalBytes,complete:row.complete,known:row.progressKnown!==false,inline:!(t?.entries??[]).some(row=>row.operation==='app:loading-adopt')};
     }
     if(bar==='load'){
       const row=t?.work?.load?.();
@@ -67,30 +67,29 @@ function recordBars() {
     seen.set(bar,pct);
     rows.push({t:performance.now(),bar,pct,step,atomic:0,bytes:0,files:0,source:evidence(bar)});
   };
+  const hooked=new WeakSet();
+  /** @param {HTMLElement} fill */
+  const hook=fill=>{
+    if(hooked.has(fill))return;hooked.add(fill);
+    const style=fill.style,read=style.getPropertyValue.bind(style),write=style.setProperty.bind(style);
+    // Chromium exposes width as an own CSS named property; WebKit puts the
+    // accessor on CSSStyleProperties. Forward both through native CSSOM on
+    // this actual bar only, before the inline document writer executes.
+    Object.defineProperty(style,'width',{configurable:true,get:()=>read('width'),set:value=>{write('width',value);sampleBar(fill);}});
+  };
   const sample=()=>{
     const card=document.querySelector('.ws-load');if(!(card instanceof HTMLElement))return;
     if(!firstFrame){firstFrame=true;requestAnimationFrame(()=>{Reflect.set(window,'__firstLoadingFrame',{name:card.querySelector('[data-el=slug]')?.textContent,art:getComputedStyle(document.documentElement).getPropertyValue('--ws-load-portrait').trim(),shell:card.hasAttribute('data-shell')});});}
     const t=timing(),first=start();let serverSteps=0,serverFiles=0,serverBytes=0;
-    for(const [key,row]of Object.entries(t?.counters??{}))if(key.startsWith('worker:')){
-      if(key.endsWith('atomic:completed'))serverSteps+=row.loaded;
-      if(key.endsWith('resource:completed'))serverFiles+=row.loaded;
-      if(row.unit==='decoded-body-bytes')serverBytes+=row.loaded;
-    }
+    const completed=(t?.entries??[]).filter(row=>row.realm!=='page'&&row.operation.startsWith('server:')&&row.result==='complete'&&row.end!==null);
+    serverSteps=completed.length;serverFiles=completed.filter(row=>row.operation.startsWith('server:verified-input:')).length;
+    for(const row of Object.values(t?.counters??{}))if(row.unit==='verified-input-bytes')serverBytes+=row.loaded;
     const reading={startBytes:first.bytes,startTotal:first.byteTotal,startFiles:first.files,serverSteps,serverFiles,serverBytes};
     const identity=JSON.stringify(reading);if(identity!==previousCount){previousCount=identity;counts.push({t:performance.now(),...reading});}
     const now=card.dataset.step??'';if(now!==step){step=now;rows.push({t:performance.now(),bar:'step',pct:0,step,atomic:0,bytes:0,files:0});}
     if(!ready&&Object.hasOwn(card.dataset,'ready')){ready=true;Reflect.set(window,'__readyAt',performance.now());}
-    for(const fill of card.querySelectorAll('[data-phase-bar]'))if(fill instanceof HTMLElement)sampleBar(fill);
+    for(const fill of card.querySelectorAll('[data-phase-bar]'))if(fill instanceof HTMLElement){hook(fill);sampleBar(fill);}
   };
-  // Observe each real native width write synchronously. MutationObserver alone
-  // can read a newer producer report after the earlier bar paint, hiding creep.
-  const descriptor=Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype,'width');
-  if(descriptor?.set===undefined)throw new Error('Native width writer is unavailable');
-  const nativeWrite=descriptor.set;
-  Object.defineProperty(CSSStyleDeclaration.prototype,'width',{...descriptor,set(value){
-    Reflect.apply(nativeWrite,this,[value]);
-    for(const fill of document.querySelectorAll('[data-phase-bar]'))if(fill instanceof HTMLElement&&fill.style===this)sampleBar(fill);
-  }});
   new MutationObserver(sample).observe(document,{subtree:true,childList:true,attributes:true,attributeFilter:['data-step','data-ready']});
   document.addEventListener('DOMContentLoaded',sample,{once:true});
 
@@ -105,7 +104,7 @@ try {
     const browser = await engine.launch({ headless: true, ...(name === 'chromium' ? { args: ['--mute-audio'] } : {}) });
     try {
       const context = await browser.newContext({ ...devices['iPhone 16 Pro'], deviceScaleFactor: 2 });
-      await context.grantPermissions(['clipboard-read']);
+      await context.grantPermissions(name==='chromium'?['clipboard-read','clipboard-write']:['clipboard-read']);
       await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
       await debugSettings(context, { holdLoading: true });
       await context.addInitScript(recordBars);

@@ -7,7 +7,7 @@ export const STEP_PCT = 1;
 
 
 /**
- * @typedef {{kind: string, done?: number, total?: number, bytes?: number, byteTotal?: number, complete?: boolean, configured?: boolean, adopted?: boolean, rows?: {state:string, fraction?:number, weight?:number}[]}} ProducerReading
+ * @typedef {{kind: string, done?: number, total?: number, bytes?: number, byteTotal?: number, complete?: boolean, configured?: boolean, adopted?: boolean, inline?: boolean, known?: boolean, rows?: {state:string, fraction?:number, weight?:number}[]}} ProducerReading
  * @typedef {{t: number, bar: string, pct: number, step: string, atomic: number, bytes: number, files: number, work?: string, source?: ProducerReading}} BarRow
  * `bar` is a phase bar (`start`, `download`, `load`) or `step`, a change of the card's current step with no bar change.
  * `atomic`, `bytes` and `files` are LS1's counters at that moment: completed boundaries, streamed body bytes, finished files.
@@ -58,7 +58,10 @@ function earned(source) {
   }
   if (source.kind === 'download') {
     if (!valid(source.done) || !valid(source.total) || source.done > source.total) return null;
-    return source.complete === true ? 100 : Math.floor(1000 * (source.total === 0 ? 0 : Math.min(.999, source.done / source.total))) / 10;
+    if(source.complete===true)return 100;
+    if(source.known===false)return 0;
+    return source.inline===true?Math.min(99,Math.floor(source.total===0?0:100*source.done/source.total))
+      :Math.floor(1000*(source.total===0?0:Math.min(.999,source.done/source.total)))/10;
   }
   if (source.kind !== 'load' || source.rows === undefined) return null;
   if (source.complete === true) return 100;

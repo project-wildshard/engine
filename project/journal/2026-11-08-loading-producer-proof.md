@@ -21,3 +21,11 @@ The grid branch earns Ember through actual road play, saves it and taps
 the real title control. Fresh home, saved Ember and missing-art metadata
 are distinct cases. No titleArrival is seeded. Browser outcomes follow
 after the full-catalogue candidate build; they are not claimed here.
+
+The first native run correctly rejected a recorder assumption: Chrome
+uses an own CSS named width property and WebKit uses CSSStyleProperties.
+The recorder now forwards the native CSSOM writer on each actual bar.
+Chromium also requires its explicit clipboard-write test permission;
+the original native refusal was retained as a failure. Pre-adoption
+Download reads the same selected operation before Loading takes over;
+its integer writer is checked at its actual precision.
