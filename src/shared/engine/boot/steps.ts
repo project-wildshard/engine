@@ -8,7 +8,7 @@
  */
 // The shared nouns are neutral (the default shard is Driftwood Isle, a low-poly island with no pines, cabins or HDRI);
 // a level names its own downloads and steps through authored boot data.
-const STEP_ROWS: readonly [readonly ["renderer", "Renderer", 1], readonly ["sky", "Sky · lighting", 1], readonly ["terrain", "Terrain · heightfield", 2], readonly ["cards", "Tree cards", 1], readonly ["forest", "Trees", 2], readonly ["physics", "Physics · Rapier · navmesh", 1], readonly ["edge", "Chunk edge · water · horizon", 1], readonly ["grass", "Grass · ground cover", 2], readonly ["cabins", "Buildings", 2], readonly ["props", "Props", 1], readonly ["animals", "Animals", 1], readonly ["weapon", "Weapons · HUD", 1], readonly ["assembly", "World assembly", 1], readonly ["menu", "Title art · explore", 1], readonly ["shaders", "Shaders", 3], readonly ["firstFrame", "First frame", 3], readonly ["audio", "Audio · music + sound effects", 3]] = [
+const STEP_ROWS: readonly [readonly ["renderer", "Renderer", 1], readonly ["sky", "Sky · lighting", 1], readonly ["terrain", "Terrain · heightfield", 2], readonly ["cards", "Tree cards", 1], readonly ["forest", "Trees", 2], readonly ["physics", "Physics · Rapier · navmesh", 1], readonly ["edge", "Chunk edge · water · horizon", 1], readonly ["grass", "Grass · ground cover", 2], readonly ["cabins", "Buildings", 2], readonly ["props", "Props", 1], readonly ["animals", "Animals", 1], readonly ["weapon", "Weapons · HUD", 1], readonly ["assembly", "World assembly", 1], readonly ["menu", "Title art · explore", 1], readonly ["shaders", "Shaders", 3], readonly ["firstFrame", "First frame", 4], readonly ["audio", "Audio · music + sound effects", 3]] = [
   ['renderer', 'Renderer', 1],
   ['sky', 'Sky · lighting', 1],
   ['terrain', 'Terrain · heightfield', 2],
@@ -25,7 +25,7 @@ const STEP_ROWS: readonly [readonly ["renderer", "Renderer", 1], readonly ["sky"
   // project/archive/2026-09-23-preload-offline.md: the title / explore art and the lazy UI code (before the title builds its deck)
   ['menu', 'Title art · explore', 1],
   ['shaders', 'Shaders', 3],
-  ['firstFrame', 'First frame', 3],
+  ['firstFrame', 'First frame', 4],
   // last, so the shaders compile while it downloads: every audio file (all styles, all sets), the selected music style +
   // sound-effect set decoded as their bytes land — nothing is fetched after the bar (project/archive/2026-09-23-preload-offline.md)
   ['audio', 'Audio · music + sound effects', 3],

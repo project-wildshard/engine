@@ -131,13 +131,20 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       // DL10: not paced on WebKit, even with Debug 'Early shader compile' on. Its baked list leaves these links compiled in
       // the GPU process, and one program a painted frame then only stretched the step (Nine Sim cold, 266f9ea939: issue
       // 1.2 s of a 3.0 s step) without shortening its longest frame (824 ms paced vs 908 ms unpaced, both in texture uploads)
-      await precompileLevel(game, (d, n, what) => p.set(d, n, `${what} · ${programs()}`), { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, turns: game.warmTurnYaws() });
+      await precompileLevel(game, (d, n, what) => {
+        bootMark('app:shader-work-count', { done: d, total: n, detail: what });
+        p.set(d, n, `${what} · ${programs()}`);
+      }, { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, turns: game.warmTurnYaws() });
     });
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during shader compile');
     await step('firstFrame', async (p) => {
       let passes = 0;
-      await game.firstFrame((d, n, what) => { passes = n; p.set(d, n, `Pass ${d} / ${n} · ${what} · ${programs()}`); });
-      p.set(passes, passes, `Pass ${passes} / ${passes} · ready · ${programs()}`);
+      await game.firstFrame((d, n, what) => {
+        bootMark('app:first-frame-work-count', { done: d, total: n, detail: what });
+        passes = n; p.set(d, n, `${d} / ${n} · ${what} · ${programs()}`);
+      });
+      bootMark('app:first-frame-work-count', { done: passes, total: passes, detail: 'ready' });
+      p.set(passes, passes, `${passes} / ${passes} · ready · ${programs()}`);
     });
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during first frame');
   } catch (error) {
