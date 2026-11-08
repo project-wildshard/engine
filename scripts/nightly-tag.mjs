@@ -4,7 +4,7 @@
 // A commit that already has a version tag is left alone: an unchanged tree needs no second release.
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import {plan, read, requireGreen} from './nightly-model.ts';
+import {plan, read, requirePublishedGreen} from './nightly-model.ts';
 
 /** @param {...string} args */
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
@@ -20,7 +20,7 @@ export function nextTag(tags) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const report = process.argv.find(arg => arg.startsWith('--report='))?.slice(9);
   if (report === undefined) throw new Error('J167: tag held; pass --report=<downloaded nightly verdict.json>');
-  requireGreen(/** @type {import('./nightly-model.ts').Verdict} */ (read(report)), plan());
+  requirePublishedGreen(/** @type {import('./nightly-model.ts').Verdict} */ (read(report)), plan());
   git('fetch', '--tags', 'origin');
   if (git('tag', '--points-at', 'HEAD').split('\n').some((tag) => /^v\d/u.test(tag))) console.log('This commit is already tagged');
   else {

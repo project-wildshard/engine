@@ -71,6 +71,12 @@ commit. The optional legacy patch-tag helper also requires this verdict:
 node scripts/nightly-tag.mjs --report=/path/to/verdict.json
 ```
 
+Both commands read the latest completed hosted nightly using the existing
+`gh` login's public Actions read access. The downloaded run ID must match
+that successful run and its exact commit. A later red night on the same
+commit cannot be cleared with an older green artifact. No new credential
+is created; unavailable history refuses promotion.
+
 The scheduled workflow has no write permission and never calls that
 helper. This preserves J184's promotion ownership while making J167's
 refusal explicit. This workflow does not configure repository rulesets

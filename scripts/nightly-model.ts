@@ -106,3 +106,22 @@ export function requireGreen(report: Verdict, expected: Plan): void {
     throw new Error('J167: complete green nightly for this exact commit and pins required; tag held');
   }
 }
+
+export function requireLatest(report: Verdict, expected: Plan, latest: unknown): void {
+  requireGreen(report, expected);
+  if (report.run === undefined || report.run === null || typeof latest !== 'object' || latest === null ||
+    !('id' in latest) || String(latest.id) !== report.run || !('head_sha' in latest) || latest.head_sha !== expected.sha ||
+    !('status' in latest) || latest.status !== 'completed' || !('conclusion' in latest) || latest.conclusion !== 'success') {
+    throw new Error('J167: latest completed nightly must be this exact green hosted run; tag held');
+  }
+}
+
+export function requirePublishedGreen(report: Verdict, expected: Plan): void {
+  // Refuse local/red evidence before asking gh for public Actions history.
+  requireGreen(report, expected);
+  if (report.run === undefined || report.run === null || !/^\d+$/u.test(report.run)) throw new Error('J167: a green hosted nightly run ID is required; tag held');
+  const latest: unknown = JSON.parse(execFileSync('gh', ['api',
+    'repos/project-wildshard/engine/actions/workflows/nightly.yml/runs?branch=main&status=completed&per_page=1',
+    '--jq', '.workflow_runs[0]'], {encoding: 'utf8', timeout: 20000, maxBuffer: 1024 * 1024}));
+  requireLatest(report, expected, latest);
+}

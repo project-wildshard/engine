@@ -2,7 +2,7 @@
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readdirSync, writeFileSync} from 'node:fs';
 import {join, relative, resolve} from 'node:path';
-import {browsers, groups, markdown, partition, plan, read, requireGreen, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, groups, markdown, partition, plan, read, requirePublishedGreen, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface VitestResult {numTotalTests?: number; testResults?: {name: string; status: string; assertionResults?: {status: string}[]}[]}
 
@@ -38,6 +38,6 @@ if (command === 'plan') {
   console.log(markdown(report));
   if (!report.ok) process.exitCode = 1;
 } else if (command === 'guard') {
-  requireGreen(read(directory) as Verdict, expected);
+  requirePublishedGreen(read(directory) as Verdict, expected);
   console.log(`J167: exact-SHA nightly green for ${expected.sha}`);
 } else throw new Error('Use nightly.mjs plan|tests|report|guard [report directory/file] [previous verdict]');

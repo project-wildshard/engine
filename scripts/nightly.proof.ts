@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {browsers, partition, phases, plan, read, requireBuild, requireGreen, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, partition, phases, plan, read, requireBuild, requireGreen, requireLatest, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface Execution {status: number | null; report: Verdict; summary: string}
 interface Fixture {root: string; heads: HeadsReport[]; suite: TestsReport; expected: Plan;
@@ -83,11 +83,23 @@ await test('prior nightly failures are compared by head hash, browser and phase'
   assert.equal(next.report.resolved.length, 1); assert.equal(next.report.newFailures.length, 1);
   assert.equal(next.report.baseline?.sha, first.report.sha);
 }));
-await test('optional tag helper refuses missing/red nightly before it can fetch or write a tag', () => fixture(({root, heads, execute}) => {
+await test('optional tag helper refuses missing/red/local nightly before it can fetch or write a tag', () => fixture(({root, heads, execute, write}) => {
   const missing = spawnSync(process.execPath, [tagger], {cwd: root, encoding: 'utf8'});
   assert.notEqual(missing.status, 0); assert.match(missing.stderr, /J167/u);
+  write('local.json', {...execute().report, run: null});
+  const local = spawnSync(process.execPath, [tagger, `--report=${join(root, 'local.json')}`], {cwd: root, encoding: 'utf8'});
+  assert.notEqual(local.status, 0); assert.match(local.stderr, /J167: a green hosted/u);
   heads[0].results[0].phases[0].ok = false; execute();
   const red = spawnSync(process.execPath, [tagger, `--report=${join(root, 'reports/verdict.json')}`], {cwd: root, encoding: 'utf8'});
   assert.notEqual(red.status, 0); assert.match(red.stderr, /J167/u);
   assert.equal(execFileSync('git', ['tag'], {cwd: root, encoding: 'utf8'}), '');
+}));
+await test('a later red night cannot be cleared by an older green artifact on the same SHA', () => fixture(({execute, expected}) => {
+  const green = {...execute().report, run: '42'};
+  const latest = {id: 42, head_sha: expected.sha, status: 'completed', conclusion: 'success'};
+  requireLatest(green, expected, latest);
+  assert.throws(() => requireLatest(green, expected, {...latest, id: 43, conclusion: 'failure'}), /J167/u);
+  assert.throws(() => requireLatest(green, expected, {...latest, conclusion: 'cancelled'}), /J167/u);
+  assert.throws(() => requireLatest(green, expected, {...latest, head_sha: 'another commit'}), /J167/u);
+  assert.throws(() => requireLatest({...green, run: null}, expected, latest), /J167/u);
 }));
