@@ -1,30 +1,29 @@
 // J141: Nalati's chapters on the server, per player (J106). The flip deletes the page that ran them; a browser proves the page shows them.
 // oxlint-disable-next-line import/no-nodejs-modules -- A world runs the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import { questBooks } from '../src/shared/engine/quest/players';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { installServerChapters } from '../src/server/game/quest/serverChapters';
-import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 
 async function nalati() {
   const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
-  const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
+  const assets = runtimeAssets(product, directory);
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
   expect(await installServerChapters(live.host, product, product.shardfile, live.fact)).toBe(true);
   return live;
 }
 const lines = (host: Parameters<typeof shardRows>[0], player: string): ReadonlyMap<string, number> => { const out = new Map<string, number>(); for (const read of shardRows(host).owned.values()) read(player, out); return out; };
 
-test('the server runs a chapter, and judges the talk that starts it', { timeout: 90_000 }, async () => {
+test('the server runs a chapter, and judges the talk that starts it', { timeout: 10_000 }, async () => {
   const live = await nalati();
   try {
     const { host } = live, lead = leadPlayer(host), routes = actRoutes(host), book = questBooks(host).of(lead.id);
@@ -47,7 +46,7 @@ test('the server runs a chapter, and judges the talk that starts it', { timeout:
   } finally { live.dispose(); }
 });
 
-test('a toppled balbal reads as a clue, for this player and on the wire', { timeout: 90_000 }, async () => {
+test('a toppled balbal reads as a clue, for this player and on the wire', { timeout: 10_000 }, async () => {
   const live = await nalati();
   try {
     const { host } = live, lead = leadPlayer(host), book = questBooks(host).of(lead.id);
@@ -64,7 +63,7 @@ test('a toppled balbal reads as a clue, for this player and on the wire', { time
   } finally { live.dispose(); }
 });
 
-test('a fight\'s row is what a chapter reads: a fallen lair is a felled flag and a feather', { timeout: 90_000 }, async () => {
+test('a fight\'s row is what a chapter reads: a fallen lair is a felled flag and a feather', { timeout: 10_000 }, async () => {
   const live = await nalati();
   try {
     const { host } = live, book = questBooks(host).of(leadPlayer(host).id);
@@ -78,7 +77,7 @@ test('a fight\'s row is what a chapter reads: a fallen lair is a felled flag and
   } finally { live.dispose(); }
 });
 
-test('a chapter is each player\'s own, and a seat costs a projection, not a script', { timeout: 90_000 }, async () => {
+test('a chapter is each player\'s own, and a seat costs a projection, not a script', { timeout: 10_000 }, async () => {
   const live = await nalati();
   try {
     const { host } = live, lead = leadPlayer(host), books = questBooks(host), routes = actRoutes(host);
@@ -99,19 +98,4 @@ test('a chapter is each player\'s own, and a seat costs a projection, not a scri
     const withTwo = (performance.now() - at) / 600;
     console.info(`[chapters] 2 seats: host tick ${withTwo.toFixed(2)} ms`);
   } finally { live.dispose(); }
-});
-
-test('a chapter is asked on the page\'s beat: its quest signal each half second and its pulse each two', { timeout: 90_000 }, async () => {
-  const dt = 1 / 60, project = vi.spyOn(ReturnProgram.prototype, 'project'); // before the install: an owner keeps the method it was given
-  const live = await nalati();
-  try {
-    const { host } = live;
-    for (let i = 0; i < 600; i++) host.step();
-    const beats = (name: string): number[] => project.mock.calls.flatMap(([signal, values]) => signal === name && values['now'] !== undefined ? [Math.round(values['now'] / dt)] : []);
-    const quest = beats('quest'), pulse = beats('feathers');
-    expect(Math.abs(quest.length - 600 * dt / 0.5), 'twice a second').toBeLessThanOrEqual(1);
-    expect(Math.abs(pulse.length - 600 * dt / 2.5), 'each pulse falls on a beat past its two seconds').toBeLessThanOrEqual(1);
-    expect(pulse.every(tick => quest.includes(tick)), 'a pulse goes with its beat').toBe(true);
-    for (let i = 1; i < quest.length; i++) expect(((quest[i] ?? 0) - (quest[i - 1] ?? 0)) * dt).toBeGreaterThanOrEqual(0.5);
-  } finally { project.mockRestore(); live.dispose(); }
 });

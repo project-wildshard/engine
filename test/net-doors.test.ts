@@ -14,18 +14,18 @@ import { instanceSave } from '../src/shared/game/instanceSaves';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 
 async function pine(opened?: ReadonlySet<string>) {
   const directory = builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
-  const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
+  const assets = runtimeAssets(product, directory);
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
   expect(await installServerDoors(live.host, product, opened)).toBe(true);
   return live;
 }
 
-test('a door stands in the server\'s world, shut and open, and a bar is its player\'s', { timeout: 90_000 }, async () => {
+test('a door stands in the server\'s world, shut and open, and a bar is its player\'s', { timeout: 10_000 }, async () => {
   const live = await pine();
   try {
     const { host } = live, lead = leadPlayer(host), routes = actRoutes(host), mill = 'cabin-7-door', hinge = { x: -178.09, z: -145.3 };
@@ -52,7 +52,7 @@ test('a door stands in the server\'s world, shut and open, and a bar is its play
   } finally { live.dispose(); }
 });
 
-test('a door a page\'s save left open stands open in a world\'s first boot, and its save reads as the page wrote it', { timeout: 90_000 }, async () => {
+test('a door a page\'s save left open stands open in a world\'s first boot, and its save reads as the page wrote it', { timeout: 10_000 }, async () => {
   const entries = new Map<string, string>(), local = { get length() { return entries.size; }, key: (index: number) => [...entries.keys()][index] ?? null, getItem: (key: string) => entries.get(key) ?? null, setItem: (key: string, value: string) => { entries.set(key, value); }, removeItem: (key: string) => { entries.delete(key); } };
   const store = new SaveStore({ local, session: null }), placement = { id: 'pine-hollow', shard: 'pine-hollow' };
   instanceSave(store, buildingSave, placement).write({ cabins: { version: 1, speed: 0, wheels: [], doors: [{ id: 'cabin-1-door', open: true, enabled: true, t: 1 }, { id: 'cabin-7-door', open: false, enabled: true, t: 0 }] } });
