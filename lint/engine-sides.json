@@ -87,6 +87,7 @@
     "src/client/engine/boot/lastEnd.ts": "client",
     "src/client/engine/boot/liveJsonParser.ts": "client",
     "src/client/engine/boot/liveJsonParser.worker.ts": "client",
+    "src/client/engine/boot/diagnostics.ts": "client",
     "src/client/engine/boot/loadingDownloadText.ts": "client",
     "src/client/engine/boot/loadingPacks.ts": "client",
     "src/client/engine/boot/manifest.ts": "client",

@@ -91,3 +91,32 @@ it('freezes ready accounting and headings at one rounding-boundary instant throu
     loading.root.querySelector<HTMLButtonElement>('.ws-load-play')?.click();await vi.advanceTimersByTimeAsync(317);await done;
   }finally{loading.scope.dispose();setSetting('holdLoading',false);setDev(false);}
 });
+
+it('copies complete useful timings without exporting private URLs, errors or free text',async()=>{
+  const sentinel='PRIVATE_DIAGNOSTIC_SENTINEL',url=`https://user:${sentinel}@private.invalid/asset.bin?token=${sentinel}#${sentinel}`;
+  const timing={version:1,build:'a84f050-mw7crm6l',attempt:'100',attemptCount:1,timeOrigin:100,
+    entries:[{id:17,realm:'page',operation:'server:world-boot',start:10,end:20,result:'complete',detail:{message:sentinel,url,nested:{private:sentinel},done:3,total:4}}],
+    resources:[{url,initiator:'fetch',realm:'page',startTime:1,responseEnd:2,decodedBodySize:100}],
+    realms:{'worker:1':{purpose:sentinel,url,timeOrigin:1,messages:{count:1,first:2,last:3,kinds:{[sentinel]:1}}}},
+    counters:{[`download:${url}`]:{loaded:100,total:200,unit:'decoded-body-bytes',at:20,events:1}},
+    navigation:{responseEnd:2,name:url},active:[],lifecycle:[],paints:[],overflow:{},largestGap:{before:1,after:2,ms:1,visibility:'visible'},
+    serviceWorker:{controller:url,private:sentinel},handoff:{input:{event:sentinel},private:sentinel},
+    begin:()=>0,end:()=>undefined,mark:()=>undefined,progress:()=>undefined,finish:()=>undefined,read:():unknown=>timing};
+  vi.stubGlobal('__bootTiming',timing);
+  let copied='';vi.stubGlobal('navigator',{clipboard:{writeText:(text:string):Promise<void>=>{copied=text;return Promise.resolve();}}});
+  const loading=new Loading({id:'private-path',name:sentinel},{scoped:true});
+  try{
+    void loading.setDownloadSource({ready:Promise.resolve(),snapshot:()=>({totalBytes:100,completedBytes:0,cachedBytes:0,filesTotal:1,filesDone:0,complete:false,error:sentinel}),subscribe:()=>()=>undefined});
+    loading.scopedStep('private-step',sentinel);loading.scopedFail(sentinel);
+    const button=loading.root.querySelector<HTMLButtonElement>('.ws-load-copy');if(button===null)throw new Error('Missing Copy diagnostics');
+    button.click();await vi.advanceTimersByTimeAsync(0);
+    expect(copied).not.toContain(sentinel);expect(copied).not.toContain('private.invalid');
+    expect(copied).toContain('server:world-boot');
+    const raw:unknown=JSON.parse(copied.split('timeline (LS1):\n')[1]??'null');
+    expect(raw).toMatchObject({build:'a84f050-mw7crm6l',entries:[{id:17,start:10,end:20,detail:{done:3,total:4}}],
+      resources:[{id:1,url:'resource-1',decodedBodySize:100}],
+      counters:{'download:resource-1':{loaded:100,total:200,unit:'decoded-body-bytes'}},
+      realms:[{realm:'worker:1',url:'resource-1',messages:{count:1}}],serviceWorker:{controller:'resource-1'}});
+    expect(timing.resources[0]?.url).toBe(url);expect(timing.entries[0]?.detail.message).toBe(sentinel);
+  }finally{loading.scope.dispose();}
+});

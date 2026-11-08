@@ -16,6 +16,7 @@ import { beginLoadingWait, reportLoadingWait, finishLoadingWait, loadingWaitStat
 import { loadingCacheText, loadingDownloadText, loadingDownloadFraction, loadingPrefetchFraction, loadingPrefetchText, type LoadingPrefetchSnapshot, type LoadingDownloadSnapshot } from '../boot/loadingDownloadText';
 import { LoadingTimeline, installLoadingTimeline, type LoadingPath, type LoadingRow, type LoadingGap } from '../../../shared/engine/boot/timeline';
 import {loadingFraction} from '../boot/weights';
+import {diagnosticBuild,diagnosticStep,safeBootDiagnostics} from '../boot/diagnostics';
 import { isDev, onDev } from '../core/devMode';
 import { getSetting, onSetting } from './Settings';
 import { listenTap } from '../input/dom';
@@ -608,17 +609,18 @@ export class Loading {
 
   /** LS4: everything the card leaves out, for Jake to paste. The full LS1 timeline rides at the end. */
   diagnosticsText(): string {
-    const timing = bootTiming()?.read(), transfer = this.downloadProgress(), times = this.phaseTimes();
+    const localTiming = bootTiming()?.read(), timing=safeBootDiagnostics(localTiming), transfer = this.downloadProgress(), times = this.phaseTimes();
     const all = this.timeline.snapshot();
     const lines = [
       `Wildshard boot diagnostics · ${new Date().toISOString()}`,
-      `${this.els.slug.textContent ?? ''} · build ${timing?.build ?? 'unknown'} · ${this.tierText()} · ${innerWidth}x${innerHeight} @${devicePixelRatio}x`,
+      `build ${diagnosticBuild(localTiming?.build)} · ${this.tierText()} · ${innerWidth}x${innerHeight} @${devicePixelRatio}x`,
       `total ${seconds(times.total)} · start ${seconds(times.start)} · download ${seconds(times.download)} · load ${seconds(times.load)}${this.finished ? '' : ' · not ready'}`,
-      `download ${loadingCacheText(transfer)} · files ${transfer.filesDone} of ${transfer.filesTotal} · ${transfer.complete ? 'complete' : 'open'}${transfer.error === null ? '' : ` · error ${transfer.error}`}`,
-      `scene textures ~${Math.round(this.textureBytes / 1048576)} MiB${this.failedReason === null && !this.view?.error ? '' : ` · failed: ${this.failedReason ?? this.view?.error ?? ''}`}`,
+      `download ${loadingCacheText(transfer)} · files ${transfer.filesDone} of ${transfer.filesTotal} · ${transfer.complete ? 'complete' : 'open'}${transfer.error === null ? '' : ' · error (private text omitted)'}`,
+      `scene textures ~${Math.round(this.textureBytes / 1048576)} MiB${this.failedReason === null && !this.view?.error ? '' : ' · failed (private text omitted)'}`,
       'load rows:',
-      ...all.rows.map(row => `  ${row.number}. ${row.label} · ${row.state} · ${Math.round(row.ms)} ms${row.detail ? ` · ${row.detail}` : ''}`),
-      ...all.gaps.map(gap => `  gap ${gap.label} · ${gap.state} · ${Math.round(gap.ms)} ms`),
+      ...all.rows.map(row => `  ${row.number}. ${diagnosticStep(row.key,row.number)} · ${row.state} · ${Math.round(row.ms)} ms`),
+      ...all.gaps.map(gap => `  gap · ${gap.state} · ${Math.round(gap.ms)} ms`),
+      'URLs use local report IDs; unrestricted names, details and errors are omitted.',
       'timeline (LS1):',
       JSON.stringify(timing ?? null),
     ];
