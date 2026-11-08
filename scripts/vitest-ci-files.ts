@@ -1,6 +1,9 @@
 /** Native integration keeps its original deadlines without sibling Vitest workers.
  * Groups run files sequentially; parallel discovery excludes their exact union. */
 export const CI_NATIVE_GROUPS = {
+  'room-performance': [
+    'test/net-bots.test.ts',
+  ],
   'escape-titan': [
     'test/tooling/parity/browser-escape.test.mjs',
     'test/nalati-titan-verbs.test.ts',

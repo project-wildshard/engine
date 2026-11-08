@@ -80,25 +80,31 @@ export function vitestTmpRoot(env: VitestTempEnvironment = process.env): Plugin 
 export async function runVitest(args: readonly string[]): Promise<number> {
   const run = temporaryRun(process.env);
   try {
-    const { assertVitestLane } = await import('./vitest-lane.ts');
+    const { assertVitestLane,isFullVitest } = await import('./vitest-lane.ts');
     assertVitestLane(args);
+    const {WS_PUSH_GATE_PROFILE:profile}=process.env;
+    const phases=profile==='full-v1'&&isFullVitest(args)&&!args.some(arg=>arg==='--config'||arg.startsWith('--config=')||arg.startsWith('--shard'))?['native','ordinary']:[undefined];
+    for(const phase of phases){
     const entry = fileURLToPath(new URL('vitest.mjs', import.meta.resolve('vitest/package.json')));
-    const child = spawn(process.execPath, [entry, ...args], {
-      stdio: 'inherit', env: { ...process.env, VITEST_TMP_ROOT: run.dir },
+    const child = spawn(process.execPath, [entry, ...args,...(phase===undefined?[]:['--config','scripts/push-vitest.config.ts'])], {
+      stdio: 'inherit', env: { ...process.env, VITEST_TMP_ROOT: run.dir,...(phase===undefined?{}:{WS_PUSH_TEST_PHASE:phase}) },
     });
     const interrupt = (): void => { child.kill('SIGINT'); };
     const terminate = (): void => { child.kill('SIGTERM'); };
     process.on('SIGINT', interrupt);
     process.on('SIGTERM', terminate);
     try {
-      return await new Promise<number>((resolve, reject) => {
+      const code=await new Promise<number>((resolve, reject) => {
         child.once('error', reject);
-        child.once('exit', (code, signal) => resolve(code ?? (signal === null ? 1 : 128 + constants.signals[signal])));
+        child.once('exit', (status, signal) => resolve(status ?? (signal === null ? 1 : 128 + constants.signals[signal])));
       });
+      if(code!==0)return code;
     } finally {
       process.off('SIGINT', interrupt);
       process.off('SIGTERM', terminate);
     }
+    }
+    return 0;
   } finally {
     run.cleanup();
   }
