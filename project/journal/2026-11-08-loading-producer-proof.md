@@ -72,3 +72,23 @@ Rebased 25 unpublished commits onto published bf37d09. Loading, fence
 and weight blobs are unchanged; preserve its remote pack-origin fix.
 Published main already owns A7 for coverage, so the LS7 receipt moves
 to A8 during the add/add resolution; neither request is overwritten.
+
+J186 keeps the native lifecycle proof outside hooks. The seven fake-GL
+FencedUnits unit cases were green, but couple the test to an internal
+model and a double cast. They are replaced by the actual native probe,
+including disposal before drain as well as during drain. This is not
+a removal of failing coverage; the browser proof retains its explicit
+settlement, zero false-credit and zero-live-handle checks.
+
+The ordinary private-context control also stopped 81.2 m from Ember,
+with no active regional hook, one required world and four optional
+metadata requests pending. Hold is not a sufficient explanation. The
+manual GRID proof now uses a fresh persistent profile, matching the
+SR4 real-browser proof and PWA storage, with no unused outer browser.
+Both private-context reds remain unresolved; persistence is a control,
+not yet a claimed fix.
+
+All seven native lifecycle paths now pass in each browser. Independent
+wrappers forward real fenceSync/deleteSync calls and track actual
+handles, rather than trusting the class census. Every case ends with
+zero live handles; failure paths credit no successful callback.

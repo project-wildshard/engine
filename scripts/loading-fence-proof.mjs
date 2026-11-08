@@ -22,35 +22,40 @@ try{for(const name of ['chromium','webkit']){
     await page.addScriptTag({content:compiled.code});
     const result=await page.evaluate(`(async()=>{
       const out=[];
-      for(const kind of ['normal','dispose','lost-before','lost-inflight','wait-failed','callback']){
+      for(const kind of ['normal','dispose','disposed-before-drain','lost-before','lost-inflight','wait-failed','callback']){
         const owner=window.__wildshard.world.game.engineScope.child('codex.native-fence-'+kind);
         const canvas=document.createElement('canvas'),gl=canvas.getContext('webgl2');
         if(!gl)throw new Error('Native WebGL2 unavailable');
         const lose=gl.getExtension('WEBGL_lose_context');if(!lose)throw new Error('Native context-loss extension unavailable');
+        const handles=new Set();let nativeCreated=0,nativeDeleted=0;
+        const make=gl.fenceSync.bind(gl),remove=gl.deleteSync.bind(gl);
+        gl.fenceSync=(...args)=>{const sync=make(...args);if(sync!==null){handles.add(sync);nativeCreated++;}return sync;};
+        gl.deleteSync=sync=>{remove(sync);if(handles.delete(sync))nativeDeleted++;};
         const units=new window.__fencedProbe.FencedUnits(gl,owner,3);
-        let completed=0,outcome='pending';
+        let completed=0,outcome='pending',live=0;
         const lost=()=>new Promise(resolve=>{canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();resolve();},{once:true});lose.loseContext();});
         try{
           if(kind==='lost-before')await lost();
-          const live=[];const original=gl.fenceSync.bind(gl);
-          if(kind==='wait-failed')gl.fenceSync=(...args)=>{const sync=original(...args);live.push(sync);return sync;};
+
           await units.submit(()=>{if(kind==='callback')throw new Error('native callback failure');completed++;});
           if(kind==='lost-inflight'||kind==='callback')await units.submit(()=>{completed++;});
           if(kind==='lost-inflight')await lost();
-          if(kind==='wait-failed')for(const sync of live)gl.deleteSync(sync);
+          if(kind==='wait-failed')for(const sync of handles)gl.deleteSync(sync);
+          if(completed!==0)throw new Error('Unpolled work was credited');
+          if(kind==='disposed-before-drain')owner.dispose();
           const work=units.drain().then(()=>{outcome='resolved';},error=>{outcome=error.reason??error.message;});
           if(kind==='dispose')owner.dispose();
           let deadline;try{await Promise.race([work,new Promise((_,reject)=>{deadline=setTimeout(()=>reject(new Error('native wait did not settle')),1000);})]);}finally{clearTimeout(deadline);}
         }catch(error){outcome=error.reason??error.message;}
-        finally{units.dispose();owner.dispose();if(!gl.isContextLost())lose.loseContext();}
-        out.push({kind,outcome,completed,pending:units.pending,...units.census});
+        finally{units.dispose();owner.dispose();live=handles.size;if(!gl.isContextLost())lose.loseContext();}
+        out.push({kind,outcome,completed,pending:units.pending,live,created:nativeCreated,deleted:nativeDeleted,credited:units.census.credited});
       }
       return out;
     })()`);
     for(const row of result){
-      assert.equal(row.pending,0);assert.equal(row.created,row.deleted);
+      assert.equal(row.pending,0);assert.equal(row.live,0);assert.equal(row.created,row.deleted);
       if(row.kind==='normal'){assert.equal(row.outcome,'resolved');assert.equal(row.completed,1);}
-      else{const expected={dispose:'disposed','lost-before':'context-lost','lost-inflight':'context-lost','wait-failed':'wait-failed',callback:'native callback failure'};assert.equal(row.outcome,Reflect.get(expected,row.kind));assert.equal(row.completed,0);}
+      else{const expected={dispose:'disposed','disposed-before-drain':'disposed','lost-before':'context-lost','lost-inflight':'context-lost','wait-failed':'wait-failed',callback:'native callback failure'};assert.equal(row.outcome,Reflect.get(expected,row.kind));assert.equal(row.completed,0);}
       if(row.kind!=='normal'&&row.kind!=='callback')assert.equal(row.credited,0);
     }
     console.log(`${name}: ${JSON.stringify(result)}`);

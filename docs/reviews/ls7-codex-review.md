@@ -1,7 +1,8 @@
 # LS7 Codex review: hold the two Opus commits
 
-Status: original NO-GO superseded by the native lifecycle re-review below.
-Publication still requires the revised strict consumer proofs and full gates.
+Status: GO for the reviewed LS7 lifecycle and measured-weight source.
+Publication remains held by the separate saved-place consumer proof and
+the required full normal gate.
 
 Reviewed committed blobs only. Neither foreign clone's dirty generated
 files was changed. The three preceding Codex commits are not rejected
@@ -93,3 +94,14 @@ findings are closed. The strengthened oracle must still pass the four
 strict boots before publication; historical label-based greens alone
 remain insufficient. Normal commit checks must cover the whole stack,
 including 6d19538, which its author committed with SKIP_CHECK=1.
+
+The stronger independent oracle subsequently passed all four installed
+catalogue cases: Dunes Chromium/WebKit ready 22.0/3.3 s, _template
+12.1/2.7 s, each with zero stalls, backwards, untraced changes or page
+errors and actual native clipboard readback. An uncatalogued legacy
+template fallback has separate real Chromium renderer stalls, recorded
+in the producer-proof journal; it is not folded into these four greens.
+The native probe now independently observes the native sync handles
+and adds disposal before drain: seven paths per browser, all green.
+The coupled fake-GL unit file is replaced by this real browser proof
+under J186; it was green before replacement. No new hook is added.
