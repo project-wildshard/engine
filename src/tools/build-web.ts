@@ -1,32 +1,31 @@
-// Builds the web SPA with esbuild into src/dist/web.
+// Builds the web SPA with rolldown into src/dist/web.
 //   node src/tools/build-web.ts          one production build
 //   node src/tools/build-web.ts --dev    watch + serve on 4402 (one process)
 import { copyFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 
-import { build, context } from 'esbuild'
+import { build, watch } from 'rolldown'
 
 import { readVersion } from '../cli/version.ts'
 import { serve } from '../server/serve.ts'
 
-import type { BuildOptions } from 'esbuild'
+import type { BuildOptions } from 'rolldown'
 
 const WEB = new URL('../client/', import.meta.url)
 const OUT_DIR = fileURLToPath(new URL('../dist/web/', import.meta.url))
 const DEV_PORT = 4402
 
 const OPTIONS: BuildOptions = {
-  entryPoints: [fileURLToPath(new URL('main.tsx', WEB))],
-  outdir: OUT_DIR,
-  bundle: true,
-  format: 'esm',
+  input: fileURLToPath(new URL('main.tsx', WEB)),
   platform: 'browser',
-  target: 'es2024',
-  jsx: 'automatic',
-  jsxImportSource: 'preact',
-  sourcemap: true,
-  logLevel: 'info',
+  transform: { target: 'es2024', jsx: 'react-jsx' },
+  output: {
+    dir: OUT_DIR,
+    entryFileNames: 'main.js',
+    format: 'esm',
+    sourcemap: true,
+  },
 }
 
 async function copyHtml(): Promise<void> {
@@ -39,13 +38,13 @@ async function copyHtml(): Promise<void> {
 
 async function buildOnce(): Promise<void> {
   await copyHtml()
-  await build({ ...OPTIONS, minify: true })
+  await build({ ...OPTIONS, output: { ...OPTIONS.output, minify: true } })
 }
 
 async function dev(): Promise<void> {
   await copyHtml()
-  const watcher = await context(OPTIONS)
-  await watcher.watch()
+  await build(OPTIONS)
+  watch(OPTIONS)
   // The server reads dist/web per request, so a refresh shows the new build.
   const server = await serve({ port: DEV_PORT, version: await readVersion() })
   process.stdout.write(`engine dev on ${server.url}\n`)

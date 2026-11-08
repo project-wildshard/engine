@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
-import { buildSync } from 'esbuild';
+import { rolldown } from 'rolldown';
 import { ASSET_CACHE_NAME } from '../../src/client/engine/pwa/cacheNames';
 import { serverPackBookPath } from '../../src/shared/game/shardfile/serverPack';
 import { titleAssetURLs } from '../title-assets.mjs';
@@ -37,9 +37,9 @@ function shellFiles(html: string, root: string, sources: ReadonlyMap<string, str
 }
 
 /** The build owns names. No worker parses boot banks, packs or runtime product metadata. */
-export function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>, root: string, buildId: string, serverBook?: { readonly url: string; readonly bytes: Uint8Array }): {
+export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>, root: string, buildId: string, serverBook?: { readonly url: string; readonly bytes: Uint8Array }): Promise<{
   core: string; build: string; assets: string; hashed: string[];
-} {
+}> {
   const document = bundle['index.html'];
   if (document?.type !== 'asset' || document.source === undefined) throw new Error('Missing worker document');
   const html = new TextDecoder().decode(document.source);
@@ -49,10 +49,13 @@ export function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>,
   // S2: a deck portrait waits for control with the code (DL1), so a first visit's title doesn't fetch every shard's.
   const shell = shellFiles(html, root, sources), portraits = shell.filter(url => /^\/assets\/title\/[^/]+-portrait-/u.test(url)), digest = createHash('sha256');
   // Bundle the worker's explicit clock/owner imports; no page runtime enters it.
-  const output = buildSync({ entryPoints: [join(root, 'src/client/engine/pwa/sw.js')], bundle: true,
-    write: false, format: 'iife', platform: 'browser', target: 'es2022' }).outputFiles?.[0];
-  if (output === undefined) throw new Error('Missing service worker bundle');
-  const source = output.text;
+  const worker = await rolldown({ input: join(root, 'src/client/engine/pwa/sw.js'), platform: 'browser', transform: { target: 'es2022' } });
+  let source: string;
+  try {
+    const output = (await worker.generate({ format: 'iife' })).output.find(file => file.type === 'chunk');
+    if (output === undefined) throw new Error('Missing service worker bundle');
+    source = output.code;
+  } finally { await worker.close(); }
   digest.update(source);
   for (const name of [...hashed, '/index.html']) {
     const file = bundle[name.slice(1)];
@@ -87,10 +90,10 @@ export function refreshServiceWorker(outDir: string, before: string): void {
 }
 
 /** Called after ordinary bundling; previous-deploy chunks are carried by MF2 afterwards. */
-export function writeServiceWorker(outDir: string, root: string): void {
+export async function writeServiceWorker(outDir: string, root: string): Promise<void> {
   const { build: buildId } = JSON.parse(readFileSync(join(outDir, 'version.json'), 'utf8')) as { build: string };
   const book = join(outDir, serverPackBookPath(buildId));
-  const { core, build, hashed } = serviceWorkerCore(writtenBundle(outDir, root), root, buildId, existsSync(book) ? { url: `/${serverPackBookPath(buildId)}`, bytes: readFileSync(book) } : undefined), scripts = workerScripts(core);
+  const { core, build, hashed } = await serviceWorkerCore(writtenBundle(outDir, root), root, buildId, existsSync(book) ? { url: `/${serverPackBookPath(buildId)}`, bytes: readFileSync(book) } : undefined), scripts = workerScripts(core);
   mkdirSync(dirname(join(outDir, scripts.fileName)), { recursive: true });
   writeFileSync(join(outDir, scripts.fileName), core);
   writeFileSync(join(outDir, 'sw.js'), scripts.bootstrap);

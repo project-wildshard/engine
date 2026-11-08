@@ -108,7 +108,7 @@ step(['--import', './scripts/bake-loader.mjs', '--input-type=module', '-e',
   "(await import('./scripts/app-build/crossroadsRig.ts')).writeCrossroadsRig(process.argv[1], process.cwd(), (await import('./scripts/api-origin.mjs')).apiOriginSet());", outDir]);
 // the service worker over the bundle as written (was vite/pwa-plugin.ts): sw.js and its content-named core
 step(['--import', './scripts/bake-loader.mjs', '--input-type=module', '-e',
-  "(await import('./scripts/app-build/serviceWorker.ts')).writeServiceWorker(process.argv[1], process.cwd());", outDir]);
+  "await (await import('./scripts/app-build/serviceWorker.ts')).writeServiceWorker(process.argv[1], process.cwd());", outDir]);
 
 // the compiled DEVSERVER mode, as a machine-readable artifact beside the bundle (scripts/check-devserver.mjs, sharddev/dev.ts);
 // the bundle itself takes it from the __DEVSERVER__ define (was vite/devserver.ts)

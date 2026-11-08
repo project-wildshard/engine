@@ -2,10 +2,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { build } from 'esbuild';
+import { rolldown } from 'rolldown';
+import { resolve as resolvePath } from 'node:path';
 import { chromium, webkit, devices } from 'playwright';
 
-const bundled = await build({ stdin: { resolveDir: process.cwd(), contents: `
+const entry = resolvePath('epoch-proof-entry.ts');
+const compiler = await rolldown({ input: entry, platform: 'browser', plugins: [{ name: 'epoch-proof-entry', resolveId(id) { if (id === entry) return entry; return null; }, load(id) { if (id === entry) return `
 import { installAppIdentity } from './src/shared/engine/app/identity';
 import { WILDSHARD_IDENTITY } from './src/client/game/identity';
 import { SaveStore } from './src/shared/engine/saves/store';
@@ -14,8 +16,11 @@ import { deviceIdentity } from './src/shared/engine/net/identity';
 import * as v from 'valibot';
 installAppIdentity(WILDSHARD_IDENTITY);
 window.epochProof = { SaveStore, openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport, deviceIdentity, installAppIdentity, WILDSHARD_IDENTITY, v };
-` }, bundle: true, format: 'esm', platform: 'browser', write: false });
-const server = createServer((request, response) => { response.setHeader('content-type', request.url === '/entry.js' ? 'application/javascript' : 'text/html'); response.end(request.url === '/entry.js' ? bundled.outputFiles[0].text : '<script type="module" src="/entry.js"></script>'); });
+`; return null; } }] });
+const bundled = (await compiler.generate({ format: 'esm' })).output.find(file => file.type === 'chunk');
+await compiler.close();
+if (bundled === undefined) throw new Error('Missing epoch proof bundle');
+const server = createServer((request, response) => { response.setHeader('content-type', request.url === '/entry.js' ? 'application/javascript' : 'text/html'); response.end(request.url === '/entry.js' ? bundled.code : '<script type="module" src="/entry.js"></script>'); });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const address = server.address();
 if (address === null || typeof address === 'string') throw new Error('No proof server');

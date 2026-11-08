@@ -3,9 +3,16 @@ import { runInNewContext } from 'node:vm';
 // oxlint-disable-next-line import/no-nodejs-modules -- Check the shipped route patterns with the native URLPattern implementation.
 import { URLPattern, type URLPatternInit } from 'node:url';
 import { expect, test, vi } from 'vitest';
-// oxlint-disable-next-line import/no-nodejs-modules -- Execute the actual bundled worker, including its explicit clock import.
-import { buildSync } from 'esbuild';
+// Execute the actual bundled worker, including its explicit clock import.
+import { rolldown } from 'rolldown';
 import { ASSET_CACHE_NAME } from '../src/client/engine/pwa/cacheNames';
+
+const workerBuild = await rolldown({input:'src/client/engine/pwa/sw.js',platform:'browser',transform:{target:'es2022'}});
+const workerOutput = await workerBuild.generate({format:'iife'});
+await workerBuild.close();
+const workerChunk = workerOutput.output.find(file => file.type === 'chunk');
+if (workerChunk === undefined) throw new Error('Missing worker bundle');
+const bundled: string = workerChunk.code;
 
 const origin = 'https://worker.test';
 const url = (path: string): string => new URL(path, origin).href;
@@ -57,8 +64,6 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     const get = (id: string): Promise<{ id: string; type?: string } | undefined> => Promise.resolve(workers.has(id) ? { id, type: 'worker' } : live.has(id) ? { id } : undefined);
     const self = { location: new URL(origin), registration: { scope: `${origin}/` }, clients: { claim, get }, skipWaiting,
       addEventListener: (kind: string, listener: (event: WorkerEvent) => void) => { listeners.set(kind, [...listeners.get(kind) ?? [], listener]); } };
-    const bundled = buildSync({entryPoints:['src/client/engine/pwa/sw.js'],bundle:true,write:false,format:'iife',platform:'browser',target:'es2022'}).outputFiles?.[0]?.text;
-    if (bundled === undefined) throw new Error('Missing worker bundle');
     const source = bundled.replaceAll('__BUILD_ID__', build)
       .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(document)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
       .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellFiles)));

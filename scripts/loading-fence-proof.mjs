@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // Manual native-WebGL lifecycle counterexamples, outside hooks. Run through browser-lane.sh.
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import {transform} from 'esbuild';
+import {rolldown} from 'rolldown';
 import {chromium,webkit,devices} from 'playwright';
 import {serve} from './parity/serve.mjs';
 import {saveFixture} from './debug-settings.mjs';
 
-const compiled=await transform(readFileSync('src/client/engine/render/fencedUnits.ts','utf8'),
-  {loader:'ts',format:'iife',globalName:'__fencedProbe'});
-const preview=await serve(process.cwd(),'',true);
+const build=await rolldown({input:'src/client/engine/render/fencedUnits.ts',platform:'browser'});
+const compiled=(await build.generate({format:'iife',name:'__fencedProbe'})).output.find(file=>file.type==='chunk');
+await build.close();
+if(compiled===undefined)throw new Error('Missing fence probe');
+const root=process.argv.find(arg=>arg.startsWith('--root='))?.slice(7)??process.cwd();
+const preview=await serve(root,'',true);
 try{for(const name of ['chromium','webkit']){
   const engine=name==='chromium'?chromium:webkit;
   const browser=await engine.launch({headless:true,...(name==='chromium'?{args:['--mute-audio']}: {})});

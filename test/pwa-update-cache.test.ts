@@ -16,38 +16,38 @@ test('worker bootstrap names exact core bytes and changes for same-length edits'
   expect(workerScripts('self.version = "first";')).toEqual(first);
 });
 
-test('the plain emitter stamps the real worker without a boot bank or code-pack input', () => {
+test('the plain emitter stamps the real worker without a boot bank or code-pack input', async () => {
   const document = { type: 'asset' as const, source: new TextEncoder().encode('<html><head></head></html>') };
   const bundle = { 'index.html': document, 'assets/app-aaaaaaaa.js': { type: 'chunk' as const, code: 'export const value=1;' } };
-  const first = serviceWorkerCore(bundle, process.cwd(), 'fixture');
-  const next = serviceWorkerCore({ ...bundle, 'assets/app-aaaaaaaa.js': { type: 'chunk', code: 'export const value=2;' } }, process.cwd(), 'fixture');
+  const first = await serviceWorkerCore(bundle, process.cwd(), 'fixture');
+  const next = await serviceWorkerCore({ ...bundle, 'assets/app-aaaaaaaa.js': { type: 'chunk', code: 'export const value=2;' } }, process.cwd(), 'fixture');
   expect(first.hashed).toEqual(['/assets/app-aaaaaaaa.js']);
   expect(first.assets).toBe('ws-assets-v1'); expect(first.build).toMatch(/^fixture-[a-f0-9]{10}$/u);
   expect(first.core).not.toContain('import { workerScope'); expect(first.core).not.toContain('__BUILD_ID__');
   expect(first.core).not.toContain('__SHELL_FILES__'); expect(first.core).not.toContain('__FILES__');
   expect(first.core).not.toContain('__DOCUMENT__');
-  expect(first.core).toContain(`var DOCUMENT = ${JSON.stringify(new TextDecoder().decode(document.source))};`);
+  expect(first.core).toContain(`const DOCUMENT = ${JSON.stringify(new TextDecoder().decode(document.source))};`);
   expect(first.core).not.toContain('PREPARE_CODE_PACK'); expect(first.core).not.toContain('server-timing');
   expect(next.build).not.toBe(first.build); expect(workerScripts(next.core).fileName).not.toBe(workerScripts(first.core).fileName);
 });
 
-test('a build precaches its server book, and a new book is a new worker', () => {
+test('a build precaches its server book, and a new book is a new worker', async () => {
   const bundle = { 'index.html': { type: 'asset' as const, source: new TextEncoder().encode('<html><head></head></html>') } };
   const url = '/assets/spawn/server-fixture.json', bytes = new TextEncoder().encode('{"book":"server"}');
-  const none = serviceWorkerCore(bundle, process.cwd(), 'fixture'), first = serviceWorkerCore(bundle, process.cwd(), 'fixture', { url, bytes });
+  const none = await serviceWorkerCore(bundle, process.cwd(), 'fixture'), first = await serviceWorkerCore(bundle, process.cwd(), 'fixture', { url, bytes });
   expect(none.core).not.toContain(url); expect(first.core).toContain(url);
   expect(first.hashed).not.toContain(url);
-  expect(serviceWorkerCore(bundle, process.cwd(), 'fixture', { url, bytes: new TextEncoder().encode('{}') }).build).not.toBe(first.build);
+  expect((await serviceWorkerCore(bundle, process.cwd(), 'fixture', { url, bytes: new TextEncoder().encode('{}') })).build).not.toBe(first.build);
 });
 
-test('document bytes remain data even when they contain worker marker text', () => {
+test('document bytes remain data even when they contain worker marker text', async () => {
   const html = `<!doctype html><html><body>π 😀 '__FILES__' '__BUILD_ID__' '__DOCUMENT__'</body></html>`;
-  const {core} = serviceWorkerCore({'index.html': {type: 'asset', source: new TextEncoder().encode(html)}}, process.cwd(), 'fixture');
-  const literal = /^\s*var DOCUMENT = (.+);$/mu.exec(core)?.[1];
+  const {core} = await serviceWorkerCore({'index.html': {type: 'asset', source: new TextEncoder().encode(html)}}, process.cwd(), 'fixture');
+  const literal = /^\s*(?:const|var) DOCUMENT = (.+);$/mu.exec(core)?.[1];
   if (literal === undefined) throw new Error('Missing document literal');
   expect(JSON.parse(literal)).toBe(html);
   // No bundle file here, so the only rows left are the deck portraits a worker fetches after control.
-  expect(/^\s*var FILES = JSON\.parse\("\[(.*)\]"\);$/mu.exec(core)?.[1]?.split(',').every(row => row.includes('-portrait-'))).toBe(true);
+  expect(/^\s*(?:const|var) FILES = JSON\.parse\("\[(.*)\]"\);$/mu.exec(core)?.[1]?.split(',').every(row => row.includes('-portrait-'))).toBe(true);
 });
 
 test('worker updates revalidate unchanged bytes and fetch a changed script in full', async () => {
