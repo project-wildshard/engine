@@ -67,10 +67,12 @@ export function installNativeEliteFeature(host: SimHost, day: DayCycleClock, inp
   host.events.answer('damage.modify', req => req !== null && routes.god === true && [...host.players.values()].some(player => player.health === req.target) && scripts.some(script => script.animal?.combatActor() === req.source) ? null : req, host.scope, { order: 1 });
   host.onStep(rows.step, dt => {
     restored = undefined;
+    for (const player of host.players.values()) player.health.attributes['statusStun'] = 0;
     for (const [id, stun] of stuns) {
       const player = host.players.get(id);
       if (player === undefined) { stuns.delete(id); continue; }
-      held.set(stun.x, stun.y, stun.z); player.position.copy(held); player.motor.resetAt(held); stun.t -= dt; if (stun.t <= 0) stuns.delete(id);
+      held.set(stun.x, stun.y, stun.z); player.position.copy(held); player.motor.resetAt(held); stun.t -= dt;
+      player.health.attributes['statusStun'] = Math.max(0, stun.t); if (stun.t <= 0) stuns.delete(id);
     }
     for (const script of scripts) {
       const at = script.animal?.position ?? script.def.lair, foe = nearestOnGround(host.players, at.x, at.z);
@@ -96,7 +98,7 @@ export function installNativeEliteFeature(host: SimHost, day: DayCycleClock, inp
       host.combat.hit({ source: body.combatActor(), sourceTags: [`creature.${body.kind}`, 'feel.blow', 'cover.checked'], target: foe.health,
         amount: effect.hit.damage, point: body.position.clone(), dir: direction.set(0, 0, 0), throughWalls: effect.hit.throughWalls, cause: { kind: body.kind, label: body.label } });
       if (effect.hit.trauma > 0) sayFightView(host, ELITE_TELL.hit, [effect.hit.trauma, foe.position.x, foe.position.z]);
-      if (effect.hit.stun > 0) { const p = foe.position, stun = stuns.get(foe.id); stuns.set(foe.id, { t: effect.hit.stun, x: stun?.x ?? p.x, y: stun?.y ?? p.y, z: stun?.z ?? p.z }); }
+      if (effect.hit.stun > 0) { const p = foe.position, stun = stuns.get(foe.id); stuns.set(foe.id, { t: effect.hit.stun, x: stun?.x ?? p.x, y: stun?.y ?? p.y, z: stun?.z ?? p.z }); foe.health.attributes['statusStun'] = effect.hit.stun; }
     }
   }, {
     snapshot: () => { if (restored !== undefined) return restored; const { stun, others } = wireStuns();

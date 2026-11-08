@@ -11,6 +11,7 @@ import { heldAmmunition } from '../loadout/nativeAmmunition';
 import { Exchange } from '../../../shared/game/loot/exchange';
 import { isCosmetic, isOwnedId, Owned } from '../../../shared/game/loot/Owned';
 import { Purse } from '../../../shared/game/loot/Purse';
+import { installOwnedEffects } from '../loadout/ownedEffects';
 import { OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
 import { inventorySave, skinSave, compendiumSave, finishPickupSave, saveSlug, CreatureRewardSchema, creatureRewardSave, type CreatureRewardState } from '../../../shared/game/saves';
 
@@ -187,6 +188,7 @@ export class PlayerOwned {
 /** Put a world on the wire's owned rows. Any owner of a pack or a shop already in the world keeps them. A good of ammunition goes to the world's quiver, and a world with none has no room for it. */
 export function installPlayerOwned(host: SimHost, shard: string, economy: unknown, pack: boolean, source?: Shardfile, profiles?: CreatureRewardStore): PlayerOwned {
   const owned = new PlayerOwned(shard), routes = actRoutes(host);
+  if (source !== undefined) installOwnedEffects(host, owned.owned, source);
   if (source !== undefined) owned.creatures(host, source, profiles);
   publishOwned(host, 'player', (_player, out) => { owned.read(out, pack); });
   routes.wear = (_player, id) => { if (isOwnedId(id) && isCosmetic(id) && owned.owned.has(id)) owned.owned.toggleWorn(id); };

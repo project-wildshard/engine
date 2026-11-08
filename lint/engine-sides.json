@@ -1126,6 +1126,7 @@
     "src/server/game/grid/roomNet.ts": "server",
     "src/server/game/grid/simulation.ts": "server",
     "src/server/game/loadout/nativeAmmunition.ts": "server",
+    "src/server/game/loadout/ownedEffects.ts": "server",
     "src/server/game/loot/personal.ts": "server",
     "src/server/game/loot/playerOwned.ts": "server",
     "src/server/game/plugin/bossPhase.ts": "server",

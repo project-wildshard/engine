@@ -137,7 +137,7 @@ export class PlayerSim implements PlayerMotionState {
       this.borrowed = true; this.body = body.borrowed; this.position = body.borrowed.position;
     } else {
       const position = new Vector3(body.at.x, body.at.y, body.at.z);
-      const health = new PlayerHealth(host.events, { now: () => host.clock.now * 1000, position: () => position, dodging: () => this.dodge.t > 0, dodgeGuard: () => false }, body.id);
+      const health = new PlayerHealth(host.events, { now: () => host.clock.now * 1000, position: () => position, dodging: () => this.dodge.t > 0, dodgeGuard: () => this.health.effectTags.includes('guard.dodge') }, body.id);
       this.borrowed = false; this.position = position;
       this.bodyMotor = body.bodiless === true ? undefined : body.motor(health);
       this.bodyMotor?.resetAt(position);

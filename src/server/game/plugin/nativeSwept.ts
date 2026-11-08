@@ -11,6 +11,7 @@ import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { STARTER_BLADE } from '../../../shared/game/weapons/starterMoves';
 import { seenBodies, seenRay, type SeenHit } from './nativeRewind';
 import { playerSeats } from './playerSeats';
+import { ownedWeaponAttribute } from '../loadout/ownedEffects';
 import { createNativeLoadout, createNativeTargetQueries } from './simulation';
 
 /** One player's input for this tick; target selection remains with the entered runtime. */
@@ -114,7 +115,7 @@ export function installNativeSweptMelee(host: SimHost, items: readonly unknown[]
       left.copy(forward).applyAxisAngle(yAxis, Math.PI / 2);
       sweptStrikeDirection(direction, forward, left, move.sweep, row.contact);
       request.sourceTags = profile.tags; request.target = actor.combatActor(); request.weaponId = profile.weapon; request.moveId = move.id; request.attackSeq = seq.swing;
-      request.amount = Math.round(sweptMoveDamage(profile.damage, move, move === profile.moves.heavy, 1));
+      request.amount = Math.round(sweptMoveDamage(profile.damage, move, move === profile.moves.heavy, ownedWeaponAttribute(host,player,profile.weapon,'heavyDamageMul',1)));
       const dealt = host.combat.hit(seen === null ? request : { ...request, point: seen.point, seen: seen.seen, headshot: seen.head, sourceTags: [...profile.tags, 'cover.checked'] });
       if (dealt === null) return;
       state.hits++; if (dealt.killed) return;

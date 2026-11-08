@@ -64,6 +64,13 @@ export async function play(browser, phone, base, only = '') {
   };
 
 
+  if (only === 'perks') {
+    const { run } = await import('./split-repair-perks.mjs');
+    const { run: stun } = await import('./split-repair-stun.mjs');
+    await step('perks: shop grants real owner health and damage', () => run(browser, phone, base));
+    await step('perks: real elite roar projects its timed stun', () => stun(browser, phone, base));
+    return steps;
+  }
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }
   if (runs('hurt')) { const { hurt } = await import('./worker-client-hurt.mjs'); await hurt(browser, phone, base, step); }
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }

@@ -11,6 +11,7 @@ import type { ShardContext } from '../plugin/context';
 import { installEnteredRuntimeService, installRetainedPlayerEffects, retainsRuntimeServices } from '../shard/retainedHooks';
 import { isOwnedId, isCosmetic } from '../../../shared/game/loot/Owned';
 import type { EffectDef, CueId, EffectId } from '@wildshard/engine/combat/effects/types';
+import { wirePage } from '../shardfile/wirePage';
 
 /** The shared permanent cosmetic grant; authored finish identity and weapon determine its exclusive group. */
 export const heldFinishEffect = (id: string, weapon: string): EffectDef => ({
@@ -52,6 +53,17 @@ export function installItemEffects(context: ShardContext): void {
     for (const entry of targets) for (const target of entry.items) effects.sync(target, selectEffectGrants(entry.grants, ownedKeys));
   };
   apply(); context.scope.onDispose(owned.onChange(apply));
+  let previousStun=0;
+  context.system({id:'game.effects.owner',phase:'update',run:()=>{
+    const client=wirePage.client,frame=client?.latest;if(client===null||frame===undefined||frame===null)return;
+    const owner=client.owner(frame),max=owner['maxHp'],stun=owner['statusStun'];
+    if(typeof max==='number'&&max>0)health.attributes.maxHealth=max;
+    if(row.statuses&&typeof stun==='number') {
+      if(stun>0&&(previousStun<=0||stun>previousStun+0.1))effects.apply(health,'effect.stun',undefined,{duration:stun});
+      else if(stun<=0&&previousStun>0)effects.remove(health,'effect.stun');
+      previousStun=stun;
+    }
+  }});
 }
 
 /** Existing starter tuning; only the authored stun is applied by normal play, and importing installs no effects. */
