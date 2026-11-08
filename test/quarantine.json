@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "policy": "J193: execute and report; failures are non-blocking until deadline. Expired entries return to the blocking cohort.",
+  "createdAt": "2026-11-08T11:13:28.000Z",
+  "entries": [
+    {
+      "file": "test/engine-rule-successors.test.ts",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T11:13:28.000Z",
+      "reason": "10-second native combat continuation timeouts; ci 42470548295"
+    },
+    {
+      "file": "test/net-fuzz.test.ts",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T11:13:28.000Z",
+      "reason": "Native setup timeouts in ci 42444052896, 42446355727 and 42449016560"
+    },
+    {
+      "file": "test/tooling/parity/browser-escape.test.mjs",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T11:13:28.000Z",
+      "reason": "Native Chrome setup/startup timeouts; ci/ring-1 42462187339 and 42463697009"
+    },
+    {
+      "file": "test/pine-rewards.test.ts",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T11:13:28.000Z",
+      "reason": "30-second cold-grid reward proof timeout; ci 42470548295"
+    }
+  ]
+}
