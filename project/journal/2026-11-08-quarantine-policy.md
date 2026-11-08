@@ -29,3 +29,13 @@ file that times out. Add that file, still owned by codex-pinefix2, until
 2026-11-10T11:57:31Z, exactly 48 hours from this follow-up. It executes in
 both non-blocking jobs; no assertion, saved fixture, runtime or clock is
 changed. The local full gate continues to include all five files.
+
+The first hosted CI4 matrix on a52f646, run 42478017721, exposes three
+more file-clock overruns against the new 60-second file budget. Their
+assertions pass: cook-worker 111595 ms (shard 2, job 128723775452), Nalati
+population 101959 ms (shard 3, job 128723775494), Driftwood population
+102584 ms (shard 4, job 128723775407). J193's additional-timeout policy
+keeps these running and reporting in both quarantine jobs, owned by
+codex-pinefix2 until 2026-11-10T12:04:31Z. These are file-budget overruns,
+not claims of failed gameplay assertions. No file clock or assertion is
+raised or weakened. Local full checks still include them.

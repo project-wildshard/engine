@@ -32,6 +32,24 @@
       "owner": "codex-pinefix2",
       "deadline": "2026-11-10T11:57:31.000Z",
       "reason": "10-second saved Nalati walk timeout; ci 42475678403 on a7ed8e0"
+    },
+    {
+      "file": "test/cook-worker.test.ts",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T12:04:31.000Z",
+      "reason": "CI4 60-second file budget overrun: 111595 ms, assertions passed; ci 42478017721 shard 2"
+    },
+    {
+      "file": "test/nalati-headless-population.test.ts",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T12:04:31.000Z",
+      "reason": "CI4 60-second file budget overrun: 101959 ms, assertions passed; ci 42478017721 shard 3"
+    },
+    {
+      "file": "test/driftwood-headless-population.test.ts",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T12:04:31.000Z",
+      "reason": "CI4 60-second file budget overrun: 102584 ms, assertions passed; ci 42478017721 shard 4"
     }
   ]
 }
