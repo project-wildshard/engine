@@ -27,6 +27,8 @@ export class ShardfileRefusedError extends Error {
 
 export interface SimulationProof {readonly ticks: number; readonly lanes: number; readonly steps: number}
 export interface CookJobPorts {
+  /** Trusted notice identity; reject a valid product for another shard before its simulation/cook. */
+  readonly expectedSlug?: string;
   /** F3 (b). Injected: the proof lives in the SDK, above this layer. */
   readonly prove: (shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections: ReadonlyMap<string, unknown>) => Promise<SimulationProof>;
   readonly wireBytes: WireBytes;
@@ -84,6 +86,10 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const started = ports.now();
   await prepareAssetDecoders();
   const product = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES);
+  // Match the transport's generic identity allowlist, without shard behavior branches.
+  if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
+    throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
+  }
   const proof = product.shard.runtime === null ? await proved(product, ports) : 'unmeasured' as const;
   const client = join(out, 'client');
   const cook = await cookShard(tarball, client, {wireBytes: ports.wireBytes, now: ports.now, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});

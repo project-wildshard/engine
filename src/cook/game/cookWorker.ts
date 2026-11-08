@@ -113,13 +113,13 @@ async function rssMB(pid: number): Promise<number> {
 const CAPTURE_BYTES = 2_000_000;
 
 /** One child. Its stdout is a report or a refusal; anything else, a crash or a limit, is `killed`. */
-export function runJob(launcher: JobLauncher, tarball: string, out: string): Promise<JobOutcome> {
+export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string): Promise<JobOutcome> {
   const {root, execPath, loader, script, wrap, limits} = launcher, work = dirname(out);
   const cache = join(dirname(work), 'cache');
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
   mkdirSync(cache, {recursive: true});
   const node = [execPath, '--permission', `--allow-fs-read=${root}`, `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, '--allow-worker',
-    `--max-old-space-size=${limits.heapMB}`, '--stack-size=4000', '--no-warnings', '--import', loader, script, tarball, out];
+    `--max-old-space-size=${limits.heapMB}`, '--stack-size=4000', '--no-warnings', '--import', loader, script, tarball, out, ...expectedSlug === undefined ? [] : [expectedSlug]];
   const [command = '', ...args] = [...wrap, ...node];
   return new Promise(resolve => {
     // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
@@ -292,7 +292,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
     writeFileSync(file, tarball);
-    const outcome = await runJob(launcher, file, out);
+    const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug));
     if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
     if (outcome.report.hash !== head.hash) return {...head, state: 'failed', detail: 'The job cooked other bytes'};

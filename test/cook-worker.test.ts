@@ -94,7 +94,7 @@ describe('the cook worker', () => {
 
   it('refuses a shardfile for another slug: a notice cannot put bytes on a shard', async () => {
     const hash = hashOf(real), cook = createCookWorker({build: 'b3', store: folderStore(join(scratch, 'other')), source: source(new Map([[hash, real]])), launcher: launcher(), serverPacks: join(scratch, 'server-other'), scratch: join(scratch, 'work')});
-    expect((await cook.cook({slug: 'pine-hollow', hash})).state).toBe('refused');
+    expect(await cook.cook({slug: 'pine-hollow', hash})).toMatchObject({state: 'refused', detail: 'A shardfile for sunscar-dunes under pine-hollow'});
     expect(await folderStore(join(scratch, 'other')).has(indexKey('b3', hash))).toBe(false);
   }, 60_000);
 
@@ -133,12 +133,30 @@ describe('the cook worker', () => {
     expect(JSON.parse(outcome.kind === 'refused' ? outcome.reason : '{}')).toEqual({home: true, hosts: true, write: true, child: true, secret: null, token: null});
   }, 30_000);
 
-  it.runIf(process.platform === 'darwin')('takes a job off the network through the host wrap', async () => {
+  it('takes a job off the network through the host wrap', async () => {
     const work = join(mkdtempSync(join(scratch, 'limit-')), 'job'), script = join(work, 'net.mjs');
     mkdirSync(work);
-    writeFileSync(script, `let reached = false; try { await fetch('https://example.com/', {signal: AbortSignal.timeout(4000)}); reached = true; } catch { /* denied */ } console.log(JSON.stringify({refused: String(reached)})); process.exit(3);`);
-    const outcome = await runJob({...launcher(script), wrap: ['sandbox-exec', '-p', '(version 1)(allow default)(deny network*)']}, join(work, 'x.tar'), join(work, 'out'));
-    expect(outcome).toEqual({kind: 'refused', reason: 'false'});
+    let reached = 0;
+    const network = createServer((_request, response) => { reached++; response.end('reachable'); });
+    await new Promise<void>(resolve => { network.listen(0, '127.0.0.1', resolve); });
+    const address = network.address();
+    if (address === null || typeof address === 'string') throw new Error('Missing host network address');
+    writeFileSync(script, `let reached = false; try { const response = await fetch('http://127.0.0.1:${address.port}', {signal: AbortSignal.timeout(4000)}); reached = response.ok; } catch { /* denied */ } console.log(JSON.stringify({refused: String(reached)})); process.exit(3);`);
+    // Same OS namespace boundary as the installed author proof. Linux's
+    // runner can create it with sudo, then drops back to the original uid/gid.
+    // Neither arm mocks sockets, fetch or the real process permission flags.
+    const wrap = process.platform === 'darwin'
+      ? ['sandbox-exec', '-p', '(version 1)(allow default)(deny network*)']
+      : process.platform === 'linux' && process.getuid !== undefined && process.getgid !== undefined
+        ? ['sudo', '-n', 'unshare', '--net', '--', 'setpriv', `--reuid=${process.getuid()}`, `--regid=${process.getgid()}`, '--init-groups', '--reset-env']
+        : undefined;
+    try {
+      if (wrap === undefined) throw new Error('Cook network proof requires an actual OS network boundary');
+      expect(await runJob(launcher(script), join(work, 'x.tar'), join(work, 'out'))).toEqual({kind: 'refused', reason: 'true'});
+      expect(reached).toBe(1);
+      expect(await runJob({...launcher(script), wrap}, join(work, 'x.tar'), join(work, 'out'))).toEqual({kind: 'refused', reason: 'false'});
+      expect(reached, 'the isolated child cannot reach the proven live host endpoint').toBe(1);
+    } finally { await new Promise<void>(resolve => { network.close(() => { resolve(); }); }); }
   }, 30_000);
 
   it('takes a notice over HTTP, with its token, and cooks it', async () => {
