@@ -1,0 +1,123 @@
+name: server-release
+
+on:
+  workflow_run:
+    workflows: [ci, ring-1]
+    branches: [main]
+    types: [completed]
+  push:
+    tags: ['v[0-9]*']
+
+permissions:
+  contents: read
+  actions: read
+
+# Duplicate CI completion events for one SHA serialize; different SHAs use R2 CAS.
+concurrency:
+  group: server-release-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    if: >-
+      github.repository == 'project-wildshard/engine' &&
+      (github.event_name == 'push' ||
+       (github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      ready: ${{ steps.source.outputs.ready }}
+      sha: ${{ steps.source.outputs.sha }}
+      channel: ${{ steps.source.outputs.channel }}
+      tag: ${{ steps.source.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - uses: ./.github/actions/org-deps
+      - run: pnpm install --frozen-lockfile
+      - name: Admit exact green main source
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/server-release/github.mjs select
+
+  publish:
+    needs: source
+    if: needs.source.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    env:
+      SOURCE_SHA: ${{ needs.source.outputs.sha }}
+      RELEASE_TAG: ${{ needs.source.outputs.tag }}
+      RELEASE_CHANNEL: ${{ needs.source.outputs.channel }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - uses: ./.github/actions/org-deps
+      - run: pnpm install --frozen-lockfile
+      - name: Build deterministic dedicated bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/build-server.mjs --build "$SOURCE_SHA" --out "$RUNNER_TEMP/server"
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - -C "$RUNNER_TEMP/server" . |
+            gzip -n > "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz"
+      - name: Validate channel configuration
+        env:
+          E7_RELEASE_SIGNING_KEY: ${{ secrets.E7_RELEASE_SIGNING_KEY }}
+          E7_RELEASE_PUBLIC_KEY: ${{ vars.E7_RELEASE_PUBLIC_KEY }}
+          E7_RELEASE_SOCKET: ${{ vars[format('E7_{0}_SOCKET', needs.source.outputs.channel == 'production' && 'PRODUCTION' || 'STAGING')] }}
+          E7_SERVER_SHARDS: ${{ vars[format('E7_{0}_SHARDS', needs.source.outputs.channel == 'production' && 'PRODUCTION' || 'STAGING')] }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET_PACKS: ${{ vars.R2_BUCKET_PACKS }}
+          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
+          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
+        run: >-
+          node scripts/server-release/publish.mjs --check
+          --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
+          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json"
+      - name: Upload immutable bundle to its tag release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          node scripts/server-release/github.mjs asset
+          "$RELEASE_TAG" "$SOURCE_SHA" "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" "$RELEASE_CHANNEL"
+      - name: Sign and advance the channel release file
+        env:
+          E7_RELEASE_SIGNING_KEY: ${{ secrets.E7_RELEASE_SIGNING_KEY }}
+          E7_RELEASE_PUBLIC_KEY: ${{ vars.E7_RELEASE_PUBLIC_KEY }}
+          E7_RELEASE_SOCKET: ${{ vars[format('E7_{0}_SOCKET', needs.source.outputs.channel == 'production' && 'PRODUCTION' || 'STAGING')] }}
+          E7_SERVER_SHARDS: ${{ vars[format('E7_{0}_SHARDS', needs.source.outputs.channel == 'production' && 'PRODUCTION' || 'STAGING')] }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET_PACKS: ${{ vars.R2_BUCKET_PACKS }}
+          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
+          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
+        run: >-
+          node scripts/server-release/publish.mjs
+          --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
+          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json"
