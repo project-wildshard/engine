@@ -59,3 +59,16 @@ files, 22 cases in 752 ms. The full normal pre-push remains required.
 Origin advanced by six test/cook commits while this lane proved UI;
 they must be integrated before publication, preserving their remote
 pack-origin transport correction.
+
+The held-card Ember walk is a real red on c9c0e38: at the third leg's
+210-second deadline, 81.1 m remained, with Ember's server ready but
+its crossing preparing and board open. No source fix is claimed. The
+proof now also waits the real loader retirement before entering, and
+will earn the save through ordinary unheld gameplay as a control. It
+records runtime/pending-work diagnostics if that control stops too.
+The earlier held-card failure remains explicit.
+
+Rebased 25 unpublished commits onto published bf37d09. Loading, fence
+and weight blobs are unchanged; preserve its remote pack-origin fix.
+Published main already owns A7 for coverage, so the LS7 receipt moves
+to A8 during the add/add resolution; neither request is overwritten.

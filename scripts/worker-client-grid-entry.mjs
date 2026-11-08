@@ -30,7 +30,7 @@ export const observed = page => page.evaluate(() => {
   const live = g.live?.live, server = r.cell === 0 ? null : g.cells[r.cell - 1]?.instance;
   return { home: g.home, inside: g.inside, board: g.cellLoading, current: live?.current, server,
     ready: live?.gameplayReady, phase: g.live?.crossing.phase, issue: g.live?.crossing.issue,
-    x: r.x, z: r.z, serverX: r.serverX, serverZ: r.serverZ, restored: r.restored, saved: r.savedOk,
+    x: r.x, z: r.z, serverX: r.serverX, serverZ: r.serverZ, restored: r.restored, saved: r.savedOk, runtimeTiming:g.live?.runtimeTiming,pendingWork:live?.pendingWork,issues:live?.issues,
     frames: r.frames, closed: r.closed };
 });
 

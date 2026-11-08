@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync,readFileSync } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
 import { chromium, webkit, devices } from 'playwright';
 import { serve } from './parity/serve.mjs';
-import { saveFixture, debugSettings } from './debug-settings.mjs';
+import { saveFixture,writeSaveFixture } from './debug-settings.mjs';
 import {walk as walkGrid,entered,settled,observed} from './worker-client-grid-entry.mjs';
 import { barStalls, untracedChanges } from './loading-bar-rule.mjs';
 
@@ -97,7 +97,7 @@ function recordBars() {
 
 }
 
-const title=readFileSync(join(root,'dist','index.html'),'utf8').match(/id="ws-title-rows"[^>]*>(.*?)<\/script>/su)?.[1];
+const title=/id="ws-title-rows"[^>]*>(.*?)<\/script>/su.exec(readFileSync(join(root,'dist','index.html'),'utf8'))?.[1];
 if(title===undefined)throw new Error('Built title catalogue is absent');
 const installed=/** @type {{slug:string}[]} */(JSON.parse(title));
 for(const requested of grid?['driftwood-isle','open-plot-ember-forge']:[shard])
@@ -113,7 +113,7 @@ try {
       const context = await browser.newContext({ ...devices['iPhone 16 Pro'], deviceScaleFactor: 2 });
       await context.grantPermissions(name==='chromium'?['clipboard-read','clipboard-write']:['clipboard-read']);
       await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-      await debugSettings(context, { holdLoading: true });
+      await context.addInitScript({content:`let walking=false;try{walking=sessionStorage.getItem('codex.loading.walking')==='1';}catch{};(${writeSaveFixture.toString()})({scope:'global',key:'settings',data:{holdLoading:!walking},merge:true});`});
       await context.addInitScript(recordBars);
       const page = await context.newPage();
       /** @type {string[]} */ const faults = [];
@@ -222,17 +222,26 @@ try {
       if (!measured) faults.push('Start code bytes or Server internal work counts absent');
       report.push({tag,faults:[...faults],log,readyAt,counts});
       if(grid){
-        await page.locator('.ws-load-play').click();await entered(page);
+        await page.locator('.ws-load-play').click();
+        await page.waitForFunction(()=>document.querySelector('.ws-load')===null);
+        await entered(page);
         const cell=await settled(page,attempt==='fresh-grid'?'driftwood-isle':'open-plot-4-1');
         if(cell.board!==null||cell.closed!==null)throw new Error('Entered cell retained its board or lost the server');
         if(attempt!=='fresh-grid'&&(earnedPose===null||Math.hypot(cell.serverX-earnedPose.x,cell.serverZ-earnedPose.z)>.003))throw new Error('Saved card disagrees with actual resumed pose');
         console.log(`${tag}: actual entered cell ${cell.current}, closed board`);
         if(attempt==='fresh-grid'){
+          // Earn the durable save in the ordinary unheld gameplay flow. The
+          // prior held-card attempt is validated separately; no save is seeded.
+          await page.evaluate(()=>{sessionStorage.setItem('codex.loading.walking','1');const w=Reflect.get(window,'__wildshard');if(w?.world===undefined)throw new Error('No live world');w.world.hud.setPaused(true);});
+          await page.getByText('Exit to main',{exact:true}).click();await page.locator('.ws-main-grid').waitFor({timeout:60000});
+          const loaded=page.waitForEvent('domcontentloaded',{timeout:60000});await page.locator('.ws-main-grid').click();await loaded;
+          await page.waitForFunction(()=>document.querySelector('.ws-load')===null,null,{timeout:150000});await entered(page);
           await walkGrid(page,0,-281.25);await walkGrid(page,1125,-281.25);await walkGrid(page,1125,-390);
           await settled(page,'open-plot-4-1');
           await page.evaluate(()=>{const save=Reflect.get(window,'__workerClientSave');if(save===undefined)throw new Error('No real save control');return save();});
           const saved=await observed(page);if(!saved.saved)throw new Error('Real Ember save was not acknowledged');
           earnedPose={x:saved.serverX,z:saved.serverZ};
+          await page.evaluate(()=>{sessionStorage.removeItem('codex.loading.walking');});
         }
         if(attempt!=='missing-art'){
           await page.evaluate(()=>{const game=Reflect.get(window,'__wildshard');if(game?.world===undefined)throw new Error('No live world');game.world.hud.setPaused(true);});
