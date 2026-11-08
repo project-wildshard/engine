@@ -54,10 +54,10 @@ async function main() {
   mkdirSync(dirname(report), {recursive: true});
   // This job installs full products even in ring-1: some of these files need
   // Driftwood and the whole road, beyond Ring 1's three-product inventory.
-  /** @type {NodeJS.ProcessEnv} */ const env = {...process.env, WS_TEST_QUARANTINE: 'only'};
+  /** @type {NodeJS.ProcessEnv} */ const env = {...process.env, WS_TEST_QUARANTINE: 'only', WS_CI_TIMINGS: `${report}.timings.json`};
   delete env.WILDSHARD_RING;
   const child = spawn(process.execPath, [fileURLToPath(new URL('vitest-tmp.ts', import.meta.url)), 'run', ...files,
-    '--maxWorkers=1', '--reporter=default', '--reporter=json', `--outputFile=${report}`], {env, stdio: 'inherit'});
+    '--maxWorkers=1', '--reporter=default', '--reporter=json', '--reporter=./scripts/engine-ci-budget.ts', `--outputFile=${report}`], {env, stdio: 'inherit'});
   /** @type {Promise<number>} */ const completed = new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', (code, signal) => resolve(signal === null ? code ?? 1 : 1)); });
   const code = await completed;
   const verdict = `J193 executed ${files.length} quarantined files; exit ${code}; original results ${report}`;
