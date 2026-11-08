@@ -44,7 +44,7 @@ import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 
-type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'presentHit' | 'presentDeath' | 'presentReward'>;
+type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
 export interface WorkerClientGrid {
   readonly cells: readonly { readonly instance: string; readonly slug: string }[];
@@ -95,7 +95,7 @@ const FIRST_ROWS_MS = 1500, FIRST_ROWS_POLL_MS = 20;
 /** How often a page whose frames are parked behind a panel still hears the server. */
 const PARKED_BEAT_MS = 120;
 const column = (name: string): number => ANIMAL_CLASS.row.findIndex(entry => entry.name === name);
-const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), STATE = column('state'), ATTACK = column('attackT'), FLINCH = column('flinch'), HP = column('hp'), ALIVE = column('alive'), RIDEABLE = column('rideable'), STRAFE = column('strafe'), BRACE = column('brace'), RISE = column('rise'), ACT = column('act');
+const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), STATE = column('state'), ATTACK = column('attackT'), ATTACK_DUR = column('attackDur'), ATTACK_STAMP = column('attackStamp'), WINDING = column('winding'), FLINCH = column('flinch'), HP = column('hp'), ALIVE = column('alive'), RIDEABLE = column('rideable'), STRAFE = column('strafe'), BRACE = column('brace'), RISE = column('rise'), ACT = column('act');
 
 /** What the page measures, as I6 lists it. */
 export interface WorkerClientReport {
@@ -135,7 +135,7 @@ function poseActs(names: ReadonlySet<string>): readonly string[] {
   return line === '' ? acts : [...acts, line];
 }
 /** A creature on screen, and the world's manager that holds it: a crossing leaves it behind. */
-interface RowBody { readonly body: Animal; readonly manager: Creatures }
+interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number }
 /** Every creature on this page is a row: a new one spawns through the real manager, one the server dropped retires. */
 function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map<number, RowBody>, retired: Map<string, number>, spawnMs: Map<string, number>, poses: ReadonlyMap<string, Record<string, number>>): void {
   for (const [handle, { body, manager }] of bodies) if (!client.entities.has(handle)) { manager.retire(body); bodies.delete(handle); }
@@ -171,9 +171,13 @@ function showRows(client: NetClient, net: NetPlayer, ports: WorkerClientPorts, b
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
   let shown = 0;
   near.length = 0;
-  for (const [handle, { body }] of bodies) {
+  for (const [handle, entry] of bodies) {
+    const { body, manager } = entry;
     if (handle === under || !interpolator.sample(handle, renderTick, row)) continue; // the body under this player is its own prediction (J48)
-    body.showRow({ x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, yaw: row[YAW] ?? 0, state: ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle', attack: row[ATTACK] ?? 0, flinch: row[FLINCH] ?? 0, strafe: row[STRAFE] ?? 0, brace: row[BRACE] ?? 0, hp: row[HP] ?? 0, alive: row[ALIVE] === 1, rise: row[RISE] ?? 0, act: row[ACT] ?? 0 }, dt);
+    const attack = row[ATTACK] ?? 0, duration = row[ATTACK_DUR] ?? 1, winding = row[WINDING] === 1;
+    const stamp = row[ATTACK_STAMP] ?? 0, started = winding && entry.windup !== stamp;
+    body.showRow({ x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, yaw: row[YAW] ?? 0, state: ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle', attack, attackDuration: duration, winding, flinch: row[FLINCH] ?? 0, strafe: row[STRAFE] ?? 0, brace: row[BRACE] ?? 0, hp: row[HP] ?? 0, alive: row[ALIVE] === 1, rise: row[RISE] ?? 0, act: row[ACT] ?? 0 }, dt);
+    if (started) { entry.windup = stamp; if (body.alive) manager.onWindup?.(body, duration); }
     shown++;
     if (row[RIDEABLE] === 1) rideable.add(handle);
     const { radius, height } = creatureBodyShape(body.dims, body.scale);

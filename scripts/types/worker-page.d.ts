@@ -8,6 +8,7 @@ import type {SkinLocker} from '../../src/client/game/cosmetics/locker';
 import type {Inventory} from '../../src/client/game/Inventory';
 import type {GridSession} from '../../src/client/game/grid/session';
 import type {WorkerClientReport} from '../../src/client/game/shardfile/clientWorker';
+import type {Animal} from '../../src/client/engine/entities/AnimalView';
 
 export type ProofResult = { ok: boolean } & Record<string, unknown>;
 export type ProofStep = (name: string, run: () => ProofResult | Promise<ProofResult>) => Promise<void>;
@@ -47,8 +48,8 @@ export interface WorkerSaveDocument {
 /** Observations made while real input goes through the worker. */
 export type RepairWindow = WorkerWindow & {
   __returnVictim: { id: string; at: number[]; boars: string[] } | null;
-  __windupProof: { events: { id: string; duration: number; at: number }[]; cues: number[]; warning: number | null; hints: string[]; hit: number | null };
+  __windupProof: { events: { id: string; duration: number; serverDuration: number; stamp: number; at: number }[]; cues: number[]; warning: number | null; hints: string[]; hit: number | null };
   __repairProof: { damage: { amount: number; head: boolean; died: boolean }[]; sounds: string[]; blood: number; kills: number; deaths: string[]; floats: string[]; loose: string[]; sailorAt: number[] | null };
-  __pineLife: { carcasses: { a: import('../../src/client/engine/entities/AnimalView').Animal; comeT: number; site: number }[]; ravens: { state: number }[] };
+  __pineLife: { carcasses: { a: Animal; comeT: number; site: number }[]; ravens: { state: number }[] };
   __hurtProof: { flashes: number; grunts: number; combat: number; shoves: number; arcs: string[]; bearings: { shown: number; expected: number }[]; hits: { amount: number; blow: boolean; at: number[] }[]; pageDamage: number };
 };

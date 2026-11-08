@@ -76,9 +76,9 @@ export class RowBodies {
   wetAt: ((x: number, z: number) => boolean) | null = null;
   onKill?: (animal: Animal) => void;
   onSound?: (name: string, position: Vector3) => void;
-  /** an attack's wind-up: no row says one yet, so on a wire this has nothing to fire it */
+  /** An authoritative attack's wind-up edge and real duration, delivered by the row adapter. */
   onWindup?: ((animal: Animal, dur: number) => void) | undefined;
-  /** every hit this page settled, which on a wire is none: amount, point, whether it was the head, whether it died */
+  /** Own confirmed contacts (or local practice): amount, point, headshot and lethal marker. */
   onDamage?: (animal: Animal, amount: number, hitPoint: Vector3, headshot: boolean, died: boolean) => void;
   /** a dev's word and a room's: nothing on this page acts on it, and a view reads it back */
   calm = false;

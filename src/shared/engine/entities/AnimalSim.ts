@@ -118,11 +118,12 @@ export class AnimalSim {
     out.flinchRoll = this.flinchRoll; out.flinchPitch = this.flinchPitch; out.brace = this.brace; out.deathSide = this.deathSide;
   }
   /** Stand as a wire row says (P1-E5.3 I6): a view of a body a server elsewhere runs. Nothing here decides or steps. */
-  showRow(row: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly state: AnimalState; readonly attack: number; readonly flinch: number; readonly strafe: number; readonly brace: number; readonly hp: number; readonly alive: boolean; readonly rise: number; readonly act: number }, dt: number): void {
+  showRow(row: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly state: AnimalState; readonly attack: number; readonly attackDuration?: number; readonly winding?: boolean; readonly flinch: number; readonly strafe: number; readonly brace: number; readonly hp: number; readonly alive: boolean; readonly rise: number; readonly act: number }, dt: number): void {
     const moved = Math.hypot(row.x - this.position.x, row.z - this.position.z);
     if (dt > 0) this.speed += (Math.min(moved / dt, 20) - this.speed) * Math.min(1, dt * 10);
     this.position.set(row.x, row.y, row.z); this.yaw = row.yaw; this.groundY = row.y; this.hp = row.hp; this.alive = row.alive;
-    this.state = row.state; this.attackT = row.attack > 0 ? row.attack : -1; this.attackDur = 1;
+    this.state = row.state; this.attackDur = row.attackDuration ?? 1;
+    this.attackT = (row.winding === true || row.attack > 0) ? row.attack * this.attackDur : -1;
     this.flinch = row.flinch; this.strafe = row.strafe; this.brace = row.brace;
     const { mem } = this;
     if (row.rise > 0 || mem['rise'] !== undefined) { mem['rising'] = Number(row.rise > (mem['rise'] ?? 0)); mem['rise'] = row.rise; mem['init'] = 1; }
@@ -190,6 +191,8 @@ export class AnimalSim {
   setStrafe(mps: number): void { this.desiredStrafe = mps; }
   startAttack(dur: number): void { this.attackT = 0; this.attackDur = Math.max(0.05, dur); this.attackStarted(this.attackDur); }
   get attackPhase(): number { return this.attackT < 0 ? -1 : Math.min(1, this.attackT / this.attackDur); }
+  /** Wrapped body-clock milliseconds at this attack's start. Existing motion checkpoints preserve both clocks. */
+  get attackStamp(): number { return this.attackT < 0 ? 0 : Math.round((this.elapsed - this.attackT) * 1000) >>> 0; }
   cancelAttack(): void { this.attackT = -1; }
   get stunned(): boolean { return this.stunT > 0; }
   damageFor(headshot: boolean, dist: number): number { return damageFor(headshot, dist, this.simPorts.random); }
