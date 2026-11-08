@@ -399,6 +399,8 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     for (let l = 0; l < 4; l++) this.legAbd[l] = ((l % 2 === 0) === (this.deathSide < 0)) ? 0.35 : 0.25;
     this.startRagdoll(dealt, point, dir);
   }
+  /** A settled wire death runs the existing collapse presentation without applying damage. */
+  presentDeath(dealt: number, point: THREE.Vector3, dir: THREE.Vector3): void { this.died(dealt, point, dir); }
   protected override damaged(dealt: number, point: THREE.Vector3, dir: THREE.Vector3, died: boolean): void { this.onDamaged?.(this, dealt, point, dir, died); }
   protected override staggered(strength: number, running: boolean): void { this.onStaggered?.(this, strength, running); }
 

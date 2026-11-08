@@ -13,6 +13,8 @@ export function installPageReturns(ctx: ShardContext, input: unknown): RespawnQu
   if (animals === undefined || world === undefined || world === null) throw new Error('Actor returns require the page population');
   const program = ReturnProgram.page(rows.program, ctx.scope);
   const queue = new RespawnQueue(rows.rules, rows.outOfSight, { order: 'reverse', limit: null, result: 'fresh' }, program);
+  // NativeReturns already owns these slots. Remote deaths still feed quest/ecology presentation, never a second population.
+  if (animals.herdless) return queue;
   let now = 0, check = 0;
   ctx.on('actor.died', ({ actor }) => {
     const body = animals.animals.find(candidate => candidate.combatActor() === actor);

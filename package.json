@@ -499,6 +499,7 @@
     "./saves/environment": "./src/shared/engine/saves/environment.ts",
     "./saves/forwardedStorage": "./src/server/engine/saves/forwardedStorage.ts",
     "./net/client": "./src/client/engine/net/client.ts",
+    "./net/messages": "./src/shared/engine/net/messages.ts",
     "./net/netPlayer": "./src/client/engine/net/netPlayer.ts",
     "./net/predictionWorld": "./src/client/engine/net/predictionWorld.ts",
     "./net/netSchemas": "./src/shared/engine/net/netSchemas.ts",

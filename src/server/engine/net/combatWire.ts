@@ -15,7 +15,7 @@ export type CombatEvent =
     readonly seen?: readonly [number, number, number] }
   | { readonly kind: 'died'; readonly tick: number; readonly id: string; readonly by: string | null;
     readonly dir: readonly [number, number, number]; readonly impulse: number }
-  | { readonly kind: 'reward'; readonly tick: number; readonly player: string; readonly coins: number; readonly body: string }
+  | { readonly kind: 'reward'; readonly tick: number; readonly player: string; readonly coins: number; readonly body: string; readonly item?: string }
   | { readonly kind: 'player-died'; readonly tick: number; readonly id: string; readonly checkpoint: boolean; readonly cause?: DeathCause }
   | NetView;
 
@@ -35,7 +35,7 @@ export class CombatWire {
       // The ragdoll's throw grows with the blow, as AnimalView.startRagdoll's does: each client simulates its own (J33).
       this.rows.push({ kind: 'died', tick: host.state.tick, id: actor.id, by, dir: [d.x, d.y, d.z], impulse: req.amount });
     }, host.scope);
-    host.events.on('reward.granted', ({ player, coins, body }) => { this.rows.push({ kind: 'reward', tick: host.state.tick, player, coins, body }); }, host.scope);
+    host.events.on('reward.granted', event => { this.rows.push({ kind: 'reward', tick: host.state.tick, ...event }); }, host.scope);
     host.events.on('player.died', ({ actor, checkpoint, cause }) => {
       this.rows.push({ kind: 'player-died', tick: host.state.tick, id: actor.id, checkpoint, ...(cause === undefined ? {} : { cause: { ...cause } }) });
     }, host.scope);

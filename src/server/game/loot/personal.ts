@@ -64,7 +64,7 @@ export function installPersonalLoot(host: SimHost, ports: PersonalLootPorts): vo
       if (coins <= 0 && items.length === 0) continue;
       ledgerDedupe.push(paid);
       if (coins > 0) { ports.grant(player, coins); host.events.emit('reward.granted', { player, coins, body: actor.id }); }
-      for (const { item, count } of items) { ledgerDedupe.push(itemKey(player, item)); ports.grantItem?.(player, item, count); }
+      for (const { item, count } of items) { ledgerDedupe.push(itemKey(player, item)); ports.grantItem?.(player, item, count); host.events.emit('reward.granted', { player, coins: 0, body: actor.id, item }); }
     }
   }, host.scope);
 }

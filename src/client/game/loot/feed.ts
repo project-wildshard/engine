@@ -16,7 +16,7 @@ export interface LootFeed {
 /** The server's payouts to this client: a body's coins, where the client last drew it. */
 export function netLootFeed(client: Pick<NetClient, 'onCombat' | 'fields' | 'latest'>): LootFeed {
   return { debug: {}, onPayout: pay => client.onCombat(event => {
-    if (event.kind !== 'reward') return;
+    if (event.kind !== 'reward' || event.coins <= 0) return;
     const row = client.latest === null ? null : client.fields(client.latest, event.body), { x, y, z } = row ?? {};
     pay({ at: { x: typeof x === 'number' ? x : 0, y: typeof y === 'number' ? y : 0, z: typeof z === 'number' ? z : 0 }, coins: event.coins });
   }) };

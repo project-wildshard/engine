@@ -14,6 +14,7 @@ import { curveAt } from '@wildshard/format/materials';
 import type { BodyShadow } from '../cosmetics/bodyShadow';
 import { ClaimedPickupRoster } from '../loot/runtime';
 import { isOwnedId, isCosmetic, type Owned } from '../../../shared/game/loot/Owned';
+import { wirePage } from '../shardfile/wirePage';
 import { rollLoot } from '../loot/tables';
 import { onCreatureDeath } from '../../../shared/game/loot/deaths';
 import type { DeclaredLootEconomy } from '../../../shared/game/shard/declaredRows';
@@ -30,6 +31,7 @@ export interface CollectionKeepsakeHost<A extends { kind: string; variant?: stri
   pickups: NonNullable<DeclaredLootEconomy['pickups']>;
   owner?: ShardContext;
   onDeath?: (run: (animal: A) => void, order: number) => void;
+  onDrop?: (run: (animal: A, item: string) => void) => void;
   owned: Owned;
   flags: Flags;
   place: (row: QuestPlace) => { x: number; y: number; z: number; yaw: number };
@@ -76,24 +78,33 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
     }));
   };
   apply(); const offOwned = owned.onChange(apply); scope?.onDispose(offOwned);
+  const awarded = new Set<string>();
   const roster = new ClaimedPickupRoster<string>(h.pickups, {
-    scene: h.game.scene, has: id => isOwnedId(id) && owned.has(id),
+    scene: h.game.scene, has: id => !awarded.has(id) && isOwnedId(id) && owned.has(id),
     model: id => { const row = rows.drops[id]; if (row === undefined) throw new Error(`Missing collection drop: ${id}`); return view.loose(row.model, row.trophy); },
     random: view.random, enter: (_id, drop) => { scope?.own(drop); },
     take: id => {
       const text = h.pickups[id]?.toast, row = rows.drops[id];
       if (!isOwnedId(id) || text === undefined || row === undefined) throw new Error(`Unknown collection pickup: ${id}`);
-      owned.grant(id); if (row.wear && isCosmetic(id)) owned.wear(id);
+      awarded.delete(id); owned.grant(id); if (row.wear && isCosmetic(id)) owned.wear(id);
       view.announce(text, 0.8);
     },
   });
   h.onDeath?.(animal => {
-    if (practiceRoomState.open) return;
+    if (practiceRoomState.open || wirePage.client !== null) return;
     const drop = roster.death(animal, h.player.position, rollLoot('trophies', animal).map(row => row.item));
     if (drop === null) return;
     if (drop.floor === 'ground') drop.at.y = h.floorAt(drop.at.x, drop.at.z);
     roster.spawn(drop.id, drop.at, true);
   }, 30);
+  h.onDrop?.((animal, item) => {
+    if (!Object.hasOwn(rows.drops, item)) return;
+    awarded.add(item);
+    const drop = roster.death(animal, h.player.position, [item]);
+    if (drop === null) { awarded.delete(item); return; }
+    if (drop.floor === 'ground') drop.at.y = h.floorAt(drop.at.x, drop.at.z);
+    roster.spawn(drop.id, drop.at, true);
+  });
   for (const row of rows.restore) {
     const at = h.rewardAt();
     if (flags.has(row.flag) && isOwnedId(row.item) && !owned.has(row.item) && at !== undefined) roster.spawn(row.item, at, false);
@@ -149,6 +160,7 @@ export async function installDeclaredCollectionKeepsakes<P extends object>(ctx: 
     place: row => adventure.place(row), floorAt: (x, z) => adventure.floorAt(x, z), rewardAt: () => adventure.finale?.rewardAt,
     owned: play.owned, sky: world.sky, player: world.player, hud: play.hud, audio: play.audio, music: play.music,
     body: play.bodyShadow ?? null, swords: owner.swords, registry: world.registry,
+    onDrop: run => { ctx.on('reward.granted', ({ body, item }) => { if (item === undefined) return; const animal = play.animals.animals.find(candidate => candidate.entityId === body); if (animal !== undefined) run(animal, item); }); },
     onDeath: (run, order) => { onCreatureDeath(ctx, () => play.animals.animals, run, order); },
     loose: collectionLoose(owner),
     game: collectionGamePorts(world.game, run => { ctx.system({ id: 'keepsakes', phase: 'update', after: ['game.loot', 'body-shadow'],

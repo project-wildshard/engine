@@ -42,7 +42,7 @@ export interface RowBodiesDraw {
   bloodBurst: (at: Vector3, dir: Vector3, strength: number) => void;
 }
 /** What the bodies read of the running app, live at each call: a region's frame swaps these under them. */
-export type RowBodiesHost = Pick<App, 'combat' | 'equipmentHost' | 'levelScope' | 'physics' | 'rng'>;
+export type RowBodiesHost = Pick<App, 'combat' | 'events' | 'equipmentHost' | 'levelScope' | 'physics' | 'rng'>;
 export interface RowBodyHit { animal: Animal; point: Vector3; distance: number; headshot: boolean; damage: number }
 /** A herd as a view holds one: who stands in it, about where. The server's herds are law. */
 export type RowHerd = HuntHerd<Animal>;
@@ -97,6 +97,7 @@ export class RowBodies {
   private readonly entityIds = new EntityIds('creature');
   private readonly spawned = new WeakSet<Animal>();
   private readonly gone = new WeakSet<Animal>();
+  private readonly deaths = new WeakMap<Animal, number>();
   private readonly playerPos = new Vector3();
   private bodies: CreatureBodies<Animal> | null = null;
   private hitResult: RowBodyHit | null = null;
@@ -228,15 +229,33 @@ export class RowBodies {
     }
     return bestA;
   }
+  /** Present an authoritative contact. Rows own health; only this player's contact gets numbers. */
+  presentHit(a: Animal, amount: number, point: Vector3, head: boolean, killed: boolean, own: boolean): void {
+    this.damaged(a, amount, point, point.clone().sub(this.playerPos).normalize(), killed, own, head, false);
+  }
+  /** Preserve the exact actor borrowed by quest and ecology listeners, without settling damage again. */
+  presentDeath(a: Animal, dir: Vector3, amount: number, tick: number, own: boolean): void {
+    if (this.deaths.get(a) === tick) return;
+    this.deaths.set(a, tick);
+    a.presentDeath(amount, a.position, dir);
+    if (own) this.onKill?.(a);
+    const actor = a.combatActor();
+    this.host.events.emit('actor.died', { actor, req: { source: 'env', sourceTags: ['dmg.remote'], target: actor, amount,
+      point: a.position.clone(), dir } });
+  }
+  /** The server already granted this owner's trophy; only its existing loose-pickup presentation runs here. */
+  presentReward(a: Animal, player: string, item: string): void {
+    this.host.events.emit('reward.granted', { player, coins: 0, body: a.entityId, item });
+  }
   /** A blow this page settled: its blood, its cry and its numbers. */
-  private readonly damaged = (a: Animal, amount: number, hitPoint: Vector3, dir: Vector3, died: boolean): void => {
+  private readonly damaged = (a: Animal, amount: number, hitPoint: Vector3, dir: Vector3, died: boolean, own = true, head?: boolean, kill = true): void => {
     const sp = speciesDef(a.kind);
     if (sp.blood !== false) this.draw.bloodBurst(hitPoint, dir, amount >= 80 ? 1.5 : 1);
     this.onSound?.(sp.sounds?.hurt ?? fallbackSound(a.aggressive, 'hurt'), a.position);
     a.headWorld(_p);
-    this.onDamage?.(a, amount, hitPoint, _p.distanceToSquared(hitPoint) < (a.dims.headRadius * a.scale + 0.06) ** 2, died);
-    if (died) this.onKill?.(a);
+    if (own) this.onDamage?.(a, amount, hitPoint, head ?? _p.distanceToSquared(hitPoint) < (a.dims.headRadius * a.scale + 0.06) ** 2, died);
+    if (died && kill) this.onKill?.(a);
   };
 }
 /** What a view may read of them. */
-export type RowBodiesView = Omit<RowBodies, 'build' | 'update'>;
+export type RowBodiesView = Omit<RowBodies, 'build' | 'update' | 'presentHit' | 'presentDeath' | 'presentReward'> & Partial<Pick<RowBodies, 'presentHit' | 'presentDeath' | 'presentReward'>>;

@@ -4,7 +4,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { LiveGridWire } from '../grid/liveSession';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
-import type { Vector3 } from 'three';
+import { Vector3 } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { importPageSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
@@ -13,6 +13,7 @@ import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
 import { countedWait } from '@wildshard/engine/boot/waits';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import type { NetClient } from '@wildshard/engine/net/client';
+import type { NetCombatEvent } from '@wildshard/engine/net/messages';
 import type { DeathCause } from '@wildshard/engine/combat/pipeline';
 import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
 import type { PredictedRow } from '@wildshard/engine/net/predictionWorld';
@@ -43,7 +44,7 @@ import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 
-type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire'>;
+type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
 export interface WorkerClientGrid {
   readonly cells: readonly { readonly instance: string; readonly slug: string }[];
@@ -296,7 +297,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   shell.ready();
   const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
+  const contacts: NetCombatEvent[] = [];
+  scope.onDispose(client.onTravel(() => { contacts.length = 0; }));
   scope.onDispose(client.onCombat(event => {
+    contacts.push(event);
     if (event.kind === 'hit' && event.confirmFor !== 0) { report.hits++; if (event.killed) report.kills++; }
     if (event.kind === 'reward') report.paid += event.coins;
   }));
@@ -353,6 +357,13 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const entered = grid?.items() ?? items;
     if (entered !== items) { items = entered; net.bindSlots(slotsOf(items)); }
     sayPoseInputs(); syncCreatures(client, animals, bodies, retired, spawnMs, poses);
+    if (here) for (const event of contacts.splice(0)) {
+      const entry = bodies.get(event.kind === 'hit' ? event.target : event.kind === 'died' ? event.id : event.body);
+      if (entry === undefined) continue;
+      if (event.kind === 'hit') entry.manager.presentHit?.(entry.body, event.amount, new Vector3(...event.at), event.head, event.killed, event.confirmFor !== 0);
+      else if (event.kind === 'reward') { if (event.item !== undefined) entry.manager.presentReward?.(entry.body, client.welcome?.player ?? '', event.item); }
+      else entry.manager.presentDeath?.(entry.body, new Vector3(...event.dir), event.impulse, event.tick, event.by === client.welcome?.handle);
+    }
     const arrows = client.owned.get(OWNED_ROW.arrows); // plus one, so an empty quiver is a line too
     if (arrows !== undefined && arrows !== arrowsSaid) { arrowsSaid = arrows; ports.weapons.mirrorArrows(arrows - 1); }
     bindMount(); offerMounts(); seatMount(); bindClaw();

@@ -371,7 +371,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   const wearSkin = (skin: SkinDef) => { const m = weaponModel(skin.weapon); if (m) { applySkin(m, skin, sky); effects.sync(weapons.get(skin.weapon), [{ id: `effect.finish.${skin.id}` }]); } skins.wear(skin.weapon, skin.id); };
   animals.onKill = (a) => {
     // a sword kill is at arm's length: "Reef crab · 1 m" read as a marker to crabs 30 m off (E296); a shot keeps its distance
-    hud.killFeed(game.level.fight.telegraphed === true ? `${a.label} killed` : `${a.label} · ${Math.round(a.position.distanceTo(player.position))} m`); progress.recordKill(a.kind, a.variant);
+    hud.killFeed(game.level.fight.telegraphed === true ? `${a.label} killed` : `${a.label} · ${Math.round(a.position.distanceTo(player.position))} m`);
+    if (player.link === null) progress.recordKill(a.kind, a.variant);
   };
   // E314 stage 3: the body shadow (ShardManifest.bodyShadow, src/engine/player/BodyShadow.ts) — hidden off play (the title, a practice
   // room, the free camera / tour) — and Driftwood's keepsakes (src/shards/driftwood-isle/loot/keepsakes.ts): the sea glass chime + charms,
