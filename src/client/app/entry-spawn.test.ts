@@ -6,6 +6,7 @@ import {stripTypeScriptTypes} from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- Inject finite module/cache ports into the real world-only continuation.
 import {runInNewContext} from 'node:vm';
 import {prepareBootImports} from './bootDownloads';
+import {bootAwait,bootMark,bootTask,bootTiming} from '@wildshard/engine/boot/timing';
 
 function deferred(): {ready: Promise<void>; finish: () => void} {
   let finish = (): void => {throw new Error('Missing deferred');};
@@ -20,11 +21,11 @@ function beforeCompletion(gate: Promise<void>, run: Promise<unknown>): Promise<v
 
 function continuation(ports: Record<string, unknown>): Promise<unknown> {
   const source = readFileSync(new URL('entry.ts', import.meta.url), 'utf8');
-  const start = source.indexOf('    const tables = prepareBootImports('), end = source.indexOf("    await import('three');", start);
+  const start = source.indexOf('    const tables = prepareBootImports('), end = source.indexOf("    await bootTask('app:three-import'", start);
   if (start === -1 || end < start) throw new Error('Missing early world download continuation');
   const body = source.slice(start, end).replaceAll(/\bimport\(([^)]+)\)/gu, 'load($1)');
   const result: unknown = runInNewContext(stripTypeScriptTypes(`(async () => {${body}})()`), {
-    prepareBootImports, search: new URLSearchParams('chunk=example'), ...ports,
+    prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, search: new URLSearchParams('chunk=example'), ...ports,
   });
   if (!(typeof result === 'object' && result !== null && 'then' in result && typeof result.then === 'function')) throw new Error('Missing root work');
   return Promise.resolve(result);
@@ -140,7 +141,7 @@ function selectedEntry(admissionFailure?: Error, packs = false) {
     '@wildshard/engine/game/systems/species/view/boar', '@wildshard/engine/game/plugin/weaponFamily']) modules[name] = kit;
   const result: unknown = runInNewContext(stripTypeScriptTypes(`${body}; startSelected();`), {
     runtimePacksOn: () => packs, search: new URLSearchParams('chunk=example'), unloadedTitleRow: () => undefined,
-    prepareBootImports, entryScope: {child: () => imageOwner}, selectedImages: undefined, crashResume: null,
+    prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, entryScope: {child: () => imageOwner}, selectedImages: undefined, crashResume: null,
     document: {getElementById: () => null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop}}},
     performance: {measure: noop},
     load: (name: string): Promise<unknown> => {

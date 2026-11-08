@@ -24,12 +24,11 @@ async function serverBytes(url: URL, path: string): Promise<Uint8Array> {
   if (body === null || bootTiming() === undefined) return new Uint8Array(await usable.arrayBuffer());
   return bootTask(`server:read-body:${path}`, async () => {
     const reader = body.getReader(), chunks: Uint8Array[] = []; let size = 0;
-    try {
-      for (;;) { const row = await reader.read(); if (row.done) break;
-        chunks.push(row.value); size += row.value.byteLength;
-        bootProgress(`download:${url.href}`, row.value.byteLength, null, 'decoded-body-bytes');
-      }
-    } finally { reader.releaseLock(); }
+    // Read to completion and drop the reader: releasing it can deadlock WebKit.
+    for (;;) { const row = await reader.read(); if (row.done) break;
+      chunks.push(row.value); size += row.value.byteLength;
+      bootProgress(`download:${url.href}`, row.value.byteLength, null, 'decoded-body-bytes');
+    }
     const bytes = new Uint8Array(size); let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     return bytes;
