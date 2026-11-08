@@ -8,12 +8,13 @@ import {linkNodeModules} from './link-node-modules.mjs';
 
 const root=process.cwd(),out=resolve(process.argv[2]??'tmp/engine-ci-budget-proof');mkdirSync(out,{recursive:true});
 const work=mkdtempSync(join(out,'run-')),report=join(work,'results.json');
+const importing=process.argv.includes('--import');
 try{
   linkNodeModules(root,work);
   writeFileSync(join(work,'package.json'),JSON.stringify({type:'module',private:true}));
-  writeFileSync(join(work,'actual.test.mjs'),"import{test}from'vitest';test('real timer',async()=>{await new Promise(resolve=>{setTimeout(resolve,25);});});");
+  writeFileSync(join(work,'actual.test.mjs'),importing?"import{test}from'vitest';await new Promise(resolve=>setTimeout(resolve,60));test('real import',()=>{});":"import{test}from'vitest';test('real timer',async()=>{await new Promise(resolve=>{setTimeout(resolve,25);});});");
   const reporter=pathToFileURL(resolve('scripts/engine-ci-budget.ts')).href;
-  writeFileSync(join(work,'vitest.config.mjs'),`export default {test:{cache:false,maxWorkers:1,include:['actual.test.mjs'],reporters:[['${reporter}',{maxMs:1}]]}};`);
+  writeFileSync(join(work,'vitest.config.mjs'),`export default {test:{cache:false,maxWorkers:1,include:['actual.test.mjs'],reporters:[['${reporter}',{maxMs:${importing?20:1}}]]}};`);
   const result=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','--root',work,'--config',join(work,'vitest.config.mjs')],{
     cwd:work,env:{...process.env,WS_CI_TIMINGS:report,TMPDIR:work,NODE_COMPILE_CACHE:join(work,'compile-cache')},encoding:'utf8',timeout:10000});
   if(result.error)throw result.error;

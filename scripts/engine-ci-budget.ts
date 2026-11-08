@@ -13,7 +13,12 @@ export default class EngineBudget implements Reporter{
     this.limit=Math.min(limit,60_000);
   }
   onTestRunEnd(modules:readonly TestModule[],_errors:readonly unknown[],reason:TestRunEndReason):void{
-    const files=modules.map(module=>({file:relative(process.cwd(),module.moduleId).replaceAll('\\','/'),state:module.state(),durationMs:module.diagnostic().duration}));
+    const files=modules.map(module=>{
+      const diagnostic=module.diagnostic();
+      return {file:relative(process.cwd(),module.moduleId).replaceAll('\\','/'),state:module.state(),
+        durationMs:diagnostic.duration+diagnostic.collectDuration+diagnostic.setupDuration+diagnostic.prepareDuration+diagnostic.environmentSetupDuration,
+        testAndHookMs:diagnostic.duration,collectMs:diagnostic.collectDuration};
+    });
     const slow=files.filter(file=>file.durationMs>this.limit);
     const {WS_CI_TIMINGS:timings,GITHUB_SHA:sha,GITHUB_RUN_ID:run}=process.env;
     const out=resolve(timings??`tmp/engine-ci/timings-${process.pid}.json`);mkdirSync(dirname(out),{recursive:true});
