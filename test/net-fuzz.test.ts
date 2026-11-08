@@ -39,11 +39,9 @@ const SEEDS = (process.env['NET_FUZZ_SEEDS'] ?? '20261105').split(',').map(Numbe
 const CLOCK = (): number => 0;
 
 let rapier: Rapier;
-let strips: Awaited<ReturnType<typeof bakedGridCollision>>;
 const products = new Map<string, HeadlessRuntimeInput>(), open: TrustedHeadlessResident[] = [];
 beforeAll(async () => {
   rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  strips = await bakedGridCollision();
 });
 afterAll(() => { for (const live of open.splice(0)) live.dispose(); });
 async function product(slug: string): Promise<HeadlessRuntimeInput> {
@@ -245,7 +243,9 @@ test('a client that hangs up leaves a server that still saves', { timeout: 10_00
 });
 
 // A crossing under fire: the acts and commands in flight when a player changes rooms belong to neither, and neither minds.
-test('a client crosses a seam while it fuzzes both rooms', { timeout: 10_000 }, async () => {
+// Ring 2: cold pinned-road collision bake plus a real 900-tick crossing exceeds ten seconds.
+test('a client crosses a seam while it fuzzes both rooms', { timeout: 60_000 }, async () => {
+  const strips = await bakedGridCollision();
   const control = new MessageChannel(), game = new MessageChannel(), storage = new PageStorage();
   let running: StandaloneGrid | undefined;
   const server = runStandaloneServer({ control: control.port1, game: game.port1, load: (_boot, slug) => product(slug), strips: () => Promise.resolve(strips),
