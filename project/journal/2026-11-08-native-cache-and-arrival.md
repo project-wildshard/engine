@@ -25,6 +25,10 @@ forced-byte-cache-deletion return and actual browser-process kill/restart.
 Every navigation has zero pending native cache calls, and page errors
 are empty. This is a local full-catalogue candidate proof; hosted staged
 Chromium/WebKit and the production repeat are still required.
+The full hook first found two old inline-epoch VM fixtures without DOM
+template APIs (5975 other cases passed). They now execute against real
+Happy DOM template nodes, preserving the epoch/retry/handoff assertions;
+the focused four-case check passes in 276 ms. Repeat the whole gate.
 
 The candidate's real Chromium one-byte quota override produced the
 native QuotaExceededError and still reached Nalati's completed card,
