@@ -58,7 +58,7 @@ const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'
 async function installSaves(only: readonly string[] = []): Promise<void> {
   const directory = 'test/pins/saves';
   if (!existsSync(directory)) return;
-  for (const name of readdirSync(directory).filter(name => name.endsWith('.json'))) {
+  for (const name of readdirSync(directory).filter(entry => entry.endsWith('.json'))) {
     const row = readJson(join(directory, name)) as {slug: string; file: string; remote?: boolean; sha256: string; bytes: number};
     if (row.remote !== true || (only.length > 0 && !only.includes(row.slug))) continue;
     if (!/^[a-f0-9]{64}$/u.test(row.sha256) || row.file !== `${row.sha256}.save.br`

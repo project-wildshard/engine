@@ -17,6 +17,7 @@ const {folderStore} = await import('../src/cook/game/packStore.ts');
 const {objectHeaders} = await import('../src/cook/game/cookWorker.ts');
 const {addStoredShards} = await import('./app-build/catalogue.ts');
 const {bareSlug} = await import('../src/shared/game/grid/catalogueSlot.ts');
+const {auditCook,reportCook} = await import('./cook-audit.ts');
 const root=process.cwd(),arg=process.argv.find(row=>row.startsWith('--out='));
 const out=resolvePath(arg?.slice(6)??'tmp/cook-to-play');
 mkdirSync(out,{recursive:true});
@@ -42,6 +43,8 @@ try {
   const dist=join(tree,'dist'),{build}=JSON.parse(readFileSync(join(dist,'version.json'),'utf8'));
   const cooked=join(work,'cooked');
   node(['scripts/ring-cook.mjs',`--out=${cooked}`,`--build=${build}`]);
+  const audit=await auditCook(join(cooked,'receipt.json'));reportCook(audit);
+  writeFileSync(join(out,'cook-audit.json'),JSON.stringify(audit));
   /** @type {{heads:{slug:string,hash:string}[],indexes:{slug:string,header:string,keys:string[]}[]}} */
   const receipt=JSON.parse(readFileSync(join(cooked,'receipt.json'),'utf8'));
   const store=folderStore(join(cooked,'store')),fetched=new Set();

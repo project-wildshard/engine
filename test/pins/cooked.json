@@ -1,0 +1,249 @@
+{
+  "version": 1,
+  "cook": {
+    "revision": "472c54475b49bcb96faec9e08c937b2544fb316f4aaf63ee04b16c5c317f3ed5",
+    "files": [
+      "pnpm-lock.yaml",
+      "scripts/cook-job.mjs",
+      "scripts/cook-revision.ts",
+      "src/cook/game/cookJob.ts",
+      "src/cook/game/entryReadSet.ts",
+      "src/cook/game/fenceReads.ts",
+      "src/cook/game/shardCook.ts",
+      "src/cook/game/spawnParts.ts",
+      "src/shared/engine/core/clock.ts",
+      "src/shared/game/shardfile/customSchema.ts",
+      "src/shared/game/shardfile/outputChecksNode.ts",
+      "src/shared/game/shardfile/outputDescriptor.ts",
+      "src/shared/game/shardfile/packReads.ts",
+      "src/shared/game/shardfile/schemaReferences.ts",
+      "src/shared/game/shardfile/spawnManifest.ts",
+      "src/shared/game/shardfile/wholeInputs.ts"
+    ],
+    "node": "24",
+    "brotli": "1.2.0",
+    "format": "github:project-wildshard/shardfile#v0.4.2"
+  },
+  "products": [
+    {
+      "slug": "template",
+      "shardfile": "b8380a16f5da7824736480c03295ec26e4ad758435dac98cb5ff6d94d770dd44",
+      "manifests": [
+        {
+          "tier": "phone",
+          "set": "entry",
+          "hash": "8f5a6f4f8f0bc5a68c1e680e41014ff955114c7919fa4bdf1c2e60a092056f51",
+          "raw": 1429397,
+          "wire": 268745,
+          "parts": []
+        },
+        {
+          "tier": "phone",
+          "set": "whole",
+          "hash": "a770443568487c0608df0ecee2a0dc47372c12bd466f0e9165b06c8cf88b7a74",
+          "raw": 5539649,
+          "wire": 561231,
+          "parts": [
+            {
+              "url": "/assets/spawn/parts/28cb5bcea70c8e94.pack.br",
+              "bytes": 17325,
+              "hash": "19a7add839f64680f081894750a40bece3a5c59c1745b5f393eeb2ec5da2e8f4"
+            },
+            {
+              "url": "/assets/spawn/parts/3b5428ad2db83785.pack.br",
+              "bytes": 2033,
+              "hash": "61a7038f316c9255a7a943f70d0028bc4ea6e7c8df1aa44e2481c119f5d77bf1"
+            },
+            {
+              "url": "/assets/spawn/parts/b040038280e4d93a.pack.br",
+              "bytes": 258089,
+              "hash": "f4089de91fe7a67ba0cd9c40128dfc7e687c06ed15b8fa4a72b00a38e7aad660"
+            }
+          ]
+        },
+        {
+          "tier": "desktop",
+          "set": "entry",
+          "hash": "aec776dc2eb5e572569b18bb4d246e811325e2aba891485de1833b40030209e8",
+          "raw": 1429397,
+          "wire": 268745,
+          "parts": []
+        },
+        {
+          "tier": "desktop",
+          "set": "whole",
+          "hash": "e7a7d87463f0573b6805f55b9592799f6259e780c87306d9bc767157647198ae",
+          "raw": 5539649,
+          "wire": 561231,
+          "parts": [
+            {
+              "url": "/assets/spawn/parts/28cb5bcea70c8e94.pack.br",
+              "bytes": 17325,
+              "hash": "19a7add839f64680f081894750a40bece3a5c59c1745b5f393eeb2ec5da2e8f4"
+            },
+            {
+              "url": "/assets/spawn/parts/3b5428ad2db83785.pack.br",
+              "bytes": 2033,
+              "hash": "61a7038f316c9255a7a943f70d0028bc4ea6e7c8df1aa44e2481c119f5d77bf1"
+            },
+            {
+              "url": "/assets/spawn/parts/b040038280e4d93a.pack.br",
+              "bytes": 258089,
+              "hash": "f4089de91fe7a67ba0cd9c40128dfc7e687c06ed15b8fa4a72b00a38e7aad660"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "blender-template",
+      "shardfile": "fbd3aba57d66811ef4bc2ecda1b6c4bfd23e6d55a2f54eb85c6a7cbb28316f02",
+      "manifests": [
+        {
+          "tier": "phone",
+          "set": "entry",
+          "hash": "a7d079fc5550a6828b6531332094ac7eeec30323ed742a3765f9ff6d5ecf00b3",
+          "raw": 1452272,
+          "wire": 1062713,
+          "parts": []
+        },
+        {
+          "tier": "phone",
+          "set": "whole",
+          "hash": "748be8f4d4fc3c9444fd8726a888215cdffb42ec1fbff9df6541153319b33fc1",
+          "raw": 1841372,
+          "wire": 1196608,
+          "parts": [
+            {
+              "url": "/assets/spawn/parts/0518fce1032712fc.pack.br",
+              "bytes": 9448,
+              "hash": "2439bd72dc63fce002e8f44484464c767eb7c6055abf901b9a8f1c24594b9d60"
+            },
+            {
+              "url": "/assets/spawn/parts/55e3f2f8eefe4f91.pack.br",
+              "bytes": 31392,
+              "hash": "2ad9a7cc19b5b4de092e3199fdd68dd0791a450d6f86ea997a8f1ff2a21d21d5"
+            },
+            {
+              "url": "/assets/spawn/parts/72a94a7c22450031.pack.br",
+              "bytes": 1030681,
+              "hash": "51ad789f7db61d8fdd23a8780cc1176b35280395f94bca46be351be1f5e0fa55"
+            }
+          ]
+        },
+        {
+          "tier": "desktop",
+          "set": "entry",
+          "hash": "7a557a060e1b6f0b318dc0f1c2647a33b54f8a6ad3bf1d7cef76cbe39e1d81cc",
+          "raw": 1452272,
+          "wire": 1062713,
+          "parts": []
+        },
+        {
+          "tier": "desktop",
+          "set": "whole",
+          "hash": "5dacf9747213cd6ad1877beb47acfe6747b1d8e0a73cca8729b3d3716b3124dc",
+          "raw": 1841372,
+          "wire": 1196608,
+          "parts": [
+            {
+              "url": "/assets/spawn/parts/0518fce1032712fc.pack.br",
+              "bytes": 9448,
+              "hash": "2439bd72dc63fce002e8f44484464c767eb7c6055abf901b9a8f1c24594b9d60"
+            },
+            {
+              "url": "/assets/spawn/parts/55e3f2f8eefe4f91.pack.br",
+              "bytes": 31392,
+              "hash": "2ad9a7cc19b5b4de092e3199fdd68dd0791a450d6f86ea997a8f1ff2a21d21d5"
+            },
+            {
+              "url": "/assets/spawn/parts/72a94a7c22450031.pack.br",
+              "bytes": 1030681,
+              "hash": "51ad789f7db61d8fdd23a8780cc1176b35280395f94bca46be351be1f5e0fa55"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "sunscar-dunes",
+      "shardfile": "75b8008d5b96b7c1b43075b8d1fdb1b437ff4afcbb3aefe9c86029775530dda4",
+      "manifests": [
+        {
+          "tier": "phone",
+          "set": "entry",
+          "hash": "2b82e4c6cf54edc359f783501a12349568563594ff985746a739eab7a2c7a34e",
+          "raw": 8433012,
+          "wire": 6601951,
+          "parts": []
+        },
+        {
+          "tier": "phone",
+          "set": "whole",
+          "hash": "2f2c3873004b9e0c639d53d5ea018073dcb89cd5e510a6cdd0c6e85f637dbe3b",
+          "raw": 10441926,
+          "wire": 8095049,
+          "parts": [
+            {
+              "url": "/assets/spawn/parts/6e025d32440e2dee.pack.br",
+              "bytes": 53557,
+              "hash": "bac7b921d0c14d4bf0d7632b5595d0ed990fcc209d2208103cb5a5ee2b16a857"
+            },
+            {
+              "url": "/assets/spawn/parts/c45b9a3c53b6e672.pack.br",
+              "bytes": 337154,
+              "hash": "d3ac9f2d03f6f5deeba64903a1c099eebfcd699f9319b8634615cb1e1bc081c8"
+            },
+            {
+              "url": "/assets/spawn/parts/85e12efafae94a71.pack.br",
+              "bytes": 1229400,
+              "hash": "be01bc3962b056c8e27c1ace2b8a7f07438ee2052b7bb10a81ba904aa0867ee1"
+            },
+            {
+              "url": "/assets/spawn/parts/c137cc18d0c7714f.pack.br",
+              "bytes": 5479903,
+              "hash": "ce703ad543d74acc037c072020d9ba122d2680cc2d27fc930d5f7359170ef8f8"
+            }
+          ]
+        },
+        {
+          "tier": "desktop",
+          "set": "entry",
+          "hash": "97244878ba56bebb004a8b4db8823669fadc6fc63e280a2c81615657815a63d1",
+          "raw": 8433012,
+          "wire": 6601951,
+          "parts": []
+        },
+        {
+          "tier": "desktop",
+          "set": "whole",
+          "hash": "b248f016c8e77eeb768e77f9cac0363b08196632d2c562a0dc46f3729686310c",
+          "raw": 10441926,
+          "wire": 8095049,
+          "parts": [
+            {
+              "url": "/assets/spawn/parts/6e025d32440e2dee.pack.br",
+              "bytes": 53557,
+              "hash": "bac7b921d0c14d4bf0d7632b5595d0ed990fcc209d2208103cb5a5ee2b16a857"
+            },
+            {
+              "url": "/assets/spawn/parts/c45b9a3c53b6e672.pack.br",
+              "bytes": 337154,
+              "hash": "d3ac9f2d03f6f5deeba64903a1c099eebfcd699f9319b8634615cb1e1bc081c8"
+            },
+            {
+              "url": "/assets/spawn/parts/85e12efafae94a71.pack.br",
+              "bytes": 1229400,
+              "hash": "be01bc3962b056c8e27c1ace2b8a7f07438ee2052b7bb10a81ba904aa0867ee1"
+            },
+            {
+              "url": "/assets/spawn/parts/c137cc18d0c7714f.pack.br",
+              "bytes": 5479903,
+              "hash": "ce703ad543d74acc037c072020d9ba122d2680cc2d27fc930d5f7359170ef8f8"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
