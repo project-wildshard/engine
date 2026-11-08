@@ -12,3 +12,9 @@ for resources. A hit names its original run and starts no heavy work. A
 miss keeps the existing authenticated lease, all generation/static/tests,
 final clean-tree capture and proof write. CI still never reuses. The
 ephemeral compatibility root/token remain excluded; the real root stays.
+
+A direct Git child reproduces another identity difference: Git prepends
+its exec directory to PATH (zero copies before, one afterwards). Normalize
+the actual execution environment to that same Git-prefixed search order
+and remove exact duplicate entries. PATH remains in the fingerprint; no
+tool directory is ignored and the original relative search order stays.

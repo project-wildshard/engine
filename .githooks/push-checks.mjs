@@ -1,6 +1,6 @@
 import {execFileSync,spawn} from 'node:child_process';
 import {constants, getPriority, loadavg,homedir} from 'node:os';
-import {resolve} from 'node:path';
+import {resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE} from '../scripts/push-budget.mjs';
@@ -13,6 +13,12 @@ export function pushEnvironment(environment=process.env){
   const env={...environment,WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
     WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1',WS_CPU_ADMISSION:'1',
     WS_HEAVY_SCHEDULER_ROOT:resolve(environment.WS_HEAVY_SCHEDULER_ROOT??environment.WS_HEAVY_ROOT??resolve(homedir(),'.wildshard-heavy-lanes'))};
+  // Git prepends its exec directory when it invokes a hook. Execute both gate
+  // entries with that same effective search order; duplicate entries add no tool.
+  if(environment.PATH!==undefined){
+    const gitPath=execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim();
+    env.PATH=[...new Set([gitPath,...environment.PATH.split(delimiter)])].join(delimiter);
+  }
   Reflect.deleteProperty(env,'WILDSHARD_RING');Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');return env;
 }
 
