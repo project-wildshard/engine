@@ -7,7 +7,7 @@ import * as v from 'valibot';
 
 const directory=resolvePath(process.argv[2]??'tmp/push-queue-proof');mkdirSync(directory,{recursive:true});
 const work=mkdtempSync(join(directory,'run-')),repo=join(work,'repo'),remote=join(work,'remote.git'),observed=join(work,'observed.jsonl');mkdirSync(repo);
-const jobSchema=v.object({id:v.string(),sha:v.string(),snapshot:v.string(),state:v.string(),error:v.optional(v.string())});
+const jobSchema=v.object({id:v.string(),sha:v.string(),requestedSha:v.optional(v.string()),snapshot:v.string(),state:v.string(),error:v.optional(v.string())});
 try{
  execFileSync('git',['init','--quiet','--bare','--initial-branch=main',remote]);
  /** @param {string[]} args */
@@ -26,6 +26,14 @@ try{
   writeFileSync(join(repo,'value.json'),JSON.stringify({value}));git(['commit','--quiet','-m',`value ${value}`,'--','value.json']);
   commits.push(git(['rev-parse','HEAD']));
  }
+ // An independent main advances before capture. Rebase only the immutable
+ // request, never the lane's dirty checkout, then check the actual derived tip.
+ const upstream=join(work,'upstream');execFileSync('git',['clone','--quiet',remote,upstream]);
+ execFileSync(process.execPath,['prepare-tools.mjs'],{cwd:upstream});
+ execFileSync('git',['config','core.hooksPath','.githooks'],{cwd:upstream});
+ writeFileSync(join(upstream,'upstream.txt'),'retained upstream bytes');
+ for(const args of [['add','upstream.txt'],['commit','--quiet','-m','independent main'],['push','--quiet','origin','main']])
+  execFileSync('git',['-c','user.name=Queue proof','-c','user.email=proof@example.test',...args],{cwd:upstream});
  // The lane has already moved on: each requested ancestor must stay exact.
  for(const sha of commits){
   const captured=v.parse(jobSchema,JSON.parse(execFileSync(process.execPath,[script,'enqueue',repo,`--commit=${sha}`,`--root=${queue}`],{encoding:'utf8'})));jobs.push(captured);
@@ -42,9 +50,12 @@ try{
  }
  assert.deepEqual(results.map(job=>job.state),['pushed','pushed','failed','failed'],JSON.stringify(results));
  const rows=v.parse(v.array(v.object({sha:v.string(),value:v.number()})),readFileSync(observed,'utf8').trim().split('\n').map(line=>JSON.parse(line)));
- assert.deepEqual(rows.slice(-5,-1).map(row=>[row.sha,row.value]),jobs.slice(0,2).flatMap((job,index)=>[[job.sha,index+2],[job.sha,index+2]]));
- assert.equal(execFileSync('git',['--git-dir',remote,'rev-parse','refs/heads/main'],{encoding:'utf8'}).trim(),jobs[1]?.sha);
+ assert.deepEqual(rows.slice(-5,-1).map(row=>[row.sha,row.value]),results.slice(0,2).flatMap((job,index)=>[[job.sha,index+2],[job.sha,index+2]]));
+ assert.equal(execFileSync('git',['--git-dir',remote,'rev-parse','refs/heads/main'],{encoding:'utf8'}).trim(),results[1]?.sha);
+ assert.deepEqual(results.map(job=>job.requestedSha),commits);
+ assert.ok(results.slice(0,2).every((job,index)=>job.sha!==commits[index]));
+ assert.equal(execFileSync('git',['--git-dir',remote,'show','main:upstream.txt'],{encoding:'utf8'}),'retained upstream bytes');
  assert.ok(jobs.every(job=>!existsSync(job.snapshot)));
  assert.match(results[3]?.error??'',/value\.json/u,'Changed source must name the actual path before cleanup');
- console.log(JSON.stringify({orderedPushes:2,requestedAncestorsPreserved:true,declaredToolsPrepared:true,normalHookFailureBlocked:true,changedSourceBlocked:true,changedPathReported:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
+ console.log(JSON.stringify({orderedPushes:2,immutableRequestsRetained:true,advancedMainRebasedBeforeCheck:true,declaredToolsPrepared:true,normalHookFailureBlocked:true,changedSourceBlocked:true,changedPathReported:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
 }finally{rmSync(work,{recursive:true,force:true});}

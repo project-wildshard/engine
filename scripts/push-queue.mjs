@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import * as v from 'valibot';
 
 const self=import.meta.filename,lock=fileURLToPath(new URL('push-queue-lock.py',import.meta.url));
-const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string()});
+const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string()});
 const terminal=new Set(['pushed','checked','already-published','failed','published-unverified','publication-unknown']);
 const keepalive='ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes';
 
@@ -90,25 +90,31 @@ async function drain(directory){
   const save=(state,extra={})=>{job.state=state;write(file,{...job,...extra});};
   try{
    if(git(snapshot,['rev-parse','HEAD'])!==job.sha)throw new Error('Queue snapshot changed before checking');
-   save('installing');run('pnpm',['install','--frozen-lockfile']);
-   const manifest=v.parse(v.object({scripts:v.optional(v.record(v.string(),v.string()),{})}),JSON.parse(readFileSync(join(snapshot,'package.json'),'utf8')));
-   if(manifest.scripts['tools:install']!==undefined)run('pnpm',['run','tools:install']);
-   const {pins}=manifest.scripts;if(pins!==undefined)run('pnpm',['pins']);
-   run('git',['fetch','origin','main']);const remote=git(snapshot,['rev-parse','refs/remotes/origin/main']);
+   run('git',['fetch','origin','main']);let remote=git(snapshot,['rev-parse','refs/remotes/origin/main']);
    if(!job.checkOnly){
     const contains=spawnSync('git',['merge-base','--is-ancestor',job.sha,remote],{cwd:snapshot,stdio:'ignore'});
     if(contains.status===0){save('already-published',{remote,finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000});continue;}
     if(contains.status!==1)throw new Error('Could not verify remote ancestry');
+    job.requestedSha??=job.sha;job.requestedTree??=job.tree;
+    save('rebasing');run('git',['pull','--rebase','origin','main']);
+    remote=git(snapshot,['rev-parse','refs/remotes/origin/main']);
+    job.sha=git(snapshot,['rev-parse','HEAD']);job.tree=git(snapshot,['rev-parse','HEAD^{tree}']);
    }
-   const base=git(snapshot,['merge-base',remote,job.sha]);
-   if(!job.checkOnly&&base!==remote)throw new Error('Remote advanced: rebase the source and enqueue its new immutable tip');
-   if(!job.checkOnly)run('git',['pull','--rebase','origin','main']);
-   if(git(snapshot,['rev-parse','HEAD'])!==job.sha)throw new Error('Remote changed the captured tip; re-enqueue from source');
+   const base=job.checkOnly?git(snapshot,['merge-base',remote,job.sha]):remote;
+   // Install the actual rebased lockfile, not the pre-rebase dependency graph.
+   save('installing');run('pnpm',['install','--frozen-lockfile']);
+   const manifest=v.parse(v.object({scripts:v.optional(v.record(v.string(),v.string()),{})}),JSON.parse(readFileSync(join(snapshot,'package.json'),'utf8')));
+   if(manifest.scripts['tools:install']!==undefined)run('pnpm',['run','tools:install']);
+   const {pins}=manifest.scripts;if(pins!==undefined)run('pnpm',['pins']);
    if(git(snapshot,['status','--porcelain','--untracked-files=normal'])!=='')throw new Error('Preparation changed tracked or untracked source');
    save('checking');
    run('bash',['.githooks/pre-push','origin',job.remote],`refs/heads/main ${job.sha} refs/heads/main ${base}\n`);
    verifySnapshot(snapshot,job,'after the normal hook, before publication');
-   if(!job.checkOnly){save('pushing');run('git',['push','origin',`${job.sha}:refs/heads/main`]);pushed=true;}
+   if(!job.checkOnly){
+    run('git',['fetch','origin','main']);const latest=git(snapshot,['rev-parse','refs/remotes/origin/main']);
+    if(latest!==remote)throw new Error(`Remote advanced after checking to ${latest}; re-enqueue immutable input ${job.requestedSha??job.sha}; no stale push attempted`);
+    save('pushing');run('git',['push','origin',`${job.sha}:refs/heads/main`]);pushed=true;
+   }
    verifySnapshot(snapshot,job,'after the normal push');
    save(job.checkOnly?'checked':'pushed',{finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000});
   }catch(error){save(pushed?'published-unverified':job.state==='pushing'?'publication-unknown':'failed',{finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000,error:error instanceof Error?error.message:String(error)});}
