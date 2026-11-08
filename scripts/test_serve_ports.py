@@ -119,6 +119,9 @@ os.execv({sys.executable!r}, [{sys.executable!r}, *sys.argv[1:]])
             self.fail('Node is required for the detached preview regression')
         self.command('node', f'''#!{sys.executable}
 import os,sys
+if sys.argv[1]=='scripts/pins.ts':
+    assert sys.argv[2:]==['install'], sys.argv
+    sys.exit(0) # External product preparation, like the generator/build roles below.
 if sys.argv[1] in ('scripts/gen.mjs','scripts/build-shardfiles.mjs'):
     if os.environ.get('FIXTURE_SOURCE_ONLY') and sys.argv[1]=='scripts/gen.mjs':
         assert '--inputs-only' in sys.argv or '--proof' in sys.argv, 'duplicate product phase: '+str(sys.argv)
