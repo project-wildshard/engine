@@ -74,7 +74,7 @@
     "oxlint-tsgolint": "7.0.2004",
     "playwright": "1.65.0",
     "rolldown": "1.2.16",
-    "sharp": "0.34.5",
+    "sharp": "0.35.5",
     "vite": "8.3.0",
     "vitest": "5.0.1",
     "ws": "8.22.0"
