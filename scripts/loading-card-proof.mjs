@@ -97,12 +97,20 @@ function recordBars() {
 
 }
 
-const title=/id="ws-title-rows"[^>]*>(.*?)<\/script>/su.exec(readFileSync(join(root,'dist','index.html'),'utf8'))?.[1];
+const remote=option('base');
+if(remote!==undefined&&remote!=='https://wildshard-singleplayer.vercel.app')throw new Error('Remote proof requires the real production origin');
+if(remote!==undefined){
+  const response=await fetch(`${remote}/version.json`,{cache:'no-store'}),version=await response.json();
+  if(!response.ok||version.build!==option('expect-build-id')||version.saveEpoch!==1)throw new Error('Unexpected production build or save epoch');
+  console.log('Exact production loading proof',JSON.stringify(version));
+}
+const html=remote===undefined?readFileSync(join(root,'dist','index.html'),'utf8'):await(await fetch(remote,{cache:'no-store'})).text();
+const title=/id="ws-title-rows"[^>]*>(.*?)<\/script>/su.exec(html)?.[1];
 if(title===undefined)throw new Error('Built title catalogue is absent');
 const installed=/** @type {{slug:string}[]} */(JSON.parse(title));
 for(const requested of grid?['driftwood-isle','open-plot-ember-forge']:[shard])
   if(!installed.some(row=>row.slug===requested))throw new Error(`Built catalogue lacks ${requested}; use its exact slug/full build`);
-const preview = await serve(root, '', true);
+const preview = remote===undefined?await serve(root, '', true):{url:remote,close:()=>undefined};
 const report = [];
 try {
   for (const name of ['chromium', 'webkit']) {

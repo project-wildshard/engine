@@ -1,6 +1,6 @@
 /** @typedef {import('./types/worker-page').WorkerWindow} WorkerWindow */
 import { saveFixture } from './debug-settings.mjs';
-import { FLOOR_GRID_ENTER, FLOOR_GRID_TAP } from './frame-floor-navigation.mjs';
+import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { chromium, webkit } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -34,12 +34,10 @@ export const observed = page => page.evaluate(() => {
     frames: r.frames, closed: r.closed };
 });
 
-/** The existing title handoff returns its protocol result before fresh-page navigation.
+/** Exercise the actual trusted title control, with its navigation listener armed first.
  * @param {import('playwright').Page} page */
 async function tapGrid(page) {
-  const loaded = page.waitForEvent('domcontentloaded', { timeout: 60_000 });
-  await page.evaluate(FLOOR_GRID_TAP);
-  await loaded;
+  await Promise.all([page.waitForEvent('domcontentloaded', { timeout: 60_000 }), page.locator('.ws-main-grid').click()]);
 }
 
 /** Real movement in world coordinates through the two public road legs, never a forced travel or readiness event.
@@ -106,7 +104,7 @@ export async function gridEntry(_browser, phone, base, step) {
   const errors = /** @type {string[]} */ ([]);
   let phase = 'entry';
   let page = context.pages()[0] ?? await context.newPage();
-  const watch = () => { const watched = page; watched.on('pageerror', error => { errors.push(error.message); console.log('grid-entry pageerror', JSON.stringify({ phase, url: watched.url(), message: error.message, stack: error.stack })); }); };
+  const watch = () => { const watched = page; watched.on('pageerror', error => { errors.push(error.message); console.log('grid-entry pageerror', JSON.stringify({ phase, url: watched.url(), name: error.name, message: error.message, stack: error.stack })); }); };
   watch();
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   const url = new URL('/?mute=1&nolock=1&sw=0', base).href;

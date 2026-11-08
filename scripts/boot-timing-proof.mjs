@@ -33,7 +33,15 @@ const serverNetwork=process.argv.includes('--server-network');
 const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'sunscar-dunes':'template');
 const swDelay=delayKind==='sw-open'||delayKind==='sw-put';
 const controlled = option('sw') === 'warm' || swDelay;
-const preview = await serve(root, '', true);
+const remote=option('base');
+if(remote!==undefined&&remote!=='https://wildshard-singleplayer.vercel.app')throw new Error('Remote proof requires the real production origin');
+if(remote!==undefined){
+  assert.equal(delayKind,undefined,'Network fault proxies require a local finished build');
+  const response=await fetch(`${remote}/version.json`,{cache:'no-store'}),version=await response.json();
+  assert.ok(response.ok);assert.equal(version.build,option('expect-build-id'));assert.equal(version.saveEpoch,1);
+  console.log('Exact production timing proof',JSON.stringify(version));
+}
+const preview = remote===undefined?await serve(root, '', true):{url:remote,close:()=>undefined};
 const expectedBuild=option('expect-build');
 const proxy=delayKind!==undefined && (swDelay||delayKind==='server')?await bootTimingDelay(preview.url,delayKind,delayMs):undefined;
 try {
