@@ -37,18 +37,21 @@ export async function deathOrder(browser, phone, base, step) {
       }
       const killer = p.bots[0];
       if (killer === undefined) throw new Error('No partner');
-      world.game.levelScope.onDispose(killer.client.onCombat(event => { if (event.kind === 'hit' && event.target === p.handle && event.killed) p.killed++; }));
+      world.game.levelScope.onDispose(killer.client.onCombat(event => { if (event.kind === 'hit' && killer.client.entities.get(event.target)?.id === p.id && event.killed) p.killed++; }));
       w.__workerClientHits(6000);
       world.player.link.place(-160, 3, -188, 0);
       world.hud.setPaused(true);
     });
+    await page.waitForFunction(() => (/** @type {OrderWindow} */ (window)).__deathOrder.bots.every(bot => bot.client.latest !== null), undefined, { timeout: 10_000 });
     await step('death-order: real kill and authored return queue death plus reliable despawn while presentation is parked', async () => {
       for (let attempt = 0; attempt < 30; attempt++) {
         if (await page.evaluate(() => (/** @type {OrderWindow} */ (window)).__deathOrder.killed > 0)) break;
         await page.evaluate(() => {
           const p = (/** @type {OrderWindow} */ (window)).__deathOrder, killer = p.bots[0];
-          const row = p.client.latest === null ? null : p.client.fields(p.client.latest, p.handle);
-          if (killer === undefined || row === null) throw new Error('No partner target');
+          if (killer === undefined) throw new Error('No partner');
+          const target = [...killer.client.entities].find(([, info]) => info.id === p.id);
+          const row = killer.client.latest === null || target === undefined ? null : killer.client.fields(killer.client.latest, target[0]);
+          if (row === null) return;
           killer.move(Number(row.x) + .8, Number(row.y), Number(row.z) + .8);
         });
         await page.waitForTimeout(180);

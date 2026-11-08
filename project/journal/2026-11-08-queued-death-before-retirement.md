@@ -26,3 +26,5 @@ manager's pinned retire method also faults its native loan; the final
 proof observes death and manager membership without replacing it.
 
 Hand this additive repair to codex-port for normal publication.
+
+Final repetitions: three fresh successful Chromium and three WebKit boots each heard one real death plus reliable despawn while parked, then presented exactly one death before retiring the body. A third WebKit fixture attempt initially read the distant observer's absent relevant row before attacking; it never killed a target. The partner now waits for actual joined frames and aims from its own real snapshot, matching targets by server identity. Its retry passes. This changes proof inputs only. No manager spawn/retire identity is replaced.
