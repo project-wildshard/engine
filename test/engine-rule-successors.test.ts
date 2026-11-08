@@ -5,7 +5,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
+import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { debitNativeInventory } from '../src/shared/game/inventoryLaw';
 import { nativeQuestPromptRoster } from '../src/server/game/quest/nativeComposition';
@@ -19,6 +19,8 @@ import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 import inputs from './fixtures/engine-lift/inputs.json' with { type: 'json' };
 
 const products = new Map<string, HeadlessRuntimeInput>();
+// Keep every earned native checkpoint without boxing each Rapier byte into a
+// number array. The same strict resident admission owns and restores all bytes.
 beforeAll(async () => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   for (const slug of ['pine-hollow', 'nalati-grasslands', 'driftwood-isle']) {
@@ -27,7 +29,7 @@ beforeAll(async () => {
   }
 });
 function input(slug: string): HeadlessRuntimeInput { const value = products.get(slug); if (value === undefined) throw new Error('Missing admitted test product'); return value; }
-function open(slug: string, saved?: ReturnType<typeof snapshotSimHost>): Promise<TrustedHeadlessResident> {
+function open(slug: string, saved?: ReturnType<typeof snapshotSimHostBytes>): Promise<TrustedHeadlessResident> {
   return createTrustedHeadlessResident(input(slug), saved, { room: true });
 }
 function step(live: TrustedHeadlessResident, ticks = 1, commands: readonly HeadlessCommand[] = []): void {
@@ -55,7 +57,7 @@ test('Pine pays Miller after its paid flag, and the actual paid adventure resume
     });
     for (let line = 0; line < 32 && !host.flags.has('errand:paid'); line++) { press(live, 'talk.miller'); step(live, 20); }
     expect(host.flags.has('errand:paid')).toBe(true); expect(paidBeforeAnyReward).toBe(true);
-    resumed = await open('pine-hollow', snapshotSimHost(host));
+    resumed = await open('pine-hollow', snapshotSimHostBytes(host));
     expect(resumed.effects).toEqual([]); expect(resumed.host.flags.has('errand:paid')).toBe(true);
     expect(debitNativeInventory(resumed.host, 'pack', { item: 'lodge-ribbon', count: 3 })).toBe(true);
     expect(debitNativeInventory(resumed.host, 'pack', { item: 'amber-resin', count: 4 })).toBe(true);
@@ -80,7 +82,7 @@ test('a Nalati adventure resumes its real movement and spent bow ammunition with
     for (let tick = 0; tick < 60; tick++) live.step([{ kind: 'player', moveX: 1, moveZ: 0, yaw: 0 }]);
     expect(arms.arrows()).toBeLessThan(initial); expect(player.position.distanceTo(start)).toBeGreaterThan(.5);
     const arrows = arms.arrows(), position = player.position.clone();
-    resumed = await open('nalati-grasslands', snapshotSimHost(live.host));
+    resumed = await open('nalati-grasslands', snapshotSimHostBytes(live.host));
     expect(resumed.effects).toEqual([]);
     expect(resumed.host.flags.has(firstFlag)).toBe(true);
     expect(heldArmsOf(resumed.host)?.of(leadPlayer(resumed.host)).arrows()).toBe(arrows);
@@ -117,7 +119,7 @@ test('the real harbour rack refuses a living guard despite a stale defeat flag, 
     expect(sailor.alive, `hp ${sailor.hp}; player ${player.health.attributes.health}; swings ${gear.swings()}; hits ${gear.hits()}`).toBe(false);
     tryRack();
     expect(gear.held()).not.toBe(before);
-    resumed = await open('driftwood-isle', snapshotSimHost(live.host)); expect(resumed.effects).toEqual([]);
+    resumed = await open('driftwood-isle', snapshotSimHostBytes(live.host)); expect(resumed.effects).toEqual([]);
     expect(nativeMeleeItem(resumed.host, 'item.driftwood-isle.swords').held()).toBe(gear.held());
   } finally { resumed?.dispose(); live.dispose(); }
 }, 10_000);
@@ -153,7 +155,7 @@ test('real mounted lance steering rejects the side cone and spends a target cont
     place(2, 1); for (let tick = 0; tick < 6; tick++) live.step([reins()]); expect(damage).toEqual([]);
     place(0, 2); for (let tick = 0; tick < 8; tick++) live.step([reins()]);
     expect(damage).toHaveLength(1); expect(victim.alive).toBe(true);
-    const health = victim.hp, saved = snapshotSimHost(host);
+    const health = victim.hp, saved = snapshotSimHostBytes(host);
     place(3, 1); for (let tick = 0; tick < 6; tick++) live.step([reins()]);
     place(0, 2); for (let tick = 0; tick < 6; tick++) live.step([reins()]);
     expect(victim.hp).toBe(health); expect(damage).toHaveLength(1);
@@ -165,12 +167,12 @@ test('real mounted lance steering rejects the side cone and spends a target cont
   } finally { resumed?.dispose(); live.dispose(); }
 }, 10_000);
 
-let titanFight: ReturnType<typeof snapshotSimHost> | undefined;
-let titanWind: ReturnType<typeof snapshotSimHost> | undefined, titanFire: ReturnType<typeof snapshotSimHost> | undefined;
-let titanArrows: ReturnType<typeof snapshotSimHost> | undefined, titanWindAt: number | undefined;
-let titanSupport: ReturnType<typeof snapshotSimHost> | undefined, titanSupportHp: number | undefined, titanRiderChip: number | undefined;
-let titanContact: ReturnType<typeof snapshotSimHost> | undefined, titanBurning: ReturnType<typeof snapshotSimHost> | undefined;
-let titanSpent: ReturnType<typeof snapshotSimHost> | undefined, titanFireCell: { cell: number; active: number; spent: number } | undefined;
+let titanFight: ReturnType<typeof snapshotSimHostBytes> | undefined;
+let titanWind: ReturnType<typeof snapshotSimHostBytes> | undefined, titanFire: ReturnType<typeof snapshotSimHostBytes> | undefined;
+let titanArrows: ReturnType<typeof snapshotSimHostBytes> | undefined, titanWindAt: number | undefined;
+let titanSupport: ReturnType<typeof snapshotSimHostBytes> | undefined, titanSupportHp: number | undefined, titanRiderChip: number | undefined;
+let titanContact: ReturnType<typeof snapshotSimHostBytes> | undefined, titanBurning: ReturnType<typeof snapshotSimHostBytes> | undefined;
+let titanSpent: ReturnType<typeof snapshotSimHostBytes> | undefined, titanFireCell: { cell: number; active: number; spent: number } | undefined;
 
 // Each bounded continuation consumes the preceding actual save, never a
 // hand-built phase. Bow damage and fire contact/burning/spent checkpoints
@@ -180,7 +182,8 @@ function earnTitanPhase(live: TrustedHeadlessResident, goal: number, health?: nu
   if (mount === undefined || arena === undefined) throw new Error('Missing actual Titan continuation');
   host.combat.playerRules(host.scope, { bossGod: true });
   let blade = false;
-  for (let tick = 0; tick < 6000 && arena.boss.phase < goal && (health === undefined || arena.fight.hpFrac > health); tick++) {
+  for (let tick = 0; tick < 6000 && arena.boss.phase < goal; tick++) {
+    if (health !== undefined && !(arena.fight.hpFrac > health)) break;
     if (tick % 900 === 0) heldArmsOf(host)?.of(player).refill();
     const rider = arena.boss.phase === 1 ? [...host.entities.values()].find(body => body.alive && body.kind === 'ghost-rider') : undefined;
     const target = rider?.position.clone() ?? arena.fight.rowlessFocus(), p = player.position;
@@ -223,7 +226,7 @@ test('real mounted entry earns the Titan fight checkpoint', async () => {
     for (let tick = 0; tick < 240 && arena.boss.state !== 'fight'; tick++) live.step([{ kind: 'script', actorId: 'nalati.titan.skip', value: 1 }]);
     expect(arena.boss.state).toBe('fight');
     mount.teleport(data.arena.center.x + 10, data.arena.center.z + 10, 0);
-    titanFight = snapshotSimHost(host);
+    titanFight = snapshotSimHostBytes(host);
   } finally { live.dispose(); }
 }, 10_000);
 
@@ -235,7 +238,7 @@ for (const quarter of [1, 2, 3, 4]) test(`real mounted arrows earn and resume Ti
     expect(live.effects).toEqual([]);
     expect(openArenaOf(live.host)?.boss.state).toBe('fight');
     earnTitanPhase(live, 1, quarter === 4 ? undefined : 1 - (1 - titanWindAt) * quarter / 4);
-    titanArrows = snapshotSimHost(live.host);
+    titanArrows = snapshotSimHostBytes(live.host);
     if (quarter === 4) { titanWind = titanArrows; titanSupportHp = openArenaOf(live.host)?.fight.hpFrac; }
   } finally { live.dispose(); }
 }, 10_000);
@@ -247,7 +250,7 @@ for (const goal of [1, 2, 3, 4]) test(`real support melee earns and resumes Tita
   try {
     expect(live.effects).toEqual([]);
     earnTitanPhase(live, 2, goal === 4 ? undefined : titanSupportHp - titanRiderChip * (goal - .5));
-    titanSupport = snapshotSimHost(live.host);
+    titanSupport = snapshotSimHostBytes(live.host);
     if (goal === 4) {
       expect(openArenaOf(live.host)?.fight.snapshot().fireOn).toBe(true);
       titanFire = titanSupport;
@@ -274,7 +277,7 @@ test('earned Titan fire keeps its actual contact cooldown', async () => {
     step(live, 30); expect(contacts.length).toBeGreaterThan(0);
     expect(contacts.every((tick, index) => index === 0 || tick - (contacts[index - 1] ?? 0) >= 5)).toBe(true);
     titanFireCell = { cell, active: data.field.states.active, spent: data.field.states.spent };
-    titanContact = snapshotSimHost(host);
+    titanContact = snapshotSimHostBytes(host);
   } finally { live.dispose(); }
 }, 10_000);
 
@@ -288,7 +291,7 @@ test('contacted Titan fire advances a real burning save checkpoint', async () =>
     step(live, 180); expect(live.host.state.tick).toBe(tick + 180);
     const arena = openArenaOf(live.host); if (arena === undefined) throw new Error('Titan did not resume');
     expect([titanFireCell.active, titanFireCell.spent]).toContain(arena.fight.snapshot().field.modes[titanFireCell.cell]);
-    titanBurning = snapshotSimHost(live.host);
+    titanBurning = snapshotSimHostBytes(live.host);
   } finally { live.dispose(); }
 }, 10_000);
 
@@ -302,7 +305,7 @@ test('the real burning checkpoint earns a spent Titan cell', async () => {
     let spent = false;
     for (let tick = 0; tick < 1800 && !spent; tick++) { step(live); if (tick % 30 === 0) spent = arena.fight.snapshot().field.modes[titanFireCell.cell] === titanFireCell.spent; }
     expect(spent).toBe(true);
-    titanSpent = snapshotSimHost(live.host);
+    titanSpent = snapshotSimHostBytes(live.host);
   } finally { live.dispose(); }
 }, 10_000);
 
