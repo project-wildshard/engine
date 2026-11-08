@@ -11,7 +11,7 @@ const directory=resolve(process.argv[2]??'tmp/engine-order-proof');mkdirSync(dir
 const work=mkdtempSync(join(directory,'run-')),order=join(work,'order.txt');
 try{
   linkNodeModules(process.cwd(),work);writeFileSync(join(work,'package.json'),'{"type":"module"}');
-  for(const name of ['a','b','c'])writeFileSync(join(work,`${name}.test.mjs`),`${name==='a'?'/*'+' '.repeat(2000)+'*/':''}import{test}from'vitest';import{appendFileSync}from'node:fs';test('${name}',()=>appendFileSync(${JSON.stringify(order)},'${name}'));`);
+  for(const name of ['a','b','c'])writeFileSync(join(work,`${name}.test.mjs`),`${name==='a'?`/*${' '.repeat(2000)}*/`:''}import{test}from'vitest';import{appendFileSync}from'node:fs';test('${name}',()=>appendFileSync(${JSON.stringify(order)},'${name}'));`);
   /** @param {string[]} args */
   const git=args=>execFileSync('git',['-c','user.name=Ordering proof','-c','user.email=proof@example.test',...args],{cwd:work,encoding:'utf8'}).trim();
   git(['init','--quiet']);git(['add','package.json','a.test.mjs','b.test.mjs','c.test.mjs']);git(['commit','--quiet','-m','fixture']);
