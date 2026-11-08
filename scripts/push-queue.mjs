@@ -56,6 +56,18 @@ function capture(source,directory,checkOnly,requested){
  finally{if(existsSync(anchor))rmSync(anchor,{recursive:true,force:true});}
 }
 
+/** Refuse changed checked bytes and retain their paths before managed cleanup.
+ * @param {string} snapshot @param {{sha:string,tree:string}} job @param {string} phase */
+function verifySnapshot(snapshot,job,phase){
+ const head=git(snapshot,['rev-parse','HEAD']),tree=git(snapshot,['rev-parse','HEAD^{tree}']);
+ const status=git(snapshot,['status','--porcelain','--untracked-files=normal']);
+ const changed=[];
+ if(head!==job.sha)changed.push(`HEAD ${job.sha} -> ${head}`);
+ if(tree!==job.tree)changed.push(`tree ${job.tree} -> ${tree}`);
+ if(status!=='')changed.push(`working tree:\n${status}`);
+ if(changed.length>0)throw new Error(`Captured source changed ${phase}; no exact-tree publication proof: ${changed.join('; ')}`);
+}
+
 /** @param {string} directory */
 async function drain(directory){
  for(;;){
@@ -95,9 +107,9 @@ async function drain(directory){
    if(git(snapshot,['status','--porcelain','--untracked-files=normal'])!=='')throw new Error('Preparation changed tracked or untracked source');
    save('checking');
    run('bash',['.githooks/pre-push','origin',job.remote],`refs/heads/main ${job.sha} refs/heads/main ${base}\n`);
-   if(git(snapshot,['rev-parse','HEAD'])!==job.sha||git(snapshot,['rev-parse','HEAD^{tree}'])!==job.tree||git(snapshot,['status','--porcelain','--untracked-files=normal'])!=='')throw new Error('Normal hook changed the captured source; publication refused');
+   verifySnapshot(snapshot,job,'after the normal hook, before publication');
    if(!job.checkOnly){save('pushing');run('git',['push','origin',`${job.sha}:refs/heads/main`]);pushed=true;}
-   if(git(snapshot,['rev-parse','HEAD'])!==job.sha||git(snapshot,['rev-parse','HEAD^{tree}'])!==job.tree||git(snapshot,['status','--porcelain','--untracked-files=normal'])!=='')throw new Error('Checked snapshot changed; no exact-tree proof can be claimed');
+   verifySnapshot(snapshot,job,'after the normal push');
    save(job.checkOnly?'checked':'pushed',{finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000});
   }catch(error){save(pushed?'published-unverified':job.state==='pushing'?'publication-unknown':'failed',{finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000,error:error instanceof Error?error.message:String(error)});}
   finally{if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});}

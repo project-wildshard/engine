@@ -1,4 +1,4 @@
-// Three real queued local Git pushes: exact snapshots, FIFO, and a failing normal hook.
+// Four actual queued Git attempts: FIFO pushes, red hook and changed-source refusal.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {chmodSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
@@ -17,12 +17,12 @@ try{
  writeFileSync(join(repo,'package.json'),JSON.stringify({name:'push-queue-proof',private:true,version:'1.0.0',type:'module',scripts:{'tools:install':'node prepare-tools.mjs'}}));writeFileSync(join(repo,'pnpm-workspace.yaml'),'packages: []\n');
  writeFileSync(join(repo,'.gitignore'),'node_modules/\n.prepared\n');
  writeFileSync(join(repo,'prepare-tools.mjs'),"import{writeFileSync}from'node:fs';writeFileSync('.prepared','ready');");
- writeFileSync(join(repo,'gate.mjs'),`import assert from'node:assert/strict';import{readFileSync,appendFileSync}from'node:fs';import{execFileSync}from'node:child_process';assert.equal(readFileSync('.prepared','utf8'),'ready');const value=JSON.parse(readFileSync('value.json')).value;assert.ok(Number.isInteger(value)&&value>0);appendFileSync(${JSON.stringify(observed)},JSON.stringify({sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),value})+'\\n');`);
+ writeFileSync(join(repo,'gate.mjs'),`import assert from'node:assert/strict';import{readFileSync,appendFileSync,writeFileSync}from'node:fs';import{execFileSync}from'node:child_process';assert.equal(readFileSync('.prepared','utf8'),'ready');const value=JSON.parse(readFileSync('value.json')).value;assert.ok(Number.isInteger(value)&&value>0);appendFileSync(${JSON.stringify(observed)},JSON.stringify({sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),value})+'\\n');if(value===4)writeFileSync('value.json','{\"value\":400}');`);
  writeFileSync(join(repo,'value.json'),'{"value":1}');execFileSync('pnpm',['install','--lockfile-only'],{cwd:repo,stdio:'pipe'});
  git(['add','.gitignore','.githooks/pre-push','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','prepare-tools.mjs','gate.mjs','value.json']);git(['commit','--quiet','-m','base']);git(['config','core.hooksPath','.githooks']);
  execFileSync(process.execPath,['prepare-tools.mjs'],{cwd:repo});git(['push','--quiet','origin','main']);
  const script=resolvePath('scripts/push-queue.mjs'),queue=join(work,'queue'),jobs=[],commits=[];
- for(const value of [2,3,-1]){
+ for(const value of [2,3,-1,4]){
   writeFileSync(join(repo,'value.json'),JSON.stringify({value}));git(['commit','--quiet','-m',`value ${value}`,'--','value.json']);
   commits.push(git(['rev-parse','HEAD']));
  }
@@ -40,10 +40,11 @@ try{
   if(results.every(result=>['pushed','failed'].includes(result.state))&&jobs.every(job=>!existsSync(job.snapshot)))break;
   await new Promise(resolve=>{setTimeout(resolve,20);});
  }
- assert.deepEqual(results.map(job=>job.state),['pushed','pushed','failed'],JSON.stringify(results));
+ assert.deepEqual(results.map(job=>job.state),['pushed','pushed','failed','failed'],JSON.stringify(results));
  const rows=v.parse(v.array(v.object({sha:v.string(),value:v.number()})),readFileSync(observed,'utf8').trim().split('\n').map(line=>JSON.parse(line)));
- assert.deepEqual(rows.slice(-4).map(row=>[row.sha,row.value]),jobs.slice(0,2).flatMap((job,index)=>[[job.sha,index+2],[job.sha,index+2]]));
+ assert.deepEqual(rows.slice(-5,-1).map(row=>[row.sha,row.value]),jobs.slice(0,2).flatMap((job,index)=>[[job.sha,index+2],[job.sha,index+2]]));
  assert.equal(execFileSync('git',['--git-dir',remote,'rev-parse','refs/heads/main'],{encoding:'utf8'}).trim(),jobs[1]?.sha);
  assert.ok(jobs.every(job=>!existsSync(job.snapshot)));
- console.log(JSON.stringify({orderedPushes:2,requestedAncestorsPreserved:true,declaredToolsPrepared:true,normalHookFailureBlocked:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
+ assert.match(results[3]?.error??'',/value\.json/u,'Changed source must name the actual path before cleanup');
+ console.log(JSON.stringify({orderedPushes:2,requestedAncestorsPreserved:true,declaredToolsPrepared:true,normalHookFailureBlocked:true,changedSourceBlocked:true,changedPathReported:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
 }finally{rmSync(work,{recursive:true,force:true});}
