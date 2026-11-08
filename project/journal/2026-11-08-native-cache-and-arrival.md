@@ -19,7 +19,12 @@ post-cancel manifest work and the next member lookup batch.
 A focused title boundary test holds the native read across cancellation:
 the download rejects immediately, leaving waits for the read, and no
 subsequent native read or network request starts. All 45 focused checks
-pass in 2.70 seconds. The full Ember repeat remains required.
+pass in 2.70 seconds (50 including overlap controls in 2.71 seconds).
+The real persistent WebKit Ember repeat now passes road crossing,
+forced-byte-cache-deletion return and actual browser-process kill/restart.
+Every navigation has zero pending native cache calls, and page errors
+are empty. This is a local full-catalogue candidate proof; hosted staged
+Chromium/WebKit and the production repeat are still required.
 
 The candidate's real Chromium one-byte quota override produced the
 native QuotaExceededError and still reached Nalati's completed card,
