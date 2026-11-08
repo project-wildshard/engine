@@ -19,7 +19,7 @@ export default defineConfig({
   plugins: [vitestTmpRoot(), vitestModuleCache()],
   resolve: { alias: rapierAlias }, assetsInclude: ['**/*.bin', '**/*.wasm'],
   // Reuse transformed code in CI; each test still executes in its isolated worker.
-  test: { execArgv: [...vitestNodeExecArgv(), '--import', resolve('scripts/format-hook.mjs')], fsModuleCache: Boolean(ci ?? githubActions), ...(maxWorkers === undefined ? {} : { maxWorkers }), testTimeout: 30_000, environment: 'node',
+  test: { execArgv: [...vitestNodeExecArgv(), '--import', resolve('scripts/format-hook.mjs')], fsModuleCache: true, ...(maxWorkers === undefined ? {} : { maxWorkers }), testTimeout: 30_000, environment: 'node',
     // Native product/hash readers own filesystem URLs, even in DOM suites.
     // Vite's browser query injection must not rewrite the hash CLI's hashbang.
     // Format ships raw .ts from the shardfile repo (J42): Vite transforms it, because Node will not under node_modules.

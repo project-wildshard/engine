@@ -7,6 +7,11 @@ import type { VitestPluginContext } from 'vitest/node';
 /** Every workspace layer's manifest, whose exports map decides what a cached specifier resolved to. */
 export function resolutionKey(root: string): string {
   const hash = createHash('sha256'), source = resolve(root, 'src');
+  // Root imports, workspace membership and installed public packages also
+  // decide the resolved addresses retained inside a transformed caller.
+  for(const name of ['package.json','pnpm-lock.yaml','pnpm-workspace.yaml']){
+    const manifest=resolve(root,name);if(existsSync(manifest))hash.update(`${name}\0`).update(readFileSync(manifest));
+  }
   for (const layer of existsSync(source) ? readdirSync(source).sort() : []) {
     const manifest = resolve(source, layer, 'package.json');
     if (existsSync(manifest)) hash.update(`${layer}\0`).update(readFileSync(manifest));
