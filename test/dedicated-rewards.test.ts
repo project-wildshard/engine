@@ -1,4 +1,6 @@
 import { expect, test } from 'vitest';
+// oxlint-disable-next-line import/no-nodejs-modules -- Exercise release admission with a real ephemeral signature.
+import { generateKeyPairSync, sign } from 'node:crypto';
 import { NetClient } from '../src/client/engine/net/client';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
@@ -9,14 +11,17 @@ import { validPlayerStore } from '../src/server/host/dedicated/playerStore';
 import type { SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { serverInput } from './fixtures/dedicated/roomBench';
 import * as v from 'valibot';
-import { ReleaseSchema } from '../src/shared/host/releaseRows';
+import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 import { Vector3 } from 'three';
 import { populationRoster } from '../src/server/game/population/roster';
 import { mountedPlayerOf } from '../src/server/game/riding/native';
 import { exportPlayer, importPlayer } from '../src/server/host/dedicated/playerDoc';
 
 test('E7 refuses a pre-flip save epoch', () => {
-  expect(() => v.parse(ReleaseSchema, { channel: 'production', serial: 1, engineBuild: 'e7', saveEpoch: 0, shards: [] })).toThrow();
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: 'e7', saveEpoch: 0, shards: [] });
+  const signed = JSON.stringify({ body, signature: sign(null, Buffer.from(body), privateKey).toString('hex') });
+  expect(() => readReleaseFile(signed, publicKey.export({ type: 'spki', format: 'der' }).toString('hex'))).toThrow();
 });
 
 test('reward documents are admitted only with valid reward data', () => {
