@@ -47,6 +47,7 @@ interface ListedRow { readonly hash: string; readonly bytes: number }
 const API = process.env.WILDSHARD_API ?? 'https://api.wildshard.io';
 const CACHE = process.env.WILDSHARD_PIN_CACHE ?? resolve(homedir(), '.cache/wildshard/pins');
 const MIRROR = process.env.WILDSHARD_PIN_MIRROR ?? 'https://github.com/project-wildshard/engine/releases/download/pins';
+const ASSET_API = process.env.WILDSHARD_PIN_ASSET_API ?? 'https://api.github.com/repos/project-wildshard/engine/releases/assets';
 const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json', LEDGER = 'out/.pins.json';
 const RINGS = 'test/pins/rings.json', SLICES = 'test/pins/slices.json', SLICED = 'out/.slices', RING_CATALOGUE = 'out/.ring-catalogue.json';
 const MARK = ['# pins: mounts published under public/, begin', '# pins: mounts published under public/, end'] as const;
@@ -59,10 +60,11 @@ async function installSaves(only: readonly string[] = []): Promise<void> {
   const directory = 'test/pins/saves';
   if (!existsSync(directory)) return;
   for (const name of readdirSync(directory).filter(entry => entry.endsWith('.json'))) {
-    const row = readJson(join(directory, name)) as {slug: string; file: string; remote?: boolean; sha256: string; bytes: number};
+    const row = readJson(join(directory, name)) as {slug: string; file: string; remote?: boolean; sha256: string; bytes: number; assetId?: number};
     if (row.remote !== true || (only.length > 0 && !only.includes(row.slug))) continue;
     if (!/^[a-f0-9]{64}$/u.test(row.sha256) || row.file !== `${row.sha256}.save.br`
-      || !Number.isSafeInteger(row.bytes) || row.bytes <= 0 || row.bytes > 32 * 1024 * 1024) throw new Error(`${row.slug}: invalid save pin`);
+      || !Number.isSafeInteger(row.bytes) || row.bytes <= 0 || row.bytes > 32 * 1024 * 1024
+      || (row.assetId !== undefined && (!Number.isSafeInteger(row.assetId) || row.assetId <= 0))) throw new Error(`${row.slug}: invalid save pin`);
     const file = join(CACHE, row.file);
     if (existsSync(file)) {
       const held = readFileSync(file);
@@ -71,8 +73,12 @@ async function installSaves(only: readonly string[] = []): Promise<void> {
     // GitHub's browser URL can return a gateway error for large save assets
     // while its explicit download endpoint serves the exact immutable bytes.
     // Both routes retain the same hash; corrupt bytes refuse immediately.
-    let body: Uint8Array | undefined;
+    // An asset ID identifies the existing release upload; the API's binary
+    // media type avoids the browser-download gateway. Hashes remain authority.
+    let body = row.assetId === undefined ? undefined : await fetched(`${ASSET_API}/${row.assetId}`, row.slug, row.sha256,
+      {headers: {Accept: 'application/octet-stream'}, cache: 'no-store', signal: AbortSignal.timeout(90_000)});
     for (const url of [`${MIRROR}/${row.file}?download=1`, `${MIRROR}/${row.file}`]) {
+      if (body !== undefined) break;
       body = await fetched(url, row.slug, row.sha256, {cache: 'no-store', signal: AbortSignal.timeout(90_000)});
       if (body !== undefined) break;
     }
