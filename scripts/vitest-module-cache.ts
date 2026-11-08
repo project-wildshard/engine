@@ -18,7 +18,8 @@ export function resolutionKey(root: string): string {
   }
   // J196 local aliases deliberately leave the root lock/manifests unchanged.
   // Cached callers hold resolved addresses and dependency export maps too.
-  const pkg=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8')) as {dependencies?:Record<string,string>;devDependencies?:Record<string,string>;optionalDependencies?:Record<string,string>};
+  const packageFile=resolve(root,'package.json');
+  const pkg=(existsSync(packageFile)?JSON.parse(readFileSync(packageFile,'utf8')):{}) as {dependencies?:Record<string,string>;devDependencies?:Record<string,string>;optionalDependencies?:Record<string,string>};
   const dependencies=new Set([...Object.keys(pkg.dependencies??{}),...Object.keys(pkg.devDependencies??{}),...Object.keys(pkg.optionalDependencies??{})]);
   for(const name of [...dependencies].sort()){
     const directory=resolve(root,'node_modules',name),manifest=resolve(directory,'package.json');

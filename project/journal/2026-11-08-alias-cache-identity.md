@@ -19,3 +19,10 @@ owned changes, including Pine's committed channel implementation. Neither
 J196's managed live links nor any foreign source file is changed. Publish
 with the ordinary full hook and wait for exact hosted proof; the three
 minute full target is still open.
+
+The complete ordinary hook catches a previously supported package-less
+fixture root in vitest-module-cache.test.ts. Keep its empty-manifest case
+instead of requiring package.json; declared dependency resolution remains
+covered when a manifest exists. Both existing typed-glob cases and all
+five real transient-save cases pass together,7/7in5.01seconds, with the
+full layered compiler green. No fixture root or assertion is excluded.
