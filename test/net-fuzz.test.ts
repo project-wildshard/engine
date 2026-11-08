@@ -6,7 +6,7 @@ import { createTrustedHeadlessResident,type HeadlessRuntimeInput,type TrustedHea
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import * as v from 'valibot';
-import { afterAll,beforeAll,expect,test,vi } from 'vitest';
+import { beforeAll,expect,onTestFinished,test,vi } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { connectStandalone,type StandaloneShell } from '../src/client/host/standalone/shell';
 import { CommandQueue } from '../src/server/engine/net/commandQueue';
@@ -30,6 +30,7 @@ import { directLoopback,type DirectLoopback } from '../src/test/engine/netLoopba
 import { builtProduct } from './fixtures/engine-lift/product';
 import { bakedGridCollision } from './fixtures/gridCollision';
 import { Fuzz,Hostile } from './fixtures/net-hostile';
+import { ownedSetup } from './fixtures/ownedSetup';
 
 // The server's law: every byte a client sends is hostile, and none of them ends the room. Real products on a real resident,
 // over the real codec. Two clients fuzz every path in, as the lead and as another player, while a third just plays.
@@ -39,11 +40,17 @@ const SEEDS = (process.env['NET_FUZZ_SEEDS'] ?? '20261105').split(',').map(Numbe
 const CLOCK = (): number => 0;
 
 let rapier: Rapier;
-const products = new Map<string, HeadlessRuntimeInput>(), open: TrustedHeadlessResident[] = [];
+const products = new Map<string, HeadlessRuntimeInput>();
 beforeAll(async () => {
   rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 });
-afterAll(() => { for (const live of open.splice(0)) live.dispose(); });
+// Immutable products may be shared; each case retires its own native worlds,
+// including a construction that settles after the case has already failed.
+function resident(input: HeadlessRuntimeInput, snapshot?: string): Promise<TrustedHeadlessResident> {
+  const setup = ownedSetup(() => createTrustedHeadlessResident(input, snapshot, { room: true }), live => Promise.resolve(live.dispose()));
+  onTestFinished(() => setup.close());
+  return setup.open();
+}
 async function product(slug: string): Promise<HeadlessRuntimeInput> {
   const held = products.get(slug);
   if (held !== undefined) return held;
@@ -58,8 +65,8 @@ async function product(slug: string): Promise<HeadlessRuntimeInput> {
 interface Seat { readonly link: DirectLoopback; readonly net: NetClient; readonly id: number }
 /** A room as `StandaloneGrid` runs one, on a fresh resident. */
 async function roomOn(slug: string): Promise<{ live: TrustedHeadlessResident; room: NetRoom; world: SimNetWorld; book: LedgerBook; seat: (player?: string, name?: string) => Seat }> {
-  const live = await createTrustedHeadlessResident(await product(slug), undefined, { room: true }), { host } = live, lead = leadPlayer(host), book = new LedgerBook();
-  open.push(live); host.respawn.served = true;
+  const live = await resident(await product(slug)), { host } = live, lead = leadPlayer(host), book = new LedgerBook();
+  host.respawn.served = true;
   const world = new SimNetWorld(host, 0, () => ledgerFilings(host, lead.id, live.effects, null)), room = new NetRoom({ world, book, step: inputs => { stepResident(live, lead.id, inputs); } });
   room.open();
   return { live, room, world, book, seat: (player, name = 'Player') => {
@@ -113,8 +120,7 @@ test.each(['pine-hollow', 'nalati-grasslands', 'sunscar-dunes', 'driftwood-isle'
   expect(worst).toBeLessThanOrEqual(64);
   // M8: what outlives the room is intact. The save restores, and the book is what it should be.
   const snapshot = serializeSimSnapshot(snapshotSimHostBytes(host));
-  const back = await createTrustedHeadlessResident(await product(slug), snapshot, { room: true });
-  open.push(back);
+  const back = await resident(await product(slug), snapshot);
   expect(back.host.state.tick).toBe(TICKS);
   expect([...back.host.players.keys()]).toEqual([...host.players.keys()]);
   back.step([]);
@@ -198,17 +204,20 @@ class PageStorage implements SaveStorage {
   setItem(key: string, value: string): void { this.items.set(key, value); }
   removeItem(key: string): void { this.items.delete(key); }
 }
-function worker(slug: string, storage: SaveStorage, input: HeadlessRuntimeInput): { shell: StandaloneShell; control: MessagePort; game: MessagePort; refused: () => number } {
+function worker(slug: string, storage: SaveStorage, input: HeadlessRuntimeInput): { shell: StandaloneShell; control: MessagePort; game: MessagePort; refused: () => number; close: () => void } {
   const control = new MessageChannel(), game = new MessageChannel();
   const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input) });
-  return { control: control.port2, game: game.port2, refused: server.refused,
-    shell: connectStandalone({ slug, base: `/shards/${slug}/`, build: 'test', savePrefix: 'wildshard.', storage, lone: true }, control.port2, game.port2, () => { server.dispose(); }) };
+  const shell = connectStandalone({ slug, base: `/shards/${slug}/`, build: 'test', savePrefix: 'wildshard.', storage, lone: true }, control.port2, game.port2, () => { server.dispose(); });
+  let closed = false;
+  const close = (): void => { if (!closed) { closed = true; shell.dispose(); } };
+  onTestFinished(close);
+  return { control: control.port2, game: game.port2, refused: server.refused, shell, close };
 }
 const until = async (ready: () => boolean): Promise<void> => { await vi.waitFor(() => { expect(ready()).toBe(true); }, { timeout: 8_000, interval: 5 }); };
 
 // The whole worker, over real MessagePorts: a native cell and a data cell, whose input takes different roads to the tick.
 test.each([['native', 'pine-hollow'], ['data', 'pastel-plain']])('the %s worker takes hostile bytes on both ports, keeps ticking and saves', { timeout: 10_000 }, async (_kind, slug) => {
-  const input = await product(slug), storage = new PageStorage(), { shell, control, game, refused } = worker(slug, storage, input), { client } = shell;
+  const input = await product(slug), storage = new PageStorage(), { shell, control, game, refused, close } = worker(slug, storage, input), { client } = shell;
   await shell.booted; shell.ready();
   await until(() => client.latest !== null);
   const hostile = new Hostile(client), fuzz = new Fuzz(SEEDS[0] ?? 1), last = client.latest?.tick ?? 0;
@@ -223,15 +232,15 @@ test.each([['native', 'pine-hollow'], ['data', 'pastel-plain']])('the %s worker 
   expect(client.closed).toBeNull();
   expect(refused()).toBeGreaterThan(0);
   expect(await shell.save()).toMatchObject({ ok: true });
-  shell.dispose();
+  close();
   // the save it made after all that is a save: the next boot resumes from it
   const again = worker(slug, storage, input);
   expect((await again.shell.booted).restored).toBe(true);
-  again.shell.dispose();
+  again.close();
 });
 
 test('a client that hangs up leaves a server that still saves', { timeout: 10_000 }, async () => {
-  const input = await product('pine-hollow'), storage = new PageStorage(), { shell } = worker('pine-hollow', storage, input);
+  const input = await product('pine-hollow'), storage = new PageStorage(), { shell, close } = worker('pine-hollow', storage, input);
   await shell.booted; shell.ready();
   await until(() => shell.client.latest !== null);
   shell.transport.close('hostile');
@@ -239,7 +248,7 @@ test('a client that hangs up leaves a server that still saves', { timeout: 10_00
   await new Promise(resolve => { setTimeout(resolve, 100); });
   expect((await shell.probe()).tick).toBeGreaterThan(before);
   expect(await shell.save()).toMatchObject({ ok: true });
-  shell.dispose();
+  close();
 });
 
 // A crossing under fire: the acts and commands in flight when a player changes rooms belong to neither, and neither minds.
@@ -284,10 +293,10 @@ test('a client crosses a seam while it fuzzes both rooms', { timeout: 60_000 }, 
 test('a save asked for before boot is told no, and the server still boots', async () => {
   const input = await product('pine-hollow'), control = new MessageChannel(), game = new MessageChannel(), heard: unknown[] = [];
   const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input) });
+  onTestFinished(() => { server.dispose(); control.port2.close(); game.port2.close(); });
   control.port2.onmessage = (event: MessageEvent<unknown>): void => { heard.push(event.data); };
   control.port2.postMessage({ kind: 'save', id: 1 }, []);
   await until(() => heard.length > 0);
   expect(heard[0]).toEqual({ kind: 'saved', id: 1, tick: 0, ok: false });
   expect(server.refused()).toBe(1);
-  server.dispose();
 });

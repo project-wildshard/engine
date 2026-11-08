@@ -14,15 +14,13 @@ import { SkinLocker } from '../src/client/game/cosmetics/locker';
 import { WirePage } from '../src/client/game/shardfile/wirePage';
 import { compendiumSave, skinSave, finishPickupSave, creatureRewardSave, syncPageRewards } from '../src/shared/game/saves';
 import { populationRoster } from '../src/server/game/population/roster';
-import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone } from '../src/client/host/standalone/shell';
 import { importPageSaves } from '../src/client/engine/saves/indexed';
-import { bakedGridCollision } from './fixtures/gridCollision';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 
 const PREFIX = 'wildshard.save.v2.', KEY = `${PREFIX}pine-hollow`;
 class PageStorage implements SaveStorage {
@@ -42,22 +40,17 @@ afterEach(() => {
   if (inheritedEnvironment !== undefined) installSaveEnvironment(inheritedEnvironment);
 });
 beforeAll(async () => {
-  const directory = process.env['PINE_PROOF_PRODUCT'] ?? builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
-  if (descriptor === undefined) throw new Error('Missing Pine output');
-  const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
+  const directory = process.env['PINE_PROOF_PRODUCT'] ?? builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory);
+  const assets = runtimeAssets(product, directory);
   input = { product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
   rosterStep = (await product.json('actors/roster.json') as { step: string }).step;
 });
-// The first grid case otherwise owns the cold road bake inside its gameplay
-// deadline. Prepare that same real fixture once; reward case clocks stay put.
-beforeAll(async () => {
-  const started = performance.now(), strips = await bakedGridCollision();
-  console.info(`Pine grid fixture: ${strips.length} real strips prepared in ${(performance.now() - started).toFixed(0)} ms`);
-}, 60_000);
+// Every reward case stays inside Pine. The real standalone host permits no
+// road strips for cell-local proofs; road crossings retain their own bake.
 async function boot(storage: PageStorage, lone?: true, identity?: string, refused?: (error: unknown) => void) {
   const control = new MessageChannel(), game = new MessageChannel();
   let grid: StandaloneGrid | undefined;
-  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input), strips: bakedGridCollision,
+  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input),
     onSaveRefused: refused ?? (error => { throw error; }), proof: { booted: value => { grid = value; } } });
   const shell = connectStandalone({ slug: 'pine-hollow', base: '/shards/pine-hollow/', build: 'test', savePrefix: PREFIX, storage, ...(identity === undefined ? {} : { identity: { player: identity, name: identity } }), ...(lone === undefined ? {} : { lone }) }, control.port2, game.port2, () => { server.dispose(); });
   const close = () => { if (opened.delete(close)) shell.dispose(); };
