@@ -1213,5 +1213,18 @@
     "typescript": "7.0.2",
     "oxfmt": "0.74.0"
   },
-  "binDependenciesDir": ".bin-deps"
+  "binDependenciesDir": ".bin-deps",
+  "files": [
+    "src",
+    "!src/**/*.test.*",
+    "scripts",
+    "!scripts/**/*.test.*",
+    "lint",
+    "vite",
+    "types",
+    "budgets",
+    "tsconfig*.json",
+    "index.html",
+    "vercel.json"
+  ]
 }
