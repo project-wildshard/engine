@@ -9,9 +9,9 @@ import { resolve } from 'node:path';
 
 assertVitestLane();
 const maxWorkers = vitestMaxWorkers();
-const { CI: ci, GITHUB_ACTIONS: githubActions } = process.env;
+const { CI: ci, GITHUB_ACTIONS: githubActions, WS_PUSH_GATE_PROFILE: pushProfile } = process.env;
 // BUILD-SPEED 1.2: lane test runs yield CPU to the measurement lane and the Simulator; workers inherit the nice value.
-if (!ci && !githubActions) setPriority(10);
+if (!ci && !githubActions && pushProfile !== 'full-v1') setPriority(10);
 export default defineConfig({
   define: { __TITLE_ASSET_URLS__: readFileSync('scripts/title-assets.generated.json', 'utf8') },
   plugins: [vitestTmpRoot(), vitestModuleCache()],

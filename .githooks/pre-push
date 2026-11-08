@@ -6,5 +6,7 @@
 # Enable once per clone: git config core.hooksPath .githooks
 set -euo pipefail
 hooks="$(git rev-parse --show-toplevel)/.githooks"
-node "$hooks/check-push.mjs"
+refs="$(cat)"
+printf '%s\n' "$refs" | node "$hooks/check-push.mjs"
+export WS_PUSH_REFS="$refs"
 exec node "$hooks/run-checks.mjs" push

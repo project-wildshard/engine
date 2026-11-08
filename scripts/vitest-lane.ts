@@ -1,5 +1,6 @@
 import { parseCLI } from 'vitest/node';
 import { assertHeavyLease } from './heavy-lane-lease.mjs';
+import { PUSH_BUDGET, PUSH_PROFILE } from './push-budget.mjs';
 
 /** Node 24 shares WASM import wrappers across isolates but can reclaim a dying
  * wrapper twice after worker retirement (nodejs/node#66366). Keep code alive for
@@ -11,7 +12,12 @@ export function vitestNodeExecArgv(version: string = process.versions.node): str
 
 /** Local tests leave cores for the other lanes and the measurement lane (BUILD-SPEED 1.1: a dozen lanes each
  * spawning 6 workers put 18 workers on 18 cores); CI retains Vitest's runner default. */
-export function vitestMaxWorkers(env: NodeJS.ProcessEnv = process.env): number | undefined {
+interface VitestEnvironment extends NodeJS.ProcessEnv { WS_PUSH_GATE_PROFILE?: string }
+export function vitestMaxWorkers(env: VitestEnvironment = process.env): number | undefined {
+  if (env.WS_PUSH_GATE_PROFILE === PUSH_PROFILE) {
+    assertHeavyLease('full-test', env);
+    return PUSH_BUDGET.workers;
+  }
   const { WS_VITEST_MAX_WORKERS: requested, CI: ci, GITHUB_ACTIONS: actions, WS_COMMIT_RELATED_TOKEN: commit } = env;
   if (requested === undefined) {
     if (ci || actions) return undefined;

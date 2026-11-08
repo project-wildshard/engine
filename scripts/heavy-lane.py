@@ -309,6 +309,9 @@ def mirror_first(command, wrapper):
 
 def launch_command(kind, command, env):
     """G668: foreground gen/build callers keep normal QoS; background work yields."""
+    if kind == 'full-test' and env.get('WS_PUSH_GATE_PROFILE') == 'full-v1':
+        # J192: a real queued push owns the complete CPU profile, not a focused lane.
+        return command
     launch = command if 'build' in RESOURCES[kind] else ['nice', '-n', '10', *command]
     normal = 'build' in RESOURCES[kind] and (env.get('WS_HEAVY_BACKGROUND') != '1' or env.get('WS_HEAVY_RULER') == '1')
     if not normal and shutil.which('taskpolicy'):
