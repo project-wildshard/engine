@@ -14,26 +14,114 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    # Native proof files start their own workers; bound the outer pool too.
-    env:
-      WS_VITEST_MAX_WORKERS: '2'
-      WS_TEST_QUARANTINE: blocking
+    outputs:
+      docs: ${{ steps.paths.outputs.docs }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - name: Scan the complete incoming history
+        env:
+          BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
+        run: printf 'refs/heads/main %s refs/heads/main %s\n' "$GITHUB_SHA" "$BASE_SHA" | node .githooks/check-push.mjs
+      - name: Classify the same complete range as pre-push
+        id: paths
+        env:
+          BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
+        run: |
+          node --input-type=module <<'JS'
+          import {appendFileSync} from 'node:fs';
+          import {pushSelection} from './scripts/push-selection.mjs';
+          const selected=pushSelection(`refs/heads/main ${process.env.GITHUB_SHA} refs/heads/main ${process.env.BASE_SHA}`);
+          appendFileSync(process.env.GITHUB_OUTPUT,`docs=${selected.mode==='docs'}\n`);
+          console.log(JSON.stringify(selected));
+          JS
+
+  static:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - run: pnpm pins
-      - run: pnpm gen:inputs
-      - run: pnpm check
-      - run: pnpm test:hooks
+      - if: needs.changes.outputs.docs != 'true'
+        run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - if: needs.changes.outputs.docs != 'true'
+        run: pnpm check:sides && pnpm check:asks && pnpm test:kit && pnpm test:hooks
+
+  plan:
+    needs: changes
+    if: needs.changes.outputs.docs != 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - name: Plan the smallest useful matrix from actual discovery
+        id: plan
+        run: node scripts/engine-ci-plan.ts
+      - name: Prove actual phase discovery and hostile-plan refusal
+        run: node test/vitest-sharding.test.ts
+      - name: Prove an actual over-budget file refuses
+        run: node scripts/engine-ci-proof.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: engine-ci-plan
+          path: tmp/engine-ci/plan.json
+          retention-days: 7
+
+  tests:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      WS_TEST_QUARANTINE: blocking
+      WS_CI_PLAN: tmp/engine-ci/plan.json
+      WS_CI_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: engine-ci-plan
+          path: tmp/engine-ci
+      - run: pnpm pins && pnpm gen:inputs
+      - run: node scripts/engine-ci-shard.mjs
+      - name: Retain actual membership, budget and timing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: engine-ci-${{ matrix.shard }}
+          path: tmp/engine-ci
+          retention-days: 7
 
   e2e:
+    needs: changes
+    if: needs.changes.outputs.docs != 'true'
     # Pinned: Playwright 1.60 can't install Chromium on ubuntu-latest (26.04).
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -67,6 +155,8 @@ jobs:
           retention-days: 7
 
   quarantine:
+    needs: changes
+    if: needs.changes.outputs.docs != 'true'
     # J193: run every active quarantined proof with its ordinary exit code,
     # separately from the blocking verdict and its covered-commit summary.
     continue-on-error: true
@@ -91,7 +181,7 @@ jobs:
           retention-days: 7
 
   verdict-coverage:
-    needs: [check, e2e]
+    needs: [changes, static, plan, tests, e2e]
     if: always() && github.event_name == 'push'
     runs-on: ubuntu-24.04
     steps:

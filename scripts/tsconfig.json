@@ -564,5 +564,9 @@
     "worker-client-saves.mjs",
     "worker-proof-page.mjs",
     "**/*.test.*"
+  ],
+  "files": [
+    "../vitest.config.ts",
+    "../vite/rapier.ts"
   ]
 }

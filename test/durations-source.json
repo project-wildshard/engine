@@ -1,0 +1,18 @@
+{
+  "full": {
+    "run": "42432200666",
+    "sha": "330e100f61e36b2a612d932afa2912f3ddd74633",
+    "wallSeconds": 1193.39,
+    "fileSeconds": 1941.3000000000063
+  },
+  "ring1": {
+    "run": "42470548302",
+    "sha": "54dfb6bdfae59556feafe42af173dcc4cc1a769e",
+    "wallSeconds": 414.44,
+    "fileSeconds": 466.2309999999997
+  },
+  "additionalGreenRuns": [
+    "42470548302",
+    "42470548208"
+  ]
+}
