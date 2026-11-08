@@ -41,7 +41,7 @@ try {
         // Exercise a real server cache miss by withholding only its optional
         // page-held byte loan. The control/game/harness ports stay unchanged.
         /** @this {Worker} @param {unknown} message @param {Transferable[]|StructuredSerializeOptions} [transfer] */
-        Worker.prototype.postMessage=function proofPostMessage(message,transfer) {
+        Worker.prototype.postMessage=function postMessage(message,transfer) {
           const config=typeof message==='object' && message!==null && 'catalogue' in message;
           const next=config && Array.isArray(transfer) && transfer.length===4?transfer.slice(0,3):transfer;
           Reflect.apply(post,this,[message,next]);

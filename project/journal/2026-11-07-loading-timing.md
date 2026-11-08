@@ -54,6 +54,8 @@ and streamed byte increments. The final warm proof also requires the
 SW's navigation delivery record. 34 existing HTML/title/bake checks
 passed in 1.66 s after adapting the remaining shell-inventory fixture to
 the actual bundled declaration, preserving every asset assertion.
+The manual worker-loan forwarder keeps the native `postMessage` property
+name; the full script lint is green with that final naming correction.
 
 54 existing outer-edge checks passed in 1.1 s: startup module bank,
 Loading waits/timeline, title preparation and real bundled SW behavior.
