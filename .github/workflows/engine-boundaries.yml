@@ -30,10 +30,7 @@ jobs:
           WS_VITEST_MAX_WORKERS: '2'
           NET_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
       - run: pnpm exec playwright install --with-deps chromium
-      # The wire proof currently exposes missing recorded programs on Blender.
-      # Renderer ownership is Opus; keep the red reproduction available manually.
       - name: Cook, attach, and play the same bytes
-        if: github.event_name == 'workflow_dispatch'
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
       - name: Keep the report
         if: always()
