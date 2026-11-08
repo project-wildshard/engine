@@ -8,23 +8,27 @@ import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { build } from 'esbuild';
+import { build } from 'rolldown';
 
 const ROOT = resolve(import.meta.dirname, '..'), require = createRequire(join(ROOT, 'package.json'));
 const { values } = parseArgs({ options: { build: { type: 'string', default: 'dev' }, out: { type: 'string', default: 'dist/server' }, entry: { type: 'string', multiple: true, default: [] }, tar: { type: 'string' } } });
 const OUT = resolve(ROOT, values.out), DEDICATED = join(ROOT, 'src/server/host/dedicated');
 
 // As vite/rapier.ts: the package's wasm import is the game's to load.
-/** @type {import('esbuild').Plugin} */
-const rapier = { name: 'rapier', setup: bundle => {
-  bundle.onResolve({ filter: /^\.\/rapier_wasm3d(\.js)?$/ }, () => ({ path: join(ROOT, 'src/server/engine/physics/rapierBindings.ts') }));
-  bundle.onResolve({ filter: /^@dimforge\/rapier3d-simd$/ }, () => ({ path: require.resolve('@dimforge/rapier3d-simd/rapier.js') }));
+/** @type {import('rolldown').Plugin} */
+const rapier = { name: 'rapier', resolveId: source => {
+  if (/^\.\/rapier_wasm3d(\.js)?$/.test(source)) return join(ROOT, 'src/server/engine/physics/rapierBindings.ts');
+  if (source === '@dimforge/rapier3d-simd') return require.resolve('@dimforge/rapier3d-simd/rapier.js');
+  return null;
 } };
 // `ws` and `pg` are CommonJS, and an ESM bundle has no `require` of its own.
 const banner = { js: 'import { createRequire as bundleRequire } from \'node:module\'; const require = bundleRequire(import.meta.url);' };
 const extra = Object.fromEntries(values.entry.map(row => { const [name, path] = row.split('='); return [name, resolve(ROOT, path)]; }));
-await build({ entryPoints: { main: join(DEDICATED, 'main.ts'), cellWorker: join(DEDICATED, 'cellWorker.ts'), ...extra }, bundle: true, platform: 'node', format: 'esm', target: 'node24', outdir: OUT, outExtension: { '.js': '.mjs' },
-  logLevel: 'warning', plugins: [rapier], banner, define: { __BUILD_ID__: JSON.stringify(values.build) }, external: ['pg-native'] });
+// Separate self-contained entries preserve the dedicated archive contract.
+for (const [name,input] of Object.entries({main:join(DEDICATED,'main.ts'),cellWorker:join(DEDICATED,'cellWorker.ts'),...extra})) {
+  await build({input,platform:'node',transform:{target:'node24',define:{__BUILD_ID__:JSON.stringify(values.build)}},
+    plugins:[rapier],external:['pg-native'],output:{file:join(OUT,`${name}.mjs`),format:'esm',codeSplitting:false,banner:banner.js}});
+}
 mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, 'bundle.json'), JSON.stringify({ engineBuild: values.build }));
 cpSync(require.resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm'), join(OUT, 'rapier.wasm'));
