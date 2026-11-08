@@ -41,12 +41,35 @@ jobs:
     # Each native proof also starts worker threads; match ci's bounded outer pool.
     env:
       WS_VITEST_MAX_WORKERS: '2'
+      WS_TEST_QUARANTINE: blocking
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - run: bash scripts/ring1.sh tests
+
+  quarantine:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - run: pnpm pins
+      - run: pnpm gen:inputs
+      - run: node scripts/test-quarantine.mjs
+      - name: Keep the original quarantine results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ring1-quarantine-results
+          path: tmp/quarantine
+          retention-days: 7
 
   products:
     runs-on: ubuntu-latest

@@ -56,12 +56,16 @@ async function main(){
   const env={...process.env,WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
     WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1'};
   Reflect.deleteProperty(env,'WILDSHARD_RING');
+  Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');
   const began=Date.now();
   const selection=pushSelection(env.WS_PUSH_REFS);
   console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths`);
   console.error(`  - full push budget ${JSON.stringify(PUSH_BUDGET)}; nice ${getPriority()}; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
   if(selection.mode==='docs'){
-    const result=await parallelChecks([{name:'format:check (docs-only; history scan already green)',commands:[['pnpm','run','--silent','format:check']]}],{env});
+    const result=await parallelChecks([
+      {name:'lint (docs-only)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
+      {name:'format:check (docs-only; history scan already green)',commands:[['pnpm','run','--silent','format:check']]},
+    ],{env});
     console.error(`  - docs-only push lane ${result.ok?'green':'RED'} in ${result.seconds.toFixed(1)} s`);process.exitCode=result.ok?0:1;return;
   }
   const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
