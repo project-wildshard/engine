@@ -21,3 +21,11 @@ Whole-tree lint exposed style errors in the first runner draft. Corrected
 them without disabling rules; whole-tree lint and typecheck now pass. Both
 workflow files also pass actionlint. The shared cohort integration is
 committed as 1633a1f, separate from the blocking covered-verdict summary.
+
+Exact a7ed8e0 CI 42475678403 reproduced one additional 10-second timeout:
+pinned-restore-play's saved Nalati real walk. The other 5,770 blocking
+cases passed. J193 explicitly authorizes the same quarantine for another
+file that times out. Add that file, still owned by codex-pinefix2, until
+2026-11-10T11:57:31Z, exactly 48 hours from this follow-up. It executes in
+both non-blocking jobs; no assertion, saved fixture, runtime or clock is
+changed. The local full gate continues to include all five files.

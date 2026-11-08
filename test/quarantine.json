@@ -26,6 +26,12 @@
       "owner": "codex-pinefix2",
       "deadline": "2026-11-10T11:13:28.000Z",
       "reason": "30-second cold-grid reward proof timeout; ci 42470548295"
+    },
+    {
+      "file": "test/pinned-restore-play.test.ts",
+      "owner": "codex-pinefix2",
+      "deadline": "2026-11-10T11:57:31.000Z",
+      "reason": "10-second saved Nalati walk timeout; ci 42475678403 on a7ed8e0"
     }
   ]
 }
