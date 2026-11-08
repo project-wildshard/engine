@@ -41,3 +41,10 @@ the booted server ticks after pausing the timer. Collision input is
 prepared once for the file, and cleanup runs on failure too. All 13
 network cases pass under the full-run load; seam travel takes 0.071
 seconds and the slowest case takes 2.858 seconds. Typechecking passes.
+
+The required v0.1.1 tag is still absent, so these commits are held
+locally. The receipt stays in flight until origin/main has the work.
+The engine publication plan tracks the remaining pushes and checks.
+
+The publication plan uses the dated lane filename expected by the
+plan gate, so the next session can find the held work consistently.
