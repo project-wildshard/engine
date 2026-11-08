@@ -4,6 +4,7 @@ import { constants } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vitest/config';
+import {PUSH_PROFILE} from './push-budget.mjs';
 
 interface VitestTempEnvironment extends NodeJS.ProcessEnv {
   TMPDIR?: string;
@@ -83,11 +84,14 @@ export async function runVitest(args: readonly string[]): Promise<number> {
     const { assertVitestLane,isFullVitest } = await import('./vitest-lane.ts');
     assertVitestLane(args);
     const {WS_PUSH_GATE_PROFILE:profile}=process.env;
-    const phases=profile==='full-v1'&&isFullVitest(args)&&!args.some(arg=>arg==='--config'||arg.startsWith('--config=')||arg.startsWith('--shard'))?['native','ordinary']:[undefined];
+    // Each real file now owns CPU admission before collection. Performance and
+    // uncapped encoder files reserve the whole budget, so their original clocks
+    // remain alone while other native/ordinary work can share the available cores.
+    const phases=profile===PUSH_PROFILE&&isFullVitest(args)&&!args.some(arg=>arg==='--config'||arg.startsWith('--config=')||arg.startsWith('--shard'))?['admitted']:[undefined];
     for(const phase of phases){
     const entry = fileURLToPath(new URL('vitest.mjs', import.meta.resolve('vitest/package.json')));
     const child = spawn(process.execPath, [entry, ...args,...(phase===undefined?[]:['--config','scripts/push-vitest.config.ts'])], {
-      stdio: 'inherit', env: { ...process.env, VITEST_TMP_ROOT: run.dir,...(phase===undefined?{}:{WS_PUSH_TEST_PHASE:phase}) },
+      stdio: 'inherit', env: { ...process.env, VITEST_TMP_ROOT: run.dir,...(phase===undefined?{}:{WS_PUSH_TEST_PHASE:phase,WS_CPU_ADMISSION:'1'}) },
     });
     const interrupt = (): void => { child.kill('SIGINT'); };
     const terminate = (): void => { child.kill('SIGTERM'); };
