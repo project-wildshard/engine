@@ -13,6 +13,7 @@ while preserving the exact same four case names and all effect ordering,
 restoration, refusal and disposal assertions. The new file is relocation
 of an existing hook case, not an added slow proof or permanent exclusion.
 
-Both owners retain four cases and pass in 675 ms total runner time. The
-required renderer revision is regenerated because its client source
-inventory now contains the relocated test file; no page body is edited.
+Both owners retain four cases and pass in 675 ms total runner time. Test
+files are excluded from the renderer identity. Its required follow-up
+stamp instead covers the newly committed CI4 script inputs included by
+that conservative source boundary; no page body is edited.
