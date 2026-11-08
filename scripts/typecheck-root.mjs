@@ -12,7 +12,7 @@ export function rootTypecheckArguments(environment=process.env) {
 if(process.argv[1]&&resolve(process.argv[1])===resolve(import.meta.filename)){
   if(process.argv.length!==2){console.error('typecheck-root: expected no arguments');process.exit(2);}
   const root=resolve(import.meta.dirname,'..'),args=rootTypecheckArguments();
-  const result=spawnSync(resolve(root,'node_modules/.bin/tsc'),args,{cwd:root,stdio:'inherit'});
+  const result=spawnSync(resolve(root,'node_modules/.bin/npr'),['tsc',...args],{cwd:root,stdio:'inherit'});
   if(result.error!==undefined)console.error(result.error.message);
   process.exitCode=result.status??1;
 }

@@ -15,11 +15,11 @@
     "pnpm:devPreinstall": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "dev": "node src/tools/build-web.ts --dev",
     "build": "node src/tools/build-web.ts",
-    "typecheck": "pnpm typecheck:kit && pnpm gen:inputs && tsc -b tsconfig.layers.json --builders 8",
+    "typecheck": "pnpm typecheck:kit && pnpm gen:inputs && npr tsc -b tsconfig.layers.json --builders 8",
     "lint": "pnpm lint:kit && pnpm lint:game",
     "lint:fix": "oxlint -c src/.oxlintrc.json --type-aware --fix --ignore-pattern '.githooks/**' --ignore-pattern 'tmp/**' --ignore-pattern 'src/client/engine/**' --ignore-pattern 'src/shared/engine/**' --ignore-pattern 'src/server/engine/**' --ignore-pattern 'src/client/game/**' --ignore-pattern 'src/shared/game/**' --ignore-pattern 'src/server/game/**' --ignore-pattern 'src/cook/game/**' --ignore-pattern 'src/client/host/**' --ignore-pattern 'src/shared/host/**' --ignore-pattern 'src/server/host/**' --ignore-pattern 'src/client/app/**' --ignore-pattern 'src/test/engine/**' --ignore-pattern 'src/test/game/**' --ignore-pattern 'scripts/**' --ignore-pattern 'test/**' --ignore-pattern 'lint/**' --ignore-pattern 'vite/**' --ignore-pattern 'types/**' --ignore-pattern 'calibration/**' --ignore-pattern 'budgets/**' --ignore-pattern 'public/**' --ignore-pattern 'vite.config.ts' --ignore-pattern 'vitest.config.ts'",
-    "format": "oxfmt -c src/.oxfmtrc.json src/cli src/tools src/e2e src/scripts",
-    "format:check": "oxfmt -c src/.oxfmtrc.json --check src/cli src/tools src/e2e src/scripts",
+    "format": "npr oxfmt -c src/.oxfmtrc.json src/cli src/tools src/e2e src/scripts",
+    "format:check": "npr oxfmt -c src/.oxfmtrc.json --check src/cli src/tools src/e2e src/scripts",
     "test": "pnpm test:kit && pnpm test:fast",
     "test:e2e": "playwright test --config src/e2e/playwright.config.ts",
     "check:sides": "node src/scripts/check-sides.mjs && node scripts/check-engine-sides.mjs",
@@ -27,7 +27,7 @@
     "md:wrap": "node src/scripts/md-wrap.mjs",
     "test:hooks": "node --test '.githooks/*.test.mjs'",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm check:sides && pnpm check:asks",
-    "typecheck:kit": "tsc -p src/tsconfig.json && tsc -p src/client/tsconfig.json",
+    "typecheck:kit": "npr tsc -p src/tsconfig.json && npr tsc -p src/client/tsconfig.json",
     "lint:kit": "oxlint -c src/.oxlintrc.json --type-aware --deny-warnings --ignore-pattern '.githooks/**' --ignore-pattern 'tmp/**' --ignore-pattern 'src/client/engine/**' --ignore-pattern 'src/shared/engine/**' --ignore-pattern 'src/server/engine/**' --ignore-pattern 'src/client/game/**' --ignore-pattern 'src/shared/game/**' --ignore-pattern 'src/server/game/**' --ignore-pattern 'src/cook/game/**' --ignore-pattern 'src/client/host/**' --ignore-pattern 'src/shared/host/**' --ignore-pattern 'src/server/host/**' --ignore-pattern 'src/client/app/**' --ignore-pattern 'src/test/engine/**' --ignore-pattern 'src/test/game/**' --ignore-pattern 'scripts/**' --ignore-pattern 'test/**' --ignore-pattern 'lint/**' --ignore-pattern 'vite/**' --ignore-pattern 'types/**' --ignore-pattern 'calibration/**' --ignore-pattern 'budgets/**' --ignore-pattern 'public/**' --ignore-pattern 'vite.config.ts' --ignore-pattern 'vitest.config.ts'",
     "lint:game": "node scripts/lint-game.mjs",
     "test:kit": "node --test 'src/cli/*.test.ts' 'src/server/*.test.ts' 'src/test/helpers/*.test.ts'",
@@ -36,12 +36,13 @@
     "gen:inputs": "node scripts/gen.mjs --inputs-only",
     "gen:source": "node --import ./scripts/bake-loader.mjs scripts/gen-source.mjs",
     "pins": "node scripts/pins.ts install",
-    "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 && node scripts/gen.mjs --inputs-only && tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",
+    "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",
     "ring:1": "bash scripts/ring1.sh all",
     "release:stamp": "node scripts/stamp-validation-revision.mjs",
     "lint:typed": "node scripts/lint-all.mjs",
     "test:checks": "pnpm gen && node scripts/check-graph.mjs --source-only && node scripts/check-engine-sides.mjs && node scripts/check-sim-players.mjs",
-    "build:game": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install && node scripts/gen.mjs --inputs-only && tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=test/pins/catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'"
+    "build:game": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=test/pins/catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",
+    "tools:install": "npr install --frozen"
   },
   "dependencies": {
     "@dimforge/rapier3d-simd": "0.21.0",
@@ -70,12 +71,11 @@
     "assemblyscript": "0.28.20",
     "esbuild": "0.28.2",
     "happy-dom": "20.14.5",
-    "oxfmt": "0.74.0",
+    "npm-bin-deps": "2.1.0",
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2004",
     "playwright": "1.65.0",
     "sharp": "0.34.5",
-    "typescript": "7.0.2",
     "vite": "8.3.0",
     "vitest": "5.0.1",
     "ws": "8.22.0"
@@ -1206,5 +1206,10 @@
     "./scripts/**/*",
     "./vite/**/*",
     "./lint/**/*"
-  ]
+  ],
+  "binDependencies": {
+    "typescript": "7.0.2",
+    "oxfmt": "0.74.0"
+  },
+  "binDependenciesDir": ".bin-deps"
 }

@@ -27,7 +27,7 @@ test('complete companion types equal native JSON and preserve mutable and negati
   const good=`${source.join('\n')}\nimport sample from './sample.json';sample.enabled=false;sample.rows.push({value:3});sample.nested.names.push('new');const indexed:Record<string,number>=sample.left;void indexed;\n`;
   const probe=resolve(root,'probe.ts');writeFileSync(probe,good);
   writeFileSync(resolve(root,'tsconfig.json'),JSON.stringify({compilerOptions:{strict:true,exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,noEmit:true,skipLibCheck:true,module:'esnext',moduleResolution:'bundler',target:'es2022',allowArbitraryExtensions:true,resolveJsonModule:true,types:[]},files:[probe]}));
-  const run=()=>spawnSync(resolve('node_modules/.bin/tsc'),['--noEmit','-p',root],{encoding:'utf8'});
+  const run=()=>spawnSync(resolve('node_modules/.bin/npr'),['tsc','--noEmit','-p',root],{encoding:'utf8'});
   const accepted=run();expect(accepted.status,accepted.stdout+accepted.stderr).toBe(0);
   writeFileSync(probe,`${good}sample.enabled="bad";sample.nested.names.push(3);\n`);
   const refused=run();expect(refused.status).not.toBe(0);expect(refused.stdout).toContain('TS2322');expect(refused.stdout).toContain('TS2345');

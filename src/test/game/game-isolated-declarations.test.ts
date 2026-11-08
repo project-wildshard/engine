@@ -1,7 +1,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Invoke the actual native compiler against an isolated fixture.
 import {spawnSync} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the installed compiler without a shell.
-import {execPath} from 'node:process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read defining sources and own small cold compiler fixtures.
 import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the actual production project without writing consumers.
@@ -56,7 +55,7 @@ test('cold native declarations preserve strict augmentation contracts',()=>{
  mkdirSync('tmp',{recursive:true});
  const root=mkdtempSync(resolve('tmp/game-isolated-native-'));
  const put=(file:string,text:string):void=>writeFileSync(resolve(root,file),text);
- const run=():ReturnType<typeof spawnSync>=>spawnSync(execPath,[resolve('node_modules/typescript/bin/tsc'),'-p',resolve(root,'tsconfig.json')],{encoding:'utf8',timeout:10_000});
+ const run=():ReturnType<typeof spawnSync>=>spawnSync(resolve('node_modules/.bin/npr'),['tsc','-p',resolve(root,'tsconfig.json')],{encoding:'utf8',timeout:10_000});
  const message=(result:ReturnType<typeof spawnSync>):string=>String(result.stdout)+String(result.stderr);
  try{
   put('tsconfig.json',JSON.stringify({compilerOptions:{strict:true,exactOptionalPropertyTypes:true,

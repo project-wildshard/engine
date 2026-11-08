@@ -26,3 +26,9 @@ runs:
         key: ${{ inputs.pins-cache-scope }}-pins-${{ hashFiles('test/pins/slices.json', 'test/pins/shardfiles.json', 'test/pins/rings.json') }}
     - run: pnpm install --frozen-lockfile
       shell: bash
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      with:
+        path: ~/.cache/npm-bin-deps
+        key: bin-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bin-deps/pnpm-lock.yaml', '.bin-deps/pnpm-workspace.yaml') }}
+    - run: pnpm exec npr install --frozen
+      shell: bash

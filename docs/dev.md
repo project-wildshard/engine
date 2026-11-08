@@ -9,6 +9,10 @@ Run from the repo root.
 
 - `pnpm install`: installs deps and points `core.hooksPath` at `.githooks/`,
   through `pnpm:devPreinstall`. Never use `prepare` here (`../leftover/docs/repo-kit.md`).
+- `pnpm tools:install`: installs TypeScript7 and oxfmt from the committed
+  `.bin-deps` lock into npr's shared cache, with `--frozen`. CI runs this
+  after dependencies install. Typecheck/format commands use these pins;
+  the optional TypeScript6 peer in node_modules is only a library.
 - `pnpm check`: typecheck + lint + format:check + unit tests + the side rule + asks. The pre-push hook runs it.
 - `pnpm test`: `node:test` on `src/**/*.test.ts`, run as .ts by Node's type stripping.
 - `pnpm test:hooks`: the `.githooks/` suite (CI, and pre-commit when hooks change).

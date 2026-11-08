@@ -6,6 +6,13 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 
+/** Resolve the exact pinned compiler, not an optional peer's fallback binary. */
+function compiler() {
+  const found = spawnSync(resolve(root, 'node_modules/.bin/npr'), ['which', 'tsc'], { cwd: root, encoding: 'utf8' });
+  if (found.error !== undefined || found.status !== 0 || found.stdout.trim() === '') throw new Error('Pinned compiler unavailable');
+  return found.stdout.trim();
+}
+
 /** @param {string} text @returns {number | null} */
 export function maximumResidentBytes(text) {
   const match = /^\s*(\d+)\s+maximum resident set size\s*$/mu.exec(text);
@@ -18,8 +25,8 @@ export function maximumResidentBytes(text) {
  * No generator, incremental cache, output emission or CI partition change.
  * @returns {readonly {name:string, executable:string, args:readonly string[]}[]} */
 export function readingCommands() {
-  const compiler = resolve(root, 'node_modules/.bin/tsc');
-  return [4, 8].map(checkers => ({ name: `root-checkers-${checkers}`, executable: compiler,
+  const executable = compiler();
+  return [4, 8].map(checkers => ({ name: `root-checkers-${checkers}`, executable,
     args: ['--noEmit', '--incremental', 'false', '--checkers', String(checkers), '-p', 'tsconfig.json'] }))
     .concat([{ name: 'full-typed-lint', executable: process.execPath, args: ['scripts/lint-all.mjs'] }]);
 }
@@ -28,7 +35,7 @@ export function readingCommands() {
  * Authored JSON stays typed; no ambient module or resolveJsonModule escape.
  * @param {string} project */
 export function compilerJsonInputs(project) {
-  const result = spawnSync(resolve(root, 'node_modules/.bin/tsc'), ['--listFilesOnly', '-p', project],
+  const result = spawnSync(compiler(), ['--listFilesOnly', '-p', project],
     { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   if (result.error !== undefined || result.status !== 0) throw new Error(`Input census failed for ${project}: ${result.error?.message ?? result.stdout + result.stderr}`);
   const files = result.stdout.split(/\r?\n/u).filter(file => isAbsolute(file) && file.endsWith('.json'))

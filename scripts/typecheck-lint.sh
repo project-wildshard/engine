@@ -3,7 +3,7 @@
 set -uo pipefail
 {
   TIMEFORMAT='Typecheck: %3R seconds'
-  time pnpm exec tsc -b tsconfig.layers.json --builders 1 --force
+  time pnpm exec npr tsc -b tsconfig.layers.json --builders 1 --force
 } &
 typecheck_pid=$!
 {
