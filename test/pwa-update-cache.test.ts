@@ -26,7 +26,7 @@ test('the plain emitter stamps the real worker without a boot bank or code-pack 
   expect(first.core).not.toContain('import { workerScope'); expect(first.core).not.toContain('__BUILD_ID__');
   expect(first.core).not.toContain('__SHELL_FILES__'); expect(first.core).not.toContain('__FILES__');
   expect(first.core).not.toContain('__DOCUMENT__');
-  expect(first.core).toContain(`const DOCUMENT = ${JSON.stringify(new TextDecoder().decode(document.source))};`);
+  expect(first.core).toContain(`var DOCUMENT = ${JSON.stringify(new TextDecoder().decode(document.source))};`);
   expect(first.core).not.toContain('PREPARE_CODE_PACK'); expect(first.core).not.toContain('server-timing');
   expect(next.build).not.toBe(first.build); expect(workerScripts(next.core).fileName).not.toBe(workerScripts(first.core).fileName);
 });
@@ -43,11 +43,11 @@ test('a build precaches its server book, and a new book is a new worker', () => 
 test('document bytes remain data even when they contain worker marker text', () => {
   const html = `<!doctype html><html><body>π 😀 '__FILES__' '__BUILD_ID__' '__DOCUMENT__'</body></html>`;
   const {core} = serviceWorkerCore({'index.html': {type: 'asset', source: new TextEncoder().encode(html)}}, process.cwd(), 'fixture');
-  const literal = /^const DOCUMENT = (.+);$/mu.exec(core)?.[1];
+  const literal = /^\s*var DOCUMENT = (.+);$/mu.exec(core)?.[1];
   if (literal === undefined) throw new Error('Missing document literal');
   expect(JSON.parse(literal)).toBe(html);
   // No bundle file here, so the only rows left are the deck portraits a worker fetches after control.
-  expect(/^const FILES = JSON\.parse\("\[(.*)\]"\);$/mu.exec(core)?.[1]?.split(',').every(row => row.includes('-portrait-'))).toBe(true);
+  expect(/^\s*var FILES = JSON\.parse\("\[(.*)\]"\);$/mu.exec(core)?.[1]?.split(',').every(row => row.includes('-portrait-'))).toBe(true);
 });
 
 test('worker updates revalidate unchanged bytes and fetch a changed script in full', async () => {

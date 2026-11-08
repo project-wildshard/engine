@@ -2,6 +2,7 @@
 // and owns what only a page can do: start the worker, keep the real storage, and pause on a hidden tab. Every page runs on it: build-app
 // emits it under the build's folder. This file must never reach a `server`-tagged module (J2).
 import { installedCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
+import { bootMark } from '@wildshard/engine/boot/timing';
 import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
@@ -108,7 +109,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
   };
   control.onmessage = (event: MessageEvent<unknown>): void => {
     const message = v.parse(ServerMessageSchema, event.data);
-    if (message.kind === 'booted') { booted({ tick: message.tick, restored: message.restored }); client.hello(config.build, config.identity ?? deviceIdentity(config.storage, config.savePrefix)); }
+    if (message.kind === 'booted') { bootMark('server:booted-receive'); booted({ tick: message.tick, restored: message.restored }); bootMark('server:hello-send'); client.hello(config.build, config.identity ?? deviceIdentity(config.storage, config.savePrefix)); }
     else if (message.kind === 'write') void write(message.seq, message.key, message.value);
     else if (message.kind === 'failed') { failed(new Error(message.reason)); client.closed ??= message.reason; }
     else waits.get(message.id)?.(message);
@@ -138,10 +139,11 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
 
 /** Start the standalone target: the server always in a module worker, with no main-thread fallback (J49). */
 export function startStandalone(config: StandaloneConfig): StandaloneShell {
-  const worker = new Worker(new URL('../../../server/host/standalone/serverWorker.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('../../../server/host/standalone/serverWorker.ts', import.meta.url), { type: 'module', name: 'standalone-server' });
   const control = new MessageChannel(), game = new MessageChannel(), harness = new MessageChannel(), reads = config.held === undefined ? undefined : new MessageChannel();
   // C3: the page's catalogue, read at boot, is the worker's too; it has no document to read it from. So are its build's
   // verdicts, which a worker's reads ask for as the page's do (they are stamped into the document, and into nothing else).
+  bootMark('worker:configuration-send');
   worker.postMessage({ catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null } satisfies ServerWorkerStart,
     [control.port2, game.port2, harness.port2, ...reads === undefined ? [] : [reads.port2]]);
   if (reads !== undefined && config.held !== undefined) answerHeldReads(reads.port1, config.held);

@@ -1,5 +1,6 @@
 import { engineString } from '../strings';
 import { diagnosticNow } from '../core/clock';
+import { bootTiming, bootMark, endBootOperation } from './timing';
 /** A path supplies its vocabulary; the engine only accounts for exclusive wall time. */
 export interface LoadingStep { key: string; label: string; weight: number; aliases?: readonly string[] }
 export interface LoadingPath { id: string; steps: readonly LoadingStep[]; ignored?: readonly string[] }
@@ -38,6 +39,7 @@ export class LoadingTimeline {
   private readonly gaps: LoadingGap[] = [];
   private readonly occurrences = new Map<string, number>();
   private sequence = 0;
+  private bootStarted = false;
   private at: number;
   private last: string | null = null;
   private readonly now: () => number;
@@ -132,11 +134,14 @@ export class LoadingTimeline {
       delete row.endedAt;
     }
     const previous = this.gaps.at(-1); if (previous?.state === 'on') previous.state = 'ok';
+    const timing = bootTiming(), bootId = timing?.begin(`game-stage:${name}`, {detail});
+    if (!this.bootStarted && name !== 'modules' && this.path.id !== 'pending') { this.bootStarted = true; endBootOperation('app:entry-and-session-preparation'); bootMark('app:game-stage-start', {name}); }
     const id = ++this.sequence, stage = { key, base, detail: initialDetail };
     this.active.set(id, stage);
     return { end: () => {
       if (!this.active.has(id)) return;
       this.accrue(); this.active.delete(id); this.last = key;
+      if (bootId !== undefined) timing?.end(bootId, 'settled');
       if (row !== undefined && ![...this.active.values()].some(value => value.key === key)) row.endedAt = this.at;
     }, detail: text => { stage.detail = text; } };
   }

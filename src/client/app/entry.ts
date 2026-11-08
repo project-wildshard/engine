@@ -33,8 +33,18 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { bootRoute } from './bootRoute';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
+import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
 
 
+declare const __BUILD_ID__: string;
+const earlyTiming = bootTiming();
+if (earlyTiming !== undefined) {
+  earlyTiming.build = __BUILD_ID__;
+  for (const row of earlyTiming.entries) row.build = __BUILD_ID__;
+}
+bootMark('app:entry-body');
+endBootOperation('app:document-and-module-graph');
+bootTiming()?.begin('app:entry-and-session-preparation');
 const entryScope = new Scope('entry');
 let crashResume: CrashResume | null = null;
 let selectedImages: Scope | undefined;
@@ -62,7 +72,7 @@ inspectPreviousBoot();
 // renderer-free title until the player chooses a shard again.
 async function enterPage(): Promise<unknown> {
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
-  const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await import('@wildshard/engine/game/grid/pageEntry');
+  const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
   const end = lastEnd();
   const named = search.get('chunk');
   crashResume = (named === null || [end.slug].includes(named)) && !search.has('explore') ? consumeCrashResume(end, titleRows) : null;
@@ -90,10 +100,10 @@ async function enterPage(): Promise<unknown> {
   return (gridRecoveryRefused() || (titleOnly && document.getElementById('ws-shardfile') === null)) ? showPageTitle() : (async () => {
     // DL21 (E526): the static card runs its clock from the tap and names the code wait until Loading adopts it.
     const chunk = search.get('chunk'); if (chunk !== null) startShellClock(entryScope, chunk);
-    const tables = prepareBootImports(import('./assetTables').then(module => module.prepareAssetTables()));
+    const tables = prepareBootImports(bootTask('app:tables-import-and-prepare', () => import('./assetTables').then(module => module.prepareAssetTables())));
     try {
-      const [tier, menu, spawn] = await Promise.all([import('@wildshard/engine/core/tier'),
-        import('@wildshard/engine/game/grid/menu'), import('@wildshard/engine/game/boot/spawnDownload')]);
+      const [tier, menu, spawn] = await bootTask('app:tier-menu-download-imports', () => Promise.all([import('@wildshard/engine/core/tier'),
+        import('@wildshard/engine/game/grid/menu'), import('@wildshard/engine/game/boot/spawnDownload')]));
       await tier.initializeTier();
       const slug = search.get('chunk');
       if (typeof slug === 'string') {
@@ -108,9 +118,9 @@ async function enterPage(): Promise<unknown> {
       }
     } catch (error) { return tables.refuse(error); }
     await tables.ready();
-    await import('three');
-    await task();
-    return import('./main');
+    await bootTask('app:three-import', () => import('three'));
+    await bootTask('app:yield-before-main', task);
+    return bootTask('app:main-import', () => import('./main'));
   })();
 }
 async function showPageTitle(): Promise<void> {
@@ -168,10 +178,10 @@ export async function start(): Promise<void> {
 }
 
 async function startSelected(): Promise<void> {
-  const selected = import('./shardSelection').then(async selection => {
+  const selected = bootAwait('app:selected-discovery', import('./shardSelection').then(async selection => {
     await selection.prepareSelectedShard();
     return selection;
-  });
+  }));
   const [{ preparePageCatalogue, completePageCatalogue }, { game }, { beginLoading }, { TIER }] = await Promise.all([
     selected, import('@wildshard/engine/game/shard/registry'), import('@wildshard/engine/ui/Loading'),
     import('@wildshard/engine/core/tier'),
@@ -216,7 +226,7 @@ async function startSelected(): Promise<void> {
   // Resolve the already-required session code while services/admission yield.
   // Its failure stays captured until the original post-kit barrier below;
   // importing declarations must not start a session or publish its services.
-  const sessionCode = prepareBootImports(import('@wildshard/engine/game/session/session'));
+  const sessionCode = prepareBootImports(bootAwait('app:session-code', import('@wildshard/engine/game/session/session')));
   loading.waiting('Preparing application services');
   // Resolve the same required code while each memory reserve yields. Imports
   // cannot publish content: the memory bank and full import barrier still
@@ -233,9 +243,9 @@ async function startSelected(): Promise<void> {
     import('@wildshard/engine/game/boot/loadingPaths'),
     import('@wildshard/engine/game/grid/prefetch'),
   ] as const;
-  const imports = prepareBootImports(Promise.all([speciesModule, iconsModule, pickupsModule, pickupRowsModule, propsModule,
+  const imports = prepareBootImports(bootAwait('app:common-service-imports', Promise.all([speciesModule, iconsModule, pickupsModule, pickupRowsModule, propsModule,
     starterModule, hoverboardModule, voicesModule, boarModule, familiesModule, sourceModule, runtimeModule,
-    gridEntryModule, pathsModule, prefetchModule]));
+    gridEntryModule, pathsModule, prefetchModule])));
   // Cover the full-ALL route's five observed misses; never recycle growables.
   const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }] = await Promise.all([
     import('@wildshard/engine/script/moduleV2'), import('@wildshard/engine/core/workSlice'),
@@ -243,11 +253,11 @@ async function startSelected(): Promise<void> {
   ]);
   const memoryStartedAt = diagnosticNow();
   let memoryTurns = 0, memoryWaitMs = 0;
-  await prepareScriptMemoryBank([35, 0, 1, 0], async () => {
+  await bootTask('app:script-memory-reservation', () => prepareScriptMemoryBank([35, 0, 1, 0], async () => {
     // Each native reserve gets its own task, even when the CPU budget is free.
     memoryTurns++; const at = diagnosticNow(); await yieldTask(entryScope); memoryWaitMs += diagnosticNow() - at;
     if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
-  }, [{ initial: 1, maximum: 2, count: 5 }, { initial: 1, maximum: 64, count: 4 }]);
+  }, [{ initial: 1, maximum: 2, count: 5 }, { initial: 1, maximum: 64, count: 4 }]));
   performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
     detail: { memoryTurns, memoryWaitMs } });
   const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies },
@@ -261,7 +271,7 @@ async function startSelected(): Promise<void> {
   try {
     imports.check();
     loading.setPrefetchSource(gridPrefetchStatus);
-    const source = pageGridRecovery() === null ? await configuredShardfile(document, browserShardfileOptions(document.baseURI)) : null;
+    const source = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI))) : null;
     page = preparePageResidency(arrival, source?.identity.slug);
     await (await import('./assetTables')).prepareAssetPacks(page.mode === 'grid' || TIER !== 'phone' ? undefined : game.shard.slug);
     await completePageCatalogue(page.mode, catalogue?.ready);
@@ -281,9 +291,9 @@ async function startSelected(): Promise<void> {
     imports.check();
     // DL11: setup overlaps the download (each read waits for its own file); control waits for the whole set (finish.ts)
     if (spawnJob !== null) await waitFor('Spawn download', spawnJob.listed ?? spawnJob.ready, 'file');
-    const manifest = source === null
-      ? await installManifestShardfile(arrival, { ...browserShardfileOptions(document.baseURI, true), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready)
-      : await installShardfileProduct(source, { ...browserShardfileOptions(document.baseURI), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready);
+    const manifest = await bootAwait('app:product-admission', source === null
+      ? installManifestShardfile(arrival, { ...browserShardfileOptions(document.baseURI, true), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready)
+      : installShardfileProduct(source, { ...browserShardfileOptions(document.baseURI), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready));
     // Keep the seam out of code and descriptor admission; world construction
     // can overlap this read and retains its original full-geometry barrier.
     if (page.mode === 'grid') gridSelection.startGridEntryContent(page.instance ?? pageGridRecovery()?.instance ?? gridSelection.gridHome().instance);
@@ -307,6 +317,8 @@ async function startSelected(): Promise<void> {
     installPickupCatalogue(PICKUP_CATALOGUE,pickupFiles);
     installKitProps();
     const { startSession } = await sessionCode.ready();
+    bootMark('app:session-code-ready');
+    bootMark('app:session-start');
     await startSession(manifest, {
       items: STARTER_BAG_ITEMS,
       tools: [HOVERBOARD_TOOL],

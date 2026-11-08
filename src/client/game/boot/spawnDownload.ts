@@ -1,5 +1,6 @@
 import {packsBookPath, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
+import { bootProgress } from '@wildshard/engine/boot/timing';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -497,6 +498,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
               // a slow part still shows it moves: every chunk publishes, as a loose file's read does (verified bytes
               // still credit only per member)
               streamedBytes += chunk.value.byteLength;
+              bootProgress(`download:${part.url}`, chunk.value.byteLength, part.bytes, 'decoded-body-bytes');
               for (let row = next; row < order.length; row++) {
                 const [index, offset] = order[row] ?? [-1, Infinity], file = files[index]; if (file === undefined || offset >= at) break;
                 if (!done.has(index)) arrive(file, at - offset);

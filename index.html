@@ -2,6 +2,138 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script data-boot-timing>
+      // LS1: local, bounded, data-only history, installed before any module.
+      (() => {
+        const origin = performance.timeOrigin, scriptStart = performance.now(), limit = 4096, now = () => performance.now();
+        let sequence = 0, stopped = false, workerSequence = 0;
+        const data = window.__bootTiming = {version: 1, build: null, attempt: String(origin), attemptCount: 1,
+          timeOrigin: origin, entries: [], resources: [], counters: {}, active: [], realms: {},
+          navigation: {}, lifecycle: [], paints: [], overflow: {}, largestGap: null, handoff: null, lastInput: null};
+        const overflow = key => { data.overflow[key] = (data.overflow[key] || 0) + 1; };
+        const append = (operation, start, end, result, detail = {}, realm = 'page') => {
+          if (data.entries.length >= limit) { overflow('entries'); return 0; }
+          const id = ++sequence;
+          data.entries.push({id, build: data.build, attempt: data.attempt, realm, operation, start, end, result, detail}); return id;
+        };
+        data.begin = (operation, detail = {}) => stopped ? 0 : append(operation, now(), null, 'pending', detail);
+        data.end = (id, result = 'complete') => {
+          const row = data.entries.find(row => row.id === id);
+          if (!row || row.end !== null) return;
+          row.end = now(); row.result = result;
+          if (result === 'complete') data.progress('atomic:completed', 1, null, 'steps');
+        };
+        data.mark = (operation, detail = {}) => { if (!stopped) { const at = now(); append(operation, at, at, 'observed', detail); } };
+        data.progress = (operation, delta, total, unit) => {
+          if (stopped || !Number.isFinite(delta) || delta < 0) return;
+          if (!data.counters[operation] && Object.keys(data.counters).length >= limit) { overflow('counters'); return; }
+          const row = data.counters[operation] ||= {loaded: 0, total, unit, at: now(), events:0};
+          row.loaded += delta; row.events++; row.at = now(); if (row.total !== null && row.loaded > row.total) row.total = null;
+        };
+        const fields = ['startTime','workerStart','fetchStart','redirectStart','redirectEnd','domainLookupStart','domainLookupEnd','connectStart','connectEnd','secureConnectionStart','requestStart','responseStart','responseEnd','duration','transferSize','encodedBodySize','decodedBodySize','nextHopProtocol','unloadEventStart','unloadEventEnd','domInteractive','domContentLoadedEventStart','domContentLoadedEventEnd','domComplete','loadEventStart','loadEventEnd','type','redirectCount'];
+        const plain = entry => Object.fromEntries(fields.map(key => [key, typeof entry[key] === 'number' || typeof entry[key] === 'string' ? entry[key] : null]));
+        const navigation = () => { const entry = performance.getEntriesByType('navigation')[0]; if (entry) data.navigation = plain(entry); };
+        data.read = () => {
+          navigation(); const at = now();
+          data.active = data.entries.filter(row => row.end === null).map(row => ({id: row.id, realm: row.realm, operation: row.operation, ageMs: Math.max(0, at - row.start)}));
+          return data;
+        };
+        const resource = (entry, realm = 'page', workerOrigin = origin) => {
+          if (data.resources.length >= limit) { overflow('resources'); return; }
+          data.resources.push({...plain(entry), url: entry.name, initiator: entry.initiatorType, realm, timeOrigin: workerOrigin,
+            pageStart: workerOrigin + entry.startTime - origin, pageEnd: workerOrigin + entry.responseEnd - origin});
+          data.progress('resource:completed', 1, null, 'files');
+          if (data.build === null) data.build = /\/b\/([^/]+)\//.exec(entry.name)?.[1] || null;
+        };
+        let observer, paintObserver;
+        try {
+          performance.setResourceTimingBufferSize(limit);
+          observer = new PerformanceObserver(list => { for (const entry of list.getEntries()) {
+            if (entry.entryType === 'resource') resource(entry);
+            else if (data.paints.length < 32) data.paints.push({name: entry.name, start: entry.startTime});
+          }});
+          observer.observe({type: 'resource', buffered: true});
+          try { paintObserver = new PerformanceObserver(list => { for (const e of list.getEntries()) if (data.paints.length < 32) data.paints.push({name:e.name,start:e.startTime}); }); paintObserver.observe({type:'paint',buffered:true}); }
+          catch { data.paints.push({name:'unavailable',start:null}); }
+        } catch { data.overflow.resourceTimingUnavailable = true; }
+        performance.addEventListener?.('resourcetimingbufferfull', () => overflow('resourceBuffer'));
+        for (const name of ['DOMContentLoaded','load']) addEventListener(name, navigation, {once: true});
+        for (const name of ['visibilitychange','pagehide','pageshow']) addEventListener(name, event => {
+          if (data.lifecycle.length < 64) data.lifecycle.push({name, at: now(), visibility: document.visibilityState, persisted: event.persisted ?? null});
+        });
+        for (const name of ['pointerup','click','keydown']) addEventListener(name, event => { data.lastInput = {event: name, eventTimeStamp: event.timeStamp, handlerEntry: now(), timeOrigin: origin}; }, {capture:true,passive:true});
+        const handoff = (storage, suffix, key) => {
+          try { for (let index=0; index<Math.min(storage.length,128); index++) {
+            const name=storage.key(index); if (!name?.endsWith(suffix)) continue;
+            const doc=JSON.parse(storage.getItem(name) || 'null'), raw=doc?.keys?.[key]?.data;
+            const arrival=typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (arrival?.timing && Number.isFinite(arrival.at) && Date.now()-arrival.at >= 0 && Date.now()-arrival.at < 60000 && (data.handoff===null || arrival.at>data.handoff.wall)) {
+              data.handoff={...arrival.timing,wall:arrival.at,received:now(),newTimeOrigin:origin,source:'pending-title-arrival',validated:false};
+            }
+          }} catch { /* Unavailable storage leaves the tap origin unknown. */ }
+        };
+        try {handoff(sessionStorage,'.session','titleArrival');handoff(localStorage,'.device','titleArrival.once');} catch { /* Storage denied. */ }
+        navigation(); append('document:navigation-and-html', 0, now(), 'observed');
+        append('app:html-script-start',scriptStart,scriptStart,'observed'); data.mark('app:collector-installed'); data.begin('app:document-and-module-graph');
+        addEventListener('DOMContentLoaded', () => { data.mark('app:dom-content-loaded'); }, {once:true});
+        let previous = now();
+        const clock = setInterval(() => { const at = now(), ms = at - previous;
+          if (data.largestGap === null || ms > data.largestGap.ms) data.largestGap = {before: previous, after: at, ms, visibility: document.visibilityState}; previous = at;
+        }, 100);
+        const restorations = [];
+        data.finish = () => { data.mark('app:loader-complete'); const ended=now(); for(const row of data.entries) if(row.end===null){row.end=ended;row.result='unresolved-at-loader-complete';} data.read(); stopped = true; clearInterval(clock); observer?.disconnect(); paintObserver?.disconnect(); for (const restore of restorations.splice(0)) { try { restore(); } catch {} } };
+        if (typeof Worker === 'function') {
+          const Native = Worker;
+          window.Worker = new Proxy(Native, {construct(target, args, constructor) {
+            const realm = `worker:${++workerSequence}`, purpose = args[1]?.name || String(args[0]);
+            const id = data.begin('worker:constructor', {realm,purpose,url:String(args[0])});
+            const worker = Reflect.construct(target, args, constructor); data.end(id);
+            const code = data.begin('worker:fetch-evaluate-start', {realm,purpose});
+            data.realms[realm] = {purpose, url:String(args[0]), timeOrigin:null, precision:'browser', instrumentation:'parent-only'};
+            const ids = new Map(); let first = true;
+            const receive = event => {
+              if (stopped) { if (event.data?.__engineBootTiming === 1) event.stopImmediatePropagation(); return; }
+              const value = event.data;
+              if (value?.__engineBootTiming === 1) {
+                event.stopImmediatePropagation();
+                const wOrigin = value.origin, offset = wOrigin - origin;
+                data.realms[realm] = {purpose:value.purpose,url:String(args[0]),timeOrigin:wOrigin,precision:'browser',instrumentation:'worker'};
+                if (first) { first = false; data.end(code); }
+                if (value.pong) { const {p0,w1,w2} = value.pong, p3 = now(); data.mark('worker:clock-roundtrip', {realm,p0,w1,w2,p3,workerTimeOrigin:wOrigin,pageTimeOrigin:origin,roundTrip:p3-p0,handling:w2-w1,transitAndQueue:p3-p0-(w2-w1)}); }
+                for (const row of value.records || []) {
+                  if (row.type === 'resource') resource(row.value, realm, wOrigin);
+                  else if (row.type === 'begin') ids.set(row.id, append(row.operation, offset+row.start, null, 'pending', row.detail, realm));
+                  else if (row.type === 'end') { const held = data.entries.find(entry => entry.id === ids.get(row.id)); if (held) {held.end=offset+row.end;held.result=row.result;if(row.result==='complete')data.progress('atomic:completed',1,null,'steps');} }
+                  else if (row.type === 'service-worker') { const r=row.value; append(r.operation,r.origin+r.start-origin,r.origin+r.end-origin,r.result,{url:r.url,client:r.client},'service-worker'); }
+                  else if (row.type === 'mark') append(row.operation,offset+row.start,offset+row.start,'observed',row.detail,realm);
+                  else if (row.type === 'progress') data.progress(`${realm}:${row.operation}`,row.delta,row.total,row.unit);
+                  else if (row.type === 'overflow') overflow(`${realm}:records`);
+                }
+              } else { if (first) {first=false;data.end(code);} data.mark('worker:message-receive',{realm,kind:value?.kind || value?.type || null}); }
+            };
+            worker.addEventListener('message',receive,{capture:true});
+            worker.addEventListener('error',()=>data.end(code,'failed'),{once:true});
+            if (/(?:serverWorker|imageDecode\.worker|liveJsonParser\.worker|ktx2Zstd\.worker|tileDecodeWorker|farImpostorDecodeWorker|road(?:Grain|Sign|TileWrite|TileCapture)\.worker|viewmodelTextures\.worker)/.test(String(args[0]))) {
+              worker.postMessage({__engineBootPing:now()}); restorations.push(()=>worker.postMessage({__engineBootStop:1}));
+            }
+            return worker;
+          }});
+          restorations.push(()=>{window.Worker=Native;});
+        }
+        if (navigator.serviceWorker) {
+          navigator.serviceWorker.controller?.postMessage({type:'BOOT_TIMING',attempt:data.attempt,url:location.href});
+          data.serviceWorker = {controller:navigator.serviceWorker.controller?.scriptURL || null};
+          navigator.serviceWorker.addEventListener('message', event => {
+            const value = event.data;
+            if (value?.__engineBootTiming !== 1 || !value.serviceWorker) return;
+            event.stopImmediatePropagation();
+            if (stopped) return;
+            for (const row of value.records || []) append(row.operation,row.origin+row.start-origin,row.origin+row.end-origin,row.result,{url:row.url,client:row.client},'service-worker');
+          });
+        }
+      })();
+    </script>
+
     <!-- no viewport-fit=cover (E58): an iOS home-screen app drawn under the status bar had WebKit shrink the viewport ~62 px after
          load and leave a black strip at the bottom; below the status bar the page runs to the bottom edge (src/client/engine/core/viewport.ts) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -367,6 +499,10 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 <div class="ws-rotate-sub">Wildshard is played upright · turn your phone to continue</div>
 </div>
 </div></div>
+    <script data-boot-shell-ready>
+      window.__bootTiming?.mark('app:shell-dom-ready');
+      requestAnimationFrame(() => requestAnimationFrame(() => window.__bootTiming?.mark('app:first-paint-opportunity')));
+    </script>
     <script type="module" src="/src/client/app/identity.ts"></script>
     <script type="module" src="/src/client/engine/boot/sw.ts"></script>
     <script type="module" src="/src/client/engine/ui/RotateGate.ts"></script>

@@ -1,3 +1,6 @@
+import { installWorkerBootTiming } from '../../../shared/engine/boot/workerTiming';
+
+installWorkerBootTiming('image-decode');
 export interface DecodeRequest { id: number; blob: Blob; options: ImageBitmapOptions }
 function request(value: unknown): value is DecodeRequest {
   return typeof value === 'object' && value !== null

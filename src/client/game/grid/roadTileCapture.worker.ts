@@ -1,6 +1,9 @@
 import { roadTileCache } from './roadTileArchive';
 import { captureJobTiles } from './roadTileCaptureJob';
 import type { CaptureJob } from './roadTileCaptureWorker';
+import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
+
+installWorkerBootTiming('road-tile-capture');
 
 /** DL11: the road tile capture worker: each job's tiles (roadTileCaptureJob.ts) into this origin's Cache Storage. */
 async function answer(job: CaptureJob): Promise<void> {

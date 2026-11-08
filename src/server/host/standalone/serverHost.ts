@@ -2,6 +2,7 @@
 // module worker is one line around this; the Node test runs the same code over a real MessageChannel.
 import * as v from 'valibot';
 import { installAppIdentity } from '@wildshard/engine/app/identity';
+import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { LedgerBook } from '@wildshard/engine/net/ledgerBook';
@@ -60,14 +61,15 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
   };
 
   const boot = async (message: Boot): Promise<void> => {
+    bootMark('server:boot-configuration');
     storage = new ForwardedStorage(message.saves, write => { post({ kind: 'write', ...write }); });
     const local = storage, { arrival, residents } = options.proof ?? {};
     installWorkerIdentity(message.savePrefix);
     allowDeveloperBoost(); // this server is the player's own device; a page only sends the button with Developer on
     installSaveEnvironment({ storage: saveScope => saveScope === 'session' ? null : local, persistent: () => true, persist: () => Promise.resolve(false) });
-    const server = await StandaloneGrid.boot({ slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
+    const server = await bootTask('server:world-boot', () => StandaloneGrid.boot({ slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
       load: slug => options.load(message, slug), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
-      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }) });
+      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }) }));
     grid = server;
     const { restored } = server;
     if (restored?.ledger !== undefined) book.restore(restored.ledger);
@@ -76,6 +78,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; },
       step: () => { try { server.tick(); } catch (error) { fail(error); } } });
     options.proof?.booted?.(server);
+    bootMark('server:booted-send');
     post({ kind: 'booted', tick: server.host.state.tick, restored: restored !== undefined });
   };
 
@@ -93,7 +96,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
       if (booting) { refused++; return; }
       booting = true; void boot(message).catch(fail);
     }
-    else if (message.kind === 'ready') { grid?.open(); clock?.start(); }
+    else if (message.kind === 'ready') { bootMark('server:ready-received'); grid?.open(); clock?.start(); }
     else if (message.kind === 'pause') clock?.pause();
     else if (message.kind === 'resume') clock?.start();
     else if (message.kind === 'save') void save(message.id).catch(fail);

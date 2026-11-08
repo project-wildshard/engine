@@ -1,4 +1,7 @@
 import { ZSTDDecoder } from 'three/examples/jsm/libs/zstddec.module.js';
+import { installWorkerBootTiming } from '../../../shared/engine/boot/workerTiming';
+
+installWorkerBootTiming('ktx2-zstd');
 
 /** one KTX2's zstd-supercompressed levels to decode (`ktx2Zstd.ts`); each level's bytes come transferred */
 export interface ZstdRequest { id: number; levels: { data: Uint8Array; size: number }[] }

@@ -5,6 +5,9 @@
  * scratches) — the main thread then draws that set itself.
  */
 import { makePixels, type Ctx2D, type SetName } from './viewmodelTextures';
+import { installWorkerBootTiming } from '../../../shared/engine/boot/workerTiming';
+
+installWorkerBootTiming('viewmodel-textures');
 
 const canvas2d = (w: number, h: number): Ctx2D => {
   const ctx = new OffscreenCanvas(w, h).getContext('2d'); // as the main thread's canvas (no willReadFrequently): the same rasteriser for the scratches

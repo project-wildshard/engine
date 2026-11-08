@@ -1,4 +1,7 @@
 import { parseJsonPages } from './parsedPages';
+import { installWorkerBootTiming } from '../../../shared/engine/boot/workerTiming';
+
+installWorkerBootTiming('live-json-parser');
 
 self.onmessage = (event: MessageEvent<unknown>): void => {
   const data = event.data;

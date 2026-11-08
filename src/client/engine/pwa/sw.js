@@ -1,4 +1,5 @@
 import { workerScope } from '../app/workerScope.js';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 /* MF1: one URL cache, one build shell, and one previous generation of code.
  * No fetched-body reconstruction, checksums, receipts, packs, retries or work timers. */
 const BUILD = '__BUILD_ID__';
@@ -197,23 +198,51 @@ workerScope.listen(self, 'activate', event => {
   })());
 });
 
-async function cached(request, name) {
+// LS1: local client messages only; never await diagnostics before delivery.
+const bootOrigin = performance.timeOrigin, bootPending = new Map();
+function bootPublish(event, rows) {
+  const id = (event?.clientId === '' ? undefined : event?.clientId) ?? event?.resultingClientId;
+  if (!id || controlled.has(id)) return;
+  const records = rows.map(row => ({...row,origin:bootOrigin,client:id}));
+  try { event.waitUntil(self.clients.get(id).then(client => {
+    if (client && (client.type === 'window' || /serverWorker|\.worker|DecodeWorker/.test(client.url))) {
+      client.postMessage({__engineBootTiming:1,serviceWorker:true,records}, []);
+    } else {
+      if (!bootPending.has(id) && bootPending.size >= 32) bootPending.delete(bootPending.keys().next().value);
+      const held=bootPending.get(id) ?? [];
+      for (const record of records) {if (held.length < 256) held.push(record);
+      else held[255]={...record,operation:'sw:buffer-overflow',result:'unknown'};}
+      bootPending.set(id,held);
+    }
+    return undefined;
+  }).catch(() => { /* Diagnostics cannot refuse a response. */ })); } catch { /* Event retirement does not affect delivery. */ }
+}
+async function cached(request, name, event) {
+  const received=diagnosticNow();
+  const records=[{operation:'sw:handler-received',url:request.url,start:received,end:received,result:'observed'}];
+  const timed = async (operation, work) => {
+    const start=diagnosticNow(); let result='complete';
+    try { return await work(); } catch(error) {result='failed';throw error;}
+    finally {records.push({operation,url:request.url,start,end:diagnosticNow(),result});}
+  };
+  const delivery = response => {records.push({operation:'sw:response-delivery-decision',url:request.url,start:diagnosticNow(),end:diagnosticNow(),result:'observed'});bootPublish(event,records);return response;};
   let cache;
   // A visible retry must reach the origin, including past the legacy URL cache.
   const reload = request.cache === 'reload' || request.cache === 'no-store';
   try {
-    cache = await store(name);
-    const response = reload ? undefined : await cache.match(request, MATCH);
-    if (response !== undefined && !isHtml(response)) return response;
+    cache = await timed('sw:cache-open', () => store(name));
+    const response = reload ? undefined : await timed('sw:cache-match', () => cache.match(request, MATCH));
+    records.push({operation:response !== undefined && !isHtml(response) ? 'sw:cache-hit' : 'sw:cache-miss',url:request.url,start:diagnosticNow(),end:diagnosticNow(),result:'observed'});
+    if (response !== undefined && !isHtml(response)) return delivery(response);
     // DL25: a hashed name read bare, where a part's member was kept under its manifest's `?v=`: the same file
     if (!reload && CONTENT.test(new URL(request.url).pathname)) {
       const kept = await cache.match(request, { ...MATCH, ignoreSearch: true });
-      if (kept !== undefined && !isHtml(kept)) return kept;
+      if (kept !== undefined && !isHtml(kept)) return delivery(kept);
     }
     if (response !== undefined) await cache.delete(request);
     if (!reload && name !== ASSETS) {
       const shared = await (await store(ASSETS)).match(request, MATCH);
-      if (shared !== undefined && !isHtml(shared)) return shared;
+      if (shared !== undefined && !isHtml(shared)) return delivery(shared);
       if (shared !== undefined) await (await store(ASSETS)).delete(request);
     }
     // Wave 2 removes the old page cache. Until then retain its already named bodies.
@@ -222,14 +251,14 @@ async function cached(request, name) {
       const old = await (await caches.open('ws-content-v0')).match(abs(`/__ws_content__/v0/${hash}`), MATCH);
       if (old !== undefined && !isHtml(old)) {
         await cache.put(request, old.clone()).catch(() => undefined);
-        return old;
+        return delivery(old);
       }
     }
   } catch { stores.delete(name); stores.delete(ASSETS); /* Storage denial keeps online fetch working. */ }
-  const response = await fetch(request);
+  const response = await timed('sw:network-fetch-to-headers', () => fetch(request)).catch((/** @type {unknown} */ error) => {bootPublish(event,records);throw error;});
   // Native no-body statuses pass through untouched. A range never replaces a full body.
-  if (cache !== undefined && response.status === 200 && !isHtml(response)) await cache.put(request, response.clone()).catch(() => undefined);
-  return response;
+  if (cache !== undefined && response.status === 200 && !isHtml(response)) await timed('sw:body-and-cache-publication', () => cache.put(request, response.clone())).catch(() => undefined);
+  return delivery(response);
 }
 
 workerScope.listen(self, 'fetch', event => {
@@ -245,16 +274,17 @@ workerScope.listen(self, 'fetch', event => {
     return;
   }
   if (immutable(url)) {
-    event.respondWith(cached(request, ASSETS));
+    event.respondWith(cached(request, ASSETS, event));
     return;
   }
   if (/^\/(?:assets|basis|fonts)\//.test(url.pathname) || url.pathname === '/manifest.webmanifest') {
-    event.respondWith(cached(request, SHELL));
+    event.respondWith(cached(request, SHELL, event));
   }
 });
 
 workerScope.listen(self, 'message', event => {
   const type = event.data?.type;
+  if (type === 'BOOT_TIMING') {const id=event.source?.id, rows=bootPending.get(id) ?? [];bootPending.delete(id);event.source?.postMessage({__engineBootTiming:1,serviceWorker:true,attempt:event.data.attempt,records:rows}, []);return;}
   if (type === 'SKIP_WAITING') { event.waitUntil(self.skipWaiting()); return; }
   if (type === 'PAUSE') { pausePrecache(event.source?.id); return; }
   if (type === 'PRECACHE') {

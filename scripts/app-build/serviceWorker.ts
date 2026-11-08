@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
+import { buildSync } from 'esbuild';
 import { ASSET_CACHE_NAME } from '../../src/client/engine/pwa/cacheNames';
 import { serverPackBookPath } from '../../src/shared/game/shardfile/serverPack';
 import { titleAssetURLs } from '../title-assets.mjs';
@@ -47,9 +48,11 @@ export function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>,
   const sources = new Map(Object.entries(titleAssetURLs(root)).map(([source, url]) => [url, source]));
   // S2: a deck portrait waits for control with the code (DL1), so a first visit's title doesn't fetch every shard's.
   const shell = shellFiles(html, root, sources), portraits = shell.filter(url => /^\/assets\/title\/[^/]+-portrait-/u.test(url)), digest = createHash('sha256');
-  const owner = readFileSync(join(root, 'src/client/engine/app/workerScope.js'), 'utf8').replaceAll(/^export /gmu, '');
-  const worker = readFileSync(join(root, 'src/client/engine/pwa/sw.js'), 'utf8').replace("import { workerScope } from '../app/workerScope.js';\n", '');
-  const source = `${owner}\n${worker}`;
+  // Bundle the worker's explicit clock/owner imports; no page runtime enters it.
+  const output = buildSync({ entryPoints: [join(root, 'src/client/engine/pwa/sw.js')], bundle: true,
+    write: false, format: 'iife', platform: 'browser', target: 'es2022' }).outputFiles?.[0];
+  if (output === undefined) throw new Error('Missing service worker bundle');
+  const source = output.text;
   digest.update(source);
   for (const name of [...hashed, '/index.html']) {
     const file = bundle[name.slice(1)];
@@ -61,9 +64,9 @@ export function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>,
   const build = `${buildId}-${digest.digest('hex').slice(0, 10)}`;
   const core = source.replaceAll('__BUILD_ID__', build).replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME)
     // The build's server book with its code: a device that adopts a build and goes offline can still read a server class it holds.
-    .replace("'__FILES__'", JSON.stringify(JSON.stringify([...hashed, ...portraits, ...serverBook === undefined ? [] : [serverBook.url]])))
-    .replace("'__SHELL_FILES__'", JSON.stringify(JSON.stringify(shell.filter(url => !portraits.includes(url)))))
-    .replace("'__DOCUMENT__'", JSON.stringify(html));
+    .replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify([...hashed, ...portraits, ...serverBook === undefined ? [] : [serverBook.url]])))
+    .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shell.filter(url => !portraits.includes(url)))))
+    .replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(html));
   return { core, build, assets: ASSET_CACHE_NAME, hashed };
 }
 

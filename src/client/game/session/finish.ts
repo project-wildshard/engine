@@ -1,4 +1,5 @@
 import type { BuiltWorld } from './context';
+import { bootMark } from '@wildshard/engine/boot/timing';
 import { Rng } from '@wildshard/engine/core/rng';
 import { gridCells } from '../plugin/context';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
@@ -121,7 +122,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       // Until the first systems step the camera stands at the origin (Nine: 127 m below the spawn's eye, at 72° not the
       // held 93°) and placed copies hold none until their first cull: one step without its draw poses the spawn view,
       // so the shaders below and firstFrame's warm turns link and draw what the player sees, not the origin's view
+      bootMark('app:first-game-step-start');
       withoutOffscreenBakes(() => { game.stepFrame(); });
+      bootMark('app:first-game-step-end');
       // A six-material job exceeded the loading text's one-second update
       // budget at phone CPU speed. Use the existing one-material sliced path.
       // PL6: and what the first frame's warm turns show, so none of it builds and links inside that frame
@@ -189,6 +192,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     game.start(); game.stepFrame();
     await precompileLevel(game, undefined, { sliceMs: BOOT_SHADER_SLICE_MS, drawnOnly: true, turns: game.warmTurnYaws() });
     game.hiddenFrame();
+    bootMark('app:first-game-frame-submitted');
+    game.levelScope.raf(() => { bootMark('app:first-game-frame-opportunity'); });
   });
   // FC2 (L15): the ready frame is one more hidden frame; the minimap's baked map decodes beside it
   // MF5 + FC2: what the hidden frames registered in the spawn view (the ring's L0 tiles the first draw asks for) refines

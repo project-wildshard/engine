@@ -6,6 +6,10 @@ import { RAPIER_WASM_URL } from '@wildshard/engine/physics/wasmUrl';
 import { askHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import { runStandaloneServer } from './serverHost';
 import { fetchGridCollision, fetchServerProduct } from './serverProduct';
+import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
+import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
+
+installWorkerBootTiming('standalone-server');
 
 /** What a page hands its server's worker: what its document holds and a worker's realm has no way to read. */
 export interface ServerWorkerStart { readonly catalogue: unknown; readonly validator: unknown; readonly verdicts: unknown }
@@ -13,7 +17,10 @@ export interface ServerWorkerStart { readonly catalogue: unknown; readonly valid
 /** Physics, once, from the page's own copy where it holds one (DL25). */
 let physics: Promise<Rapier> | undefined;
 const rapierOf = (held: HeldRead | undefined): Promise<Rapier> => {
-  physics ??= (async () => loadRapier(await held?.(new URL(RAPIER_WASM_URL, globalThis.location.href).href) ?? undefined))();
+  physics ??= (async () => {
+    const bytes = await bootTask('server:rapier-held-bytes', async () => await held?.(new URL(RAPIER_WASM_URL, globalThis.location.href).href) ?? undefined);
+    return bootTask('server:rapier-initialize', () => loadRapier(bytes));
+  })();
   return physics;
 };
 
@@ -21,6 +28,7 @@ const rapierOf = (held: HeldRead | undefined): Promise<Rapier> => {
 // hands over the control port, the game port, the harness's and, on a page with a download, the port for what it holds, once;
 // everything after that goes through them.
 self.onmessage = (event: MessageEvent<unknown>): void => {
+  bootMark('worker:configuration-received');
   self.onmessage = null;
   const start = event.data as ServerWorkerStart;
   if (start.catalogue !== null) installCatalogue(start.catalogue);

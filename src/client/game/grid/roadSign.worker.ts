@@ -1,6 +1,9 @@
 import type { SignLine } from '../../../shared/game/grid/roadLayout';
 import { paintRoadSignCanvas, roadSignPaintLayout } from './roadSignPaint';
 import { packRoadSignPixels } from './roadSignPixels';
+import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
+
+installWorkerBootTiming('road-sign');
 
 function signLines(value: unknown): value is readonly SignLine[] {
   return Array.isArray(value) && value.length <= 2048 && value.every((row: unknown) => {

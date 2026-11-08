@@ -1,4 +1,7 @@
 import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
+
+installWorkerBootTiming('road-tile-write');
 
 /** DL11: the road archive's Cache Storage writes, off the page thread. Same URL, body and headers as cacheAsset.
  * The page transfers bodies only after this module has said it is running; a refused write hands its body back so

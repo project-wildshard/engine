@@ -4,6 +4,9 @@
  */
 import { decodeTerrainTile } from '@wildshard/format/terrainTileBytes';
 import type { TileDecodeReply } from './tileDecoder';
+import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
+
+installWorkerBootTiming('terrain-tile-decode');
 
 function reply(message: TileDecodeReply, transfer: Transferable[]): void {
   self.postMessage(message, { transfer });

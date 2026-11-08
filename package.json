@@ -308,6 +308,8 @@
     "./boot/steps": "./src/shared/engine/boot/steps.ts",
     "./boot/stuck": "./src/client/engine/boot/stuck.ts",
     "./boot/stuckStep": "./src/client/engine/boot/stuckStep.ts",
+    "./boot/timing": "./src/shared/engine/boot/timing.ts",
+    "./boot/workerTiming": "./src/shared/engine/boot/workerTiming.ts",
     "./pwa/cacheNames": "./src/client/engine/pwa/cacheNames.ts",
     "./boot/tables": "./src/shared/engine/boot/tables.ts",
     "./boot/timeline": "./src/shared/engine/boot/timeline.ts",

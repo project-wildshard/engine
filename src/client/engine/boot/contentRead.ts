@@ -1,6 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
+import { bootProgress } from '../../../shared/engine/boot/timing';
 
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
 export class ContentReadError extends Error {
@@ -58,7 +59,9 @@ async function body(response: Response, url: string, maximum: number, read?: (by
         const grown = new Uint8Array(Math.min(maximum, Math.max(next, bytes.length * 2)));
         grown.set(bytes); bytes = grown;
       }
-      bytes.set(part.value, size); size = next; read?.(part.value.byteLength);
+      bytes.set(part.value, size); size = next;
+      bootProgress(`download:${url}`, part.value.byteLength, expected ?? null, 'decoded-body-bytes');
+      read?.(part.value.byteLength);
     }
   } catch (error) {
     // A caller may own a clone. Cancelling a tee waits for both branches;

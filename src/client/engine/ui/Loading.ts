@@ -1,4 +1,5 @@
 import { uiScope, mountUi } from './ownership';
+import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
 import {app} from '../app/runtime';
 import { engineString } from '../../../shared/engine/strings';
 import { saveStorage } from '../saves/slots';
@@ -103,6 +104,7 @@ export class Loading {
   private failedReason: string | null = null;
 
   constructor(chunk: { id: string; name: string; trace?: boolean }, mode: { readonly scoped?: boolean } = {}) {
+    bootMark('app:loading-adopt', {scoped: mode.scoped === true, chunk: chunk.id});
     app.ui.bindPresentation(this.scope);app.ui.holdCovered(this.scope);
     this.scoped = mode.scoped === true;
     if (!this.scoped) startBoot({ id: chunk.id, name: chunk.name }, TIER === 'phone' && chunk.trace === true);
@@ -154,6 +156,7 @@ export class Loading {
       savedStorage.setItem(key, JSON.stringify({ slug: chunk.id, at: Date.now(), count: attempt }));
     } catch { /* a storage-denied PWA still gets the loader */ }
     this.attempt = attempt;
+    const earlyTiming = bootTiming(); if (earlyTiming !== undefined) earlyTiming.attemptCount = attempt;
     this.rowsEl = this.els.rows;
     if (!this.scoped) {
       const hold = holdLoadingSwitch(this.scope); hold.classList.add('ws-load-hold');
@@ -499,6 +502,7 @@ export class Loading {
       });
       return this.completion;
     }
+    bootMark('app:control-ready');
     this.tickClock(); this.clockScope.dispose();
     this.finished = true; finishLoadingWait(this.waitId); this.phase?.end(); this.phase = undefined;
     if (this.view !== null) this.paint(this.view);
@@ -506,6 +510,7 @@ export class Loading {
     this.paintNow();
     this.completion = this.holdRequested
       ? this.waitForPlay().then(() => this.fade()) : this.fade();
+    if (!this.scoped) void this.completion.then(() => { bootTiming()?.finish(); return undefined; }, () => { bootMark('app:loader-failed'); return undefined; });
     return this.completion;
   }
 

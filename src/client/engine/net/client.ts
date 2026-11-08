@@ -1,3 +1,4 @@
+import { bootMark } from '../../../shared/engine/boot/timing';
 // P1-E5.2 (E5-REPLICATION §4): the client's end of the game protocol. It says hello, decodes frames and events, acks, and
 // sends commands in bundles with redundant copies. Prediction and interpolation build on this in E5.3; the view halves
 // read its rows in E4.3. It knows nothing of how bytes travel, and imports nothing from the server.
@@ -167,7 +168,7 @@ export class NetClient {
   private receive(bytes: Uint8Array): void {
     const arrived = this.now(); // here, never in a render frame: at 24.3 frames/s that stamp would be 41 ms of false jitter
     switch (messageId(bytes)) {
-      case MSG_WELCOME: this.welcome = decodeWelcome(bytes); this.interpolator.own = this.welcome?.handle ?? null; break;
+      case MSG_WELCOME: bootMark('server:welcome-receive'); this.welcome = decodeWelcome(bytes); this.interpolator.own = this.welcome?.handle ?? null; break;
       case MSG_EVENTS: this.events(bytes); break;
       case MSG_FRAME: this.decoded(decodeFrame(bytes, this.table), arrived); break;
       default: this.dropped++;
@@ -221,6 +222,7 @@ export class NetClient {
     if (frame === null || (this.welcome !== null && frame.cell !== this.welcome.cell)) { this.dropped++; return; }
     this.frames.set(frame.tick, frame);
     if (this.frames.size > FRAME_RING) for (const tick of this.frames.keys()) { this.frames.delete(tick); if (this.frames.size <= FRAME_RING) break; }
+    if (this.latest === null) bootMark('server:first-authoritative-frame', {tick: frame.tick});
     if (this.latest === null || frame.tick > this.latest.tick) this.latest = frame;
     this.clock.arrival(frame.tick, arrived); this.interpolator.push(frame);
     for (const listener of this.listeners) listener(frame);

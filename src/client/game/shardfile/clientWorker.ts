@@ -6,6 +6,7 @@ import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
 import { Vector3 } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
+import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { importPageSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import { syncPageRewards } from '../../../shared/game/saves';
@@ -207,15 +208,15 @@ async function readWorker(shell: Shell, report: WorkerClientReport): Promise<voi
 /** Boot the server in its worker and put this page on it. */
 async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<typeof countedWait>): Promise<void> {
   const { slug, player, physics, scope, system } = ports, build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '', root = `/b/${build}/standalone`;
-  await import(/* @vite-ignore */ `${root}/identity.js`);
-  const environment = await import(/* @vite-ignore */ `${root}/storage.js`) as { installBrowserSaveEnvironment: () => void };
+  await bootTask('server:identity-module', () => import(/* @vite-ignore */ `${root}/identity.js`));
+  const environment = await bootTask('server:storage-module', () => import(/* @vite-ignore */ `${root}/storage.js`)) as { installBrowserSaveEnvironment: () => void };
   environment.installBrowserSaveEnvironment();
-  const { startStandalone } = await import(/* @vite-ignore */ `${root}/shell.js`) as ShellModule;
+  const { startStandalone } = await bootTask('server:shell-module', () => import(/* @vite-ignore */ `${root}/shell.js`)) as ShellModule;
   // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
-  await closing; // a world a session just left may still be saving into what this one reads
-  const saves = await openIndexedSaves(serverSaveDatabase()), { savePrefix } = appIdentity();
+  await bootTask('server:previous-session-close', () => closing); // the previous world may still be saving
+  const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase())), { savePrefix } = appIdentity();
   const page = saveEnvironment().storage('shard');
-  if (page !== null) { await importPageSaves(saves, page, savePrefix); await syncPageRewards(saves, page, savePrefix); }
+  if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
   // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
   const shell = startStandalone({ slug, base: `/shardfiles/${slug}/`, build, savePrefix, ...ports.grid === null ? { lone: true as const } : {}, held: url => { card.add(); return spawnHeldBytes(url); }, ...saves }), { client } = shell;
   void shell.booted.catch(() => undefined);
@@ -298,9 +299,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     net.bindWeapons(ports.weapons, slotsOf(items));
     const day = ports.day(); if (day !== null) wirePage.dayPassed(day);
   });
-  const { restored } = await shell.booted;
+  const { restored } = await bootTask('server:await-booted', () => shell.booted);
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
-  shell.ready();
+  bootMark('server:ready-send'); shell.ready();
   const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
   const contacts: NetCombatEvent[] = [];
@@ -438,7 +439,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // DL21, DL24: a page on a server builds no bodies of its own, so the first rows were the first its creature programs were asked
   // for: they linked inside the first presented frame, at control (Pine's task of 985 ms at phone CPU, 0.5-2.7 s of 'Final activation'
   // on the Simulator, cold only). The first frame's rows take their bodies here, and their links run under the card.
-  if (ports.linkBodies === undefined) return;
+  if (ports.linkBodies === undefined) { bootMark('server:launch-complete'); return; }
+  bootMark('server:first-body-preparation-start');
   let first = -1;
   const until = diagnosticNow() + FIRST_ROWS_MS;
   while (diagnosticNow() < until) {
@@ -449,7 +451,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   }
   if (first === -1 || !net.inCell(client.latest?.cell ?? -1)) return; // a crossing's rows are its next world's
   syncCreatures(client, grid === null ? ports.animals : grid.animals(), bodies, retired, spawnMs, poses);
-  if (bodies.size > 0) await ports.linkBodies();
+  bootMark('server:first-body-preparation-end');
+  if (bodies.size > 0) await bootTask('server:first-body-links', ports.linkBodies);
+  bootMark('server:launch-complete');
 }
 
 async function guarded(ports: WorkerClientPorts): Promise<void> {

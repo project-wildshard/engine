@@ -17,6 +17,7 @@ import { stripCollider } from '@wildshard/engine/physics/stripColliders';
 import { addEdgeWalls } from '@wildshard/engine/physics/terrain';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { createSimHost, type SimHost, type SimLevel } from '@wildshard/engine/sim';
+import { bootTask, bootWork } from '@wildshard/engine/boot/timing';
 import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
@@ -240,7 +241,7 @@ export class StandaloneGrid {
     const place = candidate !== undefined || options.arrival !== undefined || options.lone === true ? null : gridRecovery(saves).lastPlace(assembly);
     const arrival = options.arrival ?? (place?.location.kind === 'road' ? { x: place.road.x, y: 0, z: place.road.z } : undefined);
     const site = arrival !== undefined ? null : candidate === undefined ? place?.instance ?? home.instance : candidate.saved.site;
-    const firstSlug = site === null ? home.slug : assembly.cell(site).slug, first = await options.load(firstSlug), { rapier } = first, lent = new Map([[firstSlug, first]]);
+    const firstSlug = site === null ? home.slug : assembly.cell(site).slug, first = await bootTask('server:product-inputs', () => options.load(firstSlug)), { rapier } = first, lent = new Map([[firstSlug, first]]);
     let resumed: SavedContinuation | undefined;
     const input = (cell: GridCell): Promise<HeadlessRuntimeInput> => { const held = lent.get(cell.slug); lent.clear(); return held === undefined ? options.load(cell.slug) : Promise.resolve(held); };
     const open = async (cell: GridCell, cached: SimSnapshot | undefined): Promise<CellWorld> => {
@@ -259,8 +260,8 @@ export class StandaloneGrid {
       resumed = refused?.row.saved;
       return world;
     };
-    const strips = options.lone === true ? [] : await options.strips();
-    const road = StandaloneGrid.road(rapier, assembly.cells, strips, site === null ? candidate?.saved.road : undefined, arrival, options.refused);
+    const strips = options.lone === true ? [] : await bootTask('server:road-collision-inputs', options.strips);
+    const road = bootWork('server:road-physics-and-collision', () => StandaloneGrid.road(rapier, assembly.cells, strips, site === null ? candidate?.saved.road : undefined, arrival, options.refused));
     const grid: GridSimulation = new GridSimulation(assembly, { highway: { host: road, dispose: () => { road.dispose(); } }, maxResidents: options.residents ?? STANDALONE_RESIDENTS,
       load: async (cell, cached) => {
         const world = await open(cell, cached);
@@ -305,10 +306,10 @@ export class StandaloneGrid {
     if (nativeCell(input)) {
       // J68: a native assembly keeps its ground whole and its solids as data. A saved world holds none of them, so a throwaway fresh one lists them.
       const near = input.product !== undefined && hasNativeAssembly(input.product) ? new NearColliders() : undefined, around = near === undefined ? { room: true } : { room: true, near };
-      if (near !== undefined && snapshot !== undefined) (await createTrustedHeadlessResident(input, undefined, around)).dispose();
+      if (near !== undefined && snapshot !== undefined) (await bootTask('server:restore-collision-inventory', () => createTrustedHeadlessResident(input, undefined, around))).dispose();
       // A world with no save of its own takes the page's: the flags and records its fights read as they install.
       const page = snapshot === undefined ? { flags: [...new Set([...[input.shard.identity.slug, cell.instance].flatMap(level => pageSavedFlags(level)), ...refused?.flags ?? []])], state: pageRuntimeState(options.saves, cell.instance) } : undefined;
-      const resident = await createTrustedHeadlessResident(input, snapshot, page === undefined ? around : { ...around, page }), { host } = resident;
+      const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createTrustedHeadlessResident(input, snapshot, page === undefined ? around : { ...around, page })), { host } = resident;
       bindDiscovery(host, input.product === undefined ? [] : await serverPlaces(input.product)); await installServerChapters(host, input.product, input.shard, resident.fact); await installServerDoors(host, input.product, snapshot === undefined ? pageOpenDoors(options.saves, placed) : undefined);
       if (snapshot === undefined && options.lone === true) addLoneWalls(host);
       host.respawn.served = true; actRoutes(host).introLocks = true;
@@ -320,7 +321,7 @@ export class StandaloneGrid {
         stepResident(resident, player.id, inputs);
       } };
     }
-    const effects: HeadlessEffect[] = [], { host, dispose, sim } = await openDataCell(input, snapshot, effects, options.lone === true);
+    const effects: HeadlessEffect[] = [], { host, dispose, sim } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects, options.lone === true));
     installRoomRespawn(host, []);
     installDeclaredClimate(host, input.shard.rows);
     bindDiscovery(host, input.product === undefined ? [] : await serverPlaces(input.product));

@@ -3,6 +3,7 @@ import { diagnosticNow } from '../core/clock';
 import { beginLoadingWait, finishLoadingWait, loadingWaitState, reportLoadingWait, type LoadingWaitState, type LoadingWaitEntry, type LoadingWaitKind } from './loadingWaits';
 import { pageScope } from '../app/resources';
 import { engineString } from '../strings';
+import { bootTask } from './timing';
 /** Pending asynchronous work is observed without changing its owner, queue or concurrency. */
 export type WaitKind = LoadingWaitKind;
 export interface BootWait extends LoadingWaitEntry { ageMs: number }
@@ -19,7 +20,7 @@ export class WaitRegistry {
     state.pending.set(id, { id, label, kind, step, owner, startedAt: now, progressAt: now, loadedBytes: 0, totalBytes: null,
       retry: null, progress: '', inline: false,
       ...(resource === undefined ? {} : {resource}) });
-    try { return await promise; }
+    try { return await bootTask(`wait:${label}`, () => promise); }
     finally {
       state.pending.delete(id);
       // DL11: a wait of a second or more is named on the page's timeline, so a stalled step shows what held it (Pine's
@@ -57,7 +58,7 @@ export function bootWaits(): readonly BootWait[] { return waits.snapshot(); }
 export async function loadingStage<T>(key: string, work: () => T | Promise<T>): Promise<T> {
   const timeline = currentLoadingTimeline(), stage = timeline?.begin(key);
   const reads = timeline === undefined ? null : stageReads(key, timeline.waitOwner);
-  try { return await work(); }
+  try { return await bootTask(`stage:${key}`, () => Promise.resolve(work())); }
   finally { reads?.(); stage?.end(); }
 }
 /** This page's same-origin fetches from now on, counted by a resource-timing observer (it sees every entry; the

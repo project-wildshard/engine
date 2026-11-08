@@ -1,4 +1,5 @@
 import type { Rapier } from '@wildshard/engine/physics/rapier';
+import { bootTask, bootProgress, bootTiming } from '@wildshard/engine/boot/timing';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { parseShardfile } from '@wildshard/format/shardSchema';
 import { contentHash } from '@wildshard/engine/game/shardfile/contentHash';
@@ -16,10 +17,23 @@ function heldBytes(url: URL): Promise<Response | undefined> | undefined {
 }
 /** The network's answer, or offline what the device holds: a level the player has been to boots with no link. Every byte is verified after this. */
 async function serverBytes(url: URL, path: string): Promise<Uint8Array> {
-  const response = await fetch(url).catch(() => undefined);
+  const response = await bootTask(`server:fetch-headers:${path}`, () => fetch(url)).catch(() => undefined);
   const usable = response?.ok === true ? response : await heldBytes(url);
   if (usable === undefined) throw new Error(`Missing server input ${path}`);
-  return new Uint8Array(await usable.arrayBuffer());
+  const body = usable.body;
+  if (body === null || bootTiming() === undefined) return new Uint8Array(await usable.arrayBuffer());
+  return bootTask(`server:read-body:${path}`, async () => {
+    const reader = body.getReader(), chunks: Uint8Array[] = []; let size = 0;
+    try {
+      for (;;) { const row = await reader.read(); if (row.done) break;
+        chunks.push(row.value); size += row.value.byteLength;
+        bootProgress(`download:${url.href}`, row.value.byteLength, null, 'decoded-body-bytes');
+      }
+    } finally { reader.releaseLock(); }
+    const bytes = new Uint8Array(size); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    return bytes;
+  });
 }
 
 /** This build's server book. The worker runs from its build's folder (`/b/<build>/standalone/`), which says whose it is. */
@@ -86,7 +100,7 @@ export async function fetchServerProduct(base: string, rapier: Rapier, held?: He
   // Nalati's boot was mostly this: 900 ms of 1.16 s in Node, 3-5 s on the Simulator, each file's schema compiled and checked again
   // on bytes its build has already checked and the page has just read without checking. As on the page, only a build's own verdict
   // for exactly these bytes spares the checks. A product with none, an outside one, keeps them.
-  const assembled = await resolveOutputDescriptor(input, { offline: false, firstParty: true, hash: contentHash, read, checks: nodeOutputDescriptorChecks });
+  const assembled = await bootTask('server:descriptor-read-and-verification', () => resolveOutputDescriptor(input, { offline: false, firstParty: true, hash: contentHash, read, checks: nodeOutputDescriptorChecks }));
   const built = isBuildValidatedOutput(assembled), shard = built ? assembled : parseShardfile(assembled);
   if (!built) carryOutputDescriptor(assembled, shard);
   const descriptor = outputDescriptor(shard);
@@ -94,13 +108,13 @@ export async function fetchServerProduct(base: string, rapier: Rapier, held?: He
   const files = new Map<string, { readonly path: string; readonly hash: string; readonly bytes: number }>();
   for (const file of descriptor.index.files) files.set(file.commons === true ? `commons:${file.hash}` : file.hash, { path: file.path, hash: file.hash, bytes: file.compressed });
   for (const file of descriptor.index.admission.server ?? []) files.set(file.hash, { path: file.path, hash: file.hash, bytes: file.bytes });
-  const verified = async (ref: string): Promise<Uint8Array> => {
+  const verified = (ref: string): Promise<Uint8Array> => bootTask(`server:verified-input:${ref}`, async () => {
     const file = files.get(ref);
     if (file === undefined) throw new Error('Undeclared server input');
     const bytes = await read(file.path);
     if (bytes.length !== file.bytes || await contentHash(bytes) !== file.hash) throw new Error('Server input hash or size mismatch');
     return bytes;
-  };
+  });
   const product = shardProductData(shard, root, verified, !built, built, nodeNamedJsonCheck, { files: true });
   const assets = new Map<string, Uint8Array>();
   // E5.2b: only what a server reads, and of that only what it asks for by hash: a named file is fetched when the product is asked

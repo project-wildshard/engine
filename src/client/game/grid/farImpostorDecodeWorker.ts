@@ -3,6 +3,9 @@
  * the image decode, the pixel read-back and the pack never touch the main thread. Started by `farImpostorView.ts`.
  */
 import { packFarImpostor, type FarImpostorDecodeReply } from './farImpostorPack';
+import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
+
+installWorkerBootTiming('far-impostor-decode');
 
 function reply(message: FarImpostorDecodeReply, transfer: Transferable[]): void {
   self.postMessage(message, { transfer });

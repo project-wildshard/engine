@@ -1,4 +1,7 @@
 import { ROAD_GRAIN_PLANES, roadGrainSteps } from './roadGrain';
+import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
+
+installWorkerBootTiming('road-grain');
 
 self.onmessage = (event: MessageEvent<unknown>): void => {
   const kind = event.data;

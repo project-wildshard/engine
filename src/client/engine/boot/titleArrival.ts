@@ -1,4 +1,6 @@
 import { saveStorage } from '../saves/slots';
+import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 /** One-shot intent from the renderer-free title page to the selected shard's fresh document. */
 export type TitleArrivalMode = 'enter' | 'explore' | 'arena';
 export interface TitleArrival { slug: string; mode: TitleArrivalMode }
@@ -18,7 +20,7 @@ const KEY = 'titleArrival';
 const BACKUP_KEY = 'titleArrival.once';
 const MAX_AGE_MS = 60_000;
 
-interface StoredArrival extends TitleArrival { at: number; name?: string; tier?: string }
+interface StoredArrival extends TitleArrival { at: number; name?: string; tier?: string; timing?: Readonly<Record<string, unknown>> }
 
 /** A one-shot handoff must be fresh when this document arrives, before cold
  * modules or world admission run. Later reloads still use their own start.
@@ -36,13 +38,22 @@ function valid(raw: string | null, slug: string): TitleArrival | null {
     const candidate = value as Partial<StoredArrival>;
     if (![slug].includes(candidate.slug ?? '') || (candidate.mode !== 'enter' && candidate.mode !== 'explore' && candidate.mode !== 'arena')) return null;
     if (typeof candidate.at !== 'number' || !freshPageArrival(candidate.at)) return null;
+    const timing = bootTiming();
+    if (timing !== undefined && candidate.timing !== undefined) timing.handoff = {
+      ...candidate.timing, wall: candidate.at, received: timing.handoff?.['received'] ?? diagnosticNow(), newTimeOrigin: timing.timeOrigin,
+      source: 'validated-title-arrival', validated: true, validatedAt: diagnosticNow(),
+    };
     return { slug, mode: candidate.mode };
   } catch { return null; }
 }
 
 /** Optional display metadata lets the first HTML paint name the destination before application modules arrive. */
 export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: string }): void {
-  const raw = JSON.stringify({ ...arrival, at: Date.now() } satisfies StoredArrival);
+  bootMark('app:navigation-decision', {slug: arrival.slug});
+  const timing = bootTiming();
+  const raw = JSON.stringify({ ...arrival, at: Date.now(), ...(timing === undefined ? {} : {timing: {
+    timeOrigin: timing.timeOrigin, decision: diagnosticNow(), input: Reflect.get(timing, 'lastInput'), attempt: timing.attempt,
+  }}) } satisfies StoredArrival);
   try { saveStorage('session').setItem(KEY, raw); } catch { /* the local one-shot below can carry the intent */ }
   // iOS home-screen navigation can replace WebContent between the static title and the game document.
   // The backup is consumed once, and expires quickly; it never becomes a remembered last shard.
