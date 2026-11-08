@@ -1,0 +1,15 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "nine-dragon-stack",
+  "shardfile": "a5d4967755a7cb21756b0d81e21e86b032525e29f7952eee182707d25da37bf8",
+  "tick": 30,
+  "position": [
+    1.3089645025786012,
+    125.0199541825219,
+    5.705435948446393
+  ],
+  "file": "nine-dragon-stack-v0.1.1.save.br",
+  "sha256": "2bc500c8565648024642c01b43a03a3e5fce636276c2b0ee7ee121fdeb34a9df",
+  "bytes": 25301
+}

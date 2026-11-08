@@ -1,0 +1,15 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "template",
+  "shardfile": "b8380a16f5da7824736480c03295ec26e4ad758435dac98cb5ff6d94d770dd44",
+  "tick": 30,
+  "position": [
+    0.27325954171828926,
+    -0.29434726666659117,
+    -1.352583408355713
+  ],
+  "file": "template-v0.1.1.save.br",
+  "sha256": "870e4b2b8b1ea77f3884ce8a384d08f8902d2f864485e940d34bfa4f943d0cfc",
+  "bytes": 43025
+}

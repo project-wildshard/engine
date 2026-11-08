@@ -1,0 +1,15 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "sunscar-dunes",
+  "shardfile": "75b8008d5b96b7c1b43075b8d1fdb1b437ff4afcbb3aefe9c86029775530dda4",
+  "tick": 30,
+  "position": [
+    0.37486669211648405,
+    17.949534312961624,
+    -1.836183574050665
+  ],
+  "file": "sunscar-dunes-v0.1.1.save.br",
+  "sha256": "dc537e6431ecf43ed34794fc9646fb2feb565104aa57e0f6fb1126cb4ca527b4",
+  "bytes": 247499
+}

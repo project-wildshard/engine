@@ -1,0 +1,15 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "pine-hollow",
+  "shardfile": "55f512f25f3601ff5fe50ab25d5cba37b8e1ebecf571104eb6fab8ade05ea36c",
+  "tick": 30,
+  "position": [
+    0.358958832686767,
+    0.019999395653576363,
+    -236.79489275626838
+  ],
+  "file": "pine-hollow-v0.1.1.save.br",
+  "sha256": "df724459713bc1c141569c50ccca06e6d9217a5f71995a0df46c137281503e48",
+  "bytes": 2338028
+}

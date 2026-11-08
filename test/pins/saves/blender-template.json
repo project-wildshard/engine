@@ -1,0 +1,15 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "blender-template",
+  "shardfile": "fbd3aba57d66811ef4bc2ecda1b6c4bfd23e6d55a2f54eb85c6a7cbb28316f02",
+  "tick": 30,
+  "position": [
+    0.35897474153898656,
+    0.020000001853622967,
+    7.205067848786712
+  ],
+  "file": "blender-template-v0.1.1.save.br",
+  "sha256": "c8dd264b667175d67cca91981c730cac3f020d739e4121968a820c36853e505a",
+  "bytes": 211238
+}

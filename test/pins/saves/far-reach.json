@@ -1,0 +1,15 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "far-reach",
+  "shardfile": "66eacdbb4a7c306d36e58396004e9bdb92230fe51d7a518b995cd3dd59973f51",
+  "tick": 30,
+  "position": [
+    0.37579968315549195,
+    30.00591563947819,
+    -7.374910975806415
+  ],
+  "file": "far-reach-v0.1.1.save.br",
+  "sha256": "5d34453475b8692373d37a7fff1de7f12ed9342c1ae0ad6af29200114d6b6d39",
+  "bytes": 92121
+}

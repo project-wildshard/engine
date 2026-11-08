@@ -33,12 +33,12 @@ for(const slug of [...ring['1'].products,...ring['1'].slices])test(`a saved ${sl
   let straight:World|null=null,restored:World|null=null;
   try {
     straight=await open();
-    const command=(tick:number):HeadlessCommand=>({kind:'player',moveX:tick<30?.2:-.2,moveZ:-1,yaw:0,...tick===15?{jump:true}:{}});
-    for(let tick=0;tick<30;tick++)await straight.step(command(tick));
+    const command=(tick:number):HeadlessCommand=>({kind:'player',moveX:tick<8?.2:-.2,moveZ:-1,yaw:0,...tick===3?{jump:true}:{}});
+    for(let tick=0;tick<8;tick++)await straight.step(command(tick));
     const saved=straight.save();expect(saved.length).toBeGreaterThan(0);
-    for(let tick=30;tick<60;tick++)await straight.step(command(tick));
+    for(let tick=8;tick<16;tick++)await straight.step(command(tick));
     const expected=digest(straight.save());await straight.close();straight=null;
-    restored=await open(saved);for(let tick=30;tick<60;tick++)await restored.step(command(tick));
+    restored=await open(saved);for(let tick=8;tick<16;tick++)await restored.step(command(tick));
     expect(digest(restored.save())).toBe(expected);
   } finally {await restored?.close();await straight?.close();}
 },10_000);

@@ -1,0 +1,15 @@
+{
+  "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
+  "saveEpoch": 1,
+  "slug": "driftwood-isle",
+  "shardfile": "0c14ad7a53687c6a1fdd9982edf60bcffbffea4973c71dc19178321cefeb2458",
+  "tick": 30,
+  "position": [
+    0.3754796350840479,
+    1.2035766455694101,
+    -195.87736398167908
+  ],
+  "file": "driftwood-isle-v0.1.1.save.br",
+  "sha256": "3565b5fc76a52b73187623ab460ed09f1fbf72240f17fd200a581dfab315857b",
+  "bytes": 1767334
+}

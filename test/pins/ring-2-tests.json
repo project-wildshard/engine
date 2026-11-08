@@ -21,6 +21,7 @@
  "test/cook-refusals.test.ts",
  "test/net-hostile-play.test.ts",
  "test/pinned-restore-play.test.ts",
+ "test/released-save-play.test.ts",
  "test/director-input-values.test.ts",
  "test/driftwood-headless-population.test.ts",
  "test/driftwood-long-session.test.ts",
