@@ -9,8 +9,10 @@ clones. The 283 decisions are in `test/engine-lift-disposition.json`:
 
 Publication is held by Jake's explicit condition: observe engine
 `refs/tags/v0.1.1` with `git ls-remote --tags` before pushing anything.
-The release lane owns the full-test lease; the corrected local whole
-check is queued behind it. Nothing has been pushed by this job yet.
+The corrected whole check waited five minutes for the release lane
+and timed out without starting. Nothing has been pushed by this job.
+The prepared work now includes upstream db17776 and its save epoch;
+all 43 migrated files / 149 cases pass again on that code.
 
 | Step | Remaining work | Done when |
 | --- | --- | --- |

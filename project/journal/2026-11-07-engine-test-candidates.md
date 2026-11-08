@@ -55,3 +55,8 @@ files / 18 cases and two repeated persistence cases also pass. The
 persistence test now names its actual contract: seeding the earlier
 record layout through the active epoch save API. Typechecking passes.
 The release tag is still absent, so publication remains held.
+
+The corrected whole rerun exhausted its five-minute resource wait
+behind the release lane without starting. The live plan records the
+actual state. Upstream db17776 has green CI/static/tests, while its
+Ring 1 products job is red; v0.1.1 remains absent. No push was made.
