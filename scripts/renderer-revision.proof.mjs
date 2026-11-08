@@ -37,6 +37,7 @@ test('exported mirror uses its bound committed inventory without Git discovery',
   for(const path of ['public','src','pnpm-lock.yaml','package.json'])cpSync(join(root,path),join(mirror,path),{recursive:true});
   writeFileSync(inventory,JSON.stringify({root:mirror,files:['public/host.bin','src/client/material.ts','pnpm-lock.yaml']}));
   const expected=rendererRevision(root);
+  /** @param {string} cap */
   const invoke=cap=>execFileSync(process.execPath,['--input-type=module','-e',`import {rendererRevision} from ${JSON.stringify(new URL('renderer-revision.mjs',import.meta.url).href)};console.log(rendererRevision(${JSON.stringify(mirror)}));`],{encoding:'utf8',stdio:['ignore','pipe','pipe'],env:{...process.env,WS_GENERATION_TREE_FILES:inventory,WS_GENERATION_TREE_ROOT:cap,GIT_CEILING_DIRECTORIES:mirror}}).trim();
   assert.equal(invoke(mirror),expected);
   assert.throws(()=>invoke(join(mirror,'wrong')),/Crossed source-program inventory root/u);
