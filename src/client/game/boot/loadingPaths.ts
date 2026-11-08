@@ -7,9 +7,12 @@ import type { GridCrossingTiming } from '../../../shared/game/grid/crossing';
  *  data-only shardfile path, Sunscar Dunes, phone tier (iPhone 16 Pro viewport, 4x CPU, 12.8 Mbit/s), headless Chromium,
  *  each row's own timeline ms at ready (`scripts/loading-card-proof.mjs --shard=sunscar-dunes --throttle --strict
  *  --dump`, its `-rows.json`; build 616462d, 2026-11-08), at the timeline's 0.1 ms resolution. A row that did not run
- *  there (state todo, 0 ms) has weight 0. `modules` includes the Start phase it spans. */
+ *  there (state todo, 0 ms) has weight 0. `modules` is the exception: its row starts at document t0, so its row ms
+ *  (8677.1) repeats the Start phase. Its weight is only its Load-phase stretch, the `game-stage:modules` span in the
+ *  same proof's `-timing.json` (from `app:loading-adopt`, where Start ends, to admission): 364 ms at that span's 1 ms
+ *  resolution, the same in builds 616462d and 2c12f2c. */
 const SHARDFILE_MEASURED_SECONDS: Readonly<Record<string, number>> = {
-  modules: 8.6778, runtimeModules: 0.0050, data: 0.0134,
+  modules: 0.364, runtimeModules: 0.0050, data: 0.0134,
   audioFiles: 0, // not run: todo at ready
   world: 1.6831, renderer: 0.0769, loadout: 1.1897, weapon: 0.0009, gameplay: 0.3758, menu: 0.0014,
   finish: 0.0231, // still on at ready: its ms then
