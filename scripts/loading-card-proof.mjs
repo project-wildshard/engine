@@ -146,7 +146,7 @@ try {
             });
             await route.fulfill({response,body:changed});
           });
-          await page.reload({waitUntil:'domcontentloaded'});
+          const uncached=new URL(page.url());uncached.searchParams.set('sw','0');await page.goto(uncached.href,{waitUntil:'domcontentloaded'});
         }
         await page.locator('.ws-main-grid').waitFor({timeout:60000});
         destination=await page.evaluate(slug=>{

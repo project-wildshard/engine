@@ -18,6 +18,25 @@
           const id = ++sequence;
           data.entries.push({id, build: data.build, attempt: data.attempt, realm, operation, start, end, result, detail}); return id;
         };
+        // A request retains every exact SW phase, but uses one timeline slot.
+        // Flat first samples preserve phase discovery without six entries per tile.
+        const swRequests = new Map(), swSamples = new Set();
+        const serviceRecord = row => {
+          if (row.operation==='sw:buffer-overflow') overflow('serviceWorker');
+          const start=row.origin+row.start-origin, end=row.origin+row.end-origin, key=String(row.client)+'|'+String(row.url);
+          if (!swSamples.has(row.operation)) {swSamples.add(row.operation);append(row.operation,start,end,row.result,{},'service-worker');}
+          let held=swRequests.get(key);
+          if (row.operation==='sw:handler-received' || !held) {
+            const id=append('sw:request',start,end,row.result,{url:row.url,phases:[]},'service-worker');
+            if (!id) return;held=data.entries[data.entries.length-1];if (!held) return;swRequests.set(key,held);
+          }
+          held.start=Math.min(held.start,start);held.end=Math.max(held.end,end);
+          if (held.detail.phases.length<32) held.detail.phases.push({operation:row.operation,start,end,result:row.result});else overflow('swPhases');
+          if (row.result==='failed') held.result='failed';
+          if (row.operation==='sw:response-delivery-decision' || row.operation==='sw:navigation-handler-and-delivery') {
+            if (held.result!=='failed') held.result='complete';swRequests.delete(key);
+          }
+        };
         data.begin = (operation, detail = {}) => stopped ? 0 : append(operation, now(), null, 'pending', detail);
         data.end = (id, result = 'complete') => {
           const row = data.entries.find(row => row.id === id);
@@ -75,7 +94,7 @@
           if (data.largestGap === null || ms > data.largestGap.ms) data.largestGap = {before: previous, after: at, ms, visibility: document.visibilityState}; previous = at;
         }, 100);
         const restorations = [];
-        data.finish = () => { data.mark('app:loader-complete'); const ended=now(); for(const row of data.entries) if(row.end===null){row.end=ended;row.result='unresolved-at-loader-complete';} data.read(); stopped = true; subscribers.clear(); clearInterval(clock); observer?.disconnect(); paintObserver?.disconnect(); performance.removeEventListener?.('resourcetimingbufferfull',resourceOverflow); for (const restore of restorations.splice(0)) { try { restore(); } catch {} } };
+        data.finish = () => { data.mark('app:loader-complete'); const ended=now(); for(const row of data.entries) if(row.end===null){row.end=ended;row.result='unresolved-at-loader-complete';} data.read(); stopped = true; subscribers.clear(); swRequests.clear(); clearInterval(clock); observer?.disconnect(); paintObserver?.disconnect(); performance.removeEventListener?.('resourcetimingbufferfull',resourceOverflow); for (const restore of restorations.splice(0)) { try { restore(); } catch {} } };
         if (typeof Worker === 'function') {
           const Native = Worker;
           window.Worker = new Proxy(Native, {construct(target, args, constructor) {
@@ -102,7 +121,7 @@
                   if (row.type === 'resource') resource(row.value, realm, wOrigin);
                   else if (row.type === 'begin') ids.set(row.id, append(row.operation, offset+row.start, null, 'pending', row.detail, realm));
                   else if (row.type === 'end') { const held = data.entries.find(entry => entry.id === ids.get(row.id)); if (held) {held.end=offset+row.end;held.result=row.result;if(row.result==='complete')data.progress('atomic:completed',1,null,'steps');} }
-                  else if (row.type === 'service-worker') { const r=row.value; append(r.operation,r.origin+r.start-origin,r.origin+r.end-origin,r.result,{url:r.url,client:r.client},'service-worker'); }
+                  else if (row.type === 'service-worker') { serviceRecord(row.value); }
                   else if (row.type === 'mark') append(row.operation,offset+row.start,offset+row.start,'observed',row.detail,realm);
                   else if (row.type === 'progress') data.progress(`${realm}:${row.operation}`,row.delta,row.total,row.unit);
                   else if (row.type === 'overflow') overflow(`${realm}:records`);
@@ -134,7 +153,7 @@
             if (value?.__engineBootTiming !== 1 || !value.serviceWorker) return;
             event.stopImmediatePropagation();
             if (stopped) return;
-            for (const row of value.records || []) append(row.operation,row.origin+row.start-origin,row.origin+row.end-origin,row.result,{url:row.url,client:row.client},'service-worker');
+            for (const row of value.records || []) serviceRecord(row);
           });
         }
       })();

@@ -4,7 +4,7 @@ import type {BootTiming} from '../../../shared/engine/boot/timing';
  * explicit projection may leave it. URLs become per-report IDs and arbitrary
  * error/detail/worker/input strings never become export labels. */
 const OPERATIONS=new Set([
-  'document:navigation-and-html','app:html-script-start','app:collector-installed','app:document-and-module-graph',
+  'document:navigation-and-html','app:html-script-start','app:collector-installed','app:document-and-module-graph','app:entry-and-session-preparation','app:page-entry-import',
   'app:dom-content-loaded','app:shell-dom-ready','app:first-paint-opportunity','app:entry-body','app:loading-adopt',
   'app:tables-import-and-prepare','app:tier-menu-download-imports','app:three-import','app:yield-before-main','app:main-import',
   'app:selected-discovery','app:session-code','app:common-service-imports','app:script-memory-reservation',
@@ -14,10 +14,14 @@ const OPERATIONS=new Set([
   'worker:module-body','worker:code-ready','worker:configuration-received','server:world-boot','server:booted-send',
   'server:booted-receive','server:first-rows','server:identity-module','server:storage-module','server:shell-module',
   'server:product-inputs','server:previous-session-close','server:indexed-saves-open','server:page-save-carry','server:reward-reconcile',
+  'sw:request','sw:handler-received','sw:cache-hit','sw:cache-miss','sw:cache-match-ignore-search','sw:discard-html',
+  'sw:shared-cache-open','sw:shared-cache-match','sw:discard-shared-html','sw:legacy-cache-list','sw:legacy-cache-open',
+  'sw:legacy-cache-match','sw:legacy-copy-publication','sw:network-fetch-to-headers','sw:response-delivery-decision','sw:buffer-overflow',
   'sw:cache-open','sw:cache-match','sw:body-and-cache-publication','sw:navigation-handler-and-delivery',
 ]);
 const STEPS=new Set(['modules','admission','models','world','loadout','gameplay','hud','server','readyFrame','spawnPrograms',
-  'worldPrograms','renderer','sky','terrain','cards','forest','physics','edge','grass','cabins','props','animals','weapon',
+  'runtimeModules','data','audioFiles','spawnDetail','worldFrame','home','homePrograms','road','colliders','enter','warm',
+  'prepare','boundary','checkpoint','commit','activate','worldPrograms','renderer','sky','terrain','cards','forest','physics','edge','grass','cabins','props','animals','weapon',
   'assembly','menu','shaders','firstFrame','audio','finish']);
 const RESULTS=['pending','complete','failed','observed','settled','unresolved-at-loader-complete','first-message-observed',
   'unsupported','unavailable','timeout','error','cancelled','other'] as const;
@@ -65,9 +69,18 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
     const row=record(value);return {...numbers(row,['eventTimeStamp','handlerEntry','timeOrigin']),
       event:oneOf(row['event'],['pointerup','click','keydown','other'] as const,'other')};
   };
+  const detail=(value:unknown):Readonly<Record<string,unknown>>=>{
+    const sourceDetail=record(value),out:Record<string,unknown>=numbers(value,DETAIL_NUMBERS);
+    const reference=url(sourceDetail['url']);if(reference!==null)out['resource']=reference;
+    if(Array.isArray(sourceDetail['phases']))out['phases']=list(sourceDetail['phases']).map((phase,index)=>{
+      const row=record(phase);return {operation:operation(row['operation'],`phase-${index+1}`),
+        start:number(row['start']),end:number(row['end']),result:oneOf(row['result'],RESULTS,'other')};
+    });
+    return out;
+  };
   const entries=list(source['entries']).map((value,index)=>{const row=record(value);return {
     id:number(row['id']),build:diagnosticBuild(row['build']),realm:realm(row['realm']),operation:operation(row['operation'],`operation-${index+1}`),
-    start:number(row['start']),end:number(row['end']),result:oneOf(row['result'],RESULTS,'other'),detail:numbers(row['detail'],DETAIL_NUMBERS),
+    start:number(row['start']),end:number(row['end']),result:oneOf(row['result'],RESULTS,'other'),detail:detail(row['detail']),
   };});
   const resources=list(source['resources']).map((value,index)=>{const row=record(value);return Object.assign(numbers(row,RESOURCE_NUMBERS),{
     id:index+1,url:url(row['url']),realm:realm(row['realm']),

@@ -1,6 +1,7 @@
 # Loading consumer review repairs
 
-Status: blocked 2026-11-08; saved-place acceptance is red in Chromium.
+Status: in progress 2026-11-08; the final gate and corrected SW trace
+proof remain required. Chromium Metal reaches and resumes real Ember.
 The four Opus UI commits and the reviewed LS7 tail remain unpublished.
 Source: J189's committed-blob review of a413c1e, 7f32ebd, 9673561 and
 a6c9661, received 2026-11-08. LS1 and later LS7 are outside that verdict.
@@ -26,7 +27,9 @@ fresh persistent runs stop about 81 m from the target after the actual
 is preparing, with no active regional hook, a required world and four
 optional metadata requests pending. Production engine v0.1.1 traverses
 the identical route on both browsers with the same Ember product hash.
-This is a candidate regression; persistence and hold did not resolve it.
+J189 subsequently reproduced the same stall on released v0.1.1 under
+SwiftShader. Metal and WebKit traverse it; the preparation-budget
+livelock is inherited, and is not a new completion event or UI regression.
 The precise await remains under diagnosis, not a longer timeout.
 
 WebKit persistent play earns Ember and passes actual saved GRID and
@@ -44,3 +47,12 @@ The native fence and measured-weight Codex re-review is GO in its own
 review, with seven independently observed native paths per browser.
 The full normal pre-push is run dry while this consumer hold remains;
 no blocked UI or LS7 publication is authorized by a dry-run result.
+
+The full normal gate then passed 5791/5793 and caught the Titan wind
+case over its 10-second cap plus a missing DOM method in the epoch VM
+fixture. Additive repairs preserve every assertion and the cap, splitting
+Titan at an actual earned fight checkpoint. Metal's saved-card proof
+also exposed SW phase-volume overflow; the request now retains all
+exact phases in one entry. The controlled missing-art fixture explicitly
+bypasses the SW embedded document for its network metadata fault.
+These changes require the next whole normal gate and real boot checks.

@@ -95,7 +95,7 @@ it('freezes ready accounting and headings at one rounding-boundary instant throu
 it('copies complete useful timings without exporting private URLs, errors or free text',async()=>{
   const sentinel='PRIVATE_DIAGNOSTIC_SENTINEL',url=`https://user:${sentinel}@private.invalid/asset.bin?token=${sentinel}#${sentinel}`;
   const timing={version:1,build:'a84f050-mw7crm6l',attempt:'100',attemptCount:1,timeOrigin:100,
-    entries:[{id:17,realm:'page',operation:'server:world-boot',start:10,end:20,result:'complete',detail:{message:sentinel,url,nested:{private:sentinel},done:3,total:4}}],
+    entries:[{id:17,realm:'page',operation:'server:world-boot',start:10,end:20,result:'complete',detail:{message:sentinel,url,nested:{private:sentinel},done:3,total:4,phases:[{operation:'sw:cache-open',start:11,end:12,result:'complete',private:sentinel}]}}],
     resources:[{url,initiator:'fetch',realm:'page',startTime:1,responseEnd:2,decodedBodySize:100}],
     realms:{'worker:1':{purpose:sentinel,url,timeOrigin:1,messages:{count:1,first:2,last:3,kinds:{[sentinel]:1}}}},
     counters:{[`download:${url}`]:{loaded:100,total:200,unit:'decoded-body-bytes',at:20,events:1}},
@@ -113,7 +113,7 @@ it('copies complete useful timings without exporting private URLs, errors or fre
     expect(copied).not.toContain(sentinel);expect(copied).not.toContain('private.invalid');
     expect(copied).toContain('server:world-boot');
     const raw:unknown=JSON.parse(copied.split('timeline (LS1):\n')[1]??'null');
-    expect(raw).toMatchObject({build:'a84f050-mw7crm6l',entries:[{id:17,start:10,end:20,detail:{done:3,total:4}}],
+    expect(raw).toMatchObject({build:'a84f050-mw7crm6l',entries:[{id:17,start:10,end:20,detail:{done:3,total:4,phases:[{operation:'sw:cache-open',start:11,end:12,result:'complete'}]}}],
       resources:[{id:1,url:'resource-1',decodedBodySize:100}],
       counters:{'download:resource-1':{loaded:100,total:200,unit:'decoded-body-bytes'}},
       realms:[{realm:'worker:1',url:'resource-1',messages:{count:1}}],serviceWorker:{controller:'resource-1'}});

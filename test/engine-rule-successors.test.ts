@@ -165,6 +165,7 @@ test('real mounted lance steering rejects the side cone and spends a target cont
   } finally { resumed?.dispose(); live.dispose(); }
 }, 10_000);
 
+let titanFight: ReturnType<typeof snapshotSimHost> | undefined;
 let titanWind: ReturnType<typeof snapshotSimHost> | undefined, titanFire: ReturnType<typeof snapshotSimHost> | undefined;
 
 // Each bounded continuation consumes the preceding actual save, never a
@@ -192,7 +193,7 @@ function earnTitanPhase(live: TrustedHeadlessResident, goal: number): void {
   expect(arena.boss.phase).toBe(goal);
 }
 
-test('real mounted arrows earn the Titan wind checkpoint', async () => {
+test('real mounted entry earns the Titan fight checkpoint', async () => {
   const live = await open('nalati-grasslands');
   try {
     const host = live.host, player = leadPlayer(host), mount = mountedPlayerOf(host), arena = openArenaOf(host);
@@ -210,7 +211,17 @@ test('real mounted arrows earn the Titan wind checkpoint', async () => {
     for (let tick = 0; tick < 240 && arena.boss.state !== 'fight'; tick++) live.step([{ kind: 'script', actorId: 'nalati.titan.skip', value: 1 }]);
     expect(arena.boss.state).toBe('fight');
     mount.teleport(data.arena.center.x + 10, data.arena.center.z + 10, 0);
-    earnTitanPhase(live, 1); titanWind = snapshotSimHost(host);
+    titanFight = snapshotSimHost(host);
+  } finally { live.dispose(); }
+}, 10_000);
+
+test('real mounted arrows resume the fight and earn Titan wind', async () => {
+  if (titanFight === undefined) throw new Error('Real mounted entry must earn the fight checkpoint');
+  const live = await open('nalati-grasslands', titanFight);
+  try {
+    expect(live.effects).toEqual([]);
+    expect(openArenaOf(live.host)?.boss.state).toBe('fight');
+    earnTitanPhase(live, 1); titanWind = snapshotSimHost(live.host);
   } finally { live.dispose(); }
 }, 10_000);
 
