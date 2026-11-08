@@ -12,6 +12,7 @@ import { painterlyMaterial } from '@wildshard/engine/world/painterly';
 import { productRiggedHulls } from '../looks/riggedHulls';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { pageAir } from '../population/pageAir';
+import { wirePage } from '../shardfile/wirePage';
 
 interface FlockOpts { x: number; z: number; count: number; seed: number; range?: number }
 
@@ -34,6 +35,17 @@ const PageCrowdsSchema = v.strictObject({ slug: v.string(), hull: v.nullable(v.s
  * perception authorities without an author factory or frame callback. */
 export function createPageCrowds(sky: SkyRig, seed: number, body: FlockBody, input: unknown, dogWolves: readonly Animal[] = []): PageCrowdViews {
   const data = v.parse(PageCrowdsSchema, input);
+  // Native rows omit page-only sound operations but keep their real decision
+  // outputs. Consume those values with the admitted cue and position offset.
+  const sounds=data.guard?.projection.operations.filter(operation=>operation.kind==='sound-position')??[];
+  const scope=app.levelScope;if(scope===null)throw new Error('Crowd sound needs an entered scope');
+  if(sounds.length>0)wirePage.whenLive(scope,client=>client.onView(({name,args})=>{
+    if(!name.startsWith('creature.output:'))return;
+    const [x,y,z,value]=args;if(x===undefined||y===undefined||z===undefined||value===undefined||value===0)return;
+    const channel=name.slice('creature.output:'.length);
+    for(const sound of sounds)if(sound.value.kind==='channel'&&sound.value.name===channel)
+      app.events.emit('creature.sound',{cue:sound.cue,x,y:y+sound.height,z});
+  }));
   const rows = data.rows.map(row => parseFlock({ ...row, seed: seed + row.seed }));
   if(data.guard?.projection.operations.some(operation=>operation.kind==='state'&&operation.states.some(state=>!ANIMAL_STATES.some(value=>value===state)))===true)throw new Error('Invalid crowd guardian states');
   if (data.bounds[0] >= data.bounds[1] || data.bounds[2] >= data.bounds[3]) throw new Error('Invalid crowd placement bounds');

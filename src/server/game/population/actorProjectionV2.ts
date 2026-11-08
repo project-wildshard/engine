@@ -46,6 +46,7 @@ export class ActorProjectionV2 {
   private scope:Scope|null=null;
   private programme:{scope:Scope;value:ReturnProgram}|null=null;
   private columns:readonly ObservationColumnsV2[]=[];
+  private readonly consumed=new Set<string>();
   readonly binding:Pick<SpeciesDef,'kind'|'think'|'damageMul'>;
   constructor(kind:string,input:unknown,page?:Pick<App,'levelScope'|'equipment'|'events'>){
     this.page=page;
@@ -57,6 +58,12 @@ export class ActorProjectionV2 {
     };
     freeze(this.rows);
     const operations=this.rows.step?.operations??[];
+    const channels=(value:unknown):void=>{
+      if(typeof value!=='object'||value===null)return;
+      if('kind' in value&&value.kind==='channel'&&'name' in value&&typeof value.name==='string')this.consumed.add(value.name);
+      for(const child of Object.values(value))channels(child);
+    };
+    channels(operations);
     for(const operation of operations)if(operation.kind==='state'&&operation.states.some(state=>!ANIMAL_STATES.some(value=>value===state)))throw new Error('Unknown actor projection state');
     this.binding={kind,...(this.rows.step===undefined?{}:{think:(actor,context)=>{
           this.step(actor,context);
@@ -106,14 +113,14 @@ export class ActorProjectionV2 {
     return Object.fromEntries(columns.capture(owners).map(row=>[row.name,row.value]));
   }
   /** Sample and apply once at the original native callback slot. */
-  step<A extends AnimalSim>(actor:A,context:ActorProjectionContext<A>,owner?:ActorProjectionOwner):void{
+  step<A extends AnimalSim>(actor:A,context:ActorProjectionContext<A>,owner?:ActorProjectionOwner):Readonly<Record<string,number>>|undefined{
     const row=this.rows.step;
-    if(row===undefined)return;
+    if(row===undefined)return undefined;
     const scope=owner?.scope??this.page?.levelScope;if(scope===undefined||scope===null||scope.disposed||scope.disposing)throw new Error('Actor projection owner disposed');
     // The original cadence guard precedes scope/column allocation and ALL live
     // sampling. Only this actor's declared columns are captured when due.
     const previous=actor.mem[row.clock],elapsed=previous===undefined?context.dt:context.t-previous;
-    if(previous!==undefined&&elapsed<row.every-1e-9)return;
+    if(previous!==undefined&&elapsed<row.every-1e-9)return undefined;
     const dt=row.dt==='context'?context.dt:elapsed,owners=this.captureOwners(actor,context,undefined,undefined,owner);
     const programme=this.program(owners.scope);if(programme.prepare===undefined)throw new Error('Missing actor projection preparation');
     const prepared=programme.prepare(row.signal,this.observations(0,{...owners,dt}),owner?.random),answer=prepared.values;
@@ -254,7 +261,11 @@ export class ActorProjectionV2 {
       if(actor.mem!==memory||actor.position!==position||actor.lookTarget!==look||context.player!==player||pins.some(valid=>!valid()))throw new Error('Replaced actor projection native owner');
       operation();
     }
+    return answer;
   }
+  /** Outputs omitted from native operations can still drive declared page effects.
+   * They never become a second decision or a write to a simulated body. */
+  consumes(channel:string):boolean{return this.consumed.has(channel);}
   private damage(actor:Animal,hit:Vector3,_direction:Vector3,request:DamageRequest|undefined):number{
     const row=this.rows.damage;
     if(row===undefined)throw new Error('Missing actor damage projection');

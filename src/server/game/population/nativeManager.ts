@@ -8,6 +8,7 @@ import { GrassField } from '../../../shared/game/systems/looks/grassField';
 import { TrampleField } from '../../../shared/game/systems/looks/trampleField';
 import { knockdownVelocity, PopulationRelations } from './relations';
 import { installPopulationSignals } from './signals';
+import { sayFightView } from '@wildshard/engine/sim/shardRows';
 import { Vector3 } from 'three';
 import { AggressionDirector } from '@wildshard/engine/ai/director';
 import type { PackBrain } from '@wildshard/engine/ai/pack';
@@ -208,7 +209,9 @@ export class NativePopulationDriver {
     const context=this.context(actor,dt);
     if(context.projection.owner?.crowd?.owner!==flock)context.projection.owner={scope:this.host.scope,group:'crowd.guard',slot:0,identity:actor.entityId,random:this.host.rng.stream('ai'),
       crowd:{owner:flock,point:this.sheep},rosters:new Map([['threats',this.wolves]])};
-    this.projection.step(actor,context,context.projection.owner);
+    const outputs=this.projection.step(actor,context,context.projection.owner);
+    if(outputs!==undefined)for(const [channel,value]of Object.entries(outputs))if(value!==0&&!this.projection.consumes(channel))
+      sayFightView(this.host,`creature.output:${channel}`,[actor.position.x,this.host.groundHeightAt(actor.position.x,actor.position.z),actor.position.z,value]);
   }
 
   private decide(actor: HuntBody, dt: number): void {

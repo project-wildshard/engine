@@ -6,14 +6,17 @@ import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 export async function run(browser,phone,base) {
   const context=await browser.newContext({...phone,deviceScaleFactor:2}),page=await context.newPage();
   try {
+    await context.addInitScript(()=>{Reflect.set(window,'__wildshardHarness',{seed:18970,capture:null});});
     await saveFixture(context,{scope:'device',key:'devMode',data:true});
     await page.goto(`${base}/?chunk=nalati-grasslands&mute=1&nolock=1&sw=0`,{waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>Reflect.get(window,'__wildshard')?.world!==undefined,undefined,{timeout:90000});
     await page.evaluate(FLOOR_GRID_ENTER);
+    await page.mouse.click(5,5); // Real gesture unlocks WebAudio; the URL keeps its master muted.
     await page.waitForFunction(()=>Reflect.get(window,'__wildshard')?.world?.animals.animals.some(row=>row.kind==='horse'),undefined,{timeout:30000});
     await page.evaluate(()=>{
       const world=Reflect.get(window,'__wildshard').requireWorld(),seen={signals:/** @type {string[]} */([]),sounds:/** @type {string[]} */([]),knockdowns:0,notices:/** @type {string[]} */([]),shots:0};
       Reflect.set(window,'__repairSignals',seen);
+      Reflect.get(window,'__wildshard').sounds();
       world.game.app.events.on('creature.signal',event=>{seen.signals.push(event.name);},world.game.levelScope);
       world.game.app.events.on('creature.sound',event=>{seen.sounds.push(event.cue);},world.game.levelScope);
       world.game.app.events.on('creature.knockdown',()=>{seen.knockdowns++;},world.game.levelScope);
@@ -44,7 +47,7 @@ export async function run(browser,phone,base) {
       if(await page.evaluate(()=>{const seen=Reflect.get(window,'__repairSignals');return seen.signals.includes('stampede')&&seen.knockdowns>0&&seen.sounds.length>0;}))break;
     }
     return await page.evaluate(()=>{
-      const seen=Reflect.get(window,'__repairSignals'),r=Reflect.get(window,'__workerClient')?.();return {ok:seen.signals.includes('stampede')&&seen.sounds.length>0&&seen.knockdowns>0,...seen,hits:r?.hits,arrows:r?.owned['held.arrows'],falls:r?.falls,hp:r?.hp,held:Reflect.get(window,'__wildshard').requireWorld().game.app.equipment?.current.id,closed:r?.closed};
+      const seen=Reflect.get(window,'__repairSignals'),r=Reflect.get(window,'__workerClient')?.(),audio=Reflect.get(window,'__wildshard').sounds().event;return {ok:seen.signals.includes('stampede')&&seen.sounds.length>0&&seen.knockdowns>0&&seen.notices.includes('Stampede!')&&seen.notices.includes('Knocked down!')&&(audio['stampede']??0)>0,...seen,audio,hits:r?.hits,arrows:r?.owned['held.arrows'],falls:r?.falls,hp:r?.hp,held:Reflect.get(window,'__wildshard').requireWorld().game.app.equipment?.current.id,closed:r?.closed};
     });
   } finally {await context.close();}
 }

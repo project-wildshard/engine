@@ -1,8 +1,8 @@
 /// <reference path="../src/client/game/population.merge.d.ts" />
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
-/** A natural raid brings wolves to the actual guardian. No clock or event is set.
- * The authored first raid is 150–240 seconds; its travel and three barks get 60 more.
+/** Wait beside the guardian for the authored 150–240 second pasture raid.
+ * Only the player is placed; no creature, clock or event is changed.
  * @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base */
 export async function run(browser,phone,base) {
   const context=await browser.newContext({...phone,deviceScaleFactor:2}),page=await context.newPage();
@@ -13,11 +13,12 @@ export async function run(browser,phone,base) {
     await page.evaluate(FLOOR_GRID_ENTER);
     await page.waitForFunction(()=>(Reflect.get(window,'__workerClient')?.().frames??0)>30);
     await page.evaluate(()=>{
-      const world=Reflect.get(window,'__wildshard').requireWorld(),seen={barks:0,first:0,start:performance.now()};Reflect.set(window,'__repairGuardian',seen);
+      const world=Reflect.get(window,'__wildshard').requireWorld(),link=world.player.link,client=link===null?null:Reflect.get(link,'client'),seen={barks:0,first:0,start:performance.now(),tick:client?.latest?.tick??0,outputs:0};Reflect.set(window,'__repairGuardian',seen);
       world.game.app.events.on('creature.sound',event=>{if(event.cue==='dog_bark'){if(seen.barks===0)seen.first=performance.now()-seen.start;seen.barks++;}},world.game.levelScope);
+      client?.onView((/** @type {import('../src/shared/engine/net/messages').NetView} */view)=>{if(view.name==='creature.output:emit')seen.outputs++;});
       const y=Reflect.get(window,'__hf').heightAt(-105,212);world.player.link?.place?.(-105,y+0.4,212,0);
     });
-    await page.waitForFunction(()=>Reflect.get(window,'__repairGuardian').barks>=3,undefined,{timeout:300000}).catch(()=>undefined);
-    return await page.evaluate(()=>{const seen=Reflect.get(window,'__repairGuardian'),r=Reflect.get(window,'__workerClient')?.();return {ok:seen.barks>=3,barks:seen.barks,firstMs:Math.round(seen.first),elapsedMs:Math.round(performance.now()-seen.start),closed:r?.closed};});
+    await page.waitForFunction(()=>Reflect.get(window,'__repairGuardian').barks>=3,undefined,{timeout:360000}).catch(()=>undefined);
+    return await page.evaluate(()=>{const seen=Reflect.get(window,'__repairGuardian'),r=Reflect.get(window,'__workerClient')?.(),world=Reflect.get(window,'__wildshard').requireWorld(),link=world.player.link,client=link===null?null:Reflect.get(link,'client');return {ok:seen.barks>=3,barks:seen.barks,outputs:seen.outputs,firstMs:Math.round(seen.first),elapsedMs:Math.round(performance.now()-seen.start),ticks:(client?.latest?.tick??0)-seen.tick,closed:r?.closed,hp:r?.hp,falls:r?.falls,wolves:world.animals.animals.filter(row=>row.kind==='wolf').length};});
   } finally {await context.close();}
 }
