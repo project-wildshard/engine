@@ -87,9 +87,10 @@ proves first serial 1, one successful concurrent advancement, a 412
 retry, an idempotent duplicate and refusal of an older green build. It
 uses a test-owned git history and no remote credentials.
 
-The workflow gives the source gate read permissions and only the asset
-step a write token. Signing material is passed only to preflight and the
-final publisher. This follows GitHub's
+The workflow gives the source gate read permissions and the publishing
+job content-write permission. Only the asset step explicitly receives
+the GitHub token for writes. Signing material is passed only to preflight
+and the final publisher. This follows GitHub's
 [privileged workflow_run contract](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run);
 the gate checks event type, repository, branch and exact SHA before the
 publishing job receives credentials.
