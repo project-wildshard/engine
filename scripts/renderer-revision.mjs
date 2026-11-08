@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
 import {existsSync,lstatSync,readFileSync} from 'node:fs';
 import {resolve,relative} from 'node:path';
+import {committedSourceFiles} from './source-input-proof.mjs';
 
 /** Conservative client-build ABI, independent of shell ids, pins and package version.
  * Generated tables and recorded programs are outputs; product bytes have their
@@ -13,8 +13,9 @@ export function rendererRevision(root=resolve(import.meta.dirname,'..')){
     return value;
   }
   const hash=createHash('sha256'),add=path=>hash.update(relative(root,path)).update('\0').update(readFileSync(path)).update('\0');
-  const inputs=execFileSync('git',['-C',root,'ls-files','-z','src/client','src/shared','types','vite','scripts','vite.config.ts','pnpm-lock.yaml','public'],{encoding:'utf8',maxBuffer:1<<24})
-    .split('\0').filter(path=>path!==''&&!path.startsWith('public/programs/')&&!path.includes('.generated.')&&!/\.(?:test|proof)\./u.test(path)&&!['scripts/renderer-revision.json','scripts/validation-revision.json'].includes(path)).sort();
+  const roots=new Set(['src/client','src/shared','types','vite','scripts','vite.config.ts','pnpm-lock.yaml','public']);
+  const inputs=committedSourceFiles(root).filter(path=>[...roots].some(prefix=>path===prefix||path.startsWith(`${prefix}/`)))
+    .filter(path=>!path.startsWith('public/programs/')&&!path.includes('.generated.')&&!/\.(?:test|proof)\./u.test(path)&&!['scripts/renderer-revision.json','scripts/validation-revision.json'].includes(path)).sort();
   for(const path of inputs){
     const file=resolve(root,path);
     if(lstatSync(file).isSymbolicLink())throw new Error(`Renderer source input must be a regular tracked file: ${path}`);
