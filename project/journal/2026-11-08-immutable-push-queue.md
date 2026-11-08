@@ -27,3 +27,10 @@ The outside-hook proof pushes two actual commits to a local bare remote
 in order, leaves subsequent dirty lane bytes out, and proves a third
 commit's failing normal hook cannot advance main. It also requires every
 managed snapshot to be removed. No production push is part of the proof.
+
+An optional full --commit selects an ancestor of source main, so a lane
+can hand off its committed boundary after another lane advances main.
+Capture first fetches that exact commit into its own temporary bare main,
+then makes an independent clone. The proof now creates all three commits
+before enqueueing their distinct ancestors and still observes exact FIFO
+publication and normal-hook refusal. It never rewinds the shared checkout.

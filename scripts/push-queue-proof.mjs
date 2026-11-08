@@ -19,10 +19,14 @@ try{
  writeFileSync(join(repo,'gate.mjs'),`import assert from'node:assert/strict';import{readFileSync,appendFileSync}from'node:fs';import{execFileSync}from'node:child_process';const value=JSON.parse(readFileSync('value.json')).value;assert.ok(Number.isInteger(value)&&value>0);appendFileSync(${JSON.stringify(observed)},JSON.stringify({sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),value})+'\\n');`);
  writeFileSync(join(repo,'value.json'),'{"value":1}');execFileSync('pnpm',['install','--lockfile-only'],{cwd:repo,stdio:'pipe'});
  git(['add','.gitignore','.githooks/pre-push','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','gate.mjs','value.json']);git(['commit','--quiet','-m','base']);git(['config','core.hooksPath','.githooks']);git(['push','--quiet','origin','main']);
- const script=resolvePath('scripts/push-queue.mjs'),queue=join(work,'queue'),jobs=[];
+ const script=resolvePath('scripts/push-queue.mjs'),queue=join(work,'queue'),jobs=[],commits=[];
  for(const value of [2,3,-1]){
   writeFileSync(join(repo,'value.json'),JSON.stringify({value}));git(['commit','--quiet','-m',`value ${value}`,'--','value.json']);
-  const captured=v.parse(jobSchema,JSON.parse(execFileSync(process.execPath,[script,'enqueue',repo,`--root=${queue}`],{encoding:'utf8'})));jobs.push(captured);
+  commits.push(git(['rev-parse','HEAD']));
+ }
+ // The lane has already moved on: each requested ancestor must stay exact.
+ for(const sha of commits){
+  const captured=v.parse(jobSchema,JSON.parse(execFileSync(process.execPath,[script,'enqueue',repo,`--commit=${sha}`,`--root=${queue}`],{encoding:'utf8'})));jobs.push(captured);
  }
  // Subsequent dirty lane bytes must never enter any captured job.
  writeFileSync(join(repo,'value.json'),'{"value":999}');
@@ -39,5 +43,5 @@ try{
  assert.deepEqual(rows.slice(-4).map(row=>[row.sha,row.value]),jobs.slice(0,2).flatMap((job,index)=>[[job.sha,index+2],[job.sha,index+2]]));
  assert.equal(execFileSync('git',['--git-dir',remote,'rev-parse','refs/heads/main'],{encoding:'utf8'}).trim(),jobs[1]?.sha);
  assert.ok(jobs.every(job=>!existsSync(job.snapshot)));
- console.log(JSON.stringify({orderedPushes:2,normalHookFailureBlocked:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
+ console.log(JSON.stringify({orderedPushes:2,requestedAncestorsPreserved:true,normalHookFailureBlocked:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
 }finally{rmSync(work,{recursive:true,force:true});}

@@ -29,18 +29,22 @@ function worker(directory){
  const child=spawn('python3',[lock,join(directory,'worker.lock'),process.execPath,self,'work',directory],{detached:true,stdio:['ignore',output,output]});
  child.on('error',error=>{console.error(`Push queue worker unavailable: ${error.message}`);});child.unref();closeSync(output);
 }
-/** @param {string} source @param {string} directory @param {boolean} checkOnly */
-function capture(source,directory,checkOnly){
+/** @param {string} source @param {string} directory @param {boolean} checkOnly @param {string | undefined} requested */
+function capture(source,directory,checkOnly,requested){
  if(git(source,['branch','--show-current'])!=='main')throw new Error('Push queue accepts main only');
  const number=Number(existsSync(join(directory,'next'))?readFileSync(join(directory,'next'),'utf8'):0);
  if(!Number.isSafeInteger(number)||number<0)throw new Error('Invalid queue sequence');
  writeFileSync(join(directory,'next.tmp'),String(number+1));renameSync(join(directory,'next.tmp'),join(directory,'next'));
  const id=`${String(number).padStart(9,'0')}-${randomUUID().slice(0,8)}`,snapshot=join(directory,'snapshots',id),file=join(directory,`${id}.json`);
+ const sha=requested??git(source,['rev-parse','HEAD']);if(!/^[a-f0-9]{40}$/u.test(sha)||spawnSync('git',['merge-base','--is-ancestor',sha,'HEAD'],{cwd:source}).status!==0)throw new Error('Queue target must be a full commit on source main');
  const remote=git(source,['remote','get-url','origin']);identity(remote);
- const job={id,source,snapshot,remote,sha:git(source,['rev-parse','HEAD']),tree:git(source,['rev-parse','HEAD^{tree}']),owner:process.pid,checkOnly,state:'capturing',createdAt:new Date().toISOString()};
+ const job={id,source,snapshot,remote,sha,tree:git(source,['rev-parse',`${sha}^{tree}`]),owner:process.pid,checkOnly,state:'capturing',createdAt:new Date().toISOString()};
  write(file,job);
+ const anchor=join(directory,'snapshots',`${id}.git`);
  try{
-  execFileSync('git',['clone','--quiet','--no-hardlinks','--branch','main',source,snapshot],{stdio:'pipe',timeout:300000});
+  execFileSync('git',['init','--quiet','--bare','--initial-branch=main',anchor],{stdio:'pipe'});
+  execFileSync('git',['--git-dir',anchor,'fetch','--quiet',source,`${sha}:refs/heads/main`],{stdio:'pipe',timeout:300000});
+  execFileSync('git',['clone','--quiet','--no-hardlinks','--branch','main',anchor,snapshot],{stdio:'pipe',timeout:300000});
   if(git(snapshot,['rev-parse','HEAD'])!==job.sha)throw new Error('Source advanced during capture; enqueue the new committed tip');
   git(snapshot,['ls-files','--error-unmatch','.githooks/pre-push']);
   // A local clone advertises the source's unpublished main as origin/main.
@@ -49,6 +53,7 @@ function capture(source,directory,checkOnly){
   git(snapshot,['remote','remove','origin']);git(snapshot,['remote','add','origin',remote]);git(snapshot,['config','core.hooksPath','.githooks']);
   job.state='queued';write(file,job);worker(directory);return job;
  }catch(error){job.state='failed';write(file,{...job,error:error instanceof Error?error.message:String(error)});if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});throw error;}
+ finally{if(existsSync(anchor))rmSync(anchor,{recursive:true,force:true});}
 }
 
 /** @param {string} directory */
@@ -104,13 +109,14 @@ if(mode==='enqueue'){
  const source=resolvePath(args.find(arg=>!arg.startsWith('--'))??'.'),remote=git(source,['remote','get-url','origin']);
  const root=resolvePath(args.find(arg=>arg.startsWith('--root='))?.slice(7)??join(homedir(),'.cache/wildshard/push-queue'));
  const directory=join(root,createHash('sha256').update(identity(remote)).digest('hex').slice(0,20));mkdirSync(join(directory,'snapshots'),{recursive:true});
- const output=execFileSync('python3',[lock,join(directory,'capture.lock'),process.execPath,self,'capture',source,directory,...(args.includes('--check-only')?['--check-only']:[])],{encoding:'utf8'});process.stdout.write(output);
+ const commit=args.find(arg=>arg.startsWith('--commit='));
+ const output=execFileSync('python3',[lock,join(directory,'capture.lock'),process.execPath,self,'capture',source,directory,...(args.includes('--check-only')?['--check-only']:[]),...(commit===undefined?[]:[commit])],{encoding:'utf8'});process.stdout.write(output);
 }else if(mode==='capture'){
  const [source,directory]=args;if(source===undefined||directory===undefined)throw new Error('Missing queue capture paths');
- console.log(JSON.stringify(capture(source,directory,args.includes('--check-only'))));
+ console.log(JSON.stringify(capture(source,directory,args.includes('--check-only'),args.find(arg=>arg.startsWith('--commit='))?.slice(9))));
 }else if(mode==='work'){
  const [directory]=args;if(directory===undefined)throw new Error('Missing queue directory');await drain(resolvePath(directory));
 }else if(mode==='status'){
  const [directory]=args;if(directory===undefined)throw new Error('Pass the repository queue directory');
  console.log(JSON.stringify(readdirSync(directory).filter(name=>/^\d+-[a-f0-9]{8}\.json$/u.test(name)).sort().map(name=>JSON.parse(readFileSync(join(directory,name),'utf8'))),null,2));
-}else throw new Error('Usage: push-queue.mjs enqueue [repo] [--root=path] [--check-only] | status <queue-dir>');
+}else throw new Error('Usage: push-queue.mjs enqueue [repo] [--commit=sha] [--root=path] [--check-only] | status <queue-dir>');
