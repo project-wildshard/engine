@@ -22,7 +22,7 @@ const world=await World.open({build:'test',cells:[],workers:1,seats:1,secret:'te
 const server=createServer((q,r)=>r.end('alive'));server.on('upgrade',(q,s,h)=>world.upgrade(q,s,h));server.listen(0,'127.0.0.1',()=>console.log(server.address().port));`);
   await build({input:entry,platform:'node',external:['pg-native'],plugins:[{name:'rapier',resolveId:source=>
     /^\.\/rapier_wasm3d(\.js)?$/.test(source)?absolute('src/server/engine/physics/rapierBindings.ts'):null}],
-    output:{file,format:'esm',codeSplitting:false,banner:"import {createRequire} from 'node:module';const require=createRequire(import.meta.url);"}})
+    output:{file,format:'esm',codeSplitting:false}})
     .catch((error:unknown)=>{rmSync(root,{recursive:true,force:true});throw error;});
   const child = spawn(process.execPath, [file]); let errors = ''; child.stderr.on('data', (bytes: Buffer) => { errors += bytes.toString(); });
   try {

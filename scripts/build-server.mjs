@@ -21,13 +21,12 @@ const rapier = { name: 'rapier', resolveId: source => {
   if (source === '@dimforge/rapier3d-simd') return require.resolve('@dimforge/rapier3d-simd/rapier.js');
   return null;
 } };
-// `ws` and `pg` are CommonJS, and an ESM bundle has no `require` of its own.
-const banner = { js: 'import { createRequire as bundleRequire } from \'node:module\'; const require = bundleRequire(import.meta.url);' };
+// Rolldown supplies the Node CommonJS require bridge for ws and pg.
 const extra = Object.fromEntries(values.entry.map(row => { const [name, path] = row.split('='); return [name, resolve(ROOT, path)]; }));
 // Separate self-contained entries preserve the dedicated archive contract.
 for (const [name,input] of Object.entries({main:join(DEDICATED,'main.ts'),cellWorker:join(DEDICATED,'cellWorker.ts'),...extra})) {
   await build({input,platform:'node',transform:{target:'node24',define:{__BUILD_ID__:JSON.stringify(values.build)}},
-    plugins:[rapier],external:['pg-native'],output:{file:join(OUT,`${name}.mjs`),format:'esm',codeSplitting:false,banner:banner.js}});
+    plugins:[rapier],external:['pg-native'],output:{file:join(OUT,`${name}.mjs`),format:'esm',codeSplitting:false}});
 }
 mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, 'bundle.json'), JSON.stringify({ engineBuild: values.build }));

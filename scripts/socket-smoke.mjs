@@ -15,6 +15,6 @@ const rapier = {name:'rapier',resolveId:source=>{
   return null;
 }};
 await build({input:join(ROOT,'test/fixtures/socketSmokeEntry.ts'),platform:'node',transform:{target:'node24'},plugins:[rapier],
-  output:{file:OUT,format:'esm',codeSplitting:false,banner:'import { createRequire as bundleRequire } from \'node:module\'; const require = bundleRequire(import.meta.url);'}});
+  output:{file:OUT,format:'esm',codeSplitting:false}});
 const run = spawnSync(process.execPath, [OUT, process.argv[2] ?? '4', join(ROOT, 'public/assets/physics/rapier.wasm')], { stdio: 'inherit', cwd: dirname(OUT) });
 process.exit(run.status ?? 1);
