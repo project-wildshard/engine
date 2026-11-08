@@ -13,12 +13,15 @@ cook proofs reserve the entire managed budget. Static work keeps its own
 declared weights. A waiting file has not begun its case clock. No fixture,
 assertion, deadline, sample, pool isolation or test is dropped.
 
-Each admitted test fork uses Node's one-thread V8 background pool rather
-than multiplying the default pool across ten forks. A real inner Worker
-boots with that process option; the existing Node-24 WASM lifetime flag
-remains. No ignored outer-worker variable is claimed to cap encoders.
+The one-thread V8 background-pool experiment is rejected: the unchanged
+motion-state and motion-predictor allocation proofs reproduce twelve and
+five GC events against their unchanged cap of two. The same admitted
+two-file run with the runtime default passes all eighteen cases. Vitest
+already gives each isolated file a fresh fork; heap reuse was not the
+cause. Keep the runtime's background pool and Node-24 WASM lifetime flag.
+No ignored outer-worker variable is claimed to cap encoder/native threads.
 
-The policy is named admitted-v2 within the same authenticated full-v1
+The corrected policy is named admitted-v3 within the same full-v1
 envelope. Exact-tree receipts naturally invalidate on this source change.
 Unmodified full pnpm check gains the same admitted consumer; focused runs
 and hosted CI retain their previous ownership. Serial native/ordinary

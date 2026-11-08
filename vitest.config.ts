@@ -8,7 +8,6 @@ import { setPriority } from 'node:os';
 import { resolve } from 'node:path';
 import { activeQuarantineFiles } from './scripts/test-quarantine.mjs';
 import { withTestEnvironments } from './scripts/vitest-environments';
-import {PUSH_BUDGET,PUSH_PROFILE} from './scripts/push-budget.mjs';
 
 assertVitestLane();
 const maxWorkers = vitestMaxWorkers();
@@ -21,7 +20,7 @@ export default defineConfig(withTestEnvironments({
   plugins: [vitestTmpRoot(), vitestModuleCache()],
   resolve: { alias: rapierAlias }, assetsInclude: ['**/*.bin', '**/*.wasm'],
   // Reuse transformed code in CI; each test still executes in its isolated worker.
-  test: { execArgv: [...vitestNodeExecArgv(), ...(pushProfile===PUSH_PROFILE&&process.env['WS_CPU_ADMISSION']==='1'?[`--v8-pool-size=${PUSH_BUDGET.v8Threads}`]:[]), '--import', resolve('scripts/format-hook.mjs')], fsModuleCache: true, ...(maxWorkers === undefined ? {} : { maxWorkers }), testTimeout: 30_000, environment: 'node',
+  test: { execArgv: [...vitestNodeExecArgv(), '--import', resolve('scripts/format-hook.mjs')], fsModuleCache: true, ...(maxWorkers === undefined ? {} : { maxWorkers }), testTimeout: 30_000, environment: 'node',
     // Native product/hash readers own filesystem URLs, even in DOM suites.
     // Vite's browser query injection must not rewrite the hash CLI's hashbang.
     // Format ships raw .ts from the shardfile repo (J42): Vite transforms it, because Node will not under node_modules.
