@@ -13,7 +13,7 @@ import { openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsFor
 import { deviceIdentity } from './src/shared/engine/net/identity';
 import * as v from 'valibot';
 installAppIdentity(WILDSHARD_IDENTITY);
-window.epochProof = { SaveStore, openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport, deviceIdentity, v };
+window.epochProof = { SaveStore, openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport, deviceIdentity, installAppIdentity, WILDSHARD_IDENTITY, v };
 ` }, bundle: true, format: 'esm', platform: 'browser', write: false });
 const server = createServer((request, response) => { response.setHeader('content-type', request.url === '/entry.js' ? 'application/javascript' : 'text/html'); response.end(request.url === '/entry.js' ? bundled.outputFiles[0].text : '<script type="module" src="/entry.js"></script>'); });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -21,6 +21,39 @@ const address = server.address();
 if (address === null || typeof address === 'string') throw new Error('No proof server');
 try {
   for (const [name, type] of [['Chromium', chromium], ['WebKit', webkit]]) {
+    await test(`${name}: later epoch boots carry the previous database identity durably without its progress`, { timeout: 10_000 }, async () => {
+      const browser = await type.launch({ headless: true });
+      try {
+        const page = await browser.newPage();
+        await page.goto(`http://127.0.0.1:${address.port}`);
+        await page.waitForFunction(() => window.epochProof !== undefined);
+        const carried = await page.evaluate(async () => {
+          const api = window.epochProof, stable = 'wildshard.save.v2.', key = `device:${stable}identity`;
+          const zero = await api.openIndexedSaves('wildshard-saves');
+          await zero.write(key, JSON.stringify({ player: 'device:stale-epoch-zero', name: 'Old' })); zero.close();
+          const previous = await api.openIndexedSaves('wildshard-saves@1');
+          await previous.write(key, JSON.stringify({ player: 'device:epoch-one', name: 'Jake' }));
+          await previous.write('wildshard.save.v2@1.standalone-lone-driftwood-isle', '{"tick":900}'); previous.close();
+          const boot = async epoch => {
+            const prefix = `wildshard.save.v2@${epoch}.`;
+            api.installAppIdentity({ ...api.WILDSHARD_IDENTITY, saveEpoch: epoch, savePrefix: prefix,
+              previousSavePrefix: `wildshard.save.v2@${epoch - 1}.`, identityPrefix: stable });
+            return { prefix, saves: await api.openIndexedSaves(api.serverSaveDatabase()) };
+          };
+          const second = await boot(2), identity = api.deviceIdentity(second.saves.storage, second.prefix);
+          const keys = Array.from({ length: second.saves.storage.length }, (_, index) => second.saves.storage.key(index));
+          const renamed = api.deviceIdentity(second.saves.storage, second.prefix, 'Alex');
+          await second.saves.write(key, JSON.stringify(renamed)); second.saves.close();
+          const reopened = await boot(2), durable = api.deviceIdentity(reopened.saves.storage, reopened.prefix); reopened.saves.close();
+          const third = await boot(3), next = api.deviceIdentity(third.saves.storage, third.prefix); third.saves.close();
+          return { identity, durable, next, keys };
+        });
+        assert.deepEqual(carried.identity, { player: 'device:epoch-one', name: 'Jake' });
+        assert.deepEqual(carried.durable, { player: 'device:epoch-one', name: 'Alex' });
+        assert.deepEqual(carried.next, carried.durable);
+        assert.deepEqual(carried.keys, ['device:wildshard.save.v2.identity']);
+      } finally { await browser.close(); }
+    });
     await test(`${name}: epoch isolates real IDB, carries identity, rejects old files, and wipes once`, async () => {
       const browser = await type.launch({ headless: true });
       try {

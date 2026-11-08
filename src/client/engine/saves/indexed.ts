@@ -8,10 +8,10 @@ import { deviceIdentity } from '../../../shared/engine/net/identity';
 export interface IndexedSaves { readonly storage: SaveStorage; readonly write: (key: string, value: string | null) => Promise<boolean>; readonly close?: () => void }
 /** The database the page's server keeps its saves in. */
 export const SERVER_SAVES = 'wildshard-saves';
+const epochDatabase = (epoch: number): string => epoch === 0 ? SERVER_SAVES : `${SERVER_SAVES}@${epoch}`;
 /** Cached older builds cannot enumerate the current epoch's database. */
 export function serverSaveDatabase(prefix: string | undefined = installedIdentity()?.savePrefix): string {
-  const epoch = saveEpoch(prefix);
-  return epoch === 0 ? SERVER_SAVES : `${SERVER_SAVES}@${epoch}`;
+  return epochDatabase(saveEpoch(prefix));
 }
 /** The database an earlier row kept them in, apart from the real saves. Nothing reads it now. */
 const RETIRED_SAVES = 'wildshard-worker-saves';
@@ -52,7 +52,8 @@ export async function openIndexedSaves(name: string): Promise<IndexedSaves> {
   if (name === serverSaveDatabase() && saveEpoch() > 0 && app?.identityPrefix !== undefined) {
     const key = `device:${app.identityPrefix}identity`;
     if (!documents.has(key)) {
-      const previous = await openIndexedSaves(SERVER_SAVES);
+      // The key namespace is stable; its newest record lives with the preceding epoch's saves.
+      const previous = await openIndexedSaves(epochDatabase(saveEpoch() - 1));
       try {
         const identity = previous.storage.getItem(key);
         if (identity !== null && !await write(key, identity)) throw new Error('Device identity carry failed');
