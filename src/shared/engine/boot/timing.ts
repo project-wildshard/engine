@@ -4,13 +4,19 @@ export interface BootTimingEntry {
   operation: string; start: number; end: number | null;
   result: string; detail: Readonly<Record<string, unknown>>;
 }
+/** Default-channel receipts are bounded summaries, never duration spans. */
+export interface BootTimingRealm {
+  purpose:string;url:string;timeOrigin:number|null;
+  precision:'browser';instrumentation:'parent-only'|'worker';
+  messages?:{count:number;first:number;last:number;kinds:Record<string,number>};
+}
 export interface BootTiming {
   version: 1; build: string | null; attempt: string; attemptCount: number;
   timeOrigin: number; entries: BootTimingEntry[];
   resources: Readonly<Record<string, unknown>>[];
   counters: Record<string, { loaded: number; total: number | null; unit: string; at: number; events: number }>;
   navigation?: Readonly<Record<string, unknown>>;
-  realms?: Readonly<Record<string, unknown>>;
+  realms?: Readonly<Record<string, BootTimingRealm>>;
   lifecycle?: readonly Readonly<Record<string, unknown>>[];
   paints?: readonly Readonly<Record<string, unknown>>[];
   overflow?: Readonly<Record<string, unknown>>;

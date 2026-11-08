@@ -92,7 +92,7 @@
               if (value?.__engineBootTiming === 1) {
                 event.stopImmediatePropagation();
                 const wOrigin = value.origin, offset = wOrigin - origin;
-                data.realms[realm] = {purpose:value.purpose,url:String(args[0]),timeOrigin:wOrigin,precision:'browser',instrumentation:'worker'};
+                Object.assign(data.realms[realm], {purpose:value.purpose,url:String(args[0]),timeOrigin:wOrigin,precision:'browser',instrumentation:'worker'});
                 if (first) { first = false; data.end(code); }
                 if (value.pong) { const {p0,w1,w2} = value.pong, p3 = now(); data.mark('worker:clock-roundtrip', {realm,p0,w1,w2,p3,workerTimeOrigin:wOrigin,pageTimeOrigin:origin,roundTrip:p3-p0,handling:w2-w1,transitAndQueue:p3-p0-(w2-w1)}); }
                 for (const row of value.records || []) {
@@ -104,7 +104,15 @@
                   else if (row.type === 'progress') data.progress(`${realm}:${row.operation}`,row.delta,row.total,row.unit);
                   else if (row.type === 'overflow') overflow(`${realm}:records`);
                 }
-              } else { if (first) {first=false;data.end(code,'first-message-observed');} data.mark('worker:message-receive',{realm,kind:value?.kind || value?.type || null}); }
+              } else {
+                if (first) {first=false;data.end(code,'first-message-observed');}
+                const at=now(), messages=data.realms[realm].messages ||= {count:0,first:at,last:at,kinds:Object.create(null)};
+                const label=value?.kind || value?.type;
+                let kind=typeof label==='string'&&label.length<=64?label:'other';
+                if(!Object.hasOwn(messages.kinds,kind)&&Object.keys(messages.kinds).length>=32)kind='other';
+                messages.count++;messages.last=at;messages.kinds[kind]=(messages.kinds[kind]||0)+1;
+                data.progress(`${realm}:messages-received`,1,null,'messages');
+              }
             };
             worker.addEventListener('message',receive,{capture:true});
             worker.addEventListener('error',()=>data.end(code,'failed'),{once:true});

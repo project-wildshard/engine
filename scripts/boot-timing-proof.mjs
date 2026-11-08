@@ -24,6 +24,7 @@ const root = resolvePath(option('root') ?? '.'), expectedAbsent = process.argv.i
 const delayKind = option('delay'), delayMs = Number(option('delay-ms')??1250);
 assert.ok(Number.isFinite(delayMs)&&delayMs>0&&delayMs<=60000,'delay-ms must be 1..60000');
 const handoff=process.argv.includes('--handoff');
+const grid=process.argv.includes('--grid');
 const serverNetwork=process.argv.includes('--server-network');
 const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'sunscar-dunes':'template');
 const swDelay=delayKind==='sw-open'||delayKind==='sw-put';
@@ -68,7 +69,26 @@ try {
       /** @type {string[]} */ const faults=[];
       page.on('pageerror',error=>faults.push(error.message));
       const address=`${proxy?.url??preview.url}/?chunk=${encodeURIComponent(shard)}&tier=phone&mute=1&nolock=1&sw=${controlled?'1':'0'}`;
-      if(handoff) {
+      if(grid) {
+        const title=new URL(address);title.searchParams.delete('chunk');
+        await page.goto(title.href,{waitUntil:'domcontentloaded',timeout:30000});
+        const burst=await page.evaluate(async()=>{
+          const timing=/** @type {import('../src/shared/engine/boot/timing').BootTiming} */(Reflect.get(window,'__bootTiming'));
+          const url=URL.createObjectURL(new Blob(['for(let n=0;n<5000;n++)postMessage({kind:"collector-proof",n});'],{type:'text/javascript'}));
+          const worker=new Worker(url,{name:'ls1-aggregate-proof'});let delivered=0;
+          try {
+            await new Promise((resolve,reject)=>{worker.onmessage=()=>{if(++delivered===5000)resolve(undefined);};worker.onerror=event=>reject(new Error(event.message));});
+            const entry=Object.entries(timing.realms??{}).find(([,realm])=>realm.purpose==='ls1-aggregate-proof');
+            const realm=entry?.[0],summary=entry?.[1].messages;
+            return {delivered,count:summary?.count,entries:timing.entries.filter(row=>row.realm===realm||row.detail.realm===realm).length,overflow:timing.overflow};
+          } finally {worker.terminate();URL.revokeObjectURL(url);}
+        });
+        assert.equal(burst.delivered,5000);assert.equal(burst.count,5000,'worker receipts were not aggregated');
+        assert.ok(burst.entries<=8,'worker burst allocated unbounded entries');
+        assert.equal(Object.keys(burst.overflow??{}).length,0,'worker burst overflowed the collector');
+        console.log(`${name}: 5000 real worker receipts retained in ${burst.entries} entries`);
+        await Promise.all([page.waitForURL(url=>url.searchParams.has('chunk'),{waitUntil:'domcontentloaded',timeout:90000}),page.locator('.ws-main-grid').click()]);
+      } else if(handoff) {
         const title=new URL(address);title.searchParams.delete('chunk');
         await page.goto(title.href,{waitUntil:'domcontentloaded',timeout:30000});
         await page.locator('.ws-main-select').click();
@@ -83,7 +103,7 @@ try {
         await context.close();continue;
       }
       await page.waitForFunction(observed,'app:first-game-step-end',{timeout:60000});
-      await page.waitForFunction(observed,'app:loader-complete',{timeout:120000});
+      await page.waitForFunction(()=>{const held=/** @type {import('../src/shared/engine/boot/timing').BootTiming|undefined} */(Reflect.get(window,'__bootTiming'));if(held===undefined)return false;return held.entries.some(row=>row.operation==='app:loader-complete')||Number(held.overflow?.entries)>0;},undefined,{timeout:120000});
       if(controlled) {
         await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
         // A new-build book/table miss with all the immutable product bodies held.
@@ -100,8 +120,21 @@ try {
       }
       const timing=await page.evaluate(snapshot);
       assert.ok(timing);
+      assert.equal(Object.keys(timing.overflow??{}).length,0,'bounded collector overflowed');
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
       const operations=new Set(timing.entries.map(row=>row.operation));
+      const ordinary=timing.entries.filter(row=>row.operation==='worker:message-receive').length;
+      const received=Object.entries(timing.counters).filter(([key,row])=>key.endsWith(':messages-received')&&row.unit==='messages').reduce((sum,[,row])=>sum+row.loaded,0);
+      if(grid) {
+        assert.ok(received>0,`${name}: grid worker messages have no realm aggregate; raw entries=${ordinary}`);
+        assert.equal(ordinary,0,'ordinary worker messages still allocate individual entries');
+        for(const [realm,entry]of Object.entries(timing.realms??{}))if(entry.messages!==undefined){
+          const messages=entry.messages;assert.equal(messages.count,timing.counters[`${realm}:messages-received`]?.loaded);
+          assert.equal(Object.values(messages.kinds).reduce((sum,count)=>sum+count,0),messages.count);
+          assert.ok(messages.first<=messages.last&&Object.keys(messages.kinds).length<=33);
+        }
+        assert.ok(await page.evaluate(()=>{const owner=/** @type {import('./types/worker-page').WorkerWindow} */(window);return Boolean(owner.__wildshard.shard.grid.state().live?.live?.gameplayReady);}),'grid did not reach gameplay readiness');
+      }
       const failures=timing.entries.filter(row=>row.operation.endsWith(':failure')).map(row=>row.detail.message);
       for (const operation of ['app:html-script-start','app:collector-installed','app:shell-dom-ready','app:entry-body',
         'app:loading-adopt','worker:module-body','worker:code-ready','worker:configuration-received',
@@ -138,7 +171,6 @@ try {
         assert.ok(timing.entries.some(row=>row.realm==='service-worker' && row.operation==='sw:cache-match'),'SW cache records absent');
         assert.ok(timing.entries.some(row=>row.realm==='service-worker' && row.operation==='sw:navigation-handler-and-delivery'),'SW navigation record absent');
       }
-      assert.equal(Object.keys(timing.overflow??{}).length,0,'bounded collector overflowed');
       if(delayKind) {
         assert.ok(delayed||proxy?.matched(),`${delayKind} route never matched`);
         const operation=delayKind==='sw-open'?'sw:cache-open':delayKind==='sw-put'?'sw:body-and-cache-publication':delayKind==='worker'?'worker:fetch-evaluate-start':delayKind==='server'?'server:world-boot':delayKind==='styles'?'wait:Startup stylesheets':delayKind==='tables'?'app:tables-import-and-prepare':'app:document-and-module-graph';
@@ -150,7 +182,7 @@ try {
         return probe?.world ? probe.requireWorld().game.renderer.info.render.frame : 0;
       });
       assert.ok(renderFrame>0,'real world did not render');
-      console.log(`${name}: PASS first-step=${Math.round(firstStep??0)}ms loader-complete=${Math.round(end)}ms unnamed=${Math.round(maxGap)}ms entries=${timing.entries.length} resources=${timing.resources.length} atomic=${timing.counters['atomic:completed']?.loaded} byteStreams=${bytes.length} chunks=${bytes.reduce((sum,[,row])=>sum+row.events,0)} delay=${delayKind??'none'} frame=${renderFrame}`);
+      console.log(`${name}: PASS first-step=${Math.round(firstStep??0)}ms loader-complete=${Math.round(end)}ms unnamed=${Math.round(maxGap)}ms entries=${timing.entries.length} resources=${timing.resources.length} atomic=${timing.counters['atomic:completed']?.loaded} byteStreams=${bytes.length} chunks=${bytes.reduce((sum,[,row])=>sum+row.events,0)} messages=${received} grid=${grid} delay=${delayKind??'none'} frame=${renderFrame}`);
       await context.close();
     } finally {await browser.close();}
   }
