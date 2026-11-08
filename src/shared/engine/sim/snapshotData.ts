@@ -301,6 +301,13 @@ function prepareSnapshot(input: SimSnapshot | SimSnapshotBytes, apiVersion: numb
   jsonTree(metadata, new Set(), 0, true);
   return { raw, saved: identities(v.parse(snapshot, metadata), apiVersion) };
 }
+/** Admit a logical continuation with the writer's strict checks and detached ownership.
+ * No transport is consumed or published, so compression and a JSON round trip add no proof. */
+export function admitSnapshotDataBytes(input: SimSnapshot | SimSnapshotBytes, apiVersion: number): SimSnapshotBytes {
+  const { raw, saved } = prepareSnapshot(input, apiVersion);
+  if (raw.length === 0) throw new RangeError('Snapshot physics exceeds byte bounds');
+  return { ...saved, physics: raw };
+}
 // packedPhysics selects compressed chunks only when sum(chunk.length + 3) + 64
 // is smaller than base64(raw). Its remaining ASCII header is bounded by these
 // maximum integer widths. This bound needs no assumptions about compressibility.

@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import { serializeSnapshotData, serializeSnapshotDataSteps, decodeSnapshotData, decodeSnapshotDataBytes, finishSteps, checkSnapshotDataWire } from './snapshotData';
+import { serializeSnapshotData, serializeSnapshotDataSteps, decodeSnapshotData, decodeSnapshotDataBytes, admitSnapshotDataBytes, finishSteps, checkSnapshotDataWire } from './snapshotData';
 import { byteArray } from './snapshotPhysics';
 import type { QuestBookSaved } from '../quest/players';
 import type { SimHost, SimLevel, SimSlots, SimValue } from '../../../server/engine/sim';
@@ -117,6 +117,12 @@ export interface SimSnapshot {
 /** Detached native physics bytes for capture, decoding and restore, without a boxed array per Rapier byte.
  *  The legacy decoded array and packed wire stay unchanged; staged serialization freezes bytes before pausing. */
 export type SimSnapshotBytes = Omit<SimSnapshot, 'physics'> & { physics: Uint8Array };
+
+/** Admit a logical continuation with the writer's complete metadata, identity and byte checks.
+ * Returns independently owned metadata/native bytes; a stored wire still uses the strict decoder. */
+export function admitSimSnapshotBytes(saved: SimSnapshot | SimSnapshotBytes): SimSnapshotBytes {
+  return admitSnapshotDataBytes(saved, SIM_API_VERSION);
+}
 
 /** Serialize exact physics (≤32 MB) in bounded lossless blocks; optional immutable fresh-world bytes serve as a checked basis. */
 export function serializeSimSnapshot(saved: SimSnapshot | SimSnapshotBytes, physicsBasis?: Uint8Array): string {
