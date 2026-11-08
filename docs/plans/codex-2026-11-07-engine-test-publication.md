@@ -1,63 +1,42 @@
 # Publish the engine test candidates
 
-Status: publishing 2026-11-08. Release v0.1.1 is visible at 0d9e238.
+Status: done 2026-11-08: engine and seven source cleanups published.
 
-The code and seven source cleanups are prepared on main in cache
-clones. The 283 decisions are in `test/engine-lift-disposition.json`:
-43 migrated files and 240 J186 removals. Named engine proofs passed
-149 cases; the remaining shard suites passed 121 files / 296 cases.
+The 283 decisions in `test/engine-lift-disposition.json` resolve as
+43 migrated files and 240 J186 removals. Engine-only 9059d6ba175e
+contains their reviewed gameplay successors. Its whole normal
+pre-push passed in 877 seconds after v0.1.1 was observed. The Ring 1
+Pine catalogue path repair is included in the integrated engine
+publication 8278424e46ef, whose whole pre-push passed in 821.9 seconds.
 
-The release condition was observed with `git ls-remote --tags` at
-02:31 UTC on November 8, and rechecked before publication.
-The corrected whole check waited five minutes for the release lane
-and timed out without starting. Nothing has been pushed by this job.
-The prepared work now includes upstream db17776 and its save epoch;
-all 43 migrated files / 149 cases pass again on that code.
+Every source cleanup ran on current main in a fresh cache clone,
+preserving the incoming runner build workflow and A2 receipt. Its
+original cleanup receipt is retained as A3. Every final pending list
+is empty, every normal publication gate passed with zero findings,
+and SSH keepalives were enabled. Each final CI passed before the next
+repository began. No deploy or hook bypass was performed.
 
-| Step | Remaining work | Done when |
-| --- | --- | --- |
-| 1 | Observe v0.1.1, fetch main/tags and integrate any incoming engine changes; refresh dependencies/pins if changed | The release is visible and the local main includes it |
-| 2 | Publish engine through the secrets gate, with SSH keepalives and authorized `WS_FULL_SUITE=1` | The corrected whole pre-push suite passes and the commit is on origin/main |
-| Review | Add quick actual-play successors for Pine/Nalati resume, Miller payment order, Titan fire, lance cone/rehit and the harbour rack; re-judge the law-test deletion | Five cases pass, each below ten seconds; precise source-based disposition and real-clock explanation are committed |
-| 3 | Publish shard-dunes: 5 migrated, 2 deleted | Its pending list is empty on origin/main and its hooks pass |
-| 4 | Publish shard-sky-reach: 1 migrated, 9 deleted | Its pending list is empty on origin/main and its hooks pass |
-| 5 | Publish shard-driftwood: 8 migrated, 59 deleted | Its pending list is empty on origin/main and its hooks pass |
-| 6 | Publish shard-nine-dragon: 3 migrated, 20 deleted | Its pending list is empty on origin/main and its hooks pass |
-| 7 | Publish shard-pine-hollow: 16 migrated, 48 deleted | Its pending list is empty on origin/main and its hooks pass |
-| 8 | Publish shard-nalati: 9 migrated, 99 deleted | Its pending list is empty on origin/main and its hooks pass |
-| 9 | Publish shard-open-plots: 1 migrated, 3 deleted | Its pending list is empty on origin/main and its hooks pass |
-| 10 | Record the actual hashes and CI results; close the receipts when publication lands | The requested external report states the actual outcome |
+| Repository | Migrated / deleted | Final main | Successful final CI |
+| --- | --- | --- | --- |
+| Dunes | 5 / 2 | 5c21e657b5f3 | [42444418924](https://github.com/project-wildshard/shard-dunes/actions/runs/42444418924) |
+| Sky | 1 / 9 | 677af030ebbc | [42445213173](https://github.com/project-wildshard/shard-sky-reach/actions/runs/42445213173) |
+| Driftwood | 8 / 59 | 9dd8f13f85fe | [42445620410](https://github.com/project-wildshard/shard-driftwood/actions/runs/42445620410) |
+| Nine | 3 / 20 | 317da8825c4e | [42445867661](https://github.com/project-wildshard/shard-nine-dragon/actions/runs/42445867661) |
+| Pine | 16 / 48 | 637f0385eae4 | [42446207850](https://github.com/project-wildshard/shard-pine-hollow/actions/runs/42446207850) |
+| Nalati | 9 / 99 | af4cd8b9cece | [42446495142](https://github.com/project-wildshard/shard-nalati/actions/runs/42446495142) |
+| Open Plots | 1 / 3 | e4c07dc8e62d | [42446939629](https://github.com/project-wildshard/shard-open-plots/actions/runs/42446939629) |
 
-Use the keepalive command in the lift handoff. Never skip checks or
-verification. The original whole run found only the real-time seam
-timeout; that case now uses the existing server tick proof port and
-passes at 71 ms under load. The corrected 13-case network file and
-typechecking passed. Engine's pre-existing pending list is unchanged.
+Nalati carries the corrected held-weapon-laws judgment: nine pure
+scalar law cases and one fabricated binding case, rather than a
+file-wide mock-count reason. The actual mounted lance successor
+checks cone and rehit. Open Plots retains every real product bake
+and assertion, with one ten-second case per product rather than a
+single catalogue-wide 300-second allowance. All eighteen local
+bakes pass at 0.595–3.075 seconds each; final CI also passes.
 
-Publication uses the fresh `engine-tests-publish` clone. It contains
-only the engine-test chain through 2c2c3cb and its review follow-up.
-The original `engine-tests` clone retains SR1-SR3 and the SR4/review
-work. Codex-port owns publishing all split repairs together, including
-SR7; this lane must never push those commits separately.
-
-Successors use admitted full products on Ring 2. They use actual
-interactions, held commands, combat and fresh-host snapshots. Fixtures
-provide an already completed Pine errand, an existing Nalati milestone,
-positions, ample ammunition and a wolf with enough health to survive
-another lance offer. No test emits a kill, hit or quest outcome. The
-Titan earns both phase transitions through arrows and support melee.
-The longest new case measured 7.41 seconds. The original real-clock
-save case now explains its intentional two-second tick wait in place.
-
-The full hook exposed an 11.1-second Titan case under load; 5,754
-other cases passed. Its play is now split at two actual earned save
-checkpoints into three bounded goals, seven successor cases overall.
-The full hook is required again. The gate's basename check requires
-the final publication clone at `engine-publication/engine`; the
-earlier `engine-tests-publish` clone preserves the prepared commit.
-
-Source review found nine pure scalar-law cases and one fabricated
-GLTF/Player binding case in held-weapon-laws. The three mock matches
-belong only to that last case. Its deletion remains J186 because the
-other cases pin projected channels, ABI identity and cadence; the
-published gameplay contract now has an actual lance successor.
+The external ENGINE-TESTS-REPORT and TESTDEBT-REPORT contain exact
+hashes, counts, gate results and CI links. This lane's original
+engine clone retains the open S1/process-loss and death-order rows
+in the split-combat repair plan; they are separate from this closed
+publication queue. Its new SR work is handed to codex-port for
+publication, never pushed separately by this lane.
