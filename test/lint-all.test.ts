@@ -85,7 +85,7 @@ test('CI runs one complete type and typed-lint job with verified inputs', () => 
   expect(job).toContain('python3 scripts/ci-products.py unpack');
   expect(job).toContain('python3 scripts/ci-fail-fast.py -- /usr/bin/time -v bash scripts/typecheck-lint.sh');
   const body=readFileSync('scripts/typecheck-lint.sh','utf8');
-  expect(body.match(/pnpm exec tsc -b tsconfig\.layers\.json --builders 1/gu)).toHaveLength(1);
+  expect(body.match(/pnpm exec npr tsc -b tsconfig\.layers\.json --builders 1/gu)).toHaveLength(1);
   expect(body.match(/pnpm run lint:typed --threads=4/gu)).toHaveLength(1);
   expect(body).toContain('wait "$typecheck_pid"');expect(body).toContain('wait "$typed_lint_pid"');
 });
@@ -108,7 +108,7 @@ finish();setTimeout(()=>{watcher.close();process.exit(70);},2000).unref();
    expect(run.status,run.stdout+run.stderr).toBe(types || lint);
    const trace=readFileSync(resolve(cwd,'trace.txt'),'utf8').trim().split('\n');
    expect(trace.slice(0,2).every(line=>line.includes(':start:'))).toBe(true);
-   expect(trace).toContain('types:start:exec tsc -b tsconfig.layers.json --builders 1 --force');
+   expect(trace).toContain('types:start:exec npr tsc -b tsconfig.layers.json --builders 1 --force');
    expect(trace).toContain('lint:start:run lint:typed --threads=4');
    expect(trace.filter(line=>line.endsWith(':finish')).sort()).toEqual(['lint:finish','types:finish']);
   }
