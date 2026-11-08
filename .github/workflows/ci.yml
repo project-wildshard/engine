@@ -85,6 +85,8 @@ jobs:
         run: node scripts/module-cache-proof.mjs
       - name: Prove an actual over-budget file refuses
         run: node scripts/engine-ci-proof.mjs && node scripts/engine-ci-proof.mjs tmp/engine-ci-budget-proof --import
+      - name: Prove a named shard deadline drains descendants
+        run: node scripts/ci-shard-wall-proof.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: engine-ci-plan
