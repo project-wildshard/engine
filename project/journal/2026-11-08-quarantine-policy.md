@@ -50,3 +50,15 @@ under J193, still executed and reported, owned by codex-pinefix2 until
 2026-11-10T12:20:11Z. No measurement threshold or gameplay assertion is
 changed. Their file-clock failures remain explicit in the quarantine
 reason rather than being mislabeled as failed simulation assertions.
+
+Exact e9d231c CI 42480438365 passed assertions but reported three further
+whole-file overruns including imports: Nalati awareness 84597 ms (job
+128731185736), open-plots physics 76674 ms (128731185759), standalone
+GRID 65508 ms (128731185773). Add these observed paths, same owner, until
+2026-11-10T12:37:14Z. Fifteen listed files now need separate admission:
+their measured serial work approaches or exceeds the old 15-minute job
+clock. The runner accepts --shard=i/n, partitions stable committed entry
+positions exactly once, and reports each original file result. Three
+workflow groups retain one worker each, the ordinary exit status,
+non-blocking policy and unique original artifacts. Expiry never shifts
+other files between groups. No assertion, case or limit is weakened.

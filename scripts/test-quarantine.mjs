@@ -29,15 +29,28 @@ export function activeQuarantineFiles(now = Date.now()) {
 }
 
 async function main() {
-  const entries = readQuarantine(), files = activeQuarantineFiles();
-  const rows = entries.map(entry => ({file: entry.file, owner: entry.owner, deadline: entry.deadline, reason: entry.reason, active: files.includes(entry.file)}));
+  const args = process.argv.slice(2), shardArgs = args.filter(arg => arg.startsWith('--shard='));
+  if (shardArgs.length > 1 || args.some(arg => arg !== '--list' && !arg.startsWith('--shard='))) throw new Error('Expected --list and at most one --shard=i/n');
+  const shard = shardArgs[0]?.slice(8) ?? '1/1';
+  if (!/^[1-9]\d*\/[1-9]\d*$/u.test(shard)) throw new Error('Invalid quarantine shard');
+  const parts = shard.split('/'), index = Number(parts[0]), count = Number(parts[1]);
+  if (!Number.isSafeInteger(index) || !Number.isSafeInteger(count) || index > count) throw new Error('Invalid quarantine shard bounds');
+  const entries = readQuarantine(), active = activeQuarantineFiles();
+  // Partition committed entry positions, so expiry never moves another file
+  // between shards. Every active entry has exactly one owner group.
+  const files = entries.filter((entry, position) => position % count === index - 1 && active.includes(entry.file)).map(entry => entry.file);
+  const rows = entries.map(entry => ({file: entry.file, owner: entry.owner, deadline: entry.deadline, reason: entry.reason, active: active.includes(entry.file), selected: files.includes(entry.file)}));
   console.log('J193 quarantine policy', JSON.stringify(rows));
   if (process.argv.includes('--list')) return 0;
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (summary) appendFileSync(summary,
-    `### J193 quarantine (non-blocking, executed separately)\n\n${rows.map(row => `- ${row.file}: owner ${row.owner}, deadline ${row.deadline}; ${row.active ? 'active' : 'expired — blocking again'}`).join('\n')}\n`);
-  if (files.length === 0) { console.log('No active quarantine; every listed file is blocking again.'); return 0; }
-  const report = resolvePath(process.env.WS_QUARANTINE_REPORT ?? 'tmp/quarantine/results.json');
+    `### J193 quarantine ${shard} (non-blocking, executed separately)\n\n${rows.map(row => {
+      let status = 'expired — blocking again';
+      if (row.active) status = row.selected ? 'executed here' : 'another shard';
+      return `- ${row.file}: owner ${row.owner}, deadline ${row.deadline}; ${status}`;
+    }).join('\n')}\n`);
+  if (files.length === 0) { console.log('No active files in this quarantine shard.'); return 0; }
+  const report = resolvePath(process.env.WS_QUARANTINE_REPORT ?? `tmp/quarantine/results-${index}-of-${count}.json`);
   mkdirSync(dirname(report), {recursive: true});
   // This job installs full products even in ring-1: some of these files need
   // Driftwood and the whole road, beyond Ring 1's three-product inventory.
