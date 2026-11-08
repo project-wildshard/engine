@@ -1,8 +1,9 @@
 # Loading consumer review repairs
 
-Status: in progress 2026-11-08; the final gate and corrected SW trace
-proof remain required. Chromium Metal reaches and resumes real Ember.
-The four Opus UI commits and the reviewed LS7 tail remain unpublished.
+Status: source and real service-worker proof verified 2026-11-08;
+the whole-stack normal gate remains the final publication step.
+Default Chromium SwiftShader and WebKit now reach and resume real
+Ember after the inherited shader-budget liveness repair.
 Source: J189's committed-blob review of a413c1e, 7f32ebd, 9673561 and
 a6c9661, received 2026-11-08. LS1 and later LS7 are outside that verdict.
 
@@ -12,12 +13,33 @@ a6c9661, received 2026-11-08. LS1 and later LS7 are outside that verdict.
 | Producer-specific bar oracle | verified locally | Each phase's movement requires its own numeric producer work and denominator; negative cases reject labels, unrelated counters, decreases and unearned initial readings. The real inline Start writer is exercised. |
 | Scoped phase accounting | verified locally | Actual source-free scoped and ordinary ready cards agree with raw diagnostics at the frozen ready instant, including a rounding boundary and held-ready state. Rounding distributes only rounding error. |
 | Real clipboard proof | verified locally | Trusted interaction preserves native write rejection, tests its failure label, and verifies the entire safe event/report set rather than an entry-count threshold. |
-| Saved-place grid proof | blocked | A full catalogue, actual durable non-home save including Ember, title GRID tap, first inline/adopted name/art and entered cell agree in Chromium and WebKit; fresh Driftwood and missing-art fallback also pass. No seeded titleArrival substitutes for that path. |
-| Strict two-second acceptance | verified locally | The strict real-boot bar check passes. Default success with recorded stalls is not acceptance; no estimates or exception list disguise LS7's remaining renderer stretch. |
+| Saved-place grid proof | verified locally | A full catalogue, actual durable non-home save including Ember, title GRID tap, first inline/adopted name/art and entered cell agree in Chromium and WebKit; fresh Driftwood and missing-art fallback also pass. No seeded titleArrival substitutes for that path. |
+| Strict two-second acceptance | verified locally | Dunes and installed _template pass the strict real-boot bar check in both browsers. Grid's recorded SwiftShader GPU stalls are separate, not strict greens; no estimates or exception list disguise them. |
 
 The stats stacking follow-up a6c9661 has no independent correctness red.
 Preserve epoch-one inline guards and serverSaveDatabase during repair.
 The UI clone's four modified generated files remain untouched.
+
+The final controlled SW GRID proof retains 2795/2800 exact phases in
+559/560 requests with zero overflow in Chromium/WebKit, including all
+named spans through loader-complete and maximum unnamed gaps of
+283/284 ms. The native phase timestamps are checked within each exact
+request. Four fresh strict Dunes/_template runs pass after the grid
+scheduling repair. The fixed missing-art fixture uses the existing
+Exit navigation rather than an extra active-title reload; the complete
+WebKit card proof now has zero errors without an error filter.
+The final Chromium SwiftShader fresh/saved/missing-art run also passes
+every card, clipboard, real entered-pose and producer-credit assertion
+with zero page errors, backwards or untraced changes. It reports its
+real GPU stalls; this functional proof does not claim strict GRID timing.
+
+Separate open wires remain: persistent WebKit process-crash navigation
+can report native Context is stopped, S1's stuck board was not
+reproduced, and SwiftShader grid firstFrame plus the uncatalogued legacy
+template path retain genuine GPU stalls. None is claimed closed by the
+UI fixes or by the shader-budget crossing liveness repair.
+
+## Earlier red evidence and repairs
 
 Candidate b1e6fdb full-catalogue fresh GRID boots in both browsers, with
 correct first/adopted Driftwood name/art and a closed entered board.

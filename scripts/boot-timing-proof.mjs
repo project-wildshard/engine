@@ -127,7 +127,21 @@ if(expectedBuild!==undefined) {
           }
         });
         await page.reload({waitUntil:'domcontentloaded',timeout:30000});
-        await page.waitForFunction(observed,'app:first-game-step-end',{timeout:60000});
+        // Grid admission deliberately replaces its address with the title URL.
+        // A reload therefore returns to the title; use its real GRID control
+        // again rather than waiting for game work on a renderer-free title.
+        if(grid){
+          await page.locator('.ws-main-grid').waitFor({timeout:60000});
+          await Promise.all([page.waitForEvent('domcontentloaded',{timeout:90000}),page.locator('.ws-main-grid').click()]);
+        }
+        try {await page.waitForFunction(observed,'app:first-game-step-end',{timeout:60000});}
+        catch(error){
+          console.error(`${name}: controlled reload did not reach its first game step`,await page.evaluate(()=>{
+            const t=Reflect.get(window,'__bootTiming');return {url:location.href,state:document.documentElement.dataset.wsState,
+              error:document.querySelector('#wserr .msg')?.textContent,overflow:t?.overflow,active:t?.read().active,
+              tail:t?.entries.slice(-12),faults:document.querySelector('.ws-load')?.getAttribute('data-step')};
+          }),faults);throw error;
+        }
         await page.waitForFunction(observed,'app:loader-complete',{timeout:120000});
       }
       const timing=await page.evaluate(snapshot);
@@ -187,6 +201,22 @@ if(expectedBuild!==undefined) {
         assert.ok(timing.serviceWorker?.controller,'warm page was not controlled');
         assert.ok(timing.entries.some(row=>row.realm==='service-worker' && row.operation==='sw:cache-match'),'SW cache records absent');
         assert.ok(timing.entries.some(row=>row.realm==='service-worker' && row.operation==='sw:navigation-handler-and-delivery'),'SW navigation record absent');
+        const requests=timing.entries.filter(row=>row.realm==='service-worker'&&row.operation==='sw:request');
+        assert.ok(requests.length>0,'real SW request groups absent');
+        let phases=0;
+        for(const request of requests){
+          const rows=request.detail.phases;
+          assert.ok(Array.isArray(rows)&&rows.length>0&&rows.length<=32,'SW phases absent or unbounded');
+          for(const phase of /** @type {unknown[]} */(rows)){
+            assert.ok(typeof phase==='object'&&phase!==null&&'operation' in phase&&typeof phase.operation==='string'&&phase.operation.startsWith('sw:')
+              &&'start' in phase&&typeof phase.start==='number'&&Number.isFinite(phase.start)&&phase.start>=request.start
+              &&'end' in phase&&typeof phase.end==='number'&&Number.isFinite(phase.end)&&phase.end>=phase.start
+              &&request.end!==null&&phase.end<=request.end,'SW phase timestamps escaped their exact request');
+          }
+          phases+=rows.length;
+        }
+        assert.ok(phases>requests.length,'SW phases were replaced by request labels');
+        console.log(`${name}: controlled SW retained ${phases} exact phases in ${requests.length} requests; overflow=0`);
       }
       if(delayKind) {
         assert.ok(delayed||proxy?.matched(),`${delayKind} route never matched`);

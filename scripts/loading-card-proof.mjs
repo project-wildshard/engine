@@ -129,25 +129,28 @@ try {
         await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8 * 8, uploadThroughput: 750e3 / 8 });
       }
       /** @type {{x:number,z:number}|null} */ let earnedPose=null;
+      // Arm the metadata fault before the preceding real Exit navigation.
+      // Re-loading an already-active title adds an unrelated WebKit native
+      // cancellation path; neither arrival nor progress is part of this fault.
+      const omitEmberArt=async()=>{
+        await context.route('**/*',async route=>{
+          if(!route.request().isNavigationRequest()){await route.continue();return;}
+          const response=await route.fetch(),body=await response.text();
+          const changed=body.replace(/(id="ws-title-rows"[^>]*>)(.*?)(<\/script>)/su,(_all,head,json,tail)=>{
+            const rows=JSON.parse(json);for(const row of rows)if(row.slug==='open-plot-ember-forge')row.card.portrait='';
+            return head+JSON.stringify(rows)+tail;
+          });
+          await route.fulfill({response,body:changed});
+        });
+        // The fault targets the network document, not an older embedded SW
+        // DOCUMENT. Keep the earned durable save and all immutable bytes.
+        await page.evaluate(async()=>{for(const registration of await navigator.serviceWorker.getRegistrations())await registration.unregister();});
+      };
       if(grid)await page.goto(`${preview.url}/?mute=1&nolock=1&sw=0`,{waitUntil:'domcontentloaded'});
       for(const attempt of grid?['fresh-grid','saved-ember','missing-art']:['entry']){
       const tag=`${name}${throttle&&name==='chromium'?'-throttled':''}-${grid?attempt:shard}`;
       /** @type {{name:string,art:string}|null} */let destination=null;
       if(grid){
-        if(attempt==='missing-art'){
-          // Missing-art metadata fault: keep the real earned save and title tap.
-          // No arrival, travel, readiness or progress event is manufactured.
-          await context.route('**/*',async route=>{
-            if(!route.request().isNavigationRequest()){await route.continue();return;}
-            const response=await route.fetch(),body=await response.text();
-            const changed=body.replace(/(id="ws-title-rows"[^>]*>)(.*?)(<\/script>)/su,(_all,head,json,tail)=>{
-              const rows=JSON.parse(json);for(const row of rows)if(row.slug==='open-plot-ember-forge')row.card.portrait='';
-              return head+JSON.stringify(rows)+tail;
-            });
-            await route.fulfill({response,body:changed});
-          });
-          const uncached=new URL(page.url());uncached.searchParams.set('sw','0');await page.goto(uncached.href,{waitUntil:'domcontentloaded'});
-        }
         await page.locator('.ws-main-grid').waitFor({timeout:60000});
         destination=await page.evaluate(slug=>{
           const rows=JSON.parse(document.getElementById('ws-title-rows')?.textContent??'[]');
@@ -234,15 +237,20 @@ try {
         if(attempt!=='fresh-grid'&&(earnedPose===null||Math.hypot(cell.serverX-earnedPose.x,cell.serverZ-earnedPose.z)>.003))throw new Error('Saved card disagrees with actual resumed pose');
         console.log(`${tag}: actual entered cell ${cell.current}, closed board`);
         if(attempt==='fresh-grid'){
+          console.log(`${tag}: native renderer`,await page.evaluate(()=>{
+            const gl=Reflect.get(window,'__wildshard').world.game.renderer.getContext(),extension=gl.getExtension('WEBGL_debug_renderer_info');
+            return extension===null?gl.getParameter(gl.RENDERER):gl.getParameter(extension.UNMASKED_RENDERER_WEBGL);
+          }));
           console.log(`${tag}: ordinary road leg 1`);await walkGrid(page,0,-281.25);
           console.log(`${tag}: ordinary road leg 2`);await walkGrid(page,1125,-281.25);
           console.log(`${tag}: ordinary Ember entry`);await walkGrid(page,1125,-390);
-          await settled(page,'open-plot-4-1');
+          console.log(`${tag}: real Ember crossing`,JSON.stringify(await settled(page,'open-plot-4-1')));
           await page.evaluate(()=>{const save=Reflect.get(window,'__workerClientSave');if(save===undefined)throw new Error('No real save control');return save();});
           const saved=await observed(page);if(!saved.saved)throw new Error('Real Ember save was not acknowledged');
           earnedPose={x:saved.serverX,z:saved.serverZ};
         }
         if(attempt!=='missing-art'){
+          if(attempt==='saved-ember')await omitEmberArt();
           await page.evaluate(()=>{const game=Reflect.get(window,'__wildshard');if(game?.world===undefined)throw new Error('No live world');game.world.hud.setPaused(true);});
           await page.getByText('Exit to main',{exact:true}).click();
           await page.locator('.ws-main-grid').waitFor({timeout:60000});

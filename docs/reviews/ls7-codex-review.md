@@ -1,8 +1,8 @@
-# LS7 Codex review: hold the two Opus commits
+# LS7 Codex review
 
 Status: GO for the reviewed LS7 lifecycle and measured-weight source.
-Publication remains held by the separate saved-place consumer proof and
-the required full normal gate.
+The native lifecycle and measured-weight findings are closed. The
+required whole-stack normal gate remains the publication check.
 
 Reviewed committed blobs only. Neither foreign clone's dirty generated
 files was changed. The three preceding Codex commits are not rejected
@@ -105,3 +105,21 @@ The native probe now independently observes the native sync handles
 and adds disposal before drain: seven paths per browser, all green.
 The coupled fake-GL unit file is replaced by this real browser proof
 under J186; it was green before replacement. No new hook is added.
+
+## Final integrated recheck
+
+After the inherited grid shader-budget liveness repair, the four strict
+actual boots pass again: Dunes Chromium/WebKit ready 24.4/3.7 s and
+installed _template 13.4/2.5 s, each with zero stalls, backwards,
+untraced changes or page errors and complete native clipboard readback.
+One real Dunes trace exposed an oracle handoff edge: control-ready can
+precede the final exact row-derived 99.8 percent paint and then 100.
+The oracle accepts those two independently earned readings, retaining
+rejection of guessed intermediate values and premature completion.
+
+The full grid entry is measured separately. Default Chromium SwiftShader
+still has real multi-second firstFrame GPU waits; no fabricated credit
+or stall exception makes that trace a strict green. The starvation fix
+allows its actual Ember tile preparation and crossing to finish. This
+does not change the four calibrated strict-case verdicts or claim the
+older uncatalogued template renderer path is fixed.
