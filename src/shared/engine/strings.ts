@@ -1,5 +1,6 @@
 /** English engine UI strings. Content-owned overrides are installed by the composition root. */
 export const ENGINE_STRINGS = {
+  "s_model_provider_notice": "Powered by Tencent Hunyuan. Wildshard is provided by Jake Verbaten. Tencent is not affiliated with, associated with, sponsoring or endorsing Wildshard.",
   "s_update_next_boundary": "New version · reload",
   "s_update_next_boundary_dev": "new ⟦0⟧ · reload",
   "s_update_confirm": "Confirm reload",

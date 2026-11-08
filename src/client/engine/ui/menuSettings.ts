@@ -7,7 +7,7 @@ import { buildSavePanel } from './SavePanel';
 import { app } from '../app/runtime';
 import type { LevelSpec } from '../../../shared/engine/level/spec';
 import { getSetting, setSetting, onSetting, getNumber, setNumber, NUM_RANGE, getSfxSet, type SettingKey, type NumberKey } from './Settings';
-import { MUSIC_CREDIT, sfxCredit, onSfxCredit } from '../audio/credits';
+import { MODEL_CREDIT, MUSIC_CREDIT, sfxCredit, onSfxCredit } from '../audio/credits';
 import { CAN_VIBRATE } from './haptics';
 import { lockReview, onReview, quickNote, reviewUnlocked, setQuickNote, unlockReview } from './review';
 import { isDev, onDev } from '../core/devMode';
@@ -129,7 +129,7 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     const sfxNote = el('ws-gmenu-note');
     const paintCredit = () => { const c = sfxCredit(getSfxSet()); sfxNote.textContent = c; sfxNote.hidden = c === ''; };
     paintCredit(); onSfxCredit(paintCredit);
-    const audio = [cats.head(el('ws-gmenu-label', engineString('s_bc1b88907d3b'))), vol, mus, buildMusicStyleRow(host.scope), el('ws-gmenu-note', MUSIC_CREDIT), sfxNote];
+    const audio = [cats.head(el('ws-gmenu-label', engineString('s_bc1b88907d3b'))), vol, mus, buildMusicStyleRow(host.scope), el('ws-gmenu-note', MUSIC_CREDIT), sfxNote, el('ws-gmenu-note', MODEL_CREDIT)];
     p.append(...audio); cats.tag('audio', ...audio);
     // lock-on (E50, src/client/engine/player/LockOnTarget.ts): how hard the view follows a locked enemy (Gentle = Jake's pick; Off keeps the
     // lock — the reticle, orbit strafing, the lunge, switching — but never turns the view: the motion-sickness escape)

@@ -24,7 +24,7 @@ import { devSwitchRows } from './devSwitch';
 import { foldCard } from './cards';
 import { buildDebugMenu, type DebugMenu } from './DebugMenu';
 import { TITLE_SKIPPERS } from './debugOptions';
-import { MUSIC_CREDIT, sfxCredit } from '../audio/credits';
+import { MODEL_CREDIT, MUSIC_CREDIT, sfxCredit } from '../audio/credits';
 import { BOOT_OPTIONS, getSfxSet, pendingReload, saveSetting, savedSetting, settingFromUrl, settingParams, settingsReloadUrl, type OptionKey, type OptionValue } from './Settings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
 import { buildOfflineRow } from './offlineDownload';
@@ -150,7 +150,7 @@ function build(): HTMLElement {
   p.append(status); actions.append(apply); body.after(actions);
   // credits (E64 — Jake: "get that music attribution out of here and move it to a dedicated credits page"): the title used to
   // print them under the cards; they live here now, and in the pause menu ▸ Settings ▸ Audio next to the pickers
-  p.append(el('ws-gmenu-label', engineString('s_2a6b24ad2872')), ...[MUSIC_CREDIT, sfxCredit(getSfxSet())].filter((t) => t !== '').map((t) => words('ws-gmenu-note', t)));
+  p.append(el('ws-gmenu-label', engineString('s_2a6b24ad2872')), ...[MUSIC_CREDIT, sfxCredit(getSfxSet()), MODEL_CREDIT].filter((t) => t !== '').map((t) => words('ws-gmenu-note', t)));
 
   listenTap(scope, apply, () => {
     debug?.applyPending(); developerTools?.applyPending();

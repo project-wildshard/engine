@@ -13,6 +13,8 @@ import { shipped } from './Stems';
 import { onOwnerDispose } from '../../../shared/engine/app/ownership';
 
 export const MUSIC_CREDIT: string = engineString('s_7fc7e56bbd7f');
+/** J201: the model provider notice is visible beside the existing credits. */
+export const MODEL_CREDIT: string = engineString('s_model_provider_notice');
 const STABILITY = engineString('s_ef691a454428');
 const NAMES: Record<Exclude<SfxSet, 'synth'>, string> = {
   best: engineString('s_9c6373f9a730'),
