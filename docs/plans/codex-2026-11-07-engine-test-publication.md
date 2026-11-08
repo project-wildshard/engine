@@ -49,6 +49,13 @@ Titan earns both phase transitions through arrows and support melee.
 The longest new case measured 7.41 seconds. The original real-clock
 save case now explains its intentional two-second tick wait in place.
 
+The full hook exposed an 11.1-second Titan case under load; 5,754
+other cases passed. Its play is now split at two actual earned save
+checkpoints into three bounded goals, seven successor cases overall.
+The full hook is required again. The gate's basename check requires
+the final publication clone at `engine-publication/engine`; the
+earlier `engine-tests-publish` clone preserves the prepared commit.
+
 Source review found nine pure scalar-law cases and one fabricated
 GLTF/Player binding case in held-weapon-laws. The three mock matches
 belong only to that last case. Its deletion remains J186 because the

@@ -165,8 +165,35 @@ test('real mounted lance steering rejects the side cone and spends a target cont
   } finally { resumed?.dispose(); live.dispose(); }
 }, 10_000);
 
-test('the Titan earns fire through real bow and support melee inputs, keeps contact cooldown and resumes spent cells', async () => {
-  const live = await open('nalati-grasslands'); let resumed: TrustedHeadlessResident | undefined;
+let titanWind: ReturnType<typeof snapshotSimHost> | undefined, titanFire: ReturnType<typeof snapshotSimHost> | undefined;
+
+// Each bounded continuation consumes the preceding actual save, never a
+// hand-built phase. Keeping the three player goals separate caps each case
+// below ten seconds even alongside the entire suite.
+function earnTitanPhase(live: TrustedHeadlessResident, goal: number): void {
+  const host = live.host, player = leadPlayer(host), mount = mountedPlayerOf(host), arena = openArenaOf(host);
+  if (mount === undefined || arena === undefined) throw new Error('Missing actual Titan continuation');
+  host.combat.playerRules(host.scope, { bossGod: true });
+  let blade = false;
+  for (let tick = 0; tick < 6000 && arena.boss.phase < goal; tick++) {
+    if (tick % 900 === 0) heldArmsOf(host)?.of(player).refill();
+    const rider = arena.boss.phase === 1 ? [...host.entities.values()].find(body => body.alive && body.kind === 'ghost-rider') : undefined;
+    const target = rider?.position.clone() ?? arena.fight.rowlessFocus(), p = player.position;
+    if (rider !== undefined) {
+      if (mount.mounted) mount.dismount();
+      if (!blade) { step(live, 1, [{ kind: 'script', actorId: 'nalati.weapon.swap', value: 1 }]); blade = true; }
+      player.resetPose({ x: target.x + 1.2, y: target.y, z: target.z }, Math.PI / 2); target.y += rider.dims.bodyY;
+    } else if (blade) { step(live, 1, [{ kind: 'script', actorId: 'nalati.weapon.swap', value: 0 }]); blade = false; }
+    const dx = target.x - p.x, dz = target.z - p.z, pitch = Math.atan2(target.y - p.y - 1.68, Math.hypot(dx, dz));
+    live.step([{ kind: 'player', moveX: 0, moveZ: 0, commandVersion: 1, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: Math.atan2(-dx, -dz), pitch,
+      ...(rider !== undefined ? tick % 24 === 0 ? { swing: true } : {} : tick % 90 < 60 ? { heavy: {} } : {}) },
+    { kind: 'script', actorId: 'nalati.weapon.aim', value: 1 }, { kind: 'script', actorId: 'nalati.weapon.pitch', value: pitch }]);
+  }
+  expect(arena.boss.phase).toBe(goal);
+}
+
+test('real mounted arrows earn the Titan wind checkpoint', async () => {
+  const live = await open('nalati-grasslands');
   try {
     const host = live.host, player = leadPlayer(host), mount = mountedPlayerOf(host), arena = openArenaOf(host);
     const product = input('nalati-grasslands').product;
@@ -179,36 +206,38 @@ test('the Titan earns fire through real bow and support melee inputs, keeps cont
     for (let tick = 0; tick < 4000 && !arena.storm(); tick++) step(live);
     expect(arena.storm()).toBe(true); press(live, 'nalati.titan.tie');
     expect(arena.fight.tied).toBe(true);
-    const setup = host.scope.child('fire-approach'); host.combat.playerRules(setup, { bossGod: true });
+    host.combat.playerRules(host.scope, { bossGod: true });
     for (let tick = 0; tick < 240 && arena.boss.state !== 'fight'; tick++) live.step([{ kind: 'script', actorId: 'nalati.titan.skip', value: 1 }]);
     expect(arena.boss.state).toBe('fight');
     mount.teleport(data.arena.center.x + 10, data.arena.center.z + 10, 0);
-    let burning = arena.fight.snapshot().fireOn;
-    let blade = false;
-    for (let tick = 0; tick < 6000 && !burning; tick++) {
-      if (tick % 900 === 0) heldArmsOf(host)?.of(player).refill();
-      const rider = arena.boss.phase === 1 ? [...host.entities.values()].find(body => body.alive && body.kind === 'ghost-rider') : undefined;
-      const target = rider?.position.clone() ?? arena.fight.rowlessFocus(), p = player.position;
-      if (rider !== undefined) {
-        if (mount.mounted) mount.dismount();
-        if (!blade) { step(live, 1, [{ kind: 'script', actorId: 'nalati.weapon.swap', value: 1 }]); blade = true; }
-        player.resetPose({ x: target.x + 1.2, y: target.y, z: target.z }, Math.PI / 2);
-        target.y += rider.dims.bodyY;
-      } else if (blade) { step(live, 1, [{ kind: 'script', actorId: 'nalati.weapon.swap', value: 0 }]); blade = false; }
-      const dx = target.x - p.x, dz = target.z - p.z;
-      live.step([{ kind: 'player', moveX: 0, moveZ: 0, commandVersion: 1, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(target.y - p.y - 1.68, Math.hypot(dx, dz)),
-        ...(rider !== undefined ? tick % 24 === 0 ? { swing: true } : {} : tick % 90 < 60 ? { heavy: {} } : {}) }, { kind: 'script', actorId: 'nalati.weapon.aim', value: 1 },
-        { kind: 'script', actorId: 'nalati.weapon.pitch', value: Math.atan2(target.y - p.y - 1.68, Math.hypot(dx, dz)) }]);
-      if (tick % 60 === 0) burning = arena.fight.snapshot().fireOn;
-    }
-    expect(burning, `actual phase ${arena.boss.phase}, heart ${arena.fight.hpFrac}, kinds ${[...host.entities.values()].filter(body => body.alive).map(body => body.kind).join(',')}`).toBe(true);
+    earnTitanPhase(live, 1); titanWind = snapshotSimHost(host);
+  } finally { live.dispose(); }
+}, 10_000);
+
+test('real support melee resumes the wind checkpoint and earns Titan fire', async () => {
+  if (titanWind === undefined) throw new Error('The actual bow input must earn the preceding checkpoint');
+  const live = await open('nalati-grasslands', titanWind);
+  try {
+    expect(live.effects).toEqual([]); earnTitanPhase(live, 2);
+    expect(openArenaOf(live.host)?.fight.snapshot().fireOn).toBe(true);
+    titanFire = snapshotSimHost(live.host);
+  } finally { live.dispose(); }
+}, 10_000);
+
+test('earned Titan fire keeps contact cooldown and resumes its spent cells', async () => {
+  if (titanFire === undefined) throw new Error('Actual support deaths must earn the preceding fire checkpoint');
+  const live = await open('nalati-grasslands', titanFire); let resumed: TrustedHeadlessResident | undefined;
+  try {
+    const host = live.host, player = leadPlayer(host), mount = mountedPlayerOf(host), arena = openArenaOf(host), product = input('nalati-grasslands').product;
+    if (mount === undefined || arena === undefined || product === undefined) throw new Error('Missing actual Titan fire continuation');
+    expect(live.effects).toEqual([]);
+    const data = await readArenaScriptData(product, { fight: 'combat/titan-fight.json', geometry: 'combat/titan-geometry.json' });
     const field = arena.fight.snapshot().field, cell = field.modes.indexOf(data.field.states.active);
     expect(cell).toBeGreaterThanOrEqual(0);
     const x = data.field.x + (cell % data.field.width + .5) * data.field.cell;
     const z = data.field.z + (Math.floor(cell / data.field.width) + .5) * data.field.cell;
     if (mount.mounted) mount.teleport(x, z, 0);
     else player.resetPose({ x, y: host.groundHeightAt(x, z), z }, 0);
-    setup.dispose();
     const contacts: number[] = [];
     host.events.on('damage.dealt', event => { if (event.req.target === player.health && event.req.toast === data.lines.burning && event.dealt > 0) contacts.push(host.state.tick); }, host.scope);
     step(live, 30); expect(contacts.length).toBeGreaterThan(0);
