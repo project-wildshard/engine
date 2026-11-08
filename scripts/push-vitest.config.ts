@@ -4,6 +4,7 @@ import {CI_SERIAL_TESTS} from './vitest-ci-files.ts';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
 import {PUSH_PROFILE,PUSH_BUDGET} from './push-budget.mjs';
 import {withTestEnvironments} from './vitest-environments.ts';
+import {PushDurationSequencer} from './push-duration-sequencer.ts';
 
 const {WS_PUSH_GATE_PROFILE:profile,WS_PUSH_TEST_PHASE:phase,WS_CPU_ADMISSION:admission}=process.env;
 if(profile!==PUSH_PROFILE||(phase!=='native'&&phase!=='ordinary'&&phase!=='admitted'))throw new Error('Missing authenticated push cohort');
@@ -13,6 +14,7 @@ assertHeavyLease('full-test');
 // cohort keeps the exact union; per-file exclusive grants protect timing proofs.
 // oxlint-disable-next-line import/no-default-export -- Vitest's config entry point.
 export default defineConfig(withTestEnvironments({...base,test:{...base.test,isolate:true,pool:'forks',
+  ...(phase==='admitted'?{sequence:{...base.test?.sequence,sequencer:PushDurationSequencer}}:{}),
   ...(phase==='native'?{include:[...CI_SERIAL_TESTS],maxWorkers:1}
     :phase==='ordinary'?{exclude:[...(base.test?.exclude??[]),...CI_SERIAL_TESTS],maxWorkers:PUSH_BUDGET.workers}
       :{maxWorkers:PUSH_BUDGET.workers})}}));
