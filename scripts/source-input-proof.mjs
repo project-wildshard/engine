@@ -4,7 +4,7 @@ import {createHash,randomBytes} from 'node:crypto';
 import {existsSync,mkdirSync,readFileSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {dirname,isAbsolute,resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {InputHashMemo} from './bake-input-hashes.mjs';
+import {InputHashMemo} from './input-hash-memo.mjs';
 import * as v from 'valibot';
 
 const path=v.pipe(v.string(),v.check(value=>value.length>0&&!isAbsolute(value)&&!value.includes('\\')&&value.split('/').every(part=>part!==''&&part!=='.'&&part!=='..')));
@@ -15,7 +15,7 @@ const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('h
 
 /** Missing, partial, crossed or changed evidence always refuses reuse.
  * @param {string} file @param {string} identity
- * @param {import('./bake-input-hashes.mjs').InputHashMemo} memo @param {string[]} outputs */
+ * @param {import('./input-hash-memo.mjs').InputHashMemo} memo @param {string[]} outputs */
 export function verifiedSourceSnapshot(file,identity,memo,outputs) {
   try {
     const saved=v.parse(Snapshot,JSON.parse(readFileSync(file,'utf8')));
@@ -32,7 +32,7 @@ export function verifiedSourceSnapshot(file,identity,memo,outputs) {
 
 /** Publish only after the complete phase and its source verification pass.
  * @param {string} file @param {string} identity
- * @param {import('./bake-input-hashes.mjs').InputHashMemo} memo
+ * @param {import('./input-hash-memo.mjs').InputHashMemo} memo
  * @param {Record<string,string>} outputs */
 export function publishSourceSnapshot(file,identity,memo,outputs) {
   const source=memo.snapshotData();memo.verifyInputs(outputs);

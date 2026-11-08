@@ -1,4 +1,4 @@
-import type {InputHashMemo} from './bake-input-hashes.mjs';
+import type {InputHashMemo} from './input-hash-memo.mjs';
 /** Current bytes/inventories must match every sealed local-phase observation. */
 export function verifiedSourceSnapshot(file:string,identity:string,memo:InputHashMemo,outputs:string[]):boolean;
 /** Verify the completed phase before atomically publishing local evidence. */
