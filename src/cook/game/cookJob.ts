@@ -60,8 +60,12 @@ function admit(tarball: Uint8Array, cap: number): ValidatedProduct {
 }
 
 /** A failed proof is a verdict on these bytes: another try walks the same lanes. A dead child never reaches this. */
-async function proved(product: ValidatedProduct, ports: CookJobPorts): Promise<SimulationProof> {
-  try { return await ports.prove(product.shard, product.assets, product.sections); }
+async function proved(product: ValidatedProduct, ports: CookJobPorts): Promise<SimulationProof | 'unmeasured'> {
+  try {
+    const proof = await ports.prove(product.shard, product.assets, product.sections);
+    // A successful empty traversal is not evidence that gameplay was exercised.
+    return proof.ticks > 0 && proof.lanes > 0 && proof.steps > 0 ? proof : 'unmeasured';
+  }
   catch (error) { throw new ShardfileRefusedError(error instanceof Error ? error.message : 'Simulation proof failed', {cause: error}); }
 }
 

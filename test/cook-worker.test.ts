@@ -50,7 +50,7 @@ describe('the cook worker', () => {
     const row = await cook.cook({slug, hash});
     expect(row.state, row.detail).toBe('cooked');
     const index = JSON.parse(new TextDecoder().decode(await store.get(indexKey('b1', hash)))) as CookIndex;
-    expect(index).toMatchObject({version: 1, build: 'b1', slug, hash, proof: 'proved'});
+    expect(index).toMatchObject({version: 1, build: 'b1', slug, hash, proof: 'unmeasured'});
     expect(index.manifests).toHaveLength(4);
     for (const key of index.keys) expect(await store.has(key), key).toBe(true);
     expect(index.keys.filter(key => key.endsWith('.pack.br')).length).toBeGreaterThan(0);
