@@ -49,7 +49,11 @@ class BrowserAdmissionTests(unittest.TestCase):
                      "elif 'etime=' in sys.argv: print('00:01')\n")
 
     def portable_environment(self):
-        self.command('ps', 'pass\n')
+        # This fake reports no processes. Avoid starting Python for every
+        # empty ps scan while four real kernel-lease supervisors are held.
+        empty_ps = self.bin / 'ps'
+        empty_ps.write_text('#!/bin/sh\nexit 0\n')
+        empty_ps.chmod(0o755)
         # Model a host without BSD lockf, while using real kernel flock locks.
         shell = self.root / 'bash-env'
         shell.write_text('''command() {
