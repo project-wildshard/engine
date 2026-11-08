@@ -11,6 +11,7 @@ import {linkNodeModules} from './link-node-modules.mjs';
 import {browserPool} from './parity/pool.mjs';
 import {serve} from './parity/serve.mjs';
 import {bootCase} from './parity/boot-smoke.mjs';
+import {uncataloguedShardCase} from './uncatalogued-shard-proof.mjs';
 
 await import('./bake-loader.mjs');
 const {folderStore} = await import('../src/cook/game/packStore.ts');
@@ -78,7 +79,9 @@ try {
   const keys=new Set(receipt.indexes.filter(row=>added.includes(row.slug)).flatMap(row=>row.keys));
   if(fetched.size===0)throw new Error('No cooked part reached the page');
   for(const key of fetched)if(!keys.has(key))throw new Error(`Page fetched outside this cook: ${key}`);
-  const proof={sha,build,added,fetched:[...fetched],results};
+  const refusals=[];
+  for(const slug of ['template','not-in-this-catalogue'])refusals.push(await uncataloguedShardCase(browser,preview.url,slug));
+  const proof={sha,build,added,fetched:[...fetched],results,refusals};
   writeFileSync(join(out,'cook-to-play.json'),JSON.stringify(proof));console.log(JSON.stringify(proof));
 } finally {
   writeFileSync(join(out,'store-requests.json'),JSON.stringify(fetches));
