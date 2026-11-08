@@ -3,10 +3,12 @@
 // Run through scripts/browser-lane.sh; uses production bytes and real workers.
 import assert from 'node:assert/strict';
 import { resolve as resolvePath } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { chromium, webkit, devices } from 'playwright';
 import { serve } from './parity/serve.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { bootTimingDelay } from './parity/boot-timing-delay.mjs';
+import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 
 /** @param {string} name */
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -30,8 +32,16 @@ const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'suns
 const swDelay=delayKind==='sw-open'||delayKind==='sw-put';
 const controlled = option('sw') === 'warm' || swDelay;
 const preview = await serve(root, '', true);
+const expectedBuild=option('expect-build');
 const proxy=delayKind!==undefined && (swDelay||delayKind==='server')?await bootTimingDelay(preview.url,delayKind,delayMs):undefined;
 try {
+if(expectedBuild!==undefined) {
+  assert.match(expectedBuild,/^[0-9a-f]{40}$/);
+  assert.equal(execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),expectedBuild,'checkout does not name the pushed SHA');
+  assert.equal(execFileSync('git',['-C',root,'status','--porcelain=v1'],{encoding:'utf8'}).trim(),'','pushed-build proof requires a clean source tree');
+  const version=/** @type {unknown} */(await (await fetch(`${preview.url}/version.json`)).json());
+  assert.ok(typeof version==='object'&&version!==null&&'build' in version&&typeof version.build==='string'&&version.build.startsWith(`${expectedBuild.slice(0,7)}-`),'preview does not name the pushed build');
+}
   const pick=option('browser')??'both';assert.ok(['both','chromium','webkit'].includes(pick));
   for (const name of ['chromium','webkit'].filter(browserName=>pick==='both'||pick===browserName)) {
     const engine=name==='chromium'?chromium:webkit;
@@ -134,6 +144,11 @@ try {
           assert.ok(messages.first<=messages.last&&Object.keys(messages.kinds).length<=33);
         }
         assert.ok(await page.evaluate(()=>{const owner=/** @type {import('./types/worker-page').WorkerWindow} */(window);return Boolean(owner.__wildshard.shard.grid.state().live?.live?.gameplayReady);}),'grid did not reach gameplay readiness');
+        await page.evaluate(FLOOR_GRID_ENTER);
+        await page.waitForFunction(()=>{const owner=/** @type {import('./types/worker-page').WorkerWindow} */(window);return typeof owner.__workerClient==='function'&&owner.__workerClient().frames>=30&&owner.__wildshard.shard.grid.state().cellLoading===null;},undefined,{timeout:90000});
+        const entered=await page.evaluate(()=>{const owner=/** @type {import('./types/worker-page').WorkerWindow} */(window),state=owner.__wildshard.shard.grid.state(),report=owner.__workerClient();return {home:state.home,playing:state.cells.find(cell=>cell.shows==='playing')?.instance,board:state.cellLoading,frames:report.frames,closed:report.closed};});
+        assert.equal(entered.playing,entered.home,'fresh grid did not enter its home');assert.equal(entered.closed,null);
+        console.log(`${name}: entered ${entered.playing}, home board=${entered.board}, frames=${entered.frames}, pushed=${expectedBuild??'candidate'}`);
       }
       const failures=timing.entries.filter(row=>row.operation.endsWith(':failure')).map(row=>row.detail.message);
       for (const operation of ['app:html-script-start','app:collector-installed','app:shell-dom-ready','app:entry-body',
