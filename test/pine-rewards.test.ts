@@ -48,6 +48,12 @@ beforeAll(async () => {
   input = { product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
   rosterStep = (await product.json('actors/roster.json') as { step: string }).step;
 });
+// The first grid case otherwise owns the cold road bake inside its gameplay
+// deadline. Prepare that same real fixture once; reward case clocks stay put.
+beforeAll(async () => {
+  const started = performance.now(), strips = await bakedGridCollision();
+  console.info(`Pine grid fixture: ${strips.length} real strips prepared in ${(performance.now() - started).toFixed(0)} ms`);
+}, 60_000);
 async function boot(storage: PageStorage, lone?: true, identity?: string, refused?: (error: unknown) => void) {
   const control = new MessageChannel(), game = new MessageChannel();
   let grid: StandaloneGrid | undefined;

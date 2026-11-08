@@ -13,13 +13,15 @@ const read = (root: string): readonly GridCollisionStrip[] => readGridCollision(
 
 /** CI packs its test products before the app build, so a test job holds no bake: the bake runs here, on those products. */
 async function bake(): Promise<readonly GridCollisionStrip[]> {
-  if (existsSync('out/.app/grid-collision/strips.json')) return read('.');
+  // An owned output root exercises the real cold bake on a warm checkout.
+  const coldRoot = process.env['GRID_PROOF_COLD_ROOT'];
+  if (coldRoot === undefined && existsSync('out/.app/grid-collision/strips.json')) return read('.');
   mkdirSync('tmp', { recursive: true });
-  const root = mkdtempSync(resolve('tmp', 'grid-collision-'));
+  const root = coldRoot ?? mkdtempSync(resolve('tmp', 'grid-collision-'));
   try {
-    await promisify(execFile)(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs', root], { maxBuffer: 64 * 1024 * 1024 });
+    await promisify(execFile)(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs', root], { maxBuffer: 64 * 1024 * 1024, timeout: 55_000 });
     return read(root);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { if (coldRoot === undefined) rmSync(root, { recursive: true, force: true }); }
 }
 
 let baked: Promise<readonly GridCollisionStrip[]> | undefined;

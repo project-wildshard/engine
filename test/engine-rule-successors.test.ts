@@ -168,6 +168,7 @@ test('real mounted lance steering rejects the side cone and spends a target cont
 let titanFight: ReturnType<typeof snapshotSimHost> | undefined;
 let titanWind: ReturnType<typeof snapshotSimHost> | undefined, titanFire: ReturnType<typeof snapshotSimHost> | undefined;
 let titanArrows: ReturnType<typeof snapshotSimHost> | undefined, titanWindAt: number | undefined;
+let titanSupport: ReturnType<typeof snapshotSimHost> | undefined, titanSupportHp: number | undefined, titanRiderChip: number | undefined;
 let titanContact: ReturnType<typeof snapshotSimHost> | undefined, titanBurning: ReturnType<typeof snapshotSimHost> | undefined;
 let titanSpent: ReturnType<typeof snapshotSimHost> | undefined, titanFireCell: { cell: number; active: number; spent: number } | undefined;
 
@@ -194,7 +195,12 @@ function earnTitanPhase(live: TrustedHeadlessResident, goal: number, health?: nu
     { kind: 'script', actorId: 'nalati.weapon.aim', value: 1 }, { kind: 'script', actorId: 'nalati.weapon.pitch', value: pitch }]);
   }
   if (health === undefined) expect(arena.boss.phase).toBe(goal);
-  else { expect(arena.fight.hpFrac).toBeLessThanOrEqual(health); expect(arena.boss.phase).toBe(goal - 1); }
+  else {
+    expect(arena.fight.hpFrac).toBeLessThanOrEqual(health); expect(arena.boss.phase).toBe(goal - 1);
+    // Save a real weapon selection too: the last rider can die while the
+    // blade is still held, before the ordinary loop switches back to bow.
+    if (goal === 2) step(live, 1, [{ kind: 'script', actorId: 'nalati.weapon.swap', value: 0 }]);
+  }
 }
 
 test('real mounted entry earns the Titan fight checkpoint', async () => {
@@ -205,6 +211,7 @@ test('real mounted entry earns the Titan fight checkpoint', async () => {
     if (mount?.mountables[0] === undefined || arena === undefined || product === undefined) throw new Error('Missing actual Titan world');
     const data = await readArenaScriptData(product, { fight: 'combat/titan-fight.json', geometry: 'combat/titan-geometry.json' });
     titanWindAt = data.phases[1]?.at;
+    titanRiderChip = data.tuning.riderChip;
     step(live, 120);
     const horse = mount.mountables[0]; player.resetPose(horse.position, horse.yaw); expect(mount.mount(horse.entityId)).toBe(true);
     const cairn = arena.fight.cairnSpot(); mount.teleport(cairn.x, cairn.z, 0);
@@ -229,17 +236,22 @@ for (const quarter of [1, 2, 3, 4]) test(`real mounted arrows earn and resume Ti
     expect(openArenaOf(live.host)?.boss.state).toBe('fight');
     earnTitanPhase(live, 1, quarter === 4 ? undefined : 1 - (1 - titanWindAt) * quarter / 4);
     titanArrows = snapshotSimHost(live.host);
-    if (quarter === 4) titanWind = titanArrows;
+    if (quarter === 4) { titanWind = titanArrows; titanSupportHp = openArenaOf(live.host)?.fight.hpFrac; }
   } finally { live.dispose(); }
 }, 10_000);
 
-test('real support melee resumes the wind checkpoint and earns Titan fire', async () => {
-  if (titanWind === undefined) throw new Error('The actual bow input must earn the preceding checkpoint');
-  const live = await open('nalati-grasslands', titanWind);
+for (const goal of [1, 2, 3, 4]) test(`real support melee earns and resumes Titan rider checkpoint ${goal}/4`, async () => {
+  const saved = goal === 1 ? titanWind : titanSupport;
+  if (saved === undefined || titanSupportHp === undefined || titanRiderChip === undefined) throw new Error('Actual combat must earn the preceding checkpoint');
+  const live = await open('nalati-grasslands', saved);
   try {
-    expect(live.effects).toEqual([]); earnTitanPhase(live, 2);
-    expect(openArenaOf(live.host)?.fight.snapshot().fireOn).toBe(true);
-    titanFire = snapshotSimHost(live.host);
+    expect(live.effects).toEqual([]);
+    earnTitanPhase(live, 2, goal === 4 ? undefined : titanSupportHp - titanRiderChip * (goal - .5));
+    titanSupport = snapshotSimHost(live.host);
+    if (goal === 4) {
+      expect(openArenaOf(live.host)?.fight.snapshot().fireOn).toBe(true);
+      titanFire = titanSupport;
+    }
   } finally { live.dispose(); }
 }, 10_000);
 
