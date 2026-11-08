@@ -1251,6 +1251,7 @@
     "src/shared/engine/boot/steps.ts": "shared",
     "src/shared/engine/boot/tables.ts": "shared",
     "src/shared/engine/boot/timeline.ts": "shared",
+    "src/shared/engine/boot/serverProgress.ts": "shared",
     "src/shared/engine/boot/timing.ts": "shared",
     "src/shared/engine/boot/workerTiming.ts": "shared",
     "src/shared/engine/boot/waits.ts": "shared",

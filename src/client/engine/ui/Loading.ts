@@ -1,5 +1,6 @@
 import { uiScope, mountUi } from './ownership';
 import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
+import { serverBootProgress } from '../../../shared/engine/boot/serverProgress';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import {app} from '../app/runtime';
 import { engineString } from '../../../shared/engine/strings';
@@ -220,6 +221,8 @@ export class Loading {
     this.paintPhases();
     this.tickClock();
     this.clockScope.interval(CLOCK_MS, () => { this.tickClock(); });
+    const unsubscribe = bootTiming()?.subscribe?.(() => { this.readServerProgress(); });
+    if (unsubscribe !== undefined) this.clockScope.onDispose(unsubscribe);
   }
 
   /** Read application-owned disk-prefetch progress without changing this attempt's wire accounting. */
@@ -454,6 +457,21 @@ export class Loading {
     });
   }
 
+  /** Actual collector events publish even if a worker boots between clock ticks. */
+  private readServerProgress(): void {
+    // LS7: the worker's completed internal work is already in the collector.
+    // Sampling it cannot mint work; a quiet/failed worker leaves the count fixed.
+    const server = this.timeline.snapshot().rows.find(row => row.key === 'server' && row.state === 'on');
+    const timing = bootTiming();
+    if (server?.startedAt !== undefined && timing !== undefined) {
+      const progress = serverBootProgress(timing, server.startedAt);
+      this.timeline.report('server', progress.detail, progress.done, progress.total);
+      setData(this.root, 'serverSteps', String(progress.steps));
+      setData(this.root, 'serverFiles', String(progress.files));
+      setData(this.root, 'serverBytes', String(progress.bytes));
+    }
+  }
+
   private tickClock(): void {
     const now = this.readyAt >= 0 ? this.readyAt : performance.now();
     // The clock is one text node, sampled at its displayed precision without another animation-frame chain.
@@ -465,6 +483,7 @@ export class Loading {
     const step = this.view?.step ?? this.admission?.phase ?? '';
     if (step === this.lastPaintStep && now - this.lastPaintAt < PAINT_MS) return;
     this.lastPaintAt = now; this.lastPaintStep = step;
+    this.readServerProgress();
     // Refresh explicit producer progress and the elapsed clock during quiet waits.
     if (this.view !== null) this.view = { ...this.view, setup: this.setupProgress() };
     this.dirty = true;

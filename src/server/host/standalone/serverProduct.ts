@@ -112,6 +112,7 @@ export async function fetchServerProduct(base: string, rapier: Rapier, held?: He
     if (file === undefined) throw new Error('Undeclared server input');
     const bytes = await read(file.path);
     if (bytes.length !== file.bytes || await contentHash(bytes) !== file.hash) throw new Error('Server input hash or size mismatch');
+    bootProgress('server:verified-input-bytes', bytes.byteLength, null, 'verified-input-bytes');
     return bytes;
   });
   const product = shardProductData(shard, root, verified, !built, built, nodeNamedJsonCheck, { files: true });
