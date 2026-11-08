@@ -88,7 +88,7 @@ async function main(){
   const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
   if(!generated.ok){process.exitCode=1;return;}
   const result=await parallelChecks([
-    {name:'typecheck (kit + layers)',commands:[['pnpm','run','--silent','typecheck:kit'],['pnpm','exec','tsc','-b','tsconfig.layers.json','--builders',String(PUSH_BUDGET.builders)]]},
+    {name:'typecheck (kit + layers)',commands:[['pnpm','run','--silent','typecheck:kit'],['pnpm','exec','npr','tsc','-b','tsconfig.layers.json','--builders',String(PUSH_BUDGET.builders)]]},
     {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
     {name:'format:check',commands:[['pnpm','run','--silent','format:check']]},
     {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
