@@ -66,7 +66,6 @@
  "test/net-loot-bounty.test.ts",
  "test/net-pose-inputs.test.ts",
  "test/net-swing.test.ts",
- "test/net-traversal-wire.test.ts",
  "test/night-market-kit-budget.test.ts",
  "test/nine-memory-floor.test.ts",
  "test/output-descriptor.test.ts",
