@@ -101,6 +101,8 @@ export interface CookedShard {
   readonly discovery?: Uint8Array;
   /** Its row of the server pack book, when it has a server class. */
   readonly server?: unknown;
+  /** Whether this cook actually published the optional recorded-program file. */
+  readonly entryPrograms?: boolean;
 }
 
 /** A catalogue shard this build has no code or table for, once its packs exist: each table a page reads names it, in files
@@ -111,7 +113,7 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
   let html = readFileSync(file, 'utf8');
   const expression = /(<script type="application\/json" id="boot-module-files">)([^<]+)(<\/script>)/u, match = expression.exec(html);
   if (match?.[2] === undefined) throw new Error('Missing entry module bank');
-  const bank = JSON.parse(match[2]) as {spawnManifests: {client: Record<string, Record<string, unknown>>; home?: PackHome}};
+  const bank = JSON.parse(match[2]) as {entryPrograms?: Record<string, boolean>; spawnManifests: {client: Record<string, Record<string, unknown>>; home?: PackHome}};
   const bookFile = join(outDir, packsBookPath(build)), book = JSON.parse(readFileSync(bookFile, 'utf8')) as {client?: Record<string, Record<string, unknown>>};
   const verdicts: unknown[] = [];
   for (const shard of shards) {
@@ -122,6 +124,7 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
     };
     const pick = (set: 'entry' | 'whole'): Record<string, unknown> => Object.fromEntries(shard.manifests.filter(row => row.set === set).map(row => [row.tier, address(row)]));
     bank.spawnManifests.client[shard.slug] = pick('entry');
+    if (shard.entryPrograms !== undefined) (bank.entryPrograms ??= {})[shard.slug] = shard.entryPrograms;
     (book.client ??= {})[shard.slug] = pick('whole');
     verdicts.push(shard.verdict);
   }
@@ -193,7 +196,8 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
       for (const key of index.keys) if (key.startsWith('assets/spawn/server/')) await copy(key, out);
       const proved = await productVerdict(await read(head.hash), out);
       const server = index.serverPack?.index.slice(1);
-      added.push({slug: index.slug, hash: head.hash, header: index.header, manifests: index.manifests, ...proved,
+      added.push({slug: index.slug, hash: head.hash, header: index.header, manifests: index.manifests,
+        entryPrograms: index.keys.includes(`programs/${index.slug}.json`), ...proved,
         ...(server === undefined ? {} : {server: JSON.parse(new TextDecoder().decode(await need(server))) as unknown})});
     }
     if (added.length > 0) {

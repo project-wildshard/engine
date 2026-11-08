@@ -43,7 +43,9 @@ import { HorizonMatte } from '@wildshard/engine/world/HorizonMatte';
 
 /** DL10: the shard's recorded entry programs (`scripts/bake-entry-programs.mjs`), or null when it has none. */
 async function bakedEntryPrograms(slug: string): Promise<BakedPrograms | null> {
-  const response = await fetch(new URL(`programs/${slug}.json`, shardPackBase(slug)));
+  const base = shardPackBase(slug);
+  if (base === null) return null;
+  const response = await fetch(new URL(`programs/${slug}.json`, base));
   if (!response.ok) return null;
   const data: unknown = await response.json();
   if (typeof data !== 'object' || data === null || !('version' in data) || data.version !== 2 || !('lines' in data) || !('shaders' in data)
