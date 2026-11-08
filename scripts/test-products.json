@@ -344,7 +344,6 @@
   "test/boss-arena-room.test.ts": [],
   "test/grapple-platform.test.ts": [],
   "test/nalati-layout-bake.test.ts": [],
-  "test/data-map-painter.test.ts": [],
   "test/template-map-generation.test.ts": [
     "_template"
   ],
