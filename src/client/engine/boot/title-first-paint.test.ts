@@ -39,6 +39,24 @@ function firstDocument(search: string, frames?: Frames, developer = false, hando
   return window;
 }
 
+test('a split document cannot expose a loading card before its real arrival metadata is applied', () => {
+  const window = new Window({ url: 'https://launch.test/?chunk=driftwood-isle', settings: {
+    enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
+    enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true,
+  } });
+  windows.push(window);
+  window.sessionStorage.setItem(`wildshard.save.v2@${saveEpoch}.session`, JSON.stringify({keys: {titleArrival: {data: {
+    slug: 'driftwood-isle', name: 'Saved destination', art: '/assets/saved-destination.jpg', mode: 'enter', at: Date.now(),
+  }}}}));
+  const split = html.indexOf('<script data-loading-clock>');
+  expect(split).toBeGreaterThan(0);
+  window.document.open(); window.document.write(html.slice(0, split));
+  expect(window.document.querySelector('.ws-load')).toBeNull();
+  window.document.write(html.slice(split)); window.document.close();
+  expect(window.document.querySelector('.ws-load [data-el="slug"]')?.textContent).toBe('Saved destination');
+  expect(window.document.documentElement.style.getPropertyValue('--ws-load-portrait')).toContain('/assets/saved-destination.jpg');
+});
+
 test('plain launch paints only the approved hero and WILDSHARD, the launch image\'s own art, without application modules', () => {
   const window = firstDocument(''), panel = window.document.querySelector('[data-title-shell]');
   if (panel === null) throw new Error('Missing inline title');

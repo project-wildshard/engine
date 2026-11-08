@@ -142,7 +142,7 @@ test('DL18: a warm visit answers every packed member from the held-parts index, 
   }
 });
 
-test('a cache too big to list still answers held parts: each member is proved on its own and nothing refetches', async () => {
+test('warm packed reads verify every member without enumerating native cache keys', async () => {
   const disk = new Map<string, Response>(), reads: string[] = [];
   let index: HeldParts = {};
   const ports = (keys: () => Promise<ReadonlySet<string>>) => ({packs: true, whole: true,
@@ -156,10 +156,46 @@ test('a cache too big to list still answers held parts: each member is proved on
     }});
   await downloadSpawnManifest(address, ports(() => Promise.resolve(new Set(disk.keys()))), base).ready;
   reads.length = 0;
-  const warm = downloadSpawnManifest(address, ports(() => Promise.reject(new DOMException('Operation too large', 'UnknownError'))), base);
+  let scans = 0;
+  const warm = downloadSpawnManifest(address, ports(() => { scans++; return Promise.reject(new DOMException('Operation too large', 'UnknownError')); }), base);
   await warm.ready;
   expect(reads).not.toContain(part.url);
   expect(warm.snapshot().complete).toBe(true);
+  expect(scans).toBe(0);
+});
+
+test('quota-denied manifest or member publication keeps verified network bytes usable without cached credit', async () => {
+  for (const failing of ['manifest', 'member']) {
+    const reads: string[] = [];
+    let attempts = 0, indexes = 0;
+    const denied = (): Promise<void> => { attempts++; return Promise.reject(new DOMException('Disk full', 'QuotaExceededError')); };
+    const download = downloadSpawnManifest(address, {
+      packs: true, whole: true, cached: () => Promise.resolve(undefined),
+      store: failing === 'manifest' ? denied : () => Promise.resolve(), keep: denied,
+      held: {read: () => Promise.resolve({}), write: () => { indexes++; return Promise.resolve(); }},
+      fetch: url => {
+        const path = new URL(url).pathname; reads.push(path);
+        return Promise.resolve(new Response(path === address.url ? text : path === part.url ? partBytes : body(path)));
+      },
+    }, base);
+    await download.ready;
+    expect(download.snapshot()).toMatchObject({complete: true, cachedBytes: 0, completedBytes: 12, filesDone: 3, error: null, parts: {failed: 0}});
+    expect(attempts).toBe(1); expect(indexes).toBe(0);
+    expect(reads.filter(path => path === part.url)).toHaveLength(1);
+    const member = await window.fetch(new URL(glb.url, base).href);
+    expect(new Uint8Array(await member.arrayBuffer())).toEqual(new Uint8Array(5).fill(2));
+    releaseSpawnMembers();
+  }
+});
+
+test('non-quota cache publication faults remain explicit download failures', async () => {
+  const download = downloadSpawnManifest(address, {
+    packs: true, cached: () => Promise.resolve(undefined),
+    store: () => Promise.reject(new TypeError('Broken cache protocol')),
+    fetch: () => Promise.resolve(new Response(text)),
+  }, base);
+  await expect(download.ready).rejects.toThrow('Broken cache protocol');
+  expect(download.snapshot()).toMatchObject({complete: false, filesDone: 0, error: 'Broken cache protocol'});
 });
 
 test('DL15: on the packs path the wire facts are the parts\' q11 bodies plus the loose files', async () => {

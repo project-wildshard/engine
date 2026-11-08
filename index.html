@@ -472,7 +472,7 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
     <div id="hud"></div>
     <div id="ws-top-edge" aria-hidden="true"></div>
     <!-- the loading panel from the first HTML bytes (src/client/engine/boot/shell.ts — test/shell.test.ts keeps the two identical); src/client/engine/ui/Loading.ts adopts it -->
-    <div class="ws-load" data-shell><div class="ws-load-head">
+    <template id="ws-loading-shell"><div class="ws-load" data-shell><div class="ws-load-head">
 <div class="ws-wordmark">Project <b>Wildshard</b></div>
 <div class="ws-load-tagline">A world that does not exist yet, arriving one chunk at a time.</div>
 </div>
@@ -500,13 +500,14 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 </div>
 </div>
 </div>
-<div class="ws-load-foot"><span data-el="foot"></span><button type="button" class="ws-load-retry" data-el="retry" hidden>Retry</button></div></div>
+<div class="ws-load-foot"><span data-el="foot"></span><button type="button" class="ws-load-retry" data-el="retry" hidden>Retry</button></div></div></template>
     <!-- data-loading-first-paint: buildIdentity.mjs keeps Vite's hoisted sheet non-blocking for this shell -->
     <script data-loading-first-paint>
       // RL3 (Jake: "reload should just reload the page"): one self-reload. A page whose entry modules have not arrived 12 s
       // after it started (no data-booted: a hung module fetch) reloads once a session; a slow boot that runs is left alone.
       setTimeout(() => {
-        if (document.documentElement.hasAttribute('data-booted') || !document.querySelector('[data-title-shell]') || !document.querySelector('.ws-load[data-shell]')) return;
+        const pending = document.getElementById('ws-loading-shell');
+        if (document.documentElement.hasAttribute('data-booted') || !document.querySelector('[data-title-shell]') || !(document.querySelector('.ws-load[data-shell]') || pending instanceof HTMLTemplateElement && pending.content.querySelector('.ws-load[data-shell]'))) return;
         try { // the session save key boot.selfReload (src/client/engine/saves/slots.ts), shared with stuck.ts's one retry
           const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@1.session') || '{"keys":{}}');
           if (doc.keys?.['boot.selfReload']) return;
@@ -518,8 +519,12 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
     <script data-loading-clock>
       // DL21 (E526): before any module arrives, a world page's card runs its clock from the title tap (the fresh arrival the
       // tap stored) and names the shard and tier; Loading adopts the card (data-shell goes) and keeps the same clock.
-      (() => { try {
-        const card = document.querySelector('.ws-load[data-shell]'), slug = new URLSearchParams(location.search).get('chunk');
+      (() => {
+        // Apply the existing arrival metadata to a detached card. No parser or
+        // network yield can paint the default place before this atomic insert.
+        const template = document.getElementById('ws-loading-shell');
+        try {
+        const card = template instanceof HTMLTemplateElement ? template.content.querySelector('.ws-load[data-shell]') : document.querySelector('.ws-load[data-shell]'), slug = new URLSearchParams(location.search).get('chunk');
         const field = name => card.querySelector('[data-el="' + name + '"]'), entry = (store, scope, key) => { try { const item = JSON.parse(store().getItem('wildshard.save.v2@1.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; } catch { return null; } };
         if (!card || !slug) return;
         const found = [entry(() => sessionStorage, 'session', 'titleArrival'), entry(() => localStorage, 'device', 'titleArrival.once')].find(a => a?.slug === slug && Date.now() - a.at < 60000);
@@ -555,7 +560,8 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
           card.dataset.step = 'start.' + (steps.find(op => !done.includes(op)) || 'hand-off');
         };
         paint(); startPaint(); const tick = setInterval(() => { if (card.hasAttribute('data-shell')) { paint(); startPaint(); } else clearInterval(tick); }, 100);
-      } catch { /* the module's clock (shell.ts startShellClock) still runs */ } })();
+      } catch { /* the module's clock (shell.ts startShellClock) still runs */ }
+      finally { if (template instanceof HTMLTemplateElement) template.replaceWith(template.content); } })();
     </script>
     <!-- rotate gate (E38): portrait only on phones — a touch device held landscape sees only this (rotate.css, src/client/engine/ui/RotateGate.ts) -->
     <div class="ws-rotate" role="alertdialog" aria-modal="true" aria-label="Rotate to portrait"><div class="ws-rotate-panel">

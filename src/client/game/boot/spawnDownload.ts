@@ -1,6 +1,6 @@
 import {packsBookPath, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
-import { bootProgress,bootTiming } from '@wildshard/engine/boot/timing';
+import { bootMark,bootProgress,bootTiming } from '@wildshard/engine/boot/timing';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -42,9 +42,8 @@ export interface SpawnDownloadPorts {
   readonly keep?: (url: string, response: Response) => Promise<void>;
   /** Runtime packs: the manifest must be a whole-level one, which always carries its part table (sp-x9). */
   readonly whole?: boolean;
-  /** DL18: the held-parts index beside Cache Storage (part hash → the member URLs `keep` stored from it) and the
-   * cache's keys. A part whose members are all listed and still keyed is held: its members credit without a lookup. */
-  readonly held?: {readonly read: () => Promise<HeldParts>; readonly write: (index: HeldParts) => Promise<void>; readonly keys: () => Promise<ReadonlySet<string>>};
+  /** A non-authoritative packed-member hint. Every member still passes its own native response/length check. */
+  readonly held?: {readonly read: () => Promise<HeldParts>; readonly write: (index: HeldParts) => Promise<void>};
 }
 export type HeldParts = Readonly<Record<string, readonly string[]>>;
 
@@ -270,6 +269,19 @@ const CHECK_STEPS = 50;
  * worker-cache response credits immediately without reading/checksumming it. */
 export function downloadSpawnManifest(address: SpawnManifestAddress, ports: SpawnDownloadPorts, base: string, packs: string = base): SpawnDownload {
   const controller = new AbortController(), listeners = new Set<(snapshot: SpawnDownloadSnapshot) => void>(), aliases = new Map<string, string>();
+  let cacheWriteDenied = false;
+  // Verified bytes remain usable when optional disk publication exhausts quota.
+  // Do not retry the part, claim cached credit, or publish an index for unkept bytes.
+  const keepCopy = async (write: SpawnDownloadPorts['store'], url: string, response: Response): Promise<boolean> => {
+    let retained = false;
+    try {
+      if (write === undefined || cacheWriteDenied) return false;
+      await write(url, response); retained = true; return true;
+    } catch (failure) {
+      if (typeof failure !== 'object' || failure === null || !('name' in failure) || failure.name !== 'QuotaExceededError') throw failure;
+      cacheWriteDenied = true; bootMark('download:cache-write-quota'); return false;
+    } finally { if (!retained) void response.body?.cancel().catch(() => undefined); }
+  };
   let completedBytes = 0, cachedBytes = 0, filesDone = 0, complete = false, progressKnown = false, error: string | null = null;
   let wireCompleted = 0, wireCached = 0, wireTotal = address.wireBytes;
   // DL21: a part's chunks as they arrive, before its members verify (the stuck-boot watch's progress, never shown as read)
@@ -332,7 +344,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
       if (manifest.totalBytes !== address.totalBytes || manifest.wireBytes !== address.wireBytes || manifest.files.length !== address.files) throw new Error('Spawn address differs from manifest');
       // A default manifest never carries a part table, so it cannot pass as the whole level.
       if (ports.whole === true && manifest.parts === undefined) throw new Error('Packs manifest has no part table');
-      if (copy !== undefined) await ports.store?.(manifestURL, copy);
+      if (copy !== undefined) await keepCopy(ports.store, manifestURL, copy);
       const files = manifest.files.map(file => {
         const url = new URL(file.url, base); aliases.set(url.pathname, url.href); return {bytes: file.bytes, hash: file.hash, wireBytes: file.wireBytes ?? 0, url: url.href};
       });
@@ -350,8 +362,8 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         jobPaths = paths;
       }
       markListed();
-      // DL18: on a warm visit the held-parts index and the cache's keys answer every packed member at once; the few
-      // loose files left are looked up one by one, so no bulk read of the cache runs.
+      // The index only selects the exact per-member checks below. Enumerating
+      // every native cache key is redundant and can outlive title navigation.
       const parts = ports.packs === true ? manifest.parts : undefined, heldFiles = new Set<string>();
       // DL20 (sp-x1's coverage matrix): the counts exist from the manifest on, before the all-cached return below
       if (parts !== undefined && parts.length > 0) partCounts = {parts: 0, failed: 0, fallbackFiles: 0, fetched: 0};
@@ -368,14 +380,13 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         }
         wireTotal = files.reduce((sum, file) => sum + file.wireBytes, 0);
       }
-      // Both bulk reads only save lookups. Chromium refuses a whole-cache query past its size limit ("Operation too large"),
-      // and a player who has walked a road holds a cache that size: each file is then asked for on its own, below.
-      let heldIndex: HeldParts = {}, keys: ReadonlySet<string> | null = new Set();
+      let heldIndex: HeldParts = {};
       if (parts !== undefined && ports.held !== undefined) {
-        [heldIndex, keys] = await Promise.all([ports.held.read().catch(() => ({})), ports.held.keys().catch(() => null)]);
+        heldIndex = await ports.held.read().catch(() => ({}));
+        controller.signal.throwIfAborted();
         for (const part of parts) {
           const stored = new Set(heldIndex[part.hash]), urls = part.members.map(([at]) => files[at]?.url ?? '');
-          if (urls.every(url => stored.has(url) && keys?.has(url) !== false)) for (const url of urls) heldFiles.add(url);
+          if (urls.every(url => stored.has(url))) for (const url of urls) heldFiles.add(url);
         }
       }
       // A key only proves an entry exists. Each held member is credited only when its entry is a 200, not a page, and
@@ -470,8 +481,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             });
             if (body.length !== file.bytes) { void cachedCopy?.body?.cancel().catch(() => undefined); throw new Error(`Spawn file size differs: ${new URL(file.url).pathname}`); }
             // a job cancelled during the unabortable store publishes nothing to the page (sp-x2: after control it would)
-            if (cachedCopy !== undefined) { await ports.store?.(file.url, cachedCopy); controller.signal.throwIfAborted(); serve(file); }
-            settleFile(file.url, true); landed(file.url); wireCompleted += file.wireBytes; filesDone++; publish();
+            const stored = cachedCopy !== undefined && await keepCopy(ports.store, file.url, cachedCopy);
+            controller.signal.throwIfAborted(); if (stored) serve(file);
+            settleFile(file.url, stored); landed(file.url); wireCompleted += file.wireBytes; filesDone++; publish();
           } finally { landed(file.url); inFlight.delete(file.url); active--; if (demandedFlight.delete(file.url)) demandsActive--; nudge(); }
         }
       }));
@@ -522,9 +534,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 if (await sha256(member) !== file.hash) throw new Error(`Spawn part member differs: ${part.url}`);
                 // a cancelled job keeps nothing more: neither before a member's store nor after an unabortable one (sp-x1)
                 controller.signal.throwIfAborted();
-                await ports.keep?.(file.url, new Response(member, {headers: {'content-type': typeOf(file.url), 'content-length': String(member.length)}}));
+                const memberStored = await keepCopy(ports.keep, file.url, new Response(member, {headers: {'content-type': typeOf(file.url), 'content-length': String(member.length)}}));
                 controller.signal.throwIfAborted();
-                settle.get(index)?.(member); done.add(index); settleFile(file.url, true);
+                settle.get(index)?.(member); done.add(index); settleFile(file.url, memberStored);
                 landed(file.url); completedBytes += file.bytes; wireCompleted += file.wireBytes; filesDone++; publish();
               }
             }
@@ -542,7 +554,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           counts.parts++;
           // Every member of the part is now stored (kept here, or already credited): the index may name it.
           // A part shared by another entry keeps that entry's members too, while they are still keyed.
-          if (ports.keep !== undefined) stored.set(part.hash, [...new Set([...(heldIndex[part.hash] ?? []).filter(url => keys?.has(url) !== false),
+          if (ports.keep !== undefined && !cacheWriteDenied) stored.set(part.hash, [...new Set([...(heldIndex[part.hash] ?? []),
             ...part.members.map(([member]) => files[member]?.url ?? '')])]);
         };
         const partOf = new Map<string, number>(), demandedParts: number[] = [], takenParts = new Set<number>();
@@ -559,10 +571,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         }));
         partDemand = null;
         controller.signal.throwIfAborted();
-        // One index write per download: this download's stored parts, plus earlier entries whose members are all
-        // still keyed (the worker prunes old builds' files, so an entry never outlives its members).
-        if (stored.size > 0 && ports.held !== undefined) {
-          const kept = Object.entries(heldIndex).filter(([hash, urls]) => !stored.has(hash) && urls.every(url => keys?.has(url) !== false));
+        // Index entries remain hints; the next boot verifies every native body.
+        if (!cacheWriteDenied && stored.size > 0 && ports.held !== undefined) {
+          const kept = Object.entries(heldIndex).filter(([hash]) => !stored.has(hash));
           await ports.held.write(Object.fromEntries([...kept, ...stored])).catch(() => undefined);
         }
         } finally { partsRunning = false; nudge(); }
@@ -771,7 +782,6 @@ function downloadPorts(cacheName: unknown, packs: boolean): SpawnDownloadPorts {
     ...(store === null || !packs ? {} : {held: {
       read: async () => readHeldParts(await (await store).match(HELD_PARTS)),
       write: async (index: HeldParts) => {await (await store).put(HELD_PARTS, Response.json(index));},
-      keys: async () => new Set((await (await store).keys()).map(request => request.url)),
     }}),
   };
 }
