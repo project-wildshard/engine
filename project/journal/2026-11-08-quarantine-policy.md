@@ -16,3 +16,8 @@ Ring 1's smaller inventory cannot run every one of these files.
 The shared workflow/config owner integrates blocking selection and separate
 non-blocking jobs. Local full pre-push retains the complete test inventory.
 The deadline and list are tested directly before the full normal push.
+
+Whole-tree lint exposed style errors in the first runner draft. Corrected
+them without disabling rules; whole-tree lint and typecheck now pass. Both
+workflow files also pass actionlint. The shared cohort integration is
+committed as 1633a1f, separate from the blocking covered-verdict summary.
