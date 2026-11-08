@@ -57,7 +57,15 @@ export function openShardfile(tarball: Uint8Array): OpenShardfile {
     if (bytes.length !== row.bytes || sha256(bytes) !== row.hash) throw new Error('Spawn section differs from index');
     sections.set(row.name, JSON.parse(new TextDecoder().decode(bytes)));
   }
-  const cook = index.cook === undefined ? undefined : readCookData(JSON.parse(new TextDecoder().decode(read(COOK_DATA_PATH))));
+  const cookBytes = index.cook === undefined ? undefined : read(COOK_DATA_PATH);
+  if (cookBytes !== undefined && (cookBytes.length !== index.cook?.bytes || sha256(cookBytes) !== index.cook.hash)) {
+    throw new Error(`Stale cook preparation bytes for ${index.identity.slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
+  }
+  const cook = cookBytes === undefined ? undefined : readCookData(JSON.parse(new TextDecoder().decode(cookBytes)));
+  for (const mount of cook?.mounts ?? []) {
+    const bytes = read(mount.path);
+    if (bytes.length !== mount.bytes || sha256(bytes) !== mount.hash) throw new Error(`Stale cook preparation mount ${mount.url}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
+  }
   return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read};
 }
 
