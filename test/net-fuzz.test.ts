@@ -1,3 +1,4 @@
+import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runtimeAssets } from './fixtures/engine-lift/product';
 // oxlint-disable-next-line import/no-nodejs-modules -- The server half runs the shipped product bytes and physics module.
 import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
@@ -38,8 +39,12 @@ const SEEDS = (process.env['NET_FUZZ_SEEDS'] ?? '20261105').split(',').map(Numbe
 const CLOCK = (): number => 0;
 
 let rapier: Rapier;
+let strips: Awaited<ReturnType<typeof bakedGridCollision>>;
 const products = new Map<string, HeadlessRuntimeInput>(), open: TrustedHeadlessResident[] = [];
-beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
+beforeAll(async () => {
+  rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  strips = await bakedGridCollision();
+});
 afterAll(() => { for (const live of open.splice(0)) live.dispose(); });
 async function product(slug: string): Promise<HeadlessRuntimeInput> {
   const held = products.get(slug);
@@ -242,22 +247,38 @@ test('a client that hangs up leaves a server that still saves', { timeout: 10_00
 // A crossing under fire: the acts and commands in flight when a player changes rooms belong to neither, and neither minds.
 test('a client crosses a seam while it fuzzes both rooms', { timeout: 10_000 }, async () => {
   const control = new MessageChannel(), game = new MessageChannel(), storage = new PageStorage();
-  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: (_boot, slug) => product(slug), strips: bakedGridCollision, proof: { arrival: { x: -259, y: 0, z: 0 } } });
+  let running: StandaloneGrid | undefined;
+  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: (_boot, slug) => product(slug), strips: () => Promise.resolve(strips),
+    proof: { arrival: { x: -259, y: 0, z: 0 }, booted: grid => { running = grid; } } });
   const shell = connectStandalone({ slug: 'sunscar-dunes', base: '/shards/sunscar-dunes/', build: 'test', savePrefix: 'wildshard.', storage }, control.port2, game.port2, () => { server.dispose(); });
   const { client } = shell, travels: NetTravel[] = [], hostile = new Hostile(client), fuzz = new Fuzz(SEEDS[0] ?? 1);
+  const turn = (): Promise<void> => new Promise(resolve => { setImmediate(resolve); });
   client.onTravel(event => { travels.push(event); });
-  await shell.booted; shell.ready();
-  await until(() => client.latest !== null);
-  const timer = setInterval(() => {
-    client.command({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: -Math.PI / 2, pitch: 0, buttons: 0 }); client.flush();
-    shell.transport.send('reliable', fuzz.chance(0.5) ? hostile.act(fuzz, []) : hostile.broken(fuzz, client.latest?.tick ?? 0));
-  }, 16);
-  try { await until(() => travels.length === 1); } finally { clearInterval(timer); }
-  const { tick } = await shell.probe();
-  await new Promise(resolve => { setTimeout(resolve, 100); });
-  expect((await shell.probe()).tick).toBeGreaterThan(tick);
-  expect(client.closed).toBeNull();
-  shell.dispose();
+  try {
+    await shell.booted;
+    const grid = running;
+    if (grid === undefined) throw new Error('No booted server');
+    // Keep the real control/game ports, but let this bounded tape own the clock.
+    // FIFO control delivery opens the room and pauses its timer before the tape.
+    shell.ready(); shell.pause(); await turn(); await turn();
+    for (let tick = 0; tick < 32 && client.latest === null; tick++) { grid.tick(); await turn(); }
+    expect(client.latest).not.toBeNull();
+    for (let tick = 0; tick < 900 && travels.length === 0; tick++) {
+      client.command({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: -Math.PI / 2, pitch: 0, buttons: 0 }); client.flush();
+      shell.transport.send('reliable', fuzz.chance(0.5) ? hostile.act(fuzz, []) : hostile.broken(fuzz, client.latest?.tick ?? 0));
+      await turn(); grid.tick(); await turn();
+    }
+    expect(travels).toHaveLength(1);
+    const probe = async (): Promise<number> => {
+      const pending = shell.probe(); await turn();
+      for (let tick = 0; tick < 4; tick++) { grid.tick(); await turn(); }
+      return (await pending).tick;
+    };
+    const before = await probe();
+    for (let tick = 0; tick < 6; tick++) { grid.tick(); await turn(); }
+    expect(await probe()).toBeGreaterThan(before);
+    expect(client.closed).toBeNull();
+  } finally { shell.dispose(); }
 });
 
 test('a save asked for before boot is told no, and the server still boots', async () => {

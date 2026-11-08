@@ -33,3 +33,11 @@ budget for slower CI machines.
 
 That four-case Ring 1 wire file and typechecking pass again. Aqbars
 now completes in 0.575 seconds on this Mac instead of 3.764 seconds.
+
+The whole-suite run then reproduced a real timing failure: the
+real-time seam test timed out at ten seconds under load. Its ports,
+room handoff and probes remain real, but its bounded tape now drives
+the booted server ticks after pausing the timer. Collision input is
+prepared once for the file, and cleanup runs on failure too. All 13
+network cases pass under the full-run load; seam travel takes 0.071
+seconds and the slowest case takes 2.858 seconds. Typechecking passes.
