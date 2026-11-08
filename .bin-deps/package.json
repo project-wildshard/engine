@@ -5,5 +5,10 @@
   "dependencies": {
     "oxfmt": "0.74.0",
     "typescript": "7.0.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/three>@dimforge/rapier3d-compat": "-"
+    }
   }
 }

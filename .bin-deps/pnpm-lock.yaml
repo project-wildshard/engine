@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@types/three>@dimforge/rapier3d-compat': '-'
+
 importers:
 
   .:
