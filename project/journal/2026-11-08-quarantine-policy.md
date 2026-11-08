@@ -39,3 +39,14 @@ keeps these running and reporting in both quarantine jobs, owned by
 codex-pinefix2 until 2026-11-10T12:04:31Z. These are file-budget overruns,
 not claims of failed gameplay assertions. No file clock or assertion is
 raised or weakened. Local full checks still include them.
+
+Exact f0a8a0c run 42479173262 passed assertions but found four further
+60-second file overruns: Nalati bot taming 69632 ms (job 128727310351),
+discovery 72816 ms (128727310386), Driftwood long session 75238 ms
+(128727310364), Nalati taming 89597 ms (128727310411). The last shard
+subsequently hit its five-minute whole-job deadline before completing;
+that job is not claimed green. Add only these observed over-budget files
+under J193, still executed and reported, owned by codex-pinefix2 until
+2026-11-10T12:20:11Z. No measurement threshold or gameplay assertion is
+changed. Their file-clock failures remain explicit in the quarantine
+reason rather than being mislabeled as failed simulation assertions.
