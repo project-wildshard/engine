@@ -28,7 +28,9 @@ export async function completeCatalogue():Promise<void>{
 export async function prepareSelectedShard():Promise<void>{
   const rows=titleManifests(),named=new URLSearchParams(location.search).get('chunk');
   // C3: a catalogue shard with no discovery enters on the first row's page; its product replaces it in admission.
-  const row=named===null?undefined:findTitleManifest(named),selected=hasDiscovery(row)?row:rows.find(hasDiscovery);
+  const row=named===null?undefined:findTitleManifest(named);
+  if(named!==null&&row===undefined&&document.getElementById('ws-shardfile')===null)throw new Error('The requested world is not listed');
+  const selected=hasDiscovery(row)?row:rows.find(hasDiscovery);
   if(selected===undefined)throw new Error('No shard has a discovery document');
   if(TIER!=='phone'){await completeCatalogue();return;}
   const prepared=await selectedManifests(selected,loaders());

@@ -2,7 +2,7 @@
 import '@wildshard/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-unassigned-import -- evaluated for its effect: the app identity is installed before any other module body runs (E414)
 import './identity';
-import { installTitleManifests, readTitleRows, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
+import { findTitleManifest, installTitleManifests, readTitleRows, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
 import { installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { startPageServices } from './pageServices';
@@ -71,6 +71,13 @@ inspectPreviousBoot();
 // Safari may reload the same document after WebContent dies. Keep that automatic retry on the
 // renderer-free title until the player chooses a shard again.
 async function enterPage(): Promise<unknown> {
+  const requested = search.get('chunk');
+  // An embedded author product has its own admission. A game URL must name a
+  // listed world before any discovery, tables or renderer can be prepared.
+  if (requested !== null && document.getElementById('ws-shardfile') === null && findTitleManifest(requested) === undefined) {
+    document.documentElement.classList.add('title-first');
+    return showPageTitle('This world is not listed. Choose a world from the list.');
+  }
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
   const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
   const end = lastEnd();
@@ -123,13 +130,13 @@ async function enterPage(): Promise<unknown> {
     return bootTask('app:main-import', () => import('./main'));
   })();
 }
-async function showPageTitle(): Promise<void> {
+async function showPageTitle(refusal = ''): Promise<void> {
   const [{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }] = await Promise.all([import('@wildshard/engine/ui/StartTitle'), import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel')]);
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
   const grid = installGridTitle();
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)
   showStartTitle(({ settings, notice }) => {
-    const lines = [notice ?? '', grid.note].filter((line) => line !== '').join('\n');
+    const lines = [refusal, notice ?? '', grid.note].filter((line) => line !== '').join('\n');
     return buildTitleMenu({
       active: null,
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
