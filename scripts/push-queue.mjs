@@ -80,6 +80,7 @@ async function drain(directory){
    if(git(snapshot,['rev-parse','HEAD'])!==job.sha)throw new Error('Queue snapshot changed before checking');
    save('installing');run('pnpm',['install','--frozen-lockfile']);
    const manifest=v.parse(v.object({scripts:v.optional(v.record(v.string(),v.string()),{})}),JSON.parse(readFileSync(join(snapshot,'package.json'),'utf8')));
+   if(manifest.scripts['tools:install']!==undefined)run('pnpm',['run','tools:install']);
    const {pins}=manifest.scripts;if(pins!==undefined)run('pnpm',['pins']);
    run('git',['fetch','origin','main']);const remote=git(snapshot,['rev-parse','refs/remotes/origin/main']);
    if(!job.checkOnly){

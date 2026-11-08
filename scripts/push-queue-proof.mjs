@@ -14,11 +14,13 @@ try{
  const git=args=>execFileSync('git',['-c','user.name=Queue proof','-c','user.email=proof@example.test',...args],{cwd:repo,encoding:'utf8'}).trim();
  git(['init','--quiet','--initial-branch=main']);git(['remote','add','origin',remote]);
  mkdirSync(join(repo,'.githooks'));writeFileSync(join(repo,'.githooks/pre-push'),'#!/usr/bin/env bash\nset -euo pipefail\nnode gate.mjs\n');chmodSync(join(repo,'.githooks/pre-push'),0o755);
- writeFileSync(join(repo,'package.json'),JSON.stringify({name:'push-queue-proof',private:true,version:'1.0.0',type:'module'}));writeFileSync(join(repo,'pnpm-workspace.yaml'),'packages: []\n');
- writeFileSync(join(repo,'.gitignore'),'node_modules/\n');
- writeFileSync(join(repo,'gate.mjs'),`import assert from'node:assert/strict';import{readFileSync,appendFileSync}from'node:fs';import{execFileSync}from'node:child_process';const value=JSON.parse(readFileSync('value.json')).value;assert.ok(Number.isInteger(value)&&value>0);appendFileSync(${JSON.stringify(observed)},JSON.stringify({sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),value})+'\\n');`);
+ writeFileSync(join(repo,'package.json'),JSON.stringify({name:'push-queue-proof',private:true,version:'1.0.0',type:'module',scripts:{'tools:install':'node prepare-tools.mjs'}}));writeFileSync(join(repo,'pnpm-workspace.yaml'),'packages: []\n');
+ writeFileSync(join(repo,'.gitignore'),'node_modules/\n.prepared\n');
+ writeFileSync(join(repo,'prepare-tools.mjs'),"import{writeFileSync}from'node:fs';writeFileSync('.prepared','ready');");
+ writeFileSync(join(repo,'gate.mjs'),`import assert from'node:assert/strict';import{readFileSync,appendFileSync}from'node:fs';import{execFileSync}from'node:child_process';assert.equal(readFileSync('.prepared','utf8'),'ready');const value=JSON.parse(readFileSync('value.json')).value;assert.ok(Number.isInteger(value)&&value>0);appendFileSync(${JSON.stringify(observed)},JSON.stringify({sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),value})+'\\n');`);
  writeFileSync(join(repo,'value.json'),'{"value":1}');execFileSync('pnpm',['install','--lockfile-only'],{cwd:repo,stdio:'pipe'});
- git(['add','.gitignore','.githooks/pre-push','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','gate.mjs','value.json']);git(['commit','--quiet','-m','base']);git(['config','core.hooksPath','.githooks']);git(['push','--quiet','origin','main']);
+ git(['add','.gitignore','.githooks/pre-push','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','prepare-tools.mjs','gate.mjs','value.json']);git(['commit','--quiet','-m','base']);git(['config','core.hooksPath','.githooks']);
+ execFileSync(process.execPath,['prepare-tools.mjs'],{cwd:repo});git(['push','--quiet','origin','main']);
  const script=resolvePath('scripts/push-queue.mjs'),queue=join(work,'queue'),jobs=[],commits=[];
  for(const value of [2,3,-1]){
   writeFileSync(join(repo,'value.json'),JSON.stringify({value}));git(['commit','--quiet','-m',`value ${value}`,'--','value.json']);
@@ -43,5 +45,5 @@ try{
  assert.deepEqual(rows.slice(-4).map(row=>[row.sha,row.value]),jobs.slice(0,2).flatMap((job,index)=>[[job.sha,index+2],[job.sha,index+2]]));
  assert.equal(execFileSync('git',['--git-dir',remote,'rev-parse','refs/heads/main'],{encoding:'utf8'}).trim(),jobs[1]?.sha);
  assert.ok(jobs.every(job=>!existsSync(job.snapshot)));
- console.log(JSON.stringify({orderedPushes:2,requestedAncestorsPreserved:true,normalHookFailureBlocked:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
+ console.log(JSON.stringify({orderedPushes:2,requestedAncestorsPreserved:true,declaredToolsPrepared:true,normalHookFailureBlocked:true,dirtyBytesExcluded:true,remoteIsSecondCheckedTip:true,snapshotsRemoved:true,milliseconds:Date.now()-start}));
 }finally{rmSync(work,{recursive:true,force:true});}

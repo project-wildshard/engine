@@ -34,3 +34,10 @@ Capture first fetches that exact commit into its own temporary bare main,
 then makes an independent clone. The proof now creates all three commits
 before enqueueing their distinct ancestors and still observes exact FIFO
 publication and normal-hook refusal. It never rewinds the shared checkout.
+
+The declared tools:install preparation runs before pins and the hook when
+present (engine uses npr install --frozen). A real queue fixture with its
+required tool preparation was red before this step: all three normal hooks
+refused the absent prepared tool. Dependency installation alone did not
+satisfy that public package contract. Exact source verification still
+follows preparation, and repos without the script retain their old path.
