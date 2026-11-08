@@ -46,7 +46,9 @@ export function readEnginePlan(file:string,expected?:readonly string[]):EnginePl
 export function createEnginePlan(ring:'full'|'1',files:readonly string[]):EnginePlan{
   const baseline=v.parse(weightsSchema,JSON.parse(readFileSync(ring==='1'?'test/durations-ring1.json':'test/durations.json','utf8')) as unknown);
   const source=v.parse(metadata,JSON.parse(readFileSync('test/durations-source.json','utf8')) as unknown)[ring==='1'?'ring1':'full'];
-  const measured=Object.values(baseline).sort((a,b)=>a-b),fallback=measured[Math.floor(measured.length/2)]??1;
+  // An unmeasured file must satisfy the existing sixty-second CI file gate.
+  // A median made the new real 20/40-second socket proofs nearly free.
+  const fallback=60;
   const weights=new Map(files.map(file=>[file,baseline[file]??fallback]));
   const active=new Set(files),nativeGroups=Object.entries(CI_NATIVE_GROUPS).map(([name,members])=>({name:`@native:${name}`,files:members.filter(file=>active.has(file))})).filter(group=>group.files.length>0);
   const grouped=new Set<string>(nativeGroups.flatMap(group=>group.files));

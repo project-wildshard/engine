@@ -1,27 +1,31 @@
 {
   "full": {
-    "run": "42483388741",
-    "sha": "4c0b726f0e5017ea936345c0cc55297414daa93f",
-    "wallSeconds": 295,
-    "fileSeconds": 1607.2369999999999,
+    "run": "42500064468",
+    "sha": "17f1a6e52e4803ce46a64990bba26acbbb2d1b25",
+    "wallSeconds": 245,
+    "fileSeconds": 1719.332435312002,
     "calibration": {
       "factor": 1.35,
-      "setupSeconds": 70,
-      "observedMaxPhaseFactor": 1.223774452448961,
-      "observedMaxJobOverheadSeconds": 66.123
+      "setupSeconds": 70
     },
-    "basis": "Complete module diagnostic times from all 1129 green blocking files; maximum with cfd6681 attempt-one test/hook time plus that file admission/import overhead.",
-    "additionalRun": "42487475414",
-    "additionalAttempt": 1
+    "basis": "Complete module diagnostics for 1161 files after E7. All assertions pass; dedicated-hold independently refuses the unchanged sixty-second file cap. One platform-skipped module contributes its measured preparation only."
   },
   "ring1": {
-    "run": "42470548302",
-    "sha": "54dfb6bdfae59556feafe42af173dcc4cc1a769e",
-    "wallSeconds": 414.44,
-    "fileSeconds": 466.2309999999997
+    "run": "42500064545",
+    "sha": "17f1a6e52e4803ce46a64990bba26acbbb2d1b25",
+    "wallSeconds": 183,
+    "fileSeconds": 1302.4175510260018,
+    "calibration": {
+      "factor": 1.35,
+      "setupSeconds": 70
+    },
+    "basis": "Complete module diagnostics for 1084 files after E7. All assertions pass; dedicated-hold independently refuses the unchanged sixty-second file cap. One platform-skipped module contributes its measured preparation only."
   },
   "additionalGreenRuns": [
-    "42470548302",
-    "42470548208"
-  ]
+    "42497139602",
+    "42497612035",
+    "42499045493",
+    "42499045448"
+  ],
+  "unmeasuredFileBoundSeconds": 60
 }
