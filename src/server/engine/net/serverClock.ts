@@ -36,7 +36,7 @@ export class ServerClock {
     const now = this.ports.now();
     this.backlog += (now - this.last) / 1000; this.last = now;
     let steps = 0;
-    while (this.backlog >= FIXED_STEP && steps < MAX_FIXED_STEPS) { this.backlog -= FIXED_STEP; steps++; this.ports.step(); }
+    while (this.timer !== null && this.backlog >= FIXED_STEP && steps < MAX_FIXED_STEPS) { this.backlog -= FIXED_STEP; steps++; this.ports.step(); }
     if (steps === MAX_FIXED_STEPS && this.backlog >= FIXED_STEP) { this.backlog %= FIXED_STEP; this.drops++; }
     if (this.timer !== null) this.schedule(Math.max(0, FIXED_STEP - this.backlog));
   }

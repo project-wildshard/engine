@@ -99,5 +99,7 @@ test('a tick that throws ends the process, not one cell', { timeout: 60_000 }, a
   const room = bench.room(SHARD);
   if (room === undefined) throw new Error('No room');
   room.tick = () => { throw new Error('A broken tick'); };
+  // A real event-loop stall makes the clock catch up more than one tick.
+  const until = performance.now() + 50; while (performance.now() < until) { /* keep real elapsed time */ }
   await vi.waitFor(() => { expect(bench?.crashes).toHaveLength(1); }, { timeout: 2000, interval: 10 });
 });
