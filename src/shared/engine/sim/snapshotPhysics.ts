@@ -129,7 +129,16 @@ function references(bytes: Uint8Array, length: number, basisLength: number | und
       if (distance < 1 || distance > written || count < matchMinimum || written + count > length) throw new RangeError('Invalid snapshot physics reference');
       const end = written + count;
       if (result === undefined) written = end;
-      else while (written < end) { result[written] = result[written - distance] ?? 0; written++; }
+      else {
+        // Copy only the already reconstructed prefix. Doubling that valid span
+        // repeats overlapping LZ matches exactly, without a per-byte JS loop.
+        let span = distance;
+        while (written < end) {
+          const copied = Math.min(span, end - written);
+          result.copyWithin(written, written - span, written - span + copied);
+          written += copied; span *= 2;
+        }
+      }
     } else throw new RangeError('Unknown snapshot physics token');
   }
   if (written !== length) throw new RangeError('Snapshot physics decoded length mismatch');
