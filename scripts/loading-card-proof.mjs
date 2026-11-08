@@ -238,7 +238,8 @@ try {
         console.log(`${tag}: actual entered cell ${cell.current}, closed board`);
         if(attempt==='fresh-grid'){
           console.log(`${tag}: native renderer`,await page.evaluate(()=>{
-            const gl=Reflect.get(window,'__wildshard').world.game.renderer.getContext(),extension=gl.getExtension('WEBGL_debug_renderer_info');
+            const world=Reflect.get(window,'__wildshard').world;if(world===undefined)throw new Error('No live world for native renderer observation');
+            const gl=world.game.renderer.getContext(),extension=gl.getExtension('WEBGL_debug_renderer_info');
             return extension===null?gl.getParameter(gl.RENDERER):gl.getParameter(extension.UNMASKED_RENDERER_WEBGL);
           }));
           console.log(`${tag}: ordinary road leg 1`);await walkGrid(page,0,-281.25);

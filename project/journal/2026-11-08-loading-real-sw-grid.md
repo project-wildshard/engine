@@ -52,3 +52,11 @@ GPU fences credit only signalled work and retain the reviewed owner
 disposal/context-loss cleanup. Foreign dirty generated files are not
 part of this integration. Whole-stack normal checks and publication
 remain the final step; no hook bypass is authorized or used.
+
+The complete stack was rebased onto e0b870f after reading its two new
+test/report commits. Explicit whole-stack typecheck, lint and formatting
+all pass, including the source originally committed as 6d19538 with a
+bypass. Those checks caught an optional world access and a dataset
+style violation in the new manual diagnostics; both are fixed forward.
+The history secrets scan reports zero findings across 32 outgoing
+commits before this final diagnostic receipt. No bypass is used here.

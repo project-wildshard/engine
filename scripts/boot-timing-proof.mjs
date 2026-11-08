@@ -137,9 +137,9 @@ if(expectedBuild!==undefined) {
         try {await page.waitForFunction(observed,'app:first-game-step-end',{timeout:60000});}
         catch(error){
           console.error(`${name}: controlled reload did not reach its first game step`,await page.evaluate(()=>{
-            const t=Reflect.get(window,'__bootTiming');return {url:location.href,state:document.documentElement.dataset.wsState,
+            const t=Reflect.get(window,'__bootTiming'),card=document.querySelector('.ws-load');return {url:location.href,state:document.documentElement.dataset.wsState,
               error:document.querySelector('#wserr .msg')?.textContent,overflow:t?.overflow,active:t?.read().active,
-              tail:t?.entries.slice(-12),faults:document.querySelector('.ws-load')?.getAttribute('data-step')};
+              tail:t?.entries.slice(-12),step:card instanceof HTMLElement?card.dataset.step:undefined};
           }),faults);throw error;
         }
         await page.waitForFunction(observed,'app:loader-complete',{timeout:120000});
