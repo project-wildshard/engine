@@ -68,7 +68,14 @@ async function installSaves(only: readonly string[] = []): Promise<void> {
       const held = readFileSync(file);
       if (held.length === row.bytes && sha256(held) === row.sha256) continue;
     }
-    const body = await fetched(`${MIRROR}/${row.file}`, row.slug, row.sha256);
+    // GitHub's browser URL can return a gateway error for large save assets
+    // while its explicit download endpoint serves the exact immutable bytes.
+    // Both routes retain the same hash; corrupt bytes refuse immediately.
+    let body: Uint8Array | undefined;
+    for (const url of [`${MIRROR}/${row.file}?download=1`, `${MIRROR}/${row.file}`]) {
+      body = await fetched(url, row.slug, row.sha256, {cache: 'no-store', signal: AbortSignal.timeout(90_000)});
+      if (body !== undefined) break;
+    }
     if (body === undefined || body.length !== row.bytes) throw new Error(`${row.slug}: mirror has no matching released save`);
     mkdirSync(CACHE, {recursive: true});
     const part = `${file}.${process.pid}`;
@@ -96,8 +103,8 @@ async function refresh(): Promise<void> {
 }
 
 /** One source's bytes for a hash, or undefined if it doesn't hold them. Bytes that aren't the pin stop the build. */
-async function fetched(url: string, slug: string, hash: string): Promise<Uint8Array | undefined> {
-  const response = await fetch(url).catch(() => undefined);
+async function fetched(url: string, slug: string, hash: string, options?: RequestInit): Promise<Uint8Array | undefined> {
+  const response = await fetch(url, options).catch(() => undefined);
   if (response?.ok !== true) return undefined;
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (sha256(bytes) !== hash) throw new Error(`${slug}: ${url} is not the pin`);
