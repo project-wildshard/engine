@@ -235,6 +235,9 @@ export class Loading {
     this.root.querySelector<HTMLElement>('[data-phase="download"]')?.removeAttribute('hidden');
     this.stopDownloadSource?.();
     this.downloadSource = source;
+    const timing=bootTiming();
+    if(!this.scoped&&timing!==undefined)(timing.work??={}).download=source.snapshot;
+    this.scope.onDispose(()=>{if(timing?.work?.download===source.snapshot)delete timing.work.download;});
     this.stopDownloadSource = source.subscribe(() => {
       const fraction = this.paintDownloads();
       set(this.els.dlPct, this.downloadPct(fraction)); setBar(this.els.dlBar, fraction);

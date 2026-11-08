@@ -25,7 +25,7 @@ function crashBrowser(profile) {
 }
 
 /** @param {import('playwright').Page} page */
-const observed = page => page.evaluate(() => {
+export const observed = page => page.evaluate(() => {
   const w = /** @type {WorkerWindow} */ (window), g = w.__wildshard.shard.grid.state(), r = w.__workerClient();
   const live = g.live?.live, server = r.cell === 0 ? null : g.cells[r.cell - 1]?.instance;
   return { home: g.home, inside: g.inside, board: g.cellLoading, current: live?.current, server,
@@ -44,7 +44,7 @@ async function tapGrid(page) {
 
 /** Real movement in world coordinates through the two public road legs, never a forced travel or readiness event.
  * @param {import('playwright').Page} page @param {number} x @param {number} z */
-async function walk(page, x, z) {
+export async function walk(page, x, z) {
   const until = Date.now() + 210_000;
   let away = Infinity;
   while (Date.now() < until) {
@@ -62,7 +62,7 @@ async function walk(page, x, z) {
 }
 
 /** @param {import('playwright').Page} page */
-async function entered(page) {
+export async function entered(page) {
   await page.bringToFront();
   await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard?.world?.hud !== undefined, undefined, { timeout: 150_000 });
   await page.evaluate(FLOOR_GRID_ENTER);
@@ -81,7 +81,7 @@ async function entered(page) {
 }
 
 /** @param {import('playwright').Page} page @param {string} instance */
-async function settled(page, instance) {
+export async function settled(page, instance) {
   await page.waitForFunction(id => {
     const w = /** @type {WorkerWindow} */ (window), g = w.__wildshard?.shard?.grid?.state(), r = w.__workerClient?.();
     return g?.live?.live.current === id && g.inside === id && g.live.live.gameplayReady

@@ -4,10 +4,11 @@
 
 export const STALL_MS = 2000;
 export const STEP_PCT = 1;
-const MOMENT_MS = 5;
+
 
 /**
- * @typedef {{t: number, bar: string, pct: number, step: string, atomic: number, bytes: number, files: number, work?: string}} BarRow
+ * @typedef {{kind: string, done?: number, total?: number, bytes?: number, byteTotal?: number, complete?: boolean, configured?: boolean, adopted?: boolean, rows?: {state:string, fraction?:number, weight?:number}[]}} ProducerReading
+ * @typedef {{t: number, bar: string, pct: number, step: string, atomic: number, bytes: number, files: number, work?: string, source?: ProducerReading}} BarRow
  * `bar` is a phase bar (`start`, `download`, `load`) or `step`, a change of the card's current step with no bar change.
  * `atomic`, `bytes` and `files` are LS1's counters at that moment: completed boundaries, streamed body bytes, finished files.
  * `work` is the producer's own report: the running step's sub-progress and whether the download closed.
@@ -41,24 +42,57 @@ export function barStalls(log, start, end) {
   return { stalls, backwards };
 }
 
-/** Bar changes with no real event under them: none of LS1's counters and not the card's step moved since the last row.
+/** Recompute the earned share from the relevant original producer, never labels,
+ * clocks, unrelated realm counters or a percentage copied out of the card.
+ * @param {ProducerReading | undefined} source @returns {number | null} */
+function earned(source) {
+  if (source === undefined) return null;
+  /** @param {number | undefined} n @returns {n is number} */
+  const valid = n => n !== undefined && Number.isFinite(n) && n >= 0;
+  if (source.kind === 'start') {
+    if (source.adopted === true) return 100;
+    if (!valid(source.done) || !valid(source.total) || !valid(source.bytes) || !valid(source.byteTotal)
+      || source.done > source.total || source.bytes > source.byteTotal || source.total === 0) return null;
+    return Math.floor(100 * (source.done + (source.byteTotal > 0 ? source.bytes / source.byteTotal : 0))
+      / (source.total + (source.byteTotal > 0 ? 1 : 0)));
+  }
+  if (source.kind === 'download') {
+    if (!valid(source.done) || !valid(source.total) || source.done > source.total) return null;
+    return source.complete === true ? 100 : Math.floor(1000 * (source.total === 0 ? 0 : Math.min(.999, source.done / source.total))) / 10;
+  }
+  if (source.kind !== 'load' || source.rows === undefined) return null;
+  if (source.complete === true) return 100;
+  if (source.configured !== true) return 0;
+  let done = 0, total = 0;
+  for (const row of source.rows) {
+    const weight = row.weight ?? 1;
+    if (!valid(weight) || !['todo','on','ok'].includes(row.state)
+      || row.fraction !== undefined && (!valid(row.fraction) || row.fraction >= 1)) return null;
+    total += weight;
+    if (row.state === 'ok') done += weight;
+    else if (row.state === 'on') done += weight * (row.fraction ?? 0);
+  }
+  return total === 0 ? 0 : Math.floor(Math.min(1 - Number.EPSILON, done / total) * 1000) / 10;
+}
+
+/** Each visible reading must equal its own earned numeric share. Load retains
+ * earned credit across path refinement, just as the presenter does. Initial
+ * positive readings need evidence too; zero is the only source-free initial state.
  * @param {readonly BarRow[]} log */
 export function untracedChanges(log) {
-  const rows = [...log].sort((a, b) => a.t - b.t);
   /** @type {BarRow[]} */ const untraced = [];
-  // Rows within MOMENT_MS of each other are one moment (a step change and the bar it moves land in separate observer
-  // callbacks of the same paint): a bar row is traced when its event signature differs from the previous moment's.
-  const signature = (/** @type {BarRow} */ row) => `${row.atomic}|${row.bytes}|${row.files}|${row.step}|${row.work ?? ''}`;
-  /** @type {string | undefined} */ let previous;
-  /** @type {string | undefined} */ let latest;
-  let momentAt = Number.NEGATIVE_INFINITY;
-  /** @type {Set<string>} */ const seen = new Set();
-  for (const row of rows) {
-    if (row.t - momentAt > MOMENT_MS) { previous = latest; momentAt = row.t; }
-    // A bar's first reading at 0 is the card's initial state, not a change.
-    const initial = !seen.has(row.bar) && row.pct === 0; seen.add(row.bar);
-    if (!initial && previous !== undefined && row.bar !== 'step' && signature(row) === previous) untraced.push(row);
-    latest = signature(row);
+  /** @type {Map<string,number>} */ const held = new Map();
+  /** @type {Map<string,number>} */ const shown = new Map();
+  for (const row of [...log].sort((a,b)=>a.t-b.t)) {
+    if (row.bar === 'step') continue;
+    let expected = row.source?.kind === row.bar ? earned(row.source) : null;
+    if (expected !== null && row.bar === 'load') {
+      expected = Math.max(held.get(row.bar) ?? 0, expected); held.set(row.bar,expected);
+    }
+    const initialZero = !shown.has(row.bar) && row.pct === 0;
+    if ((!initialZero && (expected === null || Math.abs(row.pct - expected) > .00001))
+      || !Number.isFinite(row.pct) || row.pct < (shown.get(row.bar) ?? 0)) untraced.push(row);
+    shown.set(row.bar,row.pct);
   }
   return untraced;
 }

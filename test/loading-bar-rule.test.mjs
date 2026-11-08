@@ -21,8 +21,24 @@ test('LS3: a bar never runs backwards', () => {
   expect(barStalls([row(100, 'download', 40), row(200, 'download', 30)], 0, 300).backwards).toEqual([{ t: 200, bar: 'download', from: 40, to: 30 }]);
 });
 
-test('LS3: every bar change traces to a real counter or step; one task may move two bars', () => {
-  const log = [row(10, 'start', 14, { atomic: 1 }), row(20, 'download', 5, { atomic: 1, bytes: 9 }), row(20, 'load', 3, { atomic: 1, bytes: 9 }),
-    row(30, 'load', 4, { atomic: 1, bytes: 9 })];
-  expect(untracedChanges(log)).toEqual([log[3]]);
+test('J188: labels, unrelated counters and an unearned initial bar do not earn progress', () => {
+  const log=[row(0,'load',0),row(10,'load',5,{step:'renamed',bytes:100}),row(20,'download',50,{atomic:3})];
+  expect(untracedChanges(log)).toEqual(log.slice(1));
+});
+
+test('J188: phase-specific earned fractions pass and decreases or false denominators fail', () => {
+  const log=[row(0,'start',0),row(10,'start',25,{source:{kind:'start',done:1,total:3,bytes:0,byteTotal:100}}),
+    row(20,'download',50,{source:{kind:'download',done:50,total:100}}),
+    row(30,'load',25,{source:{kind:'load',configured:true,rows:[{state:'on',fraction:.5},{state:'todo'}]}}),
+    row(40,'load',30,{source:{kind:'load',configured:true,rows:[{state:'on',fraction:.5},{state:'todo'}]}}),
+    row(50,'download',40,{source:{kind:'download',done:40,total:100}}),
+    row(60,'start',50,{source:{kind:'start',done:9,total:3,bytes:0,byteTotal:100}})];
+  expect(untracedChanges(log)).toEqual(log.slice(4));
+});
+
+test('J188: an initial positive reading must be earned by its own producer', () => {
+  const good=row(0,'download',50,{source:{kind:'download',done:50,total:100}});
+  expect(untracedChanges([good])).toEqual([]);
+  const bad={...good,pct:51};expect(untracedChanges([bad])).toEqual([bad]);
+  const unrelated={...good,bar:'load'};expect(untracedChanges([unrelated])).toEqual([unrelated]);
 });

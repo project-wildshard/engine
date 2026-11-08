@@ -173,6 +173,12 @@ export class LoadingTimeline {
 let timeline: LoadingTimeline | undefined;
 /** Installed explicitly by the visible loader; imports do not install observers or services. */
 export function installLoadingTimeline(value: LoadingTimeline): () => void {
-  timeline = value; return () => { if (timeline === value) timeline = undefined; };
+  timeline = value;
+  const timing=bootTiming(), read=():ReturnType<LoadingTimeline['snapshot']>=>value.snapshot();
+  if(timing!==undefined)(timing.work??={}).load=read;
+  return () => {
+    if (timeline === value) timeline = undefined;
+    if(timing?.work?.load===read)delete timing.work.load;
+  };
 }
 export function currentLoadingTimeline(): LoadingTimeline | undefined { return timeline; }

@@ -32,6 +32,12 @@ export interface BootTiming {
   finish: () => void;
   /** Observe real collector updates; subscriptions retire with their loader. */
   subscribe?: (listener: () => void) => () => void;
+  /** Read original producer state for manual progress proofs. No UI-derived
+   * counters, polling, event copies or network work are installed here. */
+  work?: {
+    load?: () => {path:string;rows:readonly {key:string;state:string;fraction?:number;weight?:number}[]};
+    download?: () => {totalBytes:number;completedBytes:number;filesDone:number;filesTotal:number;complete:boolean;progressKnown?:boolean};
+  };
 }
 
 /** The same plain object from the first HTML statement, or absent in a non-page host. */
