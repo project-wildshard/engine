@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Manual LS1 milestone proof. Deliberately outside hooks and the unit-test glob.
 // Run through scripts/browser-lane.sh; uses production bytes and real workers.
+/** @typedef {import('./types/worker-page').WorkerWindow} WorkerWindow */
+/** @typedef {import('../src/client/engine/debug/probe').EngineProbe} EngineProbe */
 import assert from 'node:assert/strict';
 import { resolve as resolvePath } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -143,10 +145,10 @@ if(expectedBuild!==undefined) {
           assert.equal(Object.values(messages.kinds).reduce((sum,count)=>sum+count,0),messages.count);
           assert.ok(messages.first<=messages.last&&Object.keys(messages.kinds).length<=33);
         }
-        assert.ok(await page.evaluate(()=>{const owner=/** @type {import('./types/worker-page').WorkerWindow} */(window);return Boolean(owner.__wildshard.shard.grid.state().live?.live?.gameplayReady);}),'grid did not reach gameplay readiness');
+        assert.ok(await page.evaluate(()=>{const owner=/** @type {WorkerWindow} */(window);return Boolean(owner.__wildshard.shard.grid.state().live?.live?.gameplayReady);}),'grid did not reach gameplay readiness');
         await page.evaluate(FLOOR_GRID_ENTER);
-        await page.waitForFunction(()=>{const owner=/** @type {import('./types/worker-page').WorkerWindow} */(window);return typeof owner.__workerClient==='function'&&owner.__workerClient().frames>=30&&owner.__wildshard.shard.grid.state().cellLoading===null;},undefined,{timeout:90000});
-        const entered=await page.evaluate(()=>{const owner=/** @type {import('./types/worker-page').WorkerWindow} */(window),state=owner.__wildshard.shard.grid.state(),report=owner.__workerClient();return {home:state.home,playing:state.cells.find(cell=>cell.shows==='playing')?.instance,board:state.cellLoading,frames:report.frames,closed:report.closed};});
+        await page.waitForFunction(()=>{const owner=/** @type {WorkerWindow} */(window);return typeof owner.__workerClient==='function'&&owner.__workerClient().frames>=30&&owner.__wildshard.shard.grid.state().cellLoading===null;},undefined,{timeout:90000});
+        const entered=await page.evaluate(()=>{const owner=/** @type {WorkerWindow} */(window),state=owner.__wildshard.shard.grid.state(),report=owner.__workerClient();return {home:state.home,playing:state.cells.find(cell=>cell.shows==='playing')?.instance,board:state.cellLoading,frames:report.frames,closed:report.closed};});
         assert.equal(entered.playing,entered.home,'fresh grid did not enter its home');assert.equal(entered.closed,null);
         console.log(`${name}: entered ${entered.playing}, home board=${entered.board}, frames=${entered.frames}, pushed=${expectedBuild??'candidate'}`);
       }
@@ -193,7 +195,7 @@ if(expectedBuild!==undefined) {
       }
       assert.equal(faults.length,0,faults.join('\n'));
       const renderFrame=await page.evaluate(()=>{
-        const probe=/** @type {import('../src/client/engine/debug/probe').EngineProbe|undefined} */(Reflect.get(window,'__wildshard'));
+        const probe=/** @type {EngineProbe|undefined} */(Reflect.get(window,'__wildshard'));
         return probe?.world ? probe.requireWorld().game.renderer.info.render.frame : 0;
       });
       assert.ok(renderFrame>0,'real world did not render');

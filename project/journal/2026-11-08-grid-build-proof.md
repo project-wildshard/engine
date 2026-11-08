@@ -18,3 +18,21 @@ The manual proof now checks the entered home and board, and accepts
 and matching served build metadata. Run that after the loading batch is
 pushed and rebuilt, before judging the reported preview stall. The new
 check stays outside hooks and the unit-test glob. Types and lint pass.
+
+Ordered integration now follows published SR batch 8278424, whose whole
+normal pre-push passed in 821.9 seconds. The rebased helper's inline
+callback JSDoc imports failed source type resolution; module-level type
+aliases fix that without changing browser behavior. Full typecheck and
+53 focused PWA/title cases pass. The normal 28-product build passes.
+
+The rebased candidate grid passes again on Chromium and WebKit: first
+step 2448/2640 ms, loader-complete 22888/4947 ms, maximum unnamed gap
+284/283 ms. Both enter Driftwood, clear the home board and retain an
+open server with at least 30 frames. Each title-page stress retains all
+5,000 actual worker receipts in two entries, without overflow.
+
+A separate actual server cache miss with five seconds of delayed server
+work passes in both browsers. Loader-complete is 13207/8451 ms and the
+largest unnamed gap is 281/269 ms. Worker streamed bytes are observed.
+No browser remains open. The normal full LS1 publication gate is next;
+the final pushed-build verdict still waits for that exact-source build.
