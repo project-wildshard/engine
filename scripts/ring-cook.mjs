@@ -9,6 +9,7 @@ import { parseArgs } from 'node:util';
 await import('./bake-loader.mjs');
 const { createCookWorker, indexKey } = await import('../src/cook/game/cookWorker.ts');
 const { folderStore } = await import('../src/cook/game/packStore.ts');
+const { cookRevision } = await import('./cook-revision.ts');
 const { values } = parseArgs({ options: { out: {type:'string',default:'tmp/ring-cook'}, build: {type:'string',default:'ring-local'},
   only: {type:'string'}, 'timeout-ms': {type:'string',default:'120000'} } });
 const timeout = Number(values['timeout-ms']);
@@ -32,7 +33,7 @@ const worker = createCookWorker({ build: values.build, store, serverPacks: join(
   source: { heads: () => Promise.resolve(heads.map(row => ({...row, revision:1}))), download: hash => Promise.resolve(readFileSync(join(cache,`${hash}.tar`))) },
   launcher: { root, execPath: process.execPath, loader:join(root,'scripts/bake-loader.mjs'), script:join(root,'scripts/cook-job.mjs'),
     wrap:[], limits:{seconds:timeout/1000,memoryMB:4096,heapMB:2048} } });
-const indexes = [];
+const recipe = cookRevision(), indexes = [];
 for (const head of heads) {
   const started = performance.now(), row = await worker.cook(head);
   if (row.state !== 'cooked') throw new Error(`${head.slug}: ${row.state}: ${row.detail ?? 'no cook result'}`);
@@ -41,6 +42,7 @@ for (const head of heads) {
   const index = JSON.parse(new TextDecoder().decode(bytes)); indexes.push(index);
   console.log(`${head.slug}: ${index.proof}, ${index.keys.length} stored objects, ${((performance.now()-started)/1000).toFixed(1)}s`);
 }
-const receipt = { build:values.build, store:join(out,'store'), heads, indexes };
+if (cookRevision().revision !== recipe.revision) throw new Error('Cook source changed during the batch');
+const receipt = { build:values.build, cook:recipe, store:join(out,'store'), heads, indexes };
 writeFileSync(join(out,'receipt.json'),JSON.stringify(receipt));
 console.log(JSON.stringify({receipt:join(out,'receipt.json')}));
