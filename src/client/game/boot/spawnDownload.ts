@@ -455,7 +455,15 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           try {
             let received = 0, credited = 0;
             const {bytes: body, copy: cachedCopy} = await readSpawnFile(file.url, file.bytes, {
-              ...ports, fetch: (url, signal, init) => {received = 0; return ports.fetch(url, signal, init);},
+              ...ports, fetch: (url, signal, init) => {
+                received = 0;
+                // The page/cache identity stays local. A remotely cooked shard's
+                // loose header/discovery lives with its parts, just like its data.
+                const source = new URL(url), page = new URL(base);
+                const target = source.origin === page.origin && source.pathname.startsWith('/shardfiles/')
+                  ? new URL(source.pathname + source.search, packs).href : url;
+                return ports.fetch(target, signal, init);
+              },
             }, controller.signal, size => {
               received += size;
               if (received > credited) {completedBytes += received - credited; credited = received; arrive(file, received); publish();}
