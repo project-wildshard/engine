@@ -18,19 +18,19 @@ writeFileSync(join(root,'src/client/material.ts'),'export const material = "firs
 writeFileSync(join(root,'public/host.bin'),'host bytes');
 execFileSync('git',['-C',root,'init','-q']);execFileSync('git',['-C',root,'add','public/host.bin','src/client/material.ts','pnpm-lock.yaml']);
 
-test('renderer identity changes for actual client or shipped host bytes',()=>{
+await Promise.all([test('renderer identity changes for actual client or shipped host bytes',()=>{
   const first=rendererRevision(root);
   writeFileSync(join(root,'src/client/material.ts'),'export const material = "second";');
   const second=rendererRevision(root);assert.notEqual(first,second);
   writeFileSync(join(root,'public/host.bin'),'new host bytes');
   assert.notEqual(rendererRevision(root),second);
-});
+}),
 test('release version, shell identity and generated product tables do not rename the renderer',()=>{
   const first=rendererRevision(root);
   writeFileSync(join(root,'package.json'),JSON.stringify({version:'2.0.0',dependencies:{three:'fixed'}}));
   writeFileSync(join(root,'src/client/data.generated.ts'),'different product table');
   assert.equal(rendererRevision(root),first);
-});
+}),
 test('actual document stamping exposes the renderer independently of shell build id',()=>{
   const out=join(root,'document');mkdirSync(out);
   writeFileSync(join(out,'index.html'),'<html><head></head><body></body></html>');
@@ -40,7 +40,7 @@ test('actual document stamping exposes the renderer independently of shell build
   const html=readFileSync(join(out,'index.html'),'utf8');
   assert.ok(html.includes(`globalThis.__WS_RENDERER_REVISION__="${renderer}"`));
   assert.ok(html.includes('globalThis.__WS_BUILD_ID__="shell-commit"'));
-});
+}),
 test('capture-only artifact is refused by the real production gate',()=>{
   const out=join(root,'capture');mkdirSync(out);
   writeFileSync(join(out,'build-flags.json'),JSON.stringify({devserver:false}));
@@ -48,7 +48,7 @@ test('capture-only artifact is refused by the real production gate',()=>{
   assert.throws(()=>assertProductionBuild(out),/Preparation-only/u);
   writeFileSync(join(out,'version.json'),JSON.stringify({preparationOnly:false}));
   assert.doesNotThrow(()=>assertProductionBuild(out));
-});
+}),
 test('malformed renderer metadata never enters executable document source',()=>{
   const out=join(root,'invalid');mkdirSync(out);
   const html='<html><head></head><body></body></html>';
@@ -56,4 +56,4 @@ test('malformed renderer metadata never enters executable document source',()=>{
   writeFileSync(join(out,'version.json'),JSON.stringify({build:'valid-build',rendererRevision:'</script>'}));
   assert.throws(()=>stampBuildDocuments(out),/Invalid renderer identity/u);
   assert.equal(readFileSync(join(out,'index.html'),'utf8'),html);
-});
+})]);
