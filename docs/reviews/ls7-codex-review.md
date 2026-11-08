@@ -1,6 +1,7 @@
 # LS7 Codex review: hold the two Opus commits
 
-Status: NO-GO for d9c38da and 907ae63 pending the fixes below.
+Status: original NO-GO superseded by the native lifecycle re-review below.
+Publication still requires the revised strict consumer proofs and full gates.
 
 Reviewed committed blobs only. Neither foreign clone's dirty generated
 files was changed. The three preceding Codex commits are not rejected
@@ -61,3 +62,34 @@ measurement resolution. Keep unmeasured paths outside the calibrated
 profile until measured. Do not obtain strict acceptance by raising a
 share or a floor without its measurement. Re-run strict actual boots
 after the fence fix and stronger independent oracle are in place.
+
+## Codex re-review of 495aaac, f211ba7 and 6d19538
+
+The committed replacement FencedUnits class passed six real-WebGL paths
+in Chromium and WebKit using actual game child Scopes. This is the
+committed class transpiled into the full-catalogue b330883 page, not a
+claim that an earlier application build contained later changes. The
+manual native proof is scripts/loading-fence-proof.mjs, outside hooks.
+
+Normal completion created/deleted/credited 1/1/1. Disposal returned
+disposed with 1/1/0. Loss before submit returned context-lost with
+0/0/0; loss in flight returned context-lost with 2/2/0. Deleting an
+actual native handle induced WAIT_FAILED, returning wait-failed and
+1/1/0. A throwing callback released both queued handles; only its
+already-signalled GPU unit earned internal credit and no callback
+progress succeeded. Every case settled, with zero pending handles.
+Game.firstFrame wraps all preparation and progress callbacks in its
+units.dispose finally. Native lifecycle findings are closed.
+
+f211ba7 records the measured seconds for every calibrated row, its raw
+precision, build, browser, profile, command and date. Unmeasured paths
+retain their previous equal completed-work shares. The initial 8.6778
+modules weight included Start: re-review found that overlap, and
+6d19538 replaces it with the measured 0.364-second Load-only span from
+app:loading-adopt in the same timing source (also repeated at 2c12f2c).
+Start retains its independent completed boundaries/code-byte bar; its
+seconds no longer supply the modules share in Load. These source
+findings are closed. The strengthened oracle must still pass the four
+strict boots before publication; historical label-based greens alone
+remain insufficient. Normal commit checks must cover the whole stack,
+including 6d19538, which its author committed with SKIP_CHECK=1.

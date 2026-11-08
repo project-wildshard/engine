@@ -50,7 +50,7 @@ try{for(const name of ['chromium','webkit']){
     for(const row of result){
       assert.equal(row.pending,0);assert.equal(row.created,row.deleted);
       if(row.kind==='normal'){assert.equal(row.outcome,'resolved');assert.equal(row.completed,1);}
-      else{assert.notEqual(row.outcome,'resolved');assert.notEqual(row.outcome,'pending');assert.equal(row.completed,0);}
+      else{const expected={dispose:'disposed','lost-before':'context-lost','lost-inflight':'context-lost','wait-failed':'wait-failed',callback:'native callback failure'};assert.equal(row.outcome,Reflect.get(expected,row.kind));assert.equal(row.completed,0);}
       if(row.kind!=='normal'&&row.kind!=='callback')assert.equal(row.credited,0);
     }
     console.log(`${name}: ${JSON.stringify(result)}`);

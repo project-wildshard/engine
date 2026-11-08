@@ -29,3 +29,8 @@ Chromium also requires its explicit clipboard-write test permission;
 the original native refusal was retained as a failure. Pre-adoption
 Download reads the same selected operation before Loading takes over;
 its integer writer is checked at its actual precision.
+
+Native lifecycle re-review is green in both engines: the real normal,
+disposal, loss-before-submit, in-flight loss, actual WAIT_FAILED and
+throwing-callback paths all settle and leave zero queued handles. The
+exact created/deleted/credited counts are in the committed review.
