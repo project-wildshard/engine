@@ -201,7 +201,7 @@ workerScope.listen(self, 'activate', event => {
 // LS1: local client messages only; never await diagnostics before delivery.
 const bootOrigin = performance.timeOrigin, bootPending = new Map();
 function bootPublish(event, rows) {
-  const id = (event?.clientId === '' ? undefined : event?.clientId) ?? event?.resultingClientId;
+  const id = (event?.resultingClientId === '' ? undefined : event?.resultingClientId) ?? event?.clientId;
   if (!id || controlled.has(id)) return;
   const records = rows.map(row => ({...row,origin:bootOrigin,client:id}));
   try { event.waitUntil(self.clients.get(id).then(client => {
@@ -236,21 +236,23 @@ async function cached(request, name, event) {
     if (response !== undefined && !isHtml(response)) return delivery(response);
     // DL25: a hashed name read bare, where a part's member was kept under its manifest's `?v=`: the same file
     if (!reload && CONTENT.test(new URL(request.url).pathname)) {
-      const kept = await cache.match(request, { ...MATCH, ignoreSearch: true });
+      const kept = await timed('sw:cache-match-ignore-search', () => cache.match(request, { ...MATCH, ignoreSearch: true }));
       if (kept !== undefined && !isHtml(kept)) return delivery(kept);
     }
-    if (response !== undefined) await cache.delete(request);
+    if (response !== undefined) await timed('sw:discard-html', () => cache.delete(request));
     if (!reload && name !== ASSETS) {
-      const shared = await (await store(ASSETS)).match(request, MATCH);
+      const assets = await timed('sw:shared-cache-open', () => store(ASSETS));
+      const shared = await timed('sw:shared-cache-match', () => assets.match(request, MATCH));
       if (shared !== undefined && !isHtml(shared)) return delivery(shared);
-      if (shared !== undefined) await (await store(ASSETS)).delete(request);
+      if (shared !== undefined) await timed('sw:discard-shared-html', () => assets.delete(request));
     }
     // Wave 2 removes the old page cache. Until then retain its already named bodies.
     const hash = HASH.exec(new URL(request.url).pathname)?.[1];
-    if (!reload && hash !== undefined && (await caches.keys()).includes('ws-content-v0')) {
-      const old = await (await caches.open('ws-content-v0')).match(abs(`/__ws_content__/v0/${hash}`), MATCH);
+    if (!reload && hash !== undefined && (await timed('sw:legacy-cache-list', () => caches.keys())).includes('ws-content-v0')) {
+      const legacy = await timed('sw:legacy-cache-open', () => caches.open('ws-content-v0'));
+      const old = await timed('sw:legacy-cache-match', () => legacy.match(abs(`/__ws_content__/v0/${hash}`), MATCH));
       if (old !== undefined && !isHtml(old)) {
-        await cache.put(request, old.clone()).catch(() => undefined);
+        await timed('sw:legacy-copy-publication', () => cache.put(request, old.clone())).catch(() => undefined);
         return delivery(old);
       }
     }
@@ -270,7 +272,9 @@ workerScope.listen(self, 'fetch', event => {
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.searchParams.get('sw') === '0') return;
   if (url.pathname === '/version.json' || url.pathname === '/sw.js' || url.pathname.startsWith('/api/')) return;
   if (request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+    const received=diagnosticNow();
     event.respondWith(new Response(DOCUMENT, { headers: { 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } }));
+    bootPublish(event,[{operation:'sw:navigation-handler-and-delivery',url:request.url,start:received,end:diagnosticNow(),result:'complete'}]);
     return;
   }
   if (immutable(url)) {

@@ -30,7 +30,7 @@ test('every title URL names its exact original bytes and shell/runtime use the s
     const result=serviceWorkerCore({'index.html':{type:'asset',source:new TextEncoder().encode(html)}},root,'title');
     expect(result.core).toContain(urls['/assets/title/main-crossroads-square.jpg']);
     expect(result.core).toContain(urls['/assets/title/main-crossroads-landscape.jpg']);
-    const literal=/^const SHELL_FILES = JSON.parse\((.+)\);$/mu.exec(result.core)?.[1];
+    const literal=/^\s*(?:const|var) SHELL_FILES = JSON.parse\((.+)\);$/mu.exec(result.core)?.[1];
     if(literal===undefined)throw new Error('Missing installed shell inventory');
     const encoded:unknown=JSON.parse(literal);
     if(typeof encoded!=='string')throw new Error('Shell inventory must be serialized data');
@@ -40,7 +40,7 @@ test('every title URL names its exact original bytes and shell/runtime use the s
     expect(installed).toEqual(expect.arrayContaining(Object.values(urls).filter(url=>!later(url))));
     if(!Array.isArray(installed))throw new Error('Shell inventory must be a list');
     expect(installed.filter(url=>typeof url==='string'&&later(url))).toEqual([]);
-    for(const url of Object.values(urls))if(url.includes('-portrait-'))expect(/^const FILES = .+$/mu.exec(result.core)?.[0]).toContain(url);
+    for(const url of Object.values(urls))if(url.includes('-portrait-'))expect(/^\s*(?:const|var) FILES = .+$/mu.exec(result.core)?.[0]).toContain(url);
   }finally{rmSync(out,{recursive:true,force:true});}
 });
 

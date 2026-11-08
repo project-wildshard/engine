@@ -39,6 +39,22 @@ entries while retaining immutable content; it proves a metadata miss
 with old content held, not a second release deployment. These are manual
 milestone proofs, outside hooks. Browser processes and previews closed.
 
+The final handoff review reuses the inline clock's parsed arrival rather
+than rereading storage before the first paint. A real title Enter world
+navigation passed both engines at 1244/2135 ms, zero unnamed gap, with
+the captured old input stamps and old/new origins retained before entry
+and subsequently validated. Parent-only vendor replies no longer earn
+code-ready credit; constructor refusal is retained as failure. SW
+navigation delivery and legacy/shared cache paths keep their own names.
+The 24 additional existing arrival/held-read checks passed in 1.33 s.
+The real worker network-miss proof withholds only its optional held-byte
+port, preserving control/game/harness. It passed Chromium/WebKit at
+1410/2131 ms with zero unnamed gap, worker-owned fetch spans, resources
+and streamed byte increments. The final warm proof also requires the
+SW's navigation delivery record. 34 existing HTML/title/bake checks
+passed in 1.66 s after adapting the remaining shell-inventory fixture to
+the actual bundled declaration, preserving every asset assertion.
+
 54 existing outer-edge checks passed in 1.1 s: startup module bank,
 Loading waits/timeline, title preparation and real bundled SW behavior.
 Types, lint, formatting and layer sides passed. The old SW fixture had

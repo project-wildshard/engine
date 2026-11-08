@@ -7,6 +7,9 @@ or Copy diagnostics can call `read()` and serialize the returned object;
 functions naturally disappear from JSON. Nothing is uploaded or persisted
 by the collector. Existing title-arrival intent carries only the previous
 page's input and navigation origin stamps.
+The inline clock lends its already parsed arrival to the collector,
+avoiding another synchronous storage read. Input handler entry is the
+capture listener's entry, distinct from the later navigation decision.
 
 `entries` holds build, attempt, realm, operation, page-axis start/end,
 result and detail. `active` is refreshed by `read()` with current ages.
@@ -40,7 +43,9 @@ world has separate imports, storage, physics, product reads, verification,
 simulation/collision, restore, handshake and first-body boundaries.
 Constructor-to-first-worker-message is explicitly a combined
 fetch/evaluation/start/queue span. Helpers outside our source retain
-parent-only observations and an unknown worker origin.
+parent-only observations and an unknown worker origin. Their span is
+named `worker:constructor-to-first-message`; that first reply can include
+the worker's first job and earns no code-ready completion credit.
 
 Each list is bounded; overflow and unavailable APIs are explicit. The
 100 ms scheduling probe only retains the largest observed gap. Loader
@@ -62,6 +67,11 @@ It opens real iPhone portrait Chromium and WebKit boots, requires live
 worker/world records, response byte chunks and retained early resources,
 and refuses an unnamed interval over one second before the first game
 step. Delay modes also include `js`, `styles`, `tables` and `server`.
+`--handoff` navigates through the real title's Enter world control and checks
+the old input stamps and both document origins before Loading adoption.
+`--server-network` withholds only the optional page-held byte loan at the
+test's transport boundary. The real worker then fetches its own book and
+parts; the proof requires worker-realm streamed chunks and resources.
 The server case injects a bounded async wait inside Sunscar's actual worker
 world-boot boundary, separate from its code fetch and initial ping. Both
 Ring 1 worlds can borrow their inputs without a server network read, so

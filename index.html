@@ -39,6 +39,7 @@
           return data;
         };
         const resource = (entry, realm = 'page', workerOrigin = origin) => {
+          if (stopped) return;
           if (data.resources.length >= limit) { overflow('resources'); return; }
           data.resources.push({...plain(entry), url: entry.name, initiator: entry.initiatorType, realm, timeOrigin: workerOrigin,
             pageStart: workerOrigin + entry.startTime - origin, pageEnd: workerOrigin + entry.responseEnd - origin});
@@ -56,23 +57,13 @@
           try { paintObserver = new PerformanceObserver(list => { for (const e of list.getEntries()) if (data.paints.length < 32) data.paints.push({name:e.name,start:e.startTime}); }); paintObserver.observe({type:'paint',buffered:true}); }
           catch { data.paints.push({name:'unavailable',start:null}); }
         } catch { data.overflow.resourceTimingUnavailable = true; }
-        performance.addEventListener?.('resourcetimingbufferfull', () => overflow('resourceBuffer'));
+        const resourceOverflow = () => {if (!stopped) overflow('resourceBuffer');};
+        performance.addEventListener?.('resourcetimingbufferfull', resourceOverflow);
         for (const name of ['DOMContentLoaded','load']) addEventListener(name, navigation, {once: true});
         for (const name of ['visibilitychange','pagehide','pageshow']) addEventListener(name, event => {
           if (data.lifecycle.length < 64) data.lifecycle.push({name, at: now(), visibility: document.visibilityState, persisted: event.persisted ?? null});
         });
         for (const name of ['pointerup','click','keydown']) addEventListener(name, event => { data.lastInput = {event: name, eventTimeStamp: event.timeStamp, handlerEntry: now(), timeOrigin: origin}; }, {capture:true,passive:true});
-        const handoff = (storage, suffix, key) => {
-          try { for (let index=0; index<Math.min(storage.length,128); index++) {
-            const name=storage.key(index); if (!name?.endsWith(suffix)) continue;
-            const doc=JSON.parse(storage.getItem(name) || 'null'), raw=doc?.keys?.[key]?.data;
-            const arrival=typeof raw === 'string' ? JSON.parse(raw) : raw;
-            if (arrival?.timing && Number.isFinite(arrival.at) && Date.now()-arrival.at >= 0 && Date.now()-arrival.at < 60000 && (data.handoff===null || arrival.at>data.handoff.wall)) {
-              data.handoff={...arrival.timing,wall:arrival.at,received:now(),newTimeOrigin:origin,source:'pending-title-arrival',validated:false};
-            }
-          }} catch { /* Unavailable storage leaves the tap origin unknown. */ }
-        };
-        try {handoff(sessionStorage,'.session','titleArrival');handoff(localStorage,'.device','titleArrival.once');} catch { /* Storage denied. */ }
         navigation(); append('document:navigation-and-html', 0, now(), 'observed');
         append('app:html-script-start',scriptStart,scriptStart,'observed'); data.mark('app:collector-installed'); data.begin('app:document-and-module-graph');
         addEventListener('DOMContentLoaded', () => { data.mark('app:dom-content-loaded'); }, {once:true});
@@ -81,14 +72,18 @@
           if (data.largestGap === null || ms > data.largestGap.ms) data.largestGap = {before: previous, after: at, ms, visibility: document.visibilityState}; previous = at;
         }, 100);
         const restorations = [];
-        data.finish = () => { data.mark('app:loader-complete'); const ended=now(); for(const row of data.entries) if(row.end===null){row.end=ended;row.result='unresolved-at-loader-complete';} data.read(); stopped = true; clearInterval(clock); observer?.disconnect(); paintObserver?.disconnect(); for (const restore of restorations.splice(0)) { try { restore(); } catch {} } };
+        data.finish = () => { data.mark('app:loader-complete'); const ended=now(); for(const row of data.entries) if(row.end===null){row.end=ended;row.result='unresolved-at-loader-complete';} data.read(); stopped = true; clearInterval(clock); observer?.disconnect(); paintObserver?.disconnect(); performance.removeEventListener?.('resourcetimingbufferfull',resourceOverflow); for (const restore of restorations.splice(0)) { try { restore(); } catch {} } };
         if (typeof Worker === 'function') {
           const Native = Worker;
           window.Worker = new Proxy(Native, {construct(target, args, constructor) {
+            if (workerSequence >= limit) {overflow('realms');return Reflect.construct(target,args,constructor);}
             const realm = `worker:${++workerSequence}`, purpose = args[1]?.name || String(args[0]);
+            const owned = /(?:serverWorker|imageDecode\.worker|liveJsonParser\.worker|ktx2Zstd\.worker|tileDecodeWorker|farImpostorDecodeWorker|road(?:Grain|Sign|TileWrite|TileCapture)\.worker|viewmodelTextures\.worker)/.test(String(args[0]));
             const id = data.begin('worker:constructor', {realm,purpose,url:String(args[0])});
-            const worker = Reflect.construct(target, args, constructor); data.end(id);
-            const code = data.begin('worker:fetch-evaluate-start', {realm,purpose});
+            let worker;
+            try {worker=Reflect.construct(target,args,constructor);data.end(id);}
+            catch(error) {data.end(id,'failed');throw error;}
+            const code = data.begin(owned?'worker:fetch-evaluate-start':'worker:constructor-to-first-message', {realm,purpose});
             data.realms[realm] = {purpose, url:String(args[0]), timeOrigin:null, precision:'browser', instrumentation:'parent-only'};
             const ids = new Map(); let first = true;
             const receive = event => {
@@ -109,11 +104,11 @@
                   else if (row.type === 'progress') data.progress(`${realm}:${row.operation}`,row.delta,row.total,row.unit);
                   else if (row.type === 'overflow') overflow(`${realm}:records`);
                 }
-              } else { if (first) {first=false;data.end(code);} data.mark('worker:message-receive',{realm,kind:value?.kind || value?.type || null}); }
+              } else { if (first) {first=false;data.end(code,'first-message-observed');} data.mark('worker:message-receive',{realm,kind:value?.kind || value?.type || null}); }
             };
             worker.addEventListener('message',receive,{capture:true});
             worker.addEventListener('error',()=>data.end(code,'failed'),{once:true});
-            if (/(?:serverWorker|imageDecode\.worker|liveJsonParser\.worker|ktx2Zstd\.worker|tileDecodeWorker|farImpostorDecodeWorker|road(?:Grain|Sign|TileWrite|TileCapture)\.worker|viewmodelTextures\.worker)/.test(String(args[0]))) {
+            if (owned) {
               worker.postMessage({__engineBootPing:now()}); restorations.push(()=>worker.postMessage({__engineBootStop:1}));
             }
             return worker;
@@ -481,6 +476,8 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
         const field = name => card.querySelector('[data-el="' + name + '"]'), entry = (store, scope, key) => { try { const item = JSON.parse(store().getItem('wildshard.save.v2@1.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; } catch { return null; } };
         if (!card || !slug) return;
         const found = [entry(() => sessionStorage, 'session', 'titleArrival'), entry(() => localStorage, 'device', 'titleArrival.once')].find(a => a?.slug === slug && Date.now() - a.at < 60000);
+        // Adopt the clock's existing parsed handoff; no extra storage read on boot.
+        if (found?.timing && window.__bootTiming) window.__bootTiming.handoff = {...found.timing,wall:found.at,received:performance.now(),newTimeOrigin:window.__bootTiming.timeOrigin,source:'title-arrival-clock-read',validated:false};
         const start = found ? Math.min(0, found.at - performance.timeOrigin) : 0, clock = field('clock');
         card.dataset.clockStartedAt = String(start); if (found?.name) field('slug').textContent = found.name; if (found?.tier) field('tier').textContent = found.tier;
         const paint = () => { const s = (performance.now() - start) / 1000; clock.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + (s % 60).toFixed(1).padStart(4, '0'); };
