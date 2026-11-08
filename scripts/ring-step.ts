@@ -9,6 +9,7 @@
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
 import './bake-loader.mjs';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
@@ -98,6 +99,8 @@ for (const [slug, folder] of rows) {
     console.error(`${slug}: FAILED: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
   }
 }
+const report = option('report');
+if (report !== undefined) writeFileSync(report, `${JSON.stringify({version: 1, sha: execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(), platform: PLATFORM, ticks: TICKS, measured}, null, 2)}\n`);
 if (process.argv.includes('--update')) {
   if (failed > 0 && Object.keys(measured).length < rows.length) throw new Error('A row failed to step: nothing recorded');
   writeFileSync(BASELINE, `${JSON.stringify({ ...baseline, [PLATFORM]: { ...baseline[PLATFORM], [String(TICKS)]: { ...held, ...measured } } }, null, 1)}\n`);

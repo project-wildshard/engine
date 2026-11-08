@@ -31,7 +31,7 @@ products() {
   if [ "${RING_RECORD:-}" = true ]; then update=(--update); fi
   stage pins node scripts/pins.ts install --ring 1
   stage cook node scripts/ring-cook.mjs
-  stage step node --experimental-transform-types --no-warnings scripts/ring-step.ts "${update[@]}"
+  stage step node --experimental-transform-types --no-warnings scripts/ring-step.ts --report tmp/ring-cook/step.json "${update[@]}"
   stage build pnpm build:ring
   # Title to play on all three. The grid case isn't here: on three products it stalls at `home`, so road crossings stay in Ring 2 until row 7.
   WILDSHARD_RING=1 stage boot node scripts/parity/boot-smoke.mjs --case-group=developer
