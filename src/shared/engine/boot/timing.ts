@@ -30,6 +30,8 @@ export interface BootTiming {
   progress: (operation: string, delta: number, total: number | null, unit: string) => void;
   read: () => BootTiming;
   finish: () => void;
+  /** Observe real collector updates; subscriptions retire with their loader. */
+  subscribe?: (listener: () => void) => () => void;
 }
 
 /** The same plain object from the first HTML statement, or absent in a non-page host. */

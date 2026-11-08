@@ -10,6 +10,8 @@
         const data = window.__bootTiming = {version: 1, build: null, attempt: String(origin), attemptCount: 1,
           timeOrigin: origin, entries: [], resources: [], counters: {}, active: [], realms: {},
           navigation: {}, lifecycle: [], paints: [], overflow: {}, largestGap: null, handoff: null, lastInput: null};
+        const subscribers = new Set();
+        data.subscribe = listener => { subscribers.add(listener); return () => subscribers.delete(listener); };
         const overflow = key => { data.overflow[key] = (data.overflow[key] || 0) + 1; };
         const append = (operation, start, end, result, detail = {}, realm = 'page') => {
           if (data.entries.length >= limit) { overflow('entries'); return 0; }
@@ -29,6 +31,7 @@
           if (!data.counters[operation] && Object.keys(data.counters).length >= limit) { overflow('counters'); return; }
           const row = data.counters[operation] ||= {loaded: 0, total, unit, at: now(), events:0};
           row.loaded += delta; row.events++; row.at = now(); if (row.total !== null && row.loaded > row.total) row.total = null;
+          for (const listener of subscribers) listener();
         };
         const fields = ['startTime','workerStart','fetchStart','redirectStart','redirectEnd','domainLookupStart','domainLookupEnd','connectStart','connectEnd','secureConnectionStart','requestStart','responseStart','responseEnd','duration','transferSize','encodedBodySize','decodedBodySize','nextHopProtocol','unloadEventStart','unloadEventEnd','domInteractive','domContentLoadedEventStart','domContentLoadedEventEnd','domComplete','loadEventStart','loadEventEnd','type','redirectCount'];
         const plain = entry => Object.fromEntries(fields.map(key => [key, typeof entry[key] === 'number' || typeof entry[key] === 'string' ? entry[key] : null]));
@@ -72,7 +75,7 @@
           if (data.largestGap === null || ms > data.largestGap.ms) data.largestGap = {before: previous, after: at, ms, visibility: document.visibilityState}; previous = at;
         }, 100);
         const restorations = [];
-        data.finish = () => { data.mark('app:loader-complete'); const ended=now(); for(const row of data.entries) if(row.end===null){row.end=ended;row.result='unresolved-at-loader-complete';} data.read(); stopped = true; clearInterval(clock); observer?.disconnect(); paintObserver?.disconnect(); performance.removeEventListener?.('resourcetimingbufferfull',resourceOverflow); for (const restore of restorations.splice(0)) { try { restore(); } catch {} } };
+        data.finish = () => { data.mark('app:loader-complete'); const ended=now(); for(const row of data.entries) if(row.end===null){row.end=ended;row.result='unresolved-at-loader-complete';} data.read(); stopped = true; subscribers.clear(); clearInterval(clock); observer?.disconnect(); paintObserver?.disconnect(); performance.removeEventListener?.('resourcetimingbufferfull',resourceOverflow); for (const restore of restorations.splice(0)) { try { restore(); } catch {} } };
         if (typeof Worker === 'function') {
           const Native = Worker;
           window.Worker = new Proxy(Native, {construct(target, args, constructor) {
@@ -509,16 +512,27 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
         if (typeof found?.art === 'string' && /^(?:\/(?!\/)[\w./-]+\.(?:jpg|png|webp))?$/u.test(found.art)) document.documentElement.style.setProperty('--ws-load-portrait', found.art === '' ? 'none' : 'url("' + found.art + '")');
         const paint = () => { const s = (performance.now() - start) / 1000; clock.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + (s % 60).toFixed(1).padStart(4, '0'); };
         // LS2/LS3: Start's bar takes one share per completed LS1 boundary of START_STEPS (src/client/engine/boot/shell.ts),
-        // never time; its fact counts the page's finished files and their bytes from the same collector.
+        // never time; one additional share counts completed code body bytes from the compiler inventory.
         const steps = ['app:document-and-module-graph', 'app:page-entry-import', 'app:tables-import-and-prepare', 'app:tier-menu-download-imports', 'app:three-import', 'app:main-import', 'app:selected-discovery'];
         const startFact = field('stFact'), startPct = field('stPct'), startBar = field('stBar');
+        // Compiler-owned decoded body sizes, not transfer sizes or a timing estimate.
+        const moduleRows = JSON.parse(document.getElementById('boot-module-files')?.textContent || '{}').common || [];
+        const modules = new Map(moduleRows.map(([url, bytes]) => [new URL(url, location.href).href, bytes]));
+        const moduleTotal = [...modules.values()].reduce((sum, bytes) => sum + bytes, 0);
         const startPaint = () => {
           const t = window.__bootTiming; if (!t) return;
           const done = steps.filter(op => t.entries.some(e => e.operation === op && e.end !== null && e.result === 'complete'));
-          const pct = String(Math.floor(done.length / steps.length * 100));
+          const received = new Map();
+          for (const row of t.resources) if (row.realm === 'page' && modules.has(row.url) && row.decodedBodySize > 0) received.set(row.url, Math.min(modules.get(row.url), row.decodedBodySize));
+          const moduleBytes = [...received.values()].reduce((sum, bytes) => sum + bytes, 0);
+          const fraction = moduleTotal > 0 ? (done.length + moduleBytes / moduleTotal) / (steps.length + 1) : done.length / steps.length;
+          const pct = String(Math.floor(fraction * 100));
           if (startPct.textContent !== pct) { startPct.textContent = pct; startBar.style.width = pct + '%'; }
           let files = 0, bytes = 0; for (const r of t.resources) if (r.realm === 'page') { files++; bytes += r.transferSize || 0; }
-          if (files > 0) startFact.textContent = files + ' files · ' + (bytes / 1e6).toFixed(1) + ' MB';
+          if (moduleTotal > 0) {
+            startFact.textContent = received.size + ' / ' + modules.size + ' code files · ' + (moduleBytes / 1e6).toFixed(1) + ' / ' + (moduleTotal / 1e6).toFixed(1) + ' MB';
+            card.dataset.startBytes = String(moduleBytes); card.dataset.startTotalBytes = String(moduleTotal); card.dataset.startFiles = String(received.size);
+          } else if (files > 0) startFact.textContent = files + ' files · ' + (bytes / 1e6).toFixed(1) + ' MB';
           card.dataset.step = 'start.' + (steps.find(op => !done.includes(op)) || 'hand-off');
         };
         paint(); startPaint(); const tick = setInterval(() => { if (card.hasAttribute('data-shell')) { paint(); startPaint(); } else clearInterval(tick); }, 100);
