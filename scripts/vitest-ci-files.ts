@@ -10,6 +10,9 @@ export const CI_NATIVE_GROUPS = {
     'test/net-fuzz.test.ts',
     'test/pine-rewards.test.ts',
   ],
+  'native-restores': [
+    'test/pinned-restore-play.test.ts',
+  ],
   'native-routes': [
     'test/driftwood-optional-verbs.test.ts',
     'test/driftwood-trade-verbs.test.ts',
