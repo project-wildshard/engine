@@ -158,7 +158,7 @@ export abstract class HeldContactWeapon<T extends BladeBody = BladeBody> extends
   override install(ctx: EquipContext): void {
     super.install(ctx);
     this.app.input.bind('attack', () => { this.tryFire(); }, ctx.scope, () => this.enabled);
-    this.app.input.bind('heavy', () => { this.swing(true); }, ctx.scope, () => this.enabled);
+    this.app.input.bind('heavy', () => { const started = this.swing(true); this.wire?.press(started, true); }, ctx.scope, () => this.enabled);
     ctx.scope.onDispose(() => { this.hold.reset(); });
   }
   override tryFire(): void { const started = this.swing(false); this.wire?.press(started); }
@@ -341,7 +341,7 @@ export class HeldMeleeWeapon<T extends BladeBody, P> extends HeldContactWeapon<T
     if (data.mode === 'delayed' && (ports.tip === undefined || ports.caughtPart === undefined)) throw new Error('Delayed phase requires owned deformation/catch ports');
     this.binding = binding; this.ports = ports; this.model = ports.model; this.parts = ports.parts; this.presentation = ports.presentation;
     this.motion = data.phases[0].id;
-    this.moves = ports.contacts({ hit: request => this.contact.hit(request), aim: (from, dir) => this.aim(from, dir),
+    this.moves = ports.contacts({ settles: () => this.wire === null, hit: request => this.contact.hit(request), aim: (from, dir) => this.aim(from, dir),
       fired: () => { this.onFire?.(); }, struck: (id, killed) => { this.onHit?.(id, false, killed); },
       caught: caught => { if (this.moves.move === data.phases[1].move) this.catchAt(caught.at); } });
     for (let i = 0; i < data.phases.length; i++) { const phase = data.phases[i]; if (phase === undefined) throw new Error('Missing admitted primary'); const move = this.moves.row(phase.move); if (move.lane !== 'primary' || move.heavy !== (i === 1) || (data.mode === 'immediate' ? move.lands.length > 0 : move.lands.length === 0)) throw new Error('Phase crossed its contact mode or lane'); }

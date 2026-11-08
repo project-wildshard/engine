@@ -20,8 +20,9 @@ export interface AimInfo { kind: string; distance: number }
 export interface OwnHit { readonly kind: string; readonly at: Vector3; readonly head: boolean; readonly killed: boolean; readonly amount: number; readonly seq: number }
 /** A held weapon's line to the server when one owns its player (P1-E5.3-E1): what its next command should carry. */
 export interface WeaponWire {
-  /** An attack press. `started`: it started a swing or shot here, which the server must confirm or refuse. */
-  readonly press: (started: boolean) => void;
+  /** An attack press. `started`: it started here, which the server confirms or
+   * refuses. `heavy` marks this one command without changing the held draw. */
+  readonly press: (started: boolean, heavy?: boolean) => void;
   /** A held item's own second action, pressed: a fan's gust. */
   readonly secondary?: () => void;
   /** The heavy, or a draw: held down this step. */

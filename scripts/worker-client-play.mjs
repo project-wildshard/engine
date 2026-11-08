@@ -80,6 +80,13 @@ export async function play(browser, phone, base, only = '') {
     await step('Pine: a real boss death records lost', () => loss(browser, phone, base));
     return steps;
   }
+  if (only === 'held-melee') {
+    const { run } = await import('./split-repair-held-melee.mjs');
+    const { run: whip } = await import('./split-repair-whip.mjs');
+    await step('melee: direct fan Heavy reaches the server', () => run(browser, phone, base));
+    await step('melee: whip contacts leave settlement on the server', () => whip(browser, phone, base));
+    return steps;
+  }
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }
   if (runs('hurt')) { const { hurt } = await import('./worker-client-hurt.mjs'); await hurt(browser, phone, base, step); }
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }

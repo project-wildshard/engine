@@ -40,7 +40,7 @@ export class NetPlayer implements PlayerLink {
   readonly attacks: AttackPrediction = new AttackPrediction();
   /** Its weapons' line to the server: what the next command carries. */
   readonly wire: WeaponWire = {
-    press: started => { this.pressed = true; this.pressStarted ||= started; },
+    press: (started, heavy = false) => { this.pressed = true; this.pressStarted ||= started; this.heavyPress ||= heavy; },
     hold: heavy => { this.heavy = heavy; },
     secondary: () => { this.gust = true; },
     fire: ads => { this.launcher = { slot: this.held, ads, fire: true }; },
@@ -79,6 +79,7 @@ export class NetPlayer implements PlayerLink {
   private gust = false;
   private pressStarted = false;
   private heavy = false;
+  private heavyPress = false;
   private held = 0;
   private afterStep: (() => void) | null = null;
   private frameSteps = 0;
@@ -136,7 +137,7 @@ export class NetPlayer implements PlayerLink {
     this.hookLocked = false; this.hookTarget = undefined; this.hookFired = false;
     this.frameSteps++;
     if (this.pressStarted || armed.launcher?.fire === true) this.attacks.started(seq);
-    this.pressed = false; this.gust = false; this.pressStarted = false; this.launcher = null;
+    this.pressed = false; this.gust = false; this.pressStarted = false; this.heavyPress = false; this.launcher = null;
     this.world.poseFor(seq, false);
     const stepped = this.predictor.step(quantiseCommand({ ...armed, seq, viewTick: 0 })), run = this.afterStep;
     this.afterStep = null; run?.();
@@ -144,7 +145,7 @@ export class NetPlayer implements PlayerLink {
   }
   /** The step's controls, with what the weapon in hand has for this command. */
   private armed(input: PlayerWireInput): PlayerWireInput & Partial<Pick<NetCommand, 'attack' | 'launcher' | 'lockTarget'>> {
-    const { launcher } = this, buttons = input.buttons | (this.heavy ? NET_BUTTONS.heavy : 0) | (this.gust ? NET_BUTTONS.secondary : 0), lockTarget = this.lockTarget();
+    const { launcher } = this, buttons = input.buttons | (this.heavy || this.heavyPress ? NET_BUTTONS.heavy : 0) | (this.gust ? NET_BUTTONS.secondary : 0), lockTarget = this.lockTarget();
     return { ...input, buttons, ...(this.pressed ? { attack: { aim: this.player.sampleAimCommand() } } : {}), ...(launcher === null ? {} : { launcher }), ...(lockTarget === undefined ? {} : { lockTarget }) };
   }
   /** What goes to the server beyond what this body steps: a claw's JUMP moves the body only there, and only by `led`. */

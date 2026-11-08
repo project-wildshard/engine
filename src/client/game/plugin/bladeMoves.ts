@@ -12,6 +12,8 @@ export interface BladeBody {
 }
 /** What a blade is lent: the page's pipeline, a timed move's aim, the first body along a lane, and its reports. */
 export interface BladePorts<T extends BladeBody> {
+  /** A wired page poses the move; only its authority settles body contact. */
+  readonly settles?: () => boolean;
   readonly hit: (request: DamageRequest) => DamageDealt | null;
   /** a timed landing's aim from the eye; false: no aim, it lands on nothing */
   readonly aim: (from: Vector3, dir: Vector3) => boolean;
@@ -84,7 +86,10 @@ export class BladeMoves<T extends BladeBody> {
     const request = { weapon: this.weaponId, move: contact.moveId, contact: k, reach: row.reach, width: row.size, from, dir };
     if (row.shape === 'cone') { this.world?.contact(request); return 0; }
     const hit = this.ports.body?.(from, dir, row.reach) ?? null;
-    if (hit?.port.hittable === true) { this.strike(this.ports.react?.(hit.port) ?? hit.port, row, contact, hit.point, dir, from); this.ports.fired(); return 1; }
+    if (hit?.port.hittable === true) {
+      if (this.ports.settles?.() === false) return 1;
+      this.strike(this.ports.react?.(hit.port) ?? hit.port, row, contact, hit.point, dir, from); this.ports.fired(); return 1;
+    }
     const caught = this.world?.contact(request) ?? null;
     if (caught !== null) this.ports.caught(caught, k > 0);
     return 0;
