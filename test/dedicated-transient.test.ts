@@ -35,7 +35,7 @@ test('a transient save failure retries the real join without a reload', { timeou
 test('the gateway carries recovered grants into the actual room and next save', { timeout: 9000 }, async () => {
   const { exportPlayer } = await import('../src/server/host/dedicated/playerDoc');
   const { OWNED_ROW } = await import('../src/shared/game/loot/ownedRows');
-  const db = await openPglite(); await migrate(db); const saves = playerSavesOver(db, 0, () => undefined), bench = await roomBench({ saves });
+  const db = await openPglite(); await migrate(db); const saves = playerSavesOver(db, 0, () => undefined), bench = await roomBench({ saves, newsDelayMs: 100 });
   const seed = new RoomBot(bench.url, 'bench', 'device:seed');
   let back: RoomBot | undefined;
   try {
@@ -55,13 +55,13 @@ test('the gateway carries recovered grants into the actual room and next save', 
     back.transport.control('ready', new Uint8Array([1]).buffer);
     await vi.waitFor(() => { expect(room.holds(write.player)).toBe(false); });
     expect(await saves.drain(1000)).toBe(true);
-    expect((await db.query('select serial::int as serial from ledger_receipt where player_id = $1 order by serial', [write.player])).rows).toEqual([{ serial: 1 }, { serial: 2 }]);
+    await vi.waitFor(async () => { expect((await db.query('select serial::int as serial from ledger_receipt where player_id = $1 order by serial', [write.player])).rows).toEqual([{ serial: 1 }, { serial: 2 }]); });
   } finally { seed.drop(); back?.drop(); await bench.close(); await saves.drain(1000); saves.queue.dispose(); saves.reports.dispose(); await db.close(); }
 });
 
 test('an import fallback crosses the worker boundary and promotes only its checkpoint', { timeout: 9000 }, async () => {
   const { OWNED_ROW } = await import('../src/shared/game/loot/ownedRows');
-  const db = await openPglite(); await migrate(db); const saves = playerSavesOver(db, 0, () => undefined), bench = await roomBench({ saves });
+  const db = await openPglite(); await migrate(db); const saves = playerSavesOver(db, 0, () => undefined), bench = await roomBench({ saves, newsDelayMs: 100 });
   const seed = new RoomBot(bench.url, 'bench', 'device:import'); let back: RoomBot | undefined;
   try {
     expect(await seed.arrived()).toBe(true);
@@ -69,7 +69,10 @@ test('an import fallback crosses the worker boundary and promotes only its check
     room.cell.owned.of(body.id).purse.add(500); room.book.file({ player: body.id, id: 'paid', tick: 1, grant: 'coins', name: 'coins', amount: 500, pending: false });
     seed.transport.control('ready', new Uint8Array([1]).buffer);
     await vi.waitFor(() => { expect(room.holds('device:import')).toBe(false); }); expect(await saves.drain(1000)).toBe(true);
-    const saved = await saves.read('device:import', 'driftwood-isle'), doc = saved.doc; if (doc === null) throw new Error('No checkpoint');
+    // Removing the worker seat is not a parent-side durability barrier:
+    // its save message may still be crossing the real port.
+    const saved = await vi.waitFor(async () => { const durable = await saves.read('device:import', 'driftwood-isle'); expect(durable.doc).not.toBeNull(); return durable; });
+    const doc = saved.doc; if (doc === null) throw new Error('No checkpoint');
     const write = { player: 'device:import', name: 'I', shard: 'driftwood-isle', build: 'bench', saveVersion: 1, reason: 'test', receipts: [] };
     await writeSave(db, 0, { ...write, seq: saved.seq + 1, doc: { ...doc, book: { ...doc.book, quests: [] } } });
     back = new RoomBot(bench.url, 'bench', 'device:import'); expect(await back.arrived()).toBe(true); expect(back.client.owned.get(OWNED_ROW.coins)).toBe(500);
