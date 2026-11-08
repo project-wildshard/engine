@@ -1,4 +1,5 @@
 {
+  "test/net-link-play.test.ts": ["driftwood-isle"],
   "test/engine-rule-successors.test.ts": ["pine-hollow", "nalati-grasslands", "driftwood-isle"],
   "test/crack-every-player.test.ts": [],
   "test/net-traversal-wire.test.ts": ["pine-hollow", "far-reach"],

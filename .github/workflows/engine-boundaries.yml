@@ -29,7 +29,7 @@ jobs:
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: node scripts/pins.ts verify-slices
       - name: Real worker, hostile peers, and restore continuation
-        run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/cook-hostile-pins.test.ts test/net-hostile-play.test.ts test/pinned-restore-play.test.ts test/released-save-play.test.ts
+        run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/cook-hostile-pins.test.ts test/net-hostile-play.test.ts test/net-link-play.test.ts test/pinned-restore-play.test.ts test/released-save-play.test.ts
         env:
           WS_VITEST_MAX_WORKERS: '2'
           NET_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
@@ -37,6 +37,13 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - name: Cook, attach, and play the same bytes
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
+      # Ring 2: all 28 real products and a clean build exceed ten seconds.
+      - name: Census all pinned title and grid heads
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          node scripts/pins.ts install
+          pnpm build:game
+          node --import ./scripts/bake-loader.mjs scripts/catalogue-all-heads.ts dist
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
