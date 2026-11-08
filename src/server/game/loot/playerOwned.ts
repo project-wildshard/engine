@@ -33,6 +33,8 @@ import { inventorySave, ownedSave, purseSave, skinSave, compendiumSave, finishPi
 export interface CreatureRewardStore {
   read: (identity: string) => CreatureRewardState | null;
   write: (identity: string, state: CreatureRewardState) => boolean;
+  /** A multi-player host can retire this seat after the current operation, while other players finish their turn. */
+  refused?: (player: string) => void;
 }
 const REWARDS = 'owned.creature-rewards';
 
@@ -90,11 +92,17 @@ export class PlayerOwned {
     // Validate historical world data during installation, where the continuation loader can reject it and fall back.
     const historical = profiles === undefined ? v.parse(v.record(v.string(), CreatureRewardSchema), host.slots.questState[REWARDS] ?? {})[lead] : undefined;
     const rewards = new Map<string, CreatureRewardState>();
-    const persist = (identity: string, state: CreatureRewardState): void => {
-      if (profiles !== undefined) { if (!profiles.write(identity, state)) throw new Error('Creature rewards could not be saved'); return; }
+    const persist = (player: string, identity: string, state: CreatureRewardState): boolean => {
+      if (profiles !== undefined) {
+        if (profiles.write(identity, state)) return true;
+        rewards.delete(identity);
+        if (profiles.refused === undefined) throw new Error('Creature rewards could not be saved');
+        profiles.refused(player); return false;
+      }
       const saved = creatureRewardSave.read(slot);
       saved.players[identity] = state;
       if (!creatureRewardSave.write(saved, slot)) throw new Error('Creature rewards could not be saved');
+      return true;
     };
     // The seat is only a route. Every read/write resolves the current persistent identity, so reuse cannot lend its rewards.
     const seat = (player: string): { identity: string; state: CreatureRewardState } | null => {
@@ -117,7 +125,7 @@ export class PlayerOwned {
         }
       }
       for (const id of state.finishes) delete state.pending[id];
-      rewards.set(identity, state); persist(identity, state);
+      rewards.set(identity, state); if (!persist(player, identity, state)) return null;
       return { identity, state };
     };
     for (const id of Object.keys(pickups)) this.finishIds.add(id);
@@ -129,7 +137,7 @@ export class PlayerOwned {
       if (at === undefined || feet === undefined || Math.hypot(feet.x - at.x, feet.z - at.z) > 4 || Math.abs(feet.y - at.y) > 6) return;
       if (!state.finishes.includes(id)) state.finishes.push(id);
       delete state.pending[id];
-      persist(identity, state);
+      persist(player, identity, state);
     });
     host.events.on('actor.died', ({ actor }) => {
       const body = host.entities.get(actor.id);
@@ -158,7 +166,7 @@ export class PlayerOwned {
           if (death.floor !== 'source') at.y = Math.max(at.y, host.groundHeightAt(at.x, at.z));
           pending[id] = at;
         }
-        persist(identity, state);
+        persist(player, identity, state);
       }
     }, host.scope, { order: -10 });
     host.events.on('actor.died', ({ actor }) => { host.damage.forget(actor.id); }, host.scope, { order: 10 });

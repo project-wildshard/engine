@@ -23,7 +23,7 @@ const emptyPose = (): AnimalPoseSample => ({ attackT: -1, attackDur: 1, groundY:
 /** P1-E5.2: a SimHost as a NetWorld. Reads only; the sim classes do not change. */
 export class SimNetWorld implements NetWorld {
   /** A device hello is sufficient for a local worker. E7 must override this with its authenticated seat-to-player binding. */
-  identified(seat: string, identity: NetIdentity): void { actRoutes(this.host).identities.set(seat, identity.player); }
+  identified(seat: string, identity: NetIdentity): boolean { actRoutes(this.host).identities.set(seat, identity.player); return true; }
   readonly player: NetPlayer;
   private readonly host: SimHost;
   private readonly pose: AnimalPoseSample = emptyPose();

@@ -72,17 +72,19 @@ export class DedicatedRoom {
   /** Seats by device: J111's id is the only name a returning player has. */
   private readonly seats: Map<string, Seat>;
   private readonly bodies: Map<string, Seat>;
+  private readonly playerRefusals: Map<string, string>;
   private readonly options: DedicatedRoomOptions;
   private readonly shop: ShopGate;
   /** The lead's seat as nobody has used it: what clears it for the next player. */
   private readonly blank: PlayerDoc;
-  private constructor(options: DedicatedRoomOptions, cell: CellWorld, seats: Map<string, Seat>, bodies: Map<string, Seat>) {
-    this.options = options; this.cell = cell; this.host = cell.host; this.seats = seats; this.bodies = bodies;
+  private constructor(options: DedicatedRoomOptions, cell: CellWorld, seats: Map<string, Seat>, bodies: Map<string, Seat>, playerRefusals: Map<string, string>) {
+    this.options = options; this.cell = cell; this.host = cell.host; this.seats = seats; this.bodies = bodies; this.playerRefusals = playerRefusals;
     this.sim = new SimNetWorld(this.host, 1, () => this.filings());
-    this.sim.identified = (body, identity): void => {
+    this.sim.identified = (body, identity): boolean => {
       const seat = bodies.get(body);
-      if (seat === undefined || seat.device !== identity.player) throw new Error('Seat identity mismatch');
+      if (seat === undefined || seat.device !== identity.player) { playerRefusals.set(body, 'identity'); return false; }
       actRoutes(this.host).identities.set(body, seat.device);
+      return true;
     };
     this.net = new NetRoom({ world: this.sim, build: options.build, book: this.book, step: inputs => { this.step(inputs); }, ...(options.reports === undefined ? {} : { reports: options.reports }) });
     this.net.open();
@@ -96,7 +98,7 @@ export class DedicatedRoom {
   }
   /** Open the shard's world, with nobody in it. */
   static async boot(options: DedicatedRoomOptions): Promise<DedicatedRoom> {
-    const { input, slug } = options, seats = new Map<string, Seat>(), bodies = new Map<string, Seat>();
+    const { input, slug } = options, seats = new Map<string, Seat>(), bodies = new Map<string, Seat>(), playerRefusals = new Map<string, string>();
     const seated = (body: string): Seat => {
       const seat = bodies.get(body);
       if (seat === undefined) throw new Error(`No seat for ${body}`);
@@ -110,12 +112,13 @@ export class DedicatedRoom {
           const seat = seats.get(identity); if (seat === undefined) return false;
           return seat.store.rewards.write({ legacyOwner: null, players: { [identity]: state } }, slug);
         },
+        refused: body => { playerRefusals.set(body, 'reward-store'); },
       },
       facts: (name, entity, body, source) => {
         const seat = bodies.get(body);
         return seat === undefined ? null : seat.store.facts(source, slug)(name, portableEntity(entity, body));
       } });
-    return new DedicatedRoom(options, cell, seats, bodies);
+    return new DedicatedRoom(options, cell, seats, bodies, playerRefusals);
   }
   /** Where a new client should load, what a player with no save stands on. */
   get spawn(): ResumeAt { const { at, yaw } = this.host.level.player; return { x: at.x, y: at.y, z: at.z, yaw }; }
@@ -173,7 +176,8 @@ export class DedicatedRoom {
     }
     this.settle(seat);
     this.link(seat, transport, hello);
-    this.options.post({ kind: 'seated', device: entry.device, body, seats: this.seats.size });
+    this.flushRefusals();
+    if (this.seats.get(entry.device) === seat) this.options.post({ kind: 'seated', device: entry.device, body, seats: this.seats.size });
   }
   private refused(entry: SeatEntry, transport: Transport, hello: () => void, reason: string): void {
     const { previous, ...current } = entry;
@@ -203,7 +207,8 @@ export class DedicatedRoom {
     seat.transport = transport; seat.holdEnds = null;
     old?.close('replaced');
     this.link(seat, transport, hello);
-    this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size });
+    this.flushRefusals();
+    if (this.seats.get(seat.device) === seat) this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size });
   }
   private link(seat: Seat, transport: Transport, hello: () => void): void {
     this.net.join(transport, this.sim.playerOf(seat.body));
@@ -221,10 +226,26 @@ export class DedicatedRoom {
   private leave(seat: Seat, reason: string): void {
     mountedPlayerOf(this.host, seat.body)?.dismount();
     this.write(seat, reason);
+    this.release(seat);
+  }
+  /** Forget a retired seat without checkpointing progress whose store was refused. */
+  private release(seat: Seat): void {
+    this.playerRefusals.delete(seat.body);
     actRoutes(this.host).identities.delete(seat.body);
     this.seats.delete(seat.device); this.bodies.delete(seat.body); this.cell.owned.drop(seat.body); this.book.seat(seat.body, { serial: 0, rows: [] });
     if (seat.body === LEAD_SEAT) this.clearLead(); else this.host.removePlayer(seat.body);
     this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });
+  }
+  private flushRefusals(): void {
+    for (const [body, reason] of this.playerRefusals) {
+      this.playerRefusals.delete(body);
+      const seat = this.bodies.get(body); if (seat === undefined) continue;
+      const transport = seat.transport; seat.transport = null;
+      mountedPlayerOf(this.host, body)?.dismount();
+      this.options.post({ kind: 'refused', device: seat.device, reason });
+      this.release(seat);
+      transport?.close('refused');
+    }
   }
   /** The seat goes back to how boot left it, and what it was paid goes with who earned it: the next player's bounty is their own (J105). */
   private clearLead(): void {
@@ -246,14 +267,16 @@ export class DedicatedRoom {
     }
   }
   private filings(): readonly LedgerFiling[] {
-    const { host, cell, bodies } = this, filings = ledgerFilings(host, LEAD_SEAT, cell.effects(), cell.fact, this.options.bootId).filter(filing => bodies.has(filing.player));
+    const { host, cell, bodies } = this, filings = ledgerFilings(host, LEAD_SEAT, cell.effects(), cell.fact, this.options.bootId).filter(filing => bodies.has(filing.player) && !this.playerRefusals.has(filing.player));
     for (const filing of filings) { cell.owned.of(filing.player).file(filing); const seat = bodies.get(filing.player); if (seat !== undefined) this.dirty(seat); }
     return filings;
   }
   /** One fixed tick: holds that ran out, then the world. */
   tick(): void {
+    this.flushRefusals();
     if (this.host.state.tick % CHECK_TICKS === 0) this.check(this.options.now());
     this.net.tick();
+    this.flushRefusals();
   }
   /** Holds that ran out, and checkpoints that are due (E7.4). */
   private check(now: number): void {

@@ -51,7 +51,7 @@ export interface NetVisitor { entity: <S>(id: string, cls: NetClass<S>, view: S)
 /** The world a room replicates. */
 export interface NetWorld {
   /** Bind a welcomed seat to its persistent identity, including room handoffs. Dedicated hosts must verify the hello against their authenticated session. */
-  identified?: (seat: string, identity: NetIdentity) => void;
+  identified?: (seat: string, identity: NetIdentity) => boolean;
   tick: () => number;
   /** The cell frame positions are local to (§3.5). */
   cell: () => number;
@@ -200,9 +200,12 @@ export class NetRoom {
     this.remove(client);
     return to.adopt(client.transport, player, client.queue, client.identity);
   }
-  private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, identity: NetIdentity): number {
+  private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, identity: NetIdentity): number | null {
     const id = this.join(transport, player, queue), client = this.clients.find(entry => entry.id === id);
-    if (client !== undefined) { client.identity = identity; this.world.identified?.(player.id, identity); this.welcome(client); } // it said hello to the room it came from
+    if (client !== undefined) {
+      if (this.world.identified?.(player.id, identity) === false) { this.stats.refused++; this.drop(client); return null; }
+      client.identity = identity; this.welcome(client);
+    } // it said hello to the room it came from
     return id;
   }
   /** The client finished loading (§6.3.1): welcome everyone waiting and send each its full frame. */
@@ -295,8 +298,9 @@ export class NetRoom {
     if (hello.schemaHash !== NET_SCHEMA_HASH || (this.build !== '' && hello.build !== this.build)) { this.stats.refused++; client.transport.close('reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.stats.refused++; client.transport.close('refused'); return; }
-    client.identity = { player: said.output.player, name: cleanName(said.output.name) };
-    this.world.identified?.(client.player.id, client.identity);
+    const identity = { player: said.output.player, name: cleanName(said.output.name) };
+    if (this.world.identified?.(client.player.id, identity) === false) { this.stats.refused++; this.drop(client); return; }
+    client.identity = identity;
     client.ledgerSeen = hello.ledger;
     client.state = 'waiting';
     if (this.opened) this.welcome(client);
