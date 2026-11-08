@@ -1,4 +1,5 @@
 import { flatPopulationEnvironment } from './fixtures/population-environment';
+import { builtProduct } from './fixtures/engine-lift/product';
 // oxlint-disable-next-line import/no-nodejs-modules -- Scenario uses the shipped Rapier binary.
 import { parseSpawnScript } from '@wildshard/format/spawnScripts';
 import { readSpeciesPrograms } from '@wildshard/format/speciesPrograms';
@@ -161,7 +162,7 @@ test('published spawn catalogue admits v1 bytes without installing a second gene
   const { SpawnScriptsSchema } = await import('@wildshard/format/spawnScripts');
   const { sectionHostImports } = await import('../scripts/shard-platform-hosts.mjs');
   expect(sectionHostImports([{ name: 'actors/spawn-scripts' }])).toContain('game/server/population/spawnScript');
-  const product = await loadHeadlessProduct('out/pine-hollow');
+  const product = await loadHeadlessProduct(builtProduct('pine-hollow'));
   const catalogue = product.section('actors/spawn-scripts');
   const rows = new Map<string, unknown>([['actors/spawn-scripts', catalogue], ['sim/scripts', product.section('sim/scripts')]]);
   expect(scriptAdmissionRows(rows).some(row => row.id === 'pine.night')).toBe(true);
