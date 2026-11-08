@@ -314,8 +314,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     for (let tries = 0; tries < TRANSIENT_TRIES; tries++) {
       try {
         row = await cookOnce(head);
-        if (row.state !== 'failed' || FINAL.test(row.detail ?? '')) break;
       } catch (error) { row = {...head, state: 'failed', detail: error instanceof Error ? error.message : 'failed'}; }
+      if (row.state !== 'failed' || FINAL.test(row.detail ?? '')) break;
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: try ${tries + 1} failed: ${row.detail ?? ''}`);
     }
     verdicts.set(head.hash, row);

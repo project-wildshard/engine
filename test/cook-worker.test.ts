@@ -160,10 +160,16 @@ describe('the cook worker', () => {
   }, 60_000);
 
   it('holds the budget: nothing is published past it', async () => {
-    const hash = hashOf(real), row = await worker(new Map([[hash, real]]), 'b5', 'small', 1024).cook({slug, hash});
+    const hash = hashOf(real), upstream = source(new Map([[hash, real]]));
+    let downloads = 0;
+    const cook = createCookWorker({build: 'b5', store: folderStore(join(scratch, 'small')),
+      source: {...upstream, download: identity => { downloads++; return upstream.download(identity); }}, launcher: launcher(),
+      serverPacks: join(scratch, 'server'), scratch: join(scratch, 'work'), budgetBytes: 1024});
+    const row = await cook.cook({slug, hash});
     expect(row).toMatchObject({state: 'failed'});
     expect(row.detail).toContain('Over the pack budget');
     expect(existsSync(join(scratch, 'small', 'index'))).toBe(false);
+    expect(downloads, 'a permanent publication refusal cannot download and cook the same shard again').toBe(1);
   }, 120_000);
 
   it('collects what no kept build names, and leaves young objects to a running cook', async () => {

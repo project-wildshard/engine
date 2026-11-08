@@ -88,14 +88,14 @@ test('the worker runs Driftwood from its built product, tick for tick with the r
   const { directory, shard, assets, resident } = await shipped();
   const sim = await HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', product: directory }), live = await resident();
   try {
-    const input = [{ source: 'player', commands: [{ kind: 'player' as const, moveX: 0.6, moveZ: 0.8, yaw: 0 }] }];
-    let last;
-    for (let tick = 0; tick < 300; tick++) { last = await sim.step(input); live.step(input[0]?.commands ?? []); }
-    expect(last?.tick).toBe(300);
-    expect(last?.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
+    const commands = [{ kind: 'player' as const, moveX: 0.6, moveZ: 0.8, yaw: 0 }];
+    const result = await sim.verbTapePart({ version: 1, observe: [], segments: [{ id: 'same-300-inputs', ticks: 300, commands }] });
+    for (let tick = 0; tick < 300; tick++) live.step(commands);
+    expect(result.commit.tick).toBe(300);
+    expect(result.commit.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
     expect(live.host.entities.size).toBe(34);
   } finally { await sim.dispose(); live.dispose(); }
-}, 240_000); // every tick commits a full continuation; 50 s on a laptop passed 120 s on a CI runner
+}, 10_000); // Both owners still run every tick; only the final full continuation is asserted and published.
 
 test("Driftwood's server files stay off every client path", async () => {
   const { descriptor, directory } = await shipped(), { admission, files, packs } = descriptor.index;

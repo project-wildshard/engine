@@ -16,6 +16,15 @@ export const CI_NATIVE_GROUPS = {
   'native-restores': [
     'test/pinned-restore-play.test.ts',
   ],
+  'native-cook': [
+    'test/cook-worker.test.ts',
+  ],
+  'driftwood-population': [
+    'test/driftwood-headless-population.test.ts',
+  ],
+  'nalati-population': [
+    'test/nalati-headless-population.test.ts',
+  ],
   'native-routes': [
     'test/driftwood-optional-verbs.test.ts',
     'test/driftwood-trade-verbs.test.ts',
