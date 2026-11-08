@@ -309,6 +309,7 @@ export class SimHost {
       heightAt: (x, z) => this.heightAt(x, z), now: () => this.clock.now * 1000,
       floorBelow: (x, z, fromY, maxDrop) => this.floorQuery === undefined ? this.heightAt(x, z) : this.floorQuery(x, z, fromY, maxDrop),
       random: () => this.rng.stream('gameplay').next(), hit: (req) => this.combat.hit(req),
+      attackStarted: () => { this.targetIds.set(spawn.id, this.focusedPlayer.id); },
     });
     entity.place(spawn.at.x, spawn.at.z, spawn.yaw, spawn.at.y);
     // under the physics body LOD a body spawns bodiless, as on the page: the next tick's sync gives it one when near

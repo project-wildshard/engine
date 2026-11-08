@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { BitWriter } from '../src/shared/engine/net/bits';
+import { BitWriter, floatToBits } from '../src/shared/engine/net/bits';
 import { Interpolator, EXTRAPOLATE_TICKS, INTERP_SAMPLES } from '../src/client/engine/net/interpolator';
 import { ANIMAL_CLASS, PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 import { compileSchema, netSchema, type NetClass } from '../src/shared/engine/net/schema';
@@ -24,6 +24,27 @@ const still = (over: Partial<Body>): Body => ({ x: 0, y: 0, z: 0, yaw: 0, state:
 const stack = (): Interpolator => new Interpolator(() => BODY);
 const read = (lerp: Interpolator, handle: number, tick: number): Float64Array => { const out = new Float64Array(BODY.row.length); expect(lerp.sample(handle, tick, out)).toBe(true); return out; };
 const X = 0, YAW = 3, STATE = 4, FLINCH = 5;
+
+test('an authoritative strike keeps its whole duration between actual wire frames', () => {
+  const index = ANIMAL.row.findIndex(column => column.name === 'attackDur'), duration = ANIMAL.row[index];
+  if (duration === undefined) throw new Error('Missing animal strike duration');
+  const lerp = new Interpolator(() => ANIMAL), out = new Float64Array(ANIMAL.row.length);
+  const wire = (tick: number, seconds: number): DecodedFrame => {
+    const row = new Uint32Array(ANIMAL.row.length);
+    row[index] = duration.kind === 'f32' ? floatToBits(seconds) : Math.round(seconds * 1000);
+    const frame = new WorldFrame(); frame.reset(tick);
+    const at = frame.claim(7, row.length); frame.data.set(row, at);
+    const decoded = decodeFrame(new Uint8Array(encodeFrame(new BitWriter(), { frame, cell: 1, lastSeq: 0, ownerClass: ANIMAL,
+      owner: new Float64Array(ANIMAL.owner.length), visible: new Set([7]), baseline: null, classOf: () => ANIMAL })),
+    { ownerClass: ANIMAL, classOf: () => ANIMAL, baseline: () => null });
+    if (decoded === null) throw new Error('Strike frame did not round-trip');
+    return decoded;
+  };
+  lerp.push(wire(10, .4)); lerp.push(wire(14, 1.2));
+  expect(lerp.sample(7, 12, out)).toBe(true);
+  const seconds = duration.kind === 'f32' ? out[index] : (out[index] ?? 0) / 1000;
+  expect(seconds).toBeCloseTo(.4, 6);
+});
 
 test('a moving body sits within a quantisation step of its history, and the bound past the newest frame', () => {
   const path = (tick: number): number => 40 * Math.sin(tick / 90), speed = 40 / 90; // the fastest it moves, m a tick

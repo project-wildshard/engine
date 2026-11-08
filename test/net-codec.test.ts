@@ -234,3 +234,12 @@ test('a fight\'s view call keeps its name, its order and its numbers', () => {
   const decoded = decodeEvents(new Uint8Array(encodeEvents(writer, 9, views, () => undefined)), () => undefined);
   expect(decoded?.events).toEqual(views);
 });
+
+test('trophy identity and blow attribution survive the actual event codec', () => {
+  for (const blow of [true, false]) {
+    const hit: NetEvent = { kind: 'hit', tick: 17, target: 9, amount: 12, at: [0, 0, 0], head: false, killed: false, confirmFor: 0, ...(blow ? { blow: true } : {}) };
+    const rewards: NetEvent[] = [{ kind: 'reward', tick: 17, coins: 7, body: 9, item: 'boar-tusk' }, { kind: 'reward', tick: 17, coins: 2, body: 9 }];
+    const decoded = decodeEvents(new Uint8Array(encodeEvents(new BitWriter(), 17, [hit, ...rewards], () => undefined)), () => undefined);
+    expect(decoded?.events.map(event => event.kind === 'hit' ? { ...event, at: hit.at } : event)).toEqual([hit, ...rewards]);
+  }
+});

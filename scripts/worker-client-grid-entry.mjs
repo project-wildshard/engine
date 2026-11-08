@@ -55,10 +55,12 @@ async function walk(page, x, z) {
 
 /** @param {import('playwright').Page} page */
 async function entered(page) {
+  await page.bringToFront();
   await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__wildshard?.world?.hud !== undefined, undefined, { timeout: 150_000 });
   await page.evaluate(FLOOR_GRID_ENTER);
-  await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__workerClient?.().frames > 30, undefined, { timeout: 150_000 });
+  await page.waitForFunction(() => typeof (/** @type {WorkerWindow} */ (window)).__workerClient === 'function', undefined, { timeout: 150_000 });
   await page.evaluate(() => (/** @type {WorkerWindow} */ (window)).__wildshard.world.hud.setPaused(false));
+  await page.waitForFunction(() => (/** @type {WorkerWindow} */ (window)).__workerClient?.().frames > 30, undefined, { timeout: 150_000 });
 }
 
 /** @param {import('playwright').Page} page @param {string} instance */
@@ -124,7 +126,7 @@ export async function gridEntry(_browser, phone, base, step) {
       try { await entered(page); }
       catch (error) { return { ok: false, error: String(error), diagnostic: await page.evaluate(() => {
         const w = /** @type {WorkerWindow} */ (window);
-        return { text: document.body.innerText.slice(0, 2400), grid: w.__wildshard?.shard?.grid?.state(), worker: w.__workerClient?.() };
+        return { text: document.body.textContent?.slice(0, 2400), grid: w.__wildshard?.shard?.grid?.state(), worker: w.__workerClient?.() };
       }) }; }
       const out = await settled(page, ember), away = Math.hypot(out.serverX - stood.serverX, out.serverZ - stood.serverZ);
       const ends = await page.evaluate(() => Object.keys(localStorage).map(key => {

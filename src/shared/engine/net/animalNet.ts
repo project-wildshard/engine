@@ -22,7 +22,8 @@ export const ANIMAL_NET: NetSchema<AnimalNetView> = netSchema<AnimalNetView>({
     yaw: { kind: 'angle', bits: 10, read: view => view.sim.yaw },
     state: { kind: 'enum', values: ANIMAL_STATES, read: view => view.sim.state },
     attackT: { kind: 'f32q', min: 0, max: 1, bits: 8, read: view => strike(view.pose) },
-    attackDur: { kind: 'f32', read: view => view.pose.attackDur },
+    // A strike's duration is one decision, not a pose scalar to blend.
+    attackDur: { kind: 'u32', read: view => Math.round(view.pose.attackDur * 1000) },
     attackStamp: { kind: 'u32', read: view => view.sim.attackStamp },
     winding: { kind: 'bool', read: view => view.pose.attackT >= 0 && view.pose.attackT < view.pose.attackDur },
     flinch: { kind: 'f32q', min: 0, max: 1, bits: 6, read: view => view.pose.flinch },

@@ -69,6 +69,7 @@ export async function play(browser, phone, base, only = '') {
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }
   if (runs('grid-entry')) { const { gridEntry } = await import('./worker-client-grid-entry.mjs'); await gridEntry(browser, phone, base, step); }
   if (runs('death')) { const { driftwoodDeath } = await import('./worker-client-death.mjs'); await driftwoodDeath(browser, phone, base, step); }
+  if (runs('partner')) { const { partner } = await import('./worker-client-partner.mjs'); await partner(browser, phone, base, step); }
   if (runs('creature-hit')) { const { creatureHit } = await import('./worker-client-repairs.mjs'); await creatureHit(browser, phone, base, step); }
   if (runs('creature-hit') || runs('creature-returns')) { const { creatureReturns } = await import('./worker-client-returns.mjs'); await creatureReturns(browser, phone, base, step); }
 

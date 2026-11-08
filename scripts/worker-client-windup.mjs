@@ -21,7 +21,7 @@ export async function windup(browser, phone, base, step) {
         if (body !== undefined && client.latest !== null) for (const [handle, info] of client.entities) {
           if (info.initial.kind !== body.kind) continue;
           const row = client.fields(client.latest, handle), distance = Math.hypot(Number(row?.x) - body.position.x, Number(row?.z) - body.position.z);
-          if (distance < nearest) { nearest = distance; serverDuration = Number(row?.attackDur); stamp = Number(row?.attackStamp); }
+          if (distance < nearest) { nearest = distance; serverDuration = Number(row?.attackDur) / 1000; stamp = Number(row?.attackStamp); }
         }
         w.__windupProof.events.push({ id: actor.id, duration, serverDuration, stamp, at: performance.now() });
       }, world.game.levelScope);

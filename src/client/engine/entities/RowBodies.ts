@@ -238,7 +238,8 @@ export class RowBodies {
     if (this.deaths.get(a) === tick) return;
     this.deaths.set(a, tick);
     a.presentDeath(amount, a.position, dir);
-    if (own) this.onKill?.(a);
+    if (!own) return;
+    this.onKill?.(a);
     const actor = a.combatActor();
     this.host.events.emit('actor.died', { actor, req: { source: 'env', sourceTags: ['dmg.remote'], target: actor, amount,
       point: a.position.clone(), dir } });
