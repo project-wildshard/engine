@@ -435,8 +435,9 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
     host.respawn.load(saved.respawn ?? []);
     host.restoreFocus(saved.focus);
     const actors = new Set([...host.players.keys(), ...host.entities.keys()]);
+    // Native creature windups retain their focused target without a StrikeRunner.
     if (new Set(saved.targets.map(([id]) => id)).size !== saved.targets.length
-      || saved.targets.some(([id, target]) => !host.strikes.has(id) || !actors.has(target))) throw new RangeError('Snapshot strike target does not exist');
+      || saved.targets.some(([id, target]) => (!host.strikes.has(id) && !host.entities.has(id)) || !actors.has(target))) throw new RangeError('Snapshot strike target does not exist');
     host.restoreAttackTargets(saved.targets);
     host.events.restore(saved.events, (value) => decode(value, host));
     const world = new Physics(ports.rapier, new Uint8Array(saved.physics)); replacement = world;
