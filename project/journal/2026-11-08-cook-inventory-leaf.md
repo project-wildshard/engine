@@ -38,3 +38,12 @@ The coordinator assigns the breaker fix before further quarantine work.
 The FL plan tracks it as FL19; it is not done until merged and both hosted
 ci and ring-1 are green. The fifteen quarantine entries and deadlines stay.
 No release CI reruns, hook bypass, API upload, UI change or deployment occurs.
+
+The complete real cook batch also passes: Template proved in 13.7s,
+Blender Template proved in 25.7s, and Dunes unmeasured in 26.7s.
+The normal immutable hook passes all 5,818 tests in 272.8 seconds.
+Its post-hook source fence then correctly refuses the generated stamp drift.
+Running gen:inputs on canonical source reproduces that tracked-file change.
+Commit the fully tracked helper inventory's generated renderer stamp forward;
+a second generation produces identical bytes. Do not bypass the source fence.
+The immutable queue must validate and publish this complete source again.
