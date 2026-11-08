@@ -3,6 +3,11 @@ description: >-
   What every Ring 1 job needs before scripts/ring1.sh: pnpm, node, the public
   org repos over HTTPS, and the pinned tarballs from the cache. It takes no
   secret, so a fork's pull request Jake has approved gets nothing it shouldn't.
+inputs:
+  pins-cache-scope:
+    description: Separate full-product caches from Ring 1's smaller inventory.
+    required: false
+    default: ring
 runs:
   using: composite
   steps:
@@ -18,6 +23,6 @@ runs:
     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ~/.cache/wildshard/pins
-        key: ring-pins-${{ hashFiles('test/pins/slices.json', 'test/pins/shardfiles.json', 'test/pins/rings.json') }}
+        key: ${{ inputs.pins-cache-scope }}-pins-${{ hashFiles('test/pins/slices.json', 'test/pins/shardfiles.json', 'test/pins/rings.json') }}
     - run: pnpm install --frozen-lockfile
       shell: bash

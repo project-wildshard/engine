@@ -7,10 +7,11 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -23,22 +24,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: ./.github/actions/ring-setup
         with:
-          package_json_file: package.json
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-      # Org git dependencies are public (J160, J163). pnpm-lock.yaml can record
-      # them as git@github.com:..., so every URL form goes to plain HTTPS.
-      - name: Read org repos over HTTPS
-        run: |
-          base="https://github.com/project-wildshard/"
-          git config --global url."$base".insteadOf "git@github.com:project-wildshard/"
-          git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"
-      - run: pnpm install --frozen-lockfile
+          pins-cache-scope: full
       - run: pnpm pins
       - run: pnpm gen:inputs
       - run: pnpm check
@@ -76,3 +64,25 @@ jobs:
           name: playwright-traces
           path: src/e2e/test-results/
           retention-days: 7
+
+  verdict-coverage:
+    needs: [check, e2e]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      # One run stands for every commit since the last finished run.
+      - name: Name the commits this verdict covers
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=50" \
+            --jq "[.workflow_runs[]|select(.status == \"completed\" and .conclusion != \"cancelled\" and .id != $GITHUB_RUN_ID)][0].head_sha // empty")
+          test -n "$previous" || { echo 'No finished run to compare against'; exit 0; }
+          commits=$(gh api "repos/$GITHUB_REPOSITORY/compare/$previous...$GITHUB_SHA" --jq '.commits[]|"\(.sha[0:10]) \(.commit.message|split("\n")[0])"')
+          range="${previous:0:10}..${GITHUB_SHA:0:10}"
+          { echo "### Commits since the last finished run: $range"; echo '```'; echo "$commits"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          case " $RESULTS " in
+            *' failure '*) echo "::error title=Red run covers $range::$(printf '%s\n' "$commits" | sed '/^$/d' | wc -l | tr -d ' ') commits after the last finished run; see this job's summary" ;;
+          esac
