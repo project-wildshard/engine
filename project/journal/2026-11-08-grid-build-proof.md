@@ -36,3 +36,16 @@ work passes in both browsers. Loader-complete is 13207/8451 ms and the
 largest unnamed gap is 281/269 ms. Worker streamed bytes are observed.
 No browser remains open. The normal full LS1 publication gate is next;
 the final pushed-build verdict still waits for that exact-source build.
+
+Publication completed at a84f050d30f8d3dfc04a097bb445494c689e9e0d.
+The full normal pre-push passed in 859.5 seconds. The remote main was
+verified before the final proof. Clean source and served metadata both
+named a84f050-mw7crm6l, saveEpoch 1, with the full 28-product catalogue.
+
+That pushed build passed real GRID/Enter boots in Chromium and WebKit.
+Both entered Driftwood, closed the home loading board and retained an
+open server at 30 frames. Loader completion was 23439/4745 ms; maximum
+unnamed gaps were 284/286 ms. Each retained 5,000 real worker receipts
+in two entries. The reported limited-preview stall did not reproduce
+on this exact pushed build. This does not close the distinct S1 return
+or actual process-loss recovery findings.

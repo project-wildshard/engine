@@ -3,6 +3,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Loading, phaseTenths, type LoadingDownloadSource } from './Loading';
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
+import {setDev} from '../core/devMode';
+import {setSetting} from './Settings';
 
 let now = 100;
 beforeEach(() => {
@@ -49,4 +51,43 @@ it('LS2: the ready card shows phase times whose tenths add up to its clock', () 
   expect(shown.reduce((sum, value) => sum + value, 0)).toBe(18);
   shown.forEach((value, index) => { expect(Math.abs(value - ([2.4, 3.4, 12.4][index] ?? 0))).toBeLessThan(1); });
   expect(phaseTenths([28_100, 14_000, 40_100], 82_200)).toEqual([281, 140, 401]);
+  expect(()=>phaseTenths([0],1000)).toThrow('partition');
+});
+
+it.each([{scoped:true,download:false},{scoped:false,download:false},{scoped:true,download:true},{scoped:false,download:true}])(
+  'accounts the actual ready card phases (%j)',async({scoped,download})=>{
+    const loading=new Loading({id:'phase-accounting',name:'Phase accounting'},{scoped});
+    try {
+      loading.setPath({id:'accounting',steps:[{key:'work',label:'Work',weight:1}]});
+      if(scoped)loading.scopedStep('work','Prepare work');else loading.waiting('Prepare work');
+      if(download){
+        let row={totalBytes:100,completedBytes:0,cachedBytes:0,filesTotal:1,filesDone:0,complete:false,error:null};
+        let notify:()=>void=()=>undefined;
+        void loading.setDownloadSource({ready:Promise.resolve(),snapshot:()=>row,subscribe:listener=>{notify=listener;listener();return()=>undefined;}});
+        now=500;row={...row,completedBytes:100,filesDone:1,complete:true};notify();
+      }
+      now=1100;const done=loading.done();void done.catch(()=>undefined); // An assertion failure may retire the pending fade.
+      expect(loading.phaseTimes()).toEqual({start:0,download:download?400:0,load:download?600:1000,total:1000});
+      expect(loading.root.querySelector('[data-el="clock"]')?.textContent).toBe('00:01.0');
+      expect(loading.root.querySelector('[data-el="suFact"]')?.textContent).toBe(`Done · ${download?'0.6':'1.0'} s`);
+      if(download)expect(loading.root.querySelector('[data-el="dlFact"]')?.textContent).toBe('Done · 0.4 s');
+      expect(loading.diagnosticsText()).toContain(`total 1.0 s · start 0.0 s · download ${download?'0.4':'0.0'} s · load ${download?'0.6':'1.0'} s`);
+      await vi.advanceTimersByTimeAsync(317);await done;
+    }finally{loading.scope.dispose();}
+  });
+
+it('freezes ready accounting and headings at one rounding-boundary instant through the hold',async()=>{
+  setDev(true);setSetting('holdLoading',true);
+  const loading=new Loading({id:'phase-hold',name:'Phase hold'});
+  try{
+    loading.waiting('Prepare work');
+    const readyClock=vi.spyOn(performance,'now').mockImplementationOnce(()=>1149.99).mockImplementation(()=>1150.01);
+    const done=loading.done(),times=loading.phaseTimes();void done.catch(()=>undefined);
+    expect(times.total).toBeCloseTo(1049.99);expect(times.download).toBe(0);expect(times.load).toBeCloseTo(times.total);
+    expect(loading.root.querySelector('[data-el="clock"]')?.textContent).toBe('00:01.0');
+    expect(loading.root.querySelector('[data-el="suFact"]')?.textContent).toBe('Done · 1.0 s');
+    readyClock.mockReturnValue(9100);await vi.advanceTimersByTimeAsync(1000);
+    expect(loading.phaseTimes()).toEqual(times);expect(loading.root.querySelector('[data-el="clock"]')?.textContent).toBe('00:01.0');
+    loading.root.querySelector<HTMLButtonElement>('.ws-load-play')?.click();await vi.advanceTimersByTimeAsync(317);await done;
+  }finally{loading.scope.dispose();setSetting('holdLoading',false);setDev(false);}
 });

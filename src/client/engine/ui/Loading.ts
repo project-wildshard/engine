@@ -52,6 +52,9 @@ const mb = (bytes: number): string => `${(bytes / 1_000_000).toFixed(1)} MB`;
 const barWidth = (fraction: number): string => `${(Math.floor(Math.max(0, Math.min(1, fraction)) * 1000) / 10).toFixed(1)}%`;
 /** LS2: the ready card's three phase times in tenths that add up to its clock's tenths (largest remainder). */
 export function phaseTenths(parts: readonly number[], total: number): number[] {
+  const phaseTotal=parts.reduce((value,ms)=>value+ms,0);
+  if(!Number.isFinite(total)||total<0||parts.some(ms=>!Number.isFinite(ms)||ms<0)
+    ||Math.abs(phaseTotal-total)>Math.max(0.000001,Math.abs(total)*Number.EPSILON*4))throw new RangeError('Loading phases must partition their total');
   const want = Math.round(Math.max(0, total) / 100), raw = parts.map(ms => Math.max(0, ms) / 100);
   const shown = raw.map(Math.floor);
   const order = raw.map((value, index) => ({ index, rest: value - Math.floor(value) })).sort((a, b) => b.rest - a.rest);
@@ -452,7 +455,7 @@ export class Loading {
   }
 
   private tickClock(): void {
-    const now = performance.now();
+    const now = this.readyAt >= 0 ? this.readyAt : performance.now();
     // The clock is one text node, sampled at its displayed precision without another animation-frame chain.
     const s = (now - this.clockT0) / 1000;
     set(this.els.clock, engineString('s_c0951c6055b1', [String(Math.floor(s / 60)).padStart(2, '0'), (s % 60).toFixed(1).padStart(4, '0')]));
@@ -523,7 +526,7 @@ export class Loading {
   /** The three exclusive wall segments; they add up to the total (LS2). NaN for a phase not finished yet. */
   phaseTimes(): { readonly start: number; readonly download: number; readonly load: number; readonly total: number } {
     const end = this.readyAt >= 0 ? this.readyAt : diagnosticNow();
-    const download = this.downloadSource === undefined && this.readyAt >= 0 ? this.readyAt : this.downloadEndAt;
+    const download = this.downloadSource === undefined ? this.startEndAt : this.downloadEndAt;
     return { start: this.startEndAt - this.clockT0, download: download - this.startEndAt,
       load: this.readyAt - Math.max(this.startEndAt, download), total: end - this.clockT0 };
   }
@@ -577,10 +580,10 @@ export class Loading {
     const times = this.phaseTimes();
     if (!this.finished || !(times.load >= 0)) return;
     // The ready card's phases add up to its clock: Start + Download + Load = the total it shows (LS2).
-    const scoped = this.scoped, parts = scoped ? [times.load] : [times.start, Math.max(0, times.download), times.load];
-    const tenths = phaseTenths(parts, times.total), done = (value: number | undefined): string => engineString('s_loading_done', [`${((value ?? 0) / 10).toFixed(1)} s`]);
-    if (scoped) set(this.els.suFact, done(tenths[0]));
-    else { set(this.els.stFact, done(tenths[0])); set(this.els.dlFact, done(tenths[1])); set(this.els.suFact, done(tenths[2])); }
+    const phases:readonly LoadingPhase[]=this.scoped?(this.downloadSource===undefined?['load']:['download','load']):PHASES;
+    const tenths = phaseTenths(phases.map(phase=>times[phase]), times.total);
+    const facts={start:this.els.stFact,download:this.els.dlFact,load:this.els.suFact};
+    phases.forEach((phase,index)=>{set(facts[phase],engineString('s_loading_done',[`${((tenths[index]??0)/10).toFixed(1)} s`]));});
     for (const [key, ms] of Object.entries(times)) setData(this.root, `${key}Ms`, String(Math.round(ms)));
   }
 
@@ -634,8 +637,8 @@ export class Loading {
       return this.completion;
     }
     bootMark('app:control-ready');
-    this.tickClock(); this.clockScope.dispose();
     this.readyAt = diagnosticNow(); if (!(this.downloadEndAt >= 0) && this.downloadSource !== undefined) this.downloadEndAt = this.readyAt;
+    this.tickClock(); this.clockScope.dispose();
     this.finished = true; finishLoadingWait(this.waitId); this.phase?.end(); this.phase = undefined;
     set(this.els.kicker, engineString('s_loading_ready_kicker'));
     if (this.view !== null) this.paint(this.view);
