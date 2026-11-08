@@ -6,6 +6,16 @@ is stopped. Both synthetic and trusted GRID taps reproduce it; a home-cell
 control narrows it without a road. The global scan is redundant because
 every indexed member already passes its own response/type/length check.
 Remove enumeration and keep that authoritative per-member validation.
+The first candidate exposed the second native census, Cache.matchAll,
+in the same title read-ahead at pagehide. Remove that native bulk path
+as well; requested files still receive their individual cache checks.
+
+The candidate's real Chromium one-byte quota override produced the
+native QuotaExceededError and still reached Nalati's completed card,
+31 worker frames and no page errors. Its real WebKit Ember crossing,
+cold return and process-kill recovery restored the saved pose within
+0.03 mm; native navigation errors remain explicitly open until the
+second enumeration repair and hosted proofs finish.
 
 Two exact hosted Chromium runs fail Nalati at finish with cache-write
 QuotaExceededError after world/shader work completes near 25.9 seconds.

@@ -771,11 +771,8 @@ function downloadPorts(cacheName: unknown, packs: boolean): SpawnDownloadPorts {
   return {
     fetch: (url, signal, init) => downloadFetch()(url, {...init, signal}),
     cached: async url => typeof caches === 'undefined' ? undefined : store === null ? caches.match(url, {ignoreVary: true}) : (await store).match(url, {ignoreVary: true}),
-    ...(store === null ? {} : {present: async (urls: readonly string[]) => {
-      const wanted = new Set(urls), found = new Set<string>();
-      for (const response of await (await store).matchAll()) if (response.status === 200 && !/\btext\/html\b/iu.test(response.headers.get('content-type') ?? '') && wanted.has(response.url)) found.add(response.url);
-      return found;
-    }}),
+    // Native bulk enumeration can outlive a title navigation in WebKit.
+    // Each requested member retains its own authoritative cache check.
     ...(store === null || controller !== undefined && controller !== null ? {} : {store: async (url: string, response: Response) => {await (await store).put(url, response);}}),
     ...(store === null || !packs ? {} : {packs: true, keep: async (url: string, response: Response) => {await (await store).put(url, response);}}),
     ...(packs ? {whole: true} : {}),
