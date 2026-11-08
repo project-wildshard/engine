@@ -100,6 +100,7 @@ export async function play(browser, phone, base, only = '') {
   if (runs('hurt')) { const { hurt } = await import('./worker-client-hurt.mjs'); await hurt(browser, phone, base, step); }
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }
   if (runs('grid-entry')) { const { gridEntry } = await import('./worker-client-grid-entry.mjs'); await gridEntry(browser, phone, base, step); }
+  if (runs('recovery-menu')) { const { recoveryMenu } = await import('./worker-client-grid-entry.mjs'); await recoveryMenu(browser, phone, base, step); }
   if (runs('death-order')) { const { deathOrder } = await import('./worker-client-death-return.mjs'); await deathOrder(browser, phone, base, step); }
   if (runs('death')) { const { driftwoodDeath } = await import('./worker-client-death.mjs'); await driftwoodDeath(browser, phone, base, step); }
   if (runs('partner')) { const { partner } = await import('./worker-client-partner.mjs'); await partner(browser, phone, base, step); }

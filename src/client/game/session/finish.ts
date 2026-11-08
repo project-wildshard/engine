@@ -177,7 +177,6 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   } });
   // G325: an arrival enters at once, but its AudioContext waits for the player's first tap (`installAudioUnlock`)
   // an app switch that takes the GPU (iOS): hold the loop, restore in place or reload where the player stood (E54)
-  if (resuming && !ctx.continuingGridEntry) hud.setPaused(true); // Graphics recovery needs RESUME; a planned update retains the original tap.
   const recoveryInstalledAt = performance.now();
   installGpuRecovery({ game, rebuild: () => { sky.rebuildEnvironment(); }, pose: () => (hud.entered ? { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch } : null),
     ...(ctx.gridLive === null ? {} : { beforeReload: (reason: 'gpu' | 'background') => ctx.gridLive?.prepareRecovery(reason) === true }),
@@ -239,6 +238,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // DL17, DL21: the server boots under the card, a counted line on it, so its reads land before control and the player's first
   // press reaches a server that is up. Before the flip this moves only J130's row.
   await loadingStage('server', () => import('../shardfile/clientWorker').then(worker => worker.launchWorkerClient({ ...(TIER === 'phone' && entersAtReveal ? { linkBodies: () => linkWorldUnderLoader(game, true) } : {}), slug: ctx.grid?.home.slug ?? slug, player, physics: world.physics, animals, weapons, health: playerHealth, died: ctx.serverDied, hurt: ctx.serverHurt, items: ctx.grid === null ? ctx.product.shardfile.items.rows : [], dims: kind => { const species = app.species.get(kind), variant = species?.variants[0]; return variant === undefined ? null : species?.build(variant, new Rng(1)).dims ?? null; }, tools: () => app.equipment?.tools ?? [], day: () => app.dayCycle, grid: workerGrid(ctx), scope: game.levelScope, system: spec => { app.addSystem(spec, game.levelScope); } })));
+  // Let first-row activation finish before the recovery menu parks the page.
+  // Its captured resume state is play, after the loader's app transition above.
+  if (resuming && !ctx.continuingGridEntry) hud.setPaused(true); // Graphics recovery needs RESUME; a planned update retains the original tap.
   const readyFrameGate = game.frameGate, loadingFrameGate = (): boolean => false;
   if (loading.holdRequested) game.frameGate = loadingFrameGate;
   try { await loading.done(); }
