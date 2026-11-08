@@ -1,5 +1,6 @@
 // EG-21: compare actual same-commit play witnesses, independently of platform baselines.
 import {readFileSync} from 'node:fs';
+
 const [first,second]=process.argv.slice(2);
 if(first===undefined||second===undefined)throw new Error('usage: compare-platform-steps <first.json> <second.json>');
 const a=JSON.parse(readFileSync(first,'utf8')),b=JSON.parse(readFileSync(second,'utf8'));
