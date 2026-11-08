@@ -19,6 +19,7 @@
  "test/compiled-grid-strips.test.ts",
  "test/cook-worker.test.ts",
  "test/cook-refusals.test.ts",
+ "test/cook-hostile-pins.test.ts",
  "test/net-hostile-play.test.ts",
  "test/pinned-restore-play.test.ts",
  "test/released-save-play.test.ts",

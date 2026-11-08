@@ -29,10 +29,11 @@ jobs:
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: node scripts/pins.ts verify-slices
       - name: Real worker, hostile peers, and restore continuation
-        run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/net-hostile-play.test.ts test/pinned-restore-play.test.ts test/released-save-play.test.ts
+        run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/cook-hostile-pins.test.ts test/net-hostile-play.test.ts test/pinned-restore-play.test.ts test/released-save-play.test.ts
         env:
           WS_VITEST_MAX_WORKERS: '2'
           NET_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
+          COOK_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
       - run: pnpm exec playwright install --with-deps chromium
       - name: Cook, attach, and play the same bytes
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
