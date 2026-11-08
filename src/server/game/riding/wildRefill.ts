@@ -15,7 +15,7 @@ import type { BondedMountRoster } from './roster';
  * this row.
  */
 export function installWildRefill(host: SimHost, mounts: BondedMountRoster, herds: () => readonly HerdBrain<AnimalSim>[],
-  id: string, saved?: Readonly<SimSnapshot>): (dt: number) => void {
+  id: string, saved?: Readonly<Omit<SimSnapshot, 'physics'>>): (dt: number) => void {
   const state = `${id}.refill`;
   const herdOf = (actor: AnimalSim): HerdBrain<AnimalSim> | undefined => herds().find(row => row.members.includes(actor)) ?? herds()[0];
   const refill = new CreatureRefill({ players: () => [...host.players.values()], room: () => mounts.hidden.size,

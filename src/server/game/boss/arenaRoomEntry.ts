@@ -28,7 +28,7 @@ export interface ArenaEntryPorts {
   readonly spec: (kind: string, variant: string) => AnimalSimSpec;
   readonly grantItem: (player: string, item: string, count: number) => void;
   /** The restored save, whose dynamic actors go back before its adapters do. */
-  readonly snapshot?: Readonly<SimSnapshot> | undefined;
+  readonly snapshot?: Readonly<Omit<SimSnapshot, 'physics'>> | undefined;
 }
 
 const Species = v.object({ species: v.array(v.object({ kind: v.string(), aggressive: v.boolean(), lockable: v.optional(v.boolean()), dims: v.record(v.string(), v.unknown()),

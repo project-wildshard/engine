@@ -120,7 +120,7 @@ interface Home extends Body { readonly respawn: number; readonly late: boolean; 
  * spawned while the keeper installed comes back at once, one spawned in play after the runtime's later steps, when the
  * runtime calls `settle` once those are registered (the host snapshots its adapters in registration order).
  */
-export function installHomeKeeper(host: SimHost, spec: HomeKeeperSpec, saved?: Readonly<SimSnapshot>): {
+export function installHomeKeeper(host: SimHost, spec: HomeKeeperSpec, saved?: Readonly<Omit<SimSnapshot, 'physics'>>): {
   settle: () => void; homes: () => readonly KeptHome[]; boss: KeptBossBody | null;
 } {
   const rng = new Rng(spec.seed + 31), holders = new Set<AnimalSim>(), { step } = spec;

@@ -87,7 +87,7 @@ export function mixedPopulation(host: SimHost, id: string): ReturnType<typeof in
 /** Mixed native population host. Rows own policy selection, reserved slots,
  * return gates, pose services and the physical volley's before/after boundary.
  * The v8 continuation retains per-body policies, poses, ids and native handles. */
-export function installMixedPopulation(host: SimHost, ports: MixedPopulationInput, saved?: Readonly<SimSnapshot>): {
+export function installMixedPopulation(host: SimHost, ports: MixedPopulationInput, saved?: Readonly<Omit<SimSnapshot, 'physics'>>): {
   bodies: () => readonly MixedPopulationBody[]; hunt: ReturnType<typeof createNativeHunt>['hunt'];
   captain: () => HuntBody | null; spawnCaptain: () => HuntBody; alarm: () => void;
   staggered: (actor: AnimalSim, strength: number, running: boolean) => void;

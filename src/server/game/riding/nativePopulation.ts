@@ -110,7 +110,7 @@ export interface NativePopulationBindings {
   boot: NativePopulationBoot; config: NativePopulationConfig;
   bodies: readonly { actor: AnimalSim; boot: { id: string; seed: number; adopted: { x: number; z: number; stream: RngState } } }[];
   herds: readonly { kind: string; cx: number; cz: number }[]; stream: RngState; wildStream: RngState;
-  bake: { actors: readonly { spec: AnimalSimSpec }[]; marmots: unknown }; spawnY: number; elites: NativeEliteBindings; snapshot?: Readonly<SimSnapshot>;
+  bake: { actors: readonly { spec: AnimalSimSpec }[]; marmots: unknown }; spawnY: number; elites: NativeEliteBindings; snapshot?: Readonly<Omit<SimSnapshot, 'physics'>>;
   /** CI12: the raid's presentation cues (the page's PagePastureRaid rows), read by a native tape; absent, none are kept */
   pastureCues?: PastureCues;
 }

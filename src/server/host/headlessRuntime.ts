@@ -24,7 +24,7 @@ import { installRoomRespawn } from '@wildshard/engine/game/roomRespawn';
 import type { GrappleTickContext } from '@wildshard/engine/game/grapple/native';
 import { serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
-import { checkSimSnapshotWire, decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
+import { admitSimSnapshotBytes, checkSimSnapshotWire, decodeSimSnapshotBytes, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -49,7 +49,7 @@ export interface HeadlessRuntimeInstallation {
   readonly room?: boolean;
   restoring: boolean;
   /** Strictly decoded continuation; reinstall its dynamic actor roster before native restore. Never step here. */
-  snapshot?: Readonly<SimSnapshot>;
+  snapshot?: Readonly<SimSnapshot | SimSnapshotBytes>;
   commands: () => readonly HeadlessCommand[];
   /** Another player's commands this tick. */
   playerCommands?: (id: string) => readonly HeadlessCommand[];
@@ -214,13 +214,15 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
 }
 /** Install the selected plan into one fresh or strictly restored native host.
  * A failed install disposes its world; installation may emit no gameplay effects. */
-export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot>, world?: { readonly room?: boolean; readonly near?: NearColliders; readonly page?: PageProgress }): Promise<TrustedHeadlessResident> {
+export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly near?: NearColliders; readonly page?: PageProgress }): Promise<TrustedHeadlessResident> {
   // The roster rolls its herds while this installs, so a room opened afterwards is too late: a save from a native-Math boot
   // would hold recipes its restore on the portable table can't reproduce.
   installPortableMath();
   const plan = await prepareNativeRuntime(preparation, world?.room);
   let commands: readonly HeadlessCommand[] = [], effects: HeadlessEffect[] = [];
-  const saved = snapshot === undefined ? undefined : decodeSimSnapshot(typeof snapshot === 'string' ? snapshot : serializeSimSnapshot(snapshot));
+  // An in-memory continuation needs the same strict admission and detached
+  // ownership, without encoding and immediately decoding a transport string.
+  const saved = snapshot === undefined ? undefined : typeof snapshot === 'string' ? decodeSimSnapshotBytes(snapshot) : admitSimSnapshotBytes(snapshot);
   const combat = createNativeCombatFrame();
   const otherCommands = new Map<string, readonly HeadlessCommand[]>();
   const context: HeadlessRuntimeInstallation = { combat, ...(world?.room === true ? { room: true } : {}), restoring: saved !== undefined, ...(saved === undefined ? {} : { snapshot: saved }), commands: () => commands, playerCommands: id => otherCommands.get(id) ?? [], emit: effect => { effects.push(effect); } };

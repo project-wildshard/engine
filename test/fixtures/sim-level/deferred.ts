@@ -12,7 +12,7 @@ export function deferredRecipe(generation: number): SimSpawn {
     strike: { ...SIM_LEVEL.weapon, id: 'deferred.strike', windup: 0.1, damage: 1 } };
 }
 /** A real deferred keeper; installation reinstates actors without advancing its respawn clock. */
-export function installDeferred(host: SimHost, saved?: Readonly<SimSnapshot>): void {
+export function installDeferred(host: SimHost, saved?: Readonly<Pick<SimSnapshot, 'adapters'>>): void {
   let state = { ticks: 0, born: -16, generation: 0, active: false };
   const spawn = (): void => { host.spawn(deferredRecipe(state.generation)); };
   host.onStep('fixture.keeper', () => {

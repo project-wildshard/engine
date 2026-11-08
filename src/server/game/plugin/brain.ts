@@ -1165,7 +1165,7 @@ export function speciesScales(species: readonly { readonly kind: string; readonl
  * exact restore (`installHomeKeeper`), each body bound to its row's native recipe (`SpeciesBrains.body`) on the keeper's
  * own stream, its home and the keeper's attack authority (its tokens; an uncapped keeper grants every attack).
  */
-export function installSpeciesHomes(host: SimHost, spec: SpeciesHomesSpec, saved?: Readonly<SimSnapshot>): { settle: () => void; homes: () => readonly KeptHome[]; boss: KeptBossBody | null } {
+export function installSpeciesHomes(host: SimHost, spec: SpeciesHomesSpec, saved?: Readonly<Omit<SimSnapshot, 'physics'>>): { settle: () => void; homes: () => readonly KeptHome[]; boss: KeptBossBody | null } {
   const { species, brains, home, custom, placement, holds, decisions, ...keeper } = spec;
   const declared = new Map<string, { readonly at: readonly [number, number] }>(spec.homes.map(row => [row.id, row]));
   if (spec.boss !== undefined) declared.set(spec.boss.id, spec.boss);

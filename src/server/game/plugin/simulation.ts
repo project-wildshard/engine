@@ -215,7 +215,7 @@ export interface NativeRuntimeRecipe extends RuntimeWorldRecipe {
   };
 }
 interface NativeRuntimeContext {
-  readonly restoring: boolean; readonly snapshot?: Readonly<SimSnapshot>;
+  readonly restoring: boolean; readonly snapshot?: Readonly<Omit<SimSnapshot, 'physics'>>;
   readonly emit: (effect: NativeRuntimeEffect) => void; readonly commands: () => readonly NativeMeleeInput[];
   /** Another player's commands this tick. */
   readonly playerCommands?: (id: string) => readonly NativeMeleeInput[];

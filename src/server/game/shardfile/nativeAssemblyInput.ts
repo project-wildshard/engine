@@ -18,7 +18,7 @@ import type { NativeCollisionBake } from '../population/nativeBake';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 
 /** What a server host hands one install. The tick protocol belongs to the SDK: `ports` adapts it. */
-export interface NativeAssemblyContext { readonly combat?: NativeCombatFrame; readonly restoring: boolean; readonly snapshot?: Readonly<SimSnapshot>;
+export interface NativeAssemblyContext { readonly combat?: NativeCombatFrame; readonly restoring: boolean; readonly snapshot?: Readonly<Omit<SimSnapshot, 'physics'>>;
   /** A net room's world: it also runs the fights a page or a tape keeps to itself. */
   readonly room?: boolean }
 /** The SDK's tick-protocol loans. No module URL or shard code crosses this boundary. */

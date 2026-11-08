@@ -13,7 +13,7 @@ import { MoverScriptDriver, type MoverRuntime } from '../../src/server/game/plug
 import { installCableModes } from '../../src/shared/engine/player/modes';
 import { createNativeCombatFrame } from '../../src/server/game/plugin/nativeItems';
 import { createSimHost, type SimHost , type SimCommand } from '../../src/server/engine/sim';
-import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot } from '../../src/shared/engine/sim/snapshot';
+import { admitSimSnapshotBytes, decodeSimSnapshotBytes, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '../../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../../src/server/engine/sim/restore';
 import { simPlayerCommand, type HeadlessCommand, type HeadlessEffect } from '../../src/shared/host/tickProtocol';
 import type { TickWorkerAdapter } from '../../src/server/host/tickWorkerLoop';
@@ -55,10 +55,10 @@ export async function prepareNativeProof(provided: HeadlessRuntimeInput, prepare
 }
 
 /** Keep the native transaction, restore and tick fences in the direct gameplay proof. */
-export async function createNativeProofResident(preparation: HeadlessRuntimeInput, prepare: PrepareHeadlessRuntime, snapshot?: string | Readonly<SimSnapshot>): Promise<TrustedHeadlessResident> {
+export async function createNativeProofResident(preparation: HeadlessRuntimeInput, prepare: PrepareHeadlessRuntime, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>): Promise<TrustedHeadlessResident> {
   const plan = await prepareNativeProof(preparation, prepare);
   let commands: readonly HeadlessCommand[] = [], effects: HeadlessEffect[] = [];
-  const saved = snapshot === undefined ? undefined : decodeSimSnapshot(typeof snapshot === 'string' ? snapshot : serializeSimSnapshot(snapshot));
+  const saved = snapshot === undefined ? undefined : typeof snapshot === 'string' ? decodeSimSnapshotBytes(snapshot) : admitSimSnapshotBytes(snapshot);
   const combat = createNativeCombatFrame();
   const context: HeadlessRuntimeInstallation = { combat, restoring: saved !== undefined, ...(saved === undefined ? {} : { snapshot: saved }), commands: () => commands, emit: effect => { effects.push(effect); } };
   const ports = { ...plan.ports, rapier: preparation.rapier };
