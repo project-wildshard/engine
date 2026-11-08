@@ -3,7 +3,7 @@ import type { Euler } from 'three';
 import { NumericPoseSchema, type NumericPoseInputSchema, parseClientChannels, type ClientChannelProgram } from '@wildshard/format/clientChannels';
 import type { AnimalRigContext, AnimalRigJoint } from '@wildshard/engine/entities/animalRig';
 import { lookAngles, squashBody } from '@wildshard/engine/entities/species/rigs';
-import {admittedClientChannels,bindClientChannelInputRows,planMergedChannels,publishMergedChannels,type MergedChannelPlan} from './channels';
+import {admittedClientChannels,bindClientChannelInputRows,planMergedChannels,bindMergedChannels,type MergedChannelPlan} from './channels';
 import { parsePackedCreatureLooks } from '@wildshard/format/speciesLooks';
 import { emitFault, NumericInputError } from '@wildshard/engine/core/faults';
 
@@ -83,6 +83,7 @@ function buildChannelPrograms(input:unknown,group:string,owners:ReadonlyMap<stri
  // lanes themselves, which refuse exactly as before
  const merge=copiedNames===undefined?null:mergedPlan(input,group,selected,copiedNames);
  const merged=merge===null?null:admittedClientChannels(merge.program),laneList=lanes.map(row=>row.lane);
+ const publish=merge===null||merged===null?undefined:bindMergedChannels(merge,merged,laneList);
  let reported=false;
  return Object.freeze({ids,
   evaluate:(observation:ChannelProgramObservation):void=>{
@@ -93,7 +94,7 @@ function buildChannelPrograms(input:unknown,group:string,owners:ReadonlyMap<stri
     if(!isVector||external.length!==copiedNames.length)throw new Error('Invalid copied pose vector');
     for(let index=0;index<external.length;index++){const value=external[index];if(value===undefined||!Number.isFinite(value)||Math.abs(value)>1e12)throw new NumericInputError(copiedNames[index]??String(index),'Invalid copied pose value');}
     let published=false;
-    if(merge!==null&&merged!==null&&isVector){try{merged.evaluate({time:observation.time,delta:observation.delta,values:external});publishMergedChannels(merge,merged,laneList);published=true;}catch{/* the lanes below refuse as before */}}
+    if(publish!==undefined&&merged!==null&&isVector){try{merged.evaluate({time:observation.time,delta:observation.delta,values:external});publish();published=true;}catch{/* the lanes below refuse as before */}}
     if(published){for(const {lane,ports} of lanes)ports.apply(lane.frame);return;}
     for(const {indices,values}of lanes){if(indices===undefined)throw new Error('Missing copied pose indices');for(let index=0;index<indices.length;index++)values[index]=external[indices[index]??-1]??Number.NaN;}
    }else if(borrowed){

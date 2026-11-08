@@ -271,6 +271,23 @@ export function publishMergedChannels(plan: MergedChannelPlan, merged: ClientCha
   }
 }
 
+/** Bind a detached plan's fixed wiring once. Every publication still reads the
+ * current private source values and resets the target lanes before writing. */
+export function bindMergedChannels(plan: MergedChannelPlan, merged: ClientChannelLane, lanes: readonly ClientChannelLane[]): () => void {
+  const source = internals.get(merged)?.published;
+  if (source === undefined) throw new Error('Unknown merged channel lane');
+  const reset = lanes.map(lane => internals.get(lane)?.reset);
+  const writes = plan.outputs.map(([laneIndex, slot, at]) => {
+    const lane = lanes[laneIndex], target = lane === undefined ? undefined : internals.get(lane)?.published;
+    if (target === undefined) throw new Error('Unknown merged channel target');
+    return { target, slot, at };
+  });
+  return (): void => {
+    for (const run of reset) run?.();
+    for (const { target, slot, at } of writes) target[slot] = source[at] ?? Number.NaN;
+  };
+}
+
 
 /** A numeric visual loan: a copied channel writes one named field, never a script-state grant. */
 export interface ClientNumericPortRow {
