@@ -4,17 +4,17 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { build } from 'esbuild';
+import { build } from 'rolldown';
 
 const ROOT = resolve(import.meta.dirname, '..'), OUT = join(ROOT, 'tmp/socket-smoke/smoke.mjs'), require = createRequire(join(ROOT, 'package.json'));
 // As vite/rapier.ts: the package's wasm import is the game's to load.
-/** @type {import('esbuild').Plugin} */
-const rapier = { name: 'rapier', setup: bundle => {
-  bundle.onResolve({ filter: /^\.\/rapier_wasm3d(\.js)?$/ }, () => ({ path: join(ROOT, 'src/server/engine/physics/rapierBindings.ts') }));
-  bundle.onResolve({ filter: /^@dimforge\/rapier3d-simd$/ }, () => ({ path: require.resolve('@dimforge/rapier3d-simd/rapier.js') }));
-} };
-await build({ entryPoints: [join(ROOT, 'test/fixtures/socketSmokeEntry.ts')], bundle: true, platform: 'node', format: 'esm', target: 'node24', outfile: OUT, logLevel: 'warning', plugins: [rapier],
-  // `ws` is CommonJS: an ESM bundle has no `require` of its own, and E7.2's target needs this same line.
-  banner: { js: 'import { createRequire as bundleRequire } from \'node:module\'; const require = bundleRequire(import.meta.url);' } });
+/** @type {import('rolldown').Plugin} */
+const rapier = {name:'rapier',resolveId:source=>{
+  if(/^\.\/rapier_wasm3d(\.js)?$/.test(source))return join(ROOT,'src/server/engine/physics/rapierBindings.ts');
+  if(source==='@dimforge/rapier3d-simd')return require.resolve('@dimforge/rapier3d-simd/rapier.js');
+  return null;
+}};
+await build({input:join(ROOT,'test/fixtures/socketSmokeEntry.ts'),platform:'node',transform:{target:'node24'},plugins:[rapier],
+  output:{file:OUT,format:'esm',codeSplitting:false,banner:'import { createRequire as bundleRequire } from \'node:module\'; const require = bundleRequire(import.meta.url);'}});
 const run = spawnSync(process.execPath, [OUT, process.argv[2] ?? '4', join(ROOT, 'public/assets/physics/rapier.wasm')], { stdio: 'inherit', cwd: dirname(OUT) });
 process.exit(run.status ?? 1);
