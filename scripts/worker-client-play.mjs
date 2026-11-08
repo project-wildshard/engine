@@ -90,8 +90,10 @@ export async function play(browser, phone, base, only = '') {
   if (only === 'nalati-signals') {
     const { run } = await import('./split-repair-nalati-signals.mjs');
     const { run: guardian } = await import('./split-repair-guardian.mjs');
+    const { run: panic } = await import('./split-repair-horse-panic.mjs');
     await step('Nalati: real stampede signals, notice and knockdown', () => run(browser, phone, base));
     await step('Nalati: a natural raid makes the guardian bark', () => guardian(browser, phone, base));
+    await step('Nalati: a real mounted bite panics the horse', () => panic(browser, phone, base));
     return steps;
   }
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }

@@ -298,6 +298,15 @@ export function installMountedPlayer(host: SimHost, profile: unknown, pondBlock?
   const first = host.players.values().next();
   if (first.done === true) throw new Error('Simulation host has no player');
   const firstSeat = seatFor(first.value);
+  host.events.on('creature.signal',({name,x,z})=>{
+    if(name!=='rider-bitten'&&name!=='scare'&&name!=='lightning')return;
+    const victim=name==='rider-bitten'?host.nearestPlayer({x,y:host.groundHeightAt(x,z),z}).id:null;
+    for(const seat of seats.values()) {
+      const horse=seat.horse;if(horse===null||seat.body.breaking||(victim!==null&&victim!==seat.player.id))continue;
+      const result=rules.project('panic',{x,z,px:horse.position.x,pz:horse.position.z,bite:Number(name==='rider-bitten'),practice:0});
+      const seconds=result['duration']??0;if(seconds>0)seat.body.startPanic(x,z,seconds);
+    }
+  },host.scope);
   const others = (): Seat[] => [...seats.values()].filter(seat => seat !== firstSeat);
   host.onStep(rows.step, dt => {
     for (const player of host.players.values()) seatFor(player);

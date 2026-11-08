@@ -361,6 +361,17 @@ export interface MountedBodyState {
 /** The actual shipping mounted motor law, renderer-free; its native resources are explicitly installed by the caller. */
 export class MountedBody extends MountedReins {
 
+  /** Start the existing rear/bolt law from an authoritative scare position.
+   * Returns whether this is a fresh panic; later scares extend its duration. */
+  startPanic(x:number,z:number,seconds:number):boolean {
+    if(this.breaking||seconds<=0)return false;
+    const fresh=this.panicT<=0;
+    this.panicT=Math.max(this.panicT,seconds);this.panicYaw=Math.atan2(this.feet.x-x,this.feet.z-z);
+    if(fresh&&Math.abs(this.speed)<3)this.panicRear=0.5;
+    this.skidT=0;this.spur.reset();this.jolt=Math.max(this.jolt,0.7);
+    return fresh;
+  }
+
   gait: (typeof RIDE_GAITS)[number] = 'stand';
   jostles = 0; thrownBy: string | null = null;
   motor: CharacterMotor | null = null;

@@ -28,7 +28,6 @@ const BOB = { walk: 0.016, trot: 0.032, canter: 0.045, gallop: 0.038, sway: 0.01
 const ROLL_PER_RATE = 0.05;          // rad of roll per rad/s of turn (scaled by speed up to 8 m/s)
 const TILT_FOLLOW = 0.3;             // the share of the horse's slope pitch / roll the rider's view takes (a rider balances upright)
 const SEAT_TILT = 0.13;
-const PANIC_REAR = 0.5;   // s the horse rears first (from a walk or a stand), m/s it bolts at, its whirl (rein ×), the rear knob (higher lifts its neck into the rider's eye)
 const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _seat = new THREE.Vector3(), _tilt = new THREE.Euler(0, 0, 0, 'YXZ');
 const angDiff = (a: number, b: number): number => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 /** Client-only controller; trusted player/actor services bind a data profile and public actions use actor ids. */
@@ -222,11 +221,9 @@ export class Mount extends MountedBody {
   panic(x: number, z: number, secs: number): boolean {
     const a = this.horse;
     if (a === null || this.breaking) return false;
-    const fresh = this.panicT <= 0;
-    this.panicT = Math.max(this.panicT, secs);
-    this.panicYaw = Math.atan2(this.feet.x - x, this.feet.z - z);
-    if (fresh && Math.abs(this.speed) < 3) this.panicRear = PANIC_REAR;
-    this.skidT = 0; this.spur.reset();
+    // On a wire the owner block carries the clocks and motion. The signal only
+    // presents its existing feedback; starting a second bolt would fight it.
+    const fresh = this.wire!==null || this.startPanic(x,z,secs);
     this.jolt = Math.max(this.jolt, 0.7);
     if (fresh) this.events.push({ kind: 'panic', horse: a.entityId, seconds: secs });
     return true;
