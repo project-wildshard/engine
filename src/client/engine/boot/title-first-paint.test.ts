@@ -7,6 +7,9 @@ import { showStartTitle } from '../ui/StartTitle';
 import type { TitleDeckView } from '../ui/HUD';
 
 const html = readFileSync('index.html', 'utf8');
+// The real HTML runs before runtime identity installation (test/setup is epoch
+// zero for historical fixtures). Its handoff must use this release's epoch.
+const saveEpoch = (JSON.parse(readFileSync('save-epoch.json', 'utf8')) as { saveEpoch: number }).saveEpoch;
 const windows: Window[] = [];
 interface Frames { now: number; callbacks: FrameRequestCallback[] }
 afterEach(async () => {
@@ -26,7 +29,7 @@ function firstDocument(search: string, frames?: Frames, developer = false, hando
     window.requestAnimationFrame = callback => { frames.callbacks.push(callback); return nativeFrame(() => undefined); };
   }
   windows.push(window);
-  if (handoffMs > 0) window.sessionStorage.setItem('wildshard.save.v2.session', JSON.stringify({keys: {titleArrival: {data: JSON.stringify({
+  if (handoffMs > 0) window.sessionStorage.setItem(`wildshard.save.v2@${saveEpoch}.session`, JSON.stringify({keys: {titleArrival: {data: JSON.stringify({
     slug: 'driftwood-isle', name: 'Home', mode: 'enter', at: window.performance.timeOrigin + (frames?.now ?? 0) - handoffMs,
   })}}}));
   window.document.write(html);
