@@ -1,11 +1,20 @@
 import {execFileSync,spawn} from 'node:child_process';
-import {constants, getPriority, loadavg} from 'node:os';
+import {constants, getPriority, loadavg,homedir} from 'node:os';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE} from '../scripts/push-budget.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
+
+/** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
+ * @param {NodeJS.ProcessEnv} [environment] */
+export function pushEnvironment(environment=process.env){
+  const env={...environment,WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
+    WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1',WS_CPU_ADMISSION:'1',
+    WS_HEAVY_SCHEDULER_ROOT:resolve(environment.WS_HEAVY_SCHEDULER_ROOT??environment.WS_HEAVY_ROOT??resolve(homedir(),'.wildshard-heavy-lanes'))};
+  Reflect.deleteProperty(env,'WILDSHARD_RING');Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');return env;
+}
 
 /** Run actual process groups, drain each one, and never start a later step after failure.
  * @param {{name:string,commands:string[][]}[]} tasks
@@ -62,10 +71,7 @@ export async function parallelChecks(tasks,options={}) {
 
 async function main(){
   assertHeavyLease('full-test');
-  const env={...process.env,WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
-    WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1'};
-  Reflect.deleteProperty(env,'WILDSHARD_RING');
-  Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');
+  const env=pushEnvironment();
   const began=Date.now();
   const selection=pushSelection(env.WS_PUSH_REFS);
   const context=capturePushTree(PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,selection);

@@ -29,8 +29,19 @@ const pkgPath = join(pkgDir, 'package.json');
 const scripts = existsSync(pkgPath) ? (JSON.parse(readFileSync(pkgPath, 'utf8')).scripts ?? {}) : {};
 
 if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budget.mjs'))) {
-  // Own the lane before generation/static work too; no sibling push races these outputs.
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const {pushEnvironment}=await import('./push-checks.mjs');
+  const {PUSH_PROFILE}=await import('../scripts/push-budget.mjs');
+  const {pushSelection}=await import('../scripts/push-selection.mjs');
+  const {capturePushTree,readPushProof}=await import('../scripts/push-proof-cache.mjs');
+  const env = pushEnvironment(Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))));
+  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,pushSelection(env.WS_PUSH_REFS));
+  // Outgoing history/secrets have already passed in pre-push. Reusing a proved
+  // tree starts no heavy work, so it must not wait behind a later full suite.
+  if(proof!==null){
+    console.error(`  - exact-tree green reuse before lease: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
+    process.exit(0);
+  }
+  // A miss owns the lane before generation/static work too.
   const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--checkout-scope', '--', process.execPath, '.githooks/push-checks.mjs'],
     { cwd: pkgDir, env: { ...env, WS_PUSH_GATE_PROFILE: 'full-v1', WS_CPU_ADMISSION: '1' }, stdio: 'inherit' });
   process.on('SIGINT', () => child.kill('SIGINT'));
