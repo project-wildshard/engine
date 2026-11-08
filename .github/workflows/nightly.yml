@@ -36,11 +36,18 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: pins
         with:
           path: ~/.cache/wildshard/pins
           key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
       - run: node scripts/pins.ts install
+      # Save admitted immutable inputs before a red product can end the job.
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: steps.pins.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/wildshard/pins
+          key: ${{ steps.pins.outputs.cache-primary-key }}
       - run: pnpm gen:inputs
       - run: node scripts/nightly.ts tests
         env:
@@ -67,10 +74,18 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: pins
         with:
           path: ~/.cache/wildshard/pins
           key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
+      - run: node scripts/pins.ts install
+      # Save admitted immutable inputs before a red product can end the job.
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: steps.pins.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/wildshard/pins
+          key: ${{ steps.pins.outputs.cache-primary-key }}
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - run: pnpm build:game
         env:
@@ -116,6 +131,10 @@ jobs:
       - name: Refuse a red or incomplete night (J167)
         if: always()
         run: node scripts/nightly.ts report tmp/nightly/reports tmp/nightly/baseline/verdict.json
+        env:
+          NIGHTLY_PLAN_RESULT: ${{ needs.plan.result }}
+          NIGHTLY_TESTS_RESULT: ${{ needs.tests.result }}
+          NIGHTLY_HEADS_RESULT: ${{ needs.heads.result }}
       - name: Publish the per-head verdict
         if: always()
         run: cat tmp/nightly/reports/summary.md >> "$GITHUB_STEP_SUMMARY"

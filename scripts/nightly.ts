@@ -22,15 +22,17 @@ if (command === 'plan') {
   {stdio: 'inherit', timeout: 1500000, env: {...process.env, WS_FULL_SUITE: '1', WILDSHARD_RING: '2'}});
   const raw: VitestResult = existsSync(json) ? (read(json) as VitestResult) : {};
   const files = (raw.testResults ?? []).map(file => ({path: relative(process.cwd(), file.name).replaceAll('\\', '/'),
-    ok: file.status === 'passed' && file.assertionResults?.every(row => row.status === 'passed') === true,
-    assertions: file.assertionResults?.length ?? 0}));
+    ok: file.status !== 'failed' && file.assertionResults?.every(row => row.status !== 'failed') === true,
+    assertions: file.assertionResults?.filter(row => row.status === 'passed').length ?? 0,
+    skipped: file.assertionResults?.filter(row => row.status !== 'passed' && row.status !== 'failed').length ?? 0}));
   const report: TestsReport = {...expected, kind: 'tests', exitCode: child.status ?? 1, kitExitCode: kit.status ?? 1, totalTests: raw.numTotalTests ?? 0, files};
   write('tests.json', report);
-  if (report.exitCode !== 0 || report.kitExitCode !== 0 || expected.tests.some(path => !files.some(row => row.path === path && row.ok && row.assertions > 0))) process.exitCode = 1;
+  if (report.exitCode !== 0 || report.kitExitCode !== 0 || expected.tests.some(path => !files.some(row => row.path === path && row.ok && row.assertions > 0 && row.skipped === 0))) process.exitCode = 1;
 } else if (command === 'report') {
   mkdirSync(out, {recursive: true});
   const receipts = readdirSync(out).filter(name => /^(heads-|tests\.)/u.test(name) && name.endsWith('.json')).map(name => (read(join(out, name)) as Receipt));
-  const report = {...verdict(expected, receipts, baseline !== undefined && existsSync(baseline) ? (read(baseline) as Verdict) : undefined), run: process.env.GITHUB_RUN_ID ?? null};
+  const jobs = {plan: process.env.NIGHTLY_PLAN_RESULT, tests: process.env.NIGHTLY_TESTS_RESULT, heads: process.env.NIGHTLY_HEADS_RESULT};
+  const report = {...verdict(expected, receipts, baseline !== undefined && existsSync(baseline) ? (read(baseline) as Verdict) : undefined, jobs), run: process.env.GITHUB_RUN_ID ?? null};
   write('verdict.json', report);
   writeFileSync(join(out, 'summary.md'), markdown(report));
   console.log(markdown(report));

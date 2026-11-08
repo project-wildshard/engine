@@ -61,7 +61,10 @@ node scripts/nightly.ts guard /path/to/nightly-verdict/verdict.json
 ```
 
 It refuses a different commit, pin digest, test list or incomplete set of
-head/browser/phase receipts. A green old nightly never clears a new
+head/browser/phase receipts. Failed, skipped or cancelled upstream Actions
+jobs also hold the verdict, even if their uploaded phases passed. The
+head runner refuses a stale local build before launching a browser.
+A green old nightly never clears a new
 commit. The optional legacy patch-tag helper also requires this verdict:
 
 ```sh

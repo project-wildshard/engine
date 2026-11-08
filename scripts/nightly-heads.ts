@@ -10,7 +10,7 @@ import {bootCase} from './parity/boot-smoke.mjs';
 import {sweepExplorer} from './parity/explorer-smoke.mjs';
 import {serve} from './parity/serve.mjs';
 import {levelDownloadFixtures, saveFixture} from './debug-settings.mjs';
-import {partition, plan, read, type HeadResult, type HeadsReport} from './nightly-model.ts';
+import {partition, plan, read, requireBuild, type HeadResult, type HeadsReport} from './nightly-model.ts';
 import type {CookIndex} from '../src/cook/game/cookWorker.ts';
 import type {StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
 
@@ -25,14 +25,15 @@ const expected = plan(), selected = partition(expected.heads, Number(groupText))
 if (only !== undefined && !selected.some(row => row.slug === only)) throw new Error('Head outside partition');
 const out = resolvePath(directory), root = process.cwd(), dist = join(root, 'dist');
 mkdirSync(out, {recursive: true});
-const work = mkdtempSync(join(out, '.heads-'));
 const report: HeadsReport = {...expected, kind: 'heads', browser: browserName, group: Number(groupText), results: []};
 const receipt = join(out, `heads-${browserName}-${groupText}.json`);
 const checkpoint = () => {writeFileSync(`${receipt}.next`, `${JSON.stringify(report, null, 2)}\n`); renameSync(`${receipt}.next`, receipt);};
 checkpoint();
 const {build} = read(join(dist, 'version.json')) as {build: string};
+requireBuild(build, expected);
 const live = read('test/pins/catalogue.json') as StandaloneCatalogue;
 const originalHTML = readFileSync(join(dist, 'index.html'), 'utf8');
+const work = mkdtempSync(join(out, '.heads-'));
 let preview: Awaited<ReturnType<typeof serve>> | undefined;
 try {
   preview = await serve(root, '', true);
@@ -61,7 +62,7 @@ try {
           {stdio: 'inherit', timeout: 330000});
         const cookedReceipt = (read(join(cooked, 'receipt.json')) as {indexes: CookIndex[]});
         const index = cookedReceipt.indexes[0];
-        if (index?.hash !== head.hash || index.build !== build || index.keys.length === 0) throw new Error('Wrong or empty cooked product');
+        if (index?.hash !== head.hash || index.slug !== head.slug || index.build !== build || index.keys.length === 0) throw new Error('Wrong or empty cooked product');
         return {build, objects: index.keys.length, seconds: index.seconds, proof: index.proof};
       })) continue;
       const store = folderStore(join(cooked, 'store'));

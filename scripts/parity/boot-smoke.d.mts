@@ -1,5 +1,5 @@
 import type { FloorGridPlan, FloorGridWitness } from '../frame-floor-grid.mjs';
-import type { Browser } from 'playwright';
+import type { Browser, BrowserContext, Page } from 'playwright';
 
 /** Require both actual warm owners before the native title capture clock starts. */
 export function titleCaptureReady(observation:{appState:string;titlePreparation:unknown},catalogueOnly?:boolean):boolean;
@@ -41,4 +41,4 @@ export function bootRoadCompletionState(): unknown;
 export function bootRoadFailure(read:()=>Promise<unknown>, primary:unknown):Promise<Error>;
 
 /** Run an actual built title through gameplay; reused by the cooked-store proof. */
-export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:import('playwright').Page)=>Promise<void>)|null,configureContext?:((context:import('playwright').BrowserContext)=>Promise<void>)|null):Promise<{elapsedMs:number;frame:number}>;
+export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:Page)=>Promise<void>)|null,configureContext?:((context:BrowserContext)=>Promise<void>)|null):Promise<{elapsedMs:number;frame:number}>;

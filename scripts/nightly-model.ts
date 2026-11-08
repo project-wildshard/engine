@@ -8,7 +8,7 @@ export interface Plan {version: number; sha: string; pins: string; testList: str
 export interface Phase {name: string; ok: boolean; error?: string; ms?: number; detail?: unknown}
 export interface HeadResult extends Head {phases: Phase[]}
 export interface HeadsReport extends Plan {kind: 'heads'; browser: string; group: number; results: HeadResult[]}
-export interface TestFile {path: string; ok: boolean; assertions: number}
+export interface TestFile {path: string; ok: boolean; assertions: number; skipped: number}
 export interface TestsReport extends Plan {kind: 'tests'; exitCode: number; kitExitCode: number; totalTests: number; files: TestFile[]}
 export type Receipt = HeadsReport | TestsReport;
 export interface Failure {key: string; error: string}
@@ -37,10 +37,16 @@ export function partition(heads: Head[], group: number): Head[] {
   return heads.filter((_, index) => index % groups === group);
 }
 
-export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict): Verdict {
+export function requireBuild(build: string, expected: Plan): void {
+  const sha = /^([a-f0-9]{7,40})-[a-z0-9]+$/u.exec(build)?.[1];
+  if (sha === undefined || !expected.sha.startsWith(sha)) throw new Error('Nightly build is stale: rebuild this exact checkout before proving');
+}
+
+export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, jobs: Record<string, string | undefined> = {}): Verdict {
   const failures: Failure[] = [], rows: Row[] = [];
+  for (const [job, result] of Object.entries(jobs)) if (result !== undefined && result !== 'success') failures.push({key: `runner/${job}`, error: `Actions job ${result}; a red nightly holds the tag even with complete phase receipts`});
   for (const browser of browsers) for (const head of expected.heads) {
-    const matches = reports.filter((report): report is HeadsReport => report.kind === 'heads' && report.browser === browser &&
+    const matches = reports.filter((report): report is HeadsReport => report.version === expected.version && report.kind === 'heads' && report.browser === browser &&
       report.sha === expected.sha && report.pins === expected.pins && report.testList === expected.testList)
       .flatMap(report => report.results ?? []).filter(row => row.slug === head.slug && row.hash === head.hash);
     for (const phase of phases) {
@@ -52,14 +58,14 @@ export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict):
       if (!ok) failures.push({key, error});
     }
   }
-  const suites = reports.filter((row): row is TestsReport => row.kind === 'tests' && row.sha === expected.sha && row.pins === expected.pins && row.testList === expected.testList);
+  const suites = reports.filter((row): row is TestsReport => row.version === expected.version && row.kind === 'tests' && row.sha === expected.sha && row.pins === expected.pins && row.testList === expected.testList);
   if (suites.length !== 1) failures.push({key: 'shared/tests', error: `Expected one suite, got ${suites.length}`});
   else {
     const suite = suites[0];
     if (suite.exitCode !== 0 || suite.kitExitCode !== 0 || suite.totalTests < 1) failures.push({key: 'shared/tests', error: `Vitest exit ${suite.exitCode}, kit exit ${suite.kitExitCode}, ${suite.totalTests} tests`});
     for (const path of expected.tests) {
       const executions = suite.files.filter(row => row.path === path);
-      if (executions.length !== 1 || !executions[0].ok || executions[0].assertions < 1) failures.push({key: `shared/${path}`, error: 'Listed test missing, skipped or failed'});
+      if (executions.length !== 1 || !executions[0].ok || executions[0].assertions < 1 || executions[0].skipped !== 0) failures.push({key: `shared/${path}`, error: 'Listed test missing, skipped or failed'});
     }
     for (const file of suite.files.filter(row => !row.ok)) {
       if (!failures.some(row => row.key === `shared/${file.path}`)) failures.push({key: `shared/${file.path}`, error: 'Suite failure outside the slow-test list'});
@@ -94,7 +100,7 @@ export function markdown(report: Verdict): string {
 export function requireGreen(report: Verdict, expected: Plan): void {
   const keys = expected.heads.flatMap(head => browsers.flatMap(browser => phases.map(phase => `${browser}/${head.slug}@${head.hash}/${phase}`)));
   const actual = report.rows?.map(row => `${row.browser}/${row.slug}@${row.hash}/${row.phase}`) ?? [];
-  if (!report.ok || report.tag !== 'eligible' || report.sha !== expected.sha || report.pins !== expected.pins || report.testList !== expected.testList ||
+  if (report.version !== expected.version || !report.ok || report.tag !== 'eligible' || report.sha !== expected.sha || report.pins !== expected.pins || report.testList !== expected.testList ||
     !Array.isArray(report.failures) || report.failures.length > 0 || actual.length !== keys.length || new Set(actual).size !== keys.length ||
     keys.some(key => !actual.includes(key)) || report.rows.some(row => !row.ok)) {
     throw new Error('J167: complete green nightly for this exact commit and pins required; tag held');
