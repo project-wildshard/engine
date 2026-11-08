@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment node
 import { bindBorrowedMethod } from '../../../shared/game/plugin/borrowed';
 import { expect, test } from 'vitest';
 

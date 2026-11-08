@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment node
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { Flags } from '@wildshard/engine/world/interact/flags';

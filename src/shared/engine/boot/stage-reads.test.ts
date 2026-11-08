@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment node
 import { afterEach, expect, test, vi } from 'vitest';
 import { LoadingTimeline, installLoadingTimeline } from './timeline';
 import { bootWaits, loadingStage, loadingStepWaits } from './waits';
