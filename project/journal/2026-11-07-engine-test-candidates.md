@@ -48,3 +48,10 @@ The engine publication plan tracks the remaining pushes and checks.
 
 The publication plan uses the dated lane filename expected by the
 plan gate, so the next session can find the held work consistently.
+
+Rebased the held work onto db17776 and the progress-epoch release
+changes. All 40 Ring 1 files / 131 cases pass again; the three Ring 2
+files / 18 cases and two repeated persistence cases also pass. The
+persistence test now names its actual contract: seeding the earlier
+record layout through the active epoch save API. Typechecking passes.
+The release tag is still absent, so publication remains held.

@@ -9,10 +9,11 @@ import rows from './fixtures/engine-lift/pine-persistence.json' with { type: 'js
 import { pinePin } from './fixtures/engine-lift/pins';
 const source = pinePin.product.shardfile;
 
-test('adopts old Pine boss and elite saves once and reloads current records', () => {
+test('seeds active-epoch Pine records once and reloads current values', () => {
   const instance = 'test-pine-json-old-save', scope = new Scope('old-pine'), next = new Scope('reload-pine');
   const bosses = { 'antler-king': { defeated: true, rewardTaken: false, kills: 2 } };
   const elites = { ironhide: { timer: 20, discovered: true, skinTaken: true, kills: 3, retired: false } };
+  // Seed the earlier record layout through the active epoch's public save API.
   expect(bossesSave.write(bosses, instance)).toBe(true);
   expect(elitesSave.write(elites, instance)).toBe(true);
   try {
