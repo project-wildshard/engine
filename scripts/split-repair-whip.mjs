@@ -12,7 +12,12 @@ export async function run(browser,phone,base) {
     await page.waitForFunction(()=>Reflect.get(window,'__wildshard')?.world?.animals.animals.some(row=>row.alive),undefined,{timeout:30000});
     await page.evaluate(()=>{
       const world=Reflect.get(window,'__wildshard').requireWorld(),link=world.player.link;if(link===null)throw new Error('No wire');
-      const seen={hits:0,weaponHits:0,localDamage:0,floats:0};Reflect.set(window,'__repairWhip',seen);
+      const seen={hits:0,weaponHits:0,localDamage:0,floats:0,hpWritesOutsideRows:0,rowHpWrites:0};Reflect.set(window,'__repairWhip',seen);
+      for(const body of world.animals.animals) {
+        let hp=body.hp,showing=false;const show=body.showRow.bind(body);
+        Object.defineProperty(body,'hp',{configurable:true,get:()=>hp,set:(/** @type {number} */value)=>{hp=value;if(showing)seen.rowHpWrites++;else seen.hpWritesOutsideRows++;}});
+        body.showRow=(row,dt)=>{showing=true;try{show(row,dt);}finally{showing=false;}};
+      }
       Reflect.get(link,'client').onCombat((/** @type {import('../src/shared/engine/net/messages').NetCombatEvent} */event)=>{if(event.kind==='hit'&&event.confirmFor>0)seen.hits++;});
       world.game.app.events.on('weapon.hit',()=>{seen.weaponHits++;},world.game.levelScope);
       world.game.app.events.on('damage.dealt',({req})=>{if(req.target.tags.includes('actor.creature'))seen.localDamage++;},world.game.levelScope);
@@ -33,7 +38,7 @@ export async function run(browser,phone,base) {
       if(await page.evaluate(()=>Reflect.get(window,'__repairWhip').hits>0))break;
     }
     return await page.evaluate(()=>{
-      const seen=Reflect.get(window,'__repairWhip');return {ok:seen.hits===1&&seen.weaponHits===1&&seen.localDamage===0,...seen};
+      const seen=Reflect.get(window,'__repairWhip');return {ok:seen.hits===1&&seen.weaponHits===1&&seen.localDamage===0&&seen.floats===1&&seen.hpWritesOutsideRows===0&&seen.rowHpWrites>0,...seen};
     });
   } finally {await context.close();}
 }
