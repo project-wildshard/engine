@@ -16,3 +16,10 @@ bytes stay excluded, the failing third hook still refuses, and every
 managed capture is removed. All four actual attempts finish in1.871s.
 
 No bypass, force, gate omission or failed-source receipt is introduced.
+
+Focused lint exposes two unnecessary template-string escapes in the new
+proof; the actual queue19 normal gate also refuses them, draining peers
+at30.2s. Remove the escapes, preserve the identical runtime JSON and
+rerun the same real four-attempt proof (1.741s), focused lint and the
+full layered compiler. This forward precedes E7's final queue boundary;
+optional engine publications remain held through E7's push.
