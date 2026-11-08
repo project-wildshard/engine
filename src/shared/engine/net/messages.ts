@@ -59,7 +59,7 @@ export interface NetDespawn { readonly kind: 'despawn'; readonly handle: number 
 /** A cell-local vector. */
 export type NetVector = readonly [number, number, number];
 /** The server settled a hit (J47): impact FX, hit-stop and damage numbers play from this. `confirmFor` is the seq of the command that swung or fired this very blow, or 0. */
-export interface NetHit { readonly kind: 'hit'; readonly tick: number; readonly target: number; readonly amount: number; readonly at: NetVector; readonly head: boolean; readonly killed: boolean; readonly confirmFor: number }
+export interface NetHit { readonly kind: 'hit'; readonly tick: number; readonly target: number; readonly amount: number; readonly at: NetVector; readonly head: boolean; readonly killed: boolean; readonly confirmFor: number; readonly blow?: boolean }
 /** An entity died (J33): `by` is the killer's handle or 0; each client throws its own ragdoll along `dir` from `impulse`. */
 export interface NetDied { readonly kind: 'died'; readonly tick: number; readonly id: number; readonly by: number; readonly dir: NetVector; readonly impulse: number }
 /** The owner's settled health lifecycle, after its checkpoint answered; creature ragdolls use `died` separately. */
@@ -84,7 +84,7 @@ export type NetRide = NetRideChange<'mount'> | NetRideChange<'dismount'>;
 export interface NetOwned { readonly kind: 'owned'; readonly tick: number; readonly name: string; readonly value: number }
 export type NetEvent = NetSpawn | NetDespawn | NetCombatEvent | NetPlayerDied | NetView | NetQuest | NetPhase | NetTravel | NetLedger | NetChat | NetRide | NetOwned;
 /** The events' and commands' wire form, in NET_SCHEMA_HASH: a change here must refuse a stale client like a field table's does (J54). */
-export const NET_EVENT_FORMS = 'view:s,u8,f32n;hit:h16,f32,p48,b,b,u16;died:h16,h16,d24,f32;player-died:h16,b,b,?s,?s,b,?s;quest:s,b,b,s,u16;phase:s,b;reward:u32,h16,b,?s;travel:u16,u16;ledger:u32,u32,s,u2,s,f32,b;chat:u32,u32,b,h16,s,s;buttons:u8,b,u8;lockTarget:h16;hookTarget:u16;ride:u8;fresh:b;mount:h16,h16,u16;dismount:h16,h16,u16;rideWords:b,u8,f32;climate:b,s,f32;buy:u16;board:b,u16;wear:s;pose:s;owned:s,f32';
+export const NET_EVENT_FORMS = 'view:s,u8,f32n;hit:h16,f32,p48,b,b,b,u16;died:h16,h16,d24,f32;player-died:h16,b,b,?s,?s,b,?s;quest:s,b,b,s,u16;phase:s,b;reward:u32,h16,b,?s;travel:u16,u16;ledger:u32,u32,s,u2,s,f32,b;chat:u32,u32,b,h16,s,s;buttons:u8,b,u8;lockTarget:h16;hookTarget:u16;ride:u8;fresh:b;mount:h16,h16,u16;dismount:h16,h16,u16;rideWords:b,u8,f32;climate:b,s,f32;buy:u16;board:b,u16;wear:s;pose:s;owned:s,f32';
 /** The spawn's column widths, which only the receiver's class table knows. */
 export type InitialBits = (cls: number) => { readonly bits: readonly number[]; readonly text: number } | undefined;
 
@@ -101,12 +101,13 @@ function writeCombat(writer: BitWriter, event: NetCombatEvent): void {
   writer.write(event.kind === 'hit' ? EVENT_HIT : EVENT_DIED, 8); writer.write(event.tick, 32);
   if (event.kind === 'hit') {
     writer.write(event.target, 16); writer.write(floatToBits(event.amount), 32); writeVector(writer, event.at, METRES, 16, METRE_TOP);
-    writer.writeBool(event.head); writer.writeBool(event.killed); writer.write(event.confirmFor, 16);
+    writer.writeBool(event.head); writer.writeBool(event.killed); writer.writeBool(event.blow === true); writer.write(event.confirmFor, 16);
   } else { writer.write(event.id, 16); writer.write(event.by, 16); writeVector(writer, event.dir, 1, 8, UNIT_TOP); writer.write(floatToBits(event.impulse), 32); }
 }
 function readHit(reader: BitReader): NetHit {
-  return { kind: 'hit', tick: reader.read(32), target: reader.read(16), amount: bitsToFloat(reader.read(32)), at: readVector(reader, METRES, 16, METRE_TOP),
-    head: reader.readBool(), killed: reader.readBool(), confirmFor: reader.read(16) };
+  const tick = reader.read(32), target = reader.read(16), amount = bitsToFloat(reader.read(32)), at = readVector(reader, METRES, 16, METRE_TOP),
+    head = reader.readBool(), killed = reader.readBool(), blow = reader.readBool(), confirmFor = reader.read(16);
+  return { kind: 'hit', tick, target, amount, at, head, killed, confirmFor, ...(blow ? { blow } : {}) };
 }
 function readDied(reader: BitReader): NetDied {
   return { kind: 'died', tick: reader.read(32), id: reader.read(16), by: reader.read(16), dir: readVector(reader, 1, 8, UNIT_TOP), impulse: bitsToFloat(reader.read(32)) };

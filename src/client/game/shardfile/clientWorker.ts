@@ -69,6 +69,8 @@ export interface WorkerClientPorts {
   readonly weapons: NetWeapons;
   /** The page's health: the server's word from now on, and nothing on the page can touch it. */
   readonly health: { readonly attributes: { health: number; incomingCap?: number } };
+  /** The owner's settled contact: existing feel only, with no page damage. */
+  readonly hurt: (amount: number, at: Vector3, blow: boolean) => void;
   /** Deliver this owner's settled lifecycle. Resume the authoritative pose when the existing fade reaches dark. */
   readonly died: (event: { readonly checkpoint: boolean; readonly cause?: DeathCause }, resume: () => void) => void;
   /** The page's own shard's item rows: a ranged row names the server's slot for it. */
@@ -301,6 +303,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   scope.onDispose(client.onTravel(() => { contacts.length = 0; }));
   scope.onDispose(client.onCombat(event => {
     contacts.push(event);
+    if (event.kind === 'hit' && event.target === client.welcome?.handle) ports.hurt(event.amount, new Vector3(...event.at), event.blow === true);
     if (event.kind === 'hit' && event.confirmFor !== 0) { report.hits++; if (event.killed) report.kills++; }
     if (event.kind === 'reward') report.paid += event.coins;
   }));

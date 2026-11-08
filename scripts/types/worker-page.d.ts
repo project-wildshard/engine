@@ -50,5 +50,5 @@ export type RepairWindow = WorkerWindow & {
   __windupProof: { events: { id: string; duration: number; at: number }[]; cues: number[]; warning: number | null; hints: string[]; hit: number | null };
   __repairProof: { damage: { amount: number; head: boolean; died: boolean }[]; sounds: string[]; blood: number; kills: number; deaths: string[]; floats: string[]; loose: string[]; sailorAt: number[] | null };
   __pineLife: { carcasses: { a: import('../../src/client/engine/entities/AnimalView').Animal; comeT: number; site: number }[]; ravens: { state: number }[] };
-  __hurtProof: { flashes: number; grunts: number; combat: number; shoves: number; arcs: string[]; hits: { amount: number; blow: boolean; at: number[] }[]; pageDamage: number };
+  __hurtProof: { flashes: number; grunts: number; combat: number; shoves: number; arcs: string[]; bearings: { shown: number; expected: number }[]; hits: { amount: number; blow: boolean; at: number[] }[]; pageDamage: number };
 };

@@ -12,6 +12,8 @@ export interface HurtPlayer {
 }
 export interface PlayerHurtPorts {
   player: HurtPlayer;
+  /** A linked page predicts landing feel but never settles a second fall hit. */
+  serverOwned?: () => boolean;
   directional: () => boolean;
   flash: () => void; toast: (text: string) => void;
   combat: (value: number) => void; hurt: (strength: number, pan: number) => void; land: (hard: boolean) => void;
@@ -29,20 +31,28 @@ export class PlayerHurt {
       if (req.target !== health) return;
       ports.flash();
       if (req.sourceTags.includes('feel.blow')) {
-        const p = ports.player, at = req.point;
-        ports.combat(0.9);
-        if (ports.directional()) {
-          ports.arc(at.x, at.z, p.position, p.yaw, dealt);
-          ports.trauma(Math.min(0.85, 0.3 + dealt / 40));
-        }
-        p.shove(at.x, at.z, hitShoveSpeed(dealt));
-        const dx = at.x - p.position.x, dz = at.z - p.position.z, d = Math.hypot(dx, dz);
-        ports.hurt(dealt / 20, d > 0.3 ? ((dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw)) / d) * 0.7 : 0);
+        this.blow(dealt, req.point);
       } else if (req.sourceTags.includes('feel.jolt')) {
         if (req.toast !== undefined && req.toast !== '') ports.toast(req.toast);
         ports.land(true);
       }
     }, scope);
+  }
+  /** Present the server's own-player contact; health has already settled elsewhere. */
+  serverHit(amount: number, at: Vector3, blow: boolean): void {
+    this.ports.flash();
+    if (blow) this.blow(amount, at);
+  }
+  private blow(dealt: number, at: Vector3): void {
+    const p = this.ports.player;
+    this.ports.combat(0.9);
+    if (this.ports.directional()) {
+      this.ports.arc(at.x, at.z, p.position, p.yaw, dealt);
+      this.ports.trauma(Math.min(0.85, 0.3 + dealt / 40));
+    }
+    p.shove(at.x, at.z, hitShoveSpeed(dealt));
+    const dx = at.x - p.position.x, dz = at.z - p.position.z, d = Math.hypot(dx, dz);
+    this.ports.hurt(dealt / 20, d > 0.3 ? ((dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw)) / d) * 0.7 : 0);
   }
   creature(a: { kind: string; label: string; position: Vector3 }, amount: number): void {
     this.combat.hit({ source: 'env', sourceTags: [`creature.${a.kind}`, 'feel.blow', 'cover.checked'],
@@ -55,6 +65,6 @@ export class PlayerHurt {
   }
   fall(hard: boolean): void {
     this.ports.land(hard);
-    if (hard) this.combat.hit(hardFallHit(this.health, this.ports.player.position));
+    if (hard && this.ports.serverOwned?.() !== true) this.combat.hit(hardFallHit(this.health, this.ports.player.position));
   }
 }
