@@ -13,7 +13,7 @@ const OPERATIONS=new Set([
   'worker:constructor','worker:fetch-evaluate-start','worker:constructor-to-first-message','worker:clock-roundtrip',
   'worker:module-body','worker:code-ready','worker:configuration-received','server:world-boot','server:booted-send',
   'server:booted-receive','server:first-rows','server:identity-module','server:storage-module','server:shell-module',
-  'server:previous-session-close','server:indexed-saves-open','server:page-save-carry','server:reward-reconcile',
+  'server:product-inputs','server:previous-session-close','server:indexed-saves-open','server:page-save-carry','server:reward-reconcile',
   'sw:cache-open','sw:cache-match','sw:body-and-cache-publication','sw:navigation-handler-and-delivery',
 ]);
 const STEPS=new Set(['modules','admission','models','world','loadout','gameplay','hud','server','readyFrame','spawnPrograms',
@@ -21,7 +21,7 @@ const STEPS=new Set(['modules','admission','models','world','loadout','gameplay'
   'assembly','menu','shaders','firstFrame','audio','finish']);
 const RESULTS=['pending','complete','failed','observed','settled','unresolved-at-loader-complete','first-message-observed',
   'unsupported','unavailable','timeout','error','cancelled','other'] as const;
-const UNITS=['steps','files','messages','decoded-body-bytes','bytes','units','other'] as const;
+const UNITS=['steps','files','messages','decoded-body-bytes','verified-input-bytes','bytes','units','other'] as const;
 const DETAIL_NUMBERS=['done','total','count','bytes','loaded','files','p0','w1','w2','p3','workerTimeOrigin','pageTimeOrigin',
   'roundTrip','handling','transitAndQueue','scoped','duration','tick','rows','at','received','wall','decision','newTimeOrigin','validatedAt','validated'] as const;
 const RESOURCE_NUMBERS=['startTime','workerStart','fetchStart','redirectStart','redirectEnd','domainLookupStart','domainLookupEnd',
@@ -56,9 +56,9 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
   const operation=(value:unknown,fallback:string):string=>{
     if(typeof value!=='string')return fallback;
     if(OPERATIONS.has(value)||/^worker:[0-9]{1,5}:messages-received$/u.test(value)
-      ||/^(?:worker:[0-9]{1,5}:)?(?:atomic:completed|resource:completed)$/u.test(value))return value;
+      ||/^(?:worker:[0-9]{1,5}:)?(?:atomic:completed|resource:completed|server:verified-input-bytes)$/u.test(value))return value;
     if(value.startsWith('game-stage:')&&STEPS.has(value.slice(11)))return value;
-    const part=/^((?:worker:[0-9]{1,5}:)?(?:download:|server:fetch-headers:|server:read-body:))(.+)$/u.exec(value);
+    const part=/^((?:worker:[0-9]{1,5}:)?(?:download:|server:fetch-headers:|server:read-body:|server:verified-input:))(.+)$/u.exec(value);
     return part===null?fallback:`${part[1]??''}${url(part[2])??'resource'}`;
   };
   const input=(value:unknown):Readonly<Record<string,unknown>>=>{

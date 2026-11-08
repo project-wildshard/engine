@@ -5,7 +5,7 @@
 // It boots the built product at iPhone portrait size in Chromium and WebKit, records every change of the
 // card's bars with the LS1 counters that moved with it, screenshots the card loading and ready, and reports
 // each stretch of over 2 s where the bar took less than 1 %, by the stage that held it.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync,readFileSync } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
 import { chromium, webkit, devices } from 'playwright';
 import { serve } from './parity/serve.mjs';
@@ -15,7 +15,7 @@ import { barStalls, untracedChanges } from './loading-bar-rule.mjs';
 
 /** @param {string} name */
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
-const root = resolvePath(option('root') ?? '.'), shard = option('shard') ?? 'template';
+const root = resolvePath(option('root') ?? '.'), shard = option('shard') ?? '_template';
 const out = resolvePath(option('out') ?? 'tmp/loading-card'), throttle = process.argv.includes('--throttle');
 const only = option('browser');
 const grid=process.argv.includes('--grid');
@@ -33,11 +33,12 @@ function recordBars() {
     'app:tier-menu-download-imports','app:three-import','app:main-import','app:selected-discovery'];
   const timing=()=>/** @type {import('../src/shared/engine/boot/timing').BootTiming|undefined} */(Reflect.get(window,'__bootTiming'));
   const start=()=>{
-    const t=timing(), inventory=/** @type {{common?:[string,number][]}} */(JSON.parse(document.getElementById('boot-module-files')?.textContent||'{}')).common??[];
+    const t=timing(),text=document.getElementById('boot-module-files')?.textContent;
+    const inventory=/** @type {{common?:[string,number][]}} */(JSON.parse(text===undefined||text===null||text===''?'{}':text)).common??[];
     const modules=new Map(inventory.map(([url,bytes])=>[new URL(url,location.href).href,bytes]));
     const received=new Map();
-    for(const row of t?.resources??[])if(row['realm']==='page'&&typeof row['url']==='string'&&typeof row['decodedBodySize']==='number'&&row['decodedBodySize']>0){
-      const size=modules.get(row['url']);if(size!==undefined)received.set(row['url'],Math.min(size,row['decodedBodySize']));
+    for(const row of t?.resources??[])if(row.realm==='page'&&typeof row.url==='string'&&typeof row.decodedBodySize==='number'&&row.decodedBodySize>0){
+      const size=modules.get(row.url);if(size!==undefined)received.set(row.url,Math.min(size,row.decodedBodySize));
     }
     return {kind:'start',adopted:(t?.entries??[]).some(row=>row.operation==='app:loading-adopt'),
       done:startSteps.filter(op=>(t?.entries??[]).some(row=>row.operation===op&&row.end!==null&&row.result==='complete')).length,
@@ -50,13 +51,14 @@ function recordBars() {
     if(bar==='start')return start();
     if(bar==='download'){
       const row=t?.work?.download?.();
-      return row===undefined?undefined:{kind:'download',done:row.completedBytes,total:row.totalBytes,complete:row.complete,known:row.progressKnown!==false,inline:!(t?.entries??[]).some(row=>row.operation==='app:loading-adopt')};
+      return row===undefined?undefined:{kind:'download',done:row.completedBytes,total:row.totalBytes,complete:row.complete,known:row.progressKnown!==false,inline:!(t?.entries??[]).some(entry=>entry.operation==='app:loading-adopt')};
     }
     if(bar==='load'){
       const row=t?.work?.load?.();
       return row===undefined?undefined:{kind:'load',configured:row.path!=='pending',rows:row.rows.map(({state,fraction,weight})=>({state,fraction,weight})),
         complete:(t?.entries??[]).some(entry=>entry.operation==='app:control-ready')};
     }
+    return undefined;
   };
   const seen=new Map();let step='',ready=false,previousCount='',firstFrame=false;
   Reflect.set(window,'__firstLoadingFrame',null);
@@ -79,7 +81,7 @@ function recordBars() {
   };
   const sample=()=>{
     const card=document.querySelector('.ws-load');if(!(card instanceof HTMLElement))return;
-    if(!firstFrame){firstFrame=true;requestAnimationFrame(()=>{Reflect.set(window,'__firstLoadingFrame',{name:card.querySelector('[data-el=slug]')?.textContent,art:getComputedStyle(document.documentElement).getPropertyValue('--ws-load-portrait').trim(),shell:card.hasAttribute('data-shell')});});}
+    if(!firstFrame){firstFrame=true;requestAnimationFrame(()=>{Reflect.set(window,'__firstLoadingFrame',{name:card.querySelector('[data-el=slug]')?.textContent,art:getComputedStyle(document.documentElement).getPropertyValue('--ws-load-portrait').trim(),shell:Object.hasOwn(card.dataset,'shell')});});}
     const t=timing(),first=start();let serverSteps=0,serverFiles=0,serverBytes=0;
     const completed=(t?.entries??[]).filter(row=>row.realm!=='page'&&row.operation.startsWith('server:')&&row.result==='complete'&&row.end!==null);
     serverSteps=completed.length;serverFiles=completed.filter(row=>row.operation.startsWith('server:verified-input:')).length;
@@ -95,6 +97,11 @@ function recordBars() {
 
 }
 
+const title=readFileSync(join(root,'dist','index.html'),'utf8').match(/id="ws-title-rows"[^>]*>(.*?)<\/script>/su)?.[1];
+if(title===undefined)throw new Error('Built title catalogue is absent');
+const installed=/** @type {{slug:string}[]} */(JSON.parse(title));
+for(const requested of grid?['driftwood-isle','open-plot-ember-forge']:[shard])
+  if(!installed.some(row=>row.slug===requested))throw new Error(`Built catalogue lacks ${requested}; use its exact slug/full build`);
 const preview = await serve(root, '', true);
 const report = [];
 try {
@@ -140,7 +147,7 @@ try {
         await page.locator('.ws-main-grid').waitFor({timeout:60000});
         destination=await page.evaluate(slug=>{
           const rows=JSON.parse(document.getElementById('ws-title-rows')?.textContent??'[]');
-          const row=rows.find((/** @type {{slug:string}} */row)=>row.slug===slug);if(row===undefined)throw new Error('Full catalogue destination absent');
+          const row=rows.find((/** @type {{slug:string}} */candidate)=>candidate.slug===slug);if(row===undefined)throw new Error('Full catalogue destination absent');
           return {name:row.name,art:row.card?.portrait??''};
         },attempt==='fresh-grid'?'driftwood-isle':'open-plot-ember-forge');
         const loaded=page.waitForEvent('domcontentloaded',{timeout:60000});
@@ -170,7 +177,7 @@ try {
           const expected={entries:raw.entries.map(({id,start,end})=>({id,start,end})),resources:raw.resources.length,
             counters:Object.keys(raw.counters).length,realms:Object.keys(raw.realms??{}).length};
           const receipt={text,expected,settled:false,success:false};Reflect.set(window,'__copyReceipt',receipt);
-          return original(text).then(()=>{receipt.settled=true;receipt.success=true;},error=>{receipt.settled=true;throw error;});
+          return original(text).then(()=>{receipt.settled=true;receipt.success=true;return undefined;},(/** @type {unknown} */error)=>{receipt.settled=true;throw error;});
         };
       });
       await page.locator('.ws-load-copy').click();
@@ -181,7 +188,7 @@ try {
         const native=await navigator.clipboard.readText();
         if(native!==receipt.text)return {ok:false,reason:'native readback differs'};
         const marker='timeline (LS1):\n',at=native.indexOf(marker);
-        if(at<0)return {ok:false,reason:'no complete timeline'};
+        if(at===-1)return {ok:false,reason:'no complete timeline'};
         const parsed=JSON.parse(native.slice(at+marker.length)),expected=receipt.expected;
         const entries=parsed.entries.map((/** @type {{id:number,start:number,end:number|null}} */{id,start,end})=>({id,start,end}));
         const complete=JSON.stringify(entries)===JSON.stringify(expected.entries)&&parsed.resources.length===expected.resources

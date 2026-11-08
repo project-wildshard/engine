@@ -17,7 +17,7 @@ try{for(const name of ['chromium','webkit']){
     const context=await browser.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
     await saveFixture(context,{scope:'device',key:'devMode',data:true});
     const page=await context.newPage();
-    await page.goto(`${preview.url}/?chunk=template&tier=phone&mute=1&nolock=1&sw=0`);
+    await page.goto(`${preview.url}/?chunk=_template&tier=phone&mute=1&nolock=1&sw=0`);
     await page.waitForFunction(()=>Reflect.get(window,'__wildshard')?.world?.game!==undefined,null,{timeout:90000});
     await page.addScriptTag({content:compiled.code});
     const result=await page.evaluate(`(async()=>{

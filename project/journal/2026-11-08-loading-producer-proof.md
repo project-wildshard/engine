@@ -34,3 +34,20 @@ Native lifecycle re-review is green in both engines: the real normal,
 disposal, loss-before-submit, in-flight loss, actual WAIT_FAILED and
 throwing-callback paths all settle and leave zero queued handles. The
 exact created/deleted/credited counts are in the committed review.
+
+The revised independent strict proofs pass all four catalogue cases:
+Dunes ready 22.0 s Chromium / 3.3 s WebKit; installed _template ready
+12.1 s / 2.7 s. Every run has zero stalls, backwards, untraced changes
+and page errors, successful native clipboard readback and visible
+refusal feedback. Dunes reports 40 actual server steps, 33 verified
+files and 447083 bytes; Template reports 14, 7 and 631489.
+
+An accidental uncatalogued chunk=template run exercises the older
+legacy fallback instead of the installed _template product. It is a
+separate red: Chromium 72.1 s with four strict stalls in sky/shaders/
+firstFrame (2.2, 13.8, 22.7 and 8.4 s); WebKit 4.5 s without stalls.
+No unearned progress or page error appeared. The proof now requires
+an exact installed slug before boot, and defaults to _template. This
+is not a fix or a green claim for that legacy rendering path.
+Verified server-input byte units and URL-ID correlations are retained
+in safe diagnostics; private input URLs remain omitted.
