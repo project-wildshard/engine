@@ -11,7 +11,9 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Qualification dispatches must execute, rather than replacing a pending
+  # publication run. Ordinary push/PR ordering retains its existing group.
+  group: ci-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-qualification-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
