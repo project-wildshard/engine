@@ -5853,7 +5853,7 @@
     "repo": "shard-nalati",
     "file": "test/held-weapon-laws.test.ts",
     "outcome": "deleted-j186",
-    "decision": "J186: Coupled unit harness with 3 mock/spy references. It fabricates page/owner/service dependencies and asserts private construction, preparation, ownership or callback behavior instead of traversing a real player/author boundary.",
+    "decision": "J186, re-judged from source: nine cases are pure law tests, not mocked integration tests. They pin HeldDecision scalar frames, projected channels, cadence and ABI/module identity. The tenth builds GLTFs and fabricated Player/AnimalManager dependencies and spies on GLTFLoader.loadAsync (the three heuristic matches). Delete those internal pins; retain the lance cone and rehit rule through actual mounted commands, live targets, combat and a fresh-host save/resume in engine-rule-successors.test.ts. Mock count alone was an inaccurate file-wide reason.",
     "originalTests": [
       "it('queues edges until the next 100 ms snapshot and covers the thrust window',()=>{",
       "it('keeps desktop tap throws, held release and dry ammunition distinct',()=>{",

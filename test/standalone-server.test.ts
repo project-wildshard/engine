@@ -66,6 +66,10 @@ test('the server ticks on its own clock, frames arrive at 30 Hz, and rows match 
 });
 
 test('a save made in the server survives a reload, and is durable only once the page has it', async () => {
+  // This outer edge deliberately waits for 120 real server-clock ticks
+  // (about two seconds), then tests page acknowledgement and a fresh boot.
+  // It measured 5.9 s under suite load, 2.56 s alone; the real timer is
+  // part of the durability contract, and the case stays below J186's 10 s.
   const storage = new PageStorage(), input = await sunscarInput(), first = start(storage, input);
   await first.shell.booted; first.shell.ready();
   await until(() => first.shell.client.latest !== null);
