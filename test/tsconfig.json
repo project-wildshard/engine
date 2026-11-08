@@ -526,6 +526,7 @@
     "declared-entry-targets-debug.test.ts"
   ],
   "files": [
+    "../src/test/helpers/git.ts",
     "../scripts/app-build/bootProducts.ts",
     "../scripts/app-build/catalogue.ts",
     "../scripts/app-build/bootProductTiers.ts",
