@@ -87,6 +87,10 @@ jobs:
 
   quarantine:
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -98,12 +102,12 @@ jobs:
           pins-cache-scope: full
       - run: pnpm pins
       - run: pnpm gen:inputs
-      - run: node scripts/test-quarantine.mjs
+      - run: node scripts/test-quarantine.mjs --shard=${{ matrix.shard }}/3
       - name: Keep the original quarantine results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ring1-quarantine-results
+          name: ring1-quarantine-results-${{ matrix.shard }}
           path: tmp/quarantine
           retention-days: 7
 
