@@ -210,7 +210,7 @@ export interface OwnedBook { readonly of: (player: string) => PlayerOwned; /** A
 
 /** Put a world on the wire's owned rows. Any owner of a pack or a shop already in the world keeps them. A good of ammunition goes to the world's quiver, and a world with none has no room for it. */
 export function installPlayerOwned(host: SimHost, shard: string, economy: unknown, pack: boolean, stores?: OwnedStores, source?: Shardfile, profiles?: CreatureRewardStore): OwnedBook {
-  const routes = actRoutes(host), seats = new Map<string, PlayerOwned>(), shopped = economy !== null && economy !== undefined && routes.buy === null;
+  const routes = actRoutes(host), seats = new Map<string, PlayerOwned>(), effects = new Map<string, () => void>(), shopped = economy !== null && economy !== undefined && routes.buy === null;
   const open = (slots?: OwnedSlots): PlayerOwned => {
     const owned = new PlayerOwned(shard, slots, Object.keys(source?.items.pickups ?? {}));
     if (shopped) owned.trade(economy, new Map<string, unknown>([['skins', { owns: (id: string) => owned.owned.has(id), own: (id: string) => { owned.owned.grant(id); } }], ['ammo', { capacity: (kind: string, n: number) => heldAmmunition(host)?.room(kind, n) ?? false, addBolts: (n: number) => { heldAmmunition(host)?.addBolts(n); }, grant: (kind: string, n: number) => { heldAmmunition(host)?.add(kind, n); } }]]));
@@ -222,11 +222,14 @@ export function installPlayerOwned(host: SimHost, shard: string, economy: unknow
   const of = (player: string): PlayerOwned => {
     if (session !== null) return session;
     let seat = seats.get(player);
-    if (seat === undefined) { seat = open(stores?.(player)); seats.set(player, seat); }
+    if (seat === undefined) { seat = open(stores?.(player)); seats.set(player, seat);
+      const body = host.players.get(player);
+      if (source !== undefined && body !== undefined) { const scope = host.scope.child(`owned:${player}`); installOwnedEffects(host, seat.owned, source, body, scope); effects.set(player, () => { scope.dispose(); }); }
+    }
     return seat;
   };
   publishOwned(host, 'player', (player, out) => { of(player).read(out, pack); });
   routes.wear = (player, id) => { const { owned } = of(player); if (isOwnedId(id) && isCosmetic(id) && owned.has(id)) owned.toggleWorn(id); };
   if (shopped) routes.buy = (player, good) => { of(player).buy(good); };
-  return { of, drop: player => { seats.delete(player); } };
+  return { of, drop: player => { effects.get(player)?.(); effects.delete(player); seats.delete(player); } };
 }

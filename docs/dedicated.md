@@ -29,3 +29,8 @@ browser and phone proofs. They require built pages and booted devices.
 Their presence does not establish physical-phone or VPS proof. The
 scripts under `scripts/vps` are operational inputs for a later sitting;
 porting them does not deploy anything.
+
+Jake owns the [VPS setup and private backup steps](vps-setup.md).
+The private `wildshard-backups` bucket and its scoped S3 token must be
+created before claiming an offsite backup. No source change creates them.
+E7 retains the current wire format; J197 wire v1 is separate.

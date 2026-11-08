@@ -1207,7 +1207,6 @@
     "./scripts/api-origin.mjs": "./scripts/api-origin.mjs",
     "./package.json": "./package.json",
     "./net/ledgerWire": "./src/shared/engine/net/ledgerWire.ts",
-    "./net/messages": "./src/shared/engine/net/messages.ts",
     "./net/chatFilter": "./src/server/engine/net/chatFilter.ts",
     "./net/redial": "./src/client/engine/net/redial.ts",
     "./net/socketFrames": "./src/shared/engine/net/socketFrames.ts",
