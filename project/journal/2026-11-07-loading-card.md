@@ -37,3 +37,14 @@ counter, step or producer report under them. The manual proof
 Once ready (or after a failure) Copy diagnostics takes Hold's place. It
 copies the phase times, tier, attempt, cache split, every Load row and the
 full LS1 timeline. Clipboard API first, a selected text area on refusal.
+
+## What the real boots say (LS3)
+
+iPhone-size Chromium at 4x CPU and 12.8 Mbit/s, and WebKit, through
+`scripts/browser-lane.sh`. Template: no stall in WebKit; Chromium held
+2.0 s in `shaders > firstFrame`. Sunscar Dunes: Chromium held 5.2 s in
+the same stretch, WebKit none. No bar ran backwards and every change
+traced to an event. Shader compile and the first frame report no finer
+progress, so that stage needs it. On Jake's phone the long stretches were
+Start's imports and Server world; these local boots are too fast to show
+them, so the phone's Copy diagnostics is the next reading.
