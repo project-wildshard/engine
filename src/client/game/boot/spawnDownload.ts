@@ -457,10 +457,10 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             const {bytes: body, copy: cachedCopy} = await readSpawnFile(file.url, file.bytes, {
               ...ports, fetch: (url, signal, init) => {
                 received = 0;
-                // The page/cache identity stays local. A remotely cooked shard's
-                // loose header/discovery lives with its parts, just like its data.
+                // The page/cache identity stays local. Every loose member of
+                // this manifest lives beside its parts, including authored mounts.
                 const source = new URL(url), page = new URL(base);
-                const target = source.origin === page.origin && source.pathname.startsWith('/shardfiles/')
+                const target = source.origin === page.origin
                   ? new URL(source.pathname + source.search, packs).href : url;
                 return ports.fetch(target, signal, init);
               },
