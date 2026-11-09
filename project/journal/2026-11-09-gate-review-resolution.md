@@ -1,7 +1,9 @@
 # Resolve the gate-integrity review before publication
 
 The clean publication view carries only the three required gate fixes
-and their type/review forwards atop exact-green7490d38. It excludes the
+and their type/review forwards atop upstream1d3b37e (kit planner fix).
+The prior7490d38 was exact-green; the final combined tree still needs CI.
+It excludes the
 optional four-slot cook experiment and other lanes' held source.
 
 J206 one-shot review used codex exec, gpt-6.1-sol, read-only sandbox and
@@ -32,7 +34,14 @@ types and targeted typed lint pass. Actual quarantine/lift inventory,
 registration, deadline and extension bytes are unchanged.
 
 Official source recomputation gives renderer
-f75d717f13f450ea7ca87c8cc0521b1779d314571fcd0537276b3406618a98d4;
-admission remains555d2c9b68f9f83bfe48983e3118e39820b65575e5459f46b6beba1662d11482.
+596de22c355620999f1c24ad8fa7b7ab7c5d72cb99f902a881f41d6479e3a7d1;
+admission is02bbb58af0931acf4468391a8002808234c25210b864cf6e4b5c3f7f4aceb8e1.
 The normal immutable full hook and exact hosted CI/Ring1 are still
 required; neither review nor focused fixtures substitutes for them.
+
+Final acceptance also checks the live deadline after receipt coverage and
+receipt I/O; an expired new receipt is removed before refusal. After the
+required rebase, the real environment/ref/expiry protocols pass again
+(2.18s ref race, 3.44s expiry/set/deadline, 2.29s each Git boundary).
+Full/Ring1 planners retain every gate: 12 shards238.120s, 8 shards221.578s.
+The measured upstream kit-module fix is retained, never duplicated.
