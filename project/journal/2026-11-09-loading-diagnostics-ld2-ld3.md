@@ -20,3 +20,8 @@ the next slowest steps. `exportPrivacy` becomes `own-paths-other-urls-and-free-t
 `loading-card-proof.mjs` checks the new value.
 
 Plan: project-wildshard-meta `docs/plans/LOADING-DIAGNOSTICS-PLAN.md` (J208).
+
+Review (Codex, one-shot, ~/.cache/wildshard/session-keep/reviews/engine-LD2-LD3-1827.md): three
+MUST-FIX privacy leaks, all fixed. Operation and wait names now come from explicit lists, not a
+pattern; paths are named only on the build's public routes (`/b/`, `/assets/`, `/shardfiles/` ...);
+and a cancel ends the `download:cache-check` span at once, as `cancelled`.

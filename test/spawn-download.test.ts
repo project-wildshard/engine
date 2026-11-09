@@ -176,3 +176,35 @@ test('encoded text sizes never replace decoded body bounds or cache progress', a
   expect(() => readSpawnManifest({...encoded, wireBytes: 3})).toThrow('wire total differs');
   expect(() => readSpawnManifest({...encoded, files})).toThrow('wire total differs');
 });
+
+test('LD2: the warm check is one named span with its file count, failed when the check fails', async () => {
+  const spans: {operation: string; detail: unknown; result?: string}[] = [];
+  Reflect.set(globalThis, '__bootTiming', {version: 1, begin: (operation: string, detail: unknown) => spans.push({operation, detail}) - 1,
+    end: (id: number, result: string) => { const span = spans[id]; if (span !== undefined) span.result = result; },
+    mark: () => undefined, progress: () => undefined});
+  try {
+    const warm = downloadSpawnManifest(address, {cached: () => Promise.resolve(new Response(text)), fetch: () => Promise.reject(new Error('Unexpected warm network'))}, base);
+    await warm.ready;
+    const broken = downloadSpawnManifest(address, {cached: url => url.endsWith('.json') ? Promise.resolve(new Response(text)) : Promise.reject(new Error('native cache refused')),
+      fetch: () => Promise.reject(new Error('Unexpected network'))}, base);
+    await expect(broken.ready).rejects.toThrow('native cache refused');
+    expect(spans.filter(row => row.operation === 'download:cache-check')).toEqual([
+      {operation: 'download:cache-check', detail: {files: 2}, result: 'complete'},
+      {operation: 'download:cache-check', detail: {files: 2}, result: 'failed'}]);
+  } finally { Reflect.deleteProperty(globalThis, '__bootTiming'); }
+});
+
+test('LD2: a cancel ends the warm check span at once, even while a native cache call never returns', async () => {
+  const spans: {operation: string; result?: string}[] = [];
+  Reflect.set(globalThis, '__bootTiming', {version: 1, begin: (operation: string) => spans.push({operation}) - 1,
+    end: (id: number, result: string) => { const span = spans[id]; if (span !== undefined) span.result = result; },
+    mark: () => undefined, progress: () => undefined});
+  try {
+    let listed = (): void => undefined; const reached = new Promise<void>(resolve => { listed = resolve; });
+    const download = downloadSpawnManifest(address, {cached: url => { if (url.endsWith('.json')) return Promise.resolve(new Response(text)); listed(); return new Promise<undefined>(() => undefined); },
+      fetch: () => Promise.reject(new Error('Unexpected network'))}, base);
+    void download.ready.catch(() => undefined);
+    await reached; download.cancel();
+    expect(spans.filter(row => row.operation === 'download:cache-check')).toEqual([{operation: 'download:cache-check', result: 'cancelled'}]);
+  } finally { Reflect.deleteProperty(globalThis, '__bootTiming'); }
+});

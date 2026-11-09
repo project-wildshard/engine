@@ -441,7 +441,11 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
       // LD2 (J208): the warm check is a named span, so a paste says what a Start that sits on it waits on (v0.1.2's
       // whole-cache census held Jake's cached reload 32.8 s with no request and no name). Open checks name listed reads.
       const checkTiming = bootTiming(), checkId = checkTiming?.begin('download:cache-check', {files: files.length});
-      let checkResult = 'failed'; checksOpen++;
+      let checkResult = 'failed', checkOpen = true; checksOpen++;
+      // A cancel ends the span at once: a native call that never returns must not hold it open (Codex review of ca3c1d8)
+      const closeCheck = (): void => { if (!checkOpen) return; checkOpen = false; checksOpen--; if (checkId !== undefined) checkTiming?.end(checkId, checkResult); };
+      const cancelCheck = (): void => { if (checkOpen) checkResult = 'cancelled'; closeCheck(); };
+      void stopped.catch(cancelCheck); // `cancel` settles this at once
       try {
         await Promise.all(files.map(async file => {
           if (!heldFiles.has(file.url)) return;
@@ -460,7 +464,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         }));
         controller.signal.throwIfAborted();
         checkResult = 'complete';
-      } finally { checksOpen--; if (checkId !== undefined) checkTiming?.end(checkId, checkResult); }
+      } finally { closeCheck(); }
       const missing = files.filter(file => !counted.has(file.url));
       progressKnown = true;
       if (missing.length === 0) { complete = true; if (jobWaits === waits) { jobWaits = null; jobDemand = null; } publish(); return; }

@@ -20,7 +20,7 @@ const OPERATIONS=new Set([
   'sw:legacy-cache-match','sw:legacy-copy-publication','sw:network-fetch-to-headers','sw:response-delivery-decision','sw:buffer-overflow',
   'sw:cache-open','sw:cache-match','sw:body-and-cache-publication','sw:navigation-handler-and-delivery',
 ]);
-const STEPS=new Set(['modules','admission','models','world','loadout','gameplay','hud','server','readyFrame','spawnPrograms',
+const STEPS=new Set(['product','manifest.load','level.data','ktx2','audio.preload','level.world','level.kit','level.play','roster','modules','admission','models','world','loadout','gameplay','hud','server','readyFrame','spawnPrograms',
   'runtimeModules','data','audioFiles','spawnDetail','worldFrame','home','homePrograms','road','colliders','enter','warm',
   'prepare','boundary','checkpoint','commit','activate','worldPrograms','renderer','sky','terrain','cards','forest','physics','edge','grass','cabins','props','animals','weapon',
   'assembly','menu','shaders','firstFrame','audio','finish']);
@@ -45,21 +45,32 @@ function numbers(value:unknown,keys:readonly string[]):Record<string,number|bool
 const realm=(value:unknown):string=>typeof value==='string'&&/^(?:page|service-worker|worker:[0-9]{1,5})$/u.test(value)?value:'other';
 /** Only build-system shaped public IDs are labels; arbitrary identifiers are not. */
 export const diagnosticBuild=(value:unknown):string=>typeof value==='string'&&/^[a-f0-9]{7,40}-[a-z0-9]{6,16}$/u.test(value)?value:'unknown';
-/** LD3: an engine-shaped operation keeps its name (`app:`, `game-stage:`, `sw:` ... and short code keys): only a known
- *  prefix, with no URL, space or free text. Unknown shapes still fall back to `operation-N`. */
-const NAMED_OPERATION=/^(?:app|game-stage|stage|worker|server|sw|download|boot|grid|loading|document)(?::[a-zA-Z0-9][a-zA-Z0-9._-]{0,47}){1,3}$/u;
-/** LD3: a loading wait's label is engine text ('Spawn download', 'Read Product descriptor'); a URL inside it is named
- *  as any resource is, and anything outside this plain alphabet stays private. */
-const WAIT_LABEL=/^[A-Za-z0-9 .,:/()·?=…_-]{1,160}$/u;
+/** LD3: engine operations named in a paste beyond OPERATIONS: an explicit list (Codex review of ca3c1d8: a pattern let
+ *  any `app:<text>` through). A name not listed here or in OPERATIONS still becomes `operation-N`. */
+const NAMED_OPERATIONS=new Set(['download:cache-check','app:session-code-ready','app:session-start','app:first-game-step-start',
+  'app:first-game-frame-opportunity','app:first-game-frame-submitted','app:shader-work-count','worker:configuration-send',
+  ...['await-booted','boot-configuration','descriptor-read-and-verification','first-authoritative-frame','first-body-links',
+    'first-body-preparation-end','first-body-preparation-start','hello-send','launch-complete','rapier-held-bytes','rapier-initialize',
+    'ready-received','ready-send','road-collision-inputs','road-physics-and-collision','simulation-and-collision-create',
+    'welcome-receive','worker-bootstrap-ready','worker-runtime-import'].map(name=>`server:${name}`)]);
+/** LD3: the loading waits a paste may name, exactly as the engine writes them; `GLTF decode <url>` names its file the way
+ *  every resource is named. Any other label stays private. */
+const WAIT_LABELS=new Set(['GLTF decode (owned bytes)','GLTF decode pacing','Grid road grain','Grid road signs','Horizon paintings',
+  'Minimap','Read Model data','Read Product data','Read Product data section','Read Product descriptor','Read Program data',
+  'Read Texture data','Read grid session module','Spawn download','Startup stylesheets']);
 const SAFE_SEGMENT=/^[A-Za-z0-9._-]{1,96}$/u, CONTENT_V=/^[a-f0-9]{8,64}$/u;
-/** LD3: this page's own file as its path (opaque segments elided), or null for another origin, a credential or a
- *  non-http URL: those keep a per-report ID. */
+/** LD3: the build's public routes. Same origin alone does not make a file public (Codex review of ca3c1d8). */
+const PUBLIC_DIRECTORIES=new Set(['b','assets','shardfiles','basis','fonts','programs','sw-core','calibration']);
+const PUBLIC_FILES=new Set(['/','/index.html','/sw.js','/version.json','/manifest.webmanifest','/favicon.png','/apple-touch-icon.png',
+  '/icon-192.png','/icon-512.png','/catalogue.json','/asset-index.json','/asset-manifest.json','/clear-cache.json']);
+/** LD3: this page's own public file as its path (opaque segments elided), or null for another origin, a route outside
+ *  the build's public files, a credential or a non-http URL: those keep a per-report ID. */
 export function diagnosticPath(value:string,origin:string|undefined=typeof location==='undefined'?undefined:location.origin):string|null{
   if(origin===undefined||!/^https?:/u.test(origin))return null;
   let parsed:URL;try{parsed=new URL(value,origin);}catch{return null;}
   if(!/^https?:$/u.test(parsed.protocol)||parsed.origin!==origin||parsed.username!==''||parsed.password!=='')return null;
   const segments=parsed.pathname.split('/').slice(1);
-  if(segments[0]==='api')return '/api/…';
+  if(!PUBLIC_FILES.has(parsed.pathname)&&!(segments.length>1&&PUBLIC_DIRECTORIES.has(segments[0]??'')))return null;
   const path=`/${segments.map(segment=>segment===''||SAFE_SEGMENT.test(segment)?segment:'…').join('/')}`;
   const version=parsed.searchParams.get('v');
   return `${path}${version!==null&&CONTENT_V.test(version)?`?v=${version}`:''}`.slice(0,200);
@@ -114,10 +125,12 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
     if(OPERATIONS.has(value)||/^worker:[0-9]{1,5}:messages-received$/u.test(value)
       ||/^(?:worker:[0-9]{1,5}:)?(?:atomic:completed|resource:completed|server:verified-input-bytes)$/u.test(value))return value;
     if(value.startsWith('game-stage:')&&STEPS.has(value.slice(11)))return value;
-    if(NAMED_OPERATION.test(value))return value;
+    if(NAMED_OPERATIONS.has(value)||/^(?:game-)?stage:/u.test(value)&&STEPS.has(value.replace(/^(?:game-)?stage:/u,'')))return value;
+    if(/^(?:worker:[0-9]{1,5}:)?server:verified-input:[a-f0-9]{64}$/u.test(value))return value; // a content hash
     if(value.startsWith('wait:')){
-      const label=value.slice(5).replaceAll(/https?:\/\/\S+/gu,found=>url(found)??'resource');
-      if(WAIT_LABEL.test(label))return `wait:${label}`;
+      const label=value.slice(5),decode=/^GLTF decode (https?:\/\/\S+)$/iu.exec(label)?.[1];
+      if(WAIT_LABELS.has(label)||/^Link [0-9]{1,4} shader programs$/u.test(label))return value;
+      if(decode!==undefined)return `wait:GLTF decode ${url(decode)??'resource'}`;
     }
     const part=/^((?:worker:[0-9]{1,5}:)?(?:download:|server:fetch-headers:|server:read-body:|server:verified-input:))(.+)$/u.exec(value);
     return part===null?fallback:`${part[1]??''}${url(part[2])??'resource'}`;
