@@ -34,6 +34,18 @@ function notify(job,state,message){
  const lane=/^[a-z][a-z0-9_-]*$/u.test(job.lane??'')?job.lane:'push-queue';
  try{mkdirSync(dirname(file),{recursive:true});appendFileSync(file,`${new Date().toISOString().slice(11,16)} ${lane} push queue ${job.id} ${state}: ${message.replaceAll(/\s+/gu,' ').slice(0,1000)}\n`);}catch(error){console.error('Push queue receipt unavailable',error);}
 }
+/** A worker outlives its enqueuer and can drain other lanes' jobs. Carry only
+ * tool/OS/auth transport settings, never gate bypasses, loaders or test modes.
+ * @param {NodeJS.ProcessEnv} [source] */
+function workerEnvironment(source=process.env){
+ const allowed=new Set(['HOME','PATH','USER','LOGNAME','SHELL','TMPDIR','TMP','TEMP','LANG','TZ','TERM','COLORTERM','NO_COLOR','FORCE_COLOR',
+  'PNPM_HOME','XDG_CONFIG_HOME','XDG_CACHE_HOME','XDG_DATA_HOME','SSH_AUTH_SOCK','SSH_AGENT_PID',
+  'HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy',
+  'SSL_CERT_FILE','SSL_CERT_DIR','NODE_EXTRA_CA_CERTS','CPATH','LIBRARY_PATH','MANPATH','SDKROOT',
+  'WS_LANE_RECEIPTS']);
+ const environment=Object.fromEntries(Object.entries(source).filter(([key])=>allowed.has(key)||/^LC_[A-Z_]+$/u.test(key)));
+ return {...environment,WS_FULL_SUITE:'1',GIT_TERMINAL_PROMPT:'0',GIT_SSH_COMMAND:keepalive};
+}
 /** A broken record fails only itself; a minimal invalid receipt is not a publication proof.
  * @param {string} directory @param {string} name */
 function readJob(directory,name){
@@ -60,7 +72,7 @@ function identity(remote){
 /** @param {string} directory */
 function worker(directory){
  const output=openSync(join(directory,'worker.log'),'a');
- const child=spawn('python3',[lock,join(directory,'worker.lock'),process.execPath,self,'work',directory],{detached:true,stdio:['ignore',output,output]});
+ const child=spawn('python3',[lock,join(directory,'worker.lock'),process.execPath,self,'work',directory],{env:workerEnvironment(),detached:true,stdio:['ignore',output,output]});
  child.on('error',error=>{console.error(`Push queue worker unavailable: ${error.message}`);});child.unref();closeSync(output);
 }
 /** @param {string} source @param {string} directory @param {boolean} checkOnly @param {string | undefined} requested */
@@ -118,8 +130,7 @@ async function drain(directory){
    const error=held.status===1?'Capture no longer holds capture.lock; PID reuse is not liveness':'Capture lock could not be verified';
    write(file,{...job,state:'failed',error});notify(job,'failed',error);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});continue;
   }
-  const environment={...process.env,WS_FULL_SUITE:'1',GIT_SSH_COMMAND:keepalive,PWD:snapshot};
-  for(const key of Object.keys(environment))if(key.startsWith('GIT_')&&key!=='GIT_SSH_COMMAND'||key.startsWith('WS_HEAVY_')&&key!=='WS_HEAVY_SCHEDULER_ROOT'||['WS_CPU_ADMISSION','WS_CPU_ROOT','WS_PUSH_REFS','WILDSHARD_RING','WS_TEST_QUARANTINE'].includes(key))Reflect.deleteProperty(environment,key);
+  const environment={...workerEnvironment(),PWD:snapshot};
   /** @param {string} command @param {string[]} args @param {string} [input] */
   const run=(command,args,input)=>execFileSync(command,args,{cwd:snapshot,env:environment,stdio:input===undefined?'inherit':['pipe','inherit','inherit'],input});
   /** @param {string} state @param {object} [extra] */
