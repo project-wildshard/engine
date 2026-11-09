@@ -19,12 +19,13 @@ try {
   const runtimeFile = paths.find(path => /^serverRuntime.*\.js$/u.test(path));
   const heldFile = runtimeFile ?? workerFile;
   let release = () => { /* Assigned when each browser owns its barrier. */ }, blocked = false, refuse = false;
-  let barrier = Promise.resolve();
+  let barrier = Promise.resolve(), refuseBootstrap = false;
   /** @param {import('node:http').IncomingMessage} request @param {import('node:http').ServerResponse} response */
   const handleRequest = async (request, response) => {
     const path = new URL(request.url ?? '/', 'http://localhost').pathname;
     if (path === '/') { response.setHeader('Content-Type', 'text/html'); response.end('<!doctype html><title>Worker bootstrap proof</title>'); return; }
     if (path === '/refuse-runtime') { refuse = true; release(); response.end('released'); return; }
+    if (refuseBootstrap && path.endsWith(`/${workerFile}`)) { response.writeHead(503); response.end(); return; }
     if (path.endsWith(`/${heldFile}`)) { blocked = true; await barrier; if (refuse) { response.writeHead(503); response.end(); return; } }
     try { response.setHeader('Content-Type', 'text/javascript'); response.end(await readFile(join(directory, path))); }
     catch { response.writeHead(404); response.end(); }
@@ -34,7 +35,7 @@ try {
   try {
     const address = server.address(); assert.ok(address && typeof address !== 'string');
     for (const name of ['chromium', 'webkit']) {
-      blocked = false; refuse = false;
+      blocked = false; refuse = false; refuseBootstrap = false;
       barrier = new Promise(resolve => { release = resolve; });
       const browser = await (name === 'chromium' ? chromium : webkit).launch({ headless: true, ...(name === 'chromium' ? { args: [...KEYCHAIN_ARGS] } : {}) });
       try {
@@ -62,6 +63,16 @@ try {
         assert.equal(first.heard, true, `${name}: worker has no first message before its heavy graph loads`);
         assert.equal(first.failed, true, `${name}: refused runtime left boot hanging`);
         console.log(`${name}: first message precedes held runtime; import refusal rejects actual boot`);
+        refuseBootstrap = true;
+        const loadFailure = await page.evaluate(async shellPath => {
+          const {startStandalone} = /** @type {{startStandalone:(config:{slug:string,base:string,build:string,savePrefix:string,storage:Storage})=>{booted:Promise<unknown>,dispose:()=>void}}} */ (await import(shellPath));
+          const shell = startStandalone({slug:'template',base:'/shardfiles/template/',build:'bootstrap-proof',savePrefix:'bootstrap.',storage:localStorage});
+          try {
+            return await Promise.race([shell.booted.then(()=>false,()=>true),new Promise(resolve=>{setTimeout(()=>{resolve(false);},750);})]);
+          } finally {shell.dispose();}
+        }, '/b/bootstrap-proof/standalone/shell.js');
+        assert.equal(loadFailure,true,`${name}: actual bootstrap HTTP503 left booted pending`);
+        console.log(`${name}: actual bootstrap HTTP503 rejects the page shell boot`);
       } finally { await browser.close(); }
     }
   } finally { release(); server.closeAllConnections(); await new Promise(resolve => { server.close(resolve); }); }

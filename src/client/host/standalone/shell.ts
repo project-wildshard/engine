@@ -141,6 +141,12 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
 export function startStandalone(config: StandaloneConfig): StandaloneShell {
   const worker = new Worker(new URL('../../../server/host/standalone/serverWorker.ts', import.meta.url), { type: 'module', name: 'standalone-server' });
   const bootstrapScope = new Scope('standalone.bootstrap');
+  let failBoot: (error: Error) => void = () => undefined;
+  const nativeFailure = new Promise<never>((_resolve, reject) => { failBoot = reject; });
+  bootstrapScope.listen(worker, 'error', (event: ErrorEvent) => {
+    const cause: unknown = event.error;
+    failBoot(cause instanceof Error ? cause : new Error(event.message || 'Standalone server worker failed to load'));
+  });
   bootstrapScope.listen(worker, 'message', (event: MessageEvent<unknown>) => {
     if (typeof event.data === 'object' && event.data !== null && '__engineWorkerBoot' in event.data) bootMark('server:worker-bootstrap-ready');
   });
@@ -154,5 +160,6 @@ export function startStandalone(config: StandaloneConfig): StandaloneShell {
   // The worker sits beside this module, so an emitted module's `/b/<build>/` folder is the server's real build (J57).
   const served = /^\/b\/([\w.-]+)\//u.exec(new URL(import.meta.url).pathname)?.[1];
   const refused = (): void => { void import('@wildshard/engine/boot/browserChunkRecovery').then(recovery => recovery.reloadRefusedBuild()); };
-  return connectStandalone({ refused, ...served === undefined ? {} : { serverBuild: served }, ...config }, control.port1, game.port1, () => { bootstrapScope.dispose(); reads?.port1.close(); harness.port1.close(); worker.terminate(); }, harness.port1);
+  const shell = connectStandalone({ refused, ...served === undefined ? {} : { serverBuild: served }, ...config }, control.port1, game.port1, () => { bootstrapScope.dispose(); reads?.port1.close(); harness.port1.close(); worker.terminate(); }, harness.port1);
+  return { ...shell, booted: Promise.race([shell.booted, nativeFailure]) };
 }

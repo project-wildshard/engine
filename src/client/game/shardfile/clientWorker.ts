@@ -495,12 +495,12 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
 async function guarded(ports: WorkerClientPorts): Promise<void> {
   const card = countedWait('Worker boot', 'files'); // completed worker tasks and verified inputs own its progress
   try { await startWorkerClient(ports, card); }
-  catch (error) { console.error('[worker client]', error); showError(`The game's server didn't start (${String(error)})`, error instanceof Error ? error.stack ?? '' : ''); }
+  catch (error) { console.error('[worker client]', error); throw error; }
   finally { card.end(); }
 }
 
 /** Start the client and its server; a failure says so, because a phone has no console. It settles once the server has booted, or
  *  failed: the boot is part of the load, so a page that awaits it hands the player a world the server already holds. */
 export function launchWorkerClient(ports: WorkerClientPorts): Promise<void> {
-  return new Promise(resolve => { ports.scope.onDispose(resolve); void guarded(ports).finally(resolve); }); // a level left mid-boot hears no server
+  return new Promise((resolve, reject) => { ports.scope.onDispose(resolve); void guarded(ports).then(resolve, reject); }); // a level left mid-boot hears no server
 }
