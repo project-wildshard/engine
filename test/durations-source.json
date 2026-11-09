@@ -30,6 +30,17 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "test/declared-kit-items.test.ts",
+      "sha": "17b936e595f674e9c75d64a068b2a205cd98aa63",
+      "run": "42718338723",
+      "artifact": 13719890211,
+      "report": "shard-2-ordinary.json",
+      "measuredAt": 1794266151918,
+      "durationMs": 6072.365115999999,
+      "appliedTo": ["full", "ring1"],
+      "basis": "Passed Linux Ring 1 module includes 5423.357833 ms collection plus setup and 591.539543 ms cases/hooks. It opens only the pinned _template product with the same Node environment in both rings. Other unknowns keep sixty seconds, and no global calibration or gate changes."
+    },
+    {
       "file": "test/connection-doctor.test.ts",
       "sha": "906dfd51f6d2df39c33b0ec83977861fe73ca1f7",
       "run": "42709241950",

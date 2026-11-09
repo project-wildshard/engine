@@ -613,6 +613,7 @@
   "test/creature-swing.test.ts": 0.05832208399999999,
   "test/cue-shared-recording.test.ts": 0.111109338,
   "test/declared-entry-targets-debug.test.ts": 3.2374445280000006,
+  "test/declared-kit-items.test.ts": 6.072365115999999,
   "test/dedicated-addresses.test.ts": 2.6749129460000005,
   "test/dedicated-doc.test.ts": 34.640851847,
   "test/dedicated-gateway-safety.test.ts": 0.8734327019999999,
