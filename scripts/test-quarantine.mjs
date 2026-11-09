@@ -2,35 +2,61 @@
 import {appendFileSync, mkdirSync, readFileSync} from 'node:fs';
 import {dirname, resolve as resolvePath} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {spawn} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 
-/** Read committed policy, refusing malformed or ambiguous entries. */
-export function readQuarantine() {
-  const raw = /** @type {unknown} */ (JSON.parse(readFileSync(new URL('../test/quarantine.json', import.meta.url), 'utf8')));
+/** Read committed policy, refusing malformed or ambiguous entries.
+ * @param {string|URL} [policyFile] */
+export function readQuarantine(policyFile=new URL('../test/quarantine.json', import.meta.url)) {
+  const raw = /** @type {unknown} */ (JSON.parse(readFileSync(policyFile, 'utf8')));
   if (!record(raw) || raw.schema !== 1 || !Array.isArray(raw.entries)) throw new Error('Invalid J193 quarantine policy');
   /** @type {Set<string>} */ const seen = new Set();
   return raw.entries.map((/** @type {unknown} */ value) => {
     if (!record(value) || typeof value.file !== 'string' || typeof value.owner !== 'string'
-      || typeof value.deadline !== 'string' || typeof value.reason !== 'string') throw new Error('Incomplete quarantine entry');
-    const {file, owner, deadline, reason} = value;
+      || typeof value.addedAt !== 'string' || typeof value.deadline !== 'string' || typeof value.reason !== 'string') throw new Error('Incomplete quarantine entry');
+    const {file, owner, addedAt, deadline, reason} = value;
     if (!/^test\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.test\.(?:ts|mjs)$/u.test(file)
       || !/^[a-z][a-z0-9_-]+$/u.test(owner) || !Number.isFinite(Date.parse(deadline)) || reason.length < 8 || seen.has(file)) throw new Error('Invalid quarantine identity, deadline or reason');
+    const admitted=Date.parse(addedAt),ends=Date.parse(deadline);
+    if(!Number.isFinite(admitted)||admitted>Date.now()||ends<=admitted||ends-admitted>48*3_600_000)throw new Error(`Quarantine must end within 48 hours of its admission: ${file}`);
     seen.add(file);
-    return {file, owner, deadline, reason};
+    return {file, owner, addedAt, deadline, reason};
   });
 }
 
 /** Expiry restores blocking coverage automatically; it never drops a test. */
 export function activeQuarantineFiles(now = Date.now()) {
-  return readQuarantine().filter(entry => Date.parse(entry.deadline) > now).map(entry => entry.file);
+  return readQuarantine().filter(entry => Date.parse(entry.addedAt)<=now&&Date.parse(entry.deadline) > now).map(entry => entry.file);
+}
+
+/** A rewritten date cannot restart an existing admission's 48-hour clock.
+ * @param {string} [root] */
+export function assertQuarantineHistory(root=process.cwd()){
+ const entries=readQuarantine(resolvePath(root,'test/quarantine.json'));
+ /** @param {string[]} args */
+ const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',maxBuffer:16*1024*1024}).trim();
+ if(git(['rev-parse','--is-shallow-repository'])!=='false')throw new Error('Quarantine admission history requires fetch-depth: 0');
+ const history=git(['log','--reverse','--first-parent','--format=%H %ct','--','test/quarantine.json']);
+ /** @type {Map<string,number>} */const admissions=new Map();
+ /** @type {Set<string>} */let previous=new Set();
+ for(const line of history.split('\n').filter(Boolean)){
+  const [sha,seconds]=line.split(' ');
+  /** @type {unknown} */const value=JSON.parse(git(['show',`${sha}:test/quarantine.json`]));
+  if(!record(value)||!Array.isArray(value.entries))throw new Error('Invalid historical quarantine admission');
+  const present=new Set(value.entries.filter(record).map(entry=>entry.file).filter(candidate=>typeof candidate==='string'));
+  for(const file of present)if(!previous.has(file))admissions.set(file,Number(seconds)*1000);
+  previous=present;
+ }
+ for(const entry of entries)if(admissions.get(entry.file)!==Date.parse(entry.addedAt))throw new Error(`Quarantine admission date must match the introducing commit: ${entry.file}`);
+ return entries;
 }
 
 async function main() {
   const args = process.argv.slice(2), shardArgs = args.filter(arg => arg.startsWith('--shard='));
-  if (shardArgs.length > 1 || args.some(arg => arg !== '--list' && !arg.startsWith('--shard='))) throw new Error('Expected --list and at most one --shard=i/n');
+  if (shardArgs.length > 1 || args.some(arg => arg !== '--list' && arg !== '--check-history' && !arg.startsWith('--shard='))) throw new Error('Expected --list, --check-history or at most one --shard=i/n');
+  if(args.includes('--check-history')){console.log(`J193 admission history valid for ${assertQuarantineHistory().length} entries; each at most 48 hours`);return 0;}
   const shard = shardArgs[0]?.slice(8) ?? '1/1';
   if (!/^[1-9]\d*\/[1-9]\d*$/u.test(shard)) throw new Error('Invalid quarantine shard');
   const parts = shard.split('/'), index = Number(parts[0]), count = Number(parts[1]);
@@ -63,6 +89,8 @@ async function main() {
   const verdict = `J193 executed ${files.length} quarantined files; exit ${code}; original results ${report}`;
   console.log(verdict);
   if (summary) appendFileSync(summary, `\n${verdict}\n`);
+  if(code!==0&&process.env.GITHUB_ACTIONS)for(const entry of entries.filter(candidate=>files.includes(candidate.file)))
+    console.error(`::error title=Quarantine owner ${entry.owner}::${entry.file} failed its reported cohort; deadline ${entry.deadline}`);
   // Preserve the real exit status. Only the workflow's explicit
   // continue-on-error makes this cohort non-blocking.
   return code;

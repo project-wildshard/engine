@@ -30,6 +30,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: package.json
+      - name: Enforce quarantine admission dates and the 48-hour cap
+        run: node scripts/test-quarantine.mjs --check-history
       - name: Scan the complete incoming history
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}

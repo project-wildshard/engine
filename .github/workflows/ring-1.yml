@@ -31,7 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - name: Enforce quarantine admission dates and the 48-hour cap
+        run: node scripts/test-quarantine.mjs --check-history
       - uses: ./.github/actions/ring-setup
       - run: bash scripts/ring1.sh static
       - run: pnpm test:kit
