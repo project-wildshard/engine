@@ -243,9 +243,11 @@ function loadServerModules(): Promise<ShellModule> {
 }
 /** A standalone server's boot: the page's saves carried into IndexedDB, then its worker. `held` counts each read it answers. */
 async function bootStandalone(slug: string, lone: boolean, held: () => void): Promise<Shell> {
+  // Read at the call: a leave this boot's own owner sets later chains on this boot, and must not be waited for here.
+  const previous = closing;
   const { startStandalone } = await loadServerModules(), { build } = buildRoot(), { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
   // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
-  await bootTask('server:previous-session-close', () => closing); // a world a session just left may still be saving into what this one reads
+  await bootTask('server:previous-session-close', () => previous); // a world a session just left may still be saving into what this one reads
   const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase()));
   if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
   // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
@@ -271,12 +273,21 @@ export function startWorkerServerEarly(options: { readonly slug: string; readonl
   if (early !== null && !early.adopted) return;
   const reads: EarlyServer['reads'] = { count: 0, card: null };
   const shell = bootStandalone(options.slug, options.lone, () => { if (reads.card === null) reads.count++; else reads.card.add(); });
-  void shell.catch(() => undefined); // its failure is the Worker boot step's, where it surfaces as an unadopted boot's would
+  // Its failures are the Worker boot step's, which awaits the same promises; until then nothing reports them early.
+  void (async () => { try { await (await shell).booted; } catch { /* reported at the Worker boot step */ } })();
   const started: EarlyServer = { key: serverKey(options.slug, options.lone), shell, reads, adopted: false };
   early = started;
+  // Settings' import stops an unadopted server as it stops an adopted one (no save); adoption registers its own stop.
+  const unstop = serverStopsForImport(() => {
+    if (started.adopted) return;
+    started.adopted = true; if (early === started) early = null;
+    closing = (async () => { try { (await shell).dispose(); } catch { /* a failed boot holds nothing */ } })();
+  });
   options.scope.onDispose(() => {
+    unstop();
     if (early === started) early = null;
     if (started.adopted) return;
+    started.adopted = true;
     closing = leaveEarly(shell);
   });
 }
