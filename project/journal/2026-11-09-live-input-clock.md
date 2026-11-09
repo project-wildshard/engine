@@ -36,3 +36,16 @@ The first exact 4ca Chromium road repeat is still red (320.9 m short at
 210 s while moving, 6.7 presented fps and about 59.95 simulation TPS).
 The native clock test does not establish that the live page timer is
 active. Trace that page path before claiming a crossing fix.
+
+The real live-page observer found only 34 timer-produced calls over about
+19 s, while 1154 authoritative ticks arrived and 53 frames presented.
+The timer was therefore still coupled to the congested page scheduler.
+Replace it with the transport's actual authoritative-frame callback.
+The bootstrap binds live mode and a pure current-control reader; every
+received frame can use only new tick credit, and capture/paused modes
+still grant no supplemental command. There is no input timer now.
+
+The native regression now uses those actual serialized frame arrivals,
+not an independent fixture pulse. It parks the live driver before its
+acknowledgement-only tail, so those tail ticks cannot earn test movement.
+All original command/position/capture bounds remain unchanged.

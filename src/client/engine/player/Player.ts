@@ -39,9 +39,9 @@ export type PlayerWireInput = Pick<NetCommand, 'steer' | 'yaw' | 'pitch' | 'butt
 /** Where a controls step goes when a server owns this body: `client/net/netPlayer.ts`. False: the step did not run. */
 export interface PlayerLink {
   readonly step: (input: PlayerWireInput) => boolean;
-  /** Optional live device clock. Frame mode preserves deterministic capture;
-   * paused grants no input credit. A producer peeks without consuming presses. */
-  readonly pulseDevice?: (mode: 'frame' | 'live' | 'paused', held?: () => PlayerWireInput) => void;
+  /** Optional live device driver. The transport reads current mode and held
+   * controls on server frames; capture and presses stay on the page clock. */
+  readonly driveDevice?: (mode: () => 'frame' | 'live' | 'paused', held: () => PlayerWireInput) => void;
   /** A harness moved this player: tell the server, whose word it is. */
   readonly place?: (x: number, y: number, z: number, yaw: number) => void;
 }

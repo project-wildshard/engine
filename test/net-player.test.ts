@@ -37,24 +37,19 @@ function play(seconds: number, frameMs: (frame: number) => number, press: (frame
   if (body === undefined) throw new Error('No body on the server');
   player.link = net; player.keys.add('KeyW'); player.locked = true; body.harnessHold = true;
   const speed = 3 * FIXED_STEP, drawn: number[] = [], out = new Float64Array(16);
-  let due = 0, acc = 0, commands = 0, nextTick = 0, nextPulse = 0, last = 0, frame = 0, handle = 0;
+  let due = 0, acc = 0, commands = 0, nextTick = 0, last = 0, frame = 0, handle = 0;
   const command = client.command.bind(client);
   client.command = input => { commands++; return command(input); };
   for (const [id, info] of client.entities) if (info.id === body.entityId) handle = id;
   const end = seconds * 1000;
   while (clock < end) {
     const tick = (): void => { body.position.x += speed; room.tick(); };
-    if (nextTick <= Math.min(due, pacing === undefined ? Infinity : nextPulse)) { for (let run = 0; run < 2; run++) tick(); nextTick += 2 * TICK_MS * 60 / 59.9; link.pump(); clock = Math.max(clock, nextTick - 2 * TICK_MS); continue; }
-    if (pacing !== undefined && nextPulse < due) {
-      clock = nextPulse;
-      net.pulseDevice(pacing(clock / 1000), () => player.sampleHeldCommand());
-      link.pump(); nextPulse += TICK_MS; continue;
-    }
+    if (nextTick <= due) { for (let run = 0; run < 2; run++) tick(); nextTick += 2 * TICK_MS * 60 / 59.9; link.pump(); clock = Math.max(clock, nextTick - 2 * TICK_MS); continue; }
     clock = due;
     const dt = (clock - last) / 1000;
     last = clock;
     press(frame, page);
-    net.reconcile(); if (pacing !== undefined) net.pulseDevice(pacing(clock / 1000)); player.input(dt);
+    net.reconcile(); if (pacing !== undefined) net.driveDevice(() => pacing(clock / 1000), () => player.sampleHeldCommand()); player.input(dt);
     acc += dt;
     let ran = 0;
     while (acc >= FIXED_STEP && ran < MAX_FIXED_STEPS) { page.stepWorld(); player.setBodyEnabled(true); player.stepDevice(FIXED_STEP); acc -= FIXED_STEP; ran++; }
@@ -65,6 +60,7 @@ function play(seconds: number, frameMs: (frame: number) => number, press: (frame
     if (client.interpolator.sample(handle, render, out)) drawn.push(out[0] ?? 0);
     frame++; due += frameMs(frame);
   }
+  if (pacing !== undefined) net.driveDevice(() => 'paused', () => player.sampleHeldCommand());
   for (let settle = 0; settle < 6; settle++) { for (let run = 0; run < 2; run++) room.tick(); link.pump(); }
   net.reconcile();
   const report = { commands, steps: room.lastSeq(seat), corrections: net.predictor.corrections, replays: net.predictor.replays, offset: net.worstOffset, feetGap: player.position.distanceTo(host.player.position), delayMs: client.clock.delayMs, drawn, rowSpeed: speed, x: host.player.position.x };

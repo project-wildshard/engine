@@ -86,6 +86,7 @@ export class NetPlayer implements PlayerLink {
   private frameSteps = 0;
   private deviceMode: 'frame' | 'live' | 'paused' = 'frame';
   private inputTick: number | null = null;
+  private deviceDriver: { mode: () => 'frame' | 'live' | 'paused'; held: () => PlayerWireInput } | null = null;
   private launcher: NonNullable<NetCommand['launcher']> | null = null;
   private hookLocked = false;
   private hookTarget: number | undefined;
@@ -116,6 +117,7 @@ export class NetPlayer implements PlayerLink {
     }),
     client.onRide(event => { if (event.rider === client.welcome?.handle) this.heard.push(event); }),
     // A crossing is a snap (§5.2): nothing is sent until the next world's first frame seats this body there, in its coordinates.
+    client.onFrame(() => { const driver = this.deviceDriver; if (driver !== null) this.pulseDevice(driver.mode(), driver.held); }),
     client.onTravel(() => { this.seen = null; }),
     // A new link is a new command stream: every saved move named the old one, and `adopt` lets them go on the first frame.
     client.onRejoin(() => { this.seen = null; this.seq = 0; this.heard.length = 0; this.attacks.clear(); })];
@@ -141,6 +143,11 @@ export class NetPlayer implements PlayerLink {
     if (!this.claimInputTick(0)) return false;
     const armed = this.armed(input);
     return this.sendCommand(armed, true, this.hooked(armed));
+  }
+  /** Bind current page activity and controls without consuming a device edge. */
+  driveDevice(mode: () => 'frame' | 'live' | 'paused', held: () => PlayerWireInput): void {
+    this.deviceDriver = { mode, held };
+    this.pulseDevice(mode());
   }
   /** Keep sustained controls on the server's clock when GPU presentation is
    * slow. Reserve a render frame's bounded steps for presses/weapon sequences;
