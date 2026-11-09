@@ -19,6 +19,7 @@ export const CI_NATIVE_GROUPS = {
   'native-cook': [
     'test/cook-worker.test.ts',
   ],
+  'native-cook-cpu': ['test/cook-cpu-limit.test.ts'],
   'driftwood-population': [
     'test/driftwood-headless-population.test.ts',
   ],

@@ -12,7 +12,7 @@ if(enabled==='1'){
   const file=relative(process.cwd(),filename).replaceAll('\\','/');
   // Performance and uncapped encoder proofs reserve the complete managed budget.
   // No environment variable is claimed to cap their native inner workers.
-  const exclusive=file==='test/net-bots.test.ts'||file==='test/cook-worker.test.ts';
+  const exclusive=file==='test/net-bots.test.ts'||file==='test/cook-worker.test.ts'||file==='test/cook-cpu-limit.test.ts';
   const native=new Set<string>(CI_SERIAL_TESTS).has(file);
   const lease=await holdCpu(exclusive?'all':native?2:1);
   void (async()=>{await lease.lost;console.error(`CPU admission lost: ${file}`);process.kill(process.pid,'SIGTERM');})();

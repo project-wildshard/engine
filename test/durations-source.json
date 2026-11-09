@@ -30,6 +30,27 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "test/cook-cpu-limit.test.ts",
+      "sha": "32f182df49688e4e70331dc33d5f7a4e66566220",
+      "run": "42703311246",
+      "report": "engine-ci-6/shard-6-ordinary.json",
+      "measuredAt": 1794260137151,
+      "durationMs": 4824.455306,
+      "appliedTo": ["full"],
+      "basis": "Passed Linux module includes collection, setup and environment, not only the 2092.880604 ms case/hook sum. Moving this unchanged actual encoder proof to its own native group keeps the ordinary two-worker phase from overlapping its uncapped no-grant branch. No calibration, cap or deadline change."
+    },
+    {
+      "file": "test/cook-cpu-limit.test.ts",
+      "sha": "32f182df49688e4e70331dc33d5f7a4e66566220",
+      "run": "42703311121",
+      "artifact": 13711789837,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794260053802,
+      "durationMs": 4946.377766,
+      "appliedTo": ["ring1"],
+      "basis": "Separate passed Ring 1 Linux module includes collection, setup and environment. Unchanged real q11 bytes, worker counts and all three cases remain; the native singleton is scheduled independently with the existing safety factor and full sixty-second bound for other unknown files."
+    },
+    {
       "file": "src/client/engine/ui/load-failure-copy.test.ts",
       "sha": "299fb0ad890e0f7587f7d527fa8ed309aaa2596b",
       "run": "42699787431",
