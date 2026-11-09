@@ -10,7 +10,8 @@ const address = {url: '/assets/spawn/lanes-1234567890abcdef.json', bytes: text.l
 
 test('a page read of the last listed file is answered long before the warm check ends, with at most eight check lookups in flight', async () => {
   document.body.innerHTML = `<script id="boot-module-files" type="application/json">${JSON.stringify({spawnManifests: {cacheName: 'lanes-assets', client: {lanes: {phone: address}}}})}</script>`;
-  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => Promise.resolve(new Response(String(input).endsWith('.json') ? text : 'network'))));
+  const network = vi.fn((input: RequestInfo | URL) => Promise.resolve(new Response(String(input).endsWith('.json') ? text : 'network')));
+  vi.stubGlobal('fetch', network);
   // One native queue, one answer a macrotask, as a phone's cache storage answered Jake's 480 lookups.
   const queue: (() => void)[] = [];
   let inFlight = 0, most = 0, answered = 0;
@@ -35,5 +36,8 @@ test('a page read of the last listed file is answered long before the warm check
     expect(answeredAtRead).toBeLessThan(files.length / 2);
     expect(most).toBeLessThanOrEqual(9); // eight lanes, plus the page read's own copy from the store
     expect(download.snapshot()).toMatchObject({complete: true, filesDone: files.length});
+    // every listed file was held: only the page read may reach the network, once (this fixture's hashes are not its bytes)
+    const listedFetches = network.mock.calls.map(([input]) => new URL(String(input), document.baseURI).pathname).filter(path => path.startsWith('/shardfiles/'));
+    expect(listedFetches.length).toBeLessThanOrEqual(1); expect(new Set(listedFetches).size).toBe(listedFetches.length);
   } finally { clearInterval(pump); vi.unstubAllGlobals(); }
 });
