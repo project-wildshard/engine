@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+// Git's actual child observes Apple's selected SDK; emit only compiler inputs.
+const keys=['CPATH','LIBRARY_PATH','MANPATH','SDKROOT'];
+process.stdout.write(JSON.stringify(Object.fromEntries(keys.filter(key=>process.env[key]!==undefined).map(key=>[key,process.env[key]]))));

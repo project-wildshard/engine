@@ -16,8 +16,23 @@ export function pushEnvironment(environment=process.env){
   // Git prepends its exec directory when it invokes a hook. Execute both gate
   // entries with that same effective search order; duplicate entries add no tool.
   if(environment.PATH!==undefined){
-    const gitPath=execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim();
+    const gitPath=execFileSync('git',['--exec-path'],{env:environment,encoding:'utf8'}).trim();
     env.PATH=[...new Set([gitPath,...environment.PATH.split(delimiter)])].join(delimiter);
+  }
+  // Apple's Git launcher also selects compiler paths before starting a hook.
+  // Observe its real child now so the pre-gate and hook execute under the same
+  // SDK, rather than omitting compiler inputs from the proof fingerprint.
+  if(process.platform==='darwin'){
+    const bin=resolve(import.meta.dirname,'bin');
+    /** @type {Record<string,unknown>} */
+    const sdk=JSON.parse(execFileSync('git',['wildshard-push-env'],{env:{...env,PATH:[bin,environment.PATH??''].join(delimiter)},encoding:'utf8'}));
+    for(const key of ['CPATH','LIBRARY_PATH','MANPATH','SDKROOT']){
+      const value=sdk[key];
+      if(value!==undefined){if(typeof value!=='string')throw new Error('Invalid Git compiler environment');env[key]=value;}
+    }
+    // xcrun appends the same manual search directory on every nested invocation.
+    // Repeating a directory changes no lookup but would change the runtime hash.
+    if(env.MANPATH!==undefined)env.MANPATH=[...new Set(env.MANPATH.split(delimiter))].join(delimiter);
   }
   Reflect.deleteProperty(env,'WILDSHARD_RING');Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');return env;
 }
