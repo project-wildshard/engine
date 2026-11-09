@@ -6,9 +6,11 @@ import { bootProgress } from '../../../shared/engine/boot/timing';
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
 export class ContentReadError extends Error {
   readonly url: string;
-  constructor(url: string, detail: string, cause?: unknown) {
+  /** RL8: the server answered that the file is not there (404, or the HTML fallback): a retry of the same URL can't help */
+  readonly missing: boolean;
+  constructor(url: string, detail: string, cause?: unknown, missing = false) {
     super(`Read failed: ${new URL(url, 'https://content.invalid').pathname} · ${detail}`, { cause });
-    this.name = 'ContentReadError'; this.url = url;
+    this.name = 'ContentReadError'; this.url = url; this.missing = missing;
   }
 }
 export interface ContentReadOptions {
@@ -33,7 +35,7 @@ async function body(response: Response, url: string, maximum: number, read?: (by
     : new ContentReadError(url, 'byte length differs from manifest');
   if (!response.ok || /\btext\/html\b/iu.test(response.headers.get('content-type') ?? '')) {
     await response.body?.cancel().catch(() => undefined);
-    throw new ContentReadError(url, response.ok ? 'missing content (HTML response)' : `HTTP ${response.status}`);
+    throw new ContentReadError(url, response.ok ? 'missing content (HTML response)' : `HTTP ${response.status}`, undefined, response.ok || response.status === 404);
   }
   const length = response.headers.get('content-length');
   if (length !== null && (!/^\d+$/u.test(length) || Number(length) > maximum)) {
@@ -121,7 +123,14 @@ export async function readContent(url: string, maximum: number, options: Content
       options.signal?.throwIfAborted();
       if (!(error instanceof ContentReadError)) throw error;
       if (!retried) { retried = true; }
-      else { await (options.retry === undefined ? retryFromCard(error, options.signal) : options.retry(error)); retried = false; }
+      else {
+        // RL8 (Jake's phone, 2026-11-09: an old cached build sat at "0.00 MB of 28.4 MB"): a deploy keeps only the live
+        // build's hashed files, so a missing first-party file on a build the server no longer serves can never arrive.
+        // Instead of RETRY forever, the page reloads past its worker into the live build (once per build and tab).
+        if (options.retry === undefined && error.missing && typeof document !== 'undefined'
+          && await (await import('./browserChunkRecovery')).reloadIfStaleBuild()) await new Promise<void>(() => { /* never settles: the page is navigating */ });
+        await (options.retry === undefined ? retryFromCard(error, options.signal) : options.retry(error)); retried = false;
+      }
     }
   }
 }

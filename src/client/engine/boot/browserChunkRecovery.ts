@@ -73,9 +73,33 @@ export function settleRefusedBuild(): void {
 
 /** A player's tap on a stale tab: the next document comes from the network, whatever worker holds this one, and the tab may reload itself once more. */
 export async function reloadPastWorker(): Promise<void> {
-  try { await dropWorker(); } catch { /* The reload goes anyway. */ }
   settleRefusedBuild();
-  countReload(); markReload('new build panel', 'background'); location.reload();
+  await leavePastWorker('new build panel');
+}
+/** Drop this tab's worker, then reload: the next document comes from the network. */
+async function leavePastWorker(why: string): Promise<void> {
+  // RL5: dropping the worker gets 3 s (reloadCover.ts RELOAD_FALLBACK_MS); a hung unregister never keeps the tap from reloading
+  try { await Promise.race([dropWorker(), new Promise<void>(resolve => { pageScope.timeout(3000, resolve); })]); } catch { /* The reload goes anyway. */ }
+  countReload(); markReload(why, 'background'); location.reload();
+}
+
+/** RL8: this build's own file is gone from the server. When /version.json names another build, this tab's build is out
+ * of date: the full-page RELOADING cover goes up (reloadCover.ts listens for `ws:reloading`) and the page reloads past
+ * its worker into the live build. Once per build and tab, so a broken deploy can't loop; false leaves the ordinary RETRY. */
+export async function reloadIfStaleBuild(): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof __BUILD_ID__ !== 'string') return false;
+  const live = await latestVersion(() => !documentLeaving);
+  if (live === null || live === __BUILD_ID__) return false;
+  // the tab's one self-reload claim (chunk recovery shares it), marked with this build: never twice for the same build
+  const mark = `stale ${__BUILD_ID__}`;
+  try {
+    const store = saveStorage('session');
+    if (store.getItem('boot.selfReload') === mark) return false;
+    store.setItem('boot.selfReload', mark);
+  } catch { return false; }
+  document.dispatchEvent(new CustomEvent('ws:reloading', { detail: 'This build is out of date · getting the new one' }));
+  void leavePastWorker('stale build: its files are gone from the server');
+  return true;
 }
 
 let installed = false;
