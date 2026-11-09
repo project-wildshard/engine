@@ -46,3 +46,11 @@ required. Every page/console error remains a failure. Chromium carries
 both keychain flags; both engines use muted iPhone portrait contexts.
 A production-origin negative control refuses before fetch/browser;
 syntax and the complete scripts TypeScript project are green.
+
+The first real staging Chromium pair saw both bodies and Names. Its
+movement probe then released the key after a non-idle gait before its
+own authoritative pose changed. Require actual walk/run gait and actual
+authoritative displacement together while the key remains held, within
+the same 20-second bound. The displacement assertion is retained; no
+world placement, command, backend or game timing changes. The original
+refusal is not claimed as a gameplay pass.

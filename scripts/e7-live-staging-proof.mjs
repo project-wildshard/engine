@@ -54,7 +54,8 @@ try{
  console.log('PASS both real bodies and names',engine);
  const before=await b.evaluate(()=>{const row=window.__workerClient?.();if(row===undefined)throw new Error('Authoritative observer missing');return{x:row.serverX,z:row.serverZ};});
  await b.keyboard.down('KeyW');
- try{await a.waitForFunction(name=>window.__onlinePlayers?.().some(row=>row.name===name&&row.gait!=='idle'),bName,{timeout:20000});}finally{await b.keyboard.up('KeyW');}
+ try{await Promise.all([a.waitForFunction(name=>window.__onlinePlayers?.().some(row=>row.name===name&&(row.gait==='walk'||row.gait==='run')),bName,{timeout:20000}),b.waitForFunction(before=>{const row=window.__workerClient?.();return row!==undefined&&Math.hypot(row.serverX-before.x,row.serverZ-before.z)>.01;},before,{timeout:20000})]);}finally{await b.keyboard.up('KeyW');}
+ console.log('PASS authoritative movement and remote walk',engine,before);
  const after=await b.evaluate(()=>{const row=window.__workerClient?.();if(row===undefined)throw new Error('Authoritative observer missing');return{x:row.serverX,z:row.serverZ};});assert.ok(Math.hypot(after.x-before.x,after.z-before.z)>.01);
  const line=`agent proof ${engine} ${build.slice(0,7)}`;await b.locator('#ws-chat input').fill(line);await b.locator('#ws-chat input').press('Enter');
  for(const page of[a,b])await page.locator('#ws-chat',{hasText:`${bName}: ${line}`}).waitFor({timeout:10000});
