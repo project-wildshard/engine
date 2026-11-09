@@ -35,7 +35,11 @@ export function playScript(seconds: number): string {
     if (now - raf > 250) out.pageGaps.push({ at: performance.timeOrigin + now, ms: now - raf }); raf = now;
     const p0 = info.programs?.length ?? 0, t1 = info.memory.textures;
     if (p0 !== programs || t1 !== textures) {
-      const list = info.programs ?? [], added = programs < 0 ? [] : list.filter(row => !known.has(row)).map(row => String(row.name) + ' ' + String(row.cacheKey).slice(0, 160));
+      const list = info.programs ?? [], fresh = programs < 0 ? [] : list.filter(row => !known.has(row));
+      const users = (program) => { const out = []; g.rootScene.traverse(o => { for (const m of [o.material].flat()) {
+        if (m && g.renderer.properties.get(m).currentProgram === program && out.length < 4) { const names = []; for (let n = o; n && names.length < 4; n = n.parent) names.push(n.name || n.type);
+          const w = o.getWorldPosition(o.position.clone()); out.push(m.type + ':' + (m.name || '-') + ' on ' + names.join('<') + ' @' + Math.round(Math.hypot(w.x - p.position.x, w.z - p.position.z)) + 'm'); } } }); return out.join(' | '); };
+      const added = fresh.map(row => users(row) + ' [' + String(row.cacheKey).length + ' key chars] ' + String(row.cacheKey));
       for (const row of list) known.add(row);
       programs = p0; textures = t1; out.gpu.push({ at: performance.timeOrigin + now, programs: p0, textures: t1, added }); }
     const size = g.frameMs.length, k = Math.min(size, g.frameCount - seen); seen = g.frameCount;
@@ -120,8 +124,9 @@ export function parsePlayCapture(text: string): PlayCapture | null {
     const get = (key: string): unknown => typeof row === 'object' && row !== null ? Reflect.get(row, key) : null;
     const at = get('at'), programs = get('programs'), textures = get('textures');
     if (typeof at !== 'number' || typeof programs !== 'number' || typeof textures !== 'number') throw new Error('Invalid play GPU row');
-    const added = get('added');
-    return {at, programs, textures, ...(Array.isArray(added) ? {added: added.map(String)} : {})};
+    const added = get('added'), sample: PlayGpu = {at, programs, textures};
+    if (Array.isArray(added)) sample.added = added.map(String);
+    return sample;
   }) : undefined;
   return {start, seconds, frames: frames.map(frame), pageGaps: pageGaps.map(frame), track: track.map(point), phase, ...(gpu === undefined ? {} : {gpu})};
 }
