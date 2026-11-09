@@ -49,3 +49,24 @@ The native regression now uses those actual serialized frame arrivals,
 not an independent fixture pulse. It parks the live driver before its
 acknowledgement-only tail, so those tail ticks cannot earn test movement.
 All original command/position/capture bounds remain unchanged.
+
+## Real browser boundary, df81be0
+
+Exact build df81be0a-mw9mawkx, renderer revision
+47caae1f211addefddfdbd1faa0678c903c71b5e3591e66da14064952a7c36ae,
+epoch 1. Sequential iPhone-profile Chromium SwiftShader and WebKit runs
+used the existing prove-release extended grid journey, unchanged 210 s
+legs, actual controls, ready/current/inside/server checks and no backend
+change. Both passed every leg, actual Ember entry, acknowledged save,
+correct first card and complete safe native clipboard.
+
+The 1125 m leg took 155.988 s in Chromium and 155.877 s in WebKit. Both
+finished ready and settled with the Ember board closed. Reload restored
+the earned Ember position within 0.423 mm and 0.213 mm respectively, with
+no page errors. Both browsers closed. This is a local exact-build proof;
+service workers were blocked here. Hosted staged SW/headers/API/full phone
+proofs and production remain required, and production is still held.
+
+J189 owns the next immutable stamp/full publication capture; no duplicate
+full suite was started by this lane. The existing full-gate hook-wire red
+is repaired in 8bffe37, with the frame-receipt driver in df81be0.
