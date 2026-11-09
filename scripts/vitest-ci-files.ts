@@ -25,6 +25,12 @@ export const CI_NATIVE_GROUPS = {
   'nalati-population': [
     'test/nalati-headless-population.test.ts',
   ],
+  'nalati-bot-taming': ['test/nalati-bot-taming.test.ts'],
+  'nalati-taming': ['test/nalati-taming-verbs.test.ts'],
+  'nalati-awareness': ['test/nalati-awareness-verbs.test.ts'],
+  'driftwood-long-session': ['test/driftwood-long-session.test.ts'],
+  'open-plots-headless': ['test/physics-open-plots-headless.test.ts'],
+  'standalone-grid': ['test/standalone-grid.test.ts'],
   'native-routes': [
     'test/driftwood-optional-verbs.test.ts',
     'test/driftwood-trade-verbs.test.ts',
