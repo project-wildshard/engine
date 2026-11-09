@@ -16,7 +16,7 @@ const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');as
 const health=await(await fetch('https://wildshard.tailb41b20.ts.net:8443/health',{signal:AbortSignal.timeout(15000)})).json();assert.equal(health.build,build);assert.equal(health.serial,release.serial);
 const version=await(await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(30000)})).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,1);
 const html=await(await fetch(base,{signal:AbortSignal.timeout(30000)})).text();assert.ok(html.includes(releaseURL));assert.ok(!html.includes('/releases/production.json'));
-const browser=await(engine==='chromium'?chromium:webkit).launch({headless:true,args:engine==='chromium'?[...KEYCHAIN_ARGS,'--mute-audio','--use-angle=metal']:[]});
+const browser=await(engine==='chromium'?chromium:webkit).launch({headless:true,args:engine==='chromium'?[...KEYCHAIN_ARGS,'--mute-audio',...(process.platform==='darwin'?['--use-angle=metal']:[])]:[]});
 /** @type {{page:import('playwright').Page,context:import('playwright').BrowserContext,name:string}[]} */
 const opened=[];
 /** @type {{name:string,error:string}[]} */
@@ -41,7 +41,8 @@ try{
   page.on('pageerror',e=>faults.push({name,error:e.message}));
   page.on('console',m=>{if(m.type()==='error')faults.push({name,error:m.text()});});
   page.on('response',result=>{if(result.status()>=400)faults.push({name,error:`HTTP ${result.status()} ${result.url()}`});});
-  page.on('websocket',ws=>{assert.equal(new URL(ws.url()).origin,socket);console.log('NATIVE STAGING SOCKET',engine,name,ws.url());});
+  page.on('requestfailed',r=>faults.push({name,error:`Request failed ${r.url()}: ${r.failure()?.errorText??'unknown'}`}));page.on('crash',()=>faults.push({name,error:'Native page crash'}));
+  page.on('websocket',ws=>{if(new URL(ws.url()).origin!==socket)faults.push({name,error:'Non-staging live socket'});ws.on('socketerror',e=>faults.push({name,error:`Socket error ${e}`}));console.log('NATIVE STAGING SOCKET',engine,name,ws.url());});
   console.log('STAGING PAGE ACTION',engine,name,'navigate');
   await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1',base).href,{waitUntil:'load',timeout:90000});
   console.log('STAGING PAGE ACTION',engine,name,'wait for real Name form');

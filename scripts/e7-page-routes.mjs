@@ -4,7 +4,9 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
 
-const root=resolve(process.argv[2]??'.'),project=JSON.parse(readFileSync(resolve(root,'.vercel/project.json'),'utf8'));
+const root=resolve(process.argv[2]??'.');
+assert.equal(execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8'}).trim(),'','E7 publication requires a clean source tree');
+const project=JSON.parse(readFileSync(resolve(root,'.vercel/project.json'),'utf8'));
 const projects=new Map([['wildshard-e7','prj_99LWfc8go9eVql5pcT292Tfvp4p7'],['wildshard-e7-staging','prj_FpkS6hGufxXYPuU44ILo1vArz0z6']]);
 assert.ok(projects.has(project.projectName));assert.equal(project.projectId,projects.get(project.projectName));
 const output=resolve(root,'.vercel/output'),version=JSON.parse(readFileSync(resolve(output,'static/version.json'),'utf8'));

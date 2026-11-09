@@ -40,3 +40,22 @@ publication and v0.1.4 remain held behind the separate gate-safety
 MUST-FIXes; no second capture is queued while that breaker is active.
 J207's approved main-menu-to-Settings move belongs to Opus after v0.1.4;
 it is not a reason to hold the release or change mainMenu.ts here.
+
+
+J206 one-shot Opus review is saved as engine-e7-page-proofs-2246.md in
+the external review directory. Its sole MUST-FIX is now closed: routing
+refuses a dirty source tree before writing output. A real clean Git
+fixture proves accepted/idempotent routing and dirty full-HEAD refusal
+in under one second; the previous helper fails that exact regression.
+
+Reviewed SHOULDs also tighten the manual proof: clipboard report time
+must belong to the current run; native failed requests, crashes and
+socket errors become retained faults; socket event assertions no longer
+escape cleanup; every external Doctor script must use the full build
+path; the document's pinned release key must match the supplied key.
+Shared staging player counts are diagnostics, not a claim of no seat;
+actual sent frames still forbid READY and require only hello/pings.
+The Metal launch option is Mac-only. These are manual proof changes,
+not UI, gameplay, native transport or deadline changes. Remaining review
+notes on visible text and staging telemetry classification do not claim
+runtime fixes or an API-server cutover. J205 remains staging-only.
