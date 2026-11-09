@@ -15,3 +15,7 @@ The repaired lint runner, latest hook prediction and committed-source
 dependency checks pass ten assertions across five active files in
 2.79 seconds. Engine's canonical format alias now resolves inside its
 own checkout; no root-containment guard was relaxed.
+
+The full hook then caught TS7016 on the fixture's new MJS import. The
+helper now has an explicit declaration matching its public return data
+and ProcessEnv contract. No implicit-any allowance or gate change.
