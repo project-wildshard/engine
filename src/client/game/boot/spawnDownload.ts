@@ -503,7 +503,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             // a job cancelled during the unabortable store publishes nothing to the page (sp-x2: after control it would)
             const stored = cachedCopy !== undefined && await keepCopy(ports.store, file.url, cachedCopy);
             controller.signal.throwIfAborted();
-            if (stored) serve(file); else members.set(file.url, Promise.resolve(Uint8Array.from(body)));
+            if (stored) serve(file); else if (cacheWriteDenied) members.set(file.url, Promise.resolve(Uint8Array.from(body)));
             settleFile(file.url, stored); landed(file.url); wireCompleted += file.wireBytes; filesDone++; publish();
           } finally { landed(file.url); inFlight.delete(file.url); active--; if (demandedFlight.delete(file.url)) demandsActive--; nudge(); }
         }

@@ -20,3 +20,9 @@ cache boundaries pass in under three seconds. Full hooks and actual
 browser validation remain publication prerequisites. The leave-drain is
 still bounded by the existing four-second navigation deadline, and cannot
 guarantee completion on browser Back/close or arbitrary pagehide.
+
+The full shared gate caught an over-broad loose-byte fallback: retaining
+bytes when no store adapter exists also bypassed an existing later fetch
+interceptor. Retain loose bytes only after an actual quota refusal. The
+original overlap assertion stays intact, alongside the new quota and
+single-download assertions.
