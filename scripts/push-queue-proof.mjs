@@ -37,7 +37,7 @@ try{
   execFileSync('git',['-c','user.name=Queue proof','-c','user.email=proof@example.test',...args],{cwd:upstream});
  // The lane has already moved on: each requested ancestor must stay exact.
  for(const sha of commits){
-  const captured=v.parse(jobSchema,JSON.parse(execFileSync(process.execPath,[script,'enqueue',repo,`--commit=${sha}`,`--root=${queue}`],{encoding:'utf8'})));jobs.push(captured);
+  const captured=v.parse(jobSchema,JSON.parse(execFileSync(process.execPath,[script,'enqueue',repo,`--commit=${sha}`,`--root=${queue}`],{env:{...process.env,WS_LANE_RECEIPTS:join(work,'receipts.log')},encoding:'utf8'})));jobs.push(captured);
  }
  // Subsequent dirty lane bytes must never enter any captured job.
  writeFileSync(join(repo,'value.json'),'{"value":999}');

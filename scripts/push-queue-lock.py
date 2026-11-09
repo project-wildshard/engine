@@ -7,6 +7,14 @@ import signal
 import subprocess
 import sys
 
+if sys.argv[1] == '--held':
+    with Path(sys.argv[2]).open('a+') as probe:
+        try:
+            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit(0)
+    raise SystemExit(1)
+
 path = Path(sys.argv[1])
 path.parent.mkdir(parents=True, exist_ok=True)
 child = None
