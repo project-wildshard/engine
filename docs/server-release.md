@@ -19,6 +19,13 @@ rerun that tag's server-release workflow after its main CI succeeds.
 Tags from before this producer existed are ignored. No manual promotion
 or second channel-writing workflow should race this producer.
 
+J205 reserves live production for humans. Agent proofs, bots and soaks
+use the signed staging channel, its exact matching client/server build,
+the separate staging page origin and `saves_staging`. Today's staging
+socket is `wss://wildshard.tailb41b20.ts.net:8443`. A production tag or
+successful producer is not permission for an agent to join production.
+Local isolated producer/codec tests do not connect to either live server.
+
 Staging assets live on prerelease tag `server-staging-<full SHA>`;
 production assets live on the pushed version tag. The archive is
 `engine-server-<full SHA>.tar.gz`. Sorted entries, normalized ownership

@@ -1,9 +1,9 @@
 # VPS setup and private backups
 
-Owner: Jake. Phase 1 ran on the existing VPS at `d074282`. Phase 2 is a
-local candidate awaiting Opus re-review and publication; do not stage
-it for the sitting until that review passes. No bucket, token or VPS
-service has been changed by this candidate.
+Owner: Jake. Phase 1 ran on the existing VPS at `d074282`. Phase 2 was
+reviewed, published in `fba1f8f` with exact CI/Ring 1 green, and applied
+by Jake on 2026-11-09. Its staged setup bytes matched that source.
+Agents made no sudo or VPS service changes.
 
 Phase 2 requires Phase 1's existing PostgreSQL 16, user and packages. It
 does not install packages, alter PostgreSQL, restart shared services or
@@ -51,6 +51,22 @@ host:port must be absent or exactly ours; foreign TCP, foreground or
 AllowFunnel configuration refuses. A completed rerun is accepted.
 No Serve/Funnel reset, off command or Tailscale identity change occurs.
 The old quick-tunnel unit is left untouched and reported if still active.
+
+## J205: live agent traffic is staging only
+
+Production serves humans only. Every live agent proof, bot and soak uses
+`wss://wildshard.tailb41b20.ts.net:8443`, the staging channel and
+`saves_staging`. Build its separate client origin for the exact signed
+staging SHA and `releases/staging.json`; never repurpose the human
+production page or join the production socket from a proof.
+
+The staging unit already sets `RELEASE_CHANNEL=staging` and reads
+`/etc/wildshard/staging.env`. Without a database override, the verified
+release channel selects `saves_staging`. A live proof must not override
+that with a production database. Local isolated rigs may use memory or
+a disposable test database. No production wipe or sudo SQL cleanup is
+part of setup or proof preparation. Codex-port owns the page/proof guard;
+codex-j189 owns the runbook and VPS channel setup.
 
 Both public loopback targets have an owned health stub while waiting for
 their first signed release, including staging. The owned pull timers
