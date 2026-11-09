@@ -1,12 +1,15 @@
 import {spawn} from 'node:child_process';
 import {resolve as resolvePath} from 'node:path';
 import * as v from 'valibot';
+import {holdBrokerCpu} from './cpu-broker.mjs';
 
 const grantSchema=v.object({lease:v.string(),slots:v.number(),capacity:v.number(),queueSeconds:v.number()});
 
 /** A real scheduler child holds the grant until its owner's pipe closes.
  * @param {number|'all'} slots @param {{root?:string,capacity?:number,repo?:string}} [options] */
 export async function holdCpu(slots,options={}){
+ if(process.env.WS_CPU_BROKER!==undefined&&options.root===undefined&&options.capacity===undefined)
+  return holdBrokerCpu(process.env.WS_CPU_BROKER,slots,options.repo??process.cwd());
  const child=spawn('python3',[resolvePath('scripts/cpu-admission.py'),'hold','--slots',String(slots),'--repo',options.repo??process.cwd(),...(options.capacity===undefined?[]:['--capacity',String(options.capacity)])],{
   env:{...process.env,...(options.root===undefined?{}:{WS_CPU_ROOT:options.root})},stdio:['pipe','pipe','pipe']});
  let stderr='',buffer='',closed=false,granted=false;

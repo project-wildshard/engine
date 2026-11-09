@@ -16,6 +16,34 @@ lane = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(lane)
 
 
+def acquire_cpu(root, entry, capacity, deadline):
+    """One policy for command owners and the run-owned socket broker."""
+    with lane.scheduler(root, deadline) as state:
+        known = state.setdefault('cpuCapacity', capacity)
+        if known != capacity:
+            raise RuntimeError('CPU admission policy differs from the active scheduler')
+        pending = state.setdefault('cpuQueue', [])
+        active = state.setdefault('cpuActive', [])
+        pending[:] = [row for row in pending if lane.alive(row['pid'])]
+        active[:] = [row for row in active if lane.alive(row['pid'])]
+        if not any(row['token'] == entry['token'] for row in pending):
+            entry['ticket'] = state.setdefault('cpuNext', 0)
+            state['cpuNext'] += 1
+            pending.append(entry)
+        head = min(pending, key=lambda row: row['ticket'])
+        if head['token'] == entry['token'] and sum(row['slots'] for row in active) + entry['slots'] <= capacity:
+            pending[:] = [row for row in pending if row['token'] != entry['token']]
+            active.append(entry)
+            return True
+        return False
+
+
+def release_cpu(root, token):
+    with lane.scheduler(root) as state:
+        for key in ('cpuQueue', 'cpuActive'):
+            state[key] = [row for row in state.get(key, []) if row['token'] != token and lane.alive(row['pid'])]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('mode', choices=['hold', 'run'])
@@ -50,28 +78,7 @@ def main():
         while True:
             if os.getppid() != owner:
                 return 130
-            with lane.scheduler(root, deadline) as state:
-                known = state.setdefault('cpuCapacity', capacity)
-                if known != capacity:
-                    raise RuntimeError('CPU admission policy differs from the active scheduler')
-                pending = state.setdefault('cpuQueue', [])
-                active = state.setdefault('cpuActive', [])
-                pending[:] = [row for row in pending if lane.alive(row['pid'])]
-                active[:] = [row for row in active if lane.alive(row['pid'])]
-                if not any(row['token'] == entry['token'] for row in pending):
-                    entry['ticket'] = state.setdefault('cpuNext', 0)
-                    state['cpuNext'] += 1
-                    pending.append(entry)
-                # FIFO reservations prevent an exclusive/timing proof starving
-                # behind a continuous stream of smaller file requests.
-                head = min(pending, key=lambda row: row['ticket'])
-                if head['token'] == entry['token'] and sum(row['slots'] for row in active) + slots <= capacity:
-                    pending[:] = [row for row in pending if row['token'] != entry['token']]
-                    active.append(entry)
-                    granted = True
-                else:
-                    granted = False
-            if granted:
+            if acquire_cpu(root, entry, capacity, deadline):
                 break
             if time.monotonic() >= deadline:
                 raise TimeoutError('CPU admission exceeded five minutes waiting for owned work')
@@ -92,9 +99,7 @@ def main():
         print(str(error), file=sys.stderr)
         return 1
     finally:
-        with lane.scheduler(root) as state:
-            for key in ('cpuQueue', 'cpuActive'):
-                state[key] = [row for row in state.get(key, []) if row['token'] != entry['token'] and lane.alive(row['pid'])]
+        release_cpu(root, entry['token'])
 
 
 if __name__ == '__main__':

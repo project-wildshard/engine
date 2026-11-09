@@ -5,6 +5,7 @@ import { join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vitest/config';
 import {PUSH_PROFILE} from './push-budget.mjs';
+import type {startCpuBroker} from './cpu-broker.mjs';
 
 interface VitestTempEnvironment extends NodeJS.ProcessEnv {
   TMPDIR?: string;
@@ -80,10 +81,17 @@ export function vitestTmpRoot(env: VitestTempEnvironment = process.env): Plugin 
 /** Scope the CLI before loading any config, including standalone configs without the root plugin. */
 export async function runVitest(args: readonly string[]): Promise<number> {
   const run = temporaryRun(process.env);
+  let broker: Awaited<ReturnType<typeof startCpuBroker>> | undefined;
   try {
     const { assertVitestLane,isFullVitest } = await import('./vitest-lane.ts');
     assertVitestLane(args);
-    const {WS_PUSH_GATE_PROFILE:profile}=process.env;
+    const {WS_PUSH_GATE_PROFILE:profile,WS_CPU_ADMISSION:admission}=process.env;
+    if(profile===PUSH_PROFILE&&admission==='1'){
+      const {assertHeavyLease}=await import('./heavy-lane-lease.mjs');
+      assertHeavyLease('full-test');
+      const {startCpuBroker}=await import('./cpu-broker.mjs');
+      broker=await startCpuBroker();
+    }
     // Each real file now owns CPU admission before collection. Performance and
     // uncapped encoder files reserve the whole budget, so their original clocks
     // remain alone while other native/ordinary work can share the available cores.
@@ -91,8 +99,10 @@ export async function runVitest(args: readonly string[]): Promise<number> {
     for(const phase of phases){
     const entry = fileURLToPath(new URL('vitest.mjs', import.meta.resolve('vitest/package.json')));
     const child = spawn(process.execPath, [entry, ...args,...(phase===undefined?[]:['--config','scripts/push-vitest.config.ts'])], {
-      stdio: 'inherit', env: { ...process.env, VITEST_TMP_ROOT: run.dir,...(phase===undefined?{}:{WS_PUSH_TEST_PHASE:phase,WS_CPU_ADMISSION:'1'}) },
+      stdio: 'inherit', env: { ...process.env, VITEST_TMP_ROOT: run.dir,...(broker===undefined?{}:{WS_CPU_BROKER:broker.environment}),...(phase===undefined?{}:{WS_PUSH_TEST_PHASE:phase,WS_CPU_ADMISSION:'1'}) },
     });
+    let brokerFailed=false;
+    void (async()=>{try{await broker?.lost;}catch(error){brokerFailed=true;console.error(error);child.kill('SIGTERM');}})();
     const interrupt = (): void => { child.kill('SIGINT'); };
     const terminate = (): void => { child.kill('SIGTERM'); };
     process.on('SIGINT', interrupt);
@@ -102,7 +112,7 @@ export async function runVitest(args: readonly string[]): Promise<number> {
         child.once('error', reject);
         child.once('exit', (status, signal) => resolve(status ?? (signal === null ? 1 : 128 + constants.signals[signal])));
       });
-      if(code!==0)return code;
+      if(code!==0||brokerFailed)return code===0?1:code;
     } finally {
       process.off('SIGINT', interrupt);
       process.off('SIGTERM', terminate);
@@ -110,7 +120,8 @@ export async function runVitest(args: readonly string[]): Promise<number> {
     }
     return 0;
   } finally {
-    run.cleanup();
+    try { await broker?.close(); }
+    finally { run.cleanup(); }
   }
 }
 
