@@ -6,6 +6,9 @@ import { saveStorage } from '../saves/slots';
 import './styles/hints.css';
 import type { Player } from '../player/Player';
 import { lockOn } from '../player/AimTargets';
+import { foldKeys } from '../input/bindingTable';
+import { keycap } from '../input/keycap';
+import type { Action } from '../input/InputService';
 
 const savedStorage = saveStorage('global');
 
@@ -39,7 +42,7 @@ export interface HintTrigger {
   when: () => boolean;
   /** the words over the touch control (default: HINT_TOUCH) — the first word is lit cyan */
   touch?: string;
-  /** the words under the crosshair on a desktop (default: HINT_DESK) */
+  /** the words under the crosshair on a desktop (default: deskHint, the player's own keys) */
   desk?: string;
 }
 
@@ -53,9 +56,24 @@ export interface FirstHintsOptions {
 const HINT_TOUCH: Record<HintControl, string> = {
   move: engineString('s_f9408bf8e7a8'), jump: engineString('s_cb601147eb2e'), attack: engineString('s_061a2f9cac0f'), lock: engineString('s_4da52d13f9ab'), dodge: engineString('s_5bffb8c39729'), use: engineString('s_cbd3c26b4566'),
 };
-const HINT_DESK: Record<HintControl, string> = {
-  move: engineString('s_08cd5b7c05ad'), jump: engineString('s_cecbb2c757bc'), attack: engineString('s_dcc07bd2df54'), lock: engineString('s_8bd319b4ee37'), dodge: engineString('s_8cdc7e187f3e'), use: engineString('s_14f307167912'),
-};
+/** KP1 (Jake 2026-11-09, on a Mac: "It says press Alt to dodge ... So Alt is not a thing"): the desktop line names the
+ *  player's own keys for the action, in their platform's words ("V / ⌥ Option to dodge" on a Mac, "V / Alt" elsewhere) */
+const DESK_KEYS = { jump: 's_hint_jump_keys', lock: 's_hint_lock_keys', dodge: 's_hint_dodge_keys', use: 's_hint_use_keys' } as const;
+const DESK_FIXED = { move: 's_08cd5b7c05ad', attack: 's_dcc07bd2df54' } as const;
+/** an action's bound keyboard and mouse keys, from the first registered context that binds it, as keycaps */
+export function boundKeycaps(action: Action): string {
+  const bindings = app.input.bindings;
+  for (const context of bindings.contexts()) {
+    const keys = foldKeys(bindings.keys(context)[action] ?? []);
+    if (keys.length > 0) return keys.map(keycap).join(engineString('s_keys_or'));
+  }
+  return '';
+}
+export function deskHint(control: HintControl): string {
+  if (control === 'move' || control === 'attack') return engineString(DESK_FIXED[control]);
+  const keys = boundKeycaps(control);
+  return engineString(DESK_KEYS[control], [keys === '' ? engineString('s_keys_none') : keys]);
+}
 /** the touch control each hint sits on (TouchControls.ts' markup) */
 const ANCHOR: Record<HintControl, string> = {
   move: '.ws-touch-stick', jump: '.ws-touch-disc.jump', attack: '.ws-touch-attack', lock: '.ws-touch-disc.lock', dodge: '.ws-touch-disc.dodge', use: '.ws-touch-use',
@@ -203,7 +221,7 @@ export class FirstHints {
   private show(t: HintTrigger | null): void {
     this.current = t; this.shownT = 0; this.measureT = 0;
     if (t === null) { this.ring.classList.remove('show'); this.tag.classList.remove('show'); return; }
-    const text = (this.opts.touch ? t.touch ?? HINT_TOUCH[t.control] : t.desk ?? HINT_DESK[t.control]).toUpperCase();
+    const text = (this.opts.touch ? t.touch ?? HINT_TOUCH[t.control] : t.desk ?? deskHint(t.control)).toUpperCase();
     const sp = text.indexOf(' ');
     const lit = document.createElement('b');
     lit.textContent = sp > 0 ? text.slice(0, sp) : text;

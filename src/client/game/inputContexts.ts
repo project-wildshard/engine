@@ -27,5 +27,5 @@ export const INPUT_CONTEXTS: readonly InputContextDef[] = [
     keys: { 'nav.left': ['ArrowLeft', 'KeyA'], 'nav.right': ['ArrowRight', 'KeyD'], tab: ['Tab'], confirm: ['Enter', 'Space'], use: ['KeyE'], back: ['Escape'], map: ['KeyM'], journal: ['KeyJ'], note: ['KeyN'] } },
   { id: 'dialog', actions: ['use', 'confirm', 'back'], blocks: ['attack', 'heavy', 'aim', 'reload', 'swap', 'jump', 'dodge'], keys: { use: ['KeyE'], confirm: ['Enter'], back: ['Escape'] } },
   { id: 'explore', actions: [...movement, 'fly.up', 'fly.down', 'fly.boost', 'pane.1', 'pane.2', 'pane.3', 'map', 'back', 'quickNote', 'focus'], blocks: 'below',
-    keys: { ...moveKeys, 'fly.up': ['KeyE', 'Space'], 'fly.down': ['KeyQ', 'ControlLeft'], 'fly.boost': ['ShiftLeft', 'ShiftRight'], 'pane.1': ['Digit1'], 'pane.2': ['Digit2'], 'pane.3': ['Digit3'], map: ['KeyM'], quickNote: ['F8'], focus: ['KeyF'], back: ['Escape'] } },
+    keys: { ...moveKeys, 'fly.up': ['KeyE', 'Space'], 'fly.down': ['KeyQ', 'KeyC'], 'fly.boost': ['ShiftLeft', 'ShiftRight'], 'pane.1': ['Digit1'], 'pane.2': ['Digit2'], 'pane.3': ['Digit3'], map: ['KeyM'], quickNote: ['F8'], focus: ['KeyF'], back: ['Escape'] } },
 ];

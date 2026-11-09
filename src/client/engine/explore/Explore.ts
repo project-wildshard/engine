@@ -31,6 +31,7 @@ import * as THREE from 'three';
 import { beginExploreEntry, endExploreEntry } from '../boot/bootTrace';
 import '../ui/styles/explore.css';
 import { FreeCam } from './FreeCam';
+import { keycap } from '../input/keycap';
 import { TouchFly, holdButton } from './TouchFly';
 import { heightAt } from '../../../shared/engine/world/Heightfield';
 import { CHUNK_HALF } from '../../../shared/engine/core/config';
@@ -295,7 +296,7 @@ export class Explore {
   /** ORBIT on a selection: one finger (phone) / Alt-drag (desktop) turns around it; off = free flight again */
   setOrbit(on: boolean, centre?: THREE.Vector3): void {
     if (this.fly) this.fly.orbiting = on;
-    if (on && centre) { this.cam.focus(centre, this.host.world.game.camera.position.distanceTo(centre)); this.toast(this.fly ? engineString('s_f3b53c98df2e') : engineString('s_74f6241006aa')); }
+    if (on && centre) { this.cam.focus(centre, this.host.world.game.camera.position.distanceTo(centre)); this.toast(this.fly ? engineString('s_f3b53c98df2e') : engineString('s_explore_orbit', [keycap('Alt')])); }
   }
 
   /**

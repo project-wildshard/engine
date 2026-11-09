@@ -209,6 +209,7 @@
     "src/client/engine/input/gameplay.ts": "client",
     "src/client/engine/input/InputService.ts": "client",
     "src/client/engine/input/keycap.ts": "client",
+    "src/client/engine/input/platform.ts": "client",
     "src/client/engine/input/menuInput.ts": "client",
     "src/client/engine/input/weaponActions.ts": "client",
     "src/client/engine/level/frame.ts": "client",
