@@ -19,3 +19,11 @@ this commit does not mark LS1 or any plan row done.
 The ordinary grid route also now applies the same muted phone settings
 that the compiled-shard route already set. Music and SFX are explicitly
 off for every test browser. No progress, pose or arrival is seeded.
+
+The real native cold run reached entered, unpaused production d915
+with no reported app error. The original video analysis then refused an
+inverted ffmpeg range: reveal began at 12.315 s, loader ended at 23.927 s.
+Keep that M1 refusal unchanged. Persist the passive startup/collector and
+control evidence before video analysis, so its unrelated refusal cannot
+discard the actual LS1 timing capture. A new reading is still required;
+no lost collector state is reconstructed from row timings.

@@ -444,13 +444,18 @@ async function run(mode, index, target) {
     rows: entry.rows.map(([key, ms, text, detail]) => ({ key, ms: Math.round(ms), label: text, detail })) };
   // Passive startup diagnosis after the original controls/frame window. It
   // issues no cache reads or network requests and never changes M1's clocks.
-  if (args['startup-trace'] === '1') result.startup = JSON.parse(await page.evaluate(`JSON.stringify({
+  if (args['startup-trace'] === '1') {
+    result.startup = JSON.parse(await page.evaluate(`JSON.stringify({
     origin: performance.timeOrigin,
     bootTiming: Reflect.get(window, '__bootTiming')?.read() ?? null,
     navigation: performance.getEntriesByType('navigation').map(entry => entry.toJSON()),
     resources: performance.getEntriesByType('resource').map(entry => entry.toJSON()),
     measures: performance.getEntriesByType('measure').map(entry => ({ ...entry.toJSON(), detail: entry.detail }))
-  })`));
+    })`));
+    // Preserve the native collector/controls evidence even if later video
+    // analysis refuses. That refusal still fails the original M1 verdict.
+    writeFileSync(resolvePath(out, `${label}-startup.json`), `${JSON.stringify(result, null, 1)}\n`);
+  }
   // video seconds of a page time: the recording started at recordingAt (wall clock), the tap at tapAt
   const videoAt = ms => (tap + ms - recordingAt) / 1000;
   result.brokenFrames = restored || result.loaderEndMs === null ? null : brokenFrames(video, videoAt(result.loaderEndMs), videoAt(result.revealStartMs));
