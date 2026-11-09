@@ -6,54 +6,63 @@
     {
       "file": "test/cook-worker.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:05:02.000Z",
       "deadline": "2026-11-10T12:04:31.000Z",
       "reason": "CI4 60-second file budget overrun: 111595 ms, assertions passed; ci 42478017721 shard 2"
     },
     {
       "file": "test/nalati-headless-population.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:05:02.000Z",
       "deadline": "2026-11-10T12:04:31.000Z",
       "reason": "CI4 60-second file budget overrun: 101959 ms, assertions passed; ci 42478017721 shard 3"
     },
     {
       "file": "test/nalati-bot-taming.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
       "reason": "60-second file budget overrun: 69632 ms, assertion passed; ci 42479173262 shard 2"
     },
     {
       "file": "test/nalati-discovery-verbs.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
       "reason": "60-second file budget overrun: 72816 ms, assertion passed; ci 42479173262 shard 1"
     },
     {
       "file": "test/driftwood-long-session.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
       "reason": "60-second file budget overrun: 75238 ms, assertion passed; ci 42479173262 shard 4"
     },
     {
       "file": "test/nalati-taming-verbs.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
       "reason": "60-second file budget overrun: 89597 ms, assertion passed; ci 42479173262 shard 5 subsequently exceeded its job clock"
     },
     {
       "file": "test/nalati-awareness-verbs.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:38:22.000Z",
       "deadline": "2026-11-10T12:37:14.000Z",
       "reason": "60-second file budget overrun: 84597 ms, assertions passed; ci 42480438365 shard 2"
     },
     {
       "file": "test/physics-open-plots-headless.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:38:22.000Z",
       "deadline": "2026-11-10T12:37:14.000Z",
       "reason": "60-second file budget overrun: 76674 ms, assertions passed; ci 42480438365 shard 3"
     },
     {
       "file": "test/standalone-grid.test.ts",
       "owner": "codex-pinefix2",
+      "addedAt": "2026-11-08T12:38:22.000Z",
       "deadline": "2026-11-10T12:37:14.000Z",
       "reason": "60-second file budget overrun: 65508 ms, assertions passed; ci 42480438365 shard 5"
     }
