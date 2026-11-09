@@ -35,6 +35,8 @@ jobs:
           persist-credentials: false
       - name: Enforce quarantine admission dates and the 48-hour cap
         run: node scripts/test-quarantine.mjs --check-history
+      - name: Report every inherited migration owner and fixed deadline
+        run: node scripts/lift-pending.mjs
       - uses: ./.github/actions/ring-setup
       - run: bash scripts/ring1.sh static
       - run: pnpm test:kit
