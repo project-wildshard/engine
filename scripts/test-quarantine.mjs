@@ -40,6 +40,7 @@ export function readQuarantine(policyFile=new URL('../test/quarantine.json', imp
     if(!Number.isFinite(admitted)||admitted>Date.now()||ends<=admitted||ends-admitted>48*3_600_000)throw new Error(`Quarantine must end within 48 hours of its admission: ${file}`);
     seen.add(file);
     const extension=extensionOf(value.extension,deadline,admitted);
+    if(extension===undefined)return {file,owner,addedAt,deadline,reason};
     return {file, owner, addedAt, deadline, reason,extension};
   });
 }

@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {appendFileSync,readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';
 
 /** One finite migration owner applies explicitly to every committed path.
  * This is not the J193 flaky cohort and confers no execution qualification.
@@ -18,6 +19,15 @@ export function readLiftPending(root=process.cwd(),now=Date.now()){
  const registered=Date.parse(policy.registeredAt),deadline=Date.parse(policy.deadline);
  if(!Number.isFinite(registered)||!Number.isFinite(deadline)||registered>now||deadline<=registered||deadline-registered>48*3_600_000)
   throw new Error('Lift-pending migration must have a fixed deadline within 48 hours');
+ /** @param {string[]} args */
+ const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',maxBuffer:16*1024*1024}).trim();
+ if(git(['rev-parse','--is-shallow-repository'])!=='false')throw new Error('Lift-pending ownership requires complete introducing history');
+ const introduced=git(['log','--reverse','--diff-filter=A','--format=%H','--','test/lift-pending-policy.json']).split('\n')[0];
+ if(introduced===undefined||introduced==='')throw new Error('Lift-pending policy has no committed introduction');
+ /** @type {unknown} */const original=JSON.parse(git(['show',`${introduced}:test/lift-pending-policy.json`]));
+ const admitted=Number(git(['show','-s','--format=%ct',introduced]))*1000;
+ if(original===null||typeof original!=='object'||!('deadline'in original)||policy.deadline!==original.deadline||registered!==admitted)
+  throw new Error('Lift-pending registration must match its first introducing commit and immutable original deadline');
  if(!Array.isArray(files)||files.some(file=>typeof file!=='string'||! /^(?:src|test)\/[a-zA-Z0-9_./-]+\.test\.(?:ts|mjs)$/u.test(file))||new Set(files).size!==files.length)
   throw new Error('Invalid lift-pending inventory');
  return {owner:policy.owner,deadline:policy.deadline,reason:policy.reason,files:/** @type {string[]} */(files),excluded:now<deadline?/** @type {string[]} */(files):[]};
