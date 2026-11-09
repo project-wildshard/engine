@@ -7,6 +7,7 @@ export interface DocumentAdmissionFacts { readonly validator: string; readonly v
 export function newBuildId(): string;
 /** A web build's own folder for code, CSS and wasm (J57, J131). */
 export function codeDirectory(build: string): string;
+export const SHARED_CODE_DIRECTORY: 'b/c';
 /** Stamp exactly one document head, refusing missing/duplicate/unsafe identities. */
 export function stampBuildHtml(html: string, build: string, facts?: DocumentAdmissionFacts): string;
 /** Stamp all built HTML entries from version.json before service-worker emission. */
