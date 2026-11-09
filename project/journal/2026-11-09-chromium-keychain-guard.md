@@ -34,3 +34,7 @@ mandatory flags, and pool.close drains the browser and lane subprocess.
 The focused guard passes three cases in 1.48 seconds. Renderer and
 admission stamps use immutable Git view 7eb4909. Peer working-tree
 generated outputs stay untouched. This review opens no browser.
+
+The focused guard passes three cases. Renderer and admission stamps
+use immutable Git view d61a179. Peer working-tree generated outputs
+stay untouched. Computing this source inventory opens no browser.
