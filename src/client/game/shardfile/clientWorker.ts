@@ -94,7 +94,7 @@ export interface WorkerClientPorts {
 }
 interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell }
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
-interface BuildWorld { readonly release: string; readonly key: string }
+interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
 interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; failed: (message: string) => void }) => Promise<Shell> }
 interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }

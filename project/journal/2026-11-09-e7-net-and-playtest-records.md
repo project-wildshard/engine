@@ -63,3 +63,8 @@ The human table calls its RTT aggregate "Median window RTT": clients send
 measured window medians, so their median is not the whole sitting's raw
 sample median. Worst window p95 already names its actual aggregation.
 The source comment also reflects the authenticated export added later.
+
+After port committed its separate worker failure diagnostics, the remaining
+`BuildWorld.recordTag` declaration can land independently. This keeps the
+operator's stamped sitting tag in the typed online configuration; no worker
+launch or failure behavior changes in this follow-up.
