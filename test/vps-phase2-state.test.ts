@@ -34,6 +34,7 @@ test('Funnel refuses foreign paths, forwarding, hosts and public ports without p
     { Web: { [`${host}:443`]: { Handlers: { '/': { Proxy: privateTarget } } } } },
     { Web: { 'other.ts.net:8443': route('8791') } },
     { AllowFunnel: { [`${host}:10000`]: true } },
+    { AllowFunnel: { [`${host}:10000`]: false } },
     { AllowFunnel: { [`${host}:8790`]: true } },
     { Foreground: { session: { TCP: { '443': { HTTPS: true } } } } },
   ]) {
@@ -57,7 +58,10 @@ test('prefill changes only exact blank rows, is atomic, preserves filled values 
     const expected = original.replace('PACK_ORIGIN=\n', 'PACK_ORIGIN=https://wildshard-packs.wildshard.workers.dev\n').replace('RELEASE_PUBLIC_KEY=\n', `RELEASE_PUBLIC_KEY=${key}\n`);
     expect(readFileSync(path, 'utf8')).toBe(expected); expect(lstatSync(path).ino).not.toBe(inode);
     expect(lstatSync(path).mode & 0o777).toBe(0o640);
-    expect(run(args).status).toBe(0); expect(lstatSync(path).ino).not.toBe(inode);
+    const appliedInode = lstatSync(path).ino;
+    expect(run(args).status).toBe(0); expect(lstatSync(path).ino).toBe(appliedInode);
+    const differentTrust = original.replace('RELEASE_PUBLIC_KEY=\n', 'RELEASE_PUBLIC_KEY=keep-this-filled-row\n');
+    writeFileSync(path, differentTrust); expect(run(args).status).not.toBe(0); expect(readFileSync(path, 'utf8')).toBe(differentTrust);
     const target = join(directory, 'target'); writeFileSync(target, original);
     const link = join(directory, 'symlink.env'); symlinkSync(target, link); args[1] = link;
     expect(run(args).status).not.toBe(0); expect(readFileSync(target, 'utf8')).toBe(original);

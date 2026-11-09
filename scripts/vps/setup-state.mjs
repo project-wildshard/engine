@@ -21,9 +21,9 @@ function soleTrue(value, key) {
 function network(value, host, complete) {
   if (!/^[a-z0-9.-]+\.ts\.net$/u.test(host)) throw new Error('Invalid tailnet DNS name');
   const config = object(value), tcp = optionalObject(config.TCP), web = optionalObject(config.Web), funnel = optionalObject(config.AllowFunnel);
-  if (Object.keys(optionalObject(config.Foreground)).length !== 0) throw new Error('Refuse foreground Serve sessions; inspect tailscale serve status');
+  if (Object.keys(optionalObject(config.Foreground)).length > 0) throw new Error('Refuse foreground Serve sessions; inspect tailscale serve status');
   for (const [key, allowed] of Object.entries(funnel)) {
-    if (allowed !== false && (allowed !== true || ![`${host}:443`, `${host}:8443`].includes(key))) throw new Error('Refuse a foreign AllowFunnel host:port');
+    if ((allowed !== true && allowed !== false) || ![`${host}:443`, `${host}:8443`].includes(key)) throw new Error('Refuse a foreign AllowFunnel host:port');
   }
   /** @type {readonly [string, string, string, boolean][]} */
   const routes = [['443', '8790', 'HTTPS', true], ['8443', '8791', 'HTTPS', true], ['8790', '8790', 'HTTP', false]];
@@ -81,8 +81,11 @@ function prefill(path, channel, key, check, uid, gid) {
   for (const [name, value] of Object.entries(values)) {
     const rows = text.match(new RegExp(`^${name}=[^\\n]*`, 'gm')) ?? [];
     if (rows.length !== 1) throw new Error(`Expected exactly one ${name} row in ${channel} env`);
-    if (rows[0] === `${name}=`) { console.info(`${check ? 'would' : 'doing'} fill ${name} in ${channel} env`); text = text.replace(new RegExp(`^${name}=(?=\\n|$)`, 'gm'), `${name}=${value}`); }
-    else console.info(`${rows[0] === `${name}=${value}` ? 'ok' : 'warn'} keep filled ${name} in ${channel} env`);
+    if (rows[0] === `${name}=`) { console.info(`${check ? 'would' : 'doing'} fill ${name} in ${channel} env`); text = text.replaceAll(new RegExp(`^${name}=(?=\\n|$)`, 'gm'), `${name}=${value}`); }
+    else {
+      console.info(`${rows[0] === `${name}=${value}` ? 'ok' : 'warn'} keep filled ${name} in ${channel} env`);
+      if (name === 'RELEASE_PUBLIC_KEY' && rows[0] !== `${name}=${value}`) throw new Error(`Existing ${channel} release trust differs; preserve it and refuse activation`);
+    }
   }
   if (check) {
     if (stat.uid !== uid || stat.gid !== gid || (stat.mode & 0o777) !== 0o640) console.info(`would repair ${channel} env metadata`);
@@ -95,7 +98,7 @@ function prefill(path, channel, key, check, uid, gid) {
     return;
   }
   const temporary = join(dirname(path), `.phase2-${randomBytes(12).toString('hex')}`);
-  let fd;
+  let fd, failure;
   try {
     fd = openSync(temporary, 'wx', 0o600);
     writeFileSync(fd, text); fchmodSync(fd, 0o640); fchownSync(fd, uid, gid); fsyncSync(fd); closeSync(fd); fd = undefined;
@@ -103,7 +106,10 @@ function prefill(path, channel, key, check, uid, gid) {
     if (current.isSymbolicLink() || current.ino !== stat.ino || current.dev !== stat.dev || !readFileSync(path).equals(before)) throw new Error('Settings changed during prefill; preserve the current file');
     renameSync(temporary, path);
     const directory = openSync(dirname(path), 'r'); try { fsyncSync(directory); } finally { closeSync(directory); }
-  } finally { if (fd !== undefined) closeSync(fd); try { unlinkSync(temporary); } catch (error) { if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error; } }
+  } catch (error) { failure = error; }
+  try { if (fd !== undefined) closeSync(fd); } catch (error) { failure ??= error; }
+  try { unlinkSync(temporary); } catch (error) { if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') failure ??= error; }
+  if (failure !== undefined) throw failure instanceof Error ? failure : new Error('Atomic env prefill failed', { cause: failure });
 }
 
 const [mode, ...args] = process.argv.slice(2);

@@ -1,12 +1,66 @@
 # VPS setup and private backups
 
-Owner: Jake. These are operator instructions; no bucket, token, service
-or secret has been created by the E7 source port.
+Owner: Jake. Phase 1 ran on the existing VPS at `d074282`. Phase 2 is a
+local candidate awaiting Opus re-review and publication; do not stage
+it for the sitting until that review passes. No bucket, token or VPS
+service has been changed by this candidate.
 
-Run `scripts/vps/setup.sh --check` before the privileged setup in the VPS
-sitting. `sudo bash scripts/vps/setup.sh` creates protected blank env
-files and units; it preserves an existing filled-in env file. The server
-still needs its signed release, pack origin and local PostgreSQL setup.
+Phase 2 requires Phase 1's existing PostgreSQL 16, user and packages. It
+does not install packages, alter PostgreSQL, restart shared services or
+touch Docker, OpenClaw or other users. Writes stay in `/etc/wildshard`,
+`/var/lib/wildshard` and `wildshard-*` units. Helpers move into our own
+`/etc/wildshard/lib`; backup settings remain byte-identical.
+
+Run `bash scripts/vps/setup.sh --check` first. It inspects listeners,
+private Serve, both Funnel ports, the public pin and both env files even
+after a failed probe. An unprivileged check says `cannot verify` for
+protected env files and PostgreSQL, rather than inventing missing state.
+Unknown is not a green privileged verification.
+
+After review, the lane stages the pushed `scripts/vps` source under
+`~/wildshard-e7/phase2`, runs that unprivileged check, then gives Jake
+this single command, requiring only his sudo password:
+
+```sh
+ssh -t wildshard 'sudo bash ~/wildshard-e7/phase2/scripts/vps/setup.sh'
+```
+
+The staged `release-public-key.hex` must be a regular, raynos-owned file
+without group/world write permission, matching the public key embedded
+in setup.sh and GitHub's `E7_RELEASE_PUBLIC_KEY`. An explicit
+`RELEASE_PUBLIC_KEY` environment value must match it too. Existing filled
+settings survive. A different filled trust root refuses activation.
+Only exactly blank rows are filled, atomically as `640 root:wildshard`:
+
+- `PACK_ORIGIN=https://wildshard-packs.wildshard.workers.dev`.
+- `RELEASE_URL` is that origin's `releases/production.json` or
+  `releases/staging.json`.
+- `RELEASE_PUBLIC_KEY` is the verified public pin.
+
+No seat secret or credential is printed or regenerated in an existing
+file. No manual env editing is needed for these three settings.
+
+Funnel maps production HTTPS 443 to loopback 8790, and staging HTTPS
+8443 to loopback 8791. The script prints the stable `wss://` addresses
+from the node's tailnet DNS name. Private HTTP Serve on port 8790 stays
+tailnet-only. Before every route change, all paths on either public
+host:port must be absent or exactly ours; foreign TCP, foreground or
+AllowFunnel configuration refuses. A completed rerun is accepted.
+No Serve/Funnel reset, off command or Tailscale identity change occurs.
+The old quick-tunnel unit is left untouched and reported if still active.
+
+Both public loopback targets have an owned health stub while waiting for
+their first signed release, including staging. The owned pull timers
+verify and download before starting the game units, whose conflicts
+remove only our health stubs. Missing channel publication fails the
+preparatory unit rather than repeatedly starting the game. An active
+game skips this first-release pull. Check the actual release and book
+on the configured pack origin before the sitting; the setup candidate
+does not publish either of them.
+
+The CLI references are [Tailscale Funnel](https://tailscale.com/docs/reference/tailscale-cli/funnel),
+[Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) and
+[systemd OnSuccess](https://www.freedesktop.org/software/systemd/man/255/systemd.unit.html#OnSuccess=).
 
 ## J199: create the private backup destination
 

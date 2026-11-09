@@ -1,33 +1,27 @@
 #!/usr/bin/env bash
-# E7.2b: the VPS for the one world, run once by Jake, and safe to run again. Apt Postgres on its local socket, the `wildshard` user, the
-# units, the quick tunnel (C22), the nightly dump (E7.8b) and the uptime check (E7.8c). It opens no public port.
-#   sudo bash setup.sh           do what is missing
-#   bash setup.sh --check        change nothing, and say what it would do. Works over `ssh wildshard bash -s -- --check < setup.sh`
-# It never overwrites a filled-in env file, and it starts the server only once that file is complete. Until then a stub answers `/health`
-# for 30 minutes, so the Tailscale and tunnel paths can be proved before there is a bundle to run.
+# E7 Phase 2, on the existing Phase 1 VPS only (J203). No packages, users,
+# PostgreSQL settings, Docker objects or unrelated services are changed.
+# sudo bash setup.sh       install our settings/units and add owned Funnel routes
+# bash setup.sh --check    run every read-only probe; unreadable state is unknown
+# Keep this script beside the other scripts/vps files. A fresh VPS needs Phase 1.
 set -euo pipefail
-
 CHECK=0
-if [ "${1:-}" = --check ]; then CHECK=1; fi
-HERE=$(dirname "${BASH_SOURCE[0]:-$0}")
-ETC=/etc/wildshard LIB=/usr/local/lib/wildshard HOME_DIR=/var/lib/wildshard LOGS=/var/log/wildshard SYSTEMD=/etc/systemd/system
-PG_VERSION=16 PROD_PORT=8790 STAGING_PORT=8791
-NODE=/usr/bin/node
-PG_CHANGED=0
-
+if [ "${1:-}" = --check ]; then CHECK=1
+elif [ "$#" != 0 ]; then printf 'stop   Expected no arguments or --check\n'; exit 1; fi
+HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard SYSTEMD=/etc/systemd/system
+LIB=$ETC/lib LOGS=$HOME_DIR/logs
+PG_VERSION=16 PROD_PORT=8790 STAGING_PORT=8791 NODE=/usr/bin/node
+# Public SPKI DER, equal to GitHub E7_RELEASE_PUBLIC_KEY. Never a signing key.
+EXPECTED_RELEASE_PUBLIC_KEY=302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b
+KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex
+ERRORS=0
 say() { printf '%-6s %s\n' "$1" "$2"; }
 metadata_ok() { [ "$(stat -c '%a %U:%G' "$1" 2>/dev/null)" = "$2 $3" ]; }
 repair_metadata() {
   if metadata_ok "$1" "$2" "$3"; then return; fi
   if [ "$CHECK" = 1 ]; then say would "repair metadata $1"; return; fi
   if ! { chmod "$2" "$1" && chown "$3" "$1"; }; then say stop "Cannot repair metadata $1"; exit 1; fi
-}
-# Run `make` unless `have` says it is already so.
-step() {
-  local what=$1 have=$2 make=$3
-  if "$have"; then say ok "$what"
-  elif [ "$CHECK" = 1 ]; then say would "$what"
-  else say doing "$what"; "$make"; fi
 }
 # Write stdin to a path unless it already says that. Returns 0 if it wrote, or would have.
 put() {
@@ -86,98 +80,80 @@ check_listeners() {
     }' <<< "$listeners"
 }
 
-# --- Before anything
-if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then say stop 'Run this with sudo, or pass --check'; exit 1; fi
-# shellcheck source=/dev/null
-. /etc/os-release
-if [ "${VERSION_CODENAME:-}" != noble ]; then say warn "Written for Ubuntu 24.04, and this is ${PRETTY_NAME:-unknown}"; fi
-if [ "$(nproc)" -lt 16 ]; then say warn "The AllowedCPUs below assume 16 cores, and this has $(nproc)"; fi
-if ! "$NODE" --version 2>/dev/null | grep -qE '^v(2[4-9]|[3-9][0-9])\.'; then say stop 'The server needs Node 24 or newer at /usr/bin/node'; exit 1; fi
-say ok "node $("$NODE" --version)"
-
-# --- Tailscale (J175). Joining a tailnet is Jake's to do, so this only says if it isn't up.
-have_tailscale() { command -v tailscale >/dev/null; }
-make_tailscale() { curl -fsSL https://tailscale.com/install.sh | sh; }
-step 'tailscale installed' have_tailscale make_tailscale
-if have_tailscale && ! tailscale status >/dev/null 2>&1; then say warn 'Tailscale is not logged in: run sudo tailscale up, then run this again'; fi
-
-# --- Packages
-have_cloudflared_repo() { [ -f /etc/apt/sources.list.d/cloudflared.list ]; }
-make_cloudflared_repo() {
-  install -d -m 755 /usr/share/keyrings
-  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg
-  echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' > /etc/apt/sources.list.d/cloudflared.list
-  apt-get update -qq
+check_node() {
+  "$NODE" --version 2>/dev/null | grep -qE '^v(2[4-9]|[3-9][0-9])\.'
 }
-have_packages() { [ -z "$(missing_packages)" ]; }
-missing_packages() { local name; for name in postgresql rclone cloudflared; do dpkg-query -W -f='${Status}' "$name" 2>/dev/null | grep -q 'ok installed' || printf '%s ' "$name"; done; }
-# shellcheck disable=SC2046 # One word a package.
-make_packages() { apt-get update -qq; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $(missing_packages); }
-step 'cloudflared apt source' have_cloudflared_repo make_cloudflared_repo
-step 'postgresql, rclone and cloudflared' have_packages make_packages
-
-# --- The user and its folders
-have_user() { id wildshard >/dev/null 2>&1; }
-make_user() { useradd --system --home-dir "$HOME_DIR" --shell /usr/sbin/nologin wildshard; }
-step 'user wildshard' have_user make_user
-have_folders() {
-  local path
-  for path in "$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$LOGS"; do
-    [ -d "$path" ] && metadata_ok "$path" 750 wildshard:wildshard || return 1
-  done
-  [ -d "$ETC" ] && metadata_ok "$ETC" 750 root:wildshard && [ -d "$LIB" ] && metadata_ok "$LIB" 755 root:root
-}
-make_folders() {
-  install -d -m 750 -o wildshard -g wildshard "$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$LOGS"
-  install -d -m 750 -o root -g wildshard "$ETC"
-  install -d -m 755 -o root -g root "$LIB"
-}
-step 'folders' have_folders make_folders
-
-# --- Postgres: local socket only (Q92), and the CPUs it shares with the tunnel (E7.2)
-if ! pg_lsclusters --no-header | awk -v version="$PG_VERSION" '$1 == version && $2 == "main" { found=1 } END { exit !found }'; then
-  if [ "$CHECK" = 1 ]; then say would "need PostgreSQL $PG_VERSION/main"; else say stop "Missing PostgreSQL $PG_VERSION/main"; exit 1; fi
-elif [ "$CHECK" = 0 ]; then
-  PG_RUNNING_VERSION=$(pg 'show server_version_num')
-  if [ "$PG_RUNNING_VERSION" -lt 160000 ] || [ "$PG_RUNNING_VERSION" -ge 170000 ] || [ "$(pg 'show config_file')" != "/etc/postgresql/$PG_VERSION/main/postgresql.conf" ]; then
-    say stop 'Unexpected PostgreSQL version or configuration'; exit 1
+check_postgres() {
+  if [ "$(id -u)" != 0 ]; then
+    say 'cannot verify' 'PostgreSQL role, saves databases, hardening and protected folders (needs sudo)'; return
   fi
-fi
-if put "/etc/postgresql/$PG_VERSION/main/conf.d/wildshard.conf" 644 postgres:postgres <<'EOF'
-# E7.2b: local socket only. Nothing reaches this database over TCP.
-listen_addresses = ''
-EOF
-then PG_CHANGED=1; fi
-if put "$SYSTEMD/postgresql@.service.d/wildshard.conf" 644 root:root <<'EOF'
-[Service]
-AllowedCPUs=13-15
-EOF
-then PG_CHANGED=1; fi
-have_role() { [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'" 2>/dev/null)" = 1 ]; }
-make_role() { pg 'create role wildshard login'; }
-have_db() { [ "$(pg "select 1 from pg_database where datname = '$1'" 2>/dev/null)" = 1 ]; }
-have_production() { have_db saves_production; }
-have_staging() { have_db saves_staging; }
-make_production() { runuser -u postgres -- createdb --cluster "$PG_VERSION/main" -O wildshard saves_production; }
-make_staging() { runuser -u postgres -- createdb --cluster "$PG_VERSION/main" -O wildshard saves_staging; }
-step 'postgres role wildshard' have_role make_role
-step 'database saves_production' have_production make_production
-step 'database saves_staging' have_staging make_staging
+  if ! pg_lsclusters --no-header | awk -v version="$PG_VERSION" '$1==version && $2=="main" {found=1} END {exit !found}'; then say stop 'Phase 1 PostgreSQL 16/main is missing'; return 1; fi
+  if ! { [ "$(pg 'show server_version_num')" -ge 160000 ] && [ "$(pg 'show server_version_num')" -lt 170000 ] && [ "$(pg 'show config_file')" = "/etc/postgresql/$PG_VERSION/main/postgresql.conf" ] && [ -z "$(pg 'show listen_addresses')" ] && [ "$(pg 'select exists (select 1 from pg_settings where pending_restart)')" = f ]; }; then
+    say stop 'PostgreSQL Phase 1 hardening is not active; nothing was restarted'; return 1
+  fi
+  if [ "$(pg "select count(*) from pg_database where datname in ('saves_production','saves_staging')")" != 2 ] || [ "$(pg "select count(*) from pg_roles where rolname='wildshard'")" != 1 ]; then say stop 'Phase 1 role or saves databases missing'; return 1; fi
+  say ok 'PostgreSQL 16, local socket only, saves databases and role'
+}
 
-# --- Scripts
-install_beside pull.mjs 755
-install_beside dump.sh 755
-install_beside restore-check.sh 755
-install_beside uptime.sh 755
+# --- Read every prerequisite before changing anything, including in --check.
+fail() { say stop "$1"; ERRORS=1; }
+if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then say stop 'Run with sudo, or pass --check'; exit 1; fi
+for command in tailscale ss getent systemctl pg_lsclusters runuser curl; do
+  if ! command -v "$command" >/dev/null; then fail "Missing Phase 1 prerequisite: $command"; fi
+done
+if ! check_node; then fail 'The server needs Node 24 or newer at /usr/bin/node'; fi
+if ! id wildshard >/dev/null 2>&1; then fail 'Phase 1 user wildshard is missing'; fi
+RAYNOS_UID=$(id -u raynos 2>/dev/null) || { RAYNOS_UID=-1; fail 'Cannot identify the staged key owner raynos'; }
+WILDSHARD_GID=$(getent group wildshard | cut -d: -f3) || WILDSHARD_GID=
+if [ -z "$WILDSHARD_GID" ]; then fail 'Phase 1 group wildshard is missing'; fi
+if [ -L "$ETC" ] || [ -L "$HOME_DIR" ]; then fail 'Refuse symlinked Wildshard roots'; fi
+for path in "$LIB" "$LOGS" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps"; do
+  if [ -L "$path" ]; then fail "Refuse symlinked owned folder: $path"; fi
+done
+for name in setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs; do
+  if [ ! -f "$HERE/$name" ]; then fail "$name must sit beside setup.sh"; fi
+done
+if check_listeners; then say ok 'no public game or database TCP listener'
+else fail 'Unexpected game or database TCP listener (ss -ltnH)'; fi
 
-# --- Settings. A file that exists is Jake's and is never rewritten.
+# Private health Serve and both public host:ports are inspected together.
+NODE_NAME=$({ tailscale status --json | "$NODE" -e 'let s="";for await(const b of process.stdin)s+=b;const n=JSON.parse(s).Self.DNSName;if(typeof n!=="string")process.exit(1);process.stdout.write(n.replace(/\.$/,""));' --input-type=module; } 2>/dev/null) || NODE_NAME=
+SERVE_STATE=$(tailscale serve status --json 2>/dev/null) || SERVE_STATE=
+if [ -z "$NODE_NAME" ] || [ -z "$SERVE_STATE" ]; then fail 'Cannot verify Tailscale identity, private Serve or Funnel state'
+elif ! "$NODE" "$HERE/setup-state.mjs" network "$NODE_NAME" <<< "$SERVE_STATE"; then fail 'Serve/Funnel ownership conflict; inspect tailscale serve status --json'; fi
+if ! "$NODE" "$HERE/setup-state.mjs" pin "$KEY_FILE" "$EXPECTED_RELEASE_PUBLIC_KEY" "$RAYNOS_UID"; then fail 'Cannot verify the staged release public key'; fi
+
+for channel in production staging; do
+  if [ -x "$ETC" ] && [ ! -e "$ETC/$channel.env" ] && [ ! -L "$ETC/$channel.env" ]; then say would "create $channel env with the verified pin and channel URLs"
+  elif ! "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --check 0 "$WILDSHARD_GID"; then fail "Cannot safely inspect $channel env"; fi
+done
+if [ -x "$ETC" ]; then
+  if [ ! -f "$ETC/ops.env" ] || [ -L "$ETC/ops.env" ]; then fail 'Phase 1 regular ops.env missing'; fi
+else say 'cannot verify' 'private ops.env and folder metadata (needs sudo)'; fi
+if ! check_postgres; then ERRORS=1; fi
+if systemctl is-active --quiet wildshard-tunnel.service; then say warn 'Legacy quick tunnel remains active; Phase 2 never stops or rewrites it'; fi
+for channel in production staging; do
+  if systemctl is-active --quiet "wildshard-server@$channel.service"; then say ok "$channel server owns its loopback port"
+  else say would "$channel signed-release wait and owned health stub"; fi
+done
+say next "production socket wss://${NODE_NAME:-<unknown>}"
+say next "staging socket wss://${NODE_NAME:-<unknown>}:8443"
+if [ "$CHECK" = 1 ]; then say check 'All read-only probes completed. Protected state marked cannot verify needs sudo.'; exit "$ERRORS"; fi
+if [ "$ERRORS" != 0 ]; then say stop 'Phase 2 preflight refused; no files or services changed'; exit 1; fi
+
+# --- Only our roots and our units below this point. Phase 1 owns everything else.
+install -d -m 750 -o root -g wildshard "$ETC"
+install -d -m 755 -o root -g root "$LIB"
+install -d -m 750 -o wildshard -g wildshard "$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$LOGS"
+for name in pull.mjs dump.sh restore-check.sh uptime.sh setup-state.mjs health-stub.mjs; do install_beside "$name" 755; done
+
 env_file() {
   local channel=$1 port=$2 workers=$3 seats=$4 path="$ETC/$1.env"
   if [ -f "$path" ]; then repair_metadata "$path" 640 root:wildshard; say ok "$path"; return; fi
   if [ "$CHECK" = 1 ]; then say would "write $path"; return; fi
   say doing "write $path"
   if put "$path" 640 root:wildshard <<EOF
-# E7.2: the $channel server. Blank rows are Jake's. Nothing starts until they're filled, and rerunning setup.sh starts it.
+# E7.2: the $channel server. Phase 2 fills only exact blank rows from verified defaults.
 # The R2 folder of \`assets/spawn/server-<build>.json\` (E7.3f)
 PACK_ORIGIN=
 # The signed release file on R2
@@ -201,25 +177,12 @@ EOF
 }
 env_file production "$PROD_PORT" 4 32
 env_file staging "$STAGING_PORT" 2 16
-if [ "$CHECK" = 1 ]; then say would "write $ETC/ops.env, unless it's there"
-elif [ -f "$ETC/ops.env" ]; then repair_metadata "$ETC/ops.env" 600 root:root; say ok "$ETC/ops.env"
-else
-  say doing "write $ETC/ops.env"
-  if put "$ETC/ops.env" 600 root:root <<'EOF'
-# E7.8: the nightly dump and the uptime check. Both run with these blank: the dump stays on this disk, and a stopped server only logs.
-# Where a stopped server is told. Any URL taking a POSTed line, such as https://ntfy.sh/<a long random topic>
-ALERT_URL=
-# The private bucket, for example r2:wildshard-backups. Blank keeps dumps local.
-BACKUP_REMOTE=
-RCLONE_CONFIG_R2_TYPE=s3
-RCLONE_CONFIG_R2_PROVIDER=Cloudflare
-RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
-RCLONE_CONFIG_R2_ENDPOINT=
-RCLONE_CONFIG_R2_ACCESS_KEY_ID=
-RCLONE_CONFIG_R2_SECRET_ACCESS_KEY=
-EOF
-  then :; fi
-fi
+for channel in production staging; do
+  "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --apply 0 "$WILDSHARD_GID"
+done
+# The Phase 1 private backup credentials are left byte-for-byte alone.
+if [ ! -f "$ETC/ops.env" ]; then say stop 'Phase 1 ops.env missing'; exit 1; fi
+repair_metadata "$ETC/ops.env" 600 root:root
 
 # --- Units
 unit wildshard-server@.service <<EOF
@@ -261,23 +224,6 @@ EOF
 unit wildshard-server@staging.service.d/cpus.conf <<'EOF'
 [Service]
 AllowedCPUs=9-12
-EOF
-unit wildshard-tunnel.service <<EOF
-[Unit]
-Description=Wildshard quick tunnel (C22). It stays up across a game restart, so the name stays too
-After=network-online.target
-Wants=network-online.target
-StartLimitIntervalSec=0
-
-[Service]
-DynamicUser=yes
-ExecStart=cloudflared tunnel --no-autoupdate --url http://127.0.0.1:$PROD_PORT
-Restart=always
-RestartSec=5
-AllowedCPUs=13-15
-
-[Install]
-WantedBy=multi-user.target
 EOF
 unit wildshard-dump.service <<EOF
 [Unit]
@@ -330,58 +276,87 @@ AccuracySec=5s
 WantedBy=timers.target
 EOF
 
-if [ "$CHECK" = 1 ]; then
-  say check "Done. --check changed nothing."
-  exit 0
-fi
+# A verified first release starts the game without a second sudo sitting.
+# An unpublished channel fails this preparatory unit, never loops the game.
+unit wildshard-pull@.service <<EOF
+[Unit]
+Description=Wildshard first verified release, %i
+OnSuccess=wildshard-server@%i.service
+StartLimitIntervalSec=0
+[Service]
+Type=oneshot
+User=wildshard
+Group=wildshard
+Environment=WILDSHARD_HOME=$HOME_DIR/%i
+Environment=RELEASE_CHANNEL=%i
+EnvironmentFile=$ETC/%i.env
+ExecCondition=/bin/sh -c '! systemctl is-active --quiet wildshard-server@%i.service'
+ExecStart=$NODE $LIB/pull.mjs --fetch
+TimeoutStartSec=300
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=$HOME_DIR
+EOF
+unit wildshard-pull@.timer <<'EOF'
+[Unit]
+Description=Wait for Wildshard's first signed release, %i
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+Unit=wildshard-pull@%i.service
+[Install]
+WantedBy=timers.target
+EOF
+unit wildshard-health@.service <<EOF
+[Unit]
+Description=Wildshard waiting health stub, %i
+After=network-online.target
+[Service]
+User=wildshard
+Group=wildshard
+EnvironmentFile=$ETC/%i.env
+ExecStart=$NODE $LIB/health-stub.mjs %i
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+[Install]
+WantedBy=multi-user.target
+EOF
+unit wildshard-server@.service.d/health.conf <<'EOF'
+[Unit]
+Conflicts=wildshard-health@%i.service
+EOF
+unit wildshard-server@production.service.d/legacy-health.conf <<'EOF'
+[Unit]
+Conflicts=wildshard-health-stub.service
+EOF
 
-# --- Bring it up
+# --- Bring up only Wildshard objects, then recheck ownership before each route.
 systemctl daemon-reload
-if [ "$PG_CHANGED" = 1 ] || [ -n "$(pg 'show listen_addresses')" ] || [ "$(pg 'select exists (select 1 from pg_settings where pending_restart)')" = t ]; then
-  say doing 'restart postgres'; systemctl restart "postgresql@$PG_VERSION-main"
-fi
-if [ -n "$(pg 'show listen_addresses')" ] || [ "$(pg 'select exists (select 1 from pg_settings where pending_restart)')" != f ]; then
-  say stop 'PostgreSQL hardening is not active'; exit 1
-fi
-if ! check_listeners; then say stop 'Unexpected game or database TCP listener'; exit 1; fi
-systemctl enable --now wildshard-tunnel.service wildshard-dump.timer
-
-# /health over Tailscale only: this is tailnet-wide and never Funnel. It adds a port and leaves the rest of the serve config alone.
-have_serve() { tailscale serve status --json 2>/dev/null | jq -e ".TCP[\"$PROD_PORT\"]" >/dev/null; }
-make_serve() { tailscale serve --bg --yes --http="$PROD_PORT" "http://127.0.0.1:$PROD_PORT" >/dev/null || say warn "tailscale serve failed: /health is not on the tailnet"; }
-step "/health on the tailnet, port $PROD_PORT" have_serve make_serve
-
-blank_rows() { grep -E '^(PACK_ORIGIN|RELEASE_URL|RELEASE_PUBLIC_KEY|BUNDLE_ORIGIN)=$' "$ETC/production.env" | cut -d= -f1 | tr '\n' ' ' || true; }
-BLANK=$(blank_rows)
-if [ -z "$BLANK" ]; then
-  systemctl stop wildshard-health-stub.service 2>/dev/null || true
-  systemctl enable wildshard-server@production.service wildshard-uptime.timer
-  systemctl start wildshard-uptime.timer
-  if systemctl start wildshard-server@production.service; then say ok 'wildshard-server@production started'
-  else say warn 'wildshard-server@production did not start. Look at journalctl -u wildshard-server@production'; fi
-else
-  say wait "The server waits on $ETC/production.env: $BLANK"
-  if ! systemctl is-active --quiet wildshard-health-stub.service; then
-    say doing "stub /health on $PROD_PORT for 30 minutes"
-    systemd-run --quiet --unit=wildshard-health-stub --uid=wildshard --property=RuntimeMaxSec=1800 "$NODE" -e "http.createServer((q, r) => { r.writeHead(q.url === '/health' ? 200 : 404, { 'content-type': 'application/json' }).end(q.url === '/health' ? '{\"stub\":true}' : ''); }).listen($PROD_PORT, '127.0.0.1');"
+for channel in production staging; do
+  if ! systemctl is-active --quiet "wildshard-server@$channel.service"; then
+    if [ "$channel" != production ] || ! systemctl is-active --quiet wildshard-health-stub.service; then
+      systemctl enable --now "wildshard-health@$channel.service"
+    fi
   fi
-fi
-
-# --- Say where things stand
-ANSWER=none
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-  if ANSWER=$(curl -fsS -m 2 "http://127.0.0.1:$PROD_PORT/health" 2>/dev/null); then break; fi
-  ANSWER=none; sleep 1
 done
-say health "local: $ANSWER"
-NAME=
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-  NAME=$(journalctl -u wildshard-tunnel -n 200 --no-pager -o cat | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)
-  if [ -n "$NAME" ]; then break; fi
-  sleep 1
+for port in "$PROD_PORT" "$STAGING_PORT"; do
+  if ! curl -fsS -m 5 "http://127.0.0.1:$port/health" >/dev/null; then say stop "Our loopback health owner on $port is not ready; no new Funnel was added"; exit 1; fi
 done
-say tunnel "${NAME:-no name yet: journalctl -u wildshard-tunnel}"
-say next "From a phone on cellular: curl ${NAME:-<the tunnel>}/health"
-say next "Over Tailscale: curl http://$(tailscale ip -4 2>/dev/null | head -1):$PROD_PORT/health"
-if ! check_listeners; then say stop 'Unexpected game or database TCP listener. Look at ss -ltn'; exit 1; fi
-say ok 'No game or database port is public'
+network_guard() {
+  tailscale serve status --json | "$NODE" "$HERE/setup-state.mjs" network "$NODE_NAME" "${1:-}"
+}
+network_guard
+tailscale serve --bg --yes --http="$PROD_PORT" "http://127.0.0.1:$PROD_PORT"
+network_guard
+tailscale funnel --bg --yes --https=443 "http://127.0.0.1:$PROD_PORT"
+network_guard
+tailscale funnel --bg --yes --https=8443 "http://127.0.0.1:$STAGING_PORT"
+network_guard --complete
+if ! check_listeners; then say stop 'Unexpected game or database TCP listener after setup'; exit 1; fi
+systemctl enable --now wildshard-dump.timer wildshard-uptime.timer wildshard-pull@production.timer wildshard-pull@staging.timer
+say socket "production wss://$NODE_NAME"
+say socket "staging wss://$NODE_NAME:8443"
+say health "tailnet-only Serve: http://$NODE_NAME:$PROD_PORT/health"
+say ok 'Phase 2 complete; signed release timers will start the owned game units'

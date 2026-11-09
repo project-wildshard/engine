@@ -36,24 +36,19 @@ test('an unchanged file in check mode still reports unsafe metadata', () => {
   expect(checked.stdout).toContain('would repair metadata /dev/null');
 });
 
-test('an interrupted postgres restart is reconciled when files are unchanged', () => {
-  const bringUp = source.slice(source.indexOf('# --- Bring it up'), source.indexOf('systemctl enable --now wildshard-tunnel'));
-  const checked = spawnSync('bash', ['-c', `set -e; PG_CHANGED=0 PG_VERSION=16; LIVE='*'; say() { :; }; pg() { case "$1" in *listen_addresses*) printf '%s' "$LIVE";; *) printf f;; esac; }; systemctl() { printf '%s\\n' "$*"; case "$1" in restart) LIVE='';; esac; }; check_listeners() { return 0; }; ${bringUp}`], { encoding: 'utf8' });
-  expect(checked.status).toBe(0); expect(checked.stdout).toContain('restart postgresql@16-main');
+test('Phase 2 refuses a pending shared Postgres restart without restarting anything', () => {
+  const checked = spawnSync('bash', ['-c', `PG_VERSION=16; id() { printf 0; }; pg_lsclusters() { printf '16 main'; }; say() { printf '%s %s\\n' "$1" "$2"; }; pg() { case "$1" in *server_version_num*) printf 160015;; *config_file*) printf /etc/postgresql/16/main/postgresql.conf;; *listen_addresses*) printf '';; *pending_restart*) printf t;; *) exit 90;; esac; }; systemctl() { printf 'FORBIDDEN shared restart'; exit 91; }; ${definition('check_postgres')}\ncheck_postgres`], { encoding: 'utf8' });
+  expect(checked.status).not.toBe(0); expect(checked.stdout).toContain('nothing was restarted'); expect(checked.stdout).not.toContain('FORBIDDEN');
 });
 
 test('preflight checks the exact service runtime instead of PATH node', () => {
-  const start = source.indexOf('if ! "$NODE" --version');
-  expect(start).toBeGreaterThan(0);
-  const preflight = source.slice(start, source.indexOf('# --- Tailscale'));
-  const checked = spawnSync('bash', ['-c', `NODE=/no/such/service/node; node() { printf 'v24.0.0\\n'; }; say() { :; }; ${preflight}`]);
+  const checked = spawnSync('bash', ['-c', `NODE=/no/such/service/node; node() { printf 'v24.0.0\\n'; }; ${definition('check_node')}\ncheck_node`]);
   expect(checked.status).not.toBe(0);
 });
 
-test('a restart that leaves PostgreSQL exposed stops before the tunnel', () => {
-  const bringUp = source.slice(source.indexOf('# --- Bring it up'), source.indexOf('systemctl enable --now wildshard-tunnel'));
-  const checked = spawnSync('bash', ['-c', `set -e; PG_CHANGED=1 PG_VERSION=16; say() { :; }; pg() { case "$1" in *listen_addresses*) printf '*';; *) printf f;; esac; }; systemctl() { :; }; check_listeners() { return 0; }; ${bringUp}\nprintf 'tunnel-started'`], { encoding: 'utf8' });
-  expect(checked.status).not.toBe(0); expect(checked.stdout).not.toContain('tunnel-started');
+test('unprivileged Postgres inspection reports unknown and never guesses a missing role', () => {
+  const checked = spawnSync('bash', ['-c', `id() { printf 1000; }; say() { printf '%s %s\\n' "$1" "$2"; }; pg() { exit 90; }; ${definition('check_postgres')}\ncheck_postgres`], { encoding: 'utf8' });
+  expect(checked.status).toBe(0); expect(checked.stdout).toContain('cannot verify'); expect(checked.stdout).not.toContain('would');
 });
 
 test('existing settings retain their values but still request metadata repair', () => {
@@ -76,12 +71,10 @@ test('failure to publish settings preserves the complete previous file', () => {
 });
 
 test('service units and health stub execute the exact checked runtime', () => {
-  const units = source.slice(source.indexOf('# --- Units'), source.indexOf('if [ "$CHECK" = 1 ]; then\n  say check'));
-  const stub = source.split('\n').find(line => line.includes('systemd-run --quiet --unit=wildshard-health-stub'));
-  if (stub === undefined) throw new Error('Missing stub');
-  const checked = spawnSync('bash', ['-c', `NODE=/proof/checked-node HOME_DIR=/data LIB=/lib ETC=/etc/example PROD_PORT=8790; unit() { cat; }; systemd-run() { printf '%s\n' "$@"; }; ${units}\n${stub}`], { encoding: 'utf8' });
+  const units = source.slice(source.indexOf('# --- Units'), source.indexOf('# --- Bring up only'));
+  const checked = spawnSync('bash', ['-c', `NODE=/proof/checked-node HOME_DIR=/data LIB=/lib ETC=/etc/example LOGS=/data/logs PROD_PORT=8790; unit() { cat; }; ${units}`], { encoding: 'utf8' });
   expect(checked.status).toBe(0);
   expect(checked.stdout).toContain('ExecStartPre=/proof/checked-node /lib/pull.mjs');
   expect(checked.stdout).toContain('ExecStart=/proof/checked-node /data/%i/current/main.mjs');
-  expect(checked.stdout).not.toContain('/usr/bin/node'); expect(checked.stdout).toContain('\n/proof/checked-node\n-e\n');
+  expect(checked.stdout).not.toContain('/usr/bin/node'); expect(checked.stdout).toContain('ExecStart=/proof/checked-node /lib/health-stub.mjs %i');
 });
