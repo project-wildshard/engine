@@ -6,15 +6,20 @@ const WORDS: Readonly<Record<LinkState, string>> = { live: '', reconnecting: 'Re
 const STYLE = 'position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;z-index:1000;display:flex;gap:12px;align-items:center;justify-content:center;padding:6px 12px;font:600 14px/1.4 system-ui,sans-serif;color:#fff;background:rgba(20,20,24,.82);pointer-events:none';
 
 /** E7.1: the line that tells a player the link is down. Returns what to call when it changes. It takes no input but its one button. */
-export function reconnectStrip(scope: Scope, retry: () => void, parent: HTMLElement = document.body): (state: LinkState) => void {
+export function reconnectStrip(scope: Scope, retry: () => void, parent: HTMLElement = document.body, doctor?: (from: string) => void): (state: LinkState) => void {
   const strip = scope.ownNode(document.createElement('div')), words = document.createElement('span'), again = document.createElement('button');
   strip.id = 'ws-reconnect-strip'; strip.setAttribute('role', 'status'); strip.style.cssText = STYLE; strip.hidden = true; strip.style.display = 'none';
   again.textContent = 'Try again'; again.style.pointerEvents = 'auto'; again.hidden = true;
   scope.listen(again, 'click', retry);
-  strip.append(words, again); parent.append(strip);
+  // E7.5 prep: a lost link or a full world offers the Connection doctor
+  const check = document.createElement('button');
+  check.textContent = 'Check connection'; check.style.pointerEvents = 'auto'; check.hidden = true; check.dataset['doctor'] = 'open';
+  scope.listen(check, 'click', () => { check.disabled = true; doctor?.(strip.dataset['state'] === 'full' ? 'full' : 'lost'); });
+  strip.append(words, again, check); parent.append(strip);
   return state => {
     const shown = WORDS[state] !== '';
-    words.textContent = WORDS[state]; again.hidden = state !== 'lost';
+    strip.dataset['state'] = state;
+    words.textContent = WORDS[state]; again.hidden = state !== 'lost'; check.hidden = doctor === undefined || state !== 'lost' && state !== 'full';
     strip.hidden = !shown; strip.style.display = shown ? 'flex' : 'none';
   };
 }

@@ -25,6 +25,8 @@ export const GAME_STRINGS = {
     /** E483 (E140 again): the compact Developer switch beside SETTINGS, the same switch as Settings ▸ Developer */
     developer: 'DEV',
     developerLabel: 'Developer mode',
+    /** E7.5 prep: an online build's way into the Connection doctor */
+    checkConnection: 'CHECK CONNECTION',
     /** SF60 / G214 (art/menu/round-12-whats-new/B-banner*.jpg): the day's WHAT'S NEW banner under the logo */
     whatsNew: {
       label: "What's new",

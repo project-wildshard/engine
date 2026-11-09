@@ -84,7 +84,8 @@ const world: World = await World.open({ build, cells, ...worldSettings(release.c
   restart: () => { stop(0); } });
 const server = createServer((request, response) => {
   if (request.url !== '/health') { response.writeHead(404).end(); return; }
-  response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ...world.health(), serial: release.serial, uptime: Math.round((Date.now() - started) / 1000) }));
+  // E7.5 prep: any page may read it (no player data), so the Connection doctor sees the build; `now` lets it read a phone's clock.
+  response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ ...world.health(), serial: release.serial, uptime: Math.round((Date.now() - started) / 1000), now: Date.now() }));
 });
 server.on('upgrade', (request, socket, head) => { world.upgrade(request, socket, head); });
 stop = (code): void => { void (async (): Promise<void> => {

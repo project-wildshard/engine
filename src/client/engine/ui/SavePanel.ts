@@ -6,6 +6,7 @@ import { app } from '../app/runtime';
 import { markReload } from '../boot/lastEnd';
 import { SAVE_STRINGS as strings } from './saveStrings';
 import { buildOfflineRow } from './offlineDownload';
+import { buildConnectionRow } from './errorScreen';
 import { exportServerSaves, importServerSaves } from '../saves/indexed';
 import { saveEnvironment } from '../../../shared/engine/saves/environment';
 
@@ -52,5 +53,6 @@ export function buildSavePanel(): HTMLDivElement & { refresh: () => void } {
   card.append(title, note, row, picker, status, reload, aside);
   const offline = buildOfflineRow(scope);
   if (offline !== null) card.append(offline);
+  card.append(buildConnectionRow(scope)); // E7.5 prep: the Connection doctor, beside Offline play
   renderAside(); return Object.assign(card, { refresh: renderAside });
 }

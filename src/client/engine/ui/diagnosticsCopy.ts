@@ -10,6 +10,10 @@ export function setDiagnosticsSource(read: () => string): void { source = read; 
 /** The live report, or null when no loading card has run on this page. */
 export function diagnosticsSource(): (() => string) | null { return source; }
 
+/** E7.5 prep: the sessionStorage key a page leaves its report under for the Connection doctor's page (errorScreen.ts openDoctorPage).
+ *  Not `ws.`: the native save mirror copies ws.*. */
+export const DOCTOR_EARLIER_KEY = 'doctor.earlier';
+
 /** The tap is the user activation the clipboard needs (iOS Safari 13.4+); a refusal says so on the button. */
 export async function copyText(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }

@@ -68,6 +68,8 @@ const build = spawnSync(process.execPath, ['--import', resolve(import.meta.dirna
 if (build.error !== undefined) throw build.error;
 if (build.status !== 0) { process.exitCode = build.status ?? 1; process.exit(); }
 if (deferPublic) copyDeferredPublic(process.cwd(), outDir);
+// E7.5 prep: the Connection doctor's page, in its own small module graph (app-build/doctorOutput.mjs)
+await (await import('./app-build/doctorOutput.mjs')).writeDoctorOutput(outDir, buildId, process.cwd());
 
 // version.json (the build id the documents are stamped with), asset-index.json and asset-manifest.json
 step(['--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', "(await import('./scripts/app-build/versionFiles.ts')).writeVersionFiles(process.argv[1], process.argv[2]);", outDir, buildId]);

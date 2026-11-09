@@ -29,6 +29,7 @@ import { isDev } from '../core/devMode';
 import { ErrorReporter, lastReportId, safeUrl, sendReport as send, type ReportOutcome } from '../core/errorReport';
 import { RELOAD_PARAM } from '../core/GpuRecovery';
 import { currentPose } from './ReloadPrompt';
+import { hasOnlineWorld, openDoctorPage } from './errorScreen';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { TIER } from '../core/tier';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
@@ -149,6 +150,13 @@ function build(): HTMLElement {
   else if (!pose) here.textContent = engineString('s_bdc090ec61e3');
   scope.listen(here, 'click', () => { here.disabled = true; here.textContent = engineString('s_ea456dcf3d90'); reloadHere(!looped); });
   scope.listen(q(el, '.title'), 'click', () => { toTitle(); });
+  // E7.5 prep: a failed join on an online build offers the Connection doctor beside Title screen
+  if (hasOnlineWorld()) {
+    const doctor = document.createElement('button');
+    doctor.type = 'button'; doctor.className = 'doctor'; doctor.textContent = engineString('s_doctor_failed');
+    q(el, '.title').after(doctor);
+    scope.listen(doctor, 'click', () => { doctor.disabled = true; openDoctorPage('failed-join'); });
+  }
   // a dead loop can't be played on: KEEP PLAYING only acts while the loop still runs (it is hidden otherwise)
   scope.listen(q(el, '.keep'), 'click', () => { if (loopState() !== 'running') return; closeFatal(); document.dispatchEvent(new Event('ws:error-keep')); });
   const copyBtn = q(el, '.copy');

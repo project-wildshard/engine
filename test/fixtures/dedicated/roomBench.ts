@@ -21,7 +21,7 @@ export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };
 }
 /** The real door on a real localhost port, with its workers on this thread over real ports, the same code a worker runs. */
-export interface RoomBench { readonly url: string; readonly world: World; readonly room: (slug: string) => DedicatedRoom | undefined; readonly lines: Record<string, unknown>[]; readonly crashes: unknown[]; restarts: number; close: () => Promise<void> }
+export interface RoomBench { readonly url: string; readonly world: World; /** The door's HTTP server: a test may answer requests on it, as `/health` does. */ readonly server: Server; readonly room: (slug: string) => DedicatedRoom | undefined; readonly lines: Record<string, unknown>[]; readonly crashes: unknown[]; restarts: number; close: () => Promise<void> }
 export async function roomBench(options: Partial<WorldOptions> & { readonly holdMs?: number; readonly emptyMs?: number; readonly newsDelayMs?: number } = {}): Promise<RoomBench> {
   const { holdMs, emptyMs, newsDelayMs = 0, ...door } = options, delivery = new Scope('room bench IPC'), rooms = new Map<string, DedicatedRoom>(), lines: Record<string, unknown>[] = [], crashes: unknown[] = [], stops: (() => void)[] = [], bench: { restarts: number } = { restarts: 0 };
   const boot = (slugs: readonly string[]): WorkerLink => {
@@ -37,6 +37,6 @@ export async function roomBench(options: Partial<WorldOptions> & { readonly hold
   server.on('upgrade', (request, socket, head) => { world.upgrade(request, socket, head); });
   await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
   const { port } = server.address() as AddressInfo;
-  return { world, room: slug => rooms.get(slug), lines, crashes, get restarts() { return bench.restarts; }, url: `ws://127.0.0.1:${String(port)}/`,
+  return { world, server, room: slug => rooms.get(slug), lines, crashes, get restarts() { return bench.restarts; }, url: `ws://127.0.0.1:${String(port)}/`,
     close: async () => { world.dispose(); delivery.dispose(); for (const stop of stops) stop(); server.closeAllConnections(); await new Promise(resolve => { server.close(resolve); }); } };
 }

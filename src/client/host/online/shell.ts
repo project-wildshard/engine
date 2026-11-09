@@ -122,6 +122,9 @@ export interface StartOnline {
   readonly failed: (message: string) => void;
   readonly recordTag?:string;
 }
+/** E7.5 prep: ask the page to leave for the Connection doctor, saying which screen asked. The page's own bundle answers
+ *  (src/client/engine/ui/errorScreen.ts): it holds the save hold and the loading card's report, which this module can't see. */
+const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: from })); };
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
@@ -129,10 +132,10 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   if (release.engineBuild !== link.build) await reloadStale();
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
-  const held = identity(), named = held.name === GUEST.name ? identity(await askName(scope)) : held;
+  const held = identity(), named = held.name === GUEST.name ? identity(await askName(scope, () => { doctor('join'); })) : held;
   let retry = (): void => undefined, waitingForSeat = false;
   scope.interval(SEAT_WAIT_BEAT_MS, () => { if (waitingForSeat) seatWaitBeat(); });
-  const showLink = reconnectStrip(scope, () => { retry(); }), showCountdown = countdownStrip(scope);
+  const showLink = reconnectStrip(scope, () => { retry(); }, document.body, doctor), showCountdown = countdownStrip(scope);
   const ended = async (reason: string | undefined): Promise<void> => {
     if (reason !== 'reload') { failed(reason === 'replaced' ? 'This world is open in another tab.' : `The server closed this link (${String(reason)}).`); return; }
     if (!await reloadStale()) newBuildPanel(scope, reloadStale, () => { void reloadByHand(); });

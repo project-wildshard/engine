@@ -55,6 +55,9 @@
 .ws-main .ws-main-dev.on .ws-main-dev-track { border-color: var(--ws-amber); background: rgba(255, 181, 71, 0.18); }
 .ws-main .ws-main-dev.on .ws-main-dev-track::after { transform: translateX(12px); background: var(--ws-amber); box-shadow: 0 0 6px var(--ws-amber); }
 .ws-main .ws-main-dev:focus-visible { border-color: var(--ws-cyan); }
+/* E7.5 prep: an online build's Check connection, a row of its own under SETTINGS and DEV */
+.ws-main .ws-main-doctor { margin-top: 10px; min-width: 0; width: min(100%, 336px); }
+.ws-main .ws-main-doctor-dot { display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); vertical-align: middle; }
 /* SF60 / G214 (Jake: B, art/menu/round-12-whats-new/B-banner*.jpg): the WHAT'S NEW banner under the logo, src/client/game/whatsNewBanner.ts.
    Folded: one navy-glass line with the cards' corner brackets, a cyan dot, "WHAT'S NEW · N CHANGES", the build and a ▾.
    Open: the same frame drops in place to the build line, the entries (cyan diamonds) and HIDE UNTIL NEXT BUILD. */

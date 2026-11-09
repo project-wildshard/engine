@@ -2,6 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script data-doctor-door>
+      // E7.5 prep: `/?doctor`, or a /doctor/ navigation the service worker answered with this document, goes to the Connection
+      // doctor's own page past the worker (`sw=0`) before any of the game loads. A /doctor/ that already passed it is an old deploy.
+      (() => {
+        const query = new URLSearchParams(location.search), door = query.has('doctor'), path = location.pathname.startsWith('/doctor');
+        if (!door && !(path && query.get('sw') !== '0')) return;
+        query.delete('doctor'); query.set('sw', '0'); if (!query.has('from')) query.set('from', 'link');
+        document.documentElement.dataset.doctor = '';
+        location.replace(`/doctor/?${query}`);
+      })();
+    </script>
     <script data-boot-timing>
       // LS1: local, bounded, data-only history, installed before any module.
       (() => {

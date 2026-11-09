@@ -57,6 +57,8 @@ export function stampBuildDocuments(directory, facts) {
   if (typeof version !== 'object' || version === null || !('build' in version) || typeof version.build !== 'string') throw new Error('Missing document build identity');
   if (version.rendererRevision !== undefined && (typeof version.rendererRevision !== 'string' || !/^[a-f0-9]{64}$/u.test(version.rendererRevision))) throw new Error('Invalid renderer identity');
   const documents = new Set(['index.html']);
+  // E7.5 prep: the Connection doctor's page is built on its own (doctorOutput.mjs), so no manifest names it
+  if (existsSync(resolve(directory, 'doctor/index.html'))) documents.add('doctor/index.html');
   const manifest = resolve(directory, '.vite/manifest.json');
   if (existsSync(manifest)) {
     /** @type {unknown} */

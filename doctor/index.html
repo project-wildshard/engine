@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><base href="/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#050810"><title>Wildshard · Connection doctor</title>
+<!-- E7.5 prep: the Connection doctor's own page. It is not the game: no service worker registers here, and nothing but the doctor loads. -->
+<style>
+@font-face{font-family:'Rajdhani';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/rajdhani-700-latin.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-latin.woff2) format('woff2')}
+html,body{margin:0;height:100%;background:#050810;color:#e6f2f8}
+.ws-doc-shell{padding:28px 20px;font:13px/1.5 'JetBrains Mono',Menlo,monospace;color:rgba(196,220,232,.6)}
+</style></head>
+<body><div class="ws-doc-shell" data-doctor-shell>Connection doctor: starting…<noscript> It needs JavaScript.</noscript></div>
+<script type="module" src="/src/client/host/online/doctorPage.ts"></script></body>
+</html>
