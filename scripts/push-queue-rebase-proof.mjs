@@ -1,7 +1,7 @@
 // Real divergent Git histories, official source hashes and a dirty source checkout.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {chmodSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
+import {chmodSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,unlinkSync,writeFileSync} from 'node:fs';
 import {delimiter,dirname,join,resolve as resolvePath} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
@@ -9,6 +9,9 @@ const engine=resolvePath(process.argv.find(arg=>arg.startsWith('--engine='))?.sl
 const directory=resolvePath(process.argv.find(arg=>arg.startsWith('--out='))?.slice(6)??'tmp/push-queue-rebase-proof');mkdirSync(directory,{recursive:true});
 const work=mkdtempSync(join(directory,'run-')),began=performance.now(),sourceConflict=process.argv.includes('--source-conflict');
 const race=process.argv.includes('--race');
+const singleStamp=process.argv.includes('--single-stamp');
+const deletedInput=process.argv.includes('--deleted-input');
+const validationConflict=process.argv.includes('--validation-conflict');
 /** @param {string} cwd @param {string[]} args */
 const git=(cwd,args)=>execFileSync('git',['-c','user.name=Rebase proof','-c','user.email=proof@example.test',...args],{cwd,encoding:'utf8'}).trim();
 try{
@@ -20,14 +23,15 @@ try{
  writeFileSync(join(seed,'.githooks/pre-push'),'#!/usr/bin/env bash\nset -euo pipefail\nnode gate.mjs\n');chmodSync(join(seed,'.githooks/pre-push'),0o755);
  writeFileSync(join(seed,'package.json'),JSON.stringify({name:'queue-rebase-proof',private:true,version:'1.0.0',type:'module'}));writeFileSync(join(seed,'pnpm-workspace.yaml'),'packages: []\n');writeFileSync(join(seed,'.gitignore'),'node_modules/\n');
  for(const name of ['lane.txt','upstream.txt','shared.txt'])writeFileSync(join(seed,name),'base');
+ mkdirSync(join(seed,'src/client/engine/boot'),{recursive:true});writeFileSync(join(seed,'src/client/engine/boot/fixture.ts'),'export const value=0;');writeFileSync(join(seed,'src/client/engine/boot/upstream.ts'),'export const upstream=0;');
  execFileSync('pnpm',['install','--lockfile-only'],{cwd:seed,stdio:'pipe'});
- git(seed,['add','scripts/stamp-renderer-revision.mjs','scripts/stamp-validation-revision.mjs','gate.mjs','.githooks/pre-push','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','.gitignore','lane.txt','upstream.txt','shared.txt']);git(seed,['commit','--quiet','-m','seed']);
+ git(seed,['add','scripts/stamp-renderer-revision.mjs','scripts/stamp-validation-revision.mjs','gate.mjs','.githooks/pre-push','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','.gitignore','lane.txt','upstream.txt','shared.txt','src/client/engine/boot/fixture.ts','src/client/engine/boot/upstream.ts']);git(seed,['commit','--quiet','-m','seed']);
  /** @param {string} cwd */
  const stamp=cwd=>{for(const name of ['renderer','validation'])execFileSync(process.execPath,[`scripts/stamp-${name}-revision.mjs`],{cwd});};
  stamp(seed);git(seed,['add','scripts/renderer-revision.json','scripts/validation-revision.json']);git(seed,['commit','--quiet','-m','initial official stamps']);git(seed,['push','--quiet','origin','main']);
  for(const clone of [source,upstream])execFileSync('git',['clone','--quiet',remote,clone]);
- writeFileSync(join(source,'lane.txt'),'lane');writeFileSync(join(source,'scripts/lane-input.mjs'),'export const lane=1;');git(source,['add','scripts/lane-input.mjs']);git(source,['commit','--quiet','-m','lane source','--','lane.txt','scripts/lane-input.mjs']);stamp(source);git(source,['commit','--quiet','-m','lane stamps','--','scripts/renderer-revision.json','scripts/validation-revision.json']);
- writeFileSync(join(upstream,sourceConflict?'lane.txt':'upstream.txt'),'upstream');writeFileSync(join(upstream,'scripts/upstream-input.mjs'),'export const upstream=1;');git(upstream,['add','scripts/upstream-input.mjs']);git(upstream,['commit','--quiet','-m','upstream source','--',sourceConflict?'lane.txt':'upstream.txt','scripts/upstream-input.mjs']);stamp(upstream);git(upstream,['commit','--quiet','-m','upstream stamps','--','scripts/renderer-revision.json','scripts/validation-revision.json']);git(upstream,['push','--quiet','origin','main']);const before=git(upstream,['rev-parse','HEAD']);
+ writeFileSync(join(source,'lane.txt'),'lane');writeFileSync(join(source,'scripts/lane-input.mjs'),'export const lane=1;');if(singleStamp||validationConflict)writeFileSync(join(source,'src/client/engine/boot/fixture.ts'),'export const value=1;');if(deletedInput)unlinkSync(join(source,'src/client/engine/boot/fixture.ts'));git(source,['add','scripts/lane-input.mjs']);git(source,['commit','--quiet','-m','lane source','--','lane.txt','scripts/lane-input.mjs','src/client/engine/boot/fixture.ts']);stamp(source);git(source,['commit','--quiet',...(deletedInput?['--amend','--no-edit']:['-m','lane stamps']),'--','scripts/renderer-revision.json',...(singleStamp?[]:['scripts/validation-revision.json'])]);
+ writeFileSync(join(upstream,sourceConflict?'lane.txt':'upstream.txt'),'upstream');writeFileSync(join(upstream,'scripts/upstream-input.mjs'),'export const upstream=1;');if(validationConflict)writeFileSync(join(upstream,'src/client/engine/boot/upstream.ts'),'export const upstream=1;');git(upstream,['add','scripts/upstream-input.mjs']);git(upstream,['commit','--quiet','-m','upstream source','--',sourceConflict?'lane.txt':'upstream.txt','scripts/upstream-input.mjs','src/client/engine/boot/upstream.ts']);stamp(upstream);git(upstream,['commit','--quiet','-m','upstream stamps','--','scripts/renderer-revision.json','scripts/validation-revision.json']);git(upstream,['push','--quiet','origin','main']);const before=git(upstream,['rev-parse','HEAD']);
  writeFileSync(join(source,'shared.txt'),'peer dirty bytes preserved');
  const env={...process.env,WS_LANE_RECEIPTS:join(work,'receipts.log')},raced=join(work,'raced');
  if(race){

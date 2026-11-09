@@ -25,3 +25,19 @@ HEAD remain literal. A real remote advance between helper fetch/rebase
 passes4.92s with one gate attempt and retains the raced upstream file.
 The original queue environment/FIFO/partial-source proofs remain gates
 of this manual verification, never added to pre-commit or pre-push.
+
+J206 one-shot used the published repo-kit wrapper (read-only ephemeral
+Codex fallback, all HERDR keys stripped). Its deletion/rename MUST-FIX
+is real: a combined source-deletion/stamp commit regenerates before
+HEAD contains that deletion. The official renderer then hashes a missing
+HEAD path. Actual deletion replay is red before the fix and green2.17s
+after using the supported generation-inventory capability over the
+pending Git index. The temporary inventory lives only in Git metadata
+and is removed immediately; final stamps cover the complete source.
+
+Both review SHOULDs are addressed: the pre-gate fetch/retry now follows
+all generation/metadata commits, and real boot-source edits exercise
+validation revisions as well as renderer revisions. A further real
+single-renderer-conflict case reproduces the clean validation stamp
+changing during official regeneration: stage both officially generated
+paths, never any source. Old red/new green3.04s. No second review round.
