@@ -17,6 +17,15 @@ class PublicationUnknownError extends Error{name='PublicationUnknownError';}
 
 /** @param {string} cwd @param {string[]} args */
 const git=(cwd,args)=>execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
+/** A snapshot fetch cannot lazily hydrate an upload-pack's promisor objects.
+ * Refuse before creating any job or snapshot, even if HEAD itself is hydrated.
+ * @param {string} source */
+function refusePartialSource(source){
+ const result=spawnSync('git',['config','--get-regexp',String.raw`^(extensions\.partialclone|remote\..*\.(promisor|partialclonefilter))$`],{cwd:source,encoding:'utf8'});
+ if(result.error!==undefined||result.status!==0&&result.status!==1)throw new Error('Push queue cannot inspect source clone configuration',{cause:result.error});
+ const partial=result.status===0&&result.stdout.trim().split('\n').some(row=>!/^remote\..*\.promisor\s+(?:false|no|off|0)$/iu.test(row));
+ if(partial)throw new Error(`Push queue partial-clone source refused: ${source}; use a full clone without promisor/filter configuration before enqueue`);
+}
 /** @param {string} file @param {object} value */
 function write(file,value){const temporary=`${file}.${process.pid}.tmp`;writeFileSync(temporary,`${JSON.stringify(value,null,2)}\n`);renameSync(temporary,file);}
 /** @param {{id:string,lane?:string}} job @param {string} state @param {string} message */
@@ -56,6 +65,7 @@ function worker(directory){
 }
 /** @param {string} source @param {string} directory @param {boolean} checkOnly @param {string | undefined} requested */
 function capture(source,directory,checkOnly,requested){
+ refusePartialSource(source);
  if(git(source,['branch','--show-current'])!=='main')throw new Error('Push queue accepts main only');
  const number=Number(existsSync(join(directory,'next'))?readFileSync(join(directory,'next'),'utf8'):0);
  if(!Number.isSafeInteger(number)||number<0)throw new Error('Invalid queue sequence');
@@ -178,7 +188,8 @@ async function drain(directory){
 const [mode,...args]=process.argv.slice(2);
 if(mode==='enqueue'){
  if(process.env.CI||process.env.GITHUB_ACTIONS)throw new Error('The unattended push queue is a local service');
- const source=resolvePath(args.find(arg=>!arg.startsWith('--'))??'.'),remote=git(source,['remote','get-url','origin']);
+ const source=resolvePath(args.find(arg=>!arg.startsWith('--'))??'.');refusePartialSource(source);
+ const remote=git(source,['remote','get-url','origin']);
  const root=resolvePath(args.find(arg=>arg.startsWith('--root='))?.slice(7)??join(homedir(),'.cache/wildshard/push-queue'));
  const directory=join(root,createHash('sha256').update(identity(remote)).digest('hex').slice(0,20));mkdirSync(join(directory,'snapshots'),{recursive:true});
  const commit=args.find(arg=>arg.startsWith('--commit='));
