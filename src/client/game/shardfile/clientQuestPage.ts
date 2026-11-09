@@ -78,6 +78,14 @@ export function finishClientQuestPage(ctx: ShardContext, input: unknown): void {
     native.atEnd(endpoint.mover);
     if (!host.stages.some(stage => stage.row.id === endpoint.stage)) throw new Error('Unknown quest endpoint stage');
   }
+  // C14: the server moves the mover and keeps the quest. Its rows reaching the end is the moment a player sees, once a raise: a
+  // mover already at its end when this page first saw it (a save, another player's raise) makes no edge.
+  if (row.endpoints.length > 0) ctx.system({ id: `${host.graph.step}.mover-endpoints`, phase: 'update', run: () => {
+    for (const event of native.drainEndEvents()) {
+      const endpoint = row.endpoints.find(entry => entry.mover === event.mover);
+      if (endpoint !== undefined && event.atEnd && endpoint.toast !== undefined) ctx.game.runtime?.play?.hud.toast(endpoint.toast);
+    }
+  } });
   const captures = new Map(Object.entries(row.capture).map(([name, steps]) => [name, steps.map(step => {
     if ('flag' in step) { if (!source.quests.flags.includes(step.flag)) throw new Error('Unknown capture flag'); return () => { quest.flags.set(step.flag); }; }
     if ('action' in step) { if (!host.page?.actions.some(action => action.id === step.action)) throw new Error('Unknown capture action'); return () => { page.run(step.action); }; }

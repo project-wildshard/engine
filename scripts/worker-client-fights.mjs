@@ -190,10 +190,12 @@ const rowLook = (page, at) => page.evaluate(({ x, z }) => {
   return { kind: body.kind, away: Number(away(body).toFixed(1)), pinned: body.drawPinned, standard: standard.length, painted: standard.filter(material => /lights_fragment_end/u.test(material.customProgramCacheKey())).length,
     glow: Math.max(0, ...lambert.filter(material => material.emissive.getHex() !== 0).map(material => material.emissiveIntensity)), tint: lambert[0]?.color.toArray().map(value => Number(value.toFixed(2))) ?? null };
 }, at);
-/** Far Reach, whole: the keeper's notes, the roost, three vanes, the winch, the crown, the Roc. */
-async function farJourney(browser, phone, base, step) {
+/** Far Reach, whole: the keeper's notes, the roost, three vanes, the winch, the crown, the Roc. `prepare` observes the page before
+ *  the first press; `winched` hears the page once the bridge is up, and ends the journey there when it answers true. */
+export async function farJourney(browser, phone, base, step, prepare = () => Promise.resolve(), winched = () => Promise.resolve(false)) {
   const sky = await open(browser, phone, base, 'far-reach');
   const { page } = sky, flagged = flag => hasFlag(page, flag), live = async () => (await report(page)).flags.filter(flag => !flag.startsWith('seen:'));
+  await prepare(page);
   await page.evaluate(() => { window.__workerClientHits(40); });
   await step('far reach: the keeper\'s talk starts the quest', async () => {
     await standAt(page, 'keeper');
@@ -219,6 +221,7 @@ async function farJourney(browser, phone, base, step) {
     const up = await pressUntil(page, flagged('far.bridge'), 8);
     return { ok: up, found, flags: await live(), quests: (await report(page)).quests };
   });
+  if (await winched(page)) { await sky.context.close(); return; }
   await step('far reach: the Roc falls to real blows and the sky is won', async () => {
     await place(page, 0, 45.5, -188);
     const up = await until(page, async () => (await fight(page, 'far.roc.encounter'))?.state === 'fight', 20);

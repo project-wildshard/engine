@@ -266,12 +266,12 @@ export async function installQuestPageComposition(ctx: ShardContext, input: Ques
     adventure.zipline = { ...cable, placed: cable.placed, a: scenes.vector(ends.a), b: scenes.vector(ends.b) };
     setAnchor(ends.publish, { x: scenes.vector(ends.anchor).x, z: scenes.vector(ends.anchor).z });
   }
-  const mover = rows.mover === undefined ? null : installPageMover(ctx, rows.mover, { scenes, enter: enterPageMovers });
-  facets.motion = mover;
+  const mover = rows.mover === undefined ? null : installPageMover(ctx, rows.mover, { scenes, flags, sfx: kit.sfx, enter: enterPageMovers });
+  facets.motion = mover?.motion ?? null;
   const director = facets.director = rows.files.director === undefined ? null : await readChapterDirector(ctx, rows.files.director);
   if (director !== null) { ui.retainRoot(director.caption.root, () => { director.caption.show(false); }); scope.onDispose(() => { director.caption.root.remove(); }); }
   update((dt, t) => {
-    talks.update(dt, t, world.player.position); director?.update(dt);
+    talks.update(dt, t, world.player.position); mover?.update(); director?.update(dt);
     if (!practiceRoom.open) chapter.chip.update(t, world.player);
   }, rows.systems.talks);
   update(cable.update, rows.systems.cable);
