@@ -47,7 +47,7 @@ test('the typed CLI keeps native diagnostics outside node_modules', () => {
   try {
     writeFileSync(resolve(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, target: 'ES2023', module: 'ESNext' }, include: ['probe.ts'] }));
     writeFileSync(config, JSON.stringify({ categories: {}, options: { typeAware: true }, rules: { 'typescript/no-floating-promises': 'error' } }));
-    const environment = { ...process.env }; delete environment.OXLINT_TSGOLINT_PATH;
+    const environment = { ...process.env }; delete environment['OXLINT_TSGOLINT_PATH'];
     const lint = (env = environment) => spawnSync(process.execPath, [resolve('scripts/lint-cli.mjs'), '-c', config, '--no-ignore', '--disable-nested-config', '--type-aware', '--threads', '1', file], { cwd: root, encoding: 'utf8', timeout: 5000, env });
     writeFileSync(file, 'export async function work():Promise<void>{}\nwork();\n');
     const floating = lint(); expect(floating.status, floating.stdout + floating.stderr).toBe(1); expect(floating.stdout).toContain('no-floating-promises');

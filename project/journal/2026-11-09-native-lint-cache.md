@@ -38,3 +38,10 @@ The shared native tool cache still owns one pinned binary; it is not gone.
 
 The full NM2 row stays open through normal publication and hosted greens.
 No quarantine deadline, assertion or qualification requirement is weakened.
+
+The full queue45 gate caught TS4111 in the new diagnostic fixture.
+NodeJS.ProcessEnv is an index signature under the real scripts compiler.
+Delete the fixture override with bracket access, as that compiler requires.
+The earlier focused Vitest and lint passes did not check this type rule.
+The full gate's fail-fast cancellation also emitted a broker-loss tail;
+that tail was not the typecheck failure's cause. No gate was bypassed.
