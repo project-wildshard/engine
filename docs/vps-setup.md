@@ -10,6 +10,9 @@ does not install packages, alter PostgreSQL, restart shared services or
 touch Docker, OpenClaw or other users. Writes stay in `/etc/wildshard`,
 `/var/lib/wildshard` and `wildshard-*` units. Helpers move into our own
 `/etc/wildshard/lib`; backup settings remain byte-identical.
+The server unit explicitly sets `PLAYTEST_DIR=/var/lib/wildshard/logs`.
+With `PLAYTEST=1`, E7.8a writes `playtest-<date>.jsonl` there, inside its
+existing writable sandbox; it does not use `/var/log/wildshard`.
 
 Run `bash scripts/vps/setup.sh --check` first. It inspects listeners,
 private Serve, both Funnel ports, the public pin and both env files even

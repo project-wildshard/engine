@@ -199,6 +199,7 @@ Group=wildshard
 Environment=WILDSHARD_HOME=$HOME_DIR/%i
 Environment=RELEASE_CHANNEL=%i
 Environment=PULL_SCRIPT=$LIB/pull.mjs
+Environment=PLAYTEST_DIR=$LOGS
 EnvironmentFile=$ETC/%i.env
 # It exits 0 on a bad hash, so the old bundle comes back up (E7.2c).
 ExecStartPre=$NODE $LIB/pull.mjs

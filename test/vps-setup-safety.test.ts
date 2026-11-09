@@ -76,5 +76,7 @@ test('service units and health stub execute the exact checked runtime', () => {
   expect(checked.status).toBe(0);
   expect(checked.stdout).toContain('ExecStartPre=/proof/checked-node /lib/pull.mjs');
   expect(checked.stdout).toContain('ExecStart=/proof/checked-node /data/%i/current/main.mjs');
+  expect(checked.stdout).toContain('Environment=PLAYTEST_DIR=/data/logs');
+  expect(checked.stdout).toContain('ReadWritePaths=/data /data/logs');
   expect(checked.stdout).not.toContain('/usr/bin/node'); expect(checked.stdout).toContain('ExecStart=/proof/checked-node /lib/health-stub.mjs %i');
 });
