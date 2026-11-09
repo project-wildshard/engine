@@ -4,6 +4,7 @@
 //
 //   node src/scripts/asks.mjs brief   asks still open: expired claims, picks for Jake
 //   node src/scripts/asks.mjs check   pre-commit: every staged ask file follows the rules
+//   node src/scripts/asks.mjs check --all   CI/pre-push: every committed ask, even with an empty index
 //
 // An ask is a receipt of Jake's words. Follow-up work is a plan row.
 import { spawnSync } from 'node:child_process'
@@ -85,13 +86,13 @@ export function checkAsk(id, text, exists = targetExists) {
   return out
 }
 
-function check() {
-  const staged = git('diff', '--cached', '--name-only', '--diff-filter=AM', '-z')
+function check(all = false) {
+  const staged = (all ? git('ls-files', '-z') : git('diff', '--cached', '--name-only', '--diff-filter=AM', '-z'))
     .split('\0')
     .filter(p => p.startsWith(`${ASKS}/`) && p.endsWith('.md') && !p.endsWith('/README.md'))
   let bad = 0
   for (const p of staged) {
-    const problems = checkAsk(basename(p, '.md'), git('show', `:${p}`))
+    const problems = checkAsk(basename(p, '.md'), all ? readFileSync(resolve(ROOT, p), 'utf8') : git('show', `:${p}`))
     for (const m of problems) console.error(`    ${p}: ${m}`)
     bad += problems.length
   }
@@ -132,7 +133,7 @@ function brief() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const [mode] = process.argv.slice(2)
-  if (mode === 'check') check()
+  if (mode === 'check') check(process.argv.includes('--all'))
   else if (mode === 'brief') brief()
   else {
     console.error('usage: node src/scripts/asks.mjs brief | check')

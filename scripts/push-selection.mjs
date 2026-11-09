@@ -14,7 +14,17 @@ export function pushSelection(refs,cwd=process.cwd()) {
     for(const path of execFileSync('git',['diff','--name-only','-z',remote,local],{cwd,encoding:'utf8'}).split('\0').filter(Boolean))files.add(path);
   }
   const changed=[...files].sort();
-  if(changed.length>0&&changed.every(file=>file.endsWith('.md')&&(/^(?:docs|plans|project\/journal)\//u.test(file)||!file.includes('/'))))return {mode:'docs',files:changed,reason:'only Markdown documentation'};
+  if(changed.length>0&&changed.every(file=>file.endsWith('.md')&&(/^(?:docs|plans|project\/journal)\//u.test(file)||!file.includes('/')))){
+    for(const file of changed){
+      try{
+        execFileSync('git',['grep','--quiet','--fixed-strings','-e',file,'--','src','test','scripts','lint','vite'],{cwd,stdio:'pipe'});
+        return {mode:'full',files:changed,reason:`Markdown is a declared source/test/filesystem input: ${file}`};
+      }catch(error){
+        if(!(error instanceof Error&&'status'in error&&error.status===1))return {mode:'full',files:changed,reason:`Cannot prove Markdown has no code consumers: ${file}`};
+      }
+    }
+    return {mode:'docs',files:changed,reason:'Markdown without declared code consumers; committed asks still checked'};
+  }
   const harness=changed.find(file=>/(^|\/)package\.json$|(?:^|\/)(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$|^(?:scripts|\.githooks|\.github|public|out|test\/(?:fixtures|pins)|src\/test)\/|^(?:vitest|vite)\.|^tsconfig|^[^/]+\.json$|^test\/(?:setup|.*config)\./u.test(file));
   if(harness!==undefined)return {mode:'full',files:changed,reason:`test/config/dependency harness: ${harness}`};
   if(changed.length===0)return {mode:'full',files:[],reason:'no changed paths; verify full tree'};
