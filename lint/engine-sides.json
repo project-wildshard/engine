@@ -445,6 +445,7 @@
     "src/client/engine/ui/pinKeepOut.ts": "client",
     "src/client/engine/ui/playerDeath.ts": "client",
     "src/client/engine/ui/playerHurt.ts": "client",
+    "src/client/engine/ui/reloadCover.ts": "client",
     "src/client/engine/ui/ReloadPrompt.ts": "client",
     "src/client/engine/ui/review.ts": "client",
     "src/client/engine/ui/roomMap.ts": "client",

@@ -36,7 +36,8 @@ export function newBuildPanel(scope: Scope, again: () => Promise<boolean>, reloa
   panel.id = 'ws-new-build'; panel.setAttribute('role', 'alertdialog'); panel.style.cssText = NEW_BUILD;
   words.textContent = 'A new build is out. Reload to play on.'; words.style.margin = '0';
   go.type = 'button'; go.textContent = 'Reload'; go.style.cssText = NEW_BUILD_BUTTON;
-  scope.listen(go, 'click', () => { go.disabled = true; reload(); });
+  // RL3: the panel is already full-page; the tap's own turn turns it and its button into RELOADING
+  scope.listen(go, 'click', () => { go.disabled = true; go.setAttribute('aria-busy', 'true'); go.textContent = 'Reloading…'; words.textContent = 'Reloading'; reload(); });
   panel.append(words, go); parent.append(panel);
   let asking = false;
   scope.interval(NEW_BUILD_RETRY_MS, () => {

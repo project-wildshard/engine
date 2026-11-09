@@ -27,6 +27,7 @@ import { TITLE_SKIPPERS } from './debugOptions';
 import { MODEL_CREDIT, MUSIC_CREDIT, sfxCredit } from '../audio/credits';
 import { BOOT_OPTIONS, getSfxSet, pendingReload, saveSetting, savedSetting, settingFromUrl, settingParams, settingsReloadUrl, type OptionKey, type OptionValue } from './Settings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
+import { showReloading } from './reloadCover';
 import { buildOfflineRow } from './offlineDownload';
 import { buildConnectionRow } from './errorScreen';
 import { buildMusicStyleRow } from './musicStyleRow';
@@ -155,6 +156,7 @@ function build(): HTMLElement {
   p.append(el('ws-gmenu-label', engineString('s_2a6b24ad2872')), ...[MUSIC_CREDIT, sfxCredit(getSfxSet()), MODEL_CREDIT].filter((t) => t !== '').map((t) => words('ws-gmenu-note', t)));
 
   listenTap(scope, apply, () => {
+    showReloading(apply); // RL3: the tap's own turn
     debug?.applyPending(); developerTools?.applyPending();
     const next = settingsReloadUrl(location.href, TITLE_SKIPPERS);
     leaveSaved(() => { markReload('main menu settings: apply & reload'); if (next === location.href) location.reload(); else location.replace(next); });

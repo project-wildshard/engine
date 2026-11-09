@@ -33,6 +33,7 @@ import { hasOnlineWorld, openDoctorPage } from './errorScreen';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { TIER } from '../core/tier';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
+import { showReloading } from './reloadCover';
 import { captureBrowserError } from '../telemetry/browserErrors';
 import { bootDiagnostic, bootDiagnosticJson } from '../boot/bootTrace';
 // reloads from this modal (and the boot's stuck-loader recovery, src/client/engine/boot/stuck.ts) inside RELOAD_WINDOW_MS before
@@ -121,6 +122,7 @@ function cleanHref(): URL { const u = new URL(location.href); u.searchParams.del
 
 /** RELOAD HERE: back where the player stood, paused (the GPU-recovery reload's path); at the spawn after a crash loop */
 function reloadHere(atSpot: boolean): void {
+  showReloading(); // RL3: the full-page RELOADING cover in the tap's own turn, before the save
   countReload();
   const url = cleanHref();
   const pose = atSpot ? currentPose() : null;

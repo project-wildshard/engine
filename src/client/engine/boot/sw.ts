@@ -20,8 +20,10 @@ import { pageScope } from '../../../shared/engine/app/resources';
  *   ready: Promise<void>        resolves at once: a controlled document, an uncontrolled one (registration is background work), or
  *                               service workers off (`?sw=0`, dev without `?sw=1`, no SW support).
  *   waiting: ServiceWorker|null the newest discovered build is installed and waiting; null otherwise.
- *   adopt(to?): Promise<boolean> explicit recovery: activate, then reload/replace once; true if sent.
- *                               False means unavailable or retired; recovery retains its ordinary fallback.
+ *   adopt(to?, why?, within?): Promise<boolean> explicit recovery: activate, then reload/replace once; true if sent.
+ *                               False means unavailable, retired or (with `within`) not handed over in time; the caller
+ *                               then reloads hard. RL3: a player's tap passes `within` (3 s) so a reload never waits on the
+ *                               new build's whole precache.
  *   version(): Promise<SwVersion|null>  what the controlling worker holds ({ build, entries, bytes, caches }),
  *                               null when nothing controls the page.
  *
@@ -52,8 +54,8 @@ export interface WsSw {
   /** Explicit network-only opt-outs also disable optional code transports. */
   readonly enabled?: boolean;
   waiting: ServiceWorker | null;
-  /** `why`: what asked for it, recorded for the next boot (src/client/engine/boot/lastEnd.ts) */
-  adopt: (to?: string, why?: string) => Promise<boolean>;
+  /** `why`: what asked for it, recorded for the next boot (src/client/engine/boot/lastEnd.ts); `within`: ms the hand-over may take (RL3) */
+  adopt: (to?: string, why?: string, within?: number) => Promise<boolean>;
   version: () => Promise<SwVersion | null>;
 }
 
@@ -174,9 +176,17 @@ function watch(reg: ServiceWorkerRegistration): void {
   pageScope.listen(reg, 'updatefound', () => track(reg.installing));
 }
 
-/** `to`: where the page goes once the new worker controls it (default: reload this URL) */
-async function adopt(to?: string, why = 'new build adopted'): Promise<boolean> {
-  if (!await activateWaiting()) return false;
+/** Resolves `false` after `ms` (the page's scope owns the timer). */
+function lapse(ms: number): Promise<false> { return new Promise(resolve => { pageScope.timeout(ms, () => { resolve(false); }); }); }
+
+/** `to`: where the page goes once the new worker controls it (default: reload this URL).
+ * RL3 (Jake 2026-11-09, "it should just reload"): with `within`, the hand-over gets that long. The new build's precache
+ * gets two thirds of it; an online page then skips waiting anyway (the new worker fetches what it lacks), so the tap
+ * lands on the new build. At `within` this answers false and never navigates later: the caller reloads hard. */
+async function adopt(to?: string, why = 'new build adopted', within?: number): Promise<boolean> {
+  // both clocks start at the tap, so a slow registration read or version fetch eats into the same 3 s
+  const handed = within === undefined ? activateWaiting() : Promise.race([activateWaiting(lapse(Math.round(within * 2 / 3))), lapse(within)]);
+  if (!await handed) return false;
   markReload(`${why}: the new service worker took over`);
   if (to === undefined) location.reload();
   else location.replace(to);
@@ -184,7 +194,7 @@ async function adopt(to?: string, why = 'new build adopted'): Promise<boolean> {
 }
 
 /** A completed activation serves the next document without claiming this one. */
-async function activateWaiting(): Promise<boolean> {
+async function activateWaiting(precacheDue?: Promise<false>): Promise<boolean> {
   if (!sw || !swAllowed()) return false;
   let registration: ServiceWorkerRegistration | undefined;
   try { registration = await sw.getRegistration(); } catch { return false; }
@@ -198,7 +208,10 @@ async function activateWaiting(): Promise<boolean> {
     || !adoptable(w) || target !== newestBuild || !matchesNewest(build, target)) return false;
   // DL1: an update installs shell-only. Adopt it only once its code is held (offline-safe next document); a failed
   // precache leaves the current worker in place and the ordinary fallback.
-  const held = await precached(w);
+  // RL5: once `precacheDue` lapses an online page goes on without the whole precache; offline it keeps waiting (adopt's deadline ends it)
+  const holding = precached(w);
+  const held = precacheDue === undefined ? await holding
+    : await Promise.race([holding, precacheDue.then(async () => navigator.onLine || await holding)]);
   // A newer build discovered while this one precached wins: re-check the newest target after the wait.
   if (!held || pageScope.disposed || pageScope.disposing || registration?.waiting !== w || !adoptable(w)
     || target !== newestBuild || !matchesNewest(build, newestBuild)) return false;

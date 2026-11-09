@@ -149,7 +149,7 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     };
     state.debug = buildDebugMenu(dbg, { onPick: paintPending });
     state.developerTools = buildDebugMenu(tools, { purpose: 'developer', onPick: paintPending });
-    listenTap(host.scope, apply, () => { state.debug?.applyPending(); state.developerTools?.applyPending(); reloadWithPicks('pause settings: apply & reload'); });
+    listenTap(host.scope, apply, () => { state.debug?.applyPending(); state.developerTools?.applyPending(); reloadWithPicks('pause settings: apply & reload', apply); });
     state.paintPendingReload = paintPending;
     paintPending(); actions.append(apply); host.hint.before(actions);
     // Review is not debug (E140): playtesters unlock notes with it, so it stays in Settings, with the Developer switch

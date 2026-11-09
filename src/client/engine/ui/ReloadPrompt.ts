@@ -2,6 +2,7 @@
 import { RELOAD_PARAM } from '../core/GpuRecovery';
 import { settingsReloadUrl } from './Settings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
+import { showReloading } from './reloadCover';
 
 interface Pose { x: number; y: number; z: number; yaw: number; pitch: number }
 let poseOf: () => Pose | null = () => null;
@@ -13,8 +14,10 @@ export function currentPose(): Pose | null { try { return poseOf(); } catch { re
 /** params that skip the title (dev / deep links): the reload drops them so it lands on the title */
 const TITLE_SKIPPERS = ['skipintro', 'tour', 'showcase', 'nolock', 'x', 'z', 'yaw', 'pitch', 'at', RELOAD_PARAM];
 
-/** reload the page with the saved picks, on the title */
-export function reloadWithPicks(why = 'reload prompt: reload now'): void {
+/** reload the page with the saved picks, on the title; `control` (the tapped button) turns into a loading button and the
+ *  full-page RELOADING cover goes up in the tap's own turn (RL3) */
+export function reloadWithPicks(why = 'reload prompt: reload now', control?: HTMLElement): void {
+  showReloading(control);
   const url = new URL(settingsReloadUrl(location.href, TITLE_SKIPPERS));
   url.searchParams.delete('v');
   leaveSaved(() => { markReload(why); location.replace(url.toString()); });

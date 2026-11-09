@@ -7,6 +7,10 @@
    negative right margin cancels the trailing letter-spacing. ─── prefix ws-update- ─── */
 .ws-update { position: fixed; right: 44px; top: var(--ws-pill-line, calc(19.5px + env(safe-area-inset-top, 0px))); transform: translateY(-50%); z-index: calc(var(--ws-layer-modal) + 0); display: none; align-items: center; gap: 6px; box-sizing: border-box; height: 19px; padding: 0 8px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
 .ws-update.visible { display: flex; }
+/* RL1 (Jake 2026-11-09: "i just dont think i can press the reload button"): the tag stays small, its hit area does not —
+   an invisible frame takes the tap target to 45 px tall (19 + 2 × 13) and 12 px wider, Apple's 44 pt minimum */
+.ws-update::before { content: ''; position: absolute; inset: -13px -6px; }
+.ws-update[data-reloading] { color: var(--ws-cyan); border-color: var(--ws-cyan); cursor: default; }
 .ws-update [data-el='text'] { margin-right: -0.14em; text-box: trim-both cap alphabetic; }
 .ws-update .ws-update-dot { width: 4px; height: 4px; background: rgba(196, 220, 232, 0.35); }
 .ws-update.newer { color: var(--ws-cyan); border-color: var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.3); }

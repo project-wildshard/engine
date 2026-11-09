@@ -13,12 +13,13 @@ import { engineString } from '../../../shared/engine/strings';
  *
  * E176 (Jake): the in-game PAUSE menu carries it too, at the same screen corner as the title's — on the phone the pause
  * menu is the only chrome you can reach once you are in the world, so that is where a waiting deploy has to be tappable.
- * A tap reloads wherever the pill is (title; elsewhere after a confirming second tap, G877; 2026-10-29 P0).
+ * One tap reloads wherever the pill is (RL3, Jake 2026-11-09: "i sometimes see confirm reload"; G877's arm-then-confirm is gone).
  * It sits over the menu overlay (z 80 vs 70) and publishes `--ws-pill` on <html>, which is the band gmenu.css keeps free
  * above the sheet so the pill never lands on CLOSE.
  */
 import { isDev, onDev } from '../core/devMode';
 import { leaveSaved, markReload } from '../boot/lastEnd';
+import { RELOAD_FALLBACK_MS, reloadingLine, showReloading } from './reloadCover';
 
 
 // The update pill exists before content is selected; keep App and Three out of the entry graph.
@@ -37,49 +38,38 @@ hudSlots.widget('band.1', el, 0, scope, document.body);
 
 let busy = false;
 let newer = false;
-/** RL2 (RELOAD = reload): the pill's tap (the title's, or the confirmed second tap elsewhere, `tap` below) reloads; the
- *  title loads a fresh `/`, anywhere else the page reloads where it is. No cover, no progress text, no automatic reload.
+/** RL2 (RELOAD = reload): the pill's tap reloads; the title loads a fresh `/`, anywhere else the page reloads where it is.
+ *  RL3 (Jake 2026-11-09: "i press it i get no feedback", "I need the full page loading modal"): the tap's own turn turns
+ *  the pill into a loading button and puts the full-page RELOADING cover up (src/client/engine/ui/reloadCover.ts), before
+ *  the save, the worker or anything else is awaited. The cover stays until the page unloads.
  *  QC3: a waiting worker is activated first (SKIP_WAITING, then its `activated` state) so the next document is the new
- *  build's and the pill goes dark; reloading in the same turn left the old worker serving it and the pill lit forever.
- *  Nothing to adopt (no worker, or it retired) is a plain reload. */
+ *  build's and the pill goes dark. RL3: that hand-over gets RELOAD_FALLBACK_MS; past it the page reloads hard and the
+ *  cover says so. Nothing to adopt (no worker, or it retired) is a plain reload. */
 function reload(): void {
   if (busy) return;
   busy = true;
+  showReloading(el, newer ? engineString('s_reloading_update') : '');
   const title = titleBoundary(), sw = window.__ws_sw;
+  let gone = false;
   const plain = (): void => {
+    if (gone) return;
+    gone = true;
     if (title) { markReload('update at title'); location.replace('/'); }
     else { markReload('update tapped'); location.reload(); }
   };
   if (sw === undefined) { leaveSaved(plain); return; }
-  leaveSaved(() => { void sw.adopt(title ? '/' : undefined, title ? 'update at title' : 'update tapped')
-    .then(sent => { if (!sent) plain(); return undefined; }, plain); });
+  leaveSaved(() => {
+    const asked = diagnosticNow();
+    // the hand-over ran out of time (not merely "nothing to adopt"): say so, in amber, on the way out
+    const hard = (): void => { if (diagnosticNow() - asked >= RELOAD_FALLBACK_MS - 50) reloadingLine(engineString('s_reloading_slow'), 'slow'); plain(); };
+    void sw.adopt(title ? '/' : undefined, title ? 'update at title' : 'update tapped', RELOAD_FALLBACK_MS)
+      .then(sent => { if (sent) gone = true; else hard(); return undefined; }, hard);
+  });
 }
 // pointerup as well as click: iOS drops the synthesized click when a tap jitters (index.html cancels touchmove for the
 // rubber-band), so the pill answers the lift itself; `busy` keeps the pair from running twice
-scope.listen(el, 'pointerup', tap);
-scope.listen(el, 'click', tap);
-
-// G877 (Jake 2026-10-29): on the title one tap reloads; anywhere else (loading screen, pause, play) the first tap arms
-// "Confirm reload", a second tap reloads, and the pill reverts after CONFIRM_MS without one
-const CONFIRM_MS = 4000, SAME_TAP_MS = 400;
-let armedAt = -1, disarm: (() => void) | null = null;
-function tap(): void {
-  if (busy) return;
-  if (titleBoundary()) { reload(); return; }
-  const now = diagnosticNow();
-  if (armedAt < 0) {
-    armedAt = now; el.classList.add('confirm');
-    const text = el.querySelector('[data-el="text"]');
-    if (text !== null) text.textContent = engineString('s_update_confirm');
-    const timer = scope.child('update.confirm');
-    timer.timeout(CONFIRM_MS, () => { armedAt = -1; el.classList.remove('confirm'); paint(); });
-    disarm = () => { timer.dispose(); };
-    return;
-  }
-  if (now - armedAt < SAME_TAP_MS) return; // the click that follows the same tap's pointerup
-  armedAt = -1; disarm?.(); disarm = null; el.classList.remove('confirm');
-  reload();
-}
+scope.listen(el, 'pointerup', reload);
+scope.listen(el, 'click', reload);
 
 let newLabel = '';
 function titleBoundary(): boolean {
@@ -88,7 +78,7 @@ function titleBoundary(): boolean {
 /** the pill's words: a player reads "New version", a developer the build ids */
 function paint(): void {
   const text = el.querySelector('[data-el="text"]');
-  if (!text || busy || armedAt >= 0) return;
+  if (!text || busy) return;
   text.textContent = !newer ? engineString('s_9e4fe13a912d', [sha]) : isDev()
     ? engineString('s_update_next_boundary_dev', [newLabel]) : engineString('s_update_next_boundary');
 }

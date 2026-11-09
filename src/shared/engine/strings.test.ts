@@ -21,7 +21,7 @@ test('every shipped engine label retains its original complete text and placehol
 });
 
 test('live overrides preserve Unicode, malformed placeholders, repeated reads and native coercion failures', () => {
-  const name: EngineStringKey = 's_update_confirm', failure = new Error('original argument coercion');
+  const name: EngineStringKey = 's_reloading', failure = new Error('original argument coercion');
   try {
     for (const text of ['plain label', '', 'emoji 🌊', 'literal ⟦x⟧', 'open ⟦', '⟦0⟧/⟦00⟧/⟦1⟧/⟦99⟧', '⟦0⟧⟦0⟧', '$& ⟦1⟧']) {
       installEngineStrings({ [name]: text });
