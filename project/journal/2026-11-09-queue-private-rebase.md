@@ -41,3 +41,9 @@ validation revisions as well as renderer revisions. A further real
 single-renderer-conflict case reproduces the clean validation stamp
 changing during official regeneration: stage both officially generated
 paths, never any source. Old red/new green3.04s. No second review round.
+
+The final reviewed source after the FL18 upstream rebase has renderer
+3ddf24bc11f420c6e0e1ba9e9b5251259ab5b09fe308627c92a91267e95f5b1c
+and unchanged admission02bbb58af0931acf4468391a8002808234c25210b864cf6e4b5c3f7f4aceb8e1.
+Original FIFO and two-enqueuer environment proofs remain green. Normal
+full queue publication and hosted green are still required.
