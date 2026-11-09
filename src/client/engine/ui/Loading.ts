@@ -616,9 +616,11 @@ export class Loading {
   /** LS4: everything the card leaves out, for Jake to paste. The full LS1 timeline rides at the end. */
   diagnosticsText(): string {
     const localTiming = bootTiming()?.read(), timing=safeBootDiagnostics(localTiming), transfer = this.downloadProgress(), times = this.phaseTimes();
-    const all = this.timeline.snapshot();
+    const all = this.timeline.snapshot(), summary = timing?.['summary'];
     const lines = [
       `Wildshard boot diagnostics · ${new Date().toISOString()}`,
+      // LD3 (J208): a human reads the cause first; the same lines lead the JSON below
+      ...(Array.isArray(summary) ? summary.filter((line): line is string => typeof line === 'string') : []),
       `build ${diagnosticBuild(localTiming?.build)} · ${this.tierText()} · ${innerWidth}x${innerHeight} @${devicePixelRatio}x`,
       `total ${seconds(times.total)} · start ${seconds(times.start)} · download ${seconds(times.download)} · load ${seconds(times.load)}${this.finished ? '' : ' · not ready'}`,
       `download ${loadingCacheText(transfer)} · files ${transfer.filesDone} of ${transfer.filesTotal} · ${transfer.complete ? 'complete' : 'open'}${transfer.error === null ? '' : ' · error (private text omitted)'}`,
@@ -626,7 +628,7 @@ export class Loading {
       'load rows:',
       ...all.rows.map(row => `  ${row.number}. ${diagnosticStep(row.key,row.number)} · ${row.state} · ${Math.round(row.ms)} ms`),
       ...all.gaps.map(gap => `  gap · ${gap.state} · ${Math.round(gap.ms)} ms`),
-      'URLs use local report IDs; unrestricted names, details and errors are omitted.',
+      'This page\'s files are named by path; other URLs use local report IDs; free text, details and errors are omitted.',
       'timeline (LS1):',
       JSON.stringify(timing ?? null),
     ];

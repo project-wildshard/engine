@@ -1,8 +1,9 @@
 import type {BootTiming} from '../../../shared/engine/boot/timing';
 
 /** Clipboard is a trust boundary. The local collector stays complete; only this
- * explicit projection may leave it. URLs become per-report IDs and arbitrary
- * error/detail/worker/input strings never become export labels. */
+ * explicit projection may leave it. LD3 (J208): this page's own files are named by their path (they are public, and a
+ * `resource-N` the reader cannot map found no cause in Jake's 52 s reload); another origin's URL becomes a per-report ID,
+ * a query keeps only a content `v`, and arbitrary error/detail/worker/input strings never become export labels. */
 const OPERATIONS=new Set([
   'document:navigation-and-html','app:html-script-start','app:collector-installed','app:document-and-module-graph','app:entry-and-session-preparation','app:page-entry-import',
   'app:dom-content-loaded','app:shell-dom-ready','app:first-paint-opportunity','app:entry-body','app:loading-adopt',
@@ -44,8 +45,58 @@ function numbers(value:unknown,keys:readonly string[]):Record<string,number|bool
 const realm=(value:unknown):string=>typeof value==='string'&&/^(?:page|service-worker|worker:[0-9]{1,5})$/u.test(value)?value:'other';
 /** Only build-system shaped public IDs are labels; arbitrary identifiers are not. */
 export const diagnosticBuild=(value:unknown):string=>typeof value==='string'&&/^[a-f0-9]{7,40}-[a-z0-9]{6,16}$/u.test(value)?value:'unknown';
+/** LD3: an engine-shaped operation keeps its name (`app:`, `game-stage:`, `sw:` ... and short code keys): only a known
+ *  prefix, with no URL, space or free text. Unknown shapes still fall back to `operation-N`. */
+const NAMED_OPERATION=/^(?:app|game-stage|stage|worker|server|sw|download|boot|grid|loading|document)(?::[a-zA-Z0-9][a-zA-Z0-9._-]{0,47}){1,3}$/u;
+/** LD3: a loading wait's label is engine text ('Spawn download', 'Read Product descriptor'); a URL inside it is named
+ *  as any resource is, and anything outside this plain alphabet stays private. */
+const WAIT_LABEL=/^[A-Za-z0-9 .,:/()·?=…_-]{1,160}$/u;
+const SAFE_SEGMENT=/^[A-Za-z0-9._-]{1,96}$/u, CONTENT_V=/^[a-f0-9]{8,64}$/u;
+/** LD3: this page's own file as its path (opaque segments elided), or null for another origin, a credential or a
+ *  non-http URL: those keep a per-report ID. */
+export function diagnosticPath(value:string,origin:string|undefined=typeof location==='undefined'?undefined:location.origin):string|null{
+  if(origin===undefined||!/^https?:/u.test(origin))return null;
+  let parsed:URL;try{parsed=new URL(value,origin);}catch{return null;}
+  if(!/^https?:$/u.test(parsed.protocol)||parsed.origin!==origin||parsed.username!==''||parsed.password!=='')return null;
+  const segments=parsed.pathname.split('/').slice(1);
+  if(segments[0]==='api')return '/api/…';
+  const path=`/${segments.map(segment=>segment===''||SAFE_SEGMENT.test(segment)?segment:'…').join('/')}`;
+  const version=parsed.searchParams.get('v');
+  return `${path}${version!==null&&CONTENT_V.test(version)?`?v=${version}`:''}`.slice(0,200);
+}
 /** Authored/custom names and details remain local. Known engine stage keys remain useful. */
 export function diagnosticStep(value:string,index:number):string{return STEPS.has(value)?value:`Step ${index}`;}
+
+/** What the export keeps: this page's own paths; other URLs, errors and free text stay on the device. */
+export const DIAGNOSTIC_PRIVACY='own-paths-other-urls-and-free-text-removed';
+interface SummaryEntry {readonly realm:string;readonly operation:string;readonly start:number|null;readonly end:number|null}
+interface SummaryResource {readonly realm:string;readonly url:string|null;readonly startTime?:number|boolean|null}
+/** Spans that only repeat other spans (the whole Start, the document) never name the slowest step. */
+const UMBRELLAS=new Set(['app:entry-and-session-preparation','app:document-and-module-graph','game-stage:modules','document:navigation-and-html']);
+const secondsText=(ms:number):string=>`${(ms/1000).toFixed(1)} s`;
+/** LD3 (J208): the paste's first lines, for a human. The slowest page step, the longest page span inside it, and the
+ *  longest stretch inside it in which no page request started. Only collector facts, named as the export names them;
+ *  page clock only (a service worker's or worker's clock has its own origin). */
+export function diagnosticSummary(entries:readonly SummaryEntry[],resources:readonly SummaryResource[]):string[]{
+  const spans=entries.flatMap(row=>row.realm==='page'&&row.start!==null&&row.end!==null&&row.end>row.start?[{operation:row.operation,start:row.start,end:row.end,ms:row.end-row.start}]:[]);
+  const steps=spans.filter(row=>/^(?:app|game-stage):/u.test(row.operation)&&!UMBRELLAS.has(row.operation)).sort((a,b)=>b.ms-a.ms);
+  const slowest=steps[0];
+  if(slowest===undefined)return ['summary: no completed page step'];
+  const lines=[`summary: slowest step ${slowest.operation} · ${secondsText(slowest.ms)} (${secondsText(slowest.start)} → ${secondsText(slowest.end)})`];
+  const inside=spans.filter(row=>row!==slowest&&row.start>=slowest.start&&row.end<=slowest.end&&row.ms<slowest.ms).sort((a,b)=>b.ms-a.ms)[0];
+  if(inside!==undefined)lines.push(`  longest inside it: ${inside.operation} · ${secondsText(inside.ms)} (${secondsText(inside.start)} → ${secondsText(inside.end)})`);
+  const starts=resources.flatMap(row=>row.realm==='page'&&typeof row.startTime==='number'&&row.startTime>=slowest.start&&row.startTime<=slowest.end?[{at:row.startTime,url:row.url}]:[]).sort((a,b)=>a.at-b.at);
+  let gap={from:slowest.start,to:slowest.end,next:null as string|null};
+  for(let index=0,from=slowest.start;index<=starts.length;index++){
+    const next=starts[index],to=next?.at??slowest.end;
+    if(to-from>gap.to-gap.from||index===0)gap={from,to,next:next?.url??null};
+    from=to;
+  }
+  if(gap.to-gap.from>=1000)lines.push(`  no page request started for ${secondsText(gap.to-gap.from)} (${secondsText(gap.from)} → ${secondsText(gap.to)})${gap.next===null?'':`; the next was ${gap.next}`}`);
+  const others=steps.slice(1,4).map(row=>`${row.operation} ${secondsText(row.ms)}`);
+  if(others.length>0)lines.push(`  next slowest: ${others.join(' · ')}`);
+  return lines;
+}
 
 /** Preserve every event/resource/counter and its numeric facts, without exporting
  * arbitrary object payloads. No input is mutated and no network/storage is used. */
@@ -54,6 +105,7 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
   const source=record(timing),references=new Map<string,string>();
   const url=(value:unknown):string|null=>{
     if(typeof value!=='string'||value==='')return null;
+    const own=diagnosticPath(value);if(own!==null)return own;
     const held=references.get(value);if(held!==undefined)return held;
     const id=`resource-${references.size+1}`;references.set(value,id);return id;
   };
@@ -62,6 +114,11 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
     if(OPERATIONS.has(value)||/^worker:[0-9]{1,5}:messages-received$/u.test(value)
       ||/^(?:worker:[0-9]{1,5}:)?(?:atomic:completed|resource:completed|server:verified-input-bytes)$/u.test(value))return value;
     if(value.startsWith('game-stage:')&&STEPS.has(value.slice(11)))return value;
+    if(NAMED_OPERATION.test(value))return value;
+    if(value.startsWith('wait:')){
+      const label=value.slice(5).replaceAll(/https?:\/\/\S+/gu,found=>url(found)??'resource');
+      if(WAIT_LABEL.test(label))return `wait:${label}`;
+    }
     const part=/^((?:worker:[0-9]{1,5}:)?(?:download:|server:fetch-headers:|server:read-body:|server:verified-input:))(.+)$/u.exec(value);
     return part===null?fallback:`${part[1]??''}${url(part[2])??'resource'}`;
   };
@@ -99,7 +156,7 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
     name:oneOf(row['name'],['visibilitychange','pagehide','pageshow','other'] as const,'other'),
     visibility:oneOf(row['visibility'],['visible','hidden','prerender','other'] as const,'other')});});
   const handoff=record(source['handoff']),worker=record(source['serviceWorker']),gap=record(source['largestGap']);
-  return {version:1,exportPrivacy:'urls-and-free-text-removed',build:diagnosticBuild(source['build']),attemptCount:number(source['attemptCount']),
+  return {version:1,exportPrivacy:DIAGNOSTIC_PRIVACY,summary:diagnosticSummary(entries.map(row=>({realm:row.realm,operation:row.operation,start:row.start,end:row.end})),resources),build:diagnosticBuild(source['build']),attemptCount:number(source['attemptCount']),
     timeOrigin:number(source['timeOrigin']),entries,resources,counters,realms,navigation:numbers(source['navigation'],RESOURCE_NUMBERS),
     lifecycle,paints:list(source['paints']).map(value=>{const row=record(value);return {name:oneOf(row['name'],['first-paint','first-contentful-paint','unavailable','other'] as const,'other'),start:number(row['start'])};}),
     overflow:Object.values(record(source['overflow'])).map(value=>typeof value==='boolean'?value:number(value)),

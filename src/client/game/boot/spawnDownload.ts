@@ -92,6 +92,8 @@ const partPause = (): Promise<void> => new Promise(resolve => { AbortSignal.time
  *  whole set, as every read did before DL11. Level reads: `/shardfiles/` and `/assets/` content, not spawn files, boot
  *  tables or code. The shell's art loads through `<img>`, which no fetch layer sees. */
 let unlistedWait: Promise<void> | null = null;
+/** LD2: warm checks still running (a listed read waits on its own lookup while one is). */
+let checksOpen = 0;
 /** DL21 (sp-o1): a read held for the whole set is what its step truly waits on, so the card names it ('Spawn download ·
  *  n of m MB', not the first file of the step). This leaf imports no engine: the composition root lends the wait registry. */
 let holdObserver: ((held: Promise<void>, path: string) => Promise<void>) | null = null;
@@ -119,7 +121,8 @@ function installMemberLayer(): boolean {
       // the file's download first: a packed member's bytes are keyed only once its part starts (sp-x2's review)
       const pending = jobWaits?.get(url);
       if (pending !== undefined) jobDemand?.(url);
-      if (pending !== undefined) await pending;
+      // LD2: a listed read held while this device's copies are still being checked is named on the card and timeline
+      if (pending !== undefined) await (checksOpen > 0 && holdObserver !== null ? holdObserver(pending.then(() => undefined), address.pathname) : pending);
       else if (unlistedWait !== null && address.origin === new URL(document.baseURI).origin && levelRead(address.pathname)) {
         // held for the whole set: named on the page's timeline, so a step it stalls shows which file its spawn list is
         // missing (Pine's sky step, DL11)
@@ -435,22 +438,29 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         if (controller.signal.aborted || completedBytes - toldBytes < address.totalBytes / CHECK_STEPS) return;
         toldBytes = completedBytes; progressKnown = true; publish();
       };
-      await Promise.all(files.map(async file => {
-        if (!heldFiles.has(file.url)) return;
-        if (await heldMember(await ports.cached(file.url), file.bytes)) { looked(file); return; }
-        heldFiles.delete(file.url); unfit.add(file.url);
-      }));
-      controller.signal.throwIfAborted();
-      const rest = files.filter(file => !heldFiles.has(file.url) && !unfit.has(file.url));
-      const present = heldFiles.size > 0 && rest.length <= 64 ? undefined : await ports.present?.(rest.map(file => file.url)).catch(() => undefined);
-      // Optional portable metadata adapters may answer known hits. The native
-      // adapter deliberately uses exact per-file checks instead of a census.
-      await Promise.all(rest.map(async file => {
-        if (present?.has(file.url) === true) { credit(file); return; }
-        const hit = await ports.cached(file.url);
-        if (hit?.status === 200 && !/\btext\/html\b/iu.test(hit.headers.get('content-type') ?? '')) looked(file);
-      }));
-      controller.signal.throwIfAborted();
+      // LD2 (J208): the warm check is a named span, so a paste says what a Start that sits on it waits on (v0.1.2's
+      // whole-cache census held Jake's cached reload 32.8 s with no request and no name). Open checks name listed reads.
+      const checkTiming = bootTiming(), checkId = checkTiming?.begin('download:cache-check', {files: files.length});
+      let checkResult = 'failed'; checksOpen++;
+      try {
+        await Promise.all(files.map(async file => {
+          if (!heldFiles.has(file.url)) return;
+          if (await heldMember(await ports.cached(file.url), file.bytes)) { looked(file); return; }
+          heldFiles.delete(file.url); unfit.add(file.url);
+        }));
+        controller.signal.throwIfAborted();
+        const rest = files.filter(file => !heldFiles.has(file.url) && !unfit.has(file.url));
+        const present = heldFiles.size > 0 && rest.length <= 64 ? undefined : await ports.present?.(rest.map(file => file.url)).catch(() => undefined);
+        // Optional portable metadata adapters may answer known hits. The native
+        // adapter deliberately uses exact per-file checks instead of a census.
+        await Promise.all(rest.map(async file => {
+          if (present?.has(file.url) === true) { credit(file); return; }
+          const hit = await ports.cached(file.url);
+          if (hit?.status === 200 && !/\btext\/html\b/iu.test(hit.headers.get('content-type') ?? '')) looked(file);
+        }));
+        controller.signal.throwIfAborted();
+        checkResult = 'complete';
+      } finally { checksOpen--; if (checkId !== undefined) checkTiming?.end(checkId, checkResult); }
       const missing = files.filter(file => !counted.has(file.url));
       progressKnown = true;
       if (missing.length === 0) { complete = true; if (jobWaits === waits) { jobWaits = null; jobDemand = null; } publish(); return; }

@@ -211,7 +211,7 @@ try {
         const entries=parsed.entries.map((/** @type {{id:number,start:number,end:number|null}} */{id,start,end})=>({id,start,end}));
         const complete=JSON.stringify(entries)===JSON.stringify(expected.entries)&&parsed.resources.length===expected.resources
           &&Object.keys(parsed.counters).length===expected.counters&&parsed.realms.length===expected.realms;
-        return {ok:complete&&parsed.exportPrivacy==='urls-and-free-text-removed'&&document.querySelector('.ws-load-copy')?.textContent==='Copied',
+        return {ok:complete&&parsed.exportPrivacy==='own-paths-other-urls-and-free-text-removed'&&document.querySelector('.ws-load-copy')?.textContent==='Copied',
           reason:complete?`complete safe report: ${entries.length} events`:'timeline or numeric facts truncated'};
       });
       if(!copied.ok)faults.push(`copy diagnostics: ${copied.reason}`);

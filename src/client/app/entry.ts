@@ -116,6 +116,8 @@ async function enterPage(): Promise<unknown> {
       if (typeof slug === 'string') {
         const mode = menu.gridMode(menu.DEVSERVER), flow = pageGridRecovery() !== null || pendingGridEntry(slug) ? 'grid' : 'client';
         spawn.setSpawnPacks(runtimePacksOn());
+        // LD2 (J208): a Start read this download holds (selected discovery behind the warm check) is named from the tap
+        spawn.observeSpawnHolds((held, path) => waitFor('Spawn download', held, 'file', `spawn-download:${path}`));
         const job = spawn.startSpawnDownload(slug, flow, tier.TIER, `${Number(mode.developer)}${Number(mode.devserver)}${Number(mode.nineDragon)}`);
         const card = document.querySelector<HTMLElement>('.ws-load');
         if (job !== null && card !== null) {
