@@ -83,6 +83,14 @@ check_listeners() {
 check_node() {
   "$NODE" --version 2>/dev/null | grep -qE '^v(2[4-9]|[3-9][0-9])\.'
 }
+wait_health() {
+  local port=$1 attempt
+  for ((attempt=1; attempt<=20; attempt++)); do
+    if curl -fsS --connect-timeout 1 --max-time 2 "http://127.0.0.1:$port/health" >/dev/null 2>&1; then return 0; fi
+    if [ "$attempt" -lt 20 ]; then sleep 0.5; fi
+  done
+  return 1
+}
 check_postgres() {
   if [ "$(id -u)" != 0 ]; then
     say 'cannot verify' 'PostgreSQL role, saves databases, hardening and protected folders (needs sudo)'; return
@@ -343,7 +351,7 @@ for channel in production staging; do
   fi
 done
 for port in "$PROD_PORT" "$STAGING_PORT"; do
-  if ! curl -fsS -m 5 "http://127.0.0.1:$port/health" >/dev/null; then say stop "Our loopback health owner on $port is not ready; no new Funnel was added"; exit 1; fi
+  if ! wait_health "$port"; then say stop "Our loopback health owner on $port is not ready after 20 bounded probes; no new Funnel was added"; exit 1; fi
 done
 network_guard() {
   tailscale serve status --json | "$NODE" "$HERE/setup-state.mjs" network "$NODE_NAME" "${1:-}"

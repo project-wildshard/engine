@@ -46,6 +46,13 @@ test('preflight checks the exact service runtime instead of PATH node', () => {
   expect(checked.status).not.toBe(0);
 });
 
+test('health readiness waits for delayed startup and stops after twenty failed probes', () => {
+  const check = (readyAt: number): ReturnType<typeof spawnSync> => spawnSync('bash', ['-c', `calls=0 delays=0 READY_AT=$1; sleep() { delays=$((delays+1)); }; curl() { calls=$((calls+1)); [ "$calls" -ge "$READY_AT" ]; }; ${definition('wait_health')}\nif wait_health 8791; then result=ready; else result=timeout; fi; printf '%s %s %s' "$result" "$calls" "$delays"`, 'wait-health', String(readyAt)], { encoding: 'utf8' });
+  expect(check(1).stdout).toBe('ready 1 0');
+  expect(check(3).stdout).toBe('ready 3 2');
+  expect(check(100).stdout).toBe('timeout 20 19');
+});
+
 test('unprivileged Postgres inspection reports unknown and never guesses a missing role', () => {
   const checked = spawnSync('bash', ['-c', `id() { printf 1000; }; say() { printf '%s %s\\n' "$1" "$2"; }; pg() { exit 90; }; ${definition('check_postgres')}\ncheck_postgres`], { encoding: 'utf8' });
   expect(checked.status).toBe(0); expect(checked.stdout).toContain('cannot verify'); expect(checked.stdout).not.toContain('would');
