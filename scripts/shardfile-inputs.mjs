@@ -52,7 +52,7 @@ function localPath(target) {
 /** @param {string} root @param {string} path */
 function inside(root, path) {
   const file = relative(root, path).split(sep).join('/');
-  if (file === '' || file.startsWith('../') || isAbsolute(file)) return undefined;
+  if (file === '' || file === '..' || file.startsWith('../') || isAbsolute(file)) return undefined;
   if (file.split('/').some(part => ['node_modules','.git','.cache','tmp','out','.wildshard'].includes(part))) return undefined;
   return file;
 }
@@ -94,7 +94,7 @@ function note(kind, target) {
   const loaderRead=scope.traceOnly&&kind==='F'&&path!==scope.loading;
   if((scope.observing&&!loaderRead)||kind==='I'||path===undefined)return;
   const bounded=relative(scope.root,path).split(sep).join('/');
-  const file = scope.traceOnly&&bounded!==''&&!bounded.startsWith('../')&&!isAbsolute(bounded)?bounded:inside(scope.root,path);
+  const file = scope.traceOnly&&bounded!==''&&bounded!=='..'&&!bounded.startsWith('../')&&!isAbsolute(bounded)?bounded:inside(scope.root,path);
   if(file===undefined) {
     if(kind!=='W'&&scope.traceOnly&&path!==scope.root&&!path.split(sep).includes('node_modules'))scope.opaque?.add(`external-read:${path}`);
     return;
