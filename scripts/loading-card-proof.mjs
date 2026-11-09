@@ -121,7 +121,7 @@ try {
     const browser=grid?null:await engine.launch({headless:true,...(name==='chromium'?{args:[...KEYCHAIN_ARGS, '--mute-audio']}: {})});
     try {
       const context=profile!==null?await engine.launchPersistentContext(profile,{...devices['iPhone 16 Pro'],deviceScaleFactor:2,headless:true,
-        ...(name==='chromium'?{args:['--mute-audio']}: {})}):await browser?.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
+        ...(name==='chromium'?{args:[...KEYCHAIN_ARGS, '--mute-audio']}: {})}):await browser?.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
       if(context===undefined)throw new Error('Proof context not created');
       try {
       await context.grantPermissions(name==='chromium'?['clipboard-read','clipboard-write']:['clipboard-read']);

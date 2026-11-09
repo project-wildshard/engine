@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
+import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { captureRpcObserver } from './capture-rpc.mjs';
 
 /** Bounded scheduling preserves input order and drains every started task before throwing.
@@ -39,6 +40,13 @@ async function open(root, angle, captureRpc) {
       child.once('exit', (code) => reject(new Error(`lane browser exited before launch: ${code}`)));
     });
     const browser = await chromium.connect(String(endpoint));
+    try {
+      const session = await browser.newBrowserCDPSession();
+      try {
+        const command = await session.send('Browser.getBrowserCommandLine');
+        if (!KEYCHAIN_ARGS.every(arg => command.arguments.includes(arg))) throw new Error('Lane Chromium lacks mandatory keychain flags');
+      } finally { await session.detach(); }
+    } catch (error) { await browser.close(); throw error; }
     return { browser, close: async () => {
       try { await browser.close(); } finally {
         lines.close(); child.stdin.end(); child.stdout.destroy();
