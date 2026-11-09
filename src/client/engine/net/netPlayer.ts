@@ -139,7 +139,8 @@ export class NetPlayer implements PlayerLink {
   step(input: PlayerWireInput): boolean {
     if (this.respawnHeld || this.seen === null || this.predictor.full) return false;
     if (!this.claimInputTick(0)) return false;
-    return this.sendCommand(this.hooked(this.armed(input)), true);
+    const armed = this.armed(input);
+    return this.sendCommand(armed, true, this.hooked(armed));
   }
   /** Keep sustained controls on the server's clock when GPU presentation is
    * slow. Reserve a render frame's bounded steps for presses/weapon sequences;
@@ -173,8 +174,8 @@ export class NetPlayer implements PlayerLink {
     if (tick - consumed <= reserve) return false;
     this.inputTick++; return true;
   }
-  private sendCommand(input: Parameters<NetClient['command']>[0], actions: boolean): boolean {
-    const seq = this.seq = this.client.command(input);
+  private sendCommand(input: Parameters<NetClient['command']>[0], actions: boolean, wire = input): boolean {
+    const seq = this.seq = this.client.command(wire);
     if (actions) {
       this.hookLocked = false; this.hookTarget = undefined; this.hookFired = false;
       this.frameSteps++;

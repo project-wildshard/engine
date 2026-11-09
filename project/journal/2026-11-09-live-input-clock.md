@@ -25,3 +25,14 @@ steps and positions. Release, pause/resume and capture retain their bounds.
 Existing rejoin, death, crossing and discrete-action checks also pass: 14
 cases in 1.18 s. Browser crossing and the full publication gate follow this
 source commit; they are not claimed complete here.
+
+The full immutable 243e9f7 gate caught a real regression in this refactor:
+the existing hook-wire case expected the claw's wire-only jump to stay out
+of local body prediction. It had been passed to both. Restore separate
+wire and prediction inputs; retain the original assertion and rerun it
+with the player family before the next full capture.
+
+The first exact 4ca Chromium road repeat is still red (320.9 m short at
+210 s while moving, 6.7 presented fps and about 59.95 simulation TPS).
+The native clock test does not establish that the live page timer is
+active. Trace that page path before claiming a crossing fix.
