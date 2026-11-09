@@ -358,7 +358,8 @@ export function runtimeProduct(source: Shardfile): RuntimeProduct {
  * runtime whose data client already draws the textured rest compiles just its own meshes' materials. A look built before the
  * world stage (a sky backdrop) passes the page renderer it was handed with its own scope instead of a shard context.
  */
-export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'game'> | { readonly scope: Scope; readonly renderer: Renderer }, source: Shardfile, graphs?: boolean, ids?: readonly string[]): ReturnType<typeof clientMaterials> {
+export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'game'> | { readonly scope: Scope; readonly renderer: Renderer }, source: Shardfile, graphs?: boolean, ids?: readonly string[],
+  units?: (total: number) => (done: number, detail?: string) => void): ReturnType<typeof clientMaterials> {
   const renderer = 'renderer' in ctx ? ctx.renderer : ctx.game.runtime?.world?.game.renderer;
   if (renderer === undefined) throw new Error('Runtime look materials need the world stage');
   const product = runtimeProduct(source);
@@ -375,7 +376,7 @@ export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'ga
   for (const ref of files) assets.set(ref, await product.assets.read(ref));
   for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...graphFileTextureRefs(shard.look.materials, hash => assets.get(hash))])) assets.set(ref, await product.assets.read(ref));
   if (ctx.scope.disposed) throw new Error('Runtime look scope unloaded while reading materials');
-  return clientMaterials(shard, assets, renderer, ctx.scope, { trustedGraphs: true, ...(graphs === undefined ? {} : { graphs }) });
+  return clientMaterials(shard, assets, renderer, ctx.scope, { trustedGraphs: true, ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) });
 }
 
 /** Prepare the requested original graph materials for resident effects and boss storms. */

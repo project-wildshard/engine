@@ -78,10 +78,16 @@ export function frameCapAnchor(lastDrawn: number, t: number, cap: number): numbe
 }
 /** E153: the boot's warm-up draws of the world, one per quarter-turn (Game.warmTurn) */
 const WARM_TURNS = 4;
-/** LS8 (J188): a first-frame slice whose fence took longer than this narrows every later slice to one new drawable, so
- *  a slow GPU (CI's SwiftShader at 4x CPU: 1.7-4.9 s for an eight-drawable slice of Driftwood) reports each pipeline
- *  build as it completes. A fast GPU never trips it and keeps its slice count. */
-const FIRST_DRAW_NARROW = { afterMs: 400, budget: { drawables: 1, newMaterials: 1, bufferBytes: 4_000_000 } } as const;
+/** LS8 (J188, J204): a first-frame slice whose fence took longer than this narrows every later slice to one new drawable,
+ *  so a slow GPU (CI's SwiftShader at 4x CPU: 1.7-4.9 s for an eight-drawable slice of Driftwood) reports each pipeline
+ *  build as it completes. A GPU the shaders step measured slow (`firstFrame`'s `narrow`) starts narrow instead: the slow
+ *  slice that trips the fallback has already held the bar (Driftwood's fifth, two new materials, 2.3 s). */
+const FIRST_DRAW_NARROW = { afterMs: 400, budget: { drawables: 1, newMaterials: 1, newBindings: 1, bufferBytes: 4_000_000 } } as const;
+/** LS8 (J204, "weight steps by measured cost per kind"): one first-frame unit of each kind, in measured seconds, so the
+ *  step's bar share follows where its time goes. Driftwood Isle, headless Chromium at 4x CPU (SwiftShader, the calibration
+ *  profile of loadingPaths.ts), loading-card-proof --throttle --dump, 2026-11-09: 264 world drawables 41.8 s, 25 shadow
+ *  maps 3.8 s, 5 views 0.96 s, 2 post passes 0.32 s. */
+const FIRST_FRAME_SECONDS = { drawable: 0.158, shadowMap: 0.152, view: 0.192, postPass: 0.158 } as const;
 /** the three slots of one fixed step, in order: `pre` readies the world, `step` advances it, `post` moves against it */
 export type FixedPhase = 'pre' | 'step' | 'post';
 
@@ -1209,13 +1215,13 @@ export class Game {
    * composer draw were each one GPU flush: 2.0 s and 3.3 s on Sunscar Dunes in headless Chromium (SwiftShader), with
    * the page's main thread blocked in the canvas read-back for both.
    */
-  async firstFrame(onProgress?: (done: number, total: number, detail: string) => void): Promise<void> {
+  async firstFrame(onProgress?: (done: number, total: number, detail: string) => void, narrow = false): Promise<void> {
     // every wait here, fence or frame, settles when the game's scope is disposed; the finally releases every queued sync
     const units = new FencedUnits(this.renderer.getContext(), this.engineScope);
-    try { await this.firstFrameUnits(units, onProgress); } finally { units.dispose(); }
+    try { await this.firstFrameUnits(units, onProgress, narrow); } finally { units.dispose(); }
   }
 
-  private async firstFrameUnits(units: FencedUnits, onProgress?: (done: number, total: number, detail: string) => void): Promise<void> {
+  private async firstFrameUnits(units: FencedUnits, onProgress: ((done: number, total: number, detail: string) => void) | undefined, narrow: boolean): Promise<void> {
     const frame = (): Promise<void> => units.frame(); // rAF alone resumes before the paint
     // Large instanced worlds may request culling before the first draw and fewer warm views.
     const tracedBoot = bootTraceActive();
@@ -1228,10 +1234,11 @@ export class Game {
     // each boot draw is its shadow maps, one a unit, then the view (fencedDraw)
     const perDraw = this.shadowCasters(this.camera).length + 1;
     // LS8: the world's first draws count by drawable, each credited when the fence after its slice signals, so a slice
-    // narrowed after a slow one (FIRST_DRAW_NARROW) changes no total
-    const total = (): number => draws + perDraw * (1 + warmTurns) + postUnits;
+    // narrowed after a slow one (FIRST_DRAW_NARROW) changes no total. Each unit weighs its kind's measured seconds (J204).
+    const W = FIRST_FRAME_SECONDS, fullDraw = (perDraw - 1) * W.shadowMap + W.view;
+    const total = (): number => draws * W.drawable + fullDraw * (1 + warmTurns) + postUnits * W.postPass;
     const drawUnits = (base: number, label: string) => (done: number, detail: string): void => {
-      onProgress?.(base + Math.min(done, perDraw), total(), `${label} · ${detail}`);
+      onProgress?.(base + Math.min(done, perDraw - 1) * W.shadowMap + (done >= perDraw ? W.view : 0), total(), `${label} · ${detail}`);
     };
     await frame();
     checkpoint('cull:before');
@@ -1254,17 +1261,19 @@ export class Game {
           drew = false;
           const warmed = submitted;
           await units.submit(() => {
-            credited = warmed;
-            onProgress?.(warmed, total(), `${String(warmed)} / ${String(draws)} draws warmed`);
+            credited = warmed * W.drawable;
+            onProgress?.(credited, total(), `${String(warmed)} / ${String(draws)} draws warmed`);
           });
         },
         // a narrowed plan reports again: the count already credited stands
         { onPlan: (_original, selected) => { onProgress?.(credited, total(), `${String(selected)} world slices`); },
           onProgress: (done, count) => { drew ||= done > submitted; submitted = done; draws = count; },
-          narrow: FIRST_DRAW_NARROW });
+          // no widening when narrow: D12 merges slices by new material only, and three new layouts of one material (the
+          // view-model swords and arms) shared one 2.3 s SwiftShader frame
+          ...(narrow ? { budget: FIRST_DRAW_NARROW.budget } : { narrow: FIRST_DRAW_NARROW }) });
       checkpoint('world-pipelines:submitted');
     }
-    const drawables = draws;
+    const drawables = draws * W.drawable;
     units.mark(() => { onProgress?.(drawables, total(), 'world + shadows'); });
     checkpoint('world:before');
     await this.fencedDraw(this.camera, target, units, drawUnits(drawables, 'world + shadows'));
@@ -1273,16 +1282,16 @@ export class Game {
     const yaws = this.warmTurnYaws();
     for (let k = 1; k <= yaws.length; k++) {
       const label = `world, turned ${String(k * 360 / WARM_TURNS)}°`;
-      await this.warmTurn(yaws[k - 1] ?? 0, target, units, drawUnits(drawables + k * perDraw, label));
+      await this.warmTurn(yaws[k - 1] ?? 0, target, units, drawUnits(drawables + k * fullDraw, label));
     }
-    const postFrom = drawables + perDraw * (1 + warmTurns);
+    const postFrom = drawables + fullDraw * (1 + warmTurns);
     this.lookStrategy?.frame?.(0.016, 0);
     checkpoint('post:before');
     if (!splitPost) {
       if (tracedBoot) traceBootPasses(this.composer.passes, checkpoint, () => { this.composer.render(0.016); });
       else this.composer.render(0.016);
       checkpoint('post:submitted');
-      await units.submit(() => { onProgress?.(postFrom + 1, total(), 'post chain'); });
+      await units.submit(() => { onProgress?.(postFrom + W.postPass, total(), 'post chain'); });
     } else {
       // EffectComposer.render's own loop (postprocessing 6.39: render, depth blit, swap), a pass per completed fence
       const composer = this.composer, renderer = this.renderer;
@@ -1296,7 +1305,7 @@ export class Game {
         }
         if (pass.needsSwap) [input, output] = [output, input];
         checkpoint(`pass:${String(i)}:${pass.name}:submitted`);
-        await units.submit(() => { onProgress?.(postFrom + i + 1, total(), `post pass ${String(i + 1)} / ${String(postUnits)} · ${pass.name}`); });
+        await units.submit(() => { onProgress?.(postFrom + (i + 1) * W.postPass, total(), `post pass ${String(i + 1)} / ${String(postUnits)} · ${pass.name}`); });
       }
     }
     await units.drain();

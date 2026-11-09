@@ -1,4 +1,5 @@
 import type { Scope } from "@wildshard/engine/app/scope";
+import { loadingUnits } from "@wildshard/engine/boot/waits";
 import type { SkyBackdropContext } from "@wildshard/engine/render/look";
 import type { Shardfile } from "@wildshard/format/shardSchema";
 import type { runtimeLookMaterials } from "../shardfile/runtimeProduct";
@@ -219,5 +220,6 @@ export class ShaderFamily<P extends string = string> {
  */
 export async function lookGraphMaterials(scope: Scope, backdrop: Pick<SkyBackdropContext, 'renderer'>, source: Shardfile, ids: readonly string[]): ReturnType<typeof runtimeLookMaterials> {
   const { runtimeLookMaterials: compile } = await import('../shardfile/runtimeProduct');
-  return compile({ scope, renderer: backdrop.renderer }, source, true, ids);
+  // LS8 (J204): a backdrop builds these inside the sky step; count them on it
+  return compile({ scope, renderer: backdrop.renderer }, source, true, ids, total => loadingUnits('Sky look materials', total));
 }

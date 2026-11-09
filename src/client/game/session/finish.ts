@@ -1,5 +1,6 @@
 import type { BuiltWorld } from './context';
 import { bootMark } from '@wildshard/engine/boot/timing';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { Rng } from '@wildshard/engine/core/rng';
 import { gridCells } from '../plugin/context';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
@@ -10,7 +11,7 @@ import { app } from '@wildshard/engine/app/runtime';
 import { releaseByteCounter } from '@wildshard/engine/boot/bytes';
 import { hasLateAudio, startAudioPreload, startLateAudio, type AudioBanks } from '@wildshard/engine/boot/extras';
 import { macrotask } from '@wildshard/engine/boot/plan';
-import { loadingStage, waitFor } from '@wildshard/engine/boot/waits';
+import { loadingStage, loadingUnits, waitFor } from '@wildshard/engine/boot/waits';
 import { currentLoadingTimeline } from '@wildshard/engine/boot/timeline';
 import { startShardPrefetch } from '@wildshard/engine/boot/shardPrefetch';
 import { afterControl, reachControl } from '@wildshard/engine/boot/prefetch';
@@ -48,6 +49,10 @@ const EXPLORER_POLL_MS = 1000, EXPLORER_OPEN_MS = 30_000;
  *  it moved nothing (warm step 2.10 -> 2.17 s, f040ca2936): one material's job overruns any such slice there, and the step
  *  is its program builds' CPU, not its painted frames. */
 const BOOT_SHADER_SLICE_MS = 48;
+/** LS8 (J204): a shaders step slower than this per program it built marks a GPU that builds pipelines on the CPU, whose first
+ *  frame starts with narrow slices (Game FIRST_DRAW_NARROW). Measured on Driftwood at 4x CPU, 2026-11-09: SwiftShader 34 ms,
+ *  this Mac's Metal GPU 7 ms, WebKit 2.4 ms a program. */
+const SLOW_SHADER_MS_PER_PROGRAM = 15;
 /** QA8: link the world's programs the spawn view did not draw before the reveal, nearest first, at the in-play pace (a few
  *  programs a frame, each link polled). Only completion or owner retirement ends this loading step. */
 async function linkWorldUnderLoader(game: Awaited<ReturnType<typeof playStage>>['game'], unbuilt = false): Promise<void> {
@@ -120,6 +125,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // for this first fence; the final readyFrame fence uses the posed camera.
   await loadingStage('spawnDetail', () => prepareSpawnView(undefined, undefined, 'player'));
   try {
+    // LS8 (J204): the shaders step's measured cost per program decides how the first frame slices its draws
+    const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;
     await step('shaders', async (p) => {
       // Until the first systems step the camera stands at the origin (Nine: 127 m below the spawn's eye, at 72° not the
       // held 93°) and placed copies hold none until their first cull: one step without its draw poses the spawn view,
@@ -139,14 +146,18 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       }, { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, turns: game.warmTurnYaws() });
     });
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during shader compile');
+    const shaderMs = diagnosticNow() - shadersAt, built = (game.renderer.info.programs?.length ?? 0) - programsBefore;
+    const slowGpu = built > 0 && shaderMs / built > SLOW_SHADER_MS_PER_PROGRAM;
+    bootMark('app:first-frame-plan', { shaderMs: Math.round(shaderMs), programs: built, narrow: slowGpu });
     await step('firstFrame', async (p) => {
       let passes = 0;
+      // its units are measured seconds (J204), so the counts live in `what`, not in d / n
       await game.firstFrame((d, n, what) => {
         bootMark('app:first-frame-work-count', { done: d, total: n, detail: what });
-        passes = n; p.set(d, n, `${d} / ${n} · ${what} · ${programs()}`);
-      });
+        passes = n; p.set(d, n, `${what} · ${programs()}`);
+      }, slowGpu);
       bootMark('app:first-frame-work-count', { done: passes, total: passes, detail: 'ready' });
-      p.set(passes, passes, `${passes} / ${passes} · ready · ${programs()}`);
+      p.set(passes, passes, `ready · ${programs()}`);
     });
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during first frame');
   } catch (error) {
@@ -217,8 +228,12 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     // Nine's cold step 27 for 3.5 s in the DL23 recording with no read in flight). The three run together and fail as one
     // (spawnViewThenNamed); the spawn view counts its fence jobs from its opening, the tile settle included ('Spawn view ·
     // n of m · MB'), and the minimap and horizon are named after it, while they still run.
-    await spawnViewThenNamed(prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); }), 'camera', settlingTiles),
-      [['Minimap', waitEntryWork(game.levelScope, () => ctx.minimap.prepare())], ['Horizon paintings', edgeDressing.horizonReady]]);
+    // LS8 (J204): its three jobs count as each completes (2.0 s of SwiftShader at 4x CPU otherwise moved nothing)
+    const readyUnits = loadingUnits('Ready jobs', 3);
+    let readyDone = 0;
+    const counted = <T>(job: Promise<T>): Promise<T> => job.then(value => { readyUnits(++readyDone); return value; });
+    await spawnViewThenNamed(counted(prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); }), 'camera', settlingTiles)),
+      [['Minimap', counted(waitEntryWork(game.levelScope, () => ctx.minimap.prepare()))], ['Horizon paintings', counted(edgeDressing.horizonReady)]]);
   });
   // P0: the phone's spawn programs settle while loading still covers the reveal.
   // Undrawn world programs remain in the sliced after-control warm-up below.

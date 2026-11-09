@@ -166,6 +166,16 @@ const FOLLOW = 5;
 /** the declared days shardfile runtimes own (G580 T1: never borrowed by another runtime) */
 const runtimeDays = new WeakSet();
 
+/** LS8 (J204): the world hook's atomic sub-steps, counted on its loading step (Driftwood's props step ran 2.7-3.6 s at 4x CPU
+ *  with no count). WORLD_STEPS is their number on a full standalone world; a shorter mode ends its step early. */
+const WORLD_STEPS = 10;
+const worldStepsDone = new WeakMap<object, number>();
+function worldStep(ctx: ShardContext, label: string): void {
+  const done = (worldStepsDone.get(ctx) ?? 0) + 1;
+  worldStepsDone.set(ctx, done);
+  ctx.progress.set(Math.min(done, WORLD_STEPS), WORLD_STEPS, label);
+}
+
 export class ShardfileClient {
   private plan: AdmittedClientPlan | undefined;
   private readonly source: Shardfile;
@@ -217,7 +227,9 @@ export class ShardfileClient {
     this.plan = admitClientPlan(ctx.product.has('client/plan') ? ctx.product.section('client/plan') : { version: 1, features: [] }, ctx.product);
     await timeClientPreparation(ctx.product.slug, 'world.data', () => this.worldData(ctx));
     await this.phase(ctx, 'world');
+    worldStep(ctx, 'world features');
     await this.phase(ctx, 'world-bindings');
+    worldStep(ctx, 'world bindings');
   }
 
   private async worldData(ctx: ShardContext): Promise<void> {
@@ -238,7 +250,9 @@ export class ShardfileClient {
     // The reviewed opaque-runtime claim includes its whole home. Cache leases remain pinned above;
     // ordinary data homes account library/commons and tile parts independently in the same allocator.
     if (this.bindings.residency === undefined || this.source.runtime === null) await leaseClientLibrary(this.source, this.assets.retained, { validatedSource: this.validatedSource, scope: ctx.scope, allocator, owner: this.bindings.instance, textures: ktx2TranscodeSupport(world.game.renderer), read: ref => this.assets.read(ref) });
+    worldStep(ctx, 'library');
     const presentation = await clientMaterials({ ...this.source, state: this.curveState }, this.assets.retained, world.game.renderer, ctx.scope, { trustedGraphs: this.nativeFeatures || this.bindings.trustedRuntime === true });
+    worldStep(ctx, 'materials');
     this.presentation = presentation;
     if (this.nativeFeatures) presentation.graphs.bind({ hour: () => world.game.sky.dayNight?.hour ?? null });
     const family = this.source.terrain?.family, material = family === undefined ? undefined : presentation.materials.get(family);
@@ -253,8 +267,11 @@ export class ShardfileClient {
       if (ctx.product.has('look/painted')) bindPaintedMaterialMaps(ctx.product, ctx.scope, presentation);
       await bindSceneSourceLooks(ctx.product, ctx.scope, presentation);
     }
+    worldStep(ctx, 'looks');
     this.itemModels = await loadItemModels(this.source.items, this.assets.retained, ctx.scope);
+    worldStep(ctx, 'item models');
     this.skins = await loadClientSkins(this.source, this.assets.retained, presentation.compile, ctx.scope);
+    worldStep(ctx, 'skins');
     installClientWater(undrawnWater(this.source.water, this.plan?.features ?? []), { root: ctx.root, scope: ctx.scope, materials: presentation.materials, outline: presentation.outline });
     const nativeWorld = this.nativeFeatures || this.mode === 'presentation';
     const start = nativeWorld ? ctx.manifest.spawn : this.source.spawn;
@@ -262,6 +279,7 @@ export class ShardfileClient {
     // On the wire this page predicts on the ground the server walks: the shard's collider, sample for sample. A page sampled at its own
     // lattice stands centimetres off it on a dune, and every step corrects.
     if (this.source.terrain !== null && (retireTerrain(world.physics) || this.mode === 'full')) addBakedTerrainCollider(world.physics, collider ?? await this.assets.read(this.source.terrain.collider), ctx.scope);
+    worldStep(ctx, 'ground collider');
     const views = clientViews({ root: ctx.root, terrain: this.source.terrain?.family ?? null, terrainShadow: this.source.terrain?.shadow, terrainOrder: this.source.terrain?.order, ...presentation, ...(collider === undefined ? {} : { lattice: decodeTerrainTile(collider) }) });
     this.worldTiles = await standaloneClientTiles({ source: this.source, assets: this.assets, root: ctx.root, views: views.tiles }, ctx.scope, {
         instance: this.bindings.instance, budget: allocator, radius: tileRing, start,
@@ -270,6 +288,7 @@ export class ShardfileClient {
         frame: run => { ctx.system({ id: 'game.shardfile.tiles', phase: 'late', run }); },
       });
     const tiles = this.worldTiles;
+    worldStep(ctx, 'world tiles');
     // Debug ▸ Ground tiles (P1/P2): a splat ground draws from its props tiles; the world's whole native ground mesh retires
     if (splatGroundDrawn(this.source.props)) world.terrain.retireMesh();
     this.followViewer(ctx, runtime, tiles, presentation, start);
@@ -278,6 +297,7 @@ export class ShardfileClient {
     // cell's owner weight, standalone it stays whole
     const post = await clientPostStack(this.source, this.assets.retained, { compiler: () => loadScenePostGraphCompiler(world.game.renderer), composer: () => world.game.composer, scene: world.game.rootScene, camera: world.game.camera }, ctx.scope, { enabled: true });
     this.post = post; ctx.scope.onDispose(() => { if (this.post === post) this.post = null; });
+    worldStep(ctx, 'post stack');
     if (post !== null) {
       const owned = frameLookOf(world.game.rootScene)?.owned;
       if (owned !== undefined) ctx.scope.onDispose(owned(this.bindings.instance, post.weight));

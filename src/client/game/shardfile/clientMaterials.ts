@@ -124,7 +124,8 @@ function releaseRawAfterUpload(texture: DataTexture): void {
  * the field's declared default.
  * `trustedGraphs` is supplied only by the admitted runtime host to authorize declared graph ceilings.
  */
-export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<string, Uint8Array>, renderer: Renderer, scope: Scope, options: { graphs?: boolean; sources?: GraphSources; trustedGraphs?: boolean } = {}): Promise<{
+export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<string, Uint8Array>, renderer: Renderer, scope: Scope, options: { graphs?: boolean; sources?: GraphSources; trustedGraphs?: boolean;
+  /** LS8 (J204): counted completions for the caller's loading step, given the unit total */ units?: (total: number) => (done: number, detail?: string) => void } = {}): Promise<{
   /** Live toon family shared by classic and graph materials; a day clock may update it in place. */
   readonly toon: ToonLook;
   /** Set a named graph uniform through its declared type/range; no shader rebuild. */
@@ -150,6 +151,11 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   const splat = shard.props === null ? undefined : splatTerrainOf(shard.props);
   const splatRefs = new Set(splat === undefined ? [] : splatTextureRefs(splat, splatDrawTier()));
   const refs = new Set([...materialTextureRefs(sampledMaterials), ...graphFileTextureRefs(sampledMaterials, (hash) => assets.get(hash)), ...(shard.props?.textures.map((entry) => entry.colour) ?? []), ...propMaterialTextureRefs(named), ...splatRefs]);
+  // LS8 (J204): a caller's loading step (a sky backdrop's looks: 1.5 s of Driftwood's sky at 4x CPU) may count each
+  // texture transcoded and the graph compiler loaded, so it moves while they land
+  const loadsCompiler = graphsOn && carriesGraph(shard, assets);
+  const units = options.units?.(refs.size + (loadsCompiler ? 1 : 0)) ?? ((): void => undefined);
+  let unitsDone = 0;
   if (refs.size > 0) {
     const loader = detectKtx2Support(new KTX2Loader().setTranscoderPath(BASIS_PATH), renderer);
     let retired = false;
@@ -169,6 +175,7 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
       // a raw-texel file (uncompressed KTX2) arrives as a DataTexture: its decoded texels go once it is on the GPU too
       else if (texture instanceof DataTexture) releaseRawAfterUpload(texture);
       scope.own(texture); textures.set(ref, texture);
+      units(++unitsDone, 'textures transcoded');
     }
     } finally {
       // Decoded textures own their mips; no later material build uses this decoder.
@@ -190,8 +197,9 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   for (const id of defaults) if (!Object.hasOwn(shard.look.materials, id)) materials.set(id, ownMaterial(familyMaterial({ family: id, vertexColours: true, ...(id === 'pbr' ? { metalness: 0 } : {}) }, context)));
   // graph entries: the lazy compiler loads only when the row is on and the shard carries one (a shard without pays nothing)
   // the classic GLSL graph programs (NF14; the TSL node runtime retired in NF18)
-  const compiler = graphsOn && carriesGraph(shard, assets) ? await loadLookGraphCompiler(renderer) : null;
+  const compiler = loadsCompiler ? await loadLookGraphCompiler(renderer) : null;
   if (scope.disposed) throw new Error('Material scope unloaded during the graph compiler load');
+  if (compiler !== null) units(++unitsDone, 'graph compiler loaded');
   // Lazy catalogue/skin graph compiles need JSON, never the preparation's GLB,
   // texture or Wasm Map. Grid input leases retain and charge this same subset.
   const graphFiles = new Map(shard.files.filter(file => file.kind === 'json').flatMap(file => {
