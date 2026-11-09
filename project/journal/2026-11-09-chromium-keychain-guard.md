@@ -22,3 +22,7 @@ generated outputs stay untouched. This review opens no browser.
 The first full push refused eight lint errors in the new guard and pool
 check. The forward correction uses replaceAll, preserves its input
 parameter and avoids shadowing. No lint rule or existing test changes.
+
+The focused guard passes three cases in 1.48 seconds. Renderer and
+admission stamps use immutable Git view 7eb4909. Peer working-tree
+generated outputs stay untouched. This review opens no browser.
