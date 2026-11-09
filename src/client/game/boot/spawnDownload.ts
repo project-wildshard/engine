@@ -284,6 +284,8 @@ async function readSpawnFile(url: string, maximum: number, ports: SpawnDownloadP
 }
 /** How many times a warm visit's check tells the card what it has counted. */
 const CHECK_STEPS = 50;
+/** LD4: warm-check lookups in flight at once. A page read's file goes next, so it never queues behind the whole list. */
+const CHECK_LANES = 8;
 function isQuota(failure: unknown): boolean { return typeof failure === 'object' && failure !== null && 'name' in failure && failure.name === 'QuotaExceededError'; }
 /** Exactly one list, one denominator and one completion per file. A complete
  * worker-cache response credits immediately without reading/checksumming it. */
@@ -457,10 +459,23 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         const present = heldFiles.size > 0 && rest.length <= 64 ? undefined : await ports.present?.(rest.map(file => file.url)).catch(() => undefined);
         // Optional portable metadata adapters may answer known hits. The native
         // adapter deliberately uses exact per-file checks instead of a census.
-        await Promise.all(rest.map(async file => {
-          if (present?.has(file.url) === true) { credit(file); return; }
-          const hit = await ports.cached(file.url);
-          if (hit?.status === 200 && !/\btext\/html\b/iu.test(hit.headers.get('content-type') ?? '')) looked(file);
+        for (const file of rest) if (present?.has(file.url) === true) credit(file);
+        // LD4 (J208): a few lookups at a time, and a page read's own file next. Jake's phone took all 480 at once into one
+        // native queue, so the read selected discovery waited on sat behind every other lookup; it now waits for one lane.
+        const unchecked = rest.filter(file => present?.has(file.url) !== true), byUrl = new Map(unchecked.map(file => [file.url, file]));
+        const checked = new Set<string>();
+        let checkCursor = 0;
+        const nextCheck = (): (typeof files)[number] | undefined => {
+          for (const url of demanded) { const file = byUrl.get(url); if (file !== undefined && !checked.has(url)) { checked.add(url); return file; } }
+          while (checkCursor < unchecked.length) { const file = unchecked[checkCursor++]; if (file !== undefined && !checked.has(file.url)) { checked.add(file.url); return file; } }
+          return undefined;
+        };
+        await Promise.all(Array.from({length: Math.min(CHECK_LANES, unchecked.length)}, async () => {
+          for (let file = nextCheck(); file !== undefined; file = nextCheck()) {
+            controller.signal.throwIfAborted();
+            const hit = await ports.cached(file.url);
+            if (hit?.status === 200 && !/\btext\/html\b/iu.test(hit.headers.get('content-type') ?? '')) looked(file);
+          }
         }));
         controller.signal.throwIfAborted();
         checkResult = 'complete';
