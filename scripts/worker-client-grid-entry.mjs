@@ -170,6 +170,13 @@ export async function gridEntry(_browser, phone, base, step) {
           || document.documentElement.dataset.wsState === 'error'
           || (typeof (/** @type {WorkerWindow} */ (window)).__workerClient === 'function' && (load === null || load.classList.contains('hide')));
       }, undefined, { timeout: 150_000 });
+      console.log('grid-entry post-restart stores', JSON.stringify(await page.evaluate(() => Object.keys(localStorage).flatMap(key => {
+        try { const keys = JSON.parse(localStorage.getItem(key) ?? 'null')?.keys;
+          return Object.entries(keys ?? {}).filter(([name]) => name === 'grid.last-played' || name === 'platform.grid-position').map(([name, entry]) => {
+            const data = entry?.data; return { key, name, instance: data?.instance, location: data?.location?.kind, road: data?.road, at: data?.at };
+          });
+        } catch { return []; }
+      }))));
       const ends = await page.evaluate(() => Object.keys(localStorage).map(key => {
         try { return JSON.parse(localStorage.getItem(key) ?? 'null')?.keys?.['life.lastEnd']?.data ?? null; } catch { return null; }
       }).filter(end => end !== null));
@@ -185,7 +192,8 @@ export async function gridEntry(_browser, phone, base, step) {
             frame: world.game.frameGate(), clock: world.game.app.clock.paused, still: world.game.app.ui.still },
           grid: { home: g?.home, inside: g?.inside, board: g?.cellLoading, current: g?.live?.live.current,
             ready: g?.live?.live.gameplayReady, feet: g?.live?.live.worldFeet, phase: g?.live?.crossing.phase, issue: g?.live?.crossing.issue },
-          worker: r === undefined ? null : { frames: r.frames, cell: r.cell, closed: r.closed, restored: r.restored, x: r.serverX, z: r.serverZ },
+          worker: r === undefined ? null : { frames: r.frames, cell: r.cell, closed: r.closed, restored: r.restored, x: r.serverX, z: r.serverZ,
+            latest: (() => { const link = world?.player.link; const latest = link == null ? null : Reflect.get(link, 'client')?.latest; return latest == null ? null : { cell: latest.cell, tick: latest.tick, site: g?.cells[latest.cell - 1]?.instance ?? null }; })() },
           loading: { step: load instanceof HTMLElement ? load.dataset.step : undefined, text: load?.textContent?.slice(-500) },
           state: world?.game.app.state, title: document.querySelector('.ws-main-grid') !== null,
           fault: document.querySelector('#wserr .msg')?.textContent,
