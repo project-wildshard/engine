@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the fixture's pinned CLI with the current runtime.
 import { env, execPath } from 'node:process';
 import { expect, test } from 'vitest';
+import { lintEnvironment } from '../scripts/lint-tools.mjs';
 
 test('one typed process covers the complete selection and propagates failure', () => {
   mkdirSync('tmp', { recursive: true });
@@ -17,6 +18,8 @@ test('one typed process covers the complete selection and propagates failure', (
   const runner = resolve(fixture, 'scripts/lint-all.mjs');
   mkdirSync(resolve(runner, '..'));
   writeFileSync(runner, readFileSync('scripts/lint-all.mjs', 'utf8'));
+  writeFileSync(resolve(fixture, 'scripts/lint-tools.mjs'), readFileSync('scripts/lint-tools.mjs', 'utf8'));
+  const nativeEnvironment = lintEnvironment();
   const files = Array.from({ length: 1025 }, (_, index) => resolve(fixture, `source ${index}.ts`));
   for (const file of files) writeFileSync(file, 'export const value = 0;');
   const selection = resolve(fixture, 'files.txt');
@@ -45,7 +48,7 @@ if (args.join(' ') === '--debug files') {
 }
 `, { mode: 0o755 });
   const run = (failure: boolean, args: readonly string[] = [], settings: { workers?: string; gc?: string; memory?: string } = {}): ReturnType<typeof spawnSync> => spawnSync(execPath, [runner, ...args], {
-    encoding: 'utf8', env: { ...Object.fromEntries(Object.entries(env).filter(([key]) => !['GOMAXPROCS', 'GOGC', 'GOMEMLIMIT'].includes(key))),
+    encoding: 'utf8', env: { ...Object.fromEntries(Object.entries(nativeEnvironment).filter(([key]) => !['GOMAXPROCS', 'GOGC', 'GOMEMLIMIT'].includes(key))),
       ...(settings.workers === undefined ? {} : { GOMAXPROCS: settings.workers, LINT_ALL_EXPECT_GO: settings.workers }),
       ...(settings.gc === undefined ? {} : { GOGC: settings.gc, LINT_ALL_EXPECT_GOGC: settings.gc }),
       ...(settings.memory === undefined ? {} : { GOMEMLIMIT: settings.memory, LINT_ALL_EXPECT_GOMEMLIMIT: settings.memory }),
