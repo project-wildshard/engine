@@ -104,6 +104,9 @@ export function printRun(run: Run): void {
   console.log(`\n${run.engine} ${run.flow} ${run.cache} ${run.build} [${run.preset}]`);
   const play = run.play;
   if (play !== undefined) console.log(`play ${play.seconds} s: ${play.fps} fps (1st s ${play.firstSecondFps}, settled ${play.settledFps}, lowest of first 5 ${play.lowestFirst5}) longest ${play.longestFrameMs} ms, ${play.framesOver250} > 250 ms (page ${play.pageGapsOver250}); walk ${play.motion.walkM} m, boost ${play.motion.boostM} m @ ${play.motion.boostTopMps} m/s; pass ${JSON.stringify(play.pass)}`);
+  if (play?.gained !== undefined) console.log(`  gained in play: +${play.gained.programs} programs (at ${play.gained.programAt.join(', ')} s), +${play.gained.textures} textures`);
+  for (const name of play?.gained.added ?? []) console.log(`    new program ${name}`);
+  if (play !== undefined) for (const slow of play.slowFrames ?? []) console.log(`  slow frame ${slow.ms} ms at ${slow.s} s: +${slow.programs} programs, +${slow.textures} textures`);
   console.table([{seconds: run.totalMs === null ? 'INCOMPLETE' : (run.totalMs / 1000).toFixed(3),
     world: run.controlWitness?.gridHome?.slug ?? run.controlWitness?.shard ?? run.lastWitness?.shard ?? 'unqualified',
     'page network': summary('network'), 'worker network': summary('worker'), 'page via SW': summary('service-worker'),
