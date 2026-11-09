@@ -26,3 +26,8 @@ real Git remotes and its complete single-value gate. There is no mocked
 Git result, skipped gate or production receipt copied into the fixture.
 The manual proof is outside hook/Vitest discovery and under ten seconds.
 History/secrets, full fallback, assertions and every timeout stay intact.
+
+The first commit's manual process holder lacked a declared child type,
+which the whole script typecheck catches as TS7034/TS7005. Explicitly
+type the optional cleanup owner and capture the concrete child in its
+callback. This is a type-only forward; both real protocols stay unchanged.

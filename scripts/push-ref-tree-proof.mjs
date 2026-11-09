@@ -46,11 +46,11 @@ try{
   const f=fixture('lease',3);
   const holder=spawn('python3',[join(engine,'scripts/heavy-lane.py'),'full-test','--',process.execPath,'-e',"console.log('ready');process.stdin.resume()"],{cwd:f.repo,env:f.env,stdio:['pipe','pipe','pipe']});
   const observed={ready:false};holder.stdout.on('data',data=>{if(data.toString().includes('ready'))observed.ready=true;});const ended=new Promise(resolve=>{holder.once('exit',resolve);});
-  let push;
+  /** @type {import('node:child_process').ChildProcess|undefined} */let push;
   try{
    const start=Date.now();while(!observed.ready&&Date.now()-start<3000)await new Promise(resolve=>{setTimeout(resolve,10);});assert.ok(observed.ready);
-   push=spawn('git',['push','origin',`${f.second}:refs/heads/main`],{cwd:f.repo,env:f.env,stdio:['ignore','pipe','pipe']});let error='';push.stderr.on('data',data=>{error+=data;});
-   const pushed=new Promise(resolve=>{push.once('exit',resolve);});
+   const activePush=spawn('git',['push','origin',`${f.second}:refs/heads/main`],{cwd:f.repo,env:f.env,stdio:['ignore','pipe','pipe']});push=activePush;let error='';activePush.stderr.on('data',data=>{error+=data;});
+   const pushed=new Promise(resolve=>{activePush.once('exit',resolve);});
    let queued=false;const wait=Date.now();while(Date.now()-wait<3000){try{queued=JSON.parse(readFileSync(join(f.root,'queue.json'),'utf8')).queue.length>0;}catch{ /* The real holder may not have written its state yet. */ }if(queued)break;await new Promise(resolve=>{setTimeout(resolve,10);});}assert.ok(queued,`Actual push must wait behind the real global lease: ${error}`);
    writeFileSync(join(f.repo,'value.json'),'{"value":3}');f.git(['commit','--quiet','-m','land during lease','--','value.json']);holder.stdin.end();await ended;
    assert.notEqual(await pushed,0,'A lease-wait HEAD change must not validate the old target');assert.match(error,/Push target tree differs/u);
