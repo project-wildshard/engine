@@ -17,7 +17,8 @@ import { engineString } from '../../../shared/engine/strings';
 /** How long a reload waits on the service-worker hand-over before it reloads hard (Jake: "it should just reload"). */
 export const RELOAD_FALLBACK_MS = 3000;
 
-const COVER = 'position:fixed;inset:0;z-index:2147483600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;'
+// the top z-index there is: the load failure screen sits at --ws-layer-error + 1147 (2147483647); appended last, this wins the tie
+const COVER = 'position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;'
   + 'box-sizing:border-box;padding:0 28px;text-align:center;background:rgba(5,8,16,0.86);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);'
   + 'pointer-events:auto;touch-action:none;color:#e6f2f8;-webkit-user-select:none;user-select:none';
 const RING = 'width:64px;height:64px;box-sizing:border-box;border-radius:50%;border:4px solid rgba(143,227,255,0.18);border-top-color:#8fe3ff;'
@@ -88,6 +89,17 @@ export function reloadingLine(text: string, tone: keyof typeof LINE_COLOR = 'pla
   if (words === null) return;
   words.style.cssText = `${LINE};color:${LINE_COLOR[tone]}`;
   words.textContent = text;
+}
+
+/** iOS Simulator, 2026-11-09: WebKit stops painting a page as soon as a navigation starts in the same turn, so the load
+ * failure screen's RELOAD showed no cover at all. Navigate one painted frame after showReloading; a page that gets no
+ * frames (hidden) goes after LEAVE_FRAME_MS anyway. */
+const LEAVE_FRAME_MS = 100;
+export function leaveAfterPaint(go: () => void): void {
+  let gone = false;
+  const once = (): void => { if (gone) return; gone = true; go(); };
+  pageScope.raf(() => { pageScope.timeout(0, once); });
+  pageScope.timeout(LEAVE_FRAME_MS, once);
 }
 
 /** Whether a reload is on screen (tests, and callers that must not start a second one). */

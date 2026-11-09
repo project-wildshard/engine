@@ -1,5 +1,5 @@
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
-import { showReloading } from './reloadCover';
+import { leaveAfterPaint, showReloading } from './reloadCover';
 import { engineString } from '../../../shared/engine/strings';
 import type { LoadFailure } from '../core/errorReport';
 import { app } from '../app/runtime';
@@ -76,7 +76,7 @@ export function showLoadFailure(failure: LoadFailure): HTMLElement {
     reload.textContent = engineString('s_8229c4ee6826');
     const button = 'flex:none;min-height:52px;padding:14px 28px;border:1px solid #8fe3ff;color:#e8f5fa;background:#0d1b26;font:inherit;text-transform:uppercase;cursor:pointer;touch-action:manipulation';
     reload.style.cssText = button;
-    scope.listen(reload, 'click', () => { showReloading(reload); markReload('load failure reload'); location.reload(); });
+    scope.listen(reload, 'click', () => { showReloading(reload); leaveAfterPaint(() => { markReload('load failure reload'); location.reload(); }); });
     // LS4 (J188): this screen covers the loading card, so Copy diagnostics moves here, beside Reload, in flow after the
     // stack: the failure stays on screen and the one Copy stays tappable. The report is the card's own.
     const actions = document.createElement('div');

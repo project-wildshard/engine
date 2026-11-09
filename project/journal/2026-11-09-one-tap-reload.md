@@ -28,3 +28,13 @@ Tests: the tap is read synchronously after the click; a waiting worker
 that never answers PRECACHE still reloads at 3 s; online it skips
 waiting at 2 s; and no client code can raise the browser's leave
 prompt.
+
+iOS Simulator check (Jake: "It has to be checked in the iOS simulator").
+The pill and Settings take real taps in Mobile Safari and as a Home
+Screen web app; the page starts under the status bar (no
+viewport-fit=cover), so nothing near the top eats them. The load
+failure screen's RELOAD showed no cover: the screen sits at the top
+z-index, above the cover, and its handler navigated in the same turn,
+which stops WebKit painting at once. The cover now takes the top
+z-index, and every reload leaves one painted frame after showing it
+(at most 100 ms).

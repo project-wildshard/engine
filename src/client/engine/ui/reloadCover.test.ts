@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { afterEach, expect, test } from 'vitest';
-import { hideReloading, reloadingLine, reloadingShown, showReloading } from './reloadCover';
+import { afterEach, expect, test, vi } from 'vitest';
+import { hideReloading, leaveAfterPaint, reloadingLine, reloadingShown, showReloading } from './reloadCover';
 
 afterEach(() => { hideReloading(); document.body.replaceChildren(); });
 
@@ -36,4 +36,24 @@ test('RL7: before a reload starts there is no cover, so nothing sits over Settin
   document.body.innerHTML = '<button class="ws-main-settings">Settings</button>';
   expect(reloadingShown()).toBe(false);
   expect(document.getElementById('ws-reloading')).toBeNull();
+});
+
+test('RL3 (iOS Simulator): the navigation waits for one painted frame, never longer than 100 ms, and runs once', async () => {
+  vi.useFakeTimers();
+  try {
+    const go = vi.fn<() => void>();
+    showReloading();
+    leaveAfterPaint(go);
+    // same turn: WebKit would stop painting here, so nothing may navigate yet
+    expect(go).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(go).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(go).toHaveBeenCalledOnce();
+  } finally { vi.useRealTimers(); }
+});
+
+test('RL4: the cover sits at the top z-index, over the load failure screen', () => {
+  showReloading();
+  expect(document.getElementById('ws-reloading')?.style.zIndex).toBe('2147483647');
 });

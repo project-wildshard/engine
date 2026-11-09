@@ -19,7 +19,7 @@ import { engineString } from '../../../shared/engine/strings';
  */
 import { isDev, onDev } from '../core/devMode';
 import { leaveSaved, markReload } from '../boot/lastEnd';
-import { RELOAD_FALLBACK_MS, reloadingLine, showReloading } from './reloadCover';
+import { RELOAD_FALLBACK_MS, leaveAfterPaint, reloadingLine, showReloading } from './reloadCover';
 
 
 // The update pill exists before content is selected; keep App and Three out of the entry graph.
@@ -55,8 +55,10 @@ function reload(): void {
   const plain = (): void => {
     if (gone) return;
     gone = true;
-    if (title) { markReload('update at title'); location.replace('/'); }
-    else { markReload('update tapped'); location.reload(); }
+    leaveAfterPaint(() => {
+      if (title) { markReload('update at title'); location.replace('/'); }
+      else { markReload('update tapped'); location.reload(); }
+    });
   };
   if (sw === undefined) { leaveSaved(plain); return; }
   leaveSaved(() => {

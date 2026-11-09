@@ -46,7 +46,7 @@ test('RL5: a waiting worker that never finishes its precache still reloads hard 
   expect(document.getElementById('ws-reloading')).not.toBeNull();
   await vi.advanceTimersByTimeAsync(2900);
   expect(replace).not.toHaveBeenCalled(); expect(reload).not.toHaveBeenCalled();
-  await vi.advanceTimersByTimeAsync(200);
+  await vi.advanceTimersByTimeAsync(300);
   expect(replace).toHaveBeenCalledExactlyOnceWith('/'); expect(reload).not.toHaveBeenCalled();
   expect(document.getElementById('ws-reloading')?.textContent).toContain('slow to switch over');
   // an offline page never skips waiting into a build whose code it does not hold (DL1)

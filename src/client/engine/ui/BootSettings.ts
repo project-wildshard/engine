@@ -27,7 +27,7 @@ import { TITLE_SKIPPERS } from './debugOptions';
 import { MODEL_CREDIT, MUSIC_CREDIT, sfxCredit } from '../audio/credits';
 import { BOOT_OPTIONS, getSfxSet, pendingReload, saveSetting, savedSetting, settingFromUrl, settingParams, settingsReloadUrl, type OptionKey, type OptionValue } from './Settings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
-import { showReloading } from './reloadCover';
+import { leaveAfterPaint, showReloading } from './reloadCover';
 import { buildOfflineRow } from './offlineDownload';
 import { buildConnectionRow } from './errorScreen';
 import { buildMusicStyleRow } from './musicStyleRow';
@@ -159,7 +159,7 @@ function build(): HTMLElement {
     showReloading(apply); // RL3: the tap's own turn
     debug?.applyPending(); developerTools?.applyPending();
     const next = settingsReloadUrl(location.href, TITLE_SKIPPERS);
-    leaveSaved(() => { markReload('main menu settings: apply & reload'); if (next === location.href) location.reload(); else location.replace(next); });
+    leaveSaved(() => { leaveAfterPaint(() => { markReload('main menu settings: apply & reload'); if (next === location.href) location.reload(); else location.replace(next); }); });
   });
   const closeBtn = sheet.querySelector<HTMLButtonElement>('.ws-gmenu-close');
   if (closeBtn) listenTap(scope, closeBtn, close);

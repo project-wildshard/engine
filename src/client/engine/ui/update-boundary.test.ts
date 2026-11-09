@@ -25,7 +25,7 @@ test('RL2 / QC3: one tap on the title adopts a waiting worker and loads a fresh 
   if (!(pill instanceof HTMLButtonElement)) throw new Error('Missing update pill');
   pill.dispatchEvent(new Event('pointerup')); pill.click();
   expect(adopt).toHaveBeenCalledExactlyOnceWith('/', 'update at title', expect.any(Number));
-  await vi.advanceTimersByTimeAsync(0);
+  await vi.advanceTimersByTimeAsync(150);
   expect(replace).toHaveBeenCalledExactlyOnceWith('/'); expect(reload).not.toHaveBeenCalled();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
 });

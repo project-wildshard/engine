@@ -33,7 +33,7 @@ import { hasOnlineWorld, openDoctorPage } from './errorScreen';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { TIER } from '../core/tier';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
-import { showReloading } from './reloadCover';
+import { leaveAfterPaint, showReloading } from './reloadCover';
 import { captureBrowserError } from '../telemetry/browserErrors';
 import { bootDiagnostic, bootDiagnosticJson } from '../boot/bootTrace';
 // reloads from this modal (and the boot's stuck-loader recovery, src/client/engine/boot/stuck.ts) inside RELOAD_WINDOW_MS before
@@ -131,7 +131,7 @@ function reloadHere(atSpot: boolean): void {
     url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));
     url.searchParams.set(RELOAD_PARAM, '1'); // index.html's RESUMING screen from the first paint; main.ts skips the title and pauses
   }
-  leaveSaved(() => { markReload(`error modal: ${atSpot ? 'reload here' : 'reload at spawn'} (${firstText.slice(0, 80)})`); location.replace(url.toString()); });
+  leaveSaved(() => { leaveAfterPaint(() => { markReload(`error modal: ${atSpot ? 'reload here' : 'reload at spawn'} (${firstText.slice(0, 80)})`); location.replace(url.toString()); }); });
 }
 function toTitle(): void {
   leaveSaved(() => { markUnload(`error modal: title screen (${firstText.slice(0, 80)})`); location.replace(new URL('/', location.origin).toString()); });

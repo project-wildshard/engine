@@ -22,7 +22,7 @@ import { clearDownloads, freedBytes, lastClear, mbText, storageUsed } from '../b
 import { EARLY_PROGRAMS_SLOT } from '../boot/earlyPrograms';
 import { RELOAD_PARAM } from '../core/GpuRecovery';
 import { leaveSaved, markReload } from '../boot/lastEnd';
-import { showReloading } from './reloadCover';
+import { leaveAfterPaint, showReloading } from './reloadCover';
 import { OPTION_VALUES, saveSetting, setting, settingsReloadUrl } from './Settings';
 import type { DebugRowSpec } from '../../../server/engine/level/context';
 import { isDev, onDev } from '../core/devMode';
@@ -159,7 +159,7 @@ const clearDownloadsRow = action('clearDownloads', 'tools', engineString('s_59cb
   say(freed === null ? 'Cleared · reloading' : `Freed ${mbText(freed)} · reloading`,
     `${mbText(freed)} of downloads · ${r.caches} caches and ${r.workers} worker${r.workers === 1 ? '' : 's'} removed${r.httpCache ? ', HTTP cache cleared' : ''}. Reloading as a first visit.`);
   showReloading();
-  leaveSaved(() => { markReload('debug: clear downloads'); location.replace(settingsReloadUrl(location.href, TITLE_SKIPPERS)); });
+  leaveSaved(() => { leaveAfterPaint(() => { markReload('debug: clear downloads'); location.replace(settingsReloadUrl(location.href, TITLE_SKIPPERS)); }); });
 }, { purpose: 'developer', ask: 'E172', reviewBy: '2026-12-30', note: engineString('s_510ecf1f03f4') }, {
   confirm: async () => { const used = await storageUsed(); return used === null ? 'Tap again to clear' : `Tap again to clear ~${mbText(used)}`; },
   status: () => {
