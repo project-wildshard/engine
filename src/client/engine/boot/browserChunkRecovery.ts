@@ -90,12 +90,11 @@ export async function reloadIfStaleBuild(): Promise<boolean> {
   if (typeof window === 'undefined' || typeof __BUILD_ID__ !== 'string') return false;
   const live = await latestVersion(() => !documentLeaving);
   if (live === null || live === __BUILD_ID__) return false;
-  // the tab's one self-reload claim (chunk recovery shares it), marked with this build: never twice for the same build
-  const mark = `stale ${__BUILD_ID__}`;
+  // its own claim (settleRefusedBuild clears boot.selfReload on an online hello), holding this build: never twice for it
   try {
     const store = saveStorage('session');
-    if (store.getItem('boot.selfReload') === mark) return false;
-    store.setItem('boot.selfReload', mark);
+    if (store.getItem('boot.staleBuild') === __BUILD_ID__) return false;
+    store.setItem('boot.staleBuild', __BUILD_ID__);
   } catch { return false; }
   document.dispatchEvent(new CustomEvent('ws:reloading', { detail: 'This build is out of date · getting the new one' }));
   void leavePastWorker('stale build: its files are gone from the server');

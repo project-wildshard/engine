@@ -71,7 +71,7 @@ async function body(response: Response, url: string, maximum: number, read?: (by
     void reader.cancel().catch(() => undefined); throw error;
   }
   const result = size === bytes.length ? bytes : bytes.slice(0, size);
-  if (html(result)) throw new ContentReadError(url, 'missing content (HTML response)');
+  if (html(result)) throw new ContentReadError(url, 'missing content (HTML response)', undefined, true);
   if (expected !== undefined && size !== expected) throw sizeError();
   return result;
 }

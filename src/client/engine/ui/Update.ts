@@ -48,6 +48,7 @@ let newer = false;
 function reload(): void {
   if (busy) return;
   busy = true;
+  const tapped = diagnosticNow();
   showReloading(el, newer ? engineString('s_reloading_update') : '');
   const title = titleBoundary(), sw = window.__ws_sw;
   let gone = false;
@@ -59,10 +60,12 @@ function reload(): void {
   };
   if (sw === undefined) { leaveSaved(plain); return; }
   leaveSaved(() => {
-    const asked = diagnosticNow();
+    // the budget runs from the tap: a save that took time leaves the hand-over only what is left of RELOAD_FALLBACK_MS
+    const left = Math.round(RELOAD_FALLBACK_MS - (diagnosticNow() - tapped));
     // the hand-over ran out of time (not merely "nothing to adopt"): say so, in amber, on the way out
-    const hard = (): void => { if (diagnosticNow() - asked >= RELOAD_FALLBACK_MS - 50) reloadingLine(engineString('s_reloading_slow'), 'slow'); plain(); };
-    void sw.adopt(title ? '/' : undefined, title ? 'update at title' : 'update tapped', RELOAD_FALLBACK_MS)
+    const hard = (): void => { if (diagnosticNow() - tapped >= RELOAD_FALLBACK_MS - 50) reloadingLine(engineString('s_reloading_slow'), 'slow'); plain(); };
+    if (left <= 0) { hard(); return; }
+    void sw.adopt(title ? '/' : undefined, title ? 'update at title' : 'update tapped', left)
       .then(sent => { if (sent) gone = true; else hard(); return undefined; }, hard);
   });
 }
@@ -70,6 +73,8 @@ function reload(): void {
 // rubber-band), so the pill answers the lift itself; `busy` keeps the pair from running twice
 scope.listen(el, 'pointerup', reload);
 scope.listen(el, 'click', reload);
+// a bfcache return: the cover module put the pill back; the pill answers taps again
+scope.listen(window, 'pageshow', event => { if (event.persisted) busy = false; });
 
 let newLabel = '';
 function titleBoundary(): boolean {

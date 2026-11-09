@@ -27,7 +27,7 @@ test('RL2 / RL3: off the title one tap reloads in place; the pill and the cover 
   expect(document.getElementById('ws-reloading')?.textContent).toContain('Reloading');
   expect(document.body.textContent).not.toContain('Confirm reload');
   // QC3: the waiting worker is adopted in place, with RL3's 3 s; one that cannot be is a plain reload, once
-  expect(adopt).toHaveBeenCalledExactlyOnceWith(undefined, 'update tapped', 3000); await vi.advanceTimersByTimeAsync(0);
+  expect(adopt).toHaveBeenCalledExactlyOnceWith(undefined, 'update tapped', expect.any(Number)); await vi.advanceTimersByTimeAsync(0);
   expect(reload).toHaveBeenCalledOnce(); expect(replace).not.toHaveBeenCalled();
   pill.dispatchEvent(new Event('pointerup')); pill.click(); await vi.advanceTimersByTimeAsync(0);
   expect(adopt).toHaveBeenCalledOnce(); expect(reload).toHaveBeenCalledOnce();

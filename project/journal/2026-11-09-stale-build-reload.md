@@ -10,3 +10,10 @@ RETRY.
 
 Tests: a stale 404 reloads once with the cover; a 404 on the live build
 keeps the RETRY.
+
+Review (Codex, J206) found three gaps, now fixed. The 3 s budget ran
+from after the save wait, not from the tap. The stale guard shared the
+self-reload claim that an online hello clears, so one build could
+reload twice; it has its own key now. An HTML fallback sniffed from the
+body (no HTML content type) did not count as missing. A bfcache return
+also lets the pill be tapped again.

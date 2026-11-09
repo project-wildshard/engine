@@ -29,15 +29,30 @@ test('RL8: a file 404 on a build the server no longer serves reloads into the li
   await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 5000 }); // past a worker unregister that never answers (3 s cap)
   expect(files).toHaveBeenCalledTimes(2); // the one immediate retry, then the stale check: no RETRY wait
   expect(document.getElementById('ws-reloading')?.textContent).toContain('out of date');
-  // the same build in the same tab never reloads twice (a broken deploy can't loop): it falls back to the card's RETRY
-  await expect((await import('./browserChunkRecovery')).reloadIfStaleBuild()).resolves.toBe(false);
+  // the same build in the same tab never reloads twice (a broken deploy can't loop), even after an online server took
+  // the build (settleRefusedBuild clears the shared self-reload claim, not this one): it falls back to the card's RETRY
+  const recovery = await import('./browserChunkRecovery');
+  recovery.settleRefusedBuild();
+  await expect(recovery.reloadIfStaleBuild()).resolves.toBe(false);
 });
 
-test('RL8: a 404 while this build is still the live one keeps the ordinary RETRY (no reload)', async () => {
+test('RL8: an HTML fallback with no HTML content type (sniffed from the body) counts as missing too', async () => {
+  const { reload } = oldBuildPage('d91507e-live');
+  const page = vi.fn<Files>(() => Promise.resolve(Object.defineProperty(new Response('<!doctype html><html></html>', { status: 200, headers: { 'content-type': 'application/json' } }), 'url', { value: '' })));
+  const { readContent } = await import('./contentRead');
+  void readContent('https://example.com/assets/spawn/driftwood-isle-client-phone-old.json', 1000, { fetch: page });
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }, { timeout: 5000 });
+});
+
+test('RL8: a 404 while this build is still the live one keeps the default RETRY wait (no reload)', async () => {
   const { reload, files } = oldBuildPage('40e08ff-old');
   const { readContent } = await import('./contentRead');
-  const retry = vi.fn<() => Promise<void>>(() => Promise.reject(new Error('stop')));
-  await expect(readContent('https://example.com/assets/spawn/x.json', 1000, { fetch: files, retry })).rejects.toThrow('stop');
-  await expect((await import('./browserChunkRecovery')).reloadIfStaleBuild()).resolves.toBe(false);
-  expect(reload).not.toHaveBeenCalled();
+  const { loadingWaitState } = await import('../../../shared/engine/boot/loadingWaits');
+  const stop = new AbortController();
+  const read = readContent('https://example.com/assets/spawn/x.json', 1000, { fetch: files, signal: stop.signal });
+  // the default path (no `retry` option): the stale check runs, finds this build live, and the card's RETRY wait opens
+  await vi.waitFor(() => { expect([...loadingWaitState().pending.values()].some(wait => wait.label.includes('HTTP 404'))).toBe(true); });
+  expect(reload).not.toHaveBeenCalled(); expect(document.getElementById('ws-reloading')).toBeNull();
+  stop.abort(new Error('left the page'));
+  await expect(read).rejects.toThrow('left the page');
 });
