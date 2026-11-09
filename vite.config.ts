@@ -48,6 +48,8 @@ export default defineConfig(({ mode, command }) => {
         },
       },
     },
+    // J217 (LD6): a worker is content-named code too; in the build's folder, every chunk that starts one renamed each deploy
+    worker: { rolldownOptions: { output: { entryFileNames: `${shared}/[name]-[hash].js`, chunkFileNames: `${shared}/[name]-[hash].js` } } },
     assetsInclude: ['**/*.hdr', '**/*.gltf', '**/*.bin'],
     resolve: { alias: rapierAlias }, // Rapier's wasm-importing module → plain bindings (vite/rapier.ts)
     define: { __TITLE_ASSET_URLS__: readFileSync('scripts/title-assets.generated.json', 'utf8'), __GRID_SEAM_ASSET__: JSON.stringify(readGridSeams(process.cwd()).address), __BOOT_TABLE_ASSETS__: JSON.stringify(assetTableAddresses(readAssetTables(process.cwd()))), __GRID_MAP_ATLAS__: JSON.stringify(worldMapDefine()), __SHARDFILE_VALIDATOR__: VALIDATOR_EXPRESSION, __SHARDFILE_VERDICTS__: VERDICTS_EXPRESSION, __DEVSERVER__: mode === 'devserver', __BUILD_ID__: BUILD_ID_EXPRESSION },
