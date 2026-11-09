@@ -6,7 +6,7 @@ import {join,resolve as resolvePath} from 'node:path';
 
 const base=resolvePath(process.argv[2]??'tmp/queue-admission-proof');mkdirSync(base,{recursive:true});
 const work=mkdtempSync(join(base,'run-')),root=join(work,'scheduler'),marker=join(work,'hook-ran');
-const env={...process.env,WS_FULL_SUITE:'1',WS_HEAVY_ROOT:root,WS_HEAVY_SCHEDULER_ROOT:root};delete env.WS_HEAVY_TOKEN;
+/** @type {NodeJS.ProcessEnv} */const env={...process.env,WS_FULL_SUITE:'1',WS_HEAVY_ROOT:root,WS_HEAVY_SCHEDULER_ROOT:root};delete env.WS_HEAVY_TOKEN;
 const holder=spawn('python3',['scripts/heavy-lane.py','full-test','--',process.execPath,'-e',"console.log('ready');process.stdin.resume()"],{env,stdio:['pipe','pipe','pipe']});
 const observed={ready:false};holder.stdout.on('data',data=>{if(data.toString().includes('ready'))observed.ready=true;});
 const ended=new Promise(resolve=>{holder.once('exit',resolve);});
