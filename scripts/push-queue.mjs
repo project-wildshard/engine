@@ -10,7 +10,7 @@ import * as v from 'valibot';
 const self=import.meta.filename,lock=fileURLToPath(new URL('push-queue-lock.py',import.meta.url));
 const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0)))});
 const terminal=new Set(['pushed','checked','already-published','failed','published-unverified','publication-unknown']);
-const pending=new Set(['capturing','queued','retrying','rebasing','installing','checking','pushing']);
+const pending=new Set(['capturing','queued','retrying','rebasing','installing','waiting-for-hook','checking','pushing']);
 const keepalive='ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes';
 class RemoteAdvanceError extends Error{name='RemoteAdvanceError';}
 class PublicationUnknownError extends Error{name='PublicationUnknownError';}
@@ -109,7 +109,7 @@ async function drain(directory){
    write(file,{...job,state:'failed',error});notify(job,'failed',error);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});continue;
   }
   const environment={...process.env,WS_FULL_SUITE:'1',GIT_SSH_COMMAND:keepalive,PWD:snapshot};
-  for(const key of Object.keys(environment))if(key.startsWith('GIT_')&&key!=='GIT_SSH_COMMAND'||key.startsWith('WS_HEAVY_')||['WS_CPU_ADMISSION','WS_CPU_ROOT','WS_PUSH_REFS','WILDSHARD_RING','WS_TEST_QUARANTINE'].includes(key))Reflect.deleteProperty(environment,key);
+  for(const key of Object.keys(environment))if(key.startsWith('GIT_')&&key!=='GIT_SSH_COMMAND'||key.startsWith('WS_HEAVY_')&&key!=='WS_HEAVY_SCHEDULER_ROOT'||['WS_CPU_ADMISSION','WS_CPU_ROOT','WS_PUSH_REFS','WILDSHARD_RING','WS_TEST_QUARANTINE'].includes(key))Reflect.deleteProperty(environment,key);
   /** @param {string} command @param {string[]} args @param {string} [input] */
   const run=(command,args,input)=>execFileSync(command,args,{cwd:snapshot,env:environment,stdio:input===undefined?'inherit':['pipe','inherit','inherit'],input});
   /** @param {string} state @param {object} [extra] */
@@ -136,6 +136,12 @@ async function drain(directory){
      if(manifest.scripts['tools:install']!==undefined)run('pnpm',['run','tools:install']);
      if(manifest.scripts.pins!==undefined)run('pnpm',['pins']);
      if(git(snapshot,['status','--porcelain','--untracked-files=normal'])!=='')throw new Error('Preparation changed tracked or untracked source');
+     // An earlier global/manual full suite can legitimately own its lease for
+     // more than the hook's five-minute acquisition budget. Wait before the
+     // hook starts; its unchanged real lease and all checks still run normally.
+     if(existsSync(join(snapshot,'scripts/heavy-lane.py'))){
+      save('waiting-for-hook');run('python3',[fileURLToPath(new URL('push-queue-admission.py',import.meta.url)),'--checkout',snapshot]);
+     }
      save('checking');run('bash',['.githooks/pre-push','origin',job.remote],`refs/heads/main ${job.sha} refs/heads/main ${base}\n`);
      verifySnapshot(snapshot,job,'after the normal hook, before publication');
      if(!job.checkOnly){
