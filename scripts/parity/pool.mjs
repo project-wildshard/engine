@@ -43,8 +43,8 @@ async function open(root, angle, captureRpc) {
     try {
       const session = await browser.newBrowserCDPSession();
       try {
-        const command = await session.send('Browser.getBrowserCommandLine');
-        if (!KEYCHAIN_ARGS.every(arg => command.arguments.includes(arg))) throw new Error('Lane Chromium lacks mandatory keychain flags');
+        const commandLine = await session.send('Browser.getBrowserCommandLine');
+        if (!KEYCHAIN_ARGS.every(arg => commandLine.arguments.includes(arg))) throw new Error('Lane Chromium lacks mandatory keychain flags');
       } finally { await session.detach(); }
     } catch (error) { await browser.close(); throw error; }
     return { browser, close: async () => {

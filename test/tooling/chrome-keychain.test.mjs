@@ -54,11 +54,11 @@ test('raw executable aliases and every child-process API are checked', () => {
   assert.ok(keychainProblems("import { chromium as c } from 'playwright'; c.connectOverCDP(endpoint);").length > 0);
   assert.ok(keychainProblems("import { chromium } from 'playwright'; const pattern = /['\"]/u; chromium.launch({});").length > 0);
   const shell = '#!/bin/bash\nBROWSER="/cache/chromium-1254/chrome"\nexec "$BROWSER"';
-  assert.ok(keychainProblems(shell + ' --headless\n').length > 0);
-  assert.deepEqual(keychainProblems(shell + ' --headless --use-mock-keychain --password-store=basic\n'), []);
+  assert.ok(keychainProblems(`${shell} --headless\n`).length > 0);
+  assert.deepEqual(keychainProblems(`${shell} --headless --use-mock-keychain --password-store=basic\n`), []);
 });
 
 test('no source drops Playwright default arguments', () => {
-  const option = 'ignore' + 'DefaultArgs';
+  const option = 'ignoreDefaultArgs';
   assert.deepEqual(files.filter(({ text }) => text.includes(option)).map(({ file }) => file), []);
 });

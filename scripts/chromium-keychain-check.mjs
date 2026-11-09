@@ -6,10 +6,10 @@ const browserBinary = /chrom(?:e|ium)|executablePath\s*\(/iu;
 function shellProblems(/** @type {string} */ text) {
   if (!/^#![^\n]*\b(?:ba|z|da)?sh\b/u.test(text)) return [];
   const variables = new Map([...text.matchAll(/^\s*(\w+)=(?:['"]([^'"\n]+)['"]|([^\s\n]+))/gmu)].map(match => [match[1], match[2] ?? match[3]]));
-  return text.replace(/\\\n\s*/gu, ' ').split('\n').flatMap(line => {
+  return text.replaceAll(/\\\n\s*/gu, ' ').split('\n').flatMap(line => {
     const command = /^\s*(?:exec\s+)?("[^"]+"|'[^']+'|[^\s;]+)(.*)$/u.exec(line);
     if (!command || command[1].startsWith('#') || command[1].includes('=')) return [];
-    const program = command[1].replace(/\$\{?(\w+)\}?/gu, (_all, name) => variables.get(name) ?? name);
+    const program = command[1].replaceAll(/\$\{?(\w+)\}?/gu, (_all, name) => variables.get(name) ?? name);
     if (!browserBinary.test(program)) return [];
     return ['--use-mock-keychain', '--password-store=basic'].every(flag => command[2].includes(flag)) ? [] : ['bare Chromium shell executable'];
   });
@@ -60,8 +60,8 @@ function expression(/** @type {string} */ text, /** @type {number} */ start, sto
       continue;
     }
     if (char === '"' || char === "'" || char === '`') { quote = char; continue; }
-    if (char === '/' && text[i + 1] === '/') { i = text.indexOf('\n', i); if (i < 0) return text.length; continue; }
-    if (char === '/' && text[i + 1] === '*') { const end = text.indexOf('*/', i + 2); i = end < 0 ? text.length : end + 1; continue; }
+    if (char === '/' && text[i + 1] === '/') { i = text.indexOf('\n', i); if (i === -1) return text.length; continue; }
+    if (char === '/' && text[i + 1] === '*') { const end = text.indexOf('*/', i + 2); i = end === -1 ? text.length : end + 1; continue; }
     if ('([{'.includes(char)) depth++;
     if (')]}'.includes(char)) { if (depth === 0) break; depth--; }
     if (depth === 0 && (char === ';' || stopAtComma && char === ',')) break;
@@ -74,7 +74,7 @@ export function keychainProblems(/** @type {string} */ text) {
   const problems = shellProblems(text);
   const code = codeMask(text);
   let ownsSafeChromium = false;
-  if (text.includes('ignore' + 'DefaultArgs')) problems.push('drops Playwright default arguments');
+  if (text.includes('ignoreDefaultArgs')) problems.push('drops Playwright default arguments');
   const bindings = new Map();
   for (const match of code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/gu)) {
     const start = match.index + match[0].length;
@@ -82,17 +82,18 @@ export function keychainProblems(/** @type {string} */ text) {
   }
   const expand = (/** @type {string} */ value) => {
     const seen = new Set();
+    let expanded = value;
     for (let pass = 0; pass < 12; pass++) {
       let changed = false;
-      const mask = codeMask(value);
-      value = value.replace(/\b[A-Za-z_$][\w$]*\b/gu, (name, offset) => {
-        if (mask[offset] === ' ' && value.slice(offset - 2, offset) !== '${') return name;
+      const mask = codeMask(expanded);
+      expanded = expanded.replaceAll(/\b[A-Za-z_$][\w$]*\b/gu, (name, offset) => {
+        if (mask[offset] === ' ' && expanded.slice(offset - 2, offset) !== '${') return name;
         if (name === 'KEYCHAIN_ARGS' || seen.has(name) || !bindings.has(name)) return name;
         seen.add(name); changed = true; return `(${bindings.get(name)})`;
       });
       if (!changed) break;
     }
-    return value;
+    return expanded;
   };
   const safe = (/** @type {string} */ value) => /\.\.\.\s*KEYCHAIN_ARGS\b/u.test(expand(value))
     || ['--use-mock-keychain', '--password-store=basic'].every(flag => expand(value).includes(flag));
@@ -105,7 +106,7 @@ export function keychainProblems(/** @type {string} */ text) {
   let childCode = code;
   for (const match of text.matchAll(/(\brequire\s*\(\s*['"](?:node:)?child_process['"]\s*\)|\b\w+)\s*\[\s*['"](spawn(?:Sync)?|execFile(?:Sync)?|exec(?:Sync)?)['"]\s*\]\s*\(/gu)) {
     if (code[match.index] === ' ' || !/child_process/u.test(expand(match[1])) && !namespaces.has(match[1])) continue;
-    const replacement = ' '.repeat(match[0].length - match[2].length - 1) + match[2] + '(';
+    const replacement = `${' '.repeat(match[0].length - match[2].length - 1)}${match[2]}(`;
     childCode = childCode.slice(0, match.index) + replacement + childCode.slice(match.index + match[0].length);
   }
   for (const match of childCode.matchAll(childCall)) {
