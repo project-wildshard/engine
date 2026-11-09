@@ -35,6 +35,7 @@ export interface CellHostOptions {
   readonly closed?: () => void;
   /** A proof's look at each room it opens. */
   readonly booted?: (slug: string, room: DedicatedRoom) => void;
+  readonly playtest?:boolean;
 }
 /** One cell, and when it last emptied. A cell with nobody in it takes no ticks: that is all sleep is (Q80). */
 interface Cell { readonly slug: string; room: DedicatedRoom; emptySince: number; waking: Promise<void> | null }
@@ -54,7 +55,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const open = async (slug: string): Promise<DedicatedRoom> => {
     const begun = diagnosticNow(), room = await DedicatedRoom.boot({ slug, build: options.build, bootId: options.bootId(), input: await options.load(slug), now: diagnosticNow,
       post: news => { if (news.kind === 'left' && news.seats === 0) { const cell = cells.get(slug); if (cell !== undefined) cell.emptySince = diagnosticNow(); } post({ ...news, slug }); },
-      reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }) });
+      reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }),...(options.playtest===true?{playtest:row=>{post({kind:'playtest',slug,row});}}:{}) });
     post({ kind: 'cell', slug, ms: diagnosticNow() - begun });
     options.booted?.(slug, room);
     return room;

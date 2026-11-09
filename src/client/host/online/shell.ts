@@ -8,6 +8,9 @@ import { GUEST, type NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkState } from '@wildshard/engine/net/redial';
 import { decodeCountdown, type Countdown } from '@wildshard/engine/net/socketFrames';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
+import {NetRecords} from '@wildshard/engine/net/netRecord';
+import {onlineTelemetry} from '@wildshard/engine/telemetry/runtime';
+import type {NetRecord,NetCorrection} from '@wildshard/engine/net/measurements';
 import { chatLines } from './chatLines';
 import { askName } from './nameBox';
 import { fetchSignedRelease } from './release';
@@ -25,6 +28,8 @@ export interface OnlineConfig {
   /** The cell this page has loaded. */
   readonly loaded: string;
   readonly identity: NetIdentity;
+  /** Optional anonymous measurements; the page supplies the existing API sink. */
+  readonly record?:{readonly install:string;readonly session:string;readonly tag?:string;readonly send:(record:NetRecord)=>void};
 }
 /** What the link tells the page. */
 export interface OnlineView {
@@ -52,16 +57,19 @@ export interface OnlineShell {
   save: () => Promise<{ readonly tick: number; readonly ok: boolean }>;
   probe: () => Promise<{ readonly tick: number; readonly tickMs: number; readonly rows: readonly never[] }>;
   join: () => never;
+  flushRecords:()=>void;
   dispose: () => void;
 }
 
 /** The link alone, with no page around it. `startOnline` is this with the strips. */
 export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShell {
+  let playtest=false;
   let loaded = false, link: WebSocketTransport | null = null, unseated: WebSocketTransport | null = null, arrive: (value: { tick: number; restored: boolean }) => void = () => undefined;
   const booted = new Promise<{ tick: number; restored: boolean }>(resolve => { arrive = resolve; });
   const hear = (transport: WebSocketTransport): WebSocketTransport => {
     link = transport;
     transport.onControl((control, bytes) => {
+      if(control==='playtest'){playtest=true;return;}
       if (control === 'countdown') { const said = decodeCountdown(bytes); if (said !== null) view.countdown(said); return; }
       if (control !== 'resume') return;
       const seat = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))).shard;
@@ -72,7 +80,9 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     return transport;
   };
   const first = hear(new WebSocketTransport(config.socket)), client = new NetClient(first);
-  const redial = new Redial({ client, transport: first, dial: () => hear(new WebSocketTransport(config.socket)), onState: view.link });
+  const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
+    correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
+  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(config.socket));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);} });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
   const offFirst = client.onFrame(() => { offFirst(); arrive({ tick: client.latest?.tick ?? 0, restored: true }); });
   client.hello(config.build, config.identity);
@@ -82,7 +92,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     pause: idle, resume: idle, hold: idle, bossGod: idle, hardHits: idle, place: idle, raise: idle,
     save: () => Promise.resolve({ tick: tickOf(), ok: true }), probe: () => Promise.resolve({ tick: tickOf(), tickMs: 0, rows: [] }),
     join: () => { throw new Error('A second client belongs to a server in this page'); },
-    dispose: () => { redial.dispose(); client.dispose(); link?.close('disposed'); } };
+    flushRecords:()=>{records?.flush();},
+    dispose: () => { records?.dispose(); redial.dispose(); client.dispose(); link?.close('disposed'); } };
 }
 
 const reloadStale = async (): Promise<boolean> => (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadRefusedBuild(true);
@@ -109,11 +120,12 @@ export interface StartOnline {
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
   readonly failed: (message: string) => void;
+  readonly recordTag?:string;
 }
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
-  const { failed, release: at, key, identity, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;
+  const { failed, release: at, key, identity, recordTag, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;
   if (release.engineBuild !== link.build) await reloadStale();
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
@@ -125,7 +137,8 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
     if (reason !== 'reload') { failed(reason === 'replaced' ? 'This world is open in another tab.' : `The server closed this link (${String(reason)}).`); return; }
     if (!await reloadStale()) newBuildPanel(scope, reloadStale, () => { void reloadByHand(); });
   };
-  const shell = connectOnline({ ...link, socket, identity: named }, {
+  const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
+  const shell = connectOnline({ ...link, socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; showLink(state); if (state === 'ended') void ended(reason); },
     countdown: said => { showCountdown(said); preload(); },
     elsewhere: seat => { const url = new URL(location.href); url.searchParams.set('chunk', seat); location.replace(url); },
@@ -133,6 +146,7 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   retry = shell.retry;
   void settled(shell.booted);
   chatLines(scope, shell.client);
+  scope.listen(window,'pagehide',()=>{shell.flushRecords();});
   scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') shell.visible(); });
   return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); } };
 }

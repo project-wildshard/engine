@@ -97,8 +97,9 @@ step(['--import', './scripts/bake-loader.mjs', '--input-type=module', '-e',
 // Calibration documents need it too. The worker must see these final bytes.
 const validator = shardfileValidationRevision();
 // E7.2d: a build with a release file is a build of the one world. Every other build stays standalone.
-const {WILDSHARD_RELEASE_URL: worldFile, WILDSHARD_RELEASE_KEY: worldKey} = process.env;
-stampBuildDocuments(outDir, {validator, verdicts: buildValidationReceipts(validator), ...worldFile === undefined || worldKey === undefined ? {} : {world: {release: worldFile, key: worldKey}}});
+const {WILDSHARD_RELEASE_URL: worldFile, WILDSHARD_RELEASE_KEY: worldKey,WILDSHARD_RECORD_TAG:recordTag} = process.env;
+if(recordTag!==undefined&&!/^[\w.-]{1,64}$/u.test(recordTag))throw new Error('WILDSHARD_RECORD_TAG must be a bounded sitting label');
+stampBuildDocuments(outDir, {validator, verdicts: buildValidationReceipts(validator), ...worldFile === undefined || worldKey === undefined ? {} : {world: {release: worldFile, key: worldKey,...(recordTag===undefined?{}:{recordTag})}}});
 
 writeTitleAssets(process.cwd(), outDir);
 

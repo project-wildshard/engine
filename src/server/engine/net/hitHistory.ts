@@ -4,6 +4,7 @@ import { Vector3 } from 'three';
 import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
 import { hitHistoryOf, publishHitHistory } from '../combat/rewind';
 import type { SimHost } from '../sim';
+import type {HitRewind} from '../../../shared/engine/net/measurements';
 
 /** The furthest back a hit reads, in ticks: 200 ms at 60 Hz (J50). Past it the shooter leads. */
 export const REWIND_TICKS = 12;
@@ -19,6 +20,7 @@ export const HIT_HISTORY_BYTES: number = ROWS * FIELDS * Float32Array.BYTES_PER_
  * shape is the present one, so a posed joint reads today's pose at the old place, which holds for 200 ms of animation.
  */
 export class RewoundBody {
+  rewind:HitRewind={requested:0,applied:0,clamped:false};
   readonly position: Vector3 = new Vector3();
   readonly body: AnimalSim;
   private cos = 1; private sin = 0;
@@ -97,10 +99,11 @@ export class HitHistory {
    */
   at(viewTick: number): readonly RewoundBody[] | null {
     const tick = this.tickOf(viewTick); if (tick === null) return null;
+    const now=this.host.state.tick,requested=((now-viewTick+0x8000)&0xffff)-0x8000;
     const { roster, tracks } = this; roster.length = 0;
     for (const [id, body] of this.host.entities) {
       const track = tracks.get(id);
-      if (track?.body === body) roster.push(this.stand(track, tick));
+      if (track?.body === body){const seen=this.stand(track,tick);seen.rewind={requested,applied:now-Math.max(tick,track.first),clamped:requested>REWIND_TICKS};roster.push(seen);}
     }
     return roster;
   }

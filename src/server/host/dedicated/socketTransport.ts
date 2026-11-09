@@ -1,7 +1,7 @@
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { CLIENT_FLOOD_DEBT, CLIENT_MESSAGES_PER_TICK, MAX_CLIENT_MESSAGES, MAX_CLIENT_MESSAGE_BYTES } from '@wildshard/engine/net/room';
-import { channelPrefix, closeCode, closeReason, controlPrefix, decodePing, encodePong, FRAME_SKIP_BYTES, framed, PING_FLOOR_MS, SILENCE_MS, SOCKET_PING, SOCKET_READY, SOCKET_RELIABLE, SOCKET_UNRELIABLE, STALL_CLOSE_BYTES, type SocketControl } from '@wildshard/engine/net/socketFrames';
+import { channelPrefix, closeCode, closeReason, controlPrefix, decodePing, encodePong, FRAME_SKIP_BYTES, framed, PING_FLOOR_MS, SILENCE_MS, SOCKET_PING, SOCKET_PLAYTEST, SOCKET_READY, SOCKET_RELIABLE, SOCKET_UNRELIABLE, STALL_CLOSE_BYTES, type SocketControl } from '@wildshard/engine/net/socketFrames';
 import type { NetChannel, Transport, TransportStats } from '@wildshard/engine/net/transport';
 import type { RawData, ServerOptions, WebSocket } from 'ws';
 
@@ -103,6 +103,7 @@ export class SocketTransport implements Transport {
     if (prefix === SOCKET_RELIABLE || prefix === SOCKET_UNRELIABLE) { const channel = prefix === SOCKET_RELIABLE ? 'reliable' : 'unreliable'; for (const listener of this.messages) listener(channel, body); }
     else if (prefix === SOCKET_PING) this.ping(bytes);
     else if (prefix === SOCKET_READY) for (const listener of this.controls) listener('ready', body);
+    else if (prefix === SOCKET_PLAYTEST) for (const listener of this.controls) listener('playtest', body);
     else this.close('refused');
   }
   private ping(bytes: Buffer): void {

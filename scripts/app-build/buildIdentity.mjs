@@ -18,8 +18,8 @@ export function newBuildId() {
     return requested;
   }
   let sha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7);
-  try { sha ||= execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { /* not a git checkout */ }
-  return `${sha || 'b'}-${Date.now().toString(36)}`;
+  try { if(sha==='')sha=execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { /* not a git checkout */ }
+  return `${sha===''?'b':sha}-${Date.now().toString(36)}`;
 }
 
 /** J57, J131: a web build's own folder for code, CSS and wasm, immutable for good. Assets stay under /assets/, and only
@@ -29,7 +29,7 @@ export const codeDirectory = (build) => `b/${build}`;
 
 /** Stamp before executable module scripts, without changing the bundle's URLs.
  * @param {string} html @param {string} build
- * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string}}} [facts] */
+ * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}}} [facts] */
 export function stampBuildHtml(html, build, facts) {
   if (build.length === 0 || !/^[\w.-]+$/u.test(build)) throw new Error('Invalid document build identity');
   if (html.includes('globalThis.__WS_BUILD_ID__=')) throw new Error('Duplicate document build identity');

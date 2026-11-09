@@ -18,6 +18,8 @@ const send = (body: object): void => {
   if (typeof window === 'undefined' || harnessPins() !== undefined) return;
   void fetch(apiUrl('telemetry'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => undefined);
 };
+/** E7.8a shares the existing anonymous install and telemetry endpoint. */
+export function onlineTelemetry():{install:string;send:(body:object)=>void}{startTelemetry();return {install:health?.install??crypto.randomUUID(),send};}
 /** Start the page telemetry session and its native event observers once. */
 export function startTelemetry(): void {
   if (health !== null || typeof window === 'undefined' || typeof document === 'undefined') return;

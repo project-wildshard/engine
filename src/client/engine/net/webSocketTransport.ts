@@ -1,6 +1,6 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
-import { channelPrefix, closeCode, closeReason, COMMAND_SKIP_BYTES, controlPrefix, decodePong, encodePing, framed, PING_MS, SOCKET_COUNTDOWN, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME, SOCKET_UNRELIABLE, type SocketControl } from '../../../shared/engine/net/socketFrames';
+import { channelPrefix, closeCode, closeReason, COMMAND_SKIP_BYTES, controlPrefix, decodePong, encodePing, framed, PING_MS, SOCKET_COUNTDOWN, SOCKET_PLAYTEST, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME, SOCKET_UNRELIABLE, type SocketControl } from '../../../shared/engine/net/socketFrames';
 import type { NetChannel, Transport, TransportStats } from '../../../shared/engine/net/transport';
 
 /** The code a browser reports for a link that died with no close frame. */
@@ -79,7 +79,7 @@ export class WebSocketTransport implements Transport {
     const view = new DataView(data), prefix = view.getUint8(0), body = data.slice(1);
     if (prefix === SOCKET_RELIABLE || prefix === SOCKET_UNRELIABLE) { const channel = prefix === SOCKET_RELIABLE ? 'reliable' : 'unreliable'; for (const listener of this.messages) listener(channel, body); }
     else if (prefix === SOCKET_PONG) { const pong = decodePong(view); if (pong !== null) { this.rttMs = this.now() - pong.clock; this.lossPct = pong.lossPct; } }
-    else if (prefix === SOCKET_RESUME || prefix === SOCKET_COUNTDOWN) for (const listener of this.controls) listener(prefix === SOCKET_RESUME ? 'resume' : 'countdown', body);
+    else if (prefix === SOCKET_RESUME || prefix === SOCKET_COUNTDOWN || prefix===SOCKET_PLAYTEST) for (const listener of this.controls) listener(prefix === SOCKET_RESUME ? 'resume' : prefix===SOCKET_PLAYTEST?'playtest':'countdown', body);
   }
   private end(reason: string): void {
     if (this.ended) return;

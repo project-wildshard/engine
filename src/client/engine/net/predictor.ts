@@ -10,6 +10,7 @@ import { CAPTURED, captureMotion, MOTION_WORDS, restoreMotion } from '../../../s
 import type { PlayerMotionState } from '../../../shared/engine/player/motion';
 import type { PredictedRide } from '../../../shared/engine/player/modes';
 import type { CharacterMotor, MoveResult } from '../../../shared/engine/physics/CharacterMotor';
+import type { NetCorrection } from '../../../shared/engine/net/measurements';
 
 /** Saved moves: about a second. A full ring means the server has stopped answering, and the player holds still. */
 export const PREDICTION_RING = 64;
@@ -88,6 +89,7 @@ export class Predictor {
   private readonly body: PredictedBody;
   private readonly columns: readonly NetColumn<never>[];
   private readonly table: OwnerTable;
+  private readonly corrected:((row:Omit<NetCorrection,'kind'|'session'>)=>void)|undefined;
   private readonly seqs = new Uint16Array(PREDICTION_RING);
   private readonly owned = new Uint8Array(PREDICTION_RING);
   private readonly commands: (NetCommand | null)[] = Array.from({ length: PREDICTION_RING }, () => null);
@@ -101,7 +103,8 @@ export class Predictor {
   private resets: number | null = null;
   /** The newest frame has this body on a ride. */
   private aboard = false;
-  constructor(body: PredictedBody, columns: readonly NetColumn<never>[]) {
+  constructor(body: PredictedBody, columns: readonly NetColumn<never>[], corrected?: (row:Omit<NetCorrection,'kind'|'session'>)=>void) {
+    this.corrected=corrected;
     this.body = body; this.columns = columns; this.table = ownerTable(columns);
   }
   /** The ring is full: run no step and send no command until a frame frees it. */
@@ -164,6 +167,7 @@ export class Predictor {
     if (!led && !boarded) this.corrections++;
     const offsetX = x - feet.x, offsetY = y - feet.y, offsetZ = z - feet.z, far = offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > PREDICTION_SNAP * PREDICTION_SNAP;
     body.renderOffset.set(far ? 0 : offsetX, far ? 0 : offsetY, far ? 0 : offsetZ);
+    if(!led&&!boarded)this.corrected?.({tick:tick??s.tick,mode:ride!==null?'ride':s.board.on?'board':s.swim.on?'swim':'foot',offset:Math.hypot(offsetX,offsetY,offsetZ),snapped:far});
     return !led && !boarded;
   }
 

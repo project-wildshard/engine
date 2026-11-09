@@ -5,6 +5,7 @@ import type { Physics } from '../physics/Physics';
 import { lineOfSight } from '../physics/query';
 import type { AttributeSet } from '../../../client/engine/combat/effects/types';
 import type { TargetAnimal } from '../../../client/engine/combat/types';
+import type {HitRewind} from '../net/measurements';
 
 export type CombatTag = `${string}.${string}`;
 export type StringKey = string;
@@ -33,6 +34,8 @@ export interface DamageRequest {
   attackSeq?: number;
   /** A rewound blow's contact as its shooter saw it (J50): `point` is where it lands on the body now, which every rule reads. */
   seen?: Vector3;
+  /** Observed query age for E7.8a; never changes hit admission or the game wire. */
+  rewind?:HitRewind;
 }
 export interface DamageDealt { req: DamageRequest; dealt: number; killed: boolean }
 /** A simulation target shared by creature and practice weapon selection. */

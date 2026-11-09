@@ -18,6 +18,7 @@ import { FLAG_CLASS, NET_CLASSES, NET_SCHEMA_HASH, PLAYER_CLASS } from '../../..
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetClass, NetValue } from '../../../shared/engine/net/schema';
 import type { Transport } from '../../../shared/engine/net/transport';
+import type { NetCorrection } from '../../../shared/engine/net/measurements';
 import { Interpolator } from './interpolator';
 import { NetClock } from './netClock';
 import { NetDelivery } from './onRep';
@@ -60,6 +61,8 @@ export class NetClient {
   private readonly writer = new BitWriter(1024);
   private readonly frames = new Map<number, DecodedFrame>();
   private readonly listeners = new Set<(frame: DecodedFrame) => void>();
+  private readonly presented = new Set<() => void>();
+  private readonly corrected = new Set<(row: Omit<NetCorrection,'kind'|'session'>) => void>();
   private readonly fights = new Set<(event: NetCombatEvent) => void>();
   private readonly deaths = new Set<(event: NetPlayerDied) => void>();
   private deathTick = -1;
@@ -118,6 +121,12 @@ export class NetClient {
   onRejoin(listener: () => void): () => void { this.rejoins.add(listener); return () => { this.rejoins.delete(listener); }; }
   /** Call for every frame decoded; returns the unsubscribe. */
   onFrame(listener: (frame: DecodedFrame) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  /** E7.8a observes actual presentation calls and actual prediction corrections. */
+  onRender(listener:()=>void):()=>void{this.presented.add(listener);return()=>{this.presented.delete(listener);};}
+  rendered():void{for(const listener of this.presented)listener();}
+  onCorrection(listener:(row:Omit<NetCorrection,'kind'|'session'>)=>void):()=>void{this.corrected.add(listener);return()=>{this.corrected.delete(listener);};}
+  correction(row:Omit<NetCorrection,'kind'|'session'>):void{for(const listener of this.corrected)listener(row);}
+  get stats():Transport['stats']{return this.transport.stats;}
   /** Call for every look a fight tells its views; returns the unsubscribe. */
   onView(listener: (view: NetView) => void): () => void { this.fightViews.add(listener); return () => { this.fightViews.delete(listener); }; }
   /** Call for every settled hit and death (P1-E3.2); returns the unsubscribe. */
@@ -181,7 +190,7 @@ export class NetClient {
   /** Send a non-movement action on the reliable channel. */
   act(act: NetRoomAct): void { this.transport.send('reliable', encodeAct(this.writer, act)); }
   /** Stop listening; the transport stays with its owner. */
-  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); this.rejoins.clear(); }
+  dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.presented.clear(); this.corrected.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); this.rejoins.clear(); }
 
   private listen(transport: Transport): (() => void)[] {
     return [transport.onMessage((_channel, bytes) => { this.receive(new Uint8Array(bytes)); }), transport.onClose(reason => { this.closed = reason; })];

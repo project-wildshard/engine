@@ -1,6 +1,7 @@
 import type { ChatReport } from '@wildshard/engine/net/chat';
 import type { PlayerDoc } from './playerDoc';
 import type { SaveReceipt, SaveWrite } from './saves/saveStore';
+import type {PlaytestHit} from './playtest';
 
 // J182: what the door and a cell worker say to each other. Sockets stay with the door, and a seat's bytes go through its own port.
 
@@ -35,6 +36,7 @@ export interface WorkerReading {
 }
 /** What a cell tells the worker it runs on. */
 export type RoomNews =
+  | {readonly kind:'playtest';readonly row:PlaytestHit}
   | { readonly kind: 'left'; readonly device: string; readonly seats: number }
   | { readonly kind: 'seated'; readonly device: string; readonly body: string; readonly seats: number }
   | { readonly kind: 'refused'; readonly device: string; readonly reason: string }

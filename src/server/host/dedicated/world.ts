@@ -16,6 +16,8 @@ import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { decodeHello, messageId, MSG_HELLO } from '@wildshard/engine/net/messages';
 import { NET_SCHEMA_HASH } from '@wildshard/engine/net/netSchemas';
 import { encodeCountdown } from '@wildshard/engine/net/socketFrames';
+import {CorrectionSchema} from '@wildshard/engine/net/measurements';
+import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
 import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading } from './cellProtocol';
 import { bodyId } from './seats';
@@ -94,6 +96,7 @@ export interface WorldOptions {
   readonly restart: () => void;
   /** One worker's 10 s reading, for what leaves the box (E7.8a). */
   readonly reading?: (index: number, reading: WorkerReading) => void;
+  readonly playtest?:(row:PlaytestRow)=>void;
   /** A proof's overrides. */
   readonly helloMs?: number; readonly readyMs?: number; readonly connectsPerMinute?: number; readonly socketsPerIp?: number; readonly graceMs?: number;
   /** Monotonic connection-budget clock, overridable by local boundary tests. */
@@ -153,6 +156,7 @@ export class World {
     else if (news.kind === 'recovered') void this.recover(news.device, news.slug, news.seq);
     else if (news.kind === 'save') this.options.saves.write(news.write);
     else if (news.kind === 'report') { if (!this.options.saves.report(news.report, news.slug)) this.refuse('report-backlog'); }
+    else if(news.kind==='playtest')this.options.playtest?.(news.row);
     else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
     else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
@@ -276,6 +280,14 @@ export class World {
     if (!end.isOpen || this.draining) return;
     const { port1, port2 } = new MessageChannel();
     this.seated.set(entry.device, slug);
+    if(this.options.playtest!==undefined){
+      const off=end.onControl((control,bytes)=>{
+        if(control!=='playtest')return;
+        try{const parsed=v.safeParse(CorrectionSchema,JSON.parse(new TextDecoder().decode(bytes)) as unknown);if(parsed.success)this.options.playtest?.(parsed.output);else this.refuse('playtest-record');}
+        catch{this.refuse('playtest-record');}
+      });
+      end.onClose(off);end.control('playtest');
+    }
     pumpSocket(end, port1);
     this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
   }

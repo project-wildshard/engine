@@ -106,7 +106,7 @@ export class NetPlayer implements PlayerLink {
   constructor(client: NetClient, player: Player, physics: Physics) {
     this.client = client; this.player = player;
     this.world = new PredictionWorld(physics);
-    this.predictor = new Predictor(predictedPlayer(player, this.world), PLAYER_CLASS.owner);
+    this.predictor = new Predictor(predictedPlayer(player, this.world), PLAYER_CLASS.owner, row=>{client.correction(row);});
     this.attacks.onRefused(() => { this.weapons?.attackRefused(); });
     this.off = [client.onCombat(event => {
       // an own blow plays the moment it is heard: the predicted swing already ran (J47)
@@ -237,6 +237,7 @@ export class NetPlayer implements PlayerLink {
   }
   /** The end of a render frame: send what its steps queued, and glide the camera. */
   present(dt: number): void {
+    this.client.rendered();
     if (this.seen !== null) this.client.flush();
     this.predictor.update(dt);
     this.worstOffset = Math.max(this.worstOffset, this.player.renderOffset.length());

@@ -116,7 +116,7 @@ export function installNativeSweptMelee(host: SimHost, items: readonly unknown[]
       sweptStrikeDirection(direction, forward, left, move.sweep, row.contact);
       request.sourceTags = profile.tags; request.target = actor.combatActor(); request.weaponId = profile.weapon; request.moveId = move.id; request.attackSeq = seq.swing;
       request.amount = Math.round(sweptMoveDamage(profile.damage, move, move === profile.moves.heavy, ownedWeaponAttribute(host,player,profile.weapon,'heavyDamageMul',1)));
-      const dealt = host.combat.hit(seen === null ? request : { ...request, point: seen.point, seen: seen.seen, headshot: seen.head, sourceTags: [...profile.tags, 'cover.checked'] });
+      const dealt = host.combat.hit(seen === null ? request : { ...request, point: seen.point, seen: seen.seen, headshot: seen.head,...(seen.rewind===undefined?{}:{rewind:seen.rewind}), sourceTags: [...profile.tags, 'cover.checked'] });
       if (dealt === null) return;
       state.hits++; if (dealt.killed) return;
       sweptStrikePush(push, forward, left, move.sweep, row.contact);

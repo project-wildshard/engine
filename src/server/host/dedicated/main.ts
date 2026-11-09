@@ -20,6 +20,7 @@ import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
 import { savesUrl } from './saves/pgDatabase';
 import { ServerReports } from './serverReports';
+import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
 import { worldSettings } from './workerTable';
 
@@ -53,10 +54,12 @@ const hold = process.env['HOLD_MS'], grace = process.env['GRACE_MS'], poll = pro
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
 const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
+const recordTag=setting('RECORD_TAG');
+const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, ...(hold === undefined ? {} : { holdMs: Number(hold) }) };
+  const data: CellWorkerData = { slugs, build, origin, cache, ...(hold === undefined ? {} : { holdMs: Number(hold) }),...(playtest===undefined?{}:{playtest:true}) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },
@@ -77,6 +80,7 @@ process.on('uncaughtException', failed);
 const world: World = await World.open({ build, cells, ...worldSettings(release.channel, process.env), secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); },
+  ...(playtest===undefined?{}:{playtest:row=>{playtest.append(row);}}),
   restart: () => { stop(0); } });
 const server = createServer((request, response) => {
   if (request.url !== '/health') { response.writeHead(404).end(); return; }
@@ -88,6 +92,7 @@ stop = (code): void => { void (async (): Promise<void> => {
   log({ at: 'server.drained', written, saves: saves.stats?.() });
   server.close();
   await reports.settled();
+  const recorded=await playtest?.close();if(recorded===false)log({at:'playtest.incomplete'});
   process.exit(written ? code : 1);
 })(); };
 await new Promise<void>(resolve => { server.listen(port, host, resolve); });
