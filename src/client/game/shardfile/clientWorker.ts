@@ -224,21 +224,73 @@ function overlay({ scope }: Pick<WorkerClientPorts, 'scope'>): (text: string) =>
 async function readWorker(shell: Shell, report: WorkerClientReport): Promise<void> { report.workerTickMs = (await shell.probe()).tickMs; }
 
 /** Boot the server in its worker and put this page on it. */
+const buildRoot = (): { build: string; root: string } => {
+  const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
+  return { build, root: `/b/${build}/standalone` };
+};
+/** The server's page-side modules, once a page: its identity, its save environment and its shell. */
+let serverModules: Promise<ShellModule> | null = null;
+function loadServerModules(): Promise<ShellModule> {
+  serverModules ??= (async () => {
+    const { root } = buildRoot();
+    await bootTask('server:identity-module', () => import(/* @vite-ignore */ `${root}/identity.js`));
+    const environment = await bootTask('server:storage-module', () => import(/* @vite-ignore */ `${root}/storage.js`)) as { installBrowserSaveEnvironment: () => void };
+    environment.installBrowserSaveEnvironment();
+    return await bootTask('server:shell-module', () => import(/* @vite-ignore */ `${root}/shell.js`)) as ShellModule;
+  })();
+  void serverModules.catch(() => { serverModules = null; });
+  return serverModules;
+}
+/** A standalone server's boot: the page's saves carried into IndexedDB, then its worker. `held` counts each read it answers. */
+async function bootStandalone(slug: string, lone: boolean, held: () => void): Promise<Shell> {
+  const { startStandalone } = await loadServerModules(), { build } = buildRoot(), { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
+  // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
+  await bootTask('server:previous-session-close', () => closing); // a world a session just left may still be saving into what this one reads
+  const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase()));
+  if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
+  // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
+  return startStandalone({ slug, base: `/shardfiles/${slug}/`, build, savePrefix, ...lone ? { lone: true as const } : {}, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
+}
+/** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
+ *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the Worker boot
+ *  step are counted there when that step adopts it. */
+const serverKey = (world: string, lone: boolean): string => `${world}${lone ? '|lone' : '|grid'}`;
+interface EarlyServer { readonly key: string; readonly shell: Promise<Shell>; readonly reads: { count: number; card: ReturnType<typeof countedWait> | null }; adopted: boolean }
+let early: EarlyServer | null = null;
+/** An unadopted server's leave: saved and stopped, as an adopted one's is; a boot that failed holds nothing. */
+async function leaveEarly(shell: Promise<Shell>): Promise<void> {
+  let server: Shell;
+  try { server = await shell; } catch { return; }
+  server.pause();
+  try { await atMostLeaveWait(server.save()); } catch { /* the stop goes on */ } finally { server.dispose(); }
+}
+/** Start the standalone server now, for the Worker boot step to adopt. A one-shard page of a build with a world joins it at
+ *  that step instead, as before. A level left before adoption saves and stops this server as an adopted one would. */
+export function startWorkerServerEarly(options: { readonly slug: string; readonly lone: boolean; readonly scope: Scope }): void {
+  if ((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__ !== undefined && options.lone) return;
+  if (early !== null && !early.adopted) return;
+  const reads: EarlyServer['reads'] = { count: 0, card: null };
+  const shell = bootStandalone(options.slug, options.lone, () => { if (reads.card === null) reads.count++; else reads.card.add(); });
+  void shell.catch(() => undefined); // its failure is the Worker boot step's, where it surfaces as an unadopted boot's would
+  const started: EarlyServer = { key: serverKey(options.slug, options.lone), shell, reads, adopted: false };
+  early = started;
+  options.scope.onDispose(() => {
+    if (early === started) early = null;
+    if (started.adopted) return;
+    closing = leaveEarly(shell);
+  });
+}
 async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<typeof countedWait>): Promise<void> {
-  const { slug, player, physics, scope, system } = ports, build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '', root = `/b/${build}/standalone`;
-  await bootTask('server:identity-module', () => import(/* @vite-ignore */ `${root}/identity.js`));
-  const environment = await bootTask('server:storage-module', () => import(/* @vite-ignore */ `${root}/storage.js`)) as { installBrowserSaveEnvironment: () => void };
-  environment.installBrowserSaveEnvironment();
-  const { startStandalone } = await bootTask('server:shell-module', () => import(/* @vite-ignore */ `${root}/shell.js`)) as ShellModule;
-  const { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
-  const standalone = async (): Promise<Shell> => {
-    // The server's saves: the page's own, read once into IndexedDB and left in place. A session outgrows localStorage at its first cell.
-    await bootTask('server:previous-session-close', () => closing); // a world a session just left may still be saving into what this one reads
-    const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase()));
-    if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
-    // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
-    return startStandalone({ slug, base: `/shardfiles/${slug}/`, build, savePrefix, ...ports.grid === null ? { lone: true as const } : {}, held: url => { card.add(); return spawnHeldBytes(url); }, ...saves });
-  };
+  const { slug, player, physics, scope, system } = ports, { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
+  const { root, build } = buildRoot();
+  const adopted = early !== null && !early.adopted && early.key === serverKey(slug, ports.grid === null) ? early : null;
+  if (adopted !== null) { adopted.adopted = true; adopted.reads.card = card; for (let read = 0; read < adopted.reads.count; read++) card.add(); }
+  else if (early !== null && !early.adopted) {
+    // a server started for another world is stopped unsaved, as Settings stops one, and this one waits for it to go
+    const stale = early; stale.adopted = true; early = null;
+    closing = (async () => { try { (await stale.shell).dispose(); } catch { /* a failed boot holds nothing */ } })();
+  }
+  const standalone = (): Promise<Shell> => adopted?.shell ?? bootStandalone(slug, ports.grid === null, () => { card.add(); });
   // E7.2d: a build stamped with a world puts a one-shard page in it, and nothing else does (no URL switches). Everything below runs the same on either.
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { startOnline } = await bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as OnlineModule;

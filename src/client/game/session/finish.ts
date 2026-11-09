@@ -106,6 +106,14 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // wait is the grid path's 'road' step (it was an unnamed gap after Home region, 0.46 s cold on live, round 40)
   if (ctx.grid === null) await macrotask();
   else { const grid = ctx.grid; await loadingStage('road', async () => { await macrotask(); await grid.roadLanded(); }); }
+  // LD5 (J208): the server boots on its own thread beside the frame steps below; the Worker boot step adopts it. It starts
+  // only once the home region has placed the player and its saves, which the server carries from the page.
+  void (async () => {
+    try {
+      const worker = await import('../shardfile/clientWorker');
+      if (!game.levelScope.disposed) worker.startWorkerServerEarly({ slug: ctx.grid?.home.slug ?? slug, lone: workerGrid(ctx) === null, scope: game.levelScope });
+    } catch { /* the Worker boot step imports it again and reports its failure */ }
+  })();
   // R12: a standalone page's own sky clock (a painted sky, published by its runtime) is the day cycle while the level lives
   // and takes the pinned time; on the grid each entered cell registers its own (hybrid.ts)
   if (ctx.grid === null) enterSkyClock(app, [game.levelScope], game.levelScope);
