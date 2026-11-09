@@ -603,6 +603,7 @@
   "test/compiler-code.test.ts": 0.235677559,
   "test/complete-at-control.test.mjs": 2.6279276809999996,
   "test/construction-checkpoint.test.ts": 0.084055285,
+  "test/connection-doctor.test.ts": 11.570329586,
   "test/cook-cpu-limit.test.ts": 4.946377766,
   "test/cook-deploy-workflow.test.ts": 0.057898426,
   "test/cook-gc-reuse.test.ts": 1.6658336000000002,

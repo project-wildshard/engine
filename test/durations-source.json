@@ -30,6 +30,17 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "test/connection-doctor.test.ts",
+      "sha": "906dfd51f6d2df39c33b0ec83977861fe73ca1f7",
+      "run": "42709241950",
+      "artifact": 13715591117,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794262280637,
+      "durationMs": 11570.329586,
+      "appliedTo": ["full", "ring1"],
+      "basis": "Passed Linux module includes 6654.948388 ms collection plus setup/environment and 4793.522035 ms cases/hooks. Both rings use the identical Node environment and roomBench opens only the same pinned Driftwood product, with real loopback HTTP/WebSocket fixtures; there is no full-catalogue branch. Other unknowns keep sixty seconds, and no global calibration or gate changes."
+    },
+    {
       "file": "test/cook-cpu-limit.test.ts",
       "sha": "32f182df49688e4e70331dc33d5f7a4e66566220",
       "run": "42703311246",
