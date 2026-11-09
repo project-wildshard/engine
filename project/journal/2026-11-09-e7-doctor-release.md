@@ -28,3 +28,15 @@ its socket probe on load, so a live agent browser there would conflict
 with J205. Functional checks stay on staging; the same tagged source is
 published to humans after those pass. No successful Doctor proof or tag
 is claimed by this preparation commit.
+
+
+Queue 64 reached the normal full gate in the replacement full clone and
+correctly failed the three manual helpers' typed lint. The forward fixes
+import spacing, explicit index sentinels, template strings, native DOM
+dataset/textContent use, callback shadowing and unknown catches. The
+same targeted type-aware lint now passes, as do all three syntax checks.
+No assertion, deadline, socket allowlist or error filter changed. Full
+publication and v0.1.4 remain held behind the separate gate-safety
+MUST-FIXes; no second capture is queued while that breaker is active.
+J207's approved main-menu-to-Settings move belongs to Opus after v0.1.4;
+it is not a reason to hold the release or change mainMenu.ts here.

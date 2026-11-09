@@ -4,6 +4,7 @@ import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from 'playwright';
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {SOCKET_READY,SOCKET_RELIABLE,SOCKET_PING} from '../src/shared/engine/net/socketFrames.ts';
+
 const [base,build,key]=process.argv.slice(2),human=process.argv.includes('--human-static'),origin=new URL(base).origin;
 assert.equal(origin,human?'https://preview.wildshard.io':'https://staging.wildshard.io');assert.match(build,/^[a-f0-9]{40}$/u);
 const channel=human?'production':'staging',releaseURL=`https://wildshard-packs.wildshard.workers.dev/releases/${channel}.json`;
@@ -32,12 +33,12 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
    page.on('websocket',ws=>{assert.equal(new URL(ws.url()).origin,socket);ws.on('framesent',frame=>{assert.ok(Buffer.isBuffer(frame.payload));prefixes.push(frame.payload[0]??-1);});});
    await page.goto(new URL('/?doctor',base).href,{waitUntil:'load',timeout:90000});await page.waitForURL(url=>url.pathname==='/doctor/',{timeout:15000});
    await page.locator('#ws-doctor:not([data-running])[data-verdict]').waitFor({timeout:120000});
-   const rows=await page.locator('.ws-doc-row').evaluateAll(nodes=>nodes.map(node=>({id:node.getAttribute('data-check'),state:node.getAttribute('data-state'),value:node.querySelector('.ws-doc-value')?.textContent,ms:node.querySelector('.ws-doc-ms')?.textContent})));
+   const rows=await page.locator('.ws-doc-row').evaluateAll(nodes=>nodes.map(node=>{if(!(node instanceof HTMLElement))throw new Error('Doctor row must be an HTML element');return{id:node.dataset.check,state:node.dataset.state,value:node.querySelector('.ws-doc-value')?.textContent,ms:node.querySelector('.ws-doc-ms')?.textContent};}));
    assert.deepEqual(rows.map(row=>row.id),['page','release','packs','server','join','latency','browser']);assert.ok(rows.every(row=>row.state==='pass'),JSON.stringify(rows));
    assert.ok(rows.find(row=>row.id==='server')?.value?.includes(build.slice(0,7)),'Opaque reachability cannot replace a matching server');
    await page.getByRole('button',{name:'Copy report',exact:true}).click();await page.getByRole('button',{name:'Copied',exact:true}).waitFor({timeout:5000});
    const copied=await page.evaluate(()=>navigator.clipboard.readText());assert.ok(copied.includes(`build ${build}`));assert.ok(copied.includes('result all pass'));for(const row of rows)assert.ok(copied.includes(`${row.id} · pass`));
-   assert.equal(prefixes.filter(prefix=>prefix===SOCKET_RELIABLE).length,1);assert.equal(prefixes.includes(SOCKET_READY),false);assert.ok(prefixes.filter(prefix=>prefix===SOCKET_PING).length>0);assert.ok(prefixes.every(prefix=>prefix===SOCKET_RELIABLE||prefix===SOCKET_PING));
+   assert.equal(prefixes.filter(prefix=>prefix===SOCKET_RELIABLE).length,1);assert.equal(prefixes.includes(SOCKET_READY),false);assert.ok(prefixes.some(prefix=>prefix===SOCKET_PING));assert.ok(prefixes.every(prefix=>prefix===SOCKET_RELIABLE||prefix===SOCKET_PING));
    await context.close();assert.deepEqual(errors,[],'No native exception or console error is filtered');
    const after=await(await read(healthURL)).json();assert.equal(after.build,build);assert.equal(after.players,before.players);
    console.log('PASS live staging Doctor',JSON.stringify({engine,build,epoch:1,rows,prefixes,clipboard:true,playerChange:0,productionSockets:0}));
