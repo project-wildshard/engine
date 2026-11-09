@@ -20,6 +20,17 @@ test('listener checks positively allow loopback and the intended tailnet endpoin
   expect(check('127.0.0.1:8790', true)).not.toBe(0);
 });
 
+test('actual VPS ss device-scoped rows match every tailnet address and reject foreign zones', () => {
+  const listeners = readFileSync('test/fixtures/vps-ss-2026-11-09.txt', 'utf8');
+  const check = (rows: string): number | null => spawnSync('bash', ['-c', `PROD_PORT=8790 STAGING_PORT=8791; ss() { cat; }; tailscale() { if [ "$2" = -4 ]; then printf '100.64.0.1\\n100.86.54.106\\n'; else printf 'fd7a:115c:a1e0::1\\nfd7a:115c:a1e0::1a01:36d9\\n'; fi; }; ${definition('check_listeners')}\ncheck_listeners`], { input: rows }).status;
+  expect(check(listeners)).toBe(0);
+  expect(check(listeners.replaceAll('%tailscale0', '%eth0'))).not.toBe(0);
+  expect(check(listeners.replace('[fd7a:115c:a1e0::1a01:36d9]%tailscale0:8790', '[fd7a:115c:a1e0::1a01:36d9%tailscale0]:8790'))).toBe(0);
+  for (const endpoint of ['[::]%tailscale0:8790', '203.0.113.10%tailscale0:8790', '100.86.54.106%tailscale0:5432']) {
+    expect(check(`LISTEN 0 4096 ${endpoint} *:*\n`), endpoint).not.toBe(0);
+  }
+});
+
 test('an unchanged file in check mode still reports unsafe metadata', () => {
   const checked = spawnSync('bash', ['-c', `CHECK=1; say() { printf '%s %s\\n' "$1" "$2"; }; stat() { printf '644 root:root\\n'; }; cat() { printf 'same\\n'; }; ${definition('metadata_ok')}\n${definition('repair_metadata')}\n${definition('put')}\nput /dev/null 600 root:root <<<'same'\n:`], { encoding: 'utf8' });
   expect(checked.stdout).toContain('would repair metadata /dev/null');

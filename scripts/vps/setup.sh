@@ -60,16 +60,28 @@ check_listeners() {
   listeners=$(ss -ltnH) || return 1
   tail4=$(tailscale ip -4 2>/dev/null) || tail4=
   tail6=$(tailscale ip -6 2>/dev/null) || tail6=
-  awk -v prod="$PROD_PORT" -v stage="$STAGING_PORT" -v tail4="$tail4" -v tail6="$tail6" '
+  WS_SETUP_TAIL4="$tail4" WS_SETUP_TAIL6="$tail6" awk -v prod="$PROD_PORT" -v stage="$STAGING_PORT" '
+    BEGIN {
+      count=split(ENVIRON["WS_SETUP_TAIL4"] "\n" ENVIRON["WS_SETUP_TAIL6"], lines, "\n")
+      for (i=1; i<=count; i++) if (lines[i] != "") tails[lines[i]]=1
+    }
     NF == 0 { next }
     NF < 4 { exit 1 }
     {
       endpoint=$4; port=endpoint; sub(/^.*:/, "", port)
       if (port != prod && port != stage && port != "5432") next
-      address=endpoint; sub(/:[^:]*$/, "", address); gsub(/^\[|\]$/, "", address)
+      address=endpoint; sub(/:[^:]*$/, "", address)
+      # ss puts a device suffix outside IPv6 brackets, or inside them.
+      device=""
+      if (match(address, /%[^]]+/)) {
+        device=substr(address, RSTART+1, RLENGTH-1)
+        address=substr(address, 1, RSTART-1) substr(address, RSTART+RLENGTH)
+      }
+      gsub(/^\[|\]$/, "", address)
       if (port == "5432") exit 1
+      if (device != "" && device != "tailscale0") exit 1
       if (address == "127.0.0.1" || address == "::1") next
-      if (port == prod && ((tail4 != "" && address == tail4) || (tail6 != "" && address == tail6))) next
+      if (port == prod && address in tails) next
       exit 1
     }' <<< "$listeners"
 }
