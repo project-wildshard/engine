@@ -41,6 +41,7 @@ try{
   assert.notEqual(bad.status,0,'A cached HEAD proof must not publish another untested tree');assert.match(bad.stderr,/Push target tree differs/u);
   assert.notEqual(spawnSync('git',['--git-dir',f.remote,'show-ref','--verify','refs/heads/main'],{stdio:'ignore'}).status,0);
   const good=spawnSync('git',['push','origin','HEAD:refs/heads/main'],{cwd:f.repo,env:f.env,encoding:'utf8',timeout:5000});assert.equal(good.status,0,good.stderr);assert.match(good.stderr,/exact-tree green reuse before lease/u);
+  const unchanged=spawnSync('git',['push','origin','HEAD:refs/heads/main'],{cwd:f.repo,env:f.env,encoding:'utf8',timeout:5000});assert.equal(unchanged.status,0,unchanged.stderr);
  }
  if(!process.argv.includes('--case=explicit')){
   const f=fixture('lease',3);

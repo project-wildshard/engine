@@ -25,3 +25,12 @@ The manual proof is outside automatic hook/Vitest discovery. Existing
 scope, dirty-tree, changed-compiler, actual-Git and two-real-lease checks
 remain required before publication. No exclusion, deadline or extension
 is edited in the actual engine policy, and no omitted test is credited.
+
+J206 one-shot read-only review finds a further boundary: readLiftPending
+sampled now before its four real Git reads. Separate actual-clock read
+and write fixtures delay only the last real Git process across expiry,
+leaving Git bytes/results unchanged. Both reviewed684176e cases are red:
+reuse returns an expired proof, and writing a stale proof does not throw.
+The ordinary policy reader now samples expiry after Git validation while
+preserving explicitly supplied observation times. Both boundary cases
+pass in2.9s; the real Vitest reader and cache keep the same late decision.

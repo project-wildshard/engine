@@ -28,7 +28,7 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   const git=args=>execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
   const tree=git(['rev-parse','HEAD^{tree}']),commit=git(['rev-parse','HEAD']);
   let publishes=false;
-  for(const line of refs?.split('\n')??[]){
+  for(const line of refs?refs.split('\n'):[]){
     const fields=line.trim().split(/\s+/u),local=fields[1],remote=fields[3];
     if(fields.length!==4||!/^[a-f0-9]{40}$/u.test(local??'')||!/^[a-f0-9]{40}$/u.test(remote??''))throw new Error('Invalid push refs for checked-tree proof');
     if(/^0+$/u.test(local))continue;

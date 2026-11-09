@@ -31,3 +31,10 @@ The first commit's manual process holder lacked a declared child type,
 which the whole script typecheck catches as TS7034/TS7005. Explicitly
 type the optional cleanup owner and capture the concrete child in its
 callback. This is a type-only forward; both real protocols stay unchanged.
+
+The one-shot review also catches empty refs on an up-to-date actual push.
+The real repeated Git push is red on reviewed684176e and green after
+skipping an absent ref list. This authorizes no target or skipped gate.
+Its other SHOULD is retained as a testing limit: the race fixture checks
+the real entry and capture with its complete tiny leased gate, rather
+than negatively testing the production whole-suite post-gate guard.
