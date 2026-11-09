@@ -79,7 +79,7 @@ async function main(){
   assertHeavyLease('full-test');
   const env=pushEnvironment();
   const began=Date.now();
-  const selection=pushSelection(env.WS_PUSH_REFS);
+  let selection=pushSelection(env.WS_PUSH_REFS);
   const context=capturePushTree(PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,selection);
   console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths`);
   if(proof!==null){
@@ -102,6 +102,11 @@ async function main(){
   }
   const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
   if(!generated.ok){process.exitCode=1;return;}
+  if(selection.mode==='related'){
+    const {completePushSelection}=await import('../scripts/push-related.mjs');
+    selection=await completePushSelection(selection);
+    console.error(`  - verified tests: ${selection.mode}; ${selection.reason}`);
+  }
   const result=await parallelChecks([
     {name:'typecheck (kit + layers)',commands:[['pnpm','run','--silent','typecheck:kit'],['pnpm','exec','npr','tsc','-b','tsconfig.layers.json','--builders',String(PUSH_BUDGET.builders)]]},
     {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
@@ -109,7 +114,7 @@ async function main(){
     {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
     {name:'check:asks',commands:[['pnpm','run','--silent','check:asks']]},
     {name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},
-    {name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run',...selection.files]:['run']),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])]]},
+    {name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])]]},
   ],{env});
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);

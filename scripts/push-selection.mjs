@@ -14,9 +14,11 @@ export function pushSelection(refs,cwd=process.cwd()) {
     for(const path of execFileSync('git',['diff','--name-only','-z',remote,local],{cwd,encoding:'utf8'}).split('\0').filter(Boolean))files.add(path);
   }
   const changed=[...files].sort();
-  if(changed.length>0&&changed.every(file=>file.endsWith('.md')||/^(?:docs|plans)\//u.test(file)))return {mode:'docs',files:changed,reason:'only Markdown/docs/plans'};
+  if(changed.length>0&&changed.every(file=>file.endsWith('.md')&&(/^(?:docs|plans|project\/journal)\//u.test(file)||!file.includes('/'))))return {mode:'docs',files:changed,reason:'only Markdown documentation'};
   const harness=changed.find(file=>/(^|\/)package\.json$|(?:^|\/)(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$|^(?:scripts|\.githooks|\.github|public|out|test\/(?:fixtures|pins)|src\/test)\/|^(?:vitest|vite)\.|^tsconfig|^[^/]+\.json$|^test\/(?:setup|.*config)\./u.test(file));
   if(harness!==undefined)return {mode:'full',files:changed,reason:`test/config/dependency harness: ${harness}`};
   if(changed.length===0)return {mode:'full',files:[],reason:'no changed paths; verify full tree'};
+  const invisible=changed.find(file=>! /^(?:src|test)\/.+\.[cm]?[jt]sx?$/u.test(file));
+  if(invisible!==undefined)return {mode:'full',files:changed,reason:`input has no proven import-graph coverage: ${invisible}`};
   return {mode:'related',files:changed,reason:'complete pushed source diff (J193)'};
 }

@@ -48,10 +48,10 @@ export class DurationSequencer extends BaseSequencer {
       // Pure suites must not load the product reader's native image dependencies.
       if (selected.some(file => (products[file]?.length ?? 0) > 0)) {
         const { assertBuiltTestProducts,selectBuiltTestProducts } = await import('./built-product.mjs');
-        const {CI:ci,GITHUB_ACTIONS:actions}=process.env;
+        const {CI:ci,GITHUB_ACTIONS:actions,WS_PUSH_GATE_PROFILE:pushProfile}=process.env;
         // Only local dependency walks may defer unavailable product suites.
         // Explicit file runs and CI retain the original strict preflight.
-        if(((this.ctx.config.related?.length??0)>0||COMMIT_RELATED)&&!ci&&!actions){
+        if(((this.ctx.config.related?.length??0)>0||COMMIT_RELATED)&&!ci&&!actions&&pushProfile!=='full-v1'){
           const selection=selectBuiltTestProducts(root,selected);
           if(selection.blocked.length>0){
             console.warn(`Local related: skipping ${selection.blocked.length} product suites (CI still runs them): ${selection.blocked.join(', ')}. Missing current products: ${selection.missing.join(', ')}. Build: python3 scripts/heavy-lane.py build -- ${selection.buildCommand}`);
