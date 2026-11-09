@@ -28,6 +28,11 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
   const envelope = v.parse(WorkerEnvelopeSchema, workerData), clock = new BigInt64Array(envelope.clock);
   const sendError = (error: unknown): void => { Atomics.store(clock, 0, 3n); port.postMessage({ error: error instanceof Error ? error.message : String(error) }); port.close(); };
   let adapter: TickWorkerAdapter;
+  let committedTick:number|undefined;
+  const checkedCheckpoint=():HeadlessTickCommit=>{
+    const saved=v.parse(TickCommitSchema,adapter.commit());
+    committedTick=saved.tick;return saved;
+  };
   try {
     if (envelope.deferredPayload && envelope.payload !== undefined) throw new Error('Deferred worker payload must have one owner');
     // Only imports may run before parent admission. No adapter, payload assets
@@ -41,7 +46,7 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
         catch (error) { reject(error instanceof Error ? error : new Error('Invalid deferred worker payload', {cause: error})); }
       });
     }) : envelope.payload;
-    adapter = await create(payload); port.postMessage({ commit: v.parse(TickCommitSchema, adapter.commit()) });
+    adapter = await create(payload); port.postMessage({ commit: checkedCheckpoint() });
   }
   catch (error) { sendError(error); return; }
   port.on('close', () => { adapter.dispose(); });
@@ -58,10 +63,13 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
         for(const segment of request.plan.segments)for(const commands of segment.frames??[segment.commands])
           if(commands.length+(segment.route===undefined?0:1)>envelope.commandsPerTick)throw new Error('Aggregate commandsPerTick exceeded');
         if(adapter.verbTape===undefined)throw new Error('Missing native verb tape capability');
-        const guard=parts??=new TapePartBudget(v.parse(TickCommitSchema,adapter.commit()).tick);
+        // The last published checkpoint already validated this clock. Starting
+        // a tape must not encode that same full native world a second time.
+        if(committedTick===undefined)throw new Error('Tape part requires its initial checkpoint');
+        const guard=parts??=new TapePartBudget(committedTick);
         guard.admit(request.plan);
         const result=v.parse(HeadlessTapePartReportSchema,{report:adapter.verbTape(request.plan),commit:adapter.commit()});
-        guard.accept(result);port.postMessage({verbTapePart:result});return;
+        guard.accept(result);committedTick=result.commit.tick;port.postMessage({verbTapePart:result});return;
       }
       if (request.kind === 'observe') {
         if (envelope.enforceTickDeadline) throw new Error('Observation requires trusted offline timing');
@@ -72,7 +80,7 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
           const started = hrtime.bigint(); Atomics.store(clock, 1, started); Atomics.store(clock, 0, 1n);
           adapter.step([]);
           const elapsed = hrtime.bigint() - started; Atomics.store(clock, 2, elapsed); Atomics.store(clock, 0, 2n);
-          if (index === OBSERVATION_TICKS - 1) commit = v.parse(TickCommitSchema, adapter.commit());
+          if (index === OBSERVATION_TICKS - 1) commit = checkedCheckpoint();
           const metadata = commit === undefined ? adapter.observe() : Object.fromEntries(Object.entries(commit).filter(([key]) => key !== 'snapshot'));
           const checked = v.parse(TickObservationSchema, metadata);
           samples.push({ tick: checked.tick, tickMicros: Number(elapsed) / 1000, scriptMicros: checked.scriptMicros ?? 0, fuelUsed: checked.fuelUsed ?? 0 });
@@ -92,7 +100,7 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
         if(envelope.commandsPerTick<1)throw new Error('Journey needs one player command per tick');
         if(adapter.journey===undefined)throw new Error('Missing native journey capability');
         const report=v.parse(HeadlessJourneyReportSchema,adapter.journey(request.plan));
-        if(request.kind==='walk')port.postMessage({walk:{report,commit:v.parse(TickCommitSchema,adapter.commit())}});
+        if(request.kind==='walk')port.postMessage({walk:{report,commit:checkedCheckpoint()}});
         else port.postMessage({journey:report});return;
       }
       if (request.kind === 'authorProof') {
@@ -108,7 +116,7 @@ export async function runTickWorker(create: (payload: unknown) => Promise<TickWo
       const elapsed = hrtime.bigint() - started; Atomics.store(clock, 2, elapsed);
       if (envelope.enforceTickDeadline && elapsed > BigInt(tickMicros) * 1000n) throw new Error('Headless tick deadline exceeded');
       // Checkpoint construction cannot publish a partial tick and has the parent's independent request deadline.
-      Atomics.store(clock, 0, 2n); port.postMessage({ commit: v.parse(TickCommitSchema, adapter.commit()) });
+      Atomics.store(clock, 0, 2n); port.postMessage({ commit: checkedCheckpoint() });
     } catch (error) { sendError(error); }
   };
   port.on('message', (raw: unknown) => { void handle(raw); });

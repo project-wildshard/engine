@@ -38,6 +38,24 @@ try{
   assert.equal((await actual.finish()).ticks,72);
   await assert.rejects(actual.verbTapePart(plan('after-finish',[[]])),/finished/);
 }finally{await actual.dispose();await control.dispose();}
+// A first tape part may follow ordinary real steps or a non-terminal walk.
+// Both it and an independent worker restored at that earned checkpoint must
+// publish the identical next native continuation, including nonzero clocks.
+for(const prefix of ['step','walk']){
+  const first=await open();let restored;
+  try{
+    if(prefix==='step')await first.step([{source:'prefix',commands:[{kind:'player',moveX:.2,moveZ:0,yaw:0}]}]);
+    else await first.walkLeg({ticks:4,points:[{x:0,z:0},{x:40,z:0}]});
+    const saved=first.checkpoint;assert.ok(saved);assert.ok(saved.tick>0);
+    restored=await HeadlessSimulation.create(source,new Map(),saved.snapshot,{deadline:'advisory'});
+    const continued=await first.verbTapePart(plan('after-prefix',[[]]));
+    const replayed=await restored.verbTapePart(plan('after-restore',[[]]));
+    assert.equal(continued.commit.tick,saved.tick+1);
+    assert.equal(replayed.commit.tick,saved.tick+1);
+    assert.equal(continued.commit.snapshot,replayed.commit.snapshot,'prior '+prefix+' and nonzero restore retain the complete native continuation');
+    assert.equal(first.quarantined,false);assert.equal(restored.quarantined,false);
+  }finally{await restored?.dispose();await first.dispose();}
+}
 const runtime=await HeadlessSimulation.create(source,new Map());
 try{const before=runtime.checkpoint;await assert.rejects(runtime.verbTapePart(plan('runtime',[[]])),/trusted offline/);assert.deepEqual(runtime.checkpoint,before);}
 finally{await runtime.dispose();}
