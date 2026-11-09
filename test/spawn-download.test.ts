@@ -204,7 +204,7 @@ test('LD2: a cancel ends the warm check span at once, even while a native cache 
     const download = downloadSpawnManifest(address, {cached: url => { if (url.endsWith('.json')) return Promise.resolve(new Response(text)); listed(); return new Promise<undefined>(() => undefined); },
       fetch: () => Promise.reject(new Error('Unexpected network'))}, base);
     void download.ready.catch(() => undefined);
-    await reached; download.cancel();
+    await reached; download.cancel(); await Promise.resolve(); await Promise.resolve();
     expect(spans.filter(row => row.operation === 'download:cache-check')).toEqual([{operation: 'download:cache-check', result: 'cancelled'}]);
   } finally { Reflect.deleteProperty(globalThis, '__bootTiming'); }
 });
