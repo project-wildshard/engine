@@ -104,7 +104,7 @@ test('DL20: a corrupt part keeps nothing wrong, and its second read credits only
 test('DL18: a warm visit answers every packed member from the held-parts index, with no part request or bulk read; an unfit entry refetches its part', async () => {
   // One in-memory asset cache shared by a cold visit and the warm visit after it.
   const disk = new Map<string, Response>(), reads: string[] = [], lookups: string[] = [];
-  let index: HeldParts = {}, bulk = 0;
+  let index: HeldParts = {['f'.repeat(64)]: ['https://example.test/old-release.bin']}, bulk = 0;
   const ports = () => ({packs: true, whole: true,
     cached: (url: string) => { lookups.push(new URL(url).pathname); return Promise.resolve(disk.get(url)?.clone()); },
     present: (urls: readonly string[]) => { bulk++; return Promise.resolve(new Set(urls.filter(url => disk.has(url)))); },
@@ -184,6 +184,9 @@ test('quota-denied manifest or member publication keeps verified network bytes u
     expect(reads.filter(path => path === part.url)).toHaveLength(1);
     const member = await window.fetch(new URL(glb.url, base).href);
     expect(new Uint8Array(await member.arrayBuffer())).toEqual(new Uint8Array(5).fill(2));
+    const loose = await window.fetch(new URL(code.url, base).href);
+    expect(new Uint8Array(await loose.arrayBuffer())).toEqual(body(code.url));
+    expect(reads.filter(path => path === code.url)).toHaveLength(1);
     releaseSpawnMembers();
   }
 });

@@ -155,6 +155,8 @@ interface PartMembers {readonly base: string; readonly store: Promise<Cache>; re
 const partTables = new Map<string, Promise<PartMembers | null>>(), partReads = new Map<string, Promise<void>>();
 /** Members a part read kept, by path: these never ask the network first. */
 const keptMembers = new Set<string>();
+/** Verified play-time members whose optional disk publication exhausted quota. */
+const memoryPartMembers = new Map<string, Uint8Array<ArrayBuffer>>();
 let partTier: 'phone' | 'desktop' = 'phone';
 async function partTable(slug: string): Promise<PartMembers | null> {
   const selected = spawnSelection(slug, 'client', partTier, '000');
@@ -167,7 +169,8 @@ async function partTable(slug: string): Promise<PartMembers | null> {
   for (const part of manifest.parts ?? []) for (const [index, offset] of part.members) {
     const file = manifest.files[index]; if (file !== undefined) files.set(new URL(file.url, document.baseURI).pathname, {file, part, offset});
   }
-  return {base: selected.base, store: caches.open(selected.cacheName), files};
+  const cacheName = selected.cacheName;
+  return {base: selected.base, store: nativeCacheCall(() => caches.open(cacheName)), files};
 }
 function readMembersOf(part: SpawnPart, table: PartMembers): Promise<void> {
   const held = partReads.get(part.url);
@@ -177,11 +180,20 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<void> {
     if (!response.ok) throw new Error(`Spawn part unavailable: ${part.url}`);
     const body = new Uint8Array(await response.arrayBuffer()), store = await table.store;
     if (body.length !== part.bytes) throw new Error(`Spawn part size differs: ${part.url}`);
+    let quotaDenied = false;
     await Promise.all([...table.files].filter(([, row]) => row.part.url === part.url).map(async ([path, {file, offset}]) => {
       const member = body.slice(offset, offset + file.bytes);
       if (await sha256(member) !== file.hash) throw new Error(`Spawn part member differs: ${part.url}`);
-      await store.put(new URL(path, document.baseURI).href, new Response(member, {headers: {'content-type': typeOf(path), 'content-length': String(member.length)}}));
-      keptMembers.add(path);
+      if (!quotaDenied) {
+        try {
+          await nativeCacheCall(() => store.put(new URL(path, document.baseURI).href, new Response(member, {headers: {'content-type': typeOf(path), 'content-length': String(member.length)}})));
+          keptMembers.add(path); return;
+        } catch (failure) {
+          if (!isQuota(failure)) throw failure;
+          quotaDenied = true; bootMark('download:part-cache-quota');
+        }
+      }
+      memoryPartMembers.set(path, member);
     }));
   })();
   partReads.set(part.url, read);
@@ -190,9 +202,11 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<void> {
   return read;
 }
 async function heldPartMember(url: URL): Promise<Response | null> {
+  const memory = memoryPartMembers.get(url.pathname);
+  if (memory !== undefined) return new Response(memory, {headers: {'content-type': typeOf(url.pathname), 'content-length': String(memory.byteLength)}});
   if (!keptMembers.has(url.pathname)) return null;
   const slug = url.pathname.split('/')[2] ?? '', table = await partTables.get(slug);
-  return await (await table?.store)?.match(new URL(url.pathname, document.baseURI).href) ?? null;
+  return await nativeCacheCall(async () => (await table?.store)?.match(new URL(url.pathname, document.baseURI).href)) ?? null;
 }
 /** The file's bytes from its part, or null when no part holds it (the read keeps its 404). */
 async function partMember(url: URL): Promise<Response | null> {
@@ -226,6 +240,8 @@ export async function spawnHeldBytes(url: string): Promise<ArrayBuffer | null> {
   if (pending !== undefined) { jobDemand?.(file.url); await pending; }
   const member = await members.get(file.url);
   if (member !== null && member !== undefined) return member.slice().buffer; // a view into its part: only its own bytes cross
+  const memory = memoryPartMembers.get(address.pathname);
+  if (memory !== undefined) return memory.slice().buffer;
   return (await exactCopy(file))?.buffer ?? null;
 }
 /** Control: the level is complete and its reads are done, so the member bytes go. */
@@ -265,6 +281,7 @@ async function readSpawnFile(url: string, maximum: number, ports: SpawnDownloadP
 }
 /** How many times a warm visit's check tells the card what it has counted. */
 const CHECK_STEPS = 50;
+function isQuota(failure: unknown): boolean { return typeof failure === 'object' && failure !== null && 'name' in failure && failure.name === 'QuotaExceededError'; }
 /** Exactly one list, one denominator and one completion per file. A complete
  * worker-cache response credits immediately without reading/checksumming it. */
 export function downloadSpawnManifest(address: SpawnManifestAddress, ports: SpawnDownloadPorts, base: string, packs: string = base): SpawnDownload {
@@ -279,7 +296,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
       if (write === undefined || cacheWriteDenied) return false;
       await write(url, response); retained = true; return true;
     } catch (failure) {
-      if (typeof failure !== 'object' || failure === null || !('name' in failure) || failure.name !== 'QuotaExceededError') throw failure;
+      if (!isQuota(failure)) throw failure;
       cacheWriteDenied = true; bootMark('download:cache-write-quota'); return false;
     } finally { if (!retained) void response.body?.cancel().catch(() => undefined); }
   };
@@ -426,8 +443,8 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
       controller.signal.throwIfAborted();
       const rest = files.filter(file => !heldFiles.has(file.url) && !unfit.has(file.url));
       const present = heldFiles.size > 0 && rest.length <= 64 ? undefined : await ports.present?.(rest.map(file => file.url)).catch(() => undefined);
-      // Bulk native metadata avoids hundreds of cache IPC calls. Unmapped
-      // responses (older synthetic URLs/redirects) retain the exact hit check.
+      // Optional portable metadata adapters may answer known hits. The native
+      // adapter deliberately uses exact per-file checks instead of a census.
       await Promise.all(rest.map(async file => {
         if (present?.has(file.url) === true) { credit(file); return; }
         const hit = await ports.cached(file.url);
@@ -485,7 +502,8 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             if (body.length !== file.bytes) { void cachedCopy?.body?.cancel().catch(() => undefined); throw new Error(`Spawn file size differs: ${new URL(file.url).pathname}`); }
             // a job cancelled during the unabortable store publishes nothing to the page (sp-x2: after control it would)
             const stored = cachedCopy !== undefined && await keepCopy(ports.store, file.url, cachedCopy);
-            controller.signal.throwIfAborted(); if (stored) serve(file);
+            controller.signal.throwIfAborted();
+            if (stored) serve(file); else members.set(file.url, Promise.resolve(Uint8Array.from(body)));
             settleFile(file.url, stored); landed(file.url); wireCompleted += file.wireBytes; filesDone++; publish();
           } finally { landed(file.url); inFlight.delete(file.url); active--; if (demandedFlight.delete(file.url)) demandsActive--; nudge(); }
         }
@@ -576,7 +594,8 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         controller.signal.throwIfAborted();
         // Index entries remain hints; the next boot verifies every native body.
         if (!cacheWriteDenied && stored.size > 0 && ports.held !== undefined) {
-          const kept = Object.entries(heldIndex).filter(([hash]) => !stored.has(hash));
+          const liveHashes = new Set(parts.map(part => part.hash));
+          const kept = Object.entries(heldIndex).filter(([hash]) => liveHashes.has(hash) && !stored.has(hash));
           await ports.held.write(Object.fromEntries([...kept, ...stored])).catch(() => undefined);
         }
         } finally { partsRunning = false; nudge(); }
