@@ -14,3 +14,7 @@ hosts and regular-expression exec calls are not process launches.
 Parity pool connections inspect the actual connected Chromium command
 line before use. Other CDP connections own an explicitly safe raw or
 launchServer process in the same file. Playwright defaults stay enabled.
+
+The focused guard passes three cases in 1.48 seconds. Renderer and
+admission stamps use immutable Git view 5341e21. Peer working-tree
+generated outputs stay untouched. This review opens no browser.
