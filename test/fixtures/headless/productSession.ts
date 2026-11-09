@@ -8,6 +8,9 @@ import {productHeadlessSections} from '../../../src/shared/host/headlessSections
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {builtProduct} from '../builtProduct';
 import {createNativeProofWorker,type NativeProofKind} from '../headless-worker';
+import {recordNativeProcessUsage} from './processUsage';
+
+recordNativeProcessUsage();
 
 export type ProductSessionVariant = Extract<NativeProofKind, 'driftwood' | 'driftwood-trade' | 'nine-flat' | 'nalati-companions' | 'nalati-weapons' | 'nalati-predators' | 'nalati-world' | 'nalati-stealth' | 'nalati-verbs' | 'nalati-kokpar' | 'nalati-chapter' | 'nalati-king' | 'nalati-qara' | 'nalati-titan' | 'nalati-practice' | 'pine-verbs' | 'sky-verbs'>;
 const variantHosts: Readonly<Record<string, string>> = { 'driftwood': 'driftwood-isle', 'driftwood-trade': 'driftwood-isle', 'sky-verbs': 'far-reach', 'pine-verbs': 'pine-hollow', 'nine-flat': 'nine-dragon-stack', 'nalati-companions': 'nalati-grasslands', 'nalati-weapons': 'nalati-grasslands', 'nalati-predators': 'nalati-grasslands', 'nalati-world': 'nalati-grasslands', 'nalati-stealth': 'nalati-grasslands', 'nalati-verbs': 'nalati-grasslands', 'nalati-kokpar': 'nalati-grasslands', 'nalati-chapter': 'nalati-grasslands', 'nalati-king': 'nalati-grasslands', 'nalati-qara': 'nalati-grasslands', 'nalati-titan': 'nalati-grasslands', 'nalati-practice': 'nalati-grasslands' };
