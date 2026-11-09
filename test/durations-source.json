@@ -27,5 +27,18 @@
     "42499045493",
     "42499045448"
   ],
-  "unmeasuredFileBoundSeconds": 60
+  "unmeasuredFileBoundSeconds": 60,
+  "additionalFileObservations": [
+    {
+      "file": "src/client/engine/ui/load-failure-copy.test.ts",
+      "sha": "299fb0ad890e0f7587f7d527fa8ed309aaa2596b",
+      "run": "42699787431",
+      "artifact": 13710457844,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794258690435,
+      "durationMs": 1050.5239569999999,
+      "appliedTo": ["full", "ring1"],
+      "basis": "Successful Linux module diagnostic includes test, collection, setup, preparation and environment. This exact pure DOM case has the same happy-dom environment in both rings and reads no pinned product. No global calibration or unmeasured-file bound changes."
+    }
+  ]
 }

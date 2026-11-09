@@ -224,6 +224,7 @@
   "src/client/engine/ui/layers-still.test.ts": 0.058117537999999996,
   "src/client/engine/ui/loading-bar-rule.test.ts": 0.3318718599999999,
   "src/client/engine/ui/loading-cadence.test.ts": 1.1806646019999998,
+  "src/client/engine/ui/load-failure-copy.test.ts": 1.050523957,
   "src/client/engine/ui/loading-footer.test.ts": 0.47592203999999994,
   "src/client/engine/ui/loading-hold.test.ts": 0.605396603,
   "src/client/engine/ui/loading-manifest.test.ts": 0.6754140660000001,
