@@ -16,7 +16,7 @@ import {once} from 'node:events';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {availableParallelism, homedir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {join, resolve} from 'node:path';
+import {join, resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {Worker} from 'node:worker_threads';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -225,12 +225,28 @@ export interface PartEncoder {
   readonly stats: () => SpawnPartEncoding;
   readonly close: () => Promise<void>;
 }
-export function createPartEncoder(cacheDir: string = process.env['WILDSHARD_SPAWN_PART_CACHE'] ?? resolve(homedir(), '.cache/wildshard/gen/spawn-parts-br/1'),
-  lanes: number = Math.max(1, availableParallelism() - 2)): PartEncoder {
+/** The supervisor alone supplies this grant through its sanitized child environment. */
+function defaultEncoderLanes(): number {
+  const grant = process.env['COOK_CPU_SLOTS'];
+  if (grant === undefined) return Math.max(1, availableParallelism() - 2);
+  const slots = Number(grant);
+  if (!Number.isSafeInteger(slots) || slots < 1) throw new Error('Invalid cook CPU grant');
+  return Math.max(1, Math.min(slots, availableParallelism()) - 1);
+}
+export function createPartEncoder(cacheDir: string = process.env['WILDSHARD_SPAWN_PART_CACHE'] ?? resolvePath(homedir(), '.cache/wildshard/gen/spawn-parts-br/1'),
+  lanes: number = defaultEncoderLanes()): PartEncoder {
+  if (!Number.isSafeInteger(lanes) || lanes < 1) throw new Error('Invalid encoder lane count');
   const idle: Worker[] = [], all: Worker[] = [];
+  const waiting: ((worker: Worker) => void)[] = [];
   let parts = 0, rawBytes = 0, wireBytes = 0, encoded = 0;
+  const acquire = (): Promise<Worker> => {
+    const worker = idle.pop();
+    if (worker !== undefined) return Promise.resolve(worker);
+    if (all.length < lanes) { const fresh = new Worker(ENCODER, {eval: true}); all.push(fresh); return Promise.resolve(fresh); }
+    return new Promise(resolve => { waiting.push(resolve); });
+  };
   const compress = async (body: Uint8Array): Promise<Uint8Array> => {
-    const worker = idle.pop() ?? (() => { const fresh = new Worker(ENCODER, {eval: true}); all.push(fresh); return fresh; })();
+    const worker = await acquire();
     try {
       const reply = once(worker, 'message'); // rejects on the worker's 'error'
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a worker_threads port has no origin.
@@ -238,7 +254,7 @@ export function createPartEncoder(cacheDir: string = process.env['WILDSHARD_SPAW
       const [wire]: unknown[] = await reply;
       if (!(wire instanceof Uint8Array)) throw new Error('Spawn part encoder returned no bytes');
       return wire;
-    } finally { idle.push(worker); }
+    } finally { const next = waiting.shift(); if (next === undefined) idle.push(worker); else next(worker); }
   };
   return {lanes,
     encode: async (body, hash) => {

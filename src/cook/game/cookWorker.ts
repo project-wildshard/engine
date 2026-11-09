@@ -84,6 +84,8 @@ export interface CookLimits {
   readonly heapMB: number;
   /** The job's shardfile cap, when `api-server`'s has moved past D31's. */
   readonly maxBytes?: number;
+  /** Trusted host CPU grant, including the job's coordinating thread. */
+  readonly cpuSlots?: number;
 }
 /** 16 cores and 30 GB on the VPS; Pine's 300 MB ceiling cooks in under two minutes with its proof. */
 export const DEFAULT_LIMITS: CookLimits = {seconds: 600, memoryMB: 6144, heapMB: 4096};
@@ -115,6 +117,10 @@ const CAPTURE_BYTES = 2_000_000;
 /** One child. Its stdout is a report or a refusal; anything else, a crash or a limit, is `killed`. */
 export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string): Promise<JobOutcome> {
   const {root, execPath, loader, script, wrap, limits} = launcher, work = dirname(out);
+  const granted = process.env['WS_CPU_SLOTS'];
+  const slots = [limits.cpuSlots, granted === undefined ? undefined : Number(granted)].filter((value): value is number => value !== undefined);
+  if (slots.some(value => !Number.isSafeInteger(value) || value < 1)) throw new Error('Invalid cook CPU grant');
+  const cpuSlots = slots.length === 0 ? undefined : Math.min(...slots);
   const cache = join(dirname(work), 'cache');
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
   mkdirSync(cache, {recursive: true});
@@ -124,7 +130,8 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   return new Promise(resolve => {
     // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
     // is decoded against its hash before use, so one job can't poison the next.
-    const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES)}, stdio: ['ignore', 'pipe', 'pipe']});
+    const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
+      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)})}, stdio: ['ignore', 'pipe', 'pipe']});
     let stdout = '', stderr = '', peak = 0, why: string | undefined;
     const take = (text: string, kept: string): string => (kept + text).slice(-CAPTURE_BYTES);
     child.stdout.setEncoding('utf8').on('data', (text: string) => { stdout = take(text, stdout); });
