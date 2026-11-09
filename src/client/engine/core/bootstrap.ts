@@ -9,6 +9,7 @@ import { readyWebGLContext } from './webglStartup';
 import { recordBootCheckpoint } from '../boot/bootTrace';
 import { issueBakedPrograms } from '../boot/earlyPrograms';
 import { TERRAIN_RES } from '../../../shared/engine/core/config';
+import { FIXED_STEP } from '../../../shared/engine/core/fixedStep';
 import { Terrain } from '../world/Terrain';
 import { TreeFactory } from '../world/TreeFactory';
 import { Forest } from '../world/forest/Forest';
@@ -153,13 +154,18 @@ export async function bootstrap(step: StepRunner, level: LevelSpec, inputContext
   game.levelScope.listen(canvas, 'click', () => { if (!params.has('nolock') && !world.freeCamera) player.lock(); }); // Explore's free camera keeps the cursor
   // frame phases (Game.ts): input → fixed steps (pre: move the boxes, step: advance the world, post: the player's move) → update → late
   const playing = () => !tour.active && !world.freeCamera;
+  const deviceMode = (): 'frame' | 'live' | 'paused' => app.clock.mode === 'capture' ? 'frame'
+    : playing() && app.state === 'play' && !app.clock.paused && document.visibilityState !== 'hidden' ? 'live' : 'paused';
   // labels name them in error reports; `true` = core: the world step and the player's move can't be switched off (src/shared/engine/core/faults.ts)
   player.inputService = app.input; player.traversalEvents = app.events;
   app.addSystem({ id: 'engine.input.collect', phase: 'input', before: ['engine.player.input'], run: () => { if (playing()) player.collectActions(); else app.input.clear(); } }, game.levelScope);
   game.onInput((dt) => { if (playing()) player.input(dt); }, 'engine.player.input');
   game.onFixed('pre', () => { for (const m of moving) m(); }, 'physics.movers');
   game.onFixed('step', () => { world.physics.step(); }, 'physics.step', true);
-  game.onFixed('post', (dt) => { const on = playing(); player.setBodyEnabled(on); if (on) player.stepDevice(dt); }, 'player.step', true);
+  game.onFixed('post', (dt) => { const on = playing(); player.setBodyEnabled(on); player.link?.pulseDevice?.(deviceMode()); if (on) player.stepDevice(dt); }, 'player.step', true);
+  game.levelScope.interval(FIXED_STEP * 1000, () => {
+    player.link?.pulseDevice?.(deviceMode(), () => player.sampleHeldCommand());
+  });
   game.onUpdate((dt) => {
     if (tour.active) { tour.setTime(tour.time); player.position.copy(game.camera.position); player.position.y -= 1.7; }
     else if (!world.freeCamera) player.update(dt, game.alpha);

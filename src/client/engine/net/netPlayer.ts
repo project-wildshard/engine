@@ -5,6 +5,7 @@ import { Vector3 } from 'three';
 import type { NetCommand } from '@wildshard/format/netCommand';
 import type { OwnHit, WeaponWire } from '../../../shared/engine/combat/Weapon';
 import { NET_BUTTONS } from '../../../shared/engine/input/netButtons';
+import { MAX_FIXED_STEPS } from '../../../shared/engine/core/fixedStep';
 import { quantiseCommand } from '../../../shared/engine/net/command';
 import type { DecodedFrame } from '../../../shared/engine/net/frame';
 import type { NetRide } from '../../../shared/engine/net/messages';
@@ -83,6 +84,8 @@ export class NetPlayer implements PlayerLink {
   private held = 0;
   private afterStep: (() => void) | null = null;
   private frameSteps = 0;
+  private deviceMode: 'frame' | 'live' | 'paused' = 'frame';
+  private inputTick: number | null = null;
   private launcher: NonNullable<NetCommand['launcher']> | null = null;
   private hookLocked = false;
   private hookTarget: number | undefined;
@@ -135,14 +138,53 @@ export class NetPlayer implements PlayerLink {
   /** A fixed step. False, with nothing sent, before the first frame or when a full ring says the server stopped answering. */
   step(input: PlayerWireInput): boolean {
     if (this.respawnHeld || this.seen === null || this.predictor.full) return false;
-    const armed = this.armed(input), seq = this.seq = this.client.command(this.hooked(armed));
-    this.hookLocked = false; this.hookTarget = undefined; this.hookFired = false;
-    this.frameSteps++;
-    if (this.pressStarted || armed.launcher?.fire === true) this.attacks.started(seq);
-    this.pressed = false; this.gust = false; this.pressStarted = false; this.heavyPress = false; this.launcher = null;
+    if (!this.claimInputTick(0)) return false;
+    return this.sendCommand(this.hooked(this.armed(input)), true);
+  }
+  /** Keep sustained controls on the server's clock when GPU presentation is
+   * slow. Reserve a render frame's bounded steps for presses/weapon sequences;
+   * never replay an edge, grant elapsed-time credit, or change capture clocks. */
+  pulseDevice(mode: 'frame' | 'live' | 'paused', readHeld?: () => PlayerWireInput): void {
+    if (mode !== this.deviceMode || mode === 'paused') {
+      this.deviceMode = mode;
+      this.inputTick = mode === 'live' ? Math.max(0, (this.client.latest?.tick ?? 0) - MAX_FIXED_STEPS) : this.client.latest?.tick ?? null;
+    }
+    if (mode !== 'live' || readHeld === undefined || this.respawnHeld || this.player.ride !== null) return;
+    this.reconcile(false);
+    if (this.seen === null || this.predictor.full || this.pressed || this.gust || this.pressStarted || this.heavyPress
+      || this.launcher !== null || this.afterStep !== null || this.hookLocked || this.hookFired) return;
+    if (!this.claimInputTick(MAX_FIXED_STEPS)) return;
+    const held = readHeld(), target = this.lockTarget();
+    const edges = NET_BUTTONS.jump | NET_BUTTONS.dodge | NET_BUTTONS.hover | NET_BUTTONS.secondary | NET_BUTTONS.lock;
+    const input = {...held, buttons: (held.buttons & ~edges) | (this.heavy ? NET_BUTTONS.heavy : 0), ...(target === undefined ? {} : {lockTarget: target})};
+    this.sendCommand(input, false);
+    for (let at = 1; at < MAX_FIXED_STEPS && !this.predictor.full && this.claimInputTick(MAX_FIXED_STEPS); at++) this.sendCommand(input, false);
+    this.client.flush();
+  }
+  private claimInputTick(reserve: number): boolean {
+    if (this.deviceMode === 'frame') return true;
+    if (this.deviceMode === 'paused') return false;
+    const tick = this.client.latest?.tick;
+    if (tick === undefined) return false;
+    const previous = this.inputTick;
+    let consumed = previous === null || previous > tick ? Math.max(0, tick - MAX_FIXED_STEPS) : previous;
+    consumed = Math.max(consumed, tick - MAX_FIXED_STEPS - reserve);
+    this.inputTick = consumed;
+    if (tick - consumed <= reserve) return false;
+    this.inputTick++; return true;
+  }
+  private sendCommand(input: Parameters<NetClient['command']>[0], actions: boolean): boolean {
+    const seq = this.seq = this.client.command(input);
+    if (actions) {
+      this.hookLocked = false; this.hookTarget = undefined; this.hookFired = false;
+      this.frameSteps++;
+      if (this.pressStarted || input.launcher?.fire === true) this.attacks.started(seq);
+      this.pressed = false; this.gust = false; this.pressStarted = false; this.heavyPress = false; this.launcher = null;
+    }
     this.world.poseFor(seq, false);
-    const stepped = this.predictor.step(quantiseCommand({ ...armed, seq, viewTick: 0 })), run = this.afterStep;
-    this.afterStep = null; run?.();
+    const stepped = this.predictor.step(quantiseCommand({ ...input, seq, viewTick: 0 })), run = actions ? this.afterStep : null;
+    if (actions) this.afterStep = null;
+    run?.();
     return stepped;
   }
   /** The step's controls, with what the weapon in hand has for this command. */
@@ -156,8 +198,8 @@ export class NetPlayer implements PlayerLink {
     return { ...armed, buttons: armed.buttons | lock | jump, ...(hookTarget === undefined ? {} : { hookTarget }) };
   }
   /** The start of a render frame, before its fixed steps: the newest owner block, compared once. */
-  reconcile(): void {
-    this.frameSteps = 0;
+  reconcile(frameStart = true): void {
+    if (frameStart) this.frameSteps = 0;
     const frame = this.client.latest;
     if (this.respawnHeld || frame === null || frame === this.seen || !this.inCell(frame.cell)) return;
     const first = this.seen === null, { seat } = this;

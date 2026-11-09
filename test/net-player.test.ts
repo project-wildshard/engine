@@ -20,10 +20,10 @@ const scenario: MotionScenario = { id: 'net-player', start: { x: -10, z: 0, yaw:
 /** mulberry32. */
 const seeded = (seed: number): (() => number) => { let a = seed; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32; }; };
 
-interface Run { readonly commands: number; readonly steps: number; readonly corrections: number; readonly replays: number; readonly offset: number; readonly feetGap: number; readonly delayMs: number; readonly drawn: readonly number[]; readonly rowSpeed: number }
+interface Run { readonly commands: number; readonly steps: number; readonly corrections: number; readonly replays: number; readonly offset: number; readonly feetGap: number; readonly delayMs: number; readonly drawn: readonly number[]; readonly rowSpeed: number; readonly x: number }
 
 /** Play `seconds` at a frame time, with the server ticking on its own clock in batches of two. */
-function play(seconds: number, frameMs: (frame: number) => number, press: (frame: number, page: PageSide) => void = () => undefined): Run {
+function play(seconds: number, frameMs: (frame: number) => number, press: (frame: number, page: PageSide) => void = () => undefined, pacing?: (seconds: number) => 'live' | 'paused' | 'frame'): Run {
   const page = new PageSide(R, scenario), host = new HostSide(R, scenario), link = directLoopback();
   let clock = 0;
   const client = new NetClient(link.client, () => clock), { player } = page;
@@ -37,20 +37,27 @@ function play(seconds: number, frameMs: (frame: number) => number, press: (frame
   if (body === undefined) throw new Error('No body on the server');
   player.link = net; player.keys.add('KeyW'); player.locked = true; body.harnessHold = true;
   const speed = 3 * FIXED_STEP, drawn: number[] = [], out = new Float64Array(16);
-  let due = 0, acc = 0, commands = 0, nextTick = 0, last = 0, frame = 0, handle = 0;
+  let due = 0, acc = 0, commands = 0, nextTick = 0, nextPulse = 0, last = 0, frame = 0, handle = 0;
+  const command = client.command.bind(client);
+  client.command = input => { commands++; return command(input); };
   for (const [id, info] of client.entities) if (info.id === body.entityId) handle = id;
   const end = seconds * 1000;
   while (clock < end) {
     const tick = (): void => { body.position.x += speed; room.tick(); };
-    if (nextTick <= due) { for (let run = 0; run < 2; run++) tick(); nextTick += 2 * TICK_MS * 60 / 59.9; link.pump(); clock = Math.max(clock, nextTick - 2 * TICK_MS); continue; }
+    if (nextTick <= Math.min(due, pacing === undefined ? Infinity : nextPulse)) { for (let run = 0; run < 2; run++) tick(); nextTick += 2 * TICK_MS * 60 / 59.9; link.pump(); clock = Math.max(clock, nextTick - 2 * TICK_MS); continue; }
+    if (pacing !== undefined && nextPulse < due) {
+      clock = nextPulse;
+      net.pulseDevice(pacing(clock / 1000), () => player.sampleHeldCommand());
+      link.pump(); nextPulse += TICK_MS; continue;
+    }
     clock = due;
     const dt = (clock - last) / 1000;
     last = clock;
     press(frame, page);
-    net.reconcile(); player.input(dt);
+    net.reconcile(); if (pacing !== undefined) net.pulseDevice(pacing(clock / 1000)); player.input(dt);
     acc += dt;
     let ran = 0;
-    while (acc >= FIXED_STEP && ran < MAX_FIXED_STEPS) { page.stepWorld(); player.setBodyEnabled(true); const before = net.predictor.pending; player.stepDevice(FIXED_STEP); if (net.predictor.pending > before) commands++; acc -= FIXED_STEP; ran++; }
+    while (acc >= FIXED_STEP && ran < MAX_FIXED_STEPS) { page.stepWorld(); player.setBodyEnabled(true); player.stepDevice(FIXED_STEP); acc -= FIXED_STEP; ran++; }
     if (ran === MAX_FIXED_STEPS && acc >= FIXED_STEP) acc %= FIXED_STEP;
     player.update(dt, acc / FIXED_STEP);
     net.present(dt); link.pump();
@@ -60,7 +67,7 @@ function play(seconds: number, frameMs: (frame: number) => number, press: (frame
   }
   for (let settle = 0; settle < 6; settle++) { for (let run = 0; run < 2; run++) room.tick(); link.pump(); }
   net.reconcile();
-  const report = { commands, steps: room.lastSeq(seat), corrections: net.predictor.corrections, replays: net.predictor.replays, offset: net.worstOffset, feetGap: player.position.distanceTo(host.player.position), delayMs: client.clock.delayMs, drawn, rowSpeed: speed };
+  const report = { commands, steps: room.lastSeq(seat), corrections: net.predictor.corrections, replays: net.predictor.replays, offset: net.worstOffset, feetGap: player.position.distanceTo(host.player.position), delayMs: client.clock.delayMs, drawn, rowSpeed: speed, x: host.player.position.x };
   net.dispose(); room.dispose(); page.dispose(); host.dispose();
   return report;
 }
@@ -93,4 +100,33 @@ test('a jump and a dodge reach the server on the seq that ran them', () => {
 test('a board press waits for its command, and both sides step on it', () => {
   const run = play(3, lowPower(), (frame, page) => { if (frame === 20) page.player.setHover(true); });
   expect(run.corrections).toBe(0);
+});
+
+
+test.each([1, 7])('%s rendered frames/s: real held movement follows server ticks', fps => {
+  const run = play(5, () => 1000 / fps, () => undefined, () => 'live');
+  expect(run.commands).toBeGreaterThan(270);
+  expect(run.commands).toBeLessThanOrEqual(305);
+  expect(run.steps).toBe(run.commands);
+  expect(run.corrections).toBe(0);
+  expect(run.feetGap).toBeLessThan(0.02);
+});
+
+
+test('a released sustained control stops, and a paused clock grants no replay credit', () => {
+  const release = play(5, () => 1000, (frame, page) => { if (frame === 1) page.player.keys.delete('KeyW'); }, () => 'live');
+  const paused = play(5, () => 1000, () => undefined, seconds => seconds < 1 || seconds >= 4 ? 'live' : 'paused');
+  const continuous = play(5, () => 1000, () => undefined, () => 'live');
+  expect(release.x - scenario.start.x).toBeLessThan(6);
+  expect(continuous.x - release.x).toBeGreaterThan(8);
+  expect(paused.commands).toBeGreaterThan(80);
+  expect(paused.commands).toBeLessThan(125);
+  expect(paused.steps).toBe(paused.commands);
+  expect(paused.feetGap).toBeLessThan(0.02);
+});
+
+test('capture retains the original bounded render-driven device clock', () => {
+  const run = play(5, () => 1000, () => undefined, () => 'frame');
+  expect(run.commands).toBeLessThanOrEqual(18);
+  expect(run.steps).toBe(run.commands);
 });

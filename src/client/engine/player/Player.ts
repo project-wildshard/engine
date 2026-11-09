@@ -39,6 +39,9 @@ export type PlayerWireInput = Pick<NetCommand, 'steer' | 'yaw' | 'pitch' | 'butt
 /** Where a controls step goes when a server owns this body: `client/net/netPlayer.ts`. False: the step did not run. */
 export interface PlayerLink {
   readonly step: (input: PlayerWireInput) => boolean;
+  /** Optional live device clock. Frame mode preserves deterministic capture;
+   * paused grants no input credit. A producer peeks without consuming presses. */
+  readonly pulseDevice?: (mode: 'frame' | 'live' | 'paused', held?: () => PlayerWireInput) => void;
   /** A harness moved this player: tell the server, whose word it is. */
   readonly place?: (x: number, y: number, z: number, yaw: number) => void;
 }
@@ -470,6 +473,17 @@ export class Player {
       | (dive ? NET_BUTTONS.dive : 0) | (surface ? NET_BUTTONS.surface : 0) | (board ? NET_BUTTONS.hover : 0) | (input?.held('skip') === true ? NET_BUTTONS.skip : 0)
       | (this.hoverBoost && isDev() ? NET_BUTTONS.boost : 0);
     return { steer, yaw: this.yaw, pitch: this.pitch, buttons };
+  }
+
+  /** Read sustained movement without advancing aim, rides or consuming presses.
+   * The live network clock uses this between rendered frames. */
+  sampleHeldCommand(): PlayerWireInput {
+    const input = this.inputService, k = this.keys, move = this.moveInput();
+    const buttons = (((input?.held('sprint') ?? k.has('ShiftLeft')) || this.touchSprint) ? NET_BUTTONS.sprint : 0)
+      | (this.crouchWanted ? NET_BUTTONS.crouch : 0)
+      | (((input?.held('dive') ?? k.has('Space')) || this.touchDive) ? NET_BUTTONS.dive : 0)
+      | (((input?.held('surface') ?? (k.has('ShiftLeft') || k.has('ShiftRight'))) || this.touchSurface) ? NET_BUTTONS.surface : 0);
+    return { steer: { keyX: 0, keyY: 0, stickX: move.x, stickY: move.y }, yaw: this.yaw, pitch: this.pitch, buttons };
   }
 
   /**
