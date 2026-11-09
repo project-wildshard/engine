@@ -23,3 +23,6 @@ Readings on 4f31a1d (before) and the patched tree (after), Far Reach, select flo
 - Chromium 10x CPU: before +1 program at 13.4 s, longest 100 ms; after +0, roc drawn at 216 m, longest 81.7 ms.
 - Boots of seven shards in Chromium and five in WebKit reach ready with no errors; 0-26 rigs, +3 or 4 programs each,
   0.1-0.5 s more to ready on this Mac.
+
+The first push gate failed finish-composer-order: its fixture had no `animals`. The fixture now records the staging,
+after the composer in all three orders.

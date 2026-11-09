@@ -36,23 +36,24 @@ function fixture(options: {owned?: boolean; live?: boolean; standalone?: boolean
       buildComposer: () => {calls.push('build');},
       sky: {prepareLayers: () => {calls.push('layers');}},
     },
+    animals: {stageWarmRigs: () => {calls.push('warm-rigs');}},
   };
   return {calls, run: async (): Promise<void> => {await Reflect.apply(method, undefined, [ctx]);}};
 }
 
 test('initial owned home prepares one composer before world construction', async () => {
   const f = fixture(); await f.run();
-  expect(f.calls).toEqual(['prepare', 'build', 'home', 'metadata', 'enter', 'reload', 'road', 'turn', 'road-ready', 'frame', 'layers']);
+  expect(f.calls).toEqual(['prepare', 'build', 'home', 'metadata', 'enter', 'reload', 'road', 'turn', 'road-ready', 'warm-rigs', 'frame', 'layers']);
 });
 
 test('legacy grid entry retains late composer preparation', async () => {
   const f = fixture({owned: false}); await f.run();
-  expect(f.calls).toEqual(['home', 'reload', 'road', 'turn', 'road-ready', 'prepare', 'build', 'frame', 'layers']);
+  expect(f.calls).toEqual(['home', 'reload', 'road', 'turn', 'road-ready', 'prepare', 'build', 'warm-rigs', 'frame', 'layers']);
 });
 
 test('standalone retains its sky clock before composer allocation', async () => {
   const f = fixture({owned: false, live: false, standalone: true}); await f.run();
-  expect(f.calls).toEqual(['turn', 'sky-clock', 'prepare', 'build', 'layers']);
+  expect(f.calls).toEqual(['turn', 'sky-clock', 'prepare', 'build', 'warm-rigs', 'layers']);
 });
 
 test('composer preparation refusal does not start a partial home', async () => {
