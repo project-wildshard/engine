@@ -22,6 +22,7 @@ import { ShopGate } from './shopGate';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
 import { LEFT } from './socketPump';
 import type {PlaytestHit} from './playtest';
+import {hitHistoryOf} from '@wildshard/engine/combat/rewind';
 
 /** A fresh seat's step aside from the spawn, in metres, in turn. */
 const SPAWN_ASIDE: readonly number[] = [0, 1, -1, 0.5, -0.5];
@@ -92,7 +93,10 @@ export class DedicatedRoom {
     this.net.open();
     this.parkLead();
     this.shop = new ShopGate(this.host);
-    if(options.playtest!==undefined)this.host.events.on('damage.dealt',({req,dealt})=>{options.playtest?.({kind:'hit',tick:this.host.state.tick,amount:dealt,network:req.attackSeq!==undefined,rewind:req.rewind??{requested:0,applied:0,clamped:false}});},this.host.scope);
+    if(options.playtest!==undefined){
+      const history=hitHistoryOf(this.host);if(history!==undefined)history.measureRewinds=true;
+      this.host.events.on('damage.dealt',({req,dealt})=>{options.playtest?.({kind:'hit',tick:this.host.state.tick,amount:dealt,network:req.attackSeq!==undefined,rewind:req.rewind??{requested:0,applied:0,clamped:false}});},this.host.scope);
+    }
     // E7.7: a room shares one sky, and no client's word moves it.
     actRoutes(this.host).climate = null;
     actRoutes(this.host).time = null;

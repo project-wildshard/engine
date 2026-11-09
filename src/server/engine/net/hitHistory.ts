@@ -20,7 +20,7 @@ export const HIT_HISTORY_BYTES: number = ROWS * FIELDS * Float32Array.BYTES_PER_
  * shape is the present one, so a posed joint reads today's pose at the old place, which holds for 200 ms of animation.
  */
 export class RewoundBody {
-  rewind:HitRewind={requested:0,applied:0,clamped:false};
+  rewind:HitRewind|undefined;
   readonly position: Vector3 = new Vector3();
   readonly body: AnimalSim;
   private cos = 1; private sin = 0;
@@ -57,6 +57,8 @@ interface Track { readonly body: AnimalSim; readonly rows: Float32Array; readonl
 
 /** Each hittable's last `ROWS` ticks. It reads the sim and writes nothing back, so nothing it holds is saved: a restored room starts empty and reads the present. */
 export class HitHistory {
+  /** Only an operator playtest allocates per-query measurement metadata. */
+  measureRewinds=false;
   private readonly host: SimHost;
   private readonly tracks = new Map<string, Track>();
   private readonly roster: RewoundBody[] = [];
@@ -103,7 +105,7 @@ export class HitHistory {
     const { roster, tracks } = this; roster.length = 0;
     for (const [id, body] of this.host.entities) {
       const track = tracks.get(id);
-      if (track?.body === body){const seen=this.stand(track,tick);seen.rewind={requested,applied:now-Math.max(tick,track.first),clamped:requested>REWIND_TICKS};roster.push(seen);}
+      if (track?.body === body){const seen=this.stand(track,tick);if(this.measureRewinds)seen.rewind={requested,applied:now-Math.max(tick,track.first),clamped:requested>REWIND_TICKS};roster.push(seen);}
     }
     return roster;
   }

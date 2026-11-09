@@ -3,7 +3,11 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The proof owns its log directory.
 import {mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the operator's real table CLI.
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
+// oxlint-disable-next-line import/no-nodejs-modules -- The CLI export talks to a real loopback HTTP origin.
+import {createServer} from 'node:http';
+// oxlint-disable-next-line import/no-nodejs-modules -- The loopback port is allocated by the OS.
+import type {AddressInfo} from 'node:net';
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch is supplied by the proof operator.
 import {join} from 'node:path';
 import {WebSocket as RawSocket} from 'ws';
@@ -44,7 +48,7 @@ test('two actual online seats report corrections and settled rewind to the opera
   expect(net.predictor.corrections).toBeGreaterThan(0);
   await vi.waitFor(()=>{expect(room.host.state.tick).toBeGreaterThan(25);},{timeout:1000,interval:10});
   const seen=hitHistoryOf(room.host)?.at(room.host.state.tick-20)?.find(row=>row.body.alive);
-  if(seen===undefined)throw new Error('No admitted native target');
+  if(seen===undefined||seen.rewind===undefined)throw new Error('No admitted native target with playtest observation');
   const target=seen.body.combatActor();
   const hit=room.host.combat.hit(seenRequest({source:player.health,sourceTags:[],target,amount:1,point:seen.body.position.clone(),dir:new Vector3(1,0,0),attackSeq:1},{seen:seen.position.clone(),rewind:seen.rewind}));
   expect(hit).not.toBeNull();
@@ -66,6 +70,18 @@ test('two actual online seats report corrections and settled rewind to the opera
   const table=JSON.parse(execFileSync(process.execPath,['scripts/e7-playtest-table.mjs','--json',exportFile,...readdirSync(directory).filter(name=>name.startsWith('playtest-')).map(name=>join(directory,name))],{encoding:'utf8'}));
   expect(table.clients).toHaveLength(2);expect(table.rewind).toMatchObject({settledNetworkHits:1,clamped:1,clampedPercent:100,reviewJ127:true});
   expect(table.playtest).toMatchObject({complete:true,dropped:0});
+  const server=createServer((request,response)=>{
+   if(request.headers['x-review-password']!=='fixture-review'){response.writeHead(401).end();return;}
+   response.setHeader('content-type','application/json');response.end(JSON.stringify({records:records.map(({kind,build,install,session,level,tag,corrections,...metrics})=>({kind,build,install,session,shard:level,tag,corrections,metrics}))}));
+  });
+  await new Promise<void>(resolve=>{server.listen(0,'127.0.0.1',resolve);});
+  try{
+   const address=server.address() as AddressInfo;
+   const child=spawn(process.execPath,['scripts/e7-playtest-table.mjs','--api',`http://127.0.0.1:${address.port}`,'--day',new Date().toISOString().slice(0,10),'--tag','sitting-proof','--json'],{env:{...process.env,WS_TELEMETRY_REVIEW_PASSWORD:'fixture-review'},stdio:['ignore','pipe','pipe'],timeout:5000});
+   let output='',errors='';child.stdout.on('data',bytes=>{output+=String(bytes);});child.stderr.on('data',bytes=>{errors+=String(bytes);});
+   const code=await new Promise(resolve=>{child.once('exit',resolve);});expect(code,errors).toBe(0);
+   expect(JSON.parse(output).clients).toHaveLength(2);
+  }finally{server.closeAllConnections();await new Promise<void>(resolve=>{server.close(()=>{resolve();});});}
  }finally{net?.dispose();a.dispose();b.dispose();page.dispose();await bench.close();await file.close();vi.unstubAllGlobals();rmSync(directory,{recursive:true,force:true});}
 });
 

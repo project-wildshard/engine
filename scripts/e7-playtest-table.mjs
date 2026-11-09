@@ -3,6 +3,7 @@
 import {readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {resolve as resolvePath} from 'node:path';
+import {parseArgs} from 'node:util';
 
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -39,10 +40,22 @@ export function sittingTable(rows){
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolvePath(process.argv[1])).href){
- const files=process.argv.slice(2).filter(arg=>arg!=='--json');if(files.length===0)throw new Error('Usage: e7-playtest-table.mjs [--json] room-export.jsonl net-export.jsonl playtest-date.jsonl');
+ const {values,positionals:files}=parseArgs({allowPositionals:true,options:{json:{type:'boolean'},api:{type:'string'},day:{type:'string'},tag:{type:'string'}}});
+ if(files.length===0&&values.api===undefined)throw new Error('Usage: e7-playtest-table.mjs [--api origin --day YYYY-MM-DD --tag sitting] [--json] exported.jsonl playtest-date.jsonl');
  const rows=files.flatMap(file=>readFileSync(file,'utf8').split('\n').filter(line=>line.trim()!=='').map((line,index)=>{try{const value=JSON.parse(line);if(!record(value))throw new Error('record');return value;}catch{throw new Error(`Invalid JSON record: ${file}:${index+1}`);}}));
+ if(values.api!==undefined){
+  const password=process.env.WS_TELEMETRY_REVIEW_PASSWORD;if(!password)throw new Error('Set WS_TELEMETRY_REVIEW_PASSWORD for the authenticated export');
+  if(values.day===undefined||!/^\d{4}-\d{2}-\d{2}$/u.test(values.day))throw new Error('A valid --day is required for a Blob export');
+  const url=new URL('/api/telemetry',values.api);
+  if(url.protocol!=='https:'&&!(url.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(url.hostname)))throw new Error('The authenticated export requires HTTPS or loopback');
+  url.searchParams.set('records','e7');url.searchParams.set('day',values.day);if(values.tag!==undefined)url.searchParams.set('tag',values.tag);
+  const response=await fetch(url,{headers:{'x-review-password':password},redirect:'error',signal:AbortSignal.timeout(15_000)});
+  if(!response.ok)throw new Error(`E7 telemetry export refused HTTP${response.status}`);
+  const value=await response.json();if(!record(value)||!Array.isArray(value.records)||!value.records.every(record))throw new Error('Invalid E7 telemetry export');
+  rows.push(...value.records);
+ }
  const table=sittingTable(rows);
- if(process.argv.includes('--json'))console.log(JSON.stringify(table));
+ if(values.json)console.log(JSON.stringify(table));
  else{
   /** @param {unknown} value */
   const show=value=>typeof value==='number'?value.toFixed(2):'unknown';

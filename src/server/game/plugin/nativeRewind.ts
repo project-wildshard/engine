@@ -23,7 +23,7 @@ export function seenRay(bodies: readonly RewoundBody[], origin: Vector3, directi
   if (hit === null || body === null) return null;
   contact.body = body.body; contact.head = hit.head; contact.distance = hit.distance;
   contact.seen.copy(hit.point); body.present(hit.point, contact.point);
-  contact.rewind=body.rewind;
+  if(body.rewind===undefined)delete contact.rewind;else contact.rewind=body.rewind;
   return contact;
 }
 /** How far `target` stood from where it stands now, for aim at a named body; null when it has not moved for this view. */

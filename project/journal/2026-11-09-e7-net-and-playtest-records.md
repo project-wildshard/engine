@@ -47,5 +47,12 @@ PLAYTEST_DIR to that owned writable root in the unit and documents it; the
 direct-launch default remains the original /var/log/wildshard path. No global
 directory permission or VPS setting is changed by this lane.
 
+The operator CLI can fetch the actual authenticated day/tag export directly
+with --api/--day/--tag and WS_TELEMETRY_REVIEW_PASSWORD supplied by the operator;
+it reads no credential file and prints no password. The real API route export
+has old400/new200 evidence, preserving401 without authentication. The engine
+proof also runs the actual CLI against a real loopback HTTP export of its live
+records. Normal non-playtest server queries allocate no rewind metadata.
+
 Publication is held through port's v0.1.3 tag window. Page and server must be
 built from the later same committed build to use these additions.
