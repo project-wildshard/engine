@@ -1,11 +1,23 @@
 import {execFileSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
-import {mkdirSync,readFileSync,renameSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdirSync,readFileSync,renameSync,writeFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
 import * as v from 'valibot';
+import {readLiftPending} from './lift-pending.mjs';
 
-const receiptSchema=v.object({version:v.literal(1),tree:v.string(),runtime:v.string(),run:v.string(),commit:v.string(),
-  finished:v.string(),seconds:v.number(),mode:v.picklist(['full','related','docs']),files:v.array(v.string())});
+const exclusionsSchema=v.object({files:v.array(v.string()),deadline:v.nullable(v.string())});
+const receiptSchema=v.object({version:v.literal(2),tree:v.string(),runtime:v.string(),run:v.string(),commit:v.string(),
+  finished:v.string(),seconds:v.number(),mode:v.picklist(['full','related','docs']),files:v.array(v.string()),exclusions:exclusionsSchema});
+/** Local pushEnvironment removes ring/quarantine modes. The lift policy is the
+ * same time-dependent exclusion reader used by the actual Vitest config.
+ * @param {string} root */
+function exclusionScope(root){
+  const inventory=existsSync(resolve(root,'test/lift-pending.json')),policy=existsSync(resolve(root,'test/lift-pending-policy.json'));
+  if(inventory!==policy)throw new Error('Incomplete time-based test exclusion policy');
+  if(!inventory)return {files:[],deadline:null};
+  const state=readLiftPending(root);
+  return {files:[...state.excluded].sort(),deadline:state.deadline};
+}
 
 /** Never cache dirty bytes or use local receipts to skip CI.
  * @param {string} profile @param {NodeJS.ProcessEnv} env @param {string} [cwd] */
@@ -30,8 +42,9 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   }
   const excluded=/^(?:WS_PUSH_REFS|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
-  const runtime=createHash('sha256').update(JSON.stringify({profile,node:process.versions,platform:process.platform,arch:process.arch,environment})).digest('hex');
-  return {tree,commit,runtime,file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
+  const exclusions=exclusionScope(cwd);
+  const runtime=createHash('sha256').update(JSON.stringify({profile,node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions})).digest('hex');
+  return {tree,commit,runtime,root:resolve(cwd),exclusions,file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
 
 /** A partial result covers only its own complete selection, never a full fallback.
@@ -41,6 +54,7 @@ export function readPushProof(context,selection){
   try{
     const proof=v.parse(receiptSchema,JSON.parse(readFileSync(context.file,'utf8')));
     if(proof.tree!==context.tree||proof.runtime!==context.runtime||!Number.isFinite(Date.parse(proof.finished))||proof.seconds<0||proof.run==='')return null;
+    if(JSON.stringify(proof.exclusions)!==JSON.stringify(context.exclusions)||JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions))return null;
     const covers=proof.mode==='full'||(proof.mode===selection.mode&&selection.files.every(file=>proof.files.includes(file)));
     return covers?proof:null;
   }catch{return null;}
@@ -50,8 +64,9 @@ export function readPushProof(context,selection){
  * @param {NonNullable<ReturnType<typeof capturePushTree>>} context
  * @param {{mode:'full'|'related'|'docs',files:string[]}} selection @param {number} seconds */
 export function writePushProof(context,selection,seconds){
-  const proof={version:1,tree:context.tree,runtime:context.runtime,run:randomUUID(),commit:context.commit,
-    finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files};
+  if(JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions))throw new Error('Push proof exclusion scope changed while checking; rerun the full gate');
+  const proof={version:2,tree:context.tree,runtime:context.runtime,run:randomUUID(),commit:context.commit,
+    finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:context.exclusions};
   mkdirSync(dirname(context.file),{recursive:true});
   const temporary=`${context.file}.${process.pid}`;writeFileSync(temporary,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(temporary,context.file);
   return proof;
