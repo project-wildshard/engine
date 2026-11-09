@@ -106,3 +106,26 @@ test('the production HTTP carry preserves old JS/CSS and refuses a truncated bod
     rmSync(root, {recursive: true, force: true});
   }
 });
+
+test('J217 (LD6): a newer deploy shares unchanged code and still serves an old build every file it names', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-shared-'));
+  const output = (name: string, shared: Readonly<Record<string, string>>): string => {
+    const dir = join(root, name); mkdirSync(join(dir, `b/${name}`), {recursive: true}); mkdirSync(join(dir, 'b/c'), {recursive: true});
+    writeFileSync(join(dir, 'version.json'), JSON.stringify({build: name}));
+    writeFileSync(join(dir, `b/${name}/main-${name.repeat(8)}.js`), `import "../c/${Object.keys(shared).join('";import "../c/')}";`);
+    for (const [file, body] of Object.entries(shared)) writeFileSync(join(dir, `b/c/${file}`), body);
+    return dir;
+  };
+  try {
+    // The old build's page holds its entry, the chunk both builds share, and the chunk only it uses.
+    const old = output('a', {'world-11111111.js': 'world', 'oldonly-22222222.js': 'old'}); await carryPreviousDeploy(old);
+    const next = output('b', {'world-11111111.js': 'world', 'newonly-33333333.js': 'new'});
+    expect(await carryPreviousDeploy(next, {previousDirectory: old})).toMatchObject({builds: 2, carried: 2});
+    // Every file the old build names is in the newer deploy, unchanged: its entry and its own chunk carried, the shared one once.
+    const manifest = JSON.parse(readFileSync(join(next, 'deploy-chunks.json'), 'utf8')) as {builds: {build: string; files: {path: string}[]}[]};
+    const oldGraph = manifest.builds.find(row => row.build === 'a');
+    expect(oldGraph?.files.map(row => row.path)).toEqual(['b/a/main-aaaaaaaa.js', 'b/c/oldonly-22222222.js', 'b/c/world-11111111.js']);
+    for (const row of oldGraph?.files ?? []) expect(readFileSync(join(next, row.path))).toEqual(readFileSync(join(old, row.path)));
+    expect(manifest.builds.find(row => row.build === 'b')?.files.map(row => row.path)).toEqual(['b/b/main-bbbbbbbb.js', 'b/c/newonly-33333333.js', 'b/c/world-11111111.js']);
+  } finally {rmSync(root, {recursive: true, force: true});}
+});

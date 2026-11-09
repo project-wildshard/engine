@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { rapierAlias } from './vite/rapier';
 import { assertHeavyLease } from './scripts/heavy-lane-lease.mjs';
 import { buildValidationReceipts } from './scripts/app-build/validationReceipts.mjs';
-import { BUILD_ID_EXPRESSION, VALIDATOR_EXPRESSION, VERDICTS_EXPRESSION, codeDirectory } from './scripts/app-build/buildIdentity.mjs';
+import { BUILD_ID_EXPRESSION, VALIDATOR_EXPRESSION, VERDICTS_EXPRESSION, SHARED_CODE_DIRECTORY, codeDirectory } from './scripts/app-build/buildIdentity.mjs';
 import { controlChunkGroups, controlChunkFileName } from './scripts/app-build/controlChunks';
 
 /** The world map atlas's define, as scripts/app-build/worldMapAtlas.ts baked it before the bundle. */
@@ -23,6 +23,8 @@ export default defineConfig(({ mode, command }) => {
   // J57, J131: the web build's code, CSS and wasm go under its immutable folder; build-app mints the id. Other emitted
   // files are content-named and stay under /assets/.
   const build = process.env['WS_BUILD_ID'], code = build === undefined ? 'assets' : codeDirectory(build);
+  // J217 (LD6): non-entry chunks, CSS and wasm are named by content in a folder every build shares; the entry stays in `code`
+  const shared = build === undefined ? 'assets' : SHARED_CODE_DIRECTORY;
   const validationRevision = shardfileValidationRevision();
   buildValidationReceipts(validationRevision); // Fail before bundling on any stale or missing product.
   return {
@@ -40,8 +42,8 @@ export default defineConfig(({ mode, command }) => {
         input: { main: join(process.cwd(), 'index.html'), calibration: join(process.cwd(), 'calibration/index.html') },
         preserveEntrySignatures: false,
         output: {
-          strictExecutionOrder: true, chunkFileNames: chunk => controlChunkFileName(chunk, code),
-          assetFileNames: asset => `${asset.names.some(name => /\.(?:js|css|wasm)$/u.test(name)) ? code : 'assets'}/[name]-[hash][extname]`,
+          strictExecutionOrder: true, chunkFileNames: chunk => controlChunkFileName(chunk, shared),
+          assetFileNames: asset => `${asset.names.some(name => /\.(?:js|css|wasm)$/u.test(name)) ? shared : 'assets'}/[name]-[hash][extname]`,
           codeSplitting: { groups: controlChunkGroups(process.cwd()) },
         },
       },

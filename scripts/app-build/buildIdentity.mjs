@@ -26,6 +26,10 @@ export function newBuildId() {
  * this name in an uncached document points a tab at a build.
  * @param {string} build */
 export const codeDirectory = (build) => `b/${build}`;
+/** J217 (Jake, 2026-11-09), LD6: a chunk or stylesheet a deploy did not change keeps its URL. Content-named code that is not
+ * an entry lives in one folder every build shares, so a phone holds it across deploys; each build's entry and document stay
+ * in its own folder, and the deploy carries the old builds' graphs (MF2, J79) as before. */
+export const SHARED_CODE_DIRECTORY = 'b/c';
 
 /** Stamp before executable module scripts, without changing the bundle's URLs.
  * @param {string} html @param {string} build

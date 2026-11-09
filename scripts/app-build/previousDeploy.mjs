@@ -6,7 +6,7 @@
 import {copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
 import {KEEP_PROMOTED} from '../prune-deployments.mjs';
-import {codeDirectory} from './buildIdentity.mjs';
+import {SHARED_CODE_DIRECTORY, codeDirectory} from './buildIdentity.mjs';
 
 const MANIFEST = 'deploy-chunks.json', LANES = 16;
 const CHUNK = /^(?:assets\/(?:[\w.-]+\/)*[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm|json|bin|woff2?|png|webp|jpg|svg)|b\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html))$/u;
@@ -39,7 +39,8 @@ function currentManifest(directory) {
   const version = JSON.parse(readFileSync(join(directory, 'version.json'), 'utf8'));
   if (typeof version.build !== 'string') throw new Error('Missing deploy build identity');
   const files = [];
-  for (const folder of ['assets', codeDirectory(version.build)]) {
+  // J217: the shared folder holds this build's content-named code next to the graphs it carries in below
+  for (const folder of new Set(['assets', codeDirectory(version.build), SHARED_CODE_DIRECTORY])) {
     const root = join(directory, folder);
     if (!existsSync(root)) continue;
     for (const entry of readdirSync(root, {recursive: true, withFileTypes: true})) {
