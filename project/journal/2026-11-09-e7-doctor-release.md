@@ -59,3 +59,9 @@ The Metal launch option is Mac-only. These are manual proof changes,
 not UI, gameplay, native transport or deadline changes. Remaining review
 notes on visible text and staging telemetry classification do not claim
 runtime fixes or an API-server cutover. J205 remains staging-only.
+
+Jake's Q13–Q16 domain decision moves the production MMO page to
+play.wildshard.io and makes preview.wildshard.io the solo build. The
+manual human-static Doctor guard now accepts only play; the staging
+live origin/socket guard is unchanged. No agent browser or game client
+runs on production. Earlier preview-host receipts remain historical.
