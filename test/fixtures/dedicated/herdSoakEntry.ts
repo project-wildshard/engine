@@ -96,7 +96,7 @@ try {
         else if (Math.hypot(horse.x - initial[0], horse.z - initial[1]) > 1) guest.moving = true;
       }
     }
-    if (guests[0] !== undefined && guests[0].samples % 60 === 0) console.info(JSON.stringify({ at: 'herd.minute', seconds: Math.round((performance.now() - started) / 1000), near: guests.map(guest => `${String(guest.near)}/${String(guest.samples)}`), windows: readings.length, worstP95: Math.max(...readings.map(row => row.p95)) }));
+    if (guests[0] !== undefined && guests[0].samples % 60 === 0) console.info(JSON.stringify({ at: 'herd.minute', seconds: Math.round((performance.now() - started) / 1000), near: guests.map(guest => `${String(guest.near)}/${String(guest.samples)}`), windows: readings.length, worstP95: Math.max(...readings.map(row => row.p95)), drops: readings.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...readings.map(row => row.ticksPerSecond)) }));
   }
   const report = { proof: 'j201-linux-server-herd', build, seconds, elapsed: (performance.now() - started) / 1000, platform: process.platform, arch: process.arch, node: process.version, availableCpus: availableParallelism(),
     windows: readings.length, worstP95: Math.max(...readings.map(row => row.p95)), meanP95: readings.reduce((sum, row) => sum + row.p95, 0) / readings.length,
@@ -111,5 +111,11 @@ try {
 } finally {
   for (const guest of guests) guest.bot.drop();
   const ended = new Promise(resolve => { room.once('exit', resolve); });
-  if (room.exitCode === null && room.signalCode === null) { room.kill('SIGTERM'); await ended; }
+  if (room.exitCode === null && room.signalCode === null) {
+    let forced = false;
+    room.kill('SIGTERM');
+    const deadline = setTimeout(() => { forced = true; room.kill('SIGKILL'); }, 10_000);
+    try { await ended; } finally { clearTimeout(deadline); }
+    assert.ok(!forced, 'production server must drain within ten seconds');
+  }
 }

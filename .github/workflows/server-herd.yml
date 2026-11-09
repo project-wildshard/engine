@@ -1,0 +1,47 @@
+# J201, manual Ring 2: a real thirty-minute server soak cannot fit a quick case.
+# Keep this independent of push CI and its unchanged file/shard budgets.
+name: server-herd
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: server-herd
+  cancel-in-progress: false
+jobs:
+  nalati:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - run: node scripts/pins.ts install
+      - run: pnpm gen:inputs
+      - name: Build the same committed server and full Nalati pack
+        env:
+          COOK_CPU_SLOTS: '2'
+        run: |
+          mkdir -p tmp/server-herd/result
+          node scripts/build-server.mjs --build "$GITHUB_SHA" --out tmp/server-herd/server --entry herdSoak=test/fixtures/dedicated/herdSoakEntry.ts
+          node scripts/server-origin.mjs tmp/server-herd/origin "$GITHUB_SHA" "nalati-grasslands=$PWD/out/nalati-grasslands"
+      - name: Thirty minutes beside living horses on two Linux CPUs
+        run: |
+          docker run --rm --cpus=2 --cpuset-cpus=0,1 --memory=2g --pids-limit=256 --network=none \
+            --mount "type=bind,src=$PWD/tmp/server-herd/server,dst=/server,readonly" \
+            --mount "type=bind,src=$PWD/tmp/server-herd/origin,dst=/origin,readonly" \
+            --mount "type=bind,src=$PWD/tmp/server-herd/result,dst=/work" \
+            --workdir /server \
+            node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 \
+            node herdSoak.mjs file:///origin/ /work "$GITHUB_SHA" 1800
+      - name: Keep actual readings, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: server-herd-${{ github.sha }}
+          path: tmp/server-herd/result
+          retention-days: 7
