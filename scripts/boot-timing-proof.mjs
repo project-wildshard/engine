@@ -11,6 +11,7 @@ import { serve } from './parity/serve.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { bootTimingDelay } from './parity/boot-timing-delay.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 /** @param {string} name */
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -55,7 +56,7 @@ if(expectedBuild!==undefined) {
   const pick=option('browser')??'both';assert.ok(['both','chromium','webkit'].includes(pick));
   for (const name of ['chromium','webkit'].filter(browserName=>pick==='both'||pick===browserName)) {
     const engine=name==='chromium'?chromium:webkit;
-    const browser = await engine.launch({headless:true, ...(name === 'chromium' ? {args:['--mute-audio']} : {})});
+    const browser = await engine.launch({headless:true, ...(name === 'chromium' ? {args:[...KEYCHAIN_ARGS, '--mute-audio']} : {})});
     try {
       const context = await browser.newContext({...devices['iPhone 16 Pro'], deviceScaleFactor:2});
       await saveFixture(context, {scope:'device',key:'devMode',data:true});

@@ -1,8 +1,9 @@
 import { chromium } from 'playwright';
+import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 // Launched under browser-lane.sh: Chromium's ancestry holds exactly one machine-wide slot.
 const server = await chromium.launchServer({ channel: 'chromium', headless: true,
-  args: [`--use-angle=${process.argv[2] ?? 'metal'}`, '--ignore-gpu-blocklist', '--mute-audio'] });
+  args: [...KEYCHAIN_ARGS, `--use-angle=${process.argv[2] ?? 'metal'}`, '--ignore-gpu-blocklist', '--mute-audio'] });
 console.log(server.wsEndpoint());
 process.stdin.resume();
 await new Promise((resolve) => {

@@ -6,6 +6,7 @@ import { chromium, devices } from 'playwright';
 import { saveFixture } from './debug-settings.mjs';
 import { paidSave } from './worker-client-pine.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const base = process.argv.find(arg => arg.startsWith('--base='))?.slice(7);
 if (!base) throw new Error('Requires --base');
@@ -13,7 +14,7 @@ const scratchRoot = resolvePath(process.argv.find(arg => arg.startsWith('--scrat
 mkdirSync(scratchRoot, { recursive: true });
 const scratch = mkdtempSync(resolvePath(scratchRoot, 'pine-import-'));
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
-const browser = await chromium.launch({ downloadsPath: scratch, args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ downloadsPath: scratch, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const source = await browser.newContext(phone), target = await browser.newContext(phone), errors = /** @type {string[]} */ ([]);
 for (const context of [source, target]) await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
 await saveFixture(source, { scope: 'standalone-lone-pine-hollow', key: 'continuation', once: 'pine-import-seed', data: paidSave().save });

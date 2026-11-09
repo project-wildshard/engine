@@ -14,6 +14,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 import { aimAt, bootToTitle, encodePhone, enterPlayground, flags, openHub, phonePage, sleep, startRecording, stopRecording, tap } from './playground-harness.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const { chromium } = await import('playwright');
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
@@ -47,7 +48,7 @@ for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => { releaseSlot(); proc
 const HOPS = ['p1', 'p2', 'base', 'l1', 'l2', 'top']; // the run's hooks, in HOOKS order (grappleCourse.ts)
 /** @type {{ ok: boolean, hub: unknown, hops: Record<string, unknown>[], errors: string[], perf: Record<string, number> | null, video: Record<string, unknown> | null, end?: unknown, exit?: { menu: { sub: string, exit: string }, left: boolean, back: boolean } }} */
 const report = { ok: false, hub: null, hops: [], errors: [], perf: null, video: null };
-const browser = await chromium.launch({ args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 try {
   const page = await phonePage(browser);
   page.on('pageerror', (e) => { report.errors.push(e.message.slice(0, 240)); console.log(`pageerror: ${e.message.slice(0, 240)}`); });

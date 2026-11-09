@@ -15,6 +15,7 @@ import { saveFixtureCode } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { enterPage, intoWorld, openRig, PAGE_PORT, RELEASE_PORT, WORLD_PORT } from './online-rig.mjs';
 import { soakInspector } from './soak/inspector.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const ProtocolResult = v.looseObject({
   wasThrown: v.optional(v.boolean()),
@@ -184,7 +185,7 @@ const CRYPTO = `(async () => { window.__crypto = null; try { const pair = await 
 
 const rig = await openRig({ dist, nextDist, work, keyFile, pgBin, pgData, shard: SHARD }), { build, nextBuild, base } = rig, url = `${base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
 const phone = device === 'safari' ? safari(process.env.SIM_UDID ?? '', base) : await android(flag('avd', 'e7_phones'), base);
-const launched = await chromium.launch({ headless: true, args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const { defaultBrowserType: _engine, ...desk } = devices['iPhone 16 Pro'];
 let code = 1;
 

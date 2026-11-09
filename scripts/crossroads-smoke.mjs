@@ -8,6 +8,7 @@ import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { devices, chromium, webkit } from 'playwright';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const option = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const engine = option('browser', 'chromium'), site = resolve(option('site', 'tmp/crossroads/site')), keep = option('read', '');
@@ -21,7 +22,7 @@ const server = createServer((request, response) => {
 });
 await new Promise(_resolve => { server.listen(0, '127.0.0.1', _resolve); });
 const address = server.address(), origin = `http://127.0.0.1:${typeof address === 'object' && address !== null ? address.port : 0}/`;
-const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : ['--mute-audio', '--enable-experimental-web-platform-features', '--enable-blink-features=ForceEagerMeasureMemory'] });
+const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--mute-audio', '--enable-experimental-web-platform-features', '--enable-blink-features=ForceEagerMeasureMemory'] });
 const failures = [];
 /** Physical footprint in MB of the one process that runs the tab: this Mac's stand-in for a phone's, since neither browser gives a worker's heap to a page. */
 const tabFootprint = () => {

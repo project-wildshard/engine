@@ -26,7 +26,7 @@ const {values} = parseArgs({options: {preset: {type: 'string', default: 'phone'}
   play: {type: 'string'},
   help: {type: 'boolean'}}});
 if (values.help) {
-  console.log('pnpm phone-loading [--live | --head | --rev SHA | --url URL] [--preset phone|lte|desktop] [--flow grid|select:SLUG] [--record] [--webkit | --engine chromium|webkit] [--compare JSON] [--timeout MS] [--title-dwell MS=3000] [--after-control MS=4000] [--save-fixture JSON] [--cpu-profile (cold Chromium page only)] [--play S (DL24: S s of walk, then hoverboard boost from 10 s, at control)]');
+  console.log('pnpm phone-loading [--live | --head | --rev SHA | --url URL] [--preset phone|phone4|lte|desktop] [--flow grid|select:SLUG] [--record] [--webkit | --engine chromium|webkit] [--compare JSON] [--timeout MS] [--title-dwell MS=3000] [--after-control MS=4000] [--save-fixture JSON] [--cpu-profile (cold Chromium page only)] [--play S (DL24: S s of walk, then hoverboard boost from 10 s, at control)]');
   return;
 }
 const profile = profiles[values.preset];

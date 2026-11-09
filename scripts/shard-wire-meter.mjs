@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const { values: o } = parseArgs({ options: { root: { type: 'string' }, shard: { type: 'string' }, tier: { type: 'string', default: 'phone' }, flow: { type: 'string', default: 'select' },
   out: { type: 'string' }, upstream: { type: 'string' }, settle: { type: 'string', default: '20000' }, timeout: { type: 'string', default: '420000' }, shot: { type: 'string' }, last: { type: 'string' }, dwell: { type: 'string', default: '3000' } } });
@@ -54,7 +55,7 @@ await new Promise(resolve => { proxy.listen(port, '127.0.0.1', resolve); });
 const url = `http://127.0.0.1:${port}/`;
 
 const profile = mkdtempSync(join(tmpdir(), 'wire-'));
-const context = await chromium.launchPersistentContext(profile, { headless: true, args: [...process.platform === 'darwin' ? ['--use-angle=metal'] : [], '--ignore-gpu-blocklist', '--mute-audio'],
+const context = await chromium.launchPersistentContext(profile, { headless: true, args: [...KEYCHAIN_ARGS, ...process.platform === 'darwin' ? ['--use-angle=metal'] : [], '--ignore-gpu-blocklist', '--mute-audio'],
   ...(o.tier === 'phone' ? devices['iPhone 16 Pro'] : { viewport: { width: 1440, height: 900 } }) });
 await developerSettings(context, { volume: 0, music: 0, tier: o.tier, holdLoading: true });
 // The slot's first version held the bare slug; the game migrates it, so this needs no knowledge of the current shape.

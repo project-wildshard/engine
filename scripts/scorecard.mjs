@@ -43,6 +43,7 @@ import { tmpdir } from 'node:os';
 import { resolve as resolvePath, join, dirname } from 'node:path';
 import { linkNodeModules } from './link-node-modules.mjs';
 import { createServer } from 'node:net';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
 const { chromium } = await import('playwright');
@@ -1095,7 +1096,7 @@ async function waitForBrowserSlot() {
 
 async function launchBrowser() {
   const udd = mkdtempSync(join(tmpdir(), 'wildshard-scorecard-'));
-  const chromeProc = spawn(chromium.executablePath(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${udd}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--disable-features=BackForwardCache', 'about:blank'], { stdio: 'ignore' });
+  const chromeProc = spawn(chromium.executablePath(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${udd}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--disable-features=BackForwardCache', ...KEYCHAIN_ARGS, 'about:blank'], { stdio: 'ignore' });
   const portFile = join(udd, 'DevToolsActivePort');
   await waitFor(() => existsSync(portFile) && Number(readFileSync(portFile, 'utf8').split('\n')[0]) > 0, 15_000, 'chromium did not open its DevTools port');
   const port = readFileSync(portFile, 'utf8').split('\n')[0].trim();

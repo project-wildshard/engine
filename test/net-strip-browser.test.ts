@@ -18,6 +18,7 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { socketBench } from './fixtures/socketBench';
 import { tcpPuller } from './fixtures/tcpPuller';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
+import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
 
 // E7.1b: a real browser sees the strip appear and clear. It needs a browser, so it runs only by name, in the browser lane:
 //   WS_STRIP_PROOF=<folder> scripts/browser-lane.sh --max 5 pnpm exec vitest run test/net-strip-browser.test.ts
@@ -40,7 +41,7 @@ test.skipIf(FOLDER === undefined)('a browser sees the strip appear when the link
   let open = true;
   void (async () => { while (open) { const end = await bench.accepted(); if (open) room.join(end, world.playerOf(leadPlayer(host).id)); } })();
   const clock = setInterval(() => { for (let tick = 0; tick < 2; tick++) room.tick(); }, 33);
-  const browser = await chromium.launch(), page = await browser.newPage({ ...devices['iPhone 15'] }), { port } = pageServer.address() as AddressInfo;
+  const browser = await chromium.launch({ args: [...KEYCHAIN_ARGS] }), page = await browser.newPage({ ...devices['iPhone 15'] }), { port } = pageServer.address() as AddressInfo;
   try {
     await page.goto(`http://127.0.0.1:${String(port)}/?ws=${encodeURIComponent(puller.url)}`);
     await page.waitForFunction(() => (window as unknown as { proof: { frames: number } }).proof.frames > 10);

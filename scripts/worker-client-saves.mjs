@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { saveFixture } from './debug-settings.mjs';
 import { floorGridBenchmarkUrl, FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
 const base = arg('base', ''), chunk = arg('chunk', 'driftwood-isle'), delays = arg('delays', '0,20,50,100,200,500,1000').split(',').map(Number), only = arg('only', 'kill,timer,exit,travel,import').split(',');
@@ -23,7 +24,7 @@ const url = (slug = chunk, query = '') => process.argv.includes('--grid') ? floo
 
 /** A real browser on a profile that outlives it, its whole process tree ours to kill. */
 async function launch(profile) {
-  const context = await chromium.launchPersistentContext(profile, { args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'], viewport: { width: 402, height: 874 } });
+  const context = await chromium.launchPersistentContext(profile, { args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'], viewport: { width: 402, height: 874 } });
   const page = context.pages()[0] ?? await context.newPage(), errors = [];
   page.on('pageerror', error => { errors.push(error.message.slice(0, 200)); });
   return { context, page, errors, kill: () => { spawnSync('pkill', ['-9', '-f', profile]); return new Promise(resolve => { setTimeout(resolve, 500); }); } };

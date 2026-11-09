@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { exportTree, serve } from './parity/serve.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 /** @typedef {import('../src/client/engine/calibrate/run').CalibrationRun} CalibrationRun */
 const root = resolve(import.meta.dirname, '..');
@@ -21,7 +22,7 @@ const sha = execFileSync('git', ['rev-parse', args.export ?? 'HEAD'], { cwd: roo
 let exported, server, browser;
 try {
   if (!args.url) { exported = exportTree(root, sha); server = await serve(exported.tree, sha); }
-  browser = await chromium.launch({ args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });
+  browser = await chromium.launch({ args: [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });
   const context = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   page.on('pageerror', (e) => console.error(e.message));

@@ -12,6 +12,7 @@ import { developerSettings, saveFixture } from '../debug-settings.mjs';
 import { loadingCardIndex } from '../loading-benchmark/catalogue.mjs';
 import { loanMaterialPrograms, trackMaterialProgramDraws } from './material-program-loan.mjs';
 import { worldPixelDifference } from './world-pixel-difference.mjs';
+import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 /** @param {string} name */
 const arg = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -82,7 +83,7 @@ async function bounded(phase, run) {
     })]);
   } finally { clearTimeout(timer); }
 }
-const browser = await chromium.launch({ headless: true, args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 try {
   for (const [repeat, sourceUrl] of [url,url,...(hasCandidate ? [candidate ?? url] : [])].entries()) for (const {slug, poses} of sets) {
     if (poses.length === 0) continue;

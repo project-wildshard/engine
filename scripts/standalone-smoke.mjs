@@ -15,6 +15,7 @@ import { rapierAlias } from '../vite/rapier.ts';
 import { codeDirectory, stampBuildHtml } from './app-build/buildIdentity.mjs';
 import { standaloneDirectory, writeStandaloneOutput } from './app-build/standaloneOutput.mjs';
 import { readBuiltShardfile } from './built-product.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const ROOT = resolveFile(import.meta.dirname, '..'), OUT = join(ROOT, 'tmp', 'standalone-smoke'), EMITTED = join(OUT, 'emitted');
 const option = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -60,7 +61,7 @@ const server = createServer((request, response) => {
 await new Promise(resolve => { server.listen(0, '127.0.0.1', resolve); });
 const address = server.address(), origin = `http://127.0.0.1:${typeof address === 'object' && address !== null ? address.port : 0}/`;
 
-const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : ['--mute-audio'] });
+const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--mute-audio'] });
 const failures = [];
 const check = (name, passed, detail) => { if (!passed) failures.push(`${name}: ${JSON.stringify(detail)}`); };
 try {

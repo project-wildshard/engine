@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { resolve as resolvePath, join } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { writeStandaloneOutput } from './app-build/standaloneOutput.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const output = process.argv.find(arg => arg.startsWith('--output='))?.slice(9);
 assert.ok(output, 'Pass a disposable --output=<owned scratch parent>');
@@ -35,7 +36,7 @@ try {
     for (const name of ['chromium', 'webkit']) {
       blocked = false; refuse = false;
       barrier = new Promise(resolve => { release = resolve; });
-      const browser = await (name === 'chromium' ? chromium : webkit).launch({ headless: true });
+      const browser = await (name === 'chromium' ? chromium : webkit).launch({ headless: true, ...(name === 'chromium' ? { args: [...KEYCHAIN_ARGS] } : {}) });
       try {
         const page = await browser.newPage();
         await page.goto(`http://127.0.0.1:${address.port}/`);

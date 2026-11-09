@@ -2,9 +2,10 @@
 // Disposable F3.2 measurement: full Chromium, Metal, Driftwood phone tier.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
+import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 const url = process.argv.find((arg) => arg.startsWith('--url='))?.slice(6) ?? 'http://127.0.0.1:4400';
-const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });
+const browser = await chromium.launch({ channel: 'chromium', args: [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   const page = await context.newPage();

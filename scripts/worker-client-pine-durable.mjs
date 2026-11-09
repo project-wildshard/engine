@@ -4,11 +4,12 @@ import { chromium, devices } from 'playwright';
 import { saveFixture } from './debug-settings.mjs';
 import { paidSave } from './worker-client-pine.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const base = process.argv.find(arg => arg.startsWith('--base='))?.slice(7);
 if (!base) throw new Error('Requires --base');
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
-const browser = await chromium.launch({ args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const results = /** @type {{name: string, ok: boolean}[]} */ ([]);
 /** @type {import('./types/worker-page').ProofStep} */
 const step = async (name, run) => {

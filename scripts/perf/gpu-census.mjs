@@ -9,6 +9,7 @@ import {installGpuProbe} from './gpu-census-page.mjs';
 import {overdraw} from './gpu-census-overdraw.mjs';
 import {gpuPairs,gpuPhoneModel} from './gpu-census-report.mjs';
 import {graphCoverage,sourceMatchedCoverageAliases} from './gpu-census-coverage.mjs';
+import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 const nineIds=['cam-1','cam-5','cam-14','cam-27','approx-a','approx-b'];
 const pineIds=['P1','P2','P3','P4'];
@@ -50,7 +51,7 @@ const catalog=needsAuthored?JSON.parse(readFileSync('art/legacy-goldens/compare/
 const poses=gpuCensusPoses(slug,selected,catalog);
 mkdirSync(out,{recursive:true});const version=await(await fetch(new URL('version.json',url))).json();
 const readings=[],saveAll=()=>writeFileSync(`${out}/reading.json`,JSON.stringify({rows:readings,requested:{slug,modes,poses:poses.map(p=>p.id)},method:'paired frozen-frame throughput, includes CPU submission; no official timing credit',partitionStatus:'NOT_MEASURABLE (G872): overlapping subtraction, occlusion and tile flushes'},null,2));
-const browser=await chromium.launch({headless:true,args:['--mute-audio','--use-angle=metal','--ignore-gpu-blocklist']});
+const browser=await chromium.launch({headless:true,args:[...KEYCHAIN_ARGS, '--mute-audio','--use-angle=metal','--ignore-gpu-blocklist']});
 const median=xs=>{const a=[...xs].sort((x,y)=>x-y);return a[Math.floor(a.length/2)];};
 try{for(const mode of modes)for(const pose of poses){
  const context=await browser.newContext({...devices['iPhone 16 Pro'],viewport:{width:402,height:874},deviceScaleFactor:2});

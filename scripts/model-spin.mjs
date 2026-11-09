@@ -73,6 +73,7 @@ const RAD_PER_PX = 0.008;
 /** other agents' saves full-reload a dev-server page mid-run: a stub @vite/client ignores them (a built page never asks) */
 const VITE_STUB = `
 import '/@vite/env';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 const hot = () => ({ data: {}, accept() {}, acceptExports() {}, dispose() {}, prune() {}, decline() {}, invalidate() {}, on() {}, off() {}, send() {} });
 export function createHotContext() { return hot(); }
 const sheets = new Map();
@@ -91,7 +92,7 @@ const work = mkdtempSync(join(scratch, 'model-spin-'));
 /** @type {import('playwright').Browser|undefined} */
 let browser;
 try {
-  browser = await chromium.launch({ args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+  browser = await chromium.launch({ args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
   const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   if (Object.keys(DEBUG).length > 0) await debugSettings(ctx, DEBUG);
   const page = await ctx.newPage();

@@ -5,6 +5,8 @@ import type {PlayReading} from './play.ts';
 export interface Profile {cpu: number; down: number; up: number; latency: number}
 export const profiles: Record<string, Profile> = {
   phone: {cpu: 10, down: 10_000_000 / 8, up: 2_000_000 / 8, latency: 100},
+  // J198's phone-class proof profile: the loading card proof's 4x CPU, on the same link as `phone`
+  phone4: {cpu: 4, down: 10_000_000 / 8, up: 2_000_000 / 8, latency: 100},
   lte: {cpu: 6, down: 20_000_000 / 8, up: 5_000_000 / 8, latency: 60},
   desktop: {cpu: 1, down: -1, up: -1, latency: 0},
 };

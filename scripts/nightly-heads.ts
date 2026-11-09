@@ -13,6 +13,7 @@ import {levelDownloadFixtures, saveFixture} from './debug-settings.mjs';
 import {partition, plan, read, requireBuild, type HeadResult, type HeadsReport} from './nightly-model.ts';
 import type {CookIndex} from '../src/cook/game/cookWorker.ts';
 import type {StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 await import('./bake-loader.mjs');
 const {folderStore} = await import('../src/cook/game/packStore.ts');
@@ -100,7 +101,7 @@ try {
       if (title === undefined) throw new Error(`No title route for ${head.slug}`);
       const route = title.slug, mode = title.shardSelect === false ? 'arrival' : 'standalone';
       browser = browserName === 'webkit' ? await webkit.launch({headless: true}) : await chromium.launch({headless: true,
-        args: [`--use-angle=${process.platform === 'darwin' ? 'metal' : 'swiftshader'}`, '--ignore-gpu-blocklist', '--mute-audio']});
+        args: [...KEYCHAIN_ARGS, `--use-angle=${process.platform === 'darwin' ? 'metal' : 'swiftshader'}`, '--ignore-gpu-blocklist', '--mute-audio']});
       const activeBrowser = browser, url = preview.url;
       await phase('boot', async () => {
         const boot = await bootCase(activeBrowser, url, mode, evidence, route, true, async page => {

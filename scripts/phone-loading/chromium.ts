@@ -6,6 +6,7 @@ import {nativeBodyBytes} from './native-body.ts';
 import {NativeSizeLedger, type NativeSizeObservation} from './native-sizes.ts';
 import {record, type Profile} from './model.ts';
 import {startSharedLink, type SharedLink} from './link.ts';
+import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 export interface ChromiumRun {browser: Browser; close: () => Promise<void>; workerNetwork: () => boolean; errors: string[]; nativeSizes: (request: Request, response?: Response | null) => Promise<NativeSizeObservation>;
   /** The one downlink page and worker share; null when the preset is unthrottled. */
@@ -20,7 +21,7 @@ export async function launchChromium(directory: string, profile: Profile): Promi
   // <-loopback> drops Chromium's implicit loopback bypass, so 127.0.0.1 previews take the link too.
   const child = spawn(chromium.executablePath(), ['--headless=new', '--remote-debugging-port=0',
     `--user-data-dir=${directory}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions',
-    '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist',
+    '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', ...KEYCHAIN_ARGS,
     ...link === null ? [] : [`--proxy-server=${link.proxy}`, '--proxy-bypass-list=<-loopback>'], 'about:blank'], {stdio: ['ignore', 'ignore', 'pipe']});
   let socket: WebSocket | undefined;
   try {

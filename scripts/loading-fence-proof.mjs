@@ -5,6 +5,7 @@ import {rolldown} from 'rolldown';
 import {chromium,webkit,devices} from 'playwright';
 import {serve} from './parity/serve.mjs';
 import {saveFixture} from './debug-settings.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const build=await rolldown({input:'src/client/engine/render/fencedUnits.ts',platform:'browser'});
 const compiled=(await build.generate({format:'iife',name:'__fencedProbe'})).output.find(file=>file.type==='chunk');
@@ -14,7 +15,7 @@ const root=process.argv.find(arg=>arg.startsWith('--root='))?.slice(7)??process.
 const preview=await serve(root,'',true);
 try{for(const name of ['chromium','webkit']){
   const engine=name==='chromium'?chromium:webkit;
-  const browser=await engine.launch({headless:true,...(name==='chromium'?{args:['--mute-audio']}: {})});
+  const browser=await engine.launch({headless:true,...(name==='chromium'?{args:[...KEYCHAIN_ARGS, '--mute-audio']}: {})});
   try{
     const context=await browser.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
     await saveFixture(context,{scope:'device',key:'devMode',data:true});

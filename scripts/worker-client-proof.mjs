@@ -8,6 +8,7 @@
 import { chromium, webkit, devices } from 'playwright';
 import { saveFixture } from './debug-settings.mjs';
 import { floorGridBenchmarkUrl, FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
 const chunk = arg('chunk', ''), base = arg('base', ''), seconds = Number(arg('seconds', '150')), crossings = Number(arg('crossings', '2')), route = arg('route', '0,-285;0,-235').split(';').map(leg => { const [x, z] = leg.split(',').map(Number); return { x, z }; });
@@ -59,7 +60,7 @@ async function proveHook(page, failures) {
 // --webkit runs Playwright's WebKit: what Jake plays on, short of the phone. --page-fps=30 caps the page's frames as Low Power Mode does (J121);
 // the worker's timers run on, as the phone measured them.
 const engine = process.argv.includes('--webkit') ? webkit : chromium, pageFps = Number(arg('page-fps', '0'));
-const launched = await engine.launch(engine === webkit ? {} : { args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const launched = await engine.launch(engine === webkit ? {} : { args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 // One queue, as a display has: a frame runs everything waiting, so no caller starves another.
 const capFrames = fps => {
   const raf = window.requestAnimationFrame.bind(window), every = 1000 / fps;

@@ -14,6 +14,7 @@ import { SaveStore } from './src/shared/engine/saves/store';
 import { openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport } from './src/client/engine/saves/indexed';
 import { deviceIdentity } from './src/shared/engine/net/identity';
 import * as v from 'valibot';
+import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
 installAppIdentity(WILDSHARD_IDENTITY);
 window.epochProof = { SaveStore, openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport, deviceIdentity, installAppIdentity, WILDSHARD_IDENTITY, v };
 `; return null; } }] });
@@ -27,7 +28,7 @@ if (address === null || typeof address === 'string') throw new Error('No proof s
 try {
   for (const [name, type] of [['Chromium', chromium], ['WebKit', webkit]]) {
     await test(`${name}: later epoch boots carry the previous database identity durably without its progress`, { timeout: 10_000 }, async () => {
-      const browser = await type.launch({ headless: true });
+      const browser = await type.launch({ headless: true, ...(type === chromium ? { args: [...KEYCHAIN_ARGS] } : {}) });
       try {
         const page = await browser.newPage();
         await page.goto(`http://127.0.0.1:${address.port}`);
@@ -60,7 +61,7 @@ try {
       } finally { await browser.close(); }
     });
     await test(`${name}: epoch isolates real IDB, carries identity, rejects old files, and wipes once`, async () => {
-      const browser = await type.launch({ headless: true });
+      const browser = await type.launch({ headless: true, ...(type === chromium ? { args: [...KEYCHAIN_ARGS] } : {}) });
       try {
         const page = await browser.newPage({ ...devices['iPhone 16 Pro'] });
         await page.addInitScript(() => { HTMLMediaElement.prototype.play = async () => undefined; });

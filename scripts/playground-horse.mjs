@@ -13,6 +13,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 import { bootToTitle, encodePhone, enterPlayground, flags, openHub, phonePage, sleep, startRecording, stopRecording, tap } from './playground-harness.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const { chromium } = await import('playwright');
 const flag = flags();
@@ -23,7 +24,7 @@ mkdirSync(OUT, { recursive: true });
 
 /** @type {{ ok: boolean, hub: unknown, errors: string[], steps: Record<string, unknown>[], perf: Record<string, number> | null, video: Record<string, unknown> | null }} */
 const report = { ok: false, hub: null, errors: [], steps: [], perf: null, video: null };
-const browser = await chromium.launch({ args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 try {
   // the riding rows at their defaults (keep to the road on: the track is the road)
   const page = await phonePage(browser, { rideRoad: 'on', rideSpur: 'on', rideSkid: 'on', ridePanic: 'on' });

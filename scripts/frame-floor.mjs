@@ -55,6 +55,7 @@ import { WASM_CONSTRUCTORS_SCRIPT, SCRIPT_MEMORY_POOL } from './frame-floor-wasm
 import { runWasmMemoryProbe } from './frame-floor-wasm-probe.mjs';
 import { gpuBisect, settleTrace } from './frame-floor-gpu-bisect.mjs';
 import { publicGridIntentCode, publicGridPlans, readPublicGridWitness, publicGridWitnessFailures } from './public-grid.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const ROOT = resolvePath(import.meta.dirname, '..');
 const SCRIPT = import.meta.filename;
@@ -1003,7 +1004,7 @@ async function worker() {
     let driver;
     if (surface === 'desktop') {
       const { chromium } = await import('playwright');
-      browser = await chromium.launch({ channel: 'chromium', args: ['--mute-audio', `--use-angle=${chromiumAngle}`, '--ignore-gpu-blocklist'] });
+      browser = await chromium.launch({ channel: 'chromium', args: [...KEYCHAIN_ARGS, '--mute-audio', `--use-angle=${chromiumAngle}`, '--ignore-gpu-blocklist'] });
       context = await browser.newContext({ ...(chromiumPhone ? { viewport: softwareCensus?.viewport ?? { width: 402, height: 874 }, deviceScaleFactor: 3 } : { viewport: { width: 1440, height: 900 }, deviceScaleFactor: desktopDpr }), serviceWorkers: 'block' });
       await context.addInitScript({ content: `${fixture(settings.tier)};window.__wildshardHarness=${HARNESS_PINS};${ERROR_SCRIPT}${CONSOLE_SCRIPT}${LONGTASK_SCRIPT}${GL_TIME_SCRIPT}${TASK_CLOCK}${travelGl}` });
       let errors = [], profiler = null, throttle = null, cpuPhase = null;

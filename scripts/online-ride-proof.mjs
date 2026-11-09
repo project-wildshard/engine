@@ -6,6 +6,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, devices } from 'playwright';
 import { enterPage, intoWorld, openRig } from './online-rig.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const [dist = '', work = '', keyFile = '', pgBin = '', pgData = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
 const SHARD = 'nalati-grasslands', HORSE = { x: 69.1, z: 213.4 }, shots = join(work, 'shots-ride');
@@ -15,7 +16,7 @@ const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
 const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 300)}`}`); };
 
 const rig = await openRig({ dist, work, keyFile, pgBin, pgData, shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
 /** @param {string} name */
 const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };

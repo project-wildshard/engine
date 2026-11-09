@@ -10,6 +10,7 @@ import { Client } from 'pg';
 import { chromium, devices, webkit } from 'playwright';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { enterPage, intoWorld, openRig } from './online-rig.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const [dist = '', work = '', keyFile = '', pgBin = '', pgData = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
 /** @param {string} name @param {string} fallback */
@@ -24,7 +25,7 @@ const note = (step, ok, detail) => { steps.push({ step, ok, ...detail === undefi
 
 const rig = await openRig({ dist, nextDist, work, keyFile, pgBin, pgData, shard: SHARD, ...seats === '' ? {} : { seats: Number(seats) } }), { nextBuild, DATABASE } = rig;
 
-const launched = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const launched = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
 /** @param {string} name */
 const enter = async name => { const entered = await enterPage(launched, phone, `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`, name); await intoWorld(entered.page); return entered; };

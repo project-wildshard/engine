@@ -2,6 +2,7 @@ import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {chromium} from 'playwright';
 import * as v from 'valibot';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 /** Retain Network events and cache controls, never Inspector response bodies.
  * This must cover Playwright's own sessions, not just a new diagnostic session.
@@ -17,7 +18,7 @@ export function memoryNetworkCommand(message) {
  * The launch connection owns no contexts; the measured connection owns all.
  * @param {readonly string[]} args */
 export async function launchMemoryBrowser(args) {
-  const owner = await chromium.launchServer({args: [...args, '--remote-debugging-port=0']});
+  const owner = await chromium.launchServer({args: [...KEYCHAIN_ARGS, ...args, '--remote-debugging-port=0']});
   let socket;
   try {
     const directory = owner.process().spawnargs.find(arg => arg.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length);

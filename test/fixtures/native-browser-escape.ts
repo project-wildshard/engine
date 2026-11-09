@@ -12,6 +12,7 @@ import {pressEscape} from '../../scripts/parity/browser-escape.mjs';
 import {nativeChromeExecutable} from '../../scripts/warm-native-chrome.mjs';
 import {nativeSocketTemporary} from './native-socket-temp.mjs';
 import {drainNativeBrowser} from './native-browser-drain.mjs';
+import { KEYCHAIN_ARGS } from '../../scripts/chromium-keychain.mjs';
 
 const executable = nativeChromeExecutable();
 const directory = await mkdtemp(resolve('tmp/escape-control-'));
@@ -33,7 +34,7 @@ const cpuPressure = (): string | null => process.platform === 'linux' ? boundedR
 const cgroupCpu = (): string | null => process.platform === 'linux' ? boundedRead('/sys/fs/cgroup/cpu.stat', 200) : null;
 const startedAt = performance.now();
 const child = spawn(executable, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${directory}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio',
+  '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--mute-audio', ...KEYCHAIN_ARGS,
   ...(process.platform === 'darwin' ? ['--use-angle=metal', '--ignore-gpu-blocklist'] : ['--no-sandbox']), 'data:text/html,bootstrap'],
 {detached: true, stdio: ['ignore', 'ignore', 'pipe'], env: {...process.env, TMPDIR: socketTemp.path}});
 const initialPressure = cpuPressure(), initialCpu = cgroupCpu();

@@ -5,6 +5,7 @@ import { chromium, webkit } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 /** Terminate only the browser launched on this proof's unique fresh profile. No pagehide or fake lifecycle record.
  * @param {string} profile */
@@ -99,7 +100,7 @@ export async function gridEntry(_browser, phone, base, step) {
   if (scratch === undefined) throw new Error('grid-entry requires WS_PROOF_SCRATCH outside the repository');
   const profile = await mkdtemp(join(resolve(scratch), 'grid-entry-'));
   const engine = process.argv.includes('--webkit') ? webkit : chromium;
-  const options = { ...phone, ...engine === webkit ? {} : { args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] } };
+  const options = { ...phone, ...engine === webkit ? {} : { args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] } };
   let context = await engine.launchPersistentContext(profile, options);
   const errors = /** @type {string[]} */ ([]);
   let phase = 'entry';

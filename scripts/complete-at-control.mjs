@@ -53,6 +53,7 @@ import { snapshot, lapLegs, lapPops, splitRequests, splitManifests, spawnRereads
 import { execFileSync } from 'node:child_process';
 import { startSharedLink } from './phone-loading/link.ts';
 import { profiles } from './phone-loading/model.ts';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 // the service worker's own fetches reach context 'request' events (Chromium), as scripts/bench-load.mjs does
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
@@ -185,7 +186,7 @@ const mapped = (rows) => (values.dist === undefined ? rows : rows.map(row => ({ 
 // on the same proxy, loopback included (latency and CPU stay unshaped here)
 const link = linkName === 'phone' ? await startSharedLink(profiles.phone.down) : null;
 const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'chromium'
-  ? ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', ...(link === null ? [] : [`--proxy-server=${link.proxy}`, '--proxy-bypass-list=<-loopback>'])] : [] });
+  ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', ...(link === null ? [] : [`--proxy-server=${link.proxy}`, '--proxy-bypass-list=<-loopback>'])] : [] });
 const report = { schema: 2, gate: 'DL17 complete-at-control', rev, base, flow, engine, reach, levelDownload: values['level-download'] ?? null, textures: values.textures ?? 'auto', link: link === null ? null : { preset: 'phone', bytesPerSecond: link.bytesPerSecond },
   when: new Date().toISOString(), violations: [], errors: [], limitations: ['Cache Storage and blob: / data: reads are logged on the page only, not in its dedicated workers'] };
 try {

@@ -15,6 +15,7 @@ import { loadingCardIndex } from '../loading-benchmark/catalogue.mjs';
 import { drawFrames } from './draw-census-page.mjs';
 import { nativeSummary, attributionSummary, sampledCpu } from './draw-census-report.mjs';
 import { censusSelection, censusEntry } from './draw-census-poses.mjs';
+import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 
 const arg = (name, fallback = '') => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const base = arg('url'), dist = resolve(arg('dist', 'dist')), frames = Number(arg('frames', '60'));
@@ -84,7 +85,7 @@ const result = { build: version.build, url: base, protocol: { device: 'iPhone 16
   attribution: 'separate GL submission observation, including shadow/post/held; no GPU synchronization',
   propertyCounts: 'separate attribution window; native getter and descriptors restored before profile',
   profile: 'separate CDP sampled stacks mapped through the matching private dist; diagnostic, not a floor' }, rows: [] };
-const browser = await chromium.launch({ headless: true, args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 try {
   for (const { slug, poseName, pose, modes } of selections) for (const mode of modes) {
     const context = await browser.newContext({ ...device, viewport });

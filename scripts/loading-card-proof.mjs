@@ -12,6 +12,7 @@ import { serve } from './parity/serve.mjs';
 import { saveFixture,debugSettings } from './debug-settings.mjs';
 import {walk as walkGrid,entered,settled,observed} from './worker-client-grid-entry.mjs';
 import { barStalls, untracedChanges } from './loading-bar-rule.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 /** @param {string} name */
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -117,7 +118,7 @@ try {
     if (only !== undefined && only !== name) continue;
     const engine = name === 'chromium' ? chromium : webkit;
     const profile=grid?mkdtempSync(join(out,`${name}-profile-`)):null;
-    const browser=grid?null:await engine.launch({headless:true,...(name==='chromium'?{args:['--mute-audio']}: {})});
+    const browser=grid?null:await engine.launch({headless:true,...(name==='chromium'?{args:[...KEYCHAIN_ARGS, '--mute-audio']}: {})});
     try {
       const context=profile!==null?await engine.launchPersistentContext(profile,{...devices['iPhone 16 Pro'],deviceScaleFactor:2,headless:true,
         ...(name==='chromium'?{args:['--mute-audio']}: {})}):await browser?.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});

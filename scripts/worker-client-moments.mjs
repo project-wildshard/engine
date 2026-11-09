@@ -5,12 +5,13 @@
 import { chromium, devices } from 'playwright';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
 const base = arg('base', ''), only = arg('only', 'practice,pine,race,captain,god,roc,sunscar,phases,longroom,day').split(',');
 if (base === '') throw new Error('Requires --base');
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
-const browser = await chromium.launch({ args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 let failed = 0;
 const note = (name, ok, out) => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${JSON.stringify(out).slice(0, 1400)}`); };
 

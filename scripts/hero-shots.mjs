@@ -30,6 +30,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve as resolvePath } from 'node:path';
 import { saveFixture } from './debug-settings.mjs';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const { chromium } = await import('playwright');
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
@@ -54,7 +55,7 @@ const toJpeg = (png, jpg) => {
   execFileSync('rm', ['-f', tmp]);
 };
 
-const browser = await chromium.launch({ args: ['--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const errors = [];
 
 /** The real title deck with `jpg` as this shard's hero: the same card selected, the same panels, on the phone's viewport. */
