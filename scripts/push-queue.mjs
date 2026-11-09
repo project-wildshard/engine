@@ -6,6 +6,7 @@ import {homedir} from 'node:os';
 import {dirname,join,resolve as resolvePath} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import * as v from 'valibot';
+import {rebaseQueuedSnapshot} from './push-queue-rebase.mjs';
 
 const self=import.meta.filename,lock=fileURLToPath(new URL('push-queue-lock.py',import.meta.url));
 const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0)))});
@@ -147,8 +148,7 @@ async function drain(directory){
       if(contains.status===0){save('already-published',{remote,finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000});finished=true;break;}
       if(contains.status!==1)throw new Error('Could not verify remote ancestry');
       job.requestedSha??=job.sha;job.requestedTree??=job.tree;
-      save('rebasing');run('git',['pull','--rebase','origin','main']);
-      remote=git(snapshot,['rev-parse','refs/remotes/origin/main']);
+      save('rebasing');remote=rebaseQueuedSnapshot(snapshot,environment);
       job.sha=git(snapshot,['rev-parse','HEAD']);job.tree=git(snapshot,['rev-parse','HEAD^{tree}']);
      }
      const base=job.checkOnly?git(snapshot,['merge-base',remote,job.sha]):remote;
