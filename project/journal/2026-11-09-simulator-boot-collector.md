@@ -15,3 +15,7 @@ second through loader-complete. Unresolved spans cannot cover gaps.
 Syntax and diff checks pass. The actual native reading is still pending
 the production v0.1.3 promotion and a normal Simulator quiet window;
 this commit does not mark LS1 or any plan row done.
+
+The ordinary grid route also now applies the same muted phone settings
+that the compiled-shard route already set. Music and SFX are explicitly
+off for every test browser. No progress, pose or arrival is seeded.

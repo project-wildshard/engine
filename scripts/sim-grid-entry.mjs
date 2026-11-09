@@ -296,10 +296,12 @@ async function run(mode, index, target) {
   let sample = null, compiled = null, compiledReady = false, compiledFault = null, secondTapAt = null, recoveredAt = null;
   try {
     await sleep(1000);
-    const setup = shard === undefined && upgradeFrom === undefined ? '' : [
-      saveFixtureCode({ scope: 'device', key: 'devMode', data: true }),
-      saveFixtureCode({ scope: 'global', key: 'settings', merge: true, data: { volume: 0, tier: 'phone' } }),
-      saveFixtureCode({ scope: 'global', key: 'gfx', data: { dpr: '2', aa: 'auto' } }),
+    const setup = [
+      saveFixtureCode({ scope: 'global', key: 'settings', merge: true, data: { volume: 0, music: false, sfx: false, tier: 'phone' } }),
+      ...(shard === undefined && upgradeFrom === undefined ? [] : [
+        saveFixtureCode({ scope: 'device', key: 'devMode', data: true }),
+        saveFixtureCode({ scope: 'global', key: 'gfx', data: { dpr: '2', aa: 'auto' } }),
+      ]),
     ].join(';');
     await page.evaluate(`${setup};setTimeout(() => location.replace('/'), 50); true`);
     await sleep(800); await connect(`${BASE}/`);
