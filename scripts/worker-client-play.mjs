@@ -101,6 +101,11 @@ export async function play(browser, phone, base, only = '') {
     await step('movers: a real canoe ride and winch raise present their moments', () => run(browser, phone, base));
     return steps;
   }
+  if (only === 'data-shard') {
+    const { run } = await import('./split-repair-data-shard.mjs');
+    await step('data-shard: Big Blob\'s declared panel shows and retries off its row', () => run(browser, phone, base));
+    return steps;
+  }
   if (only === 'sky-trails') {
     const { run } = await import('./split-repair-sky-trails.mjs');
     await step('sky-trails: rays draw wakes, and a script anchors on its row body', () => run(browser, phone, base));

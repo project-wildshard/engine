@@ -44,6 +44,7 @@ import type { ClientScriptViewTarget } from "../plugin/ui";
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
 import { Ledger, type LedgerCatalogueItem } from '../../../shared/game/ledger';
 import { EmptyEquipment } from './emptyEquipment';
+import { BossRowBar } from '../boss/barFeed';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { PageResidency, HomeResidencyClaim } from '../grid/pageResidency';
 import { leaseClientLibrary } from './clientLibrary';
@@ -429,9 +430,20 @@ export class ShardfileClient {
       if (value !== undefined) return value;
       if (typeof field.default === 'string') throw new Error('UI requires numeric state'); return typeof field.default === 'boolean' ? Number(field.default) : field.default;
     };
-    mountDeclaredUi(source.ui, { hud: ctx.hud, system: ctx.system, scope: ctx.scope, bag: ctx.bag,
+    const declaredHud = mountDeclaredUi(source.ui, { hud: ctx.hud, system: ctx.system, scope: ctx.scope, bag: ctx.bag,
       read: (name) => { const scope = source.state.shared.some((row) => row.name === name) ? 'shared' : 'player', field = source.state[scope].find((row) => row.name === name); if (field === undefined) throw new Error('Missing declared counter field'); return read(scope, field.id); },
     });
+    // C10: a declared boss panel has one driver, its encounter's row (J130), as every native bar does: its bar, name card and retry.
+    const panels = [...declaredHud.bosses].map(([id, panel]) => {
+      const encounter = source.encounters.find(row => row.id === id);
+      if (encounter === undefined) throw new Error(`Boss panel requires its declared encounter: ${id}`);
+      const bar = new BossRowBar(panel.presentation, { id, ...panel.definition, phases: encounter.phases.map(phase => ({ at: phase.at, caption: phase.caption, name: phase.name })) }, null, {
+        lock: on => { play.weapons.setEnabled(!on); },
+        attempt: outcome => { ctx.app.events.emit('boss.attempt', { boss: id, outcome: outcome === 'died' ? 'lost' : outcome }); } });
+      ctx.on('player.died', ({ actor }) => { if (actor === ctx.app.player) bar.playerDied(); });
+      return bar;
+    });
+    if (panels.length > 0) ctx.system({ id: 'shardfile.boss-panels', phase: 'update', run: dt => { const rows = wirePage.encounters(); for (const bar of panels) bar.draw(rows, dt); } });
     yield;
     let simulationActive = true;
     // This page's flags are the server's, followed by `wirePage`: nothing here saves them.
