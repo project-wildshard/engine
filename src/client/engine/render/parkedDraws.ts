@@ -129,6 +129,8 @@ export interface ParkedDrawBudget { readonly drawables: number; readonly newMate
  *  new buffers stay under `bytes`. Still one submission per completed frame: 490e215711's two submissions a frame
  *  stalled Pine's GPU process (0cea9b55cc). */
 export interface ParkedDrawWiden { readonly max: number; readonly frameMs: number; readonly bytes: number }
+/** LS8: a slow slice's measured pause narrows the slices after it (`warmParkedDraws` `narrow`). */
+export interface ParkedDrawNarrow { readonly afterMs: number; readonly budget: ParkedDrawBudget }
 
 /** Share a first-use allowance only for ordinary meshes with the exact same geometry, material and program shape.
  * Per-object callbacks, morphs and skinning retain an independent first use. No draw or buffer upload is skipped. */
@@ -641,6 +643,10 @@ export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE
     onPlan?: (original: number, selected: number) => void;
     /** Adaptive slices per completed frame (held, off WebKit); absent, every planned slice gets its own frame. */
     widen?: ParkedDrawWiden;
+    /** LS8: once one slice's pause outlasts `afterMs` (a GPU still building that slice's pipelines), the slices not yet
+     *  drawn are planned again under `budget`, so each later slice is a smaller unit of GPU work; `onPlan` hears the new
+     *  count. Drawables and their total are unchanged. */
+    narrow?: ParkedDrawNarrow;
     /** D188 (G815): only these shown drawables (an arrival's set, or the rest it left); hidden alternates keep their
      *  one-per-pipeline warm-up either way. */
     include?: (object: THREE.Object3D) => boolean;
@@ -657,9 +663,9 @@ export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE
   // G782: a material counts against a slice's new-material budget only when its native pipeline is new to this renderer
   // and to this warm (a warm crossing re-parks fresh material objects over pipelines its last visit built)
   const budget = options.budget ?? DEFAULT_BUDGET;
-  const plan = (rows: readonly Drawable[]): Drawable[][] => {
+  const plan = (rows: readonly Drawable[], within: ParkedDrawBudget = budget): Drawable[][] => {
     const planned = new Set<string>();
-    return parkedDrawSlices(rows, budget, (object, material) => {
+    return parkedDrawSlices(rows, within, (object, material) => {
       const pipeline = nativePipeline(renderer, object, material, camera, formats);
       if (pipeline === undefined) return false;
       if (warmed.pipelines.has(pipeline) || planned.has(pipeline)) return true;
@@ -668,7 +674,7 @@ export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE
   };
   const original = plan(drawables), packed = packedDrawables(drawables, budget);
   const candidate = packed.every((object, index) => object === drawables[index]) ? original : plan(packed);
-  const slices = candidate.length < original.length ? candidate : original;
+  let slices = candidate.length < original.length ? candidate : original;
   options.onPlan?.(original.length, slices.length);
   // The scene holds the real camera equipment. Copy only the view: recursive
   // camera copies clone that unused hierarchy and can prepare fresh materials.
@@ -685,8 +691,8 @@ export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE
     // One slice per completed frame: a slice's native first draws (pipelines, buffer uploads) are bounded per frame, and
     // a CPU clock cannot see them (two slices a frame under 6 ms of JavaScript stalled Pine's GPU process past 30 s).
     // A drawable an earlier warm already drew exactly (G782) is left out; a slice left empty costs no frame.
-    const widen = options.widen, seen = new Set<THREE.Material>();
-    let width = 1, frameAt = Number.NaN;
+    const widen = options.widen, narrow = options.narrow, seen = new Set<THREE.Material>();
+    let width = 1, frameAt = Number.NaN, narrowed = false;
     for (let next = 0; next < slices.length;) {
       if (!current()) throw new Error('Parked draw owner left');
       // the planned slices this frame draws: one, or (widened) up to `merge` whose new buffers fit `widen.bytes`
@@ -714,7 +720,15 @@ export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE
       options.onDrawn?.(whole);
       drawn += slice.length; done += slice.length;
       options.onProgress?.(done, total);
+      const pausedAt = diagnosticNow();
       await pause();
+      if (narrow !== undefined && !narrowed && diagnosticNow() - pausedAt > narrow.afterMs) {
+        // the rest, planned again in smaller slices: the pipelines drawn so far are already in `warmed`
+        narrowed = true;
+        const rest = slices.slice(next).flat(), replanned = plan(rest, narrow.budget);
+        slices = [...slices.slice(0, next), ...replanned];
+        options.onPlan?.(original.length, slices.length);
+      }
       if (widen !== undefined) {
         // each pause is one completed frame: a late one is the GPU process still building, so the next draw narrows
         const now = diagnosticNow(), took = now - frameAt; frameAt = now;

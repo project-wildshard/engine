@@ -78,6 +78,10 @@ export function frameCapAnchor(lastDrawn: number, t: number, cap: number): numbe
 }
 /** E153: the boot's warm-up draws of the world, one per quarter-turn (Game.warmTurn) */
 const WARM_TURNS = 4;
+/** LS8 (J188): a first-frame slice whose fence took longer than this narrows every later slice to one new drawable, so
+ *  a slow GPU (CI's SwiftShader at 4x CPU: 1.7-4.9 s for an eight-drawable slice of Driftwood) reports each pipeline
+ *  build as it completes. A fast GPU never trips it and keeps its slice count. */
+const FIRST_DRAW_NARROW = { afterMs: 400, budget: { drawables: 1, newMaterials: 1, bufferBytes: 4_000_000 } } as const;
 /** the three slots of one fixed step, in order: `pre` readies the world, `step` advances it, `post` moves against it */
 export type FixedPhase = 'pre' | 'step' | 'post';
 
@@ -1220,10 +1224,12 @@ export class Game {
     const passes = this.composer.passes.filter(pass => pass.enabled);
     const splitPost = !passes.some(pass => pass instanceof MaskPass || pass instanceof ClearMaskPass);
     const postUnits = splitPost ? passes.length : 1;
-    let slices = 0;
+    let draws = 0, credited = 0;
     // each boot draw is its shadow maps, one a unit, then the view (fencedDraw)
     const perDraw = this.shadowCasters(this.camera).length + 1;
-    const total = (): number => slices + perDraw * (1 + warmTurns) + postUnits;
+    // LS8: the world's first draws count by drawable, each credited when the fence after its slice signals, so a slice
+    // narrowed after a slow one (FIRST_DRAW_NARROW) changes no total
+    const total = (): number => draws + perDraw * (1 + warmTurns) + postUnits;
     const drawUnits = (base: number, label: string) => (done: number, detail: string): void => {
       onProgress?.(base + Math.min(done, perDraw), total(), `${label} · ${detail}`);
     };
@@ -1239,24 +1245,26 @@ export class Game {
     if (target !== null) {
       const { warmParkedDraws } = await import('../render/parkedDraws');
       checkpoint(`shadow-maps:allocated:${String(this.allocateShadowMaps(this.camera))}`);
-      let submitted = 0, drew = false, slicesDone = 0, all = 0;
+      let submitted = 0, drew = false;
       checkpoint('world-pipelines:before');
       await warmParkedDraws(this.renderer, this.rootScene, this.camera, target, this.rootScene, () => !this.engineScope.disposed,
         // a pause after a drawn slice fences it; the bounds pauses before the first slice only yield a frame
         async () => {
           if (!drew) { await frame(); return; }
           drew = false;
-          const warmed = submitted, of = all;
+          const warmed = submitted;
           await units.submit(() => {
-            slicesDone = Math.min(slicesDone + 1, slices);
-            onProgress?.(slicesDone, total(), `${String(slicesDone)} / ${String(slices)} world slices · ${String(warmed)} / ${String(of)} draws warmed`);
+            credited = warmed;
+            onProgress?.(warmed, total(), `${String(warmed)} / ${String(draws)} draws warmed`);
           });
         },
-        { onPlan: (_original, selected) => { slices = selected; onProgress?.(0, total(), `0 / ${String(selected)} world slices`); },
-          onProgress: (done, count) => { drew ||= done > submitted; submitted = done; all = count; } });
+        // a narrowed plan reports again: the count already credited stands
+        { onPlan: (_original, selected) => { onProgress?.(credited, total(), `${String(selected)} world slices`); },
+          onProgress: (done, count) => { drew ||= done > submitted; submitted = done; draws = count; },
+          narrow: FIRST_DRAW_NARROW });
       checkpoint('world-pipelines:submitted');
     }
-    const drawables = slices;
+    const drawables = draws;
     units.mark(() => { onProgress?.(drawables, total(), 'world + shadows'); });
     checkpoint('world:before');
     await this.fencedDraw(this.camera, target, units, drawUnits(drawables, 'world + shadows'));

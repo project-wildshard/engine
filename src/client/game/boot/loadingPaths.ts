@@ -21,12 +21,28 @@ const SHARDFILE_MEASURED_SECONDS: Readonly<Record<string, number>> = {
   server: 1.8716, audio: 0.0010,
 };
 
-/** Only the calibrated profile carries weights. Every other path keeps an equal share a row, which is what every path
+/** LS8 (J188): the native and hybrid world stages (Driftwood, Pine, Nalati and Nine still build theirs in TypeScript),
+ *  measured the same way: Driftwood Isle, the same phone profile and headless Chromium, its `-rows.json` from
+ *  `scripts/loading-card-proof.mjs --shard=driftwood-isle --throttle --dump` (build d0f800b-mw9lffqd with the creature
+ *  warm-up and FIRST_DRAW_NARROW, 2026-11-09), at 0.1 ms. `modules` is its `game-stage:modules` span, 685 ms, as above.
+ *  The first frame is most of this boot there: SwiftShader builds each pipeline on the CPU. */
+const NATIVE_MEASURED_SECONDS: Readonly<Record<string, number>> = {
+  modules: 0.685, runtimeModules: 0.1605, data: 0.2816, audioFiles: 0.0103,
+  world: 0.0755, renderer: 0.0896, sky: 2.3915, terrain: 0.567, cards: 0.0039, forest: 0.0297, physics: 0.0205,
+  edge: 0.0243, grass: 0.0017, cabins: 0.0009, props: 3.7816, animals: 0.0476,
+  loadout: 0.8326, weapon: 0.0009, gameplay: 0.4638, assembly: 0.0024, menu: 0.0022,
+  finish: 0.0954, // still on at ready: its ms then
+  spawnDetail: 0.0008, shaders: 2.7485, firstFrame: 49.684, worldFrame: 0.1816, readyFrame: 0.6249,
+  spawnPrograms: 0, worldPrograms: 0, // WebKit-only links (QA8): not run in this profile
+  server: 3.324, audio: 0.1524,
+};
+
+/** Only a calibrated profile carries weights. Every other path keeps an equal share a row, which is what every path
  *  had before LS7 (the bar ignored weights), until it is measured. */
-function calibrate(path: Path, calibrated: boolean): Path {
+function calibrate(path: Path, measured: Readonly<Record<string, number>> | null): Path {
   return { ...path, steps: path.steps.map(row => {
-    if (!calibrated) return { ...row, weight: 1 };
-    const seconds = SHARDFILE_MEASURED_SECONDS[row.key];
+    if (measured === null) return { ...row, weight: 1 };
+    const seconds = measured[row.key];
     if (seconds === undefined) throw new Error(`LS7: Load row ${row.key} has no measured seconds`);
     return { ...row, weight: seconds };
   }) };
@@ -67,7 +83,8 @@ export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { l
     step('spawnPrograms', 'Spawn program links'), { ...step('worldPrograms', 'World program links'), weight: 0.01 },
     // DL21: the server's boot, on J130's row and after the flip on every page; no bar share, so a page with no server is unchanged
     { ...step('server', 'Worker boot'), weight: 0.01 }, leaf('audio')],
-    ignored: native ? [] : BOOT_STEPS.filter(key => !selected.has(key)) }, id === 'shardfile' && !native);
+    ignored: native ? [] : BOOT_STEPS.filter(key => !selected.has(key)) },
+    id === 'grid' ? null : native ? NATIVE_MEASURED_SECONDS : id === 'shardfile' ? SHARDFILE_MEASURED_SECONDS : null);
 }
 
 /** Crossings retain their existing unobstructed play view; the live diagnostic uses this separate, exact phase table. */
