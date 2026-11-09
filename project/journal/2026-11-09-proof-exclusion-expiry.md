@@ -34,3 +34,7 @@ reuse returns an expired proof, and writing a stale proof does not throw.
 The ordinary policy reader now samples expiry after Git validation while
 preserving explicitly supplied observation times. Both boundary cases
 pass in2.9s; the real Vitest reader and cache keep the same late decision.
+Cache reuse also checks the live deadline at its final coverage decision.
+Writing rechecks after its atomic rename and removes only the receipt it
+just created if expiry crossed during I/O. A fully restored inventory
+with no exclusions stays reusable after the old policy deadline.
