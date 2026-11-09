@@ -56,3 +56,10 @@ records. Normal non-playtest server queries allocate no rewind metadata.
 
 Publication is held through port's v0.1.3 tag window. Page and server must be
 built from the later same committed build to use these additions.
+
+# RTT table labels
+
+The human table calls its RTT aggregate "Median window RTT": clients send
+measured window medians, so their median is not the whole sitting's raw
+sample median. Worst window p95 already names its actual aggregation.
+The source comment also reflects the authenticated export added later.

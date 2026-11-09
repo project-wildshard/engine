@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Reads operator JSONL exports only; it never fetches private Blob or VPS data.
+// Reads operator JSONL, or the authenticated bounded API export. No VPS access.
 import {readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {resolve as resolvePath} from 'node:path';
@@ -59,7 +59,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolvePath(process.argv[1])
  else{
   /** @param {unknown} value */
   const show=value=>typeof value==='number'?value.toFixed(2):'unknown';
-  console.log('| Build / anonymous session | RTT median ms | Worst window RTT p95 ms | Corrections/min foot,board,swim,ride | Biggest offset m | Frames/s | Reconnects / total ms |\n|---|---:|---:|---|---:|---:|---|');
+  console.log('| Build / anonymous session | Median window RTT ms | Worst window RTT p95 ms | Corrections/min foot,board,swim,ride | Biggest offset m | Frames/s | Reconnects / total ms |\n|---|---:|---:|---|---:|---:|---|');
   for(const row of table.clients)console.log(`| ${row.build} / ${row.session} | ${show(row.rttMs)} | ${show(row.worstWindowRttP95)} | ${Object.values(row.correctionsPerMinute).map(show).join(', ')} | ${show(row.maxOffset)} | ${show(row.fps)} | ${row.reconnects} / ${show(row.reconnectMs)} |`);
   console.log(`Server: minimum ${show(table.server.minTicksPerSecond)} ticks/s; worst observed worker-window p95 ${show(table.server.worstWorkerP95)} ms. Rewind: ${table.rewind.clamped}/${table.rewind.settledNetworkHits} settled network hits clamped (${show(table.rewind.clampedPercent)}%). File corrections ${table.playtest.fileCorrections}; dropped ${table.playtest.dropped}.`);
   if(table.rewind.reviewJ127)console.log('J127 REVIEW: clamped hits exceed25%; record a second sitting proposal for Jake. The12-tick cap is unchanged.');
