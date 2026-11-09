@@ -211,6 +211,13 @@ export class HUD {
       // releases the lock the close had just re-taken): stay closed, a click on the canvas takes the lock back
       if (locked) this.setPaused(false); else if (!this.paused && app.clock.real * 1000 - app.ui.closedAt > 400) this.setPaused(true);
     });
+    // KP4 (Jake 2026-11-09: "Same for command T, command N"): ⌘T hides the tab (ws:background pauses), ⌘N or a click in
+    // another window only takes the focus. Without a pointer lock to lose, that left the world running; the held keys were
+    // already let go on blur (InputService), so the player comes back to the pause menu, standing still
+    this.scope.listen(window, 'blur', () => {
+      if (!this.entered || this.paused || this.holdPause || (app.ui.blocking && app.ui.top !== 'gameMenu')) return;
+      this.setPaused(true);
+    });
     const titleScope = (app.levelScope ?? app.engineScope).child('input.title');
     const title = (): boolean => this.intro !== undefined && !this.entered && !app.ui.blocking;
     app.input.bind('nav.left', () => { this.deck?.select(this.deck.index - 1); }, titleScope, title);

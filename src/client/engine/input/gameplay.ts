@@ -3,6 +3,7 @@ import type { EquipmentService } from '../combat/EquipmentService';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { app } from '../app/runtime';
 import type { InputContextDef } from '../../../server/engine/level/context';
+import { installLeaveGuard } from '../ui/leaveGuard';
 
 /** The level installs one device listener set; mode contexts compose with plugin verbs. */
 export function installGameplayInput(player: Player, canvas: HTMLCanvasElement, scope: Scope, contexts: readonly InputContextDef[]): void {
@@ -11,6 +12,7 @@ export function installGameplayInput(player: Player, canvas: HTMLCanvasElement, 
   input.captureAim = () => player.sampleAimCommand();
   scope.onDispose(() => { input.captureAim = null; });
   input.install(scope, canvas, (x, y) => { player.look(x, y); });
+  installLeaveGuard(scope); // KP4: ⌘W / ⌘Q / Ctrl+W in the world asks before the tab goes
   for (const def of contexts) input.register(def, scope);
   input.push('onFoot', scope);
   app.ui.connectInput(input, app.engineScope);

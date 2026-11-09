@@ -27,3 +27,28 @@ longer goes Back, Alt+F no longer opens Chrome's menu, and the arrows
 don't scroll. Text fields and focused buttons keep their keys. There
 is no stopPropagation: the browser's default follows preventDefault,
 and stopping propagation would starve the game's own listeners.
+
+## The leave guard
+
+Then Jake: "show 'leave the game' and confirm for command W. Same for
+command T, command N, command Q". `ui/leaveGuard.ts` cancels
+`beforeunload` while the player is in the world (play, dead, a practice
+room) and this page has seen a keyboard key, so ⌘W, ⌘Q, Ctrl+W and
+Alt+F4 get the browser's "Leave site?". The browser picks the words; a
+page's own text has been ignored since 2016. Touch-only phones never
+press a key, so they never arm it, and iOS ignores the dialog anyway.
+
+RL6 still holds: a reload the player asks for never prompts. Every
+navigation the game makes on purpose already calls markUnload or
+markReload (the reload pill, error reloads, graphics recovery, shard
+travel, a stale build), and lastEnd now keeps that moment in memory
+for ten seconds. The guard also stands down for ⌘R, Ctrl+R and F5,
+which reach the page before the browser reloads. Title, loading, pause
+and error menus never ask, and the build pill shows only there.
+
+⌘T and ⌘N unload nothing. ⌘T hides the tab, and ws:background already
+paused. ⌘N only blurs the window, which paused only if pointer lock was
+on. The HUD now pauses on blur too, and the held keys were already let
+go, so the player comes back to the pause menu standing still.
+Settings ▸ Key bindings says it in the platform's words: "While
+playing, ⌘W and ⌘Q ask before leaving the game; ⌘T and ⌘N pause it."

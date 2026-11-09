@@ -1,9 +1,10 @@
 import { app } from '../app/runtime';
 import { engineString } from '../../../shared/engine/strings';
 import type { Scope } from '../../../shared/engine/app/scope';
+import { keyPlatform } from './platform';
 import { BindingTable, bindableKey, keyOfCode, type BindingTableRow } from './bindingTable';
 
-import { keycap } from './keycap';
+import { keycap, shortcut } from './keycap';
 
 const div = (cls: string, text = ''): HTMLDivElement => { const d = document.createElement('div'); d.className = cls; if (text !== '') d.textContent = text; return d; };
 interface Editing { row: string; cell: number; key?: string; clash?: { row: string; cell: number } }
@@ -18,6 +19,9 @@ export function buildControlsPanel(parent: Scope): HTMLDivElement & { refresh: (
   const card = div('ws-gmenu-card ws-gmenu-keys');
   const title = div('ws-gmenu-cardtitle', engineString('s_f4fce9bc331d'));
   const note = div('ws-gmenu-note', engineString('s_keys_hint'));
+  // KP5: what the browser's own shortcuts do in play, in this platform's words (⌘W on a Mac, Ctrl+W elsewhere; ⌘Q is a
+  // Mac's quit, Alt+F4 the others' close-window); src/client/engine/ui/leaveGuard.ts and HUD.ts's blur pause
+  const browser = div('ws-gmenu-note ws-gmenu-keybrowser', engineString('s_keys_browser', [shortcut('W'), keyPlatform() === 'mac' ? shortcut('Q') : 'Alt+F4', shortcut('T'), shortcut('N')]));
   const cols = div('ws-gmenu-keycols');
   const clash = div('ws-gmenu-keyclash'); clash.setAttribute('role', 'status');
   const foot = div('ws-gmenu-keyfoot');
@@ -97,7 +101,7 @@ export function buildControlsPanel(parent: Scope): HTMLDivElement & { refresh: (
     paint();
   }
   foot.append(button('ws-gmenu-keybtn', engineString('s_dd7d08f05555'), () => { cancel(); table.reset(); refresh(); }, scope));
-  card.append(title, note, cols, clash, foot);
+  card.append(title, note, browser, cols, clash, foot);
   scope.listen(desktop, 'change', refresh);
   scope.onDispose(() => { capture?.dispose(); card.remove(); }); refresh();
   return Object.assign(card, { refresh });

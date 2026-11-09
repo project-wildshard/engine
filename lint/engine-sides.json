@@ -425,6 +425,7 @@
     "src/client/engine/ui/ItemCard.ts": "client",
     "src/client/engine/ui/KeyHelp.ts": "client",
     "src/client/engine/ui/layers.ts": "client",
+    "src/client/engine/ui/leaveGuard.ts": "client",
     "src/client/engine/ui/Loading.ts": "client",
     "src/client/engine/ui/loadProgress.ts": "client",
     "src/client/engine/ui/LockOn.ts": "client",

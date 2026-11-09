@@ -117,7 +117,10 @@ export class PageLife {
   }
 
   /** the game is about to navigate / reload on purpose: say why, first (the next boot reads it) */
+  /** KP4: when this page last said it is leaving on purpose (Date.now), read by the leave guard */
+  leftOnPurposeAt: number = Number.NEGATIVE_INFINITY;
   markUnload(reason: string, reload = false): void {
+    this.leftOnPurposeAt = Date.now();
     markBootPlanned();
     this.alive = false; this.clearAlive();
     const u: Unload = { reason, ...this.stamp(), ...(reload ? { reload: true } : {}) };
@@ -210,6 +213,11 @@ export class PageLife {
 const page = new PageLife(pageScope);
 export function setAliveSource(fn: () => AliveInfo): void { page.setAliveSource(fn); }
 export function markUnload(reason: string): void { page.markUnload(reason); }
+/** KP4: how long a markUnload / markReload keeps the leave guard (src/client/engine/ui/leaveGuard.ts) down; a save before
+ *  the navigation waits at most LEAVE_WAIT_MS, so this outlasts it */
+export const LEAVE_INTENT_MS = 10_000;
+/** KP4: the game said it is leaving (markUnload / markReload) within LEAVE_INTENT_MS: no "Leave site?" for it */
+export function leavingOnPurpose(now: number = Date.now()): boolean { return now - page.leftOnPurposeAt < LEAVE_INTENT_MS; }
 /** All engine reload actions share this persistence boundary; explicit navigation remains markUnload. */
 export function markReload(message: string, reason: ReloadReason = 'reload'): boolean { return page.markReload(message, reason); }
 /** Install the content-owned durable capture port for the current play scope. */
