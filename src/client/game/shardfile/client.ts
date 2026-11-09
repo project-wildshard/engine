@@ -41,6 +41,7 @@ import { declaredProductCompendium, declaredDay, declaredWeather } from '../../.
 import { installDeclaredTargets } from '../shard/declaredTargets';
 import { mountDeclaredUi } from '../shard/declaredUi';
 import type { ClientScriptViewTarget } from "../plugin/ui";
+import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
 import { Ledger, type LedgerCatalogueItem } from '../../../shared/game/ledger';
 import { EmptyEquipment } from './emptyEquipment';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
@@ -455,20 +456,30 @@ export class ShardfileClient {
     if (source.clientScripts.bindings.length > 0) {
       if (presentation === null) throw new Error('Missing client script presentation module');
       const { ClientScriptViews, driveClientScriptViews } = presentation;
+      // A declared creature is the server's row now: its body is the one the wire named after the spawn, and it may arrive late or
+      // come back as another body, so each read looks it up again. Before it arrives a script sees the origin and poses nothing.
+      const body = (target: ClientScriptTarget): ReturnType<typeof wirePage.namedBody> => target.kind === 'creature' ? wirePage.namedBody(target.id) : null;
       const scripts = createShardfileClientScripts(source, this.assets.retained, { actorId: health.id, state: { viewField: (_actor, scope, name) => fieldValue(scope, name) },
-        observe: (target) => ({ position: target.kind === 'particles' ? target.at : [0, 0, 0], frozen: !simulationActive }),
+        observe: (target) => {
+          if (target.kind === 'particles') return { position: target.at, frozen: !simulationActive };
+          return captureClientScriptPosition(body(target)?.mesh.position, !simulationActive);
+        },
         observeInto: (target, capture) => {
           // Particle rows retain their authored iterable alias until the bridge
           // copies it. A creature's former fresh tuple is a numeric snapshot.
           if (target.kind === 'particles') return { position: target.at, frozen: !simulationActive };
-          captureClientScriptPosition(undefined, false, capture);
-          capture.frozen = !simulationActive; return undefined;
+          captureClientScriptPosition(body(target)?.mesh.position, !simulationActive, capture);
+          return undefined;
         } });
       ctx.scope.onDispose(() => { scripts.dispose(); });
       const targets = scripts.targets.map(({ entity, target }): ClientScriptViewTarget => {
         const looks = source.clientScripts.bindings.find((b) => b.entity === entity)?.emitters.map((e) => ({ id: e.id, live: e.live, colour: e.colour, size: e.size, velocity: e.velocity, gravity: e.gravity })) ?? [];
-        return { entity, object: null, emitters: looks,
-          anchor: (out) => (target.kind === 'particles' ? out.fromArray(target.at) : out.set(0, 0, 0)) };
+        return { entity, get object() { return body(target)?.mesh ?? null; }, emitters: looks,
+          anchor: (out) => {
+            if (target.kind === 'particles') return out.fromArray(target.at);
+            const view = body(target);
+            return view === null ? out.set(0, 0, 0) : out.copy(view.mesh.position).setY(view.mesh.position.y + view.dims.bodyY * (view.mesh.scale.y || 1) * 1.6);
+          } };
       });
       const views = new ClientScriptViews(scripts.lane, targets, { root: ctx.root, scope: ctx.scope });
       let presentationTick = 0, stopped = false;
@@ -478,7 +489,9 @@ export class ShardfileClient {
         try { scripts.step(presentationTick++); } catch (error) { stopped = true; views.restore(); console.warn('[shardfile] client scripts stopped:', error); }
       } });
       driveClientScriptViews(views, { system: ctx.system, id: 'game.shardfile.client-script-views' });
-      ctx.debug.expose('shardfileClientScripts', { views: () => views.state(), frames: () => scripts.lane.frames() });
+      ctx.debug.expose('shardfileClientScripts', { views: () => views.state(), frames: () => scripts.lane.frames(),
+        // where each binding's particles start and whether a body is bound to pose: what a proof reads of a row's body
+        anchors: () => targets.map(target => ({ entity: target.entity, bound: target.object !== null, at: target.anchor(new Vector3()).toArray() })) });
     }
     yield;
     // The server keeps this world's saves and reads a page's old ones, and it runs its scenes: a press goes by the prompt's `wireId`.

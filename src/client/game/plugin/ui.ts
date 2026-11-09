@@ -186,6 +186,7 @@ export interface ClientScriptEmitterLook { readonly id: number; readonly live: n
 /** One bound visual: the view object a pose composes onto (null: particles only) and where its particles start. */
 export interface ClientScriptViewTarget {
   readonly entity: number;
+  /** Read each frame: a creature's body is a row's, which may arrive late or come back as another body. */
   readonly object: Object3D | null;
   /** the particle origin in the adapter root's space */
   readonly anchor: (out: Vector3) => Vector3;
@@ -212,7 +213,7 @@ void main() {
 }`;
 const PARK_Y = -10_000;
 
-interface Posed { readonly target: ClientScriptViewTarget; readonly object: Object3D; readonly base: { p: Vector3; q: Quaternion; s: Vector3 }; saved: boolean;
+interface Posed { readonly target: ClientScriptViewTarget; object: Object3D | null; readonly base: { p: Vector3; q: Quaternion; s: Vector3 }; saved: boolean;
   /** the eased pose being drawn */ readonly offset: Vector3; readonly rotation: Vector3; readonly scale: Vector3 }
 
 /** a deterministic jitter in [-1, 1] from integers (no clock, no Math.random) */
@@ -244,8 +245,8 @@ export class ClientScriptViews {
     this.lane = lane;
     this.targets = new Map(targets.map((t) => [t.entity, t])); this.order = [...this.targets.keys()].sort((a, b) => a - b);
     if (this.targets.size !== targets.length) throw new Error('client script views: one view per bound entity');
-    this.posed = targets.flatMap((target): Posed[] => target.object === null ? [] : [{ target, object: target.object, saved: false,
-      base: { p: new Vector3(), q: new Quaternion(), s: new Vector3(1, 1, 1) }, offset: new Vector3(), rotation: new Vector3(), scale: new Vector3(1, 1, 1) }]);
+    this.posed = targets.map((target): Posed => ({ target, object: null, saved: false,
+      base: { p: new Vector3(), q: new Quaternion(), s: new Vector3(1, 1, 1) }, offset: new Vector3(), rotation: new Vector3(), scale: new Vector3(1, 1, 1) }));
     const capacity = Math.min(CLIENT_SCRIPT_LIMITS.particlesLive, targets.reduce((n, t) => n + t.emitters.reduce((m, e) => m + e.live, 0), 0));
     this.lifetimes = new Float32Array(capacity); this.gravity = new Float32Array(capacity);
     if (capacity > 0) {
@@ -264,7 +265,7 @@ export class ClientScriptViews {
   /** Put every composed view back to the base it had before `apply` (run before the views write their own pose). */
   restore(): void {
     for (const p of this.posed) {
-      if (!p.saved) continue;
+      if (!p.saved || p.object === null) continue;
       p.object.position.copy(p.base.p); p.object.quaternion.copy(p.base.q); p.object.scale.copy(p.base.s); p.saved = false;
     }
   }
@@ -275,7 +276,8 @@ export class ClientScriptViews {
     this.restore();
     const lane = this.lane, ease = 1 - Math.exp(-Math.max(0, dt) * 14);
     for (const p of this.posed) {
-      const frame = lane.frame(p.target.entity), o = p.object;
+      const frame = lane.frame(p.target.entity), o = p.object = p.target.object;
+      if (o === null) continue;
       if (frame !== undefined) {
         p.offset.lerp(this._v.fromArray(frame.offset), ease); p.rotation.lerp(this._v.fromArray(frame.rotation), ease); p.scale.lerp(this._v.fromArray(frame.scale), ease);
       }
@@ -323,7 +325,7 @@ export class ClientScriptViews {
   }
 
   state(): ClientScriptViewState {
-    return { targets: this.targets.size, posed: this.posed.length, particles: this.alive, capacity: this.pool?.capacity ?? 0, tick: this.seen };
+    return { targets: this.targets.size, posed: this.posed.filter(p => p.object !== null).length, particles: this.alive, capacity: this.pool?.capacity ?? 0, tick: this.seen };
   }
 
   /** Restore every base pose and free the particle draw; further `apply` calls draw nothing. */

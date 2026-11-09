@@ -7,6 +7,7 @@ import type { RuntimeHomePorts } from '../../../shared/game/plugin/runtimeRows';
 import { bindPageHomes } from '../../../shared/game/population/pageHomes';
 import { pagePopulationRows } from '../../../shared/game/population/pageRows';
 import { productPainterLight } from '../looks/paintedLook';
+import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { wirePage } from './wirePage';
 import { clientNativeBook } from './clientNativeBook';
 
@@ -36,11 +37,13 @@ export function clientPopulationActor(ctx: ShardContext, id: string): ReturnType
   const population = clientNativeBook(ctx).population;
   return population?.held(id) ?? population?.homes.find(home => home.id === id)?.animal ?? null;
 }
-/** Actual native group members for compiled presentation features. Group rows
- * contain addresses only; the keeper remains the sole owner of every body. */
-export function clientPopulationActors(ctx: ShardContext, group: string): NonNullable<ReturnType<typeof clientPopulationActor>>[] {
+/** A group member's body as a presentation feature draws on it: the keeper's where this page spawns its own, else the server's
+ *  row of the same name (J130). A row arrives after entry and may come back as another body, so a caller asks each frame. */
+export type ClientPopulationBody = () => Animal | null;
+/** Every member of a declared group, by address. Group rows contain addresses only; the keeper or the rows own every body. */
+export function clientPopulationBodies(ctx: ShardContext, group: string): readonly ClientPopulationBody[] {
   const population = ctx.product.section('client/plan').features.find(row => row.kind === 'population.homes');
   const ids = population?.kind === 'population.homes' ? population.groups[group] : undefined;
   if (ids === undefined || clientNativeBook(ctx).population === null) throw new Error(`Missing entered native population group: ${group}`);
-  return ids.flatMap(id => clientPopulationActor(ctx, id) ?? []);
+  return ids.map(id => () => clientPopulationActor(ctx, id) ?? wirePage.namedBody(id));
 }

@@ -96,6 +96,11 @@ export async function play(browser, phone, base, only = '') {
     await step('Nalati: a real mounted bite panics the horse', () => panic(browser, phone, base));
     return steps;
   }
+  if (only === 'sky-trails') {
+    const { run } = await import('./split-repair-sky-trails.mjs');
+    await step('sky-trails: rays draw wakes, and a script anchors on its row body', () => run(browser, phone, base));
+    return steps;
+  }
   if (runs('pine-economy')) { const { pineEconomy } = await import('./worker-client-pine.mjs'); await pineEconomy(browser, phone, base, step); }
   if (runs('hurt')) { const { hurt } = await import('./worker-client-hurt.mjs'); await hurt(browser, phone, base, step); }
   if (runs('windup')) { const { windup } = await import('./worker-client-windup.mjs'); await windup(browser, phone, base, step); }
