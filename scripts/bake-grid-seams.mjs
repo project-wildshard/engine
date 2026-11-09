@@ -21,6 +21,9 @@ import { encodeGridStripPage, GridStripTransportLimitError, writeGridStripPages 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 const root = process.cwd(), outputRoot = resolve(process.argv[2] ?? root), base = 'https://build.invalid/';
+// Native worker proofs consume only the plain-grid collider files. The normal
+// build still prepares every mode and all client strip pages below.
+const collisionOnly = process.argv[3] === '--collision-only';
 // A deploy that names its catalogue (`bakeCatalogue`) gets seams for that grid, or the page's catalogue and its seams differ.
 if (process.env.WILDSHARD_CATALOGUE !== undefined) installCatalogue(JSON.parse(await readFile(process.env.WILDSHARD_CATALOGUE, 'utf8')));
 /** @param {string} path */
@@ -35,7 +38,8 @@ const fetchFile = async path => {
 const plans = new Map(), seen = new Map(), products = new Map(), sources = new Map(), entryModes = new Map();
 /** @type {import('../src/cook/game/gridStripPages.ts').CompiledGridCandidate[]} */
 const compiled = [];
-for (const developer of [false, true]) for (const devserver of [false, true]) for (const nineDragon of [false, true]) {
+const modes = collisionOnly ? [false] : [false, true];
+for (const developer of modes) for (const devserver of modes) for (const nineDragon of modes) {
   const assembly = new GridAssembly({ developer, devserver, nineDragon });
   const key = JSON.stringify(assembly.cells);
   const mode = `${Number(developer)}${Number(devserver)}${Number(nineDragon)}`;
@@ -76,6 +80,7 @@ for (const developer of [false, true]) for (const devserver of [false, true]) fo
   seen.set(key, source); entryModes.set(mode, source);
   // C2: the worker's road is the page's, from the catalogue a plain visit reads.
   if (mode === '000') writeGridCollision(outputRoot, source, strips);
+  if (collisionOnly) continue;
   for (const home of assembly.cells) {
     /** @param {import('../src/shared/engine/sim/strips.ts').GeneratedStrip} strip */
     const within = strip => Math.abs(strip.mesh.origin.x - home.origin.x) <= reach && Math.abs(strip.mesh.origin.z - home.origin.z) <= reach;
@@ -94,10 +99,12 @@ for (const developer of [false, true]) for (const devserver of [false, true]) fo
 /** @template T @param {ReadonlyMap<string,T>} rows */
 const ordered = rows => [...rows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
 const output = JSON.stringify({ plans: ordered(plans), edges: ordered(sources) });
-const { room } = JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8'));
-const pages = writeGridStripPages(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, room);
-// Addressing only: all original strip bytes, hashes and room selection stay in
-// writeGridStripPages. The title can request its exact existing initial page.
-writeFileSync(resolve(outputRoot, 'out/.app/grid-strip-entry-modes.json'), JSON.stringify(Object.fromEntries(entryModes)));
-for (const row of pages.rows) console.error(`[grid strip wire] ${row.home} source=${row.source.slice(0, 8)} added=${row.added} room=${String(row.room)} ${row.included ? 'compiled' : 'native'}${row.outer ? '+outer' : ''}`);
+if (!collisionOnly) {
+  const { room } = JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8'));
+  const pages = writeGridStripPages(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, room);
+  // Addressing only: all original strip bytes, hashes and room selection stay in
+  // writeGridStripPages. The title can request its exact existing initial page.
+  writeFileSync(resolve(outputRoot, 'out/.app/grid-strip-entry-modes.json'), JSON.stringify(Object.fromEntries(entryModes)));
+  for (const row of pages.rows) console.error(`[grid strip wire] ${row.home} source=${row.source.slice(0, 8)} added=${row.added} room=${String(row.room)} ${row.included ? 'compiled' : 'native'}${row.outer ? '+outer' : ''}`);
+}
 process.stdout.write(output);

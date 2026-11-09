@@ -19,7 +19,7 @@ async function bake(): Promise<readonly GridCollisionStrip[]> {
   mkdirSync('tmp', { recursive: true });
   const root = coldRoot ?? mkdtempSync(resolve('tmp', 'grid-collision-'));
   try {
-    await promisify(execFile)(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs', root], { maxBuffer: 64 * 1024 * 1024, timeout: 55_000 });
+    await promisify(execFile)(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs', root, '--collision-only'], { maxBuffer: 64 * 1024 * 1024, timeout: 55_000 });
     return read(root);
   } finally { if (coldRoot === undefined) rmSync(root, { recursive: true, force: true }); }
 }
