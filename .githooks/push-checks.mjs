@@ -103,7 +103,8 @@ async function main(){
   }
   const record=seconds=>{
     const after=capturePushTree(PUSH_PROFILE,env);
-    if(context!==null&&after?.tree===context.tree&&after.runtime===context.runtime){
+    if(context!==null){
+      if(after===null||after.tree!==context.tree||after.runtime!==context.runtime)throw new Error('Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree');
       const recorded=writePushProof(context,selection,seconds);console.error(`  - saved exact-tree proof run ${recorded.run} (${selection.mode})`);
     }
   };

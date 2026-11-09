@@ -10,14 +10,27 @@ const receiptSchema=v.object({version:v.literal(1),tree:v.string(),runtime:v.str
 /** Never cache dirty bytes or use local receipts to skip CI.
  * @param {string} profile @param {NodeJS.ProcessEnv} env @param {string} [cwd] */
 export function capturePushTree(profile,env,cwd=process.cwd()){
-  if(env.CI||env.GITHUB_ACTIONS)return null;
+  const refs=env.WS_PUSH_REFS?.trim();
+  if((env.CI||env.GITHUB_ACTIONS)&&!refs)return null;
   /** @param {string[]} args */
   const git=args=>execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
-  if(git(['status','--porcelain','--untracked-files=normal'])!=='')return null;
+  const tree=git(['rev-parse','HEAD^{tree}']),commit=git(['rev-parse','HEAD']);
+  let publishes=false;
+  for(const line of refs?.split('\n')??[]){
+    const fields=line.trim().split(/\s+/u),local=fields[1],remote=fields[3];
+    if(fields.length!==4||!/^[a-f0-9]{40}$/u.test(local??'')||!/^[a-f0-9]{40}$/u.test(remote??''))throw new Error('Invalid push refs for checked-tree proof');
+    if(/^0+$/u.test(local))continue;
+    publishes=true;
+    if(git(['rev-parse','--verify',`${local}^{tree}`])!==tree)throw new Error('Push target tree differs from the checked HEAD tree; check the exact target in an immutable checkout');
+  }
+  if(env.CI||env.GITHUB_ACTIONS)return null;
+  if(git(['status','--porcelain','--untracked-files=normal'])!==''){
+    if(publishes)throw new Error('Push target requires a clean checked tree; enqueue a committed immutable checkout');
+    return null;
+  }
   const excluded=/^(?:WS_PUSH_REFS|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
   const runtime=createHash('sha256').update(JSON.stringify({profile,node:process.versions,platform:process.platform,arch:process.arch,environment})).digest('hex');
-  const tree=git(['rev-parse','HEAD^{tree}']),commit=git(['rev-parse','HEAD']);
   return {tree,commit,runtime,file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
 
