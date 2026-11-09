@@ -17,7 +17,7 @@
     "build": "node src/tools/build-web.ts",
     "typecheck": "pnpm typecheck:kit && pnpm gen:inputs && npr tsc -b tsconfig.layers.json --builders 8",
     "lint": "pnpm lint:kit && pnpm lint:game",
-    "lint:fix": "oxlint -c src/.oxlintrc.json --type-aware --fix --ignore-pattern '.githooks/**' --ignore-pattern 'tmp/**' --ignore-pattern 'src/client/engine/**' --ignore-pattern 'src/shared/engine/**' --ignore-pattern 'src/server/engine/**' --ignore-pattern 'src/client/game/**' --ignore-pattern 'src/shared/game/**' --ignore-pattern 'src/server/game/**' --ignore-pattern 'src/cook/game/**' --ignore-pattern 'src/client/host/**' --ignore-pattern 'src/shared/host/**' --ignore-pattern 'src/server/host/**' --ignore-pattern 'src/client/app/**' --ignore-pattern 'src/test/engine/**' --ignore-pattern 'src/test/game/**' --ignore-pattern 'scripts/**' --ignore-pattern 'test/**' --ignore-pattern 'lint/**' --ignore-pattern 'vite/**' --ignore-pattern 'types/**' --ignore-pattern 'calibration/**' --ignore-pattern 'budgets/**' --ignore-pattern 'public/**' --ignore-pattern 'vite.config.ts' --ignore-pattern 'vitest.config.ts'",
+    "lint:fix": "node scripts/lint-cli.mjs -c src/.oxlintrc.json --type-aware --fix --ignore-pattern '.githooks/**' --ignore-pattern 'tmp/**' --ignore-pattern 'src/client/engine/**' --ignore-pattern 'src/shared/engine/**' --ignore-pattern 'src/server/engine/**' --ignore-pattern 'src/client/game/**' --ignore-pattern 'src/shared/game/**' --ignore-pattern 'src/server/game/**' --ignore-pattern 'src/cook/game/**' --ignore-pattern 'src/client/host/**' --ignore-pattern 'src/shared/host/**' --ignore-pattern 'src/server/host/**' --ignore-pattern 'src/client/app/**' --ignore-pattern 'src/test/engine/**' --ignore-pattern 'src/test/game/**' --ignore-pattern 'scripts/**' --ignore-pattern 'test/**' --ignore-pattern 'lint/**' --ignore-pattern 'vite/**' --ignore-pattern 'types/**' --ignore-pattern 'calibration/**' --ignore-pattern 'budgets/**' --ignore-pattern 'public/**' --ignore-pattern 'vite.config.ts' --ignore-pattern 'vitest.config.ts'",
     "format": "npr oxfmt -c src/.oxfmtrc.json src/cli src/tools src/e2e src/scripts",
     "format:check": "npr oxfmt -c src/.oxfmtrc.json --check src/cli src/tools src/e2e src/scripts",
     "test": "pnpm test:kit && pnpm test:fast",
@@ -28,7 +28,7 @@
     "test:hooks": "node --test '.githooks/*.test.mjs'",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm check:sides && pnpm check:asks",
     "typecheck:kit": "npr tsc -p src/tsconfig.json && npr tsc -p src/client/tsconfig.json",
-    "lint:kit": "oxlint -c src/.oxlintrc.json --type-aware --deny-warnings --ignore-pattern '.githooks/**' --ignore-pattern 'tmp/**' --ignore-pattern 'src/client/engine/**' --ignore-pattern 'src/shared/engine/**' --ignore-pattern 'src/server/engine/**' --ignore-pattern 'src/client/game/**' --ignore-pattern 'src/shared/game/**' --ignore-pattern 'src/server/game/**' --ignore-pattern 'src/cook/game/**' --ignore-pattern 'src/client/host/**' --ignore-pattern 'src/shared/host/**' --ignore-pattern 'src/server/host/**' --ignore-pattern 'src/client/app/**' --ignore-pattern 'src/test/engine/**' --ignore-pattern 'src/test/game/**' --ignore-pattern 'scripts/**' --ignore-pattern 'test/**' --ignore-pattern 'lint/**' --ignore-pattern 'vite/**' --ignore-pattern 'types/**' --ignore-pattern 'calibration/**' --ignore-pattern 'budgets/**' --ignore-pattern 'public/**' --ignore-pattern 'vite.config.ts' --ignore-pattern 'vitest.config.ts'",
+    "lint:kit": "node scripts/lint-cli.mjs -c src/.oxlintrc.json --type-aware --deny-warnings --ignore-pattern '.githooks/**' --ignore-pattern 'tmp/**' --ignore-pattern 'src/client/engine/**' --ignore-pattern 'src/shared/engine/**' --ignore-pattern 'src/server/engine/**' --ignore-pattern 'src/client/game/**' --ignore-pattern 'src/shared/game/**' --ignore-pattern 'src/server/game/**' --ignore-pattern 'src/cook/game/**' --ignore-pattern 'src/client/host/**' --ignore-pattern 'src/shared/host/**' --ignore-pattern 'src/server/host/**' --ignore-pattern 'src/client/app/**' --ignore-pattern 'src/test/engine/**' --ignore-pattern 'src/test/game/**' --ignore-pattern 'scripts/**' --ignore-pattern 'test/**' --ignore-pattern 'lint/**' --ignore-pattern 'vite/**' --ignore-pattern 'types/**' --ignore-pattern 'calibration/**' --ignore-pattern 'budgets/**' --ignore-pattern 'public/**' --ignore-pattern 'vite.config.ts' --ignore-pattern 'vitest.config.ts'",
     "lint:game": "node scripts/lint-game.mjs",
     "test:kit": "node --test 'src/cli/*.test.ts' 'src/server/*.test.ts' 'src/test/helpers/*.test.ts'",
     "test:fast": "python3 scripts/heavy-lane.py full-test -- node scripts/vitest-tmp.ts run",
@@ -49,7 +49,7 @@
     "@hono/node-server": "2.1.5",
     "@sentry/browser": "11.0.0",
     "@valibot/to-json-schema": "1.8.0",
-    "@wildshard/format": "github:project-wildshard/shardfile#4f8280c",
+    "@wildshard/format": "github:project-wildshard/shardfile#4f8280c58ab6e527aa9735eaa80fccf1f34ab6d3",
     "ajv": "6.15.0",
     "fflate": "0.8.3",
     "hono": "4.13.13",
@@ -74,7 +74,6 @@
     "happy-dom": "20.14.5",
     "npm-bin-deps": "2.1.0",
     "oxlint": "1.89.0",
-    "oxlint-tsgolint": "7.0.2004",
     "playwright": "1.65.0",
     "rolldown": "1.2.16",
     "sharp": "0.35.5",
@@ -1231,7 +1230,8 @@
   ],
   "binDependencies": {
     "typescript": "7.0.2",
-    "oxfmt": "0.74.0"
+    "oxfmt": "0.74.0",
+    "oxlint-tsgolint": "7.0.2004"
   },
   "binDependenciesDir": ".bin-deps",
   "files": [

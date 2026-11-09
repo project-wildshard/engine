@@ -1,5 +1,6 @@
 // G636: parallel exact-source checks within one five-second wall budget.
 import { execFileSync } from 'node:child_process';
+import {lintEnvironment} from './lint-tools.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { matchesGlob, posix, resolve } from 'node:path';
 import * as v from 'valibot';
@@ -57,7 +58,8 @@ export async function precommitInputs(root = resolve(import.meta.dirname, '..'),
   if (eligible.length > 0 && git(['diff', '--name-only', '--', ...eligible]).trim() === '')
     jobs.push({ name: 'typed lint', command: [executable, '--type-aware', '-c', '.oxlintrc.json', ...eligible] });
   else if (files.length > 0 && eligible.length === 0) console.info('pre-commit: no staged paths eligible for typed lint under the existing ignore policy');
-  const results = await runCommitJobs(root, jobs, deadline);
+  const environment=jobs.some(job=>job.name==='typed lint')&&executable===resolve(root,'node_modules/.bin/oxlint')?lintEnvironment(root):undefined;
+  const results = await runCommitJobs(root, jobs, deadline,environment);
   for (const result of results) {
     if (result.output !== '') console.error(result.output.trimEnd());
     if (result.timedOut || result.code === 124) console.warn(`pre-commit: ${result.name} unfinished; CI owns it`);

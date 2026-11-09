@@ -7,15 +7,18 @@ import { resolve } from 'node:path';
 import * as v from 'valibot';
 import { expect, test } from 'vitest';
 
-test('both installed lint tools are exact manifest pins, without upgrading the toolchain', () => {
+test('the library and native lint tool retain exact manifest pins', () => {
   const dependency = v.object({ version: v.string() });
-  const manifest = v.parse(v.object({ devDependencies: v.record(v.string(), v.string()) }), JSON.parse(readFileSync('package.json', 'utf8')));
-  for (const tool of ['oxlint', 'oxlint-tsgolint']) {
-    const pin = manifest.devDependencies[tool];
-    expect(pin).toMatch(/^\d+\.\d+\.\d+$/u);
-    const installed = v.parse(dependency, JSON.parse(readFileSync(`node_modules/${tool}/package.json`, 'utf8')));
-    expect(pin).toBe(installed.version);
-  }
+  const manifest = v.parse(v.object({ devDependencies: v.record(v.string(), v.string()), binDependencies: v.record(v.string(), v.string()) }), JSON.parse(readFileSync('package.json', 'utf8')));
+  const library = v.parse(dependency, JSON.parse(readFileSync('node_modules/oxlint/package.json', 'utf8')));
+  expect(manifest.devDependencies['oxlint']).toMatch(/^\d+\.\d+\.\d+$/u);
+  expect(library.version).toBe(manifest.devDependencies['oxlint']);
+  const inventory = spawnSync(resolve('node_modules/.bin/npr'), ['ls', '--depth', '0', '--json'], { encoding: 'utf8', timeout: 5000 });
+  expect(inventory.status, inventory.stdout + inventory.stderr).toBe(0);
+  const rows = v.parse(v.array(v.object({ dependencies: v.record(v.string(), dependency) })), JSON.parse(inventory.stdout));
+  const installed = rows.map(row => row.dependencies['oxlint-tsgolint']?.version).filter(version => version !== undefined);
+  expect(manifest.binDependencies['oxlint-tsgolint']).toMatch(/^\d+\.\d+\.\d+$/u);
+  expect(installed).toEqual([manifest.binDependencies['oxlint-tsgolint']]);
 });
 
 test('the main config excludes nursery diagnostics while stable errors still refuse', () => {
@@ -35,5 +38,22 @@ test('the main config excludes nursery diagnostics while stable errors still ref
     const stable = lint();
     expect(stable.status, stable.stdout + stable.stderr).toBe(1);
     expect(stable.stdout).toContain('no-debugger');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the typed CLI keeps native diagnostics outside node_modules', () => {
+  mkdirSync('tmp', { recursive: true });
+  const root = mkdtempSync(resolve('tmp/lint-native-')), file = resolve(root, 'probe.ts'), config = resolve(root, '.oxlintrc.json');
+  try {
+    writeFileSync(resolve(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, target: 'ES2023', module: 'ESNext' }, include: ['probe.ts'] }));
+    writeFileSync(config, JSON.stringify({ categories: {}, options: { typeAware: true }, rules: { 'typescript/no-floating-promises': 'error' } }));
+    const environment = { ...process.env }; delete environment.OXLINT_TSGOLINT_PATH;
+    const lint = (env = environment) => spawnSync(process.execPath, [resolve('scripts/lint-cli.mjs'), '-c', config, '--no-ignore', '--disable-nested-config', '--type-aware', '--threads', '1', file], { cwd: root, encoding: 'utf8', timeout: 5000, env });
+    writeFileSync(file, 'export async function work():Promise<void>{}\nwork();\n');
+    const floating = lint(); expect(floating.status, floating.stdout + floating.stderr).toBe(1); expect(floating.stdout).toContain('no-floating-promises');
+    writeFileSync(file, 'export async function work():Promise<void>{}\nvoid work();\n');
+    const handled = lint(); expect(handled.status, handled.stdout + handled.stderr).toBe(0);
+    const missing = lint({ ...environment, OXLINT_TSGOLINT_PATH: resolve(root, 'missing-native') });
+    expect(missing.status, missing.stdout + missing.stderr).toBe(1); expect(missing.stdout).toContain('OXLINT_TSGOLINT_PATH');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

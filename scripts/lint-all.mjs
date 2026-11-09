@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // One type program per invocation, including an unpartitioned full-repository run.
 import { spawnSync } from 'node:child_process';
+import {lintEnvironment} from './lint-tools.mjs';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { availableParallelism } from 'node:os';
@@ -9,6 +10,7 @@ const root = resolve(import.meta.dirname, '..');
 // Invoke the installed CLI with this Node runtime, without starting pnpm twice.
 // The package and complete file selection remain the repository's pinned ones.
 const oxlint = resolve(root, 'node_modules/oxlint/bin/oxlint');
+const nativeEnvironment=lintEnvironment(root);
 const args = process.argv.slice(2);
 const match = args.length === 1 ? /^--threads=([1-8])$/u.exec(args[0]) : null;
 if (args.length > 0 && match === null) {
@@ -16,7 +18,7 @@ if (args.length > 0 && match === null) {
   process.exit(2);
 }
 const threads = Math.min(match === null ? 8 : Number(match[1]), availableParallelism());
-const listed = spawnSync(process.execPath, [oxlint, '-c', '.oxlintrc.json', '--debug', 'files'], { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+const listed = spawnSync(process.execPath, [oxlint, '-c', '.oxlintrc.json', '--debug', 'files'], { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,env:nativeEnvironment });
 if (listed.error !== undefined || listed.status !== 0) {
   console.error(listed.error?.message ?? listed.stderr);
   process.exit(listed.status ?? 1);
@@ -30,7 +32,7 @@ console.info(`lint-all: complete typed check, ${files.length} files, ${threads} 
 // --threads controls Oxlint's native pool; its Go helper has a separate runtime.
 // Preserve an explicit caller setting, including a smaller existing allowance.
 const lintEnv = {
-  ...process.env,
+  ...nativeEnvironment,
   // The Mac profile shows substantial allocation/reclaim contention. Keep its
   // Go worker width at the original four-way
   // compiler baseline while Oxlint's independent native pool remains eight.
