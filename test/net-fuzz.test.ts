@@ -278,14 +278,13 @@ test('a client crosses a seam while it fuzzes both rooms', { timeout: 60_000 }, 
       await turn(); grid.tick(); await turn();
     }
     expect(travels).toHaveLength(1);
-    const probe = async (): Promise<number> => {
-      const pending = shell.probe(); await turn();
-      for (let tick = 0; tick < 4; tick++) { grid.tick(); await turn(); }
-      return (await pending).tick;
-    };
-    const before = await probe();
-    for (let tick = 0; tick < 6; tick++) { grid.tick(); await turn(); }
-    expect(await probe()).toBeGreaterThan(before);
+    // The tape reaches the seam; only the actual ServerClock can prove the
+    // arrived room stays alive. No test-driven tick is allowed after resume.
+    const before = grid.host.state.tick;
+    shell.resume();
+    await new Promise(resolve => { setTimeout(resolve, 150); });
+    expect(grid.host.state.tick).toBeGreaterThan(before);
+    expect((await shell.probe()).tick).toBeGreaterThan(before);
     expect(client.closed).toBeNull();
   } finally { shell.dispose(); }
 });
