@@ -193,7 +193,11 @@ export async function gridEntry(_browser, phone, base, step) {
           grid: { home: g?.home, inside: g?.inside, board: g?.cellLoading, current: g?.live?.live.current,
             ready: g?.live?.live.gameplayReady, feet: g?.live?.live.worldFeet, phase: g?.live?.crossing.phase, issue: g?.live?.crossing.issue },
           worker: r === undefined ? null : { frames: r.frames, cell: r.cell, closed: r.closed, restored: r.restored, x: r.serverX, z: r.serverZ,
-            latest: (() => { const link = world?.player.link; const latest = link == null ? null : Reflect.get(link, 'client')?.latest; return latest == null ? null : { cell: latest.cell, tick: latest.tick, site: g?.cells[latest.cell - 1]?.instance ?? null }; })() },
+            latest: ((link, cells) => {
+              /** @type {{ cell: number; tick: number } | null | undefined} */
+              const latest = link === null ? null : Reflect.get(link, 'client')?.latest;
+              return latest === null || latest === undefined ? null : { cell: latest.cell, tick: latest.tick, site: cells[latest.cell - 1]?.instance ?? null };
+            })(world?.player.link ?? null, g?.cells ?? []) },
           loading: { step: load instanceof HTMLElement ? load.dataset.step : undefined, text: load?.textContent?.slice(-500) },
           state: world?.game.app.state, title: document.querySelector('.ws-main-grid') !== null,
           fault: document.querySelector('#wserr .msg')?.textContent,
