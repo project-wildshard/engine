@@ -229,7 +229,11 @@ boot() {
   # Local interactive calls retain presentation after native migration.
   local developer="${DEVELOPER_DIR:-}" presentation=0
   if [ "${GITHUB_ACTIONS:-}" != true ] && [ "$started" -eq 1 ] && [[ "$developer" = /* ]] && [ -f "$developer/usr/bin/simctl" ] && [ -x "$developer/usr/bin/simctl" ]; then
-    presentation=1
+    if [ -d "$developer/Applications/Simulator.app" ]; then
+      presentation=1
+    else
+      echo 'sim-lane: selected desktop bundle is absent; native Safari and frame readiness remain required' >&2
+    fi
   fi
   # Preserve migration/system-app progress in the native failure artifact.
   # Lease stdout still contains only the exact device identifier.
