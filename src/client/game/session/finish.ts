@@ -105,6 +105,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // and takes the pinned time; on the grid each entered cell registers its own (hybrid.ts)
   if (ctx.grid === null) enterSkyClock(app, [game.levelScope], game.levelScope);
   if (!eagerGridComposer) { await game.prepareComposer(); game.buildComposer(); }
+  // DL24 (J198): every body a row can bring, parked hidden after the compose, so the first frame builds its programs
+  animals.stageWarmRigs();
   // The first live late/render phases would otherwise publish the home PMREM and install its grade only after
   // shaders/firstFrame, invalidating every warmed world key. Settle the same presentation owners without a tick.
   ctx.grid?.prepareFrame();

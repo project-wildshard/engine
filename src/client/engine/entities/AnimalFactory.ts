@@ -381,6 +381,20 @@ export class AnimalFactory {
     for (const row of rows) for (const variant of row.variant === undefined || row.variant === null ? speciesDef(row.kind).variants.map(entry => entry.id) : [row.variant]) { this.model(row.kind, variant); yield 1; }
   }
 
+  /** DL24: every model a row of these kinds can ask for, its spawn-only variants included (Far Reach's slate roc is one). */
+  everyModel(kinds: Iterable<string>): AnimalModel[] {
+    const models = new Set<AnimalModel>();
+    for (const kind of new Set(kinds)) {
+      const species = speciesDef(kind);
+      for (const variant of [...species.variants, ...species.spawnOnly ?? []]) {
+        // a warm-up never fails a boot: a model that cannot build now fails where a row asks for it, as before
+        try { models.add(this.model(kind, variant.id)); }
+        catch (error) { console.warn(`[warm] creature ${kind}:${variant.id} not prepared`, error); }
+      }
+    }
+    return [...models];
+  }
+
   /** The cached model for (kind, variant id). An unknown variant id falls back to the species' first variant. */
   model(kind: AnimalKind, variant?: string): AnimalModel {
     const species = speciesDef(kind);

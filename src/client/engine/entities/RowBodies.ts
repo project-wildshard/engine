@@ -1,7 +1,8 @@
 import { Vector3, type PerspectiveCamera } from 'three';
 import type { App } from '../app/app';
+import { app } from '../app/runtime';
 import type { LevelFrameBinding } from '../level/frame';
-import type { AnimalFactory, AnimalKind } from './AnimalFactory';
+import type { AnimalFactory, AnimalKind, AnimalModel } from './AnimalFactory';
 import type { AnimalGroup } from './animalMatrices';
 import type { Animal } from './AnimalView';
 import { BOAR_TUNING, DEER_TUNING, fallbackSound, spawnRolls, type HuntHerd } from '../../../shared/engine/ai/huntPattern';
@@ -40,6 +41,8 @@ export interface RowBodiesDraw {
   draw: (a: Animal, index: number, distanceSquared: number) => void;
   endDraw: (animals: readonly Animal[], count: number, dt: number) => void;
   bloodBurst: (at: Vector3, dir: Vector3, strength: number) => void;
+  /** DL24: hidden rigs of these models, parked for the level's life, for the boot's first-frame warm draws */
+  stageWarmRigs?: (models: readonly AnimalModel[]) => void;
 }
 /** What the bodies read of the running app, live at each call: a region's frame swaps these under them. */
 export type RowBodiesHost = Pick<App, 'combat' | 'events' | 'equipmentHost' | 'levelScope' | 'physics' | 'rng'>;
@@ -129,6 +132,14 @@ export class RowBodies {
     await within(() => draw.factory.settled());
     return within(() => { draw.finish(); if (frame !== undefined) draw.show(); return this; });
   }
+  /** DL24 (J198): park one hidden rig of every model a row can ask for, so the boot's first frame builds its programs.
+   *  Call after the composer is built: a look's compose patches the scene's materials once (Far Reach's haze), and the
+   *  rows' rigs, which all arrive after it, carry no such patch, so a rig parked before it keys a different program. */
+  stageWarmRigs(): void {
+    const kinds = [...activeLevel().spawns.map(row => row.kind), ...app.species.kinds()];
+    this.draw.stageWarmRigs?.(this.draw.factory.everyModel(kinds));
+  }
+
   retire(a: Animal): void {
     if (this.spawned.has(a) && this.animals.includes(a)) this.gone.add(a);
     a.hidden = true; this.draw.hide(a);
@@ -259,4 +270,4 @@ export class RowBodies {
   };
 }
 /** What a view may read of them. */
-export type RowBodiesView = Omit<RowBodies, 'build' | 'update' | 'presentHit' | 'presentDeath' | 'presentReward'> & Partial<Pick<RowBodies, 'presentHit' | 'presentDeath' | 'presentReward'>>;
+export type RowBodiesView = Omit<RowBodies, 'build' | 'update' | 'stageWarmRigs' | 'presentHit' | 'presentDeath' | 'presentReward'> & Partial<Pick<RowBodies, 'presentHit' | 'presentDeath' | 'presentReward'>>;

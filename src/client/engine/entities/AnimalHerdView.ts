@@ -203,6 +203,32 @@ export class AnimalHerdView implements RowBodiesDraw {
     if (this.group.parent !== this.scene) this.scene.add(this.group);
   }
 
+  /** DL24 (J198): one hidden rig per model a row can ask for, so the boot's first-frame warm draws build its programs */
+  private warmRigs: THREE.Group | null = null;
+  /**
+   * DL24 (J198, "warm shaders before control"): a body the server spawns after control (Far Reach's, 153 m out, 13 s
+   * in, at boost) built its rig's program in that frame: 390-406 ms on the Simulator. Each prepared model gets one rig
+   * here, hidden in the scene, with its one-draw shadow caster as `adopt` gives a real one. The first frame's parked
+   * draws warm every hidden pipeline no shown drawable covers (parkedDraws.ts), so these build under the loader, counted
+   * as its units. They stay parked, hidden, for the level's life: taken out, the page's residency released their
+   * materials after control and three deleted the programs with them, so the roc built its program again at boost
+   * (measured: the same 705-character key, recreated 13.4 s after control). The rows' own rigs share those programs.
+   */
+  stageWarmRigs(models: readonly AnimalModel[]): void {
+    this.warmRigs?.removeFromParent();
+    const group = new THREE.Group();
+    group.name = 'creature-warm'; group.visible = false;
+    for (const model of new Set(models)) {
+      try {
+        const { mesh } = this.factory.instantiate(model, 0.5);
+        attachShadowCaster(mesh);
+        group.add(mesh);
+      } catch (error) { console.warn(`[warm] creature rig ${model.kind}:${model.variant} not parked`, error); }
+    }
+    this.scene.add(group);
+    this.warmRigs = group;
+  }
+
   /** the hidden group joins the region before its herds spawn (RowBodiesView.build) */
   park(): void { this.group.visible = false; this.scene.add(this.group); }
   show(): void { this.group.visible = true; }

@@ -84,6 +84,11 @@ export class SpeciesService {
     const map = this.cache.get(scope) ?? new Map<string, SpeciesDef>(); map.set(kind, resolved); this.cache.set(scope, map);
     return resolved;
   }
+  /** The kinds the active level registered a row or a look for. */
+  kinds(): string[] {
+    const scope = this.active(); if (scope === null) return [];
+    return [...new Set([...this.rows, ...this.looks].filter((entry) => entry.scope.belongsTo(scope)).map((entry) => entry.value.kind))];
+  }
   look(kind: string): SpeciesLook | undefined {
     const scope = this.active();
     return scope === null ? undefined : this.looks.slice().reverse().find((entry) => entry.scope.belongsTo(scope) && entry.value.kind === kind)?.value;
