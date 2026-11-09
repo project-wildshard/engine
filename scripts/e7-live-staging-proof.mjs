@@ -39,17 +39,23 @@ try{
   const page=await context.newPage();opened.push({page,context,name});
   page.on('pageerror',e=>faults.push({name,error:e.message}));
   page.on('console',m=>{if(m.type()==='error')faults.push({name,error:m.text()});});
+  page.on('response',response=>{if(response.status()>=400)faults.push({name,error:`HTTP ${response.status()} ${response.url()}`});});
   page.on('websocket',ws=>{assert.equal(new URL(ws.url()).origin,socket);console.log('NATIVE STAGING SOCKET',engine,name,ws.url());});
+  console.log('STAGING PAGE ACTION',engine,name,'navigate');
   await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&skipintro=1',base).href,{waitUntil:'load',timeout:90000});
+  console.log('STAGING PAGE ACTION',engine,name,'wait for real Name form');
   await page.locator('#ws-name-box input').waitFor({timeout:150000});
   await page.locator('#ws-name-box input').fill(name);await page.locator('#ws-name-box button').click();
   await page.waitForFunction(()=>typeof window.__workerClient==='function'&&window.__wildshard?.world?.player!==undefined,undefined,{timeout:120000});
   await page.evaluate(()=>{const world=window.__wildshard?.world;if(world===undefined)throw new Error('World missing');world.hud.enterNow();});
   await page.waitForFunction(()=>(window.__workerClient?.().frames??0)>30,undefined,{timeout:60000});
+  const paused=await page.evaluate(()=>window.__wildshard?.world?.game.app.clock.paused===true);
+  if(paused)await page.getByRole('button',{name:/^resume$/iu}).click();
+  await page.waitForFunction(()=>window.__wildshard?.world?.game.app.clock.paused===false,undefined,{timeout:20000});
   assert.equal(await page.evaluate(()=>Reflect.get(globalThis,'__WS_BUILD_ID__')),build);
   return page;
  };
- const aName='Agent Port A',bName='Agent Port B',a=await enter(aName),b=await enter(bName);
+ const tag=(engine==='chromium'?'C':'W')+' '+Date.now().toString(36).slice(-4),aName=`Agent ${tag} A`,bName=`Agent ${tag} B`,a=await enter(aName),b=await enter(bName);
  for(const page of[a,b]){const name=page===a?bName:aName;await page.waitForFunction(name=>window.__onlinePlayers?.().some(row=>row.name===name&&row.modelled),name,{timeout:20000});}
  console.log('PASS both real bodies and names',engine);
  const before=await b.evaluate(()=>{const row=window.__workerClient?.();if(row===undefined)throw new Error('Authoritative observer missing');return{x:row.serverX,z:row.serverZ};});
@@ -61,4 +67,7 @@ try{
  for(const page of[a,b])await page.locator('#ws-chat',{hasText:`${bName}: ${line}`}).waitFor({timeout:10000});
  assert.deepEqual(faults,[],'No page or console error may be filtered');
  console.log('PASS live staging play',JSON.stringify({engine,build,epoch:1,channel:'staging',socket,bodies:2,walk:true,chat:true,errors:0,productionConnections:0}));
+}catch(error){
+ for(const row of opened){const state=await row.page.evaluate(()=>({build:Reflect.get(globalThis,'__WS_BUILD_ID__'),url:location.href,text:document.body.innerText.slice(-2500),active:Reflect.get(globalThis,'__bootTiming')?.read().active,worker:window.__workerClient?.()})).catch(reading=>({reading:String(reading)}));console.error('LIVE STAGING REFUSAL',JSON.stringify({name:row.name,state,faults}));}
+ throw error;
 }finally{for(const row of opened)await row.context.close();await browser.close();}

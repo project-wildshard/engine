@@ -54,3 +54,29 @@ authoritative displacement together while the key remains held, within
 the same 20-second bound. The displacement assertion is retained; no
 world placement, command, backend or game timing changes. The original
 refusal is not claimed as a gameplay pass.
+
+The real refusal capture separated three causes. Chromium reported
+ERR_NETWORK_CHANGED while fetching identity.js; that refusal is retained.
+WebKit joined both real sockets but stayed in the actual pause menu.
+The proof now taps the real Resume control and requires an unpaused
+clock before body/walk checks. Unique test Names prevent held clients
+from an earlier run satisfying an observer assertion.
+
+Both new static projects also lacked their same-origin diagnostic APIs.
+Use exact Vercel rewrites for errors, telemetry and inbox to the existing
+singleplayer backend, with no-store. This preserves the existing backend
+and is not Jake's API-server cutover: no API-server deploy, CORS change,
+credential copy or database change occurred. The manual page-routes
+helper refuses the wrong project, full source SHA, epoch or channel.
+All three actual staging GETs now return the existing 401/no-store
+contract instead of 404. The human tag page received the same routing
+fix from clean exact 5baa source; no live production browser was opened.
+
+Final live staging proof is green in Chromium and WebKit on exact
+32f182df49688e4e70331dc33d5f7a4e66566220/epoch 1, serial 2. Each engine
+joined two unique Agent test identities over native TLS :8443, saw both
+rendered bodies and Names, confirmed actual authoritative displacement
+and remote walk gait, and saw the real chat line on both pages. Zero
+page or console errors were filtered or tolerated. Both browsers and
+contexts are closed. No production game connection or test save exists.
+The 30-minute staging soak and its actual VPS tick reading remain open.
