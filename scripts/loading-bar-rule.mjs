@@ -1,9 +1,11 @@
-// LS3 (J188): "as long as that loading bar moves at least 1% every 2 seconds, then it's not a frustrating experience."
+// LS3 (J188, amended by J204): the bar never goes more than 2 s without a visible advance. J204 (Jake, 2026-11-09):
+// "the bar just has to move, it can move by 0.1%, moving the bar from 91.2 to 91.3 every 2s etc is visible progress.
+// Something has to progress every 2s". The card's bars and its Load number resolve tenths of a percent.
 // Pure reading of a recorded boot: no browser, no clock. scripts/loading-card-proof.mjs records the log on real boots;
 // test/loading-bar-rule.test.mjs pins the rule's edges.
 
 export const STALL_MS = 2000;
-export const STEP_PCT = 1;
+export const STEP_PCT = 0.1;
 
 
 /**
@@ -36,7 +38,8 @@ export function barStalls(log, start, end) {
     shown.set(row.bar, row.pct);
     if (row.pct < before) backwards.push({ t: row.t, bar: row.bar, from: before, to: row.pct });
     gained += Math.max(0, row.pct - before);
-    if (gained >= STEP_PCT) close(row.t);
+    // a tenth read from widths (91.2 -> 91.3) sums to 0.0999...: compare within float error
+    if (gained >= STEP_PCT - 1e-9) close(row.t);
   }
   close(end);
   return { stalls, backwards };

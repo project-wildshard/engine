@@ -51,6 +51,9 @@ const set = (el: HTMLElement, text: string): void => { if (el.textContent !== te
 const setData = (el: HTMLElement, key: string, value: string): void => { if (el.dataset[key] !== value) el.dataset[key] = value; };
 const mb = (bytes: number): string => `${(bytes / 1_000_000).toFixed(1)} MB`;
 /** LS3: every write of a bar uses one precision, so two writers of the same reading can never step it back. */
+/** J204 (Jake, 2026-11-09): the Load phase's number shows tenths, so a 0.1 % step is visible on the card ("moving the bar
+ *  from 91.2 to 91.3 every 2s etc is visible progress"); it floors like the bar, and reads 100 only when complete. */
+const loadPct = (fraction: number): string => fraction >= 1 ? '100' : (Math.floor(Math.max(0, fraction) * 1000) / 10).toFixed(1);
 const barWidth = (fraction: number): string => `${(Math.floor(Math.max(0, Math.min(1, fraction)) * 1000) / 10).toFixed(1)}%`;
 /** LS2: the ready card's three phase times in tenths that add up to its clock's tenths (largest remainder). */
 export function phaseTenths(parts: readonly number[], total: number): number[] {
@@ -169,8 +172,9 @@ export class Loading {
     if (Number.isFinite(clockStartedAt) && clockStartedAt <= this.t0 && clockStartedAt >= this.t0 - 60000) this.clockT0 = clockStartedAt;
     this.timeline = new LoadingTimeline({ id: 'pending', steps: [{ key: 'modules', label: engineString('s_loading_modules'), weight: 1 }] }, this.t0,
       undefined, {readSetup: () => {
-        const shown = this.els.suPct.textContent;
-        return shown === null || shown === '' ? undefined : Number(shown);
+        // the whole percent the card publishes (data-setup); its text shows tenths (J204)
+        const shown = this.root.dataset['setup'];
+        return shown === undefined || shown === '' ? undefined : Number(shown);
       }, beforeStart: () => { this.paintBoundarySetup(); },
       initialSetup: {at: startedAt, setup: Number(this.root.dataset['initialSetup'])}});
     this.phase = this.scoped ? undefined : this.timeline.begin('modules');
@@ -337,7 +341,7 @@ export class Loading {
     const download = this.paintDownloads();
     setData(this.root, 'setup', pct(v.setup));
     set(this.els.dlPct, this.downloadPct(download));
-    set(this.els.suPct, pct(v.setup));
+    set(this.els.suPct, loadPct(v.setup));
     setBar(this.els.dlBar, download); setBar(this.els.suBar, v.setup);
     this.paintRows(timeline);
     this.paintPhases();
@@ -351,7 +355,7 @@ export class Loading {
     const setup = this.setupProgress();
     setData(this.root, 'download', String(Math.floor(download * 100)));
     setData(this.root, 'setup', String(Math.floor(setup * 100)));
-    set(this.els.dlPct, this.downloadPct(download)); set(this.els.suPct, String(Math.floor(setup * 100)));
+    set(this.els.dlPct, this.downloadPct(download)); set(this.els.suPct, loadPct(setup));
     setBar(this.els.dlBar, download); setBar(this.els.suBar, setup);
     set(this.els.suFact, p.detail);
     this.paintRows(timeline);
@@ -373,7 +377,7 @@ export class Loading {
   /** Publish completed credit before new work begins, without repainting rows or diagnostics. */
   private paintBoundarySetup(): void {
     const setup = this.setupProgress(), pct = String(Math.floor(setup * 100));
-    setData(this.root, 'setup', pct); set(this.els.suPct, pct);
+    setData(this.root, 'setup', pct); set(this.els.suPct, loadPct(setup));
     setBar(this.els.suBar, setup);
   }
 

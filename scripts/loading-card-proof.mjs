@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Manual LS2-LS6 proof on real boots. Deliberately outside hooks and the unit-test glob.
 // Run through scripts/browser-lane.sh after `pnpm build:ring`:
-//   scripts/browser-lane.sh node scripts/loading-card-proof.mjs [--shard=template] [--out=<dir>] [--throttle] [--grid]
+//   scripts/browser-lane.sh node scripts/loading-card-proof.mjs [--shard=template] [--out=<dir>] [--throttle] [--gpu] [--grid]
+// --gpu (J204): Chromium on this Mac's real GPU (ANGLE Metal) instead of headless SwiftShader; --throttle still slows its CPU 4x.
 // It boots the built product at iPhone portrait size in Chromium and WebKit, records every change of the
 // card's bars with the LS1 counters that moved with it, screenshots the card loading and ready, and reports
 // each stretch of over 2 s where the bar took less than 1 %, by the stage that held it.
@@ -17,7 +18,8 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 /** @param {string} name */
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
 const root = resolvePath(option('root') ?? '.'), shard = option('shard') ?? '_template';
-const out = resolvePath(option('out') ?? 'tmp/loading-card'), throttle = process.argv.includes('--throttle');
+const out = resolvePath(option('out') ?? 'tmp/loading-card'), throttle = process.argv.includes('--throttle'), gpu = process.argv.includes('--gpu');
+const chromiumArgs = [...KEYCHAIN_ARGS, '--mute-audio', ...(gpu ? ['--use-angle=metal', '--ignore-gpu-blocklist'] : [])];
 const only = option('browser');
 const grid=process.argv.includes('--grid');
 if(option('arrival')!==undefined)throw new Error('Seeded titleArrival is not a saved-place proof; use --grid');
@@ -118,10 +120,10 @@ try {
     if (only !== undefined && only !== name) continue;
     const engine = name === 'chromium' ? chromium : webkit;
     const profile=grid?mkdtempSync(join(out,`${name}-profile-`)):null;
-    const browser=grid?null:await engine.launch({headless:true,...(name==='chromium'?{args:[...KEYCHAIN_ARGS, '--mute-audio']}: {})});
+    const browser=grid?null:await engine.launch({headless:true,...(name==='chromium'?{args:chromiumArgs}: {})});
     try {
       const context=profile!==null?await engine.launchPersistentContext(profile,{...devices['iPhone 16 Pro'],deviceScaleFactor:2,headless:true,
-        ...(name==='chromium'?{args:[...KEYCHAIN_ARGS, '--mute-audio']}: {})}):await browser?.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
+        ...(name==='chromium'?{args:chromiumArgs}: {})}):await browser?.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
       if(context===undefined)throw new Error('Proof context not created');
       try {
       await context.grantPermissions(name==='chromium'?['clipboard-read','clipboard-write']:['clipboard-read']);
@@ -157,7 +159,7 @@ try {
       };
       if(grid)await page.goto(`${preview.url}/?mute=1&nolock=1&sw=0`,{waitUntil:'domcontentloaded'});
       for(const attempt of grid?['fresh-grid','saved-ember','missing-art']:['entry']){
-      const tag=`${name}${throttle&&name==='chromium'?'-throttled':''}-${grid?attempt:shard}`;
+      const tag=`${name}${gpu&&name==='chromium'?'-gpu':''}${throttle&&name==='chromium'?'-throttled':''}-${grid?attempt:shard}`;
       /** @type {{name:string,art:string}|null} */let destination=null;
       if(grid){
         await page.locator('.ws-main-grid').waitFor({timeout:60000});

@@ -4,15 +4,24 @@ import { barStalls, untracedChanges } from '../scripts/loading-bar-rule.mjs';
 /** @param {number} t @param {string} bar @param {number} pct @param {Partial<import('../scripts/loading-bar-rule.mjs').BarRow>} [rest] */
 const row = (t, bar, pct, rest = {}) => ({ t, bar, pct, step: '', atomic: 0, bytes: 0, files: 0, ...rest });
 
-test('LS3: 1 % inside every 2 s passes; the edge itself passes and a millisecond over names the stage', () => {
-  expect(barStalls([row(2000, 'start', 1), row(4000, 'start', 2)], 0, 4000).stalls).toEqual([]);
-  const late = barStalls([row(0, 'start', 0, { step: 'start.app:three-import' }), row(2001, 'start', 1)], 0, 2001);
+test('J204: a visible 0.1 % inside every 2 s passes; the edge itself passes and a millisecond over names the stage', () => {
+  expect(barStalls([row(2000, 'start', 0.1), row(4000, 'start', 0.2)], 0, 4000).stalls).toEqual([]);
+  const late = barStalls([row(0, 'start', 0, { step: 'start.app:three-import' }), row(2001, 'start', 0.1)], 0, 2001);
   expect(late.stalls).toEqual([{ from: 0, to: 2001, ms: 2001, stages: ['start.app:three-import'] }]);
 });
 
+test('J204: a tenth read off two widths counts, despite float error', () => {
+  expect(barStalls([row(0, 'load', 91.2), row(1900, 'load', 91.3), row(3800, 'load', 91.4)], 0, 3800).stalls).toEqual([]);
+});
+
+test('J204: less than a visible tenth is no advance', () => {
+  const crumbs = barStalls([row(1000, 'load', 0.04), row(1900, 'load', 0.08), row(3000, 'load', 0.09)], 0, 3000);
+  expect(crumbs.stalls.map(s => s.ms)).toEqual([3000]);
+});
+
 test('LS3: the phases add up; small steps accumulate and a quiet end of boot still counts', () => {
-  // half a percent on two different bars is one percent of movement
-  expect(barStalls([row(1000, 'download', 0.5), row(1900, 'load', 0.5), row(3800, 'load', 1.5)], 0, 3800).stalls).toEqual([]);
+  // half a tenth on two different bars is a tenth of movement
+  expect(barStalls([row(1000, 'download', 0.05), row(1900, 'load', 0.05), row(3800, 'load', 0.15)], 0, 3800).stalls).toEqual([]);
   const tail = barStalls([row(500, 'load', 90, { step: 'world' }), row(600, 'step', 0, { step: 'audio' })], 0, 5000);
   expect(tail.stalls).toEqual([{ from: 500, to: 5000, ms: 4500, stages: ['world', 'audio'] }]);
 });

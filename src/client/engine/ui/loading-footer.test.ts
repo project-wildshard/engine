@@ -108,13 +108,13 @@ it('publishes completed step credit before the next step records its visible set
       filesDone: 0, filesTotal: 1, bytesRead: 0, bytesTotal: 0});
     const timeline = currentLoadingTimeline();
     if (timeline === undefined) throw new Error('Missing timeline');
-    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('33');
+    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('33.3');
     expect(timeline.snapshot().rows[1]?.setupAtStart).toBe(33);
     expect(Number.parseFloat(loading.root.querySelector<HTMLElement>('[data-el="suBar"]')?.style.width ?? ''))
       .toBeCloseTo(100 / 3, 1);
     now = 2600; loading.endAdmission();
     const world = timeline.begin('world');
-    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('66');
+    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('66.6');
     expect(timeline.snapshot().rows[2]?.setupAtStart).toBe(66);
     expect(loading.root.dataset['setup']).toBe('66');
     world.end();
@@ -149,11 +149,11 @@ it('keeps boundary credit when the next paced paint still carries the previous v
     const view: ProgressView = {download: 0, setup: 0, done: false, error: null, step: 'assembly', label: 'World', detail: '',
       bytes: null, bytesRead: 0, bytesTotal: 0, filesDone: 0, filesTotal: 0, worldBytesReady: false, doneCount: 0, rows: [], gaps: []};
     loading.paint(view); vi.advanceTimersByTime(100);
-    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('33');
+    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('33.3');
     now = 2100; world.end(); const finish = timeline.begin('finish');
-    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('66');
+    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('66.6');
     vi.advanceTimersByTime(100);
-    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('66');
+    expect(loading.root.querySelector('[data-el="suPct"]')?.textContent).toBe('66.6');
     finish.end();
   } finally { loading.scope.dispose(); }
 });
@@ -210,7 +210,8 @@ it('retains a completed short step start even when it finished before the first 
     now = 110; vi.advanceTimersByTime(100);
     now = 120; loading.paintAdmission({phase: 'product', detail: 'Reading entry.json',
       filesDone: 0, filesTotal: 0, bytesRead: 0, bytesTotal: 0});
-    const setupAtStart = Number(loading.root.querySelector('[data-el="suPct"]')?.textContent);
+    // J204: the card's text shows tenths; the timeline records the whole percent published as data-setup
+    const setupAtStart = Number(loading.root.dataset['setup']);
     expect(Number.isFinite(setupAtStart)).toBe(true);
     loading.endAdmission();
     now = 500; const world = timeline.begin('world'); vi.advanceTimersByTime(100);
