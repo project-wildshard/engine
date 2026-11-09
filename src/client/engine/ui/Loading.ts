@@ -23,6 +23,7 @@ import { listenTap } from '../input/dom';
 import { withOwner } from '../../../shared/engine/app/ownership';
 import { holdLoadingSwitch } from './devSwitch';
 import { markReload } from '../boot/lastEnd';
+import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import './loading.css';
 
 const savedStorage = saveStorage('session');
@@ -82,10 +83,6 @@ function paintLog(log: HTMLElement, rows: readonly LogRow[]): void {
     set(el.children[0] as HTMLElement, row.label); set(el.children[1] as HTMLElement, row.detail);
     set(el.children[2] as HTMLElement, Number.isFinite(row.ms) ? seconds(row.ms) : '');
   });
-}
-/** The tap is the user activation the clipboard needs (iOS Safari 13.4+); a refusal says so on the button. */
-async function copyText(text: string): Promise<boolean> {
-  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
 }
 
 
@@ -155,6 +152,8 @@ export class Loading {
     app.ui.bindPresentation(this.scope);app.ui.holdCovered(this.scope);
     this.scoped = mode.scoped === true;
     if (!this.scoped) startBoot({ id: chunk.id, name: chunk.name }, TIER === 'phone' && chunk.trace === true);
+    // LS4: a fatal load screen covers this card; it copies the same report through this source.
+    if (!this.scoped) setDiagnosticsSource(() => this.diagnosticsText());
     // index.html paints this panel from its first bytes (src/client/engine/boot/shell.ts): adopt it; a page without it gets a fresh one
     const shell = this.scoped ? null : document.querySelector<HTMLElement>('.ws-load[data-shell]');
     if (shell) { stopShellClock(); this.root = shell; delete shell.dataset['shell']; mountUi(shell, this.scope, document.body); }

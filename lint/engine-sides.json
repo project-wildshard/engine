@@ -406,6 +406,7 @@
     "src/client/engine/ui/declared.ts": "client",
     "src/client/engine/ui/developerBanner.ts": "client",
     "src/client/engine/ui/devSwitch.ts": "client",
+    "src/client/engine/ui/diagnosticsCopy.ts": "client",
     "src/client/engine/ui/drawBudgetCounter.ts": "client",
     "src/client/engine/ui/EliteBar.ts": "client",
     "src/client/engine/ui/ErrorModal.ts": "client",
