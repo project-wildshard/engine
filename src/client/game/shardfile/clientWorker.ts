@@ -47,6 +47,7 @@ import { poseInputNames } from '../../../shared/game/plugin/channelPrograms';
 import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
+import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
@@ -61,7 +62,7 @@ export interface WorkerClientGrid {
   readonly saveLocation: () => void;
 }
 /** The part of an item row that says where the server holds it. */
-export interface WorkerItemRow { readonly id: string; readonly ranged?: { readonly slot: number } | undefined }
+export interface WorkerItemRow { readonly id: string; readonly kind?: string; readonly family?: string; readonly ranged?: { readonly slot: number } | undefined }
 /** What the page hands the proof. */
 export interface WorkerClientPorts {
   readonly slug: string;
@@ -301,7 +302,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   };
   // A crossing brings another shard's items, and each has its own slots.
   let items = ports.items;
-  const slotsOf = (rows: readonly WorkerItemRow[]): Map<string, number> => new Map(rows.flatMap(item => item.ranged === undefined ? [] : [[item.id, item.ranged.slot] as const]));
+  // SR11 (C8): a data shard's kit melee goes by its order among them, the slot its server owner reads (`declaredKitSlots`).
+  const slotsOf = (rows: readonly WorkerItemRow[]): Map<string, number> => new Map([...declaredKitSlots(rows), ...rows.flatMap(item => item.ranged === undefined ? [] : [[item.id, item.ranged.slot] as const])]);
   player.link = net; net.place = shell.place; net.bindWeapons(ports.weapons, slotsOf(items));
   // A frame names its world. A grid page crosses when one says so; a one-shard page has only the world it opened in, and waits there.
   const { grid } = ports, bookOf = (cell: number | undefined): string | null => cell === undefined || cell === 0 ? null : grid?.cells[cell - 1]?.slug ?? null, siteOf = (cell: number): string | null | undefined => cell === 0 ? null : grid?.cells[cell - 1]?.instance;

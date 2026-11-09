@@ -2,7 +2,7 @@ import { isJsonData } from '@wildshard/format/json';
 import type { InputContextDef } from '@wildshard/engine/level/context';
 import { inputWhenMatches, inputExtraRules, type InputObservation } from '@wildshard/format/inputDeclarations';
 import * as v from 'valibot';
-import { ItemRuntime, type ItemPorts, type ItemSpec } from '@wildshard/engine/combat/items';
+import { ItemRuntime, type ItemAction, type ItemPorts, type ItemSpec } from '@wildshard/engine/combat/items';
 import type { ItemFamily } from '@wildshard/engine/combat/itemFamilies';
 import type { EquipmentIcon, EquipmentRow, WeaponId } from '@wildshard/engine/combat/Equipment';
 import type { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
@@ -54,6 +54,8 @@ export interface DeclaredItemPorts {
   contexts?: 'install' | 'runtime';
   observation?: InputObservation;
   bindings?: Pick<InputService['bindings'], 'describe'>;
+  /** A page on the wire (SR11, C9): an item request goes to the server's runtime, and none queues here. False: no wire, it queues here. */
+  relay?: (item: string, action: ItemAction) => boolean;
 }
 /** Merge a trusted shard's own item families over the kit's, refusing a foreign or shadowing name. */
 export function shardItemFamilies(kit: ReadonlyMap<string, ItemFamily>, shard: NonNullable<DeclaredItemPorts['shardFamilies']>): ReadonlyMap<string, ItemFamily> {
@@ -66,6 +68,12 @@ export function shardItemFamilies(kit: ReadonlyMap<string, ItemFamily>, shard: N
   }
   return merged;
 }
+/** The kit families whose numeric runtime the server owns under the wire (SR11, C8 and C9). */
+export const SERVER_KIT_FAMILIES: ReadonlySet<string> = new Set(['kit.melee', 'kit.lantern']);
+/** The held slot each declared kit melee weapon goes by on the wire: its order among them. Page and server read the same rows. */
+export function declaredKitSlots(rows: readonly { readonly id: string; readonly kind?: string; readonly family?: string }[]): ReadonlyMap<string, number> {
+  return new Map(rows.filter(row => row.kind === 'weapon' && row.family === 'kit.melee').slice(0, 32).map((row, slot) => [row.id, slot] as const));
+}
 /** Normal equipment factory result plus authoritative fixed-step runtimes, scoped to the one session. */
 export interface DeclaredItems {
   primary: Weapon | null; secondary: Weapon | null; extras: readonly Weapon[]; tools: readonly Tool[]; order: readonly WeaponId[];
@@ -73,7 +81,7 @@ export interface DeclaredItems {
 }
 /** Runtime-owned tools keep their native input controller; declared toggle tools retain the numeric action path. */
 function bindToolAction(spec: Extract<ItemSpec, { kind: 'tool' }>, ports: DeclaredItemPorts, runtime: ItemRuntime, scope: Scope, instance: Tool): void {
-  if (spec.action !== null) ports.input.bind(spec.action, () => { runtime.queue(3); }, scope, () => instance.enabled);
+  if (spec.action !== null) ports.input.bind(spec.action, () => { if (ports.relay?.(spec.id, 3) !== true) runtime.queue(3); }, scope, () => instance.enabled);
 }
 /** A native controller is admitted only through a runtime-owned items installation. */
 function nativeTool(spec: ItemSpec): boolean { return spec.kind === 'tool' && spec.action === null; }

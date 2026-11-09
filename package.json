@@ -1000,6 +1000,7 @@
     "./game/boss/nativeArenaSeal": "./src/server/game/boss/nativeArenaSeal.ts",
     "./game/shardfile/nativeRuntimeLoans": "./src/server/game/shardfile/nativeRuntimeLoans.ts",
     "./game/shardfile/declaredClimate": "./src/server/game/shardfile/declaredClimate.ts",
+    "./game/shardfile/declaredKitItems": "./src/server/game/shardfile/declaredKitItems.ts",
     "./game/shardfile/nativeAssembly": "./src/server/game/shardfile/nativeAssembly.ts",
     "./game/shardfile/nativeAssemblyInput": "./src/server/game/shardfile/nativeAssemblyInput.ts",
     "./game/population/mixedRoster": "./src/server/game/population/mixedRoster.ts",

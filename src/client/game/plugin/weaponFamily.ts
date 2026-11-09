@@ -72,12 +72,20 @@ class DeclaredMelee extends Weapon {
   readonly state: WeaponState = { ammo: undefined, magazine: 0, reserve: 0, loaded: true, reloading: false, reloadProgress: 0, ads: false };
   holster = 0; enabled = true; aimInfo: AimInfo | null = null;
   private readonly ports: ItemFamilyPorts;
+  private readonly spec: Extract<ItemSpec, { kind: 'weapon' }>;
   private held = false;
+  /** On the wire the server's runtime keeps the cooldown; this one only spares it presses it would refuse. */
+  private cooling = 0;
   private readonly origin = new Vector3(); private readonly direction = new Vector3();
   get adsHeld(): boolean { return this.held; }
-  set adsHeld(on: boolean) { this.held = this.enabled && on; this.ports.runtime.hold(this.held, this.ports.aim(), this.enabled); }
-  constructor(row: EquipmentRow, _spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
-    super(row); this.ports = ports; this.model = itemMesh(ports); this.setAimSource(ports.aim);
+  set adsHeld(on: boolean) {
+    const held = this.enabled && on;
+    // SR11 (C8): on the wire the server holds the charge and strikes on its release; this page's runtime never steps.
+    if (this.wire !== null) { this.held = held; this.wire.hold(held); return; }
+    this.held = held; this.ports.runtime.hold(this.held, this.ports.aim(), this.enabled);
+  }
+  constructor(row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
+    super(row); this.ports = ports; this.spec = spec; this.model = itemMesh(ports); this.setAimSource(ports.aim);
     ports.runtime.observe(ports.scope, (phase, contact) => {
       if (phase === 'fire') this.onFire?.();
       if (phase === 'hit' && contact !== undefined) this.onHit?.(contact.kind, contact.headshot, contact.killed);
@@ -86,13 +94,22 @@ class DeclaredMelee extends Weapon {
   override install(ctx: EquipContext): void {
     super.install(ctx); ctx.scope.onDispose(() => { this.ports.scope.dispose(); });
     this.ports.input.bind('attack', () => { this.tryFire(); }, ctx.scope, () => this.enabled);
-    this.ports.input.bind('heavy', () => { this.ports.runtime.queue(2, this.ports.aim()); }, ctx.scope, () => this.enabled);
+    this.ports.input.bind('heavy', () => { if (!this.pressWire(true)) this.ports.runtime.queue(2, this.ports.aim()); }, ctx.scope, () => this.enabled);
   }
   tryFire(): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.pressWire(false)) return;
     this.aimRay(this.origin, this.direction); this.ports.runtime.queue(1, { origin: this.origin, direction: this.direction });
   }
-  update(_dt: number, _t: number): void {
+  /** SR11 (C8): a press goes to the server, which strikes with this item's own runtime and aim. False: no wire, the page's runtime takes it. */
+  private pressWire(heavy: boolean): boolean {
+    if (this.wire === null) return false;
+    if (this.cooling > 0) return true;
+    this.cooling = (heavy ? this.spec.heavy : this.spec.light).cooldown;
+    this.wire.press(false, heavy); this.onFire?.();
+    return true;
+  }
+  update(dt: number, _t: number): void {
+    this.cooling = Math.max(0, this.cooling - dt);
     this.model.visible = this.enabled || this.holster > 0;
     keepInFrame(this.model, this.ports.view.position);
   }

@@ -66,7 +66,7 @@ import { installClientWater, undrawnWater } from './clientWater';
 import { standaloneClientTiles } from './tileContent';
 import { tileRing } from './tileDriver';
 import { buildYield } from '@wildshard/engine/core/workSlice';
-import { clientScene, handledItemInputs } from './clientItems';
+import { clientScene, handledItemInputs, itemScene } from './clientItems';
 import { installShardfileColliders } from '../../../shared/game/shardfile/collisionBindings';
 import type { ClientAssets } from './clientAssets';
 import { installDeclaredItems, type DeclaredItems } from '../../../shared/game/shardfile/items';
@@ -163,6 +163,12 @@ type DataMode = 'full' | 'empty' | 'presentation';
 const FOLLOW = 5;
 
 /** The existing Game's world/kit/play stages install one authored level, one borrowed simulation and the normal equipment/HUD. */
+/** SR11 (C9): on the wire an item request is the scene the server takes it by. False: no wire or no scene, so it queues on this page. */
+function relayItem(source: Shardfile, item: string, action: number): boolean {
+  const scene = itemScene(source, item, action);
+  if (scene === undefined || wirePage.client === null) return false;
+  wirePage.send(scene); return true;
+}
 /** the declared days shardfile runtimes own (G580 T1: never borrowed by another runtime) */
 const runtimeDays = new WeakSet();
 
@@ -356,6 +362,7 @@ export class ShardfileClient {
       const retained = retainsRuntimeServices(ctx); if (retained) installPageItemContexts(ctx, source);
       const items = installDeclaredItems(source.items, { scope: ctx.scope, actorId: actor.id, input: ctx.app.input, bindings: ctx.app.input.bindings, ...(retained ? { contexts: 'runtime' as const } : {}), observation: { get mode() { const actorPlayer = ctx.game.runtime?.world?.player; return actorPlayer === undefined ? 'foot' : playerModes(actorPlayer).current(); }, get item() { return ctx.app.equipment?.current.row.id ?? null; }, get flags() { return runtime.hooks.questFlags?.() ?? []; } }, families: this.bindings.items, models: this.itemModels, icon: this.bindings.icon,
         aim: () => ({ origin: world.game.camera.getWorldPosition(new Vector3()), direction: world.game.camera.getWorldDirection(new Vector3()) }),
+        relay: (item, action) => relayItem(source, item, action),
         runtime: (row) => ({ actor, combat: ctx.app.combat, active: () => ctx.app.state === 'play' && !world.freeCamera,
           targets: () => ctx.app.combat.targets().map(aimTarget),
           effect: (target, effect, from) => { const service = ctx.app.effects; if (service === null) throw new Error('Missing normal effect host'); service.apply(target, effect, from); },
@@ -437,10 +444,13 @@ export class ShardfileClient {
     });
     // A field a player may see, on this page: the server's row where it sends one. Only public shared fields have rows, so a player's own stands
     // at its authored default: no such row, and none invented here (RETIRE-FEED A6).
+    // SR11 (C9): an item's field is an owned line once a wire is up; a line at zero is dropped from `owned`, so absent is zero.
+    const itemLines = new Set((source.targets.itemFields ?? []).flatMap(row => source.state.player.filter(field => field.id === row.fieldId).map(field => field.name)));
+    const itemLine = (name: string): number | undefined => wirePage.client === null || !itemLines.has(name) ? undefined : wirePage.line(name);
     const fieldValue = (scope: 'shared' | 'player', name: string): number | undefined => {
       const field = source.state[scope].find((row) => row.name === name);
       if (field === undefined || (scope === 'shared' ? field.privacy !== 'public' : field.privacy === 'host')) return undefined;
-      const value = wirePage.row(name);
+      const value = scope === 'player' ? itemLine(name) : wirePage.row(name);
       if (value !== undefined || typeof field.default === 'string') return value;
       return typeof field.default === 'boolean' ? Number(field.default) : field.default;
     };
@@ -527,7 +537,20 @@ export class ShardfileClient {
     }
     yield;
     // The server keeps this world's saves and reads a page's old ones, and it runs its scenes: a press goes by the prompt's `wireId`.
-    const scene = clientScene(source, items.runtimes, () => undefined);
+    const scene = clientScene(source, items.runtimes, () => undefined, (item, action) => relayItem(source, item, action));
+    // SR11 (C9): the server burns the lantern; its owned lines are what this page's runtime shows, since it never steps.
+    const mirrored = (source.targets.itemFields ?? []).flatMap(row => {
+      const field = source.state.player.find(entry => entry.id === row.fieldId), item = items.runtimes.get(row.item);
+      return field === undefined || item === undefined || field.privacy === 'host' ? [] : [{ item, name: field.name, property: row.property }];
+    });
+    if (mirrored.length > 0) ctx.system({ id: 'shardfile.item-lines', phase: 'update', run: () => {
+      if (wirePage.client === null) return;
+      for (const { item, name, property } of mirrored) {
+        const line = wirePage.line(name); // a line at zero is dropped from `owned`: its absence is the server's zero
+        const now = item.snapshot(), fuel = property === 'fuel' ? Math.min(1, Math.max(0, line)) : now.fuel, lit = property === 'lit' ? line > 0 : now.lit;
+        if (fuel !== now.fuel || lit !== now.lit) item.restore({ ...now, fuel, lit: lit && fuel > 0 });
+      }
+    } });
 
     if (source.plumbing !== null && source.plumbing.input.length + source.plumbing.debug.length > 0) {
       const plumbing = installDeclaredPlumbing(source.plumbing, { handledInput: handledItemInputs(source), instance: source.identity.slug, tier: TIER, scope: ctx.scope, input: ctx.app.input,

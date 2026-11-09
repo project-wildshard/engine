@@ -1204,6 +1204,7 @@
     "src/server/game/shardfile/brainRuntime.ts": "server",
     "src/server/game/shardfile/decisions.ts": "server",
     "src/server/game/shardfile/declaredClimate.ts": "server",
+    "src/server/game/shardfile/declaredKitItems.ts": "server",
     "src/server/game/shardfile/groupRuntime.ts": "server",
     "src/server/game/shardfile/homeKeeper.ts": "server",
     "src/server/game/shardfile/nativeAssembly.ts": "server",

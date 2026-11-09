@@ -11,11 +11,15 @@ export function handledItemInputs(source: Shardfile): ReadonlySet<string> {
   return handled;
 }
 
-export function clientScene(source: Shardfile, runtimes: ReadonlyMap<string, ItemRuntime>, fallback: (id: string) => void): (id: string) => void {
+export function clientScene(source: Shardfile, runtimes: ReadonlyMap<string, ItemRuntime>, fallback: (id: string) => void, relay?: (item: string, action: 3 | 4) => boolean): (id: string) => void {
   const actions = new Map((source.targets.itemActions ?? []).map((row) => [row.scene, row]));
   return (id) => {
     const action = actions.get(id); if (action === undefined) { fallback(id); return; }
     const item = runtimes.get(action.item); if (item === undefined) throw new Error('Missing admitted scene item');
-    item.queue(action.action);
+    if (relay?.(action.item, action.action) !== true) item.queue(action.action);
   };
+}
+/** SR11 (C9): an item request as the scene the server takes it by. Undefined: the shard names no scene for it. */
+export function itemScene(source: Pick<Shardfile, 'targets'>, item: string, action: number): string | undefined {
+  return source.targets.itemActions?.find(row => row.item === item && row.action === action)?.scene;
 }

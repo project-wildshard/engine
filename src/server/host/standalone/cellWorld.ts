@@ -34,6 +34,7 @@ import { pageOpenDoors } from '@wildshard/engine/game/shardfile/buildingDoor';
 import { pageRuntimeState } from '@wildshard/engine/game/shardfile/runtimeState';
 import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
+import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput } from '../headlessRuntime';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
 import { FallFloor } from './fallFloor';
@@ -88,17 +89,22 @@ const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean):
 function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics); }); }
 
 /** A cell with no native plan: a data shard, which any host can run from its output. */
-async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], lone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined }> {
+async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], lone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
   await Promise.resolve();
   const { shard, assets, rapier } = input;
   const ports: ShardfileSimPorts = { rapier,
     quest: { fact: (name, actorId) => { effects.push({ kind: 'fact', name, actorId }); }, coins: (amount, actorId) => { effects.push({ kind: 'coins', amount, actorId }); } } };
-  const fresh = createShardfileSim(shard, assets, ports);
-  if (snapshot === undefined) { if (lone) addLoneWalls(fresh.host); return { host: fresh.host, sim: () => fresh, dispose: () => { fresh.dispose(); } }; }
-  const { level } = fresh.host; fresh.dispose();
-  const installed: { value?: ReturnType<typeof bindShardfileSim> } = {};
-  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); });
-  return { host, sim: () => installed.value, dispose: () => { (installed.value ?? { dispose: () => { host.dispose(); } }).dispose(); } };
+  // SR11: the kit items install with the simulation, so a restore finds their seats where the save put them.
+  const kitOf = (sim: ShardfileSimulation): DeclaredKitItems | null => installDeclaredKitItems(sim.host, shard, sim.itemHooks);
+  if (snapshot === undefined) {
+    const fresh = createShardfileSim(shard, assets, ports), kit = kitOf(fresh);
+    if (lone) addLoneWalls(fresh.host);
+    return { host: fresh.host, sim: () => fresh, kit: () => kit, dispose: () => { fresh.dispose(); } };
+  }
+  const probe = createShardfileSim(shard, assets, ports), { level } = probe.host; probe.dispose();
+  const installed: { value?: ReturnType<typeof bindShardfileSim>; kit?: DeclaredKitItems | null } = {};
+  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); installed.kit = kitOf(installed.value); });
+  return { host, sim: () => installed.value, kit: () => installed.kit ?? null, dispose: () => { (installed.value ?? { dispose: () => { host.dispose(); } }).dispose(); } };
 }
 
 /** How far past a place's own radius a client's word for it holds: it saw it a frame ago, and the server is a command behind. */
@@ -147,7 +153,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
       stepResident(resident, player.id, inputs);
     } };
   }
-  const effects: HeadlessEffect[] = [], { host, dispose, sim } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects, lone));
+  const effects: HeadlessEffect[] = [], { host, dispose, sim, kit } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects, lone));
   installRoomRespawn(host, []);
   installDeclaredClimate(host, input.shard.rows);
   bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product));
@@ -157,8 +163,12 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     effects.length = 0;
     // A data shard's prompts answer whoever stands at them; an id they don't offer that player is dropped, since an input may not end the server.
     const routes = actRoutes(host);
+    const items = kit();
+    for (const { player, command } of inputs) if (command !== null) items?.command(player, command);
     for (const { player, acts } of inputs) for (const act of acts) {
       const claim = act.kind === 'interact' ? routes.claims.get(act.id) : undefined;
+      if (act.kind === 'equip' && items?.equip(player, act.slot) === true) continue;
+      if (act.kind === 'interact' && items?.scene(player, act.id) === true) continue;
       if (act.kind === 'interact' && act.id.startsWith('seen:') && routes.seen !== null) routes.seen(player, act.id);
       else if (act.kind === 'interact' && act.id.startsWith(STORY_ACT)) routes.story?.(player, act.id.slice(STORY_ACT.length));
       else if (claim !== undefined) claim(player);
