@@ -44,6 +44,8 @@ bound. A real negative CLI control returned success with an invalid declared
 limit before the fix (six cases pass, one fails). The ratchet now forwards
 the existing WS_PUSH_LINT_THREADS limit to Oxlint and rejects invalid limits;
 both restored child paths explicitly use one thread. All seven cases pass
-with every original assertion retained plus the new CLI refusal. Refresh this
-file's full/Ring1 clock for its new blob before publication. Final concurrent
-gate and hosted qualification remain pending.
+with every original assertion retained plus the new CLI refusal. Actual full
+and normal thin installs each pass7/7 for this final blob; sealed complete
+module clocks are2.803s/2.751s. The public recorder preserves the earlier
+historical observations and binds the current clocks to this new source.
+Final concurrent gate and hosted qualification remain pending.

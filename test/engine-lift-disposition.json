@@ -8889,8 +8889,8 @@
     "target": "test/schema-types.test.ts",
     "ring": 1,
     "decision": "J232 E-GREEN: restore the complete original engine intent: The schema-types lint finds untyped exported valibot schemas by syntax alone (factories, aliases, wrappers, export forms), passes explicit signatures, retires paid-down identities only in scope, needs approval for identity replacements, and the real ratchet update lowers counts. The approval helper runs from the copied push-tool directory.",
-    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
-    "sourceBlob": "e79aa073017fa21373d2bab34c14e5a3e951bd1e",
+    "sourceRevision": "e02bbf39ea4fb2bf225f5c18b5f0b91c608f06cc",
+    "sourceBlob": "b3d2715d55958c07240f12b369521ce53166d7b8",
     "originalTests": [
       "syntax-only detection follows factories, aliases, wrappers and export forms",
       "explicit value and factory signatures pass; actions and shadowed owners are not schemas",
@@ -8900,7 +8900,8 @@
       "the real ratchet update lowers counts and retires paid-down identity allowances",
       "the approval helper executes from the copied push-tool directory without source neighbours"
     ],
-    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "fixtureChange": "Preserve all seven original case identities and original assertions; bound both actual Oxlint child paths to one thread and add a real invalid-worker-limit CLI refusal. Old implementation accepted the invalid limit (6/7 pass); fixed7/7 pass with unchanged budgets."
   },
   {
     "repo": "engine",

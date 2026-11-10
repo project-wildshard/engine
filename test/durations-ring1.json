@@ -997,7 +997,7 @@
   "test/scene-contact-file-only.test.ts": 0.9270396229999999,
   "test/scene-dressing-file-only.test.ts": 0.5388802830000001,
   "test/scene-source-reads.test.ts": 1.1894529040000001,
-  "test/schema-types.test.ts": 3.486949542000001,
+  "test/schema-types.test.ts": 2.750859334,
   "test/script-state-cow.test.ts": 0.04666914899999998,
   "test/script-v2-group-senses.test.ts": 0.716384017,
   "test/script-v2-strip.test.ts": 0.10995658800000001,

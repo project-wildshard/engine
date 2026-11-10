@@ -1080,7 +1080,7 @@
   "test/scene-contact-file-only.test.ts": 0.857451117,
   "test/scene-dressing-file-only.test.ts": 1.177017259,
   "test/scene-source-reads.test.ts": 0.727656658,
-  "test/schema-types.test.ts": 3.226633375,
+  "test/schema-types.test.ts": 2.803280874,
   "test/script-state-cow.test.ts": 0.06124261399999997,
   "test/script-v2-group-senses.test.ts": 0.47416995400000006,
   "test/script-v2-observation-columns.test.ts": 0.913286425,
