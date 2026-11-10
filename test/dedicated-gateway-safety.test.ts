@@ -110,7 +110,6 @@ test('voice signalling joins, relays inside one cell and says leave on close', a
     b.say({ k: 'sig', to: aId, m: 4, i: 0, n: 1, d: 'after' });
     expect((await a.next('sig')).m).toBe(4);
     expect(c.words.filter(word => word.k === 'sig')).toEqual([]);
-    expect(world.health().voice).toBe(3);
     b.socket.close(); await once(b.socket, 'close');
     let left = await a.next('roster');
     while ((left.peers ?? []).length !== 1) left = await a.next('roster');

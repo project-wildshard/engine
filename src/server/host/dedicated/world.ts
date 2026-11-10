@@ -312,8 +312,8 @@ export class World {
     this.scope.timeout(ms, () => { this.options.restart(); });
   }
   /** What `/health` says: no player data. */
-  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number; readonly voice: number } {
-    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size, voice: this.voice.talking };
+  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number } {
+    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size };
   }
   /** Stop: everyone is saved and told `restart`, and the queue gets its time. */
   async drain(): Promise<boolean> {
