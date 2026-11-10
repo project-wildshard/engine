@@ -30,7 +30,8 @@ async function serveOrigin(release: string, missingPart = false): Promise<string
     const body = path === '/version.json' ? JSON.stringify({ build: 'bench', saveEpoch: 1 }) : path === '/release.json' ? release
       : path === '/assets/spawn/server-bench.json' ? JSON.stringify({ book: 'server', build: 'bench', shards: { [SHARD]: { url: PART } } })
       : path === PART && !missingPart ? 'part' : null;
-    response.writeHead(body === null ? 404 : 200, { 'content-type': 'application/json' }).end(body ?? '');
+    // `busy`'s book answers 503: a passing fault, not an unpublished build.
+    response.writeHead(path === '/assets/spawn/server-busy.json' ? 503 : body === null ? 404 : 200, { 'content-type': 'application/json' }).end(body ?? '');
   });
   await new Promise<void>(resolve => { origin?.listen(0, '127.0.0.1', resolve); });
   return `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}`;
@@ -106,6 +107,14 @@ test('a release ahead of its packs: the server is stuck, not moving, and join na
   expect(rows['join']).toMatchObject({ state: 'pass' });
   expect(rows['join']?.value).toContain('build bench');
   expect(rows['join']?.value).not.toContain('next');
+});
+
+test('a book the origin fails to serve is not called unpublished, and the server is not called stuck', { timeout: 30_000 }, async () => {
+  bench = await roomBench(); answerHealth(bench);
+  const rows = await run(config(await serveOrigin(signed(releaseFor(bench.url, 'busy')))));
+  expect(rows['packs']).toMatchObject({ state: 'fail', value: 'server book 503 · build busy' });
+  expect(rows['packs']?.hint).toContain('Run the check again');
+  expect(rows['server']?.hint).not.toContain('Stuck');
 });
 
 test('the health address sits beside the socket', () => {

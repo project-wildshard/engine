@@ -35,8 +35,9 @@ signed file stays live and the server keeps serving it.
 main with `build` set to a full green main SHA whose packs are published:
 `gh workflow run server-release.yml --ref main -f build=<sha>`. It signs
 that build as the next staging serial, newer or older than the current
-one, using main's tooling and the bundle already on the build's
-`server-staging-<sha>` tag. This is how a held build goes live once its
+one. It signs with main's tooling, but rebuilds the bundle in the named
+build's own tree and refuses unless it matches the asset already on its
+`server-staging-<sha>` tag, so a replaced archive is never signed. This is how a held build goes live once its
 packs land, and how staging rolls back to its last good build. The packs
 gate still applies, CI and Ring 1 must be green for that SHA, and
 production can never be aligned.

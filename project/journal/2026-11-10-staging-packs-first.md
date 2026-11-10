@@ -37,3 +37,11 @@ again in a few minutes. The packs row names the build it asked for.
 The doctor change ships in its own commit, with a regression test where
 the release names a build with no book: packs fail with the build named,
 the server warns stuck, and join names the build the server runs.
+
+A one-shot codex review (J206) found two holes, fixed in a follow-up.
+An alignment first downloaded the tag's asset and signed its bytes, so a
+replaced archive could get a staging signature. It now rebuilds the
+bundle in the named build's tree and the asset step refuses a mismatch.
+And the doctor called any book fetch failure "never published" and the
+server "stuck". Only a 404 means that now; a 503 or a timeout says try
+again.

@@ -130,6 +130,8 @@ async function checkPacks(config: DoctorConfig, learned: Learned, ms: number): P
   try {
     const shards = await limited(learned.scope, ms, async signal => {
       const response = await fetch(book, { cache: 'no-store', signal });
+      // Only a 404 proves the book was never published; any other answer may be this phone's network or a passing fault.
+      if (response.status === 404) learned.packsMissing = true;
       if (!response.ok) throw new Error(`server book ${String(response.status)} · build ${short(release.engineBuild)}`);
       return (await response.json() as { shards?: Record<string, { url?: string }> }).shards ?? {};
     });
@@ -138,11 +140,11 @@ async function checkPacks(config: DoctorConfig, learned: Learned, ms: number): P
     if (product === undefined || part === undefined) { learned.packsMissing = true; return fail(`book has no shards`, 'The server book for this build is empty. The pack publish is incomplete: tell Jake.'); }
     // A part's headers are enough: the body is the server's to read, so the doctor stops at the status.
     const status = await limited(learned.scope, ms, async signal => { const response = await fetch(new URL(part, origin), { signal }); void response.body?.cancel(); return response.status; });
-    if (status !== 200) { learned.packsMissing = true; return fail(`${product} part ${String(status)}`, 'A pack part is missing on the packs origin. The pack publish is incomplete: tell Jake.'); }
+    if (status !== 200) { learned.packsMissing = status === 404; return fail(`${product} part ${String(status)}`, 'A pack part is missing on the packs origin. The pack publish is incomplete: tell Jake.'); }
     return pass(`server book · ${String(Object.keys(shards).length)} shards · ${product} part ok`);
   } catch (error) {
-    learned.packsMissing = true;
-    return fail(errorText(error), `The packs origin has no server book for build ${short(release.engineBuild)}, the one the release file names. Its packs were never published, so the server cannot move to it: tell Jake.`);
+    if (learned.packsMissing === true) return fail(errorText(error), `The packs origin has no server book for build ${short(release.engineBuild)}, the one the release file names. Its packs were never published, so the server cannot move to it: tell Jake.`);
+    return fail(errorText(error), `The packs origin did not serve build ${short(release.engineBuild)}'s server book. Run the check again in a minute; if it stays, tell Jake.`);
   }
 }
 
