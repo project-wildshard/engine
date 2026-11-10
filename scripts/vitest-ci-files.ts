@@ -21,6 +21,9 @@ export const CI_NATIVE_GROUPS = {
   'native-cook': [
     'test/cook-worker.test.ts',
   ],
+  // The cook's other two files keep the original serial, no-neighbour placement in groups of their own.
+  'native-cook-publish': ['test/cook-worker-publish.test.ts'],
+  'native-cook-limits': ['test/cook-worker-limits.test.ts'],
   'native-cook-cpu': ['test/cook-cpu-limit.test.ts'],
   'driftwood-population': [
     'test/driftwood-headless-population.test.ts',

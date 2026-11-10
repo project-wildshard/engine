@@ -10,6 +10,8 @@
  "test/committed-source-tables.test.ts",
  "test/compiled-grid-strips.test.ts",
  "test/cook-worker.test.ts",
+ "test/cook-worker-publish.test.ts",
+ "test/cook-worker-limits.test.ts",
  "test/cook-refusals.test.ts",
  "test/cook-hostile-pins.test.ts",
  "test/net-hostile-play.test.ts",
