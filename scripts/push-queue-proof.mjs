@@ -51,7 +51,14 @@ try{
  }
  assert.deepEqual(results.map(job=>job.state),['pushed','pushed','failed','failed'],JSON.stringify(results));
  const rows=v.parse(v.array(v.object({sha:v.string(),value:v.number()})),readFileSync(observed,'utf8').trim().split('\n').map(line=>JSON.parse(line)));
- assert.deepEqual(rows.slice(-5,-1).map(row=>[row.sha,row.value]),results.slice(0,2).flatMap((job,index)=>[[job.sha,index+2],[job.sha,index+2]]));
+ // Bisection adds failed candidate attempts, and a green cohort may cover
+ // several requests at one final tree. Prove every actual published tree's
+ // two normal hook entries instead of pinning the total attempt ordering.
+ for(const sha of new Set(results.slice(0,2).map(job=>job.sha))){
+  const value=JSON.parse(execFileSync('git',['--git-dir',remote,'show',`${sha}:value.json`],{encoding:'utf8'})).value;
+  assert.ok(value===2||value===3);assert.equal(rows.filter(row=>row.sha===sha&&row.value===value).length,2);
+ }
+ execFileSync('git',['--git-dir',remote,'merge-base','--is-ancestor',results[0]?.sha??'',results[1]?.sha??'']);
  assert.equal(execFileSync('git',['--git-dir',remote,'rev-parse','refs/heads/main'],{encoding:'utf8'}).trim(),results[1]?.sha);
  assert.deepEqual(results.map(job=>job.requestedSha),commits);
  assert.ok(results.slice(0,2).every((job,index)=>job.sha!==commits[index]));

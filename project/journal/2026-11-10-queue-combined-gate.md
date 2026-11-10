@@ -26,3 +26,13 @@ no test selection or hook bypass is involved.
 
 This is manual outer-edge evidence, outside automatic hook discovery.
 A real engine combined full gate and exact hosted green remain open.
+
+Before review, an actual changed-snapshot negative reproduces a newly
+introduced boundary bug: cloning the snapshot without checking its
+original SHA/tree could include an unrequested new commit. Guards now
+verify the original before/after copy and the copied tree before replay.
+Old red/new green6.50s refuses exactly that payload and publishes the
+three intact requests through two fresh complete gates. No unrequested
+file reaches the remote. Original FIFO proof now checks each published
+tree's actual normal hook entries while allowing red bisection attempts
+and shared green cohorts, retaining all other original assertions.

@@ -144,8 +144,11 @@ async function batch(directory,jobs){
    let combined=join(candidateRoot,'origin');
    execFileSync('git',['clone','--quiet','--branch=main','--reference-if-able',first.snapshot,'--dissociate',first.remote,combined],{env:workerEnvironment(),stdio:'pipe'});
    for(const [index,job] of subset.entries()){
+    verifySnapshot(job.snapshot,job,'before combining the immutable request');
     const view=join(candidateRoot,String(index));
     execFileSync('git',['clone','--quiet','--no-hardlinks','--branch=main',job.snapshot,view],{env:workerEnvironment(),stdio:'pipe'});
+    verifySnapshot(view,job,'after copying the immutable request');
+    verifySnapshot(job.snapshot,job,'after copying the immutable request');
     git(view,['remote','remove','origin']);git(view,['remote','add','origin',job.remote]);git(view,['config','core.hooksPath','.githooks']);
     git(view,['remote','add','cohort',combined]);
     rebaseQueuedSnapshot(view,{...workerEnvironment(),PWD:view},'cohort');

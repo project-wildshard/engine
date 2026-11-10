@@ -7,6 +7,7 @@ import {dirname,join,resolve as resolvePath} from 'node:path';
 const directory=resolvePath(process.argv[2]??'tmp/push-queue-batch-proof');mkdirSync(directory,{recursive:true});
 const work=mkdtempSync(join(directory,'run-')),script=resolvePath('scripts/push-queue.mjs'),lock=resolvePath('scripts/push-queue-lock.py'),began=performance.now();
 const red=process.argv.includes('--red');
+const changed=process.argv.includes('--changed-snapshot'),rejected=red||changed;
 /** @param {string} cwd @param {string[]} args */
 const git=(cwd,args)=>execFileSync('git',['-c','user.name=Batch proof','-c','user.email=proof@example.test',...args],{cwd,encoding:'utf8'}).trim();
 try{
@@ -31,16 +32,17 @@ try{
    jobs.push(JSON.parse(execFileSync(process.execPath,[script,'enqueue',source,`--root=${queue}`],{env:{...process.env,WS_LANE_RECEIPTS:join(work,'receipts.log'),WS_LANE_NAME:`proof-${i}`},encoding:'utf8'})));
   }
   assert.ok(jobs.every(job=>JSON.parse(readFileSync(join(queueDir,`${job.id}.json`),'utf8')).state==='queued'),'All four jobs must really be waiting before the worker starts');
+  if(changed){const snapshot=jobs[1].snapshot;writeFileSync(join(snapshot,'intruder.txt'),'unrequested source');git(snapshot,['add','intruder.txt']);git(snapshot,['commit','--quiet','-m','changed snapshot']);}
  }finally{holder.stdin.end();await ended;}
  let results=[];const started=Date.now();
  while(Date.now()-started<8000){results=jobs.map(job=>JSON.parse(readFileSync(join(dirname(dirname(job.snapshot)),`${job.id}.json`),'utf8')));if(results.every(row=>['pushed','failed'].includes(row.state))&&jobs.every(job=>!existsSync(job.snapshot)))break;await new Promise(resolve=>{setTimeout(resolve,10);});}
- assert.deepEqual(results.map(row=>row.state),red?['pushed','failed','pushed','pushed']:['pushed','pushed','pushed','pushed'],JSON.stringify(results));
+ assert.deepEqual(results.map(row=>row.state),rejected?['pushed','failed','pushed','pushed']:['pushed','pushed','pushed','pushed'],JSON.stringify(results));
  const rows=readFileSync(observed,'utf8').trim().split('\n').map(line=>JSON.parse(line));
- if(!red){assert.equal(rows.length,1,'Four waiting jobs must cost one actual complete gate');assert.deepEqual(rows[0].values,[1,2,3,4]);assert.equal(new Set(results.map(row=>row.sha)).size,1);}
+ if(!rejected){assert.equal(rows.length,1,'Four waiting jobs must cost one actual complete gate');assert.deepEqual(rows[0].values,[1,2,3,4]);assert.equal(new Set(results.map(row=>row.sha)).size,1);}
  for(let i=1;i<=4;i++){
-  const result=execFileSync('git',['--git-dir',remote,'ls-tree','--name-only','main'],{encoding:'utf8'}).split('\n');assert.equal(result.includes(`lane-${i}.json`),!red||i!==2);
+  const result=execFileSync('git',['--git-dir',remote,'ls-tree','--name-only','main'],{encoding:'utf8'}).split('\n');assert.equal(result.includes(`lane-${i}.json`),!rejected||i!==2);assert.ok(!result.includes('intruder.txt'));
   assert.equal(results[i-1].requestedSha,jobs[i-1].sha,'Every original request retains its provenance');
  }
  assert.ok(jobs.every(job=>!existsSync(job.snapshot)));
- console.log(JSON.stringify({waitingJobs:4,redMiddleJobIsolated:red,completeGates:rows.length,greenPublished:red?3:4,seconds:(performance.now()-began)/1000}));
+ console.log(JSON.stringify({waitingJobs:4,redMiddleJobIsolated:red,changedSnapshotRefused:changed,completeGates:rows.length,greenPublished:rejected?3:4,seconds:(performance.now()-began)/1000}));
 }finally{rmSync(work,{recursive:true,force:true});}
