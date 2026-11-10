@@ -12,6 +12,35 @@ wakes the producer. A pending companion workflow leaves publication to
 its completion event. PR and fork events cannot enter the signing job.
 An unrelated or older completed build cannot displace a newer channel.
 
+**Staging signs packs-first.** Jake, 2026-11-10: "staging needs to be
+healthy. we can't show these half-assed, half-open, half-closed failure
+states." The running server loads the named build's server book and parts
+before its grace, and stays on its old build while they are missing. So a
+staging file that names a build with no book strands the server, the page
+and every doctor check behind it (serial 63 named `b721769` while its book
+was 404 and the server sat on `a8144a5`). Before signing a staging file,
+`publish.mjs` reads `assets/spawn/server-<build>.json` from the bucket and
+heads every part the release's pinned shards and the grid name. If any is
+missing the run reports `held`, with a notice, and the channel keeps naming
+the last build whose packs are published. `test/server-release-ci.test.ts`
+proves held, published and the rollback below against a real S3 boundary.
+
+The order is: publish the build's server book and parts (the staging
+page/pack publish), then sign the release file (this workflow), then the
+server moves (its poller preloads, counts down 60 s and restarts), then
+alias the staging page to the same build. If a step fails, the previous
+signed file stays live and the server keeps serving it.
+
+**Staging alignment.** Run this workflow by hand (`workflow_dispatch`) on
+main with `build` set to a full green main SHA whose packs are published:
+`gh workflow run server-release.yml --ref main -f build=<sha>`. It signs
+that build as the next staging serial, newer or older than the current
+one, using main's tooling and the bundle already on the build's
+`server-staging-<sha>` tag. This is how a held build goes live once its
+packs land, and how staging rolls back to its last good build. The packs
+gate still applies, CI and Ring 1 must be green for that SHA, and
+production can never be aligned.
+
 A `vMAJOR.MINOR.PATCH` tag qualifies for production. Its peeled commit
 must belong to main and have the same two green main-push workflows. A
 tag arriving while they run waits up to 40 minutes. A red result fails;

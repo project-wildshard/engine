@@ -4,18 +4,54 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { GetObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3';
 import * as v from 'valibot';
+import { readServerPackBook, serverPackBookPath } from '../../src/shared/game/shardfile/serverPack.ts';
 import { bundleDescriptor, COMMIT, publication, readPublication, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
 
 /** @typedef {import('../../src/shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
-/** @typedef {{client: S3Client, bucket: string, candidate: ReleaseFile, privateKey: string, publicKey: string, isAncestor: (older: string, newer: string) => boolean}} PublishOptions */
+/** @typedef {{client: S3Client, bucket: string, candidate: ReleaseFile, privateKey: string, publicKey: string, isAncestor: (older: string, newer: string) => boolean,
+ *   packsReady?: (release: ReleaseFile) => Promise<string | null>, align?: boolean}} PublishOptions */
 
-/** Older completed CI must never replace a newer green commit. Repeated bytes are a no-op.
- * @param {PublishOptions} options @returns {Promise<{status: string, release: ReleaseFile, signed: string}>} */
+/** @param {unknown} error @returns {boolean} */
+const missing = error => error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound' || error.$metadata.httpStatusCode === 404);
+
+/** Staging's order (Jake, 2026-11-10: "staging needs to be healthy"): packs first, the signed file last. The server preloads the
+ *  named build's book and parts before its grace and stays on its old build while they are missing, so a file naming a build with
+ *  no book strands every check behind it. Null when the book and every part the release's shards and grid need are in the bucket.
+ * @param {S3Client} client @param {string} bucket @param {ReleaseFile} release @returns {Promise<string | null>} */
+export async function serverPacksReady(client, bucket, release) {
+  const key = serverPackBookPath(release.engineBuild);
+  let text;
+  try { text = await (await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))).Body?.transformToString(); }
+  catch (error) { if (missing(error)) return `no server book at ${key}`; throw error; }
+  if (text === undefined) return `empty server book at ${key}`;
+  const book = readServerPackBook(JSON.parse(text));
+  if (book.build !== release.engineBuild) return `${key} names build ${book.build}`;
+  /** @type {Set<string>} */
+  const parts = new Set();
+  for (const row of release.shards) {
+    const pack = book.shards[row.slug];
+    if (pack === undefined) return `${key} has no ${row.slug}`;
+    for (const part of [pack, ...pack.more ?? []]) parts.add(part.url.slice(1));
+  }
+  if (book.grid !== undefined) for (const part of [book.grid, ...book.grid.more ?? []]) parts.add(part.url.slice(1));
+  for (const part of parts) {
+    try { await client.send(new HeadObjectCommand({ Bucket: bucket, Key: part })); }
+    catch (error) { if (missing(error)) return `no server part at ${part}`; throw error; }
+  }
+  return null;
+}
+
+/** Older completed CI must never replace a newer green commit, except an explicit staging alignment. Repeated bytes are a no-op.
+ *  With `packsReady`, a candidate whose packs are not published leaves the channel as it is (`held`).
+ * @param {PublishOptions} options @returns {Promise<{status: string, release: ReleaseFile, signed: string, reason?: string}>} */
 export async function publishChannel(options) {
   const { client, bucket, privateKey, publicKey, isAncestor: ancestor } = options, candidate = publication(options.candidate), key = `releases/${candidate.channel}.json`;
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
+  if (options.align === true && candidate.channel !== 'staging') throw new Error('Only staging can be aligned to an older build');
+  /** @type {string | null | undefined} */
+  let blocked;
   for (let attempt = 0; attempt < 3; attempt++) {
     /** @type {{release: ReleaseFile, signed: string, etag: string} | null} */
     let previous = null;
@@ -29,12 +65,16 @@ export async function publishChannel(options) {
     const prior = previous?.release;
     if (previous !== null && prior !== undefined) {
       if (prior.engineBuild !== candidate.engineBuild && !ancestor(prior.engineBuild, candidate.engineBuild)) {
-        if (ancestor(candidate.engineBuild, prior.engineBuild)) return { status: 'stale', release: prior, signed: previous.signed };
-        throw new Error('A channel cannot move to unrelated history');
+        if (!ancestor(candidate.engineBuild, prior.engineBuild)) throw new Error('A channel cannot move to unrelated history');
+        if (options.align !== true) return { status: 'stale', release: prior, signed: previous.signed };
       }
       if (prior.engineBuild === candidate.engineBuild && prior.bundle?.sha256 !== candidate.bundle?.sha256) throw new Error('The same engine build has different bundle bytes');
       if (JSON.stringify({ ...candidate, serial: prior.serial }) === JSON.stringify(prior)) return { status: 'unchanged', release: prior, signed: previous.signed };
       if (candidate.saveEpoch < prior.saveEpoch) throw new Error('A channel cannot lower its save epoch');
+    }
+    if (options.packsReady !== undefined) {
+      blocked ??= await options.packsReady(candidate);
+      if (blocked !== null) return { status: 'held', release: prior ?? candidate, signed: previous?.signed ?? '', reason: blocked };
     }
     const release = publication({ ...candidate, serial: (prior?.serial ?? 0) + 1 }), signed = signRelease(release, privateKey);
     try {
@@ -58,25 +98,35 @@ function isAncestor(older, newer) {
 
 /** CLI runs only after CI has uploaded the exact immutable asset. @returns {Promise<void>} */
 async function main() {
-  const { values } = parseArgs({ options: { channel: { type: 'string' }, build: { type: 'string' }, tag: { type: 'string' }, bundle: { type: 'string' }, out: { type: 'string' }, check: { type: 'boolean', default: false } } });
+  const { values } = parseArgs({ options: { channel: { type: 'string' }, build: { type: 'string' }, tag: { type: 'string' }, bundle: { type: 'string' }, out: { type: 'string' }, check: { type: 'boolean', default: false },
+    align: { type: 'boolean', default: false } } });
+  // `--align` (staging only): sign a named green main build, older or newer, from main's own tooling. The bundle is the one its tag
+  // already holds, and its epoch and pins are read from that commit.
+  const align = values.align, head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  if (align && (values.channel !== 'staging' || values.build === undefined || !COMMIT.test(values.build) || !isAncestor(values.build, head))) throw new Error('--align needs staging and a full build on the checked-out main');
+  /** @param {string} path @returns {string} */
+  const sourceFile = path => align ? execFileSync('git', ['show', `${values.build ?? ''}:${path}`], { encoding: 'utf8' }) : readFileSync(path, 'utf8');
   if (values.bundle === undefined || values.tag === undefined || values.out === undefined) throw new Error('Expected --bundle, --tag and --out');
   const privateKey = need('E7_RELEASE_SIGNING_KEY'), publicKey = need('E7_RELEASE_PUBLIC_KEY'), account = need('R2_ACCOUNT_ID'), bucket = need('R2_BUCKET_PACKS');
   const credentials = { accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY') };
   if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
   if (bucket !== 'wildshard-packs') throw new Error('R2_BUCKET_PACKS must be wildshard-packs (C26)');
-  const epoch = v.parse(v.object({ saveEpoch: v.pipe(v.number(), v.integer(), v.minValue(1)) }), JSON.parse(readFileSync('save-epoch.json', 'utf8'))).saveEpoch;
+  const epoch = v.parse(v.object({ saveEpoch: v.pipe(v.number(), v.integer(), v.minValue(1)) }), JSON.parse(sourceFile('save-epoch.json'))).saveEpoch;
   const shardNames = process.env.E7_SERVER_SHARDS?.trim();
   const candidate = publication({ channel: values.channel, serial: 1, engineBuild: values.build, saveEpoch: epoch,
-    shards: releaseShards(JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')), shardNames === undefined || shardNames === '' ? 'driftwood-isle,nalati-grasslands' : shardNames),
+    shards: releaseShards(JSON.parse(sourceFile('test/pins/shardfiles.json')), shardNames === undefined || shardNames === '' ? 'driftwood-isle,nalati-grasslands' : shardNames),
     bundle: bundleDescriptor(values.bundle, values.tag), socket: need('E7_RELEASE_SOCKET') });
-  if (execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== candidate.engineBuild) throw new Error('Publication is not the checked-out build');
+  if (!align && head !== candidate.engineBuild) throw new Error('Publication is not the checked-out build');
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
   if (values.check) { console.log('Server release configuration admitted'); return; }
   const client = new S3Client({ region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials });
   try {
-    const result = await publishChannel({ client, bucket, candidate, privateKey, publicKey, isAncestor });
+    const packsReady = candidate.channel === 'staging' ? (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release) : undefined;
+    const result = await publishChannel({ client, bucket, candidate, privateKey, publicKey, isAncestor, align, ...packsReady === undefined ? {} : { packsReady } });
     writeFileSync(values.out, `${result.signed}\n`);
-    console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `releases/${result.release.channel}.json` }));
+    console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `releases/${result.release.channel}.json`,
+      ...result.reason === undefined ? {} : { held: candidate.engineBuild, reason: result.reason } }));
+    if (result.status === 'held') console.log(`::notice title=Staging held::${candidate.engineBuild.slice(0, 7)} is not signed: ${result.reason ?? ''}. Publish its packs, then run server-release with build=${candidate.engineBuild}.`);
   } finally { client.destroy(); }
 }
 

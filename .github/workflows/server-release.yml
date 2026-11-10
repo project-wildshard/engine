@@ -7,6 +7,14 @@ on:
     types: [completed]
   push:
     tags: ['v[0-9]*']
+  # Staging alignment: sign a named green main build whose packs are already on R2, newer or older than the
+  # channel's. This is how a held build goes live once its page/pack publish lands, and how staging rolls back.
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Full 40-character green main SHA whose server book and parts are published
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -14,7 +22,7 @@ permissions:
 
 # Duplicate CI completion events for one SHA serialize; different SHAs use R2 CAS.
 concurrency:
-  group: server-release-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+  group: server-release-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event_name == 'workflow_dispatch' && inputs.build || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -22,6 +30,7 @@ jobs:
     if: >-
       github.repository == 'project-wildshard/engine' &&
       (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
        (github.event.workflow_run.event == 'push' &&
         github.event.workflow_run.head_repository.full_name == github.repository &&
         github.event.workflow_run.conclusion == 'success'))
@@ -32,6 +41,7 @@ jobs:
       sha: ${{ steps.source.outputs.sha }}
       channel: ${{ steps.source.outputs.channel }}
       tag: ${{ steps.source.outputs.tag }}
+      align: ${{ steps.source.outputs.align }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,6 +61,7 @@ jobs:
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
+          ALIGN_BUILD: ${{ inputs.build }}
         run: node scripts/server-release/github.mjs select
 
   publish:
@@ -65,10 +76,12 @@ jobs:
       SOURCE_SHA: ${{ needs.source.outputs.sha }}
       RELEASE_TAG: ${{ needs.source.outputs.tag }}
       RELEASE_CHANNEL: ${{ needs.source.outputs.channel }}
+      ALIGN_FLAG: ${{ needs.source.outputs.align == 'true' && '--align' || '' }}
     steps:
+      # An alignment runs main's own tooling against the named build; a normal release checks out its source.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.source.outputs.sha }}
+          ref: ${{ needs.source.outputs.align == 'true' && github.sha || needs.source.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -80,7 +93,13 @@ jobs:
           cache: pnpm
       - uses: ./.github/actions/org-deps
       - run: pnpm install --frozen-lockfile
+      - name: Take the build's existing bundle from its tag
+        if: needs.source.outputs.align == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "engine-server-$SOURCE_SHA.tar.gz" --dir "$RUNNER_TEMP"
       - name: Build deterministic dedicated bundle
+        if: needs.source.outputs.align != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -100,13 +119,15 @@ jobs:
         run: >-
           node scripts/server-release/publish.mjs --check
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
-          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json"
+          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" $ALIGN_FLAG
       - name: Upload immutable bundle to its tag release
+        if: needs.source.outputs.align != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           node scripts/server-release/github.mjs asset
           "$RELEASE_TAG" "$SOURCE_SHA" "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" "$RELEASE_CHANNEL"
+      # Staging signs only a build whose server book and parts are on R2 (publish.mjs `serverPacksReady`); otherwise it holds.
       - name: Sign and advance the channel release file
         env:
           E7_RELEASE_SIGNING_KEY: ${{ secrets.E7_RELEASE_SIGNING_KEY }}
@@ -120,4 +141,4 @@ jobs:
         run: >-
           node scripts/server-release/publish.mjs
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
-          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json"
+          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" $ALIGN_FLAG

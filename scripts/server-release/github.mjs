@@ -27,10 +27,17 @@ async function api(path, options = {}) {
 /** @param {string[]} args @returns {string} */
 const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
-/** No fork or PR event is allowed to reach a signing job. @returns {{sha: string, channel: string, tag: string} | null} */
+/** No fork or PR event is allowed to reach a signing job. @returns {{sha: string, channel: string, tag: string, align?: true} | null} */
 function candidate() {
   if (process.env.GITHUB_REPOSITORY !== REPOSITORY) return null;
   const eventName = process.env.GITHUB_EVENT_NAME;
+  if (eventName === 'workflow_dispatch') {
+    // A staging alignment: a person names an exact green main build whose packs are published, to finish or roll back staging.
+    const sha = process.env.ALIGN_BUILD ?? '';
+    if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('Staging alignment runs from main only');
+    if (!COMMIT.test(sha)) throw new Error('Staging alignment needs a full 40-character build SHA');
+    return { sha, channel: 'staging', tag: `server-staging-${sha}`, align: true };
+  }
   if (eventName === 'workflow_run') {
     const event = v.parse(v.object({ workflow_run: v.object({ ...Run.entries, head_repository: v.object({ full_name: v.string() }) }) }), JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH ?? '', 'utf8'))).workflow_run;
     if (event.event !== 'push' || event.head_branch !== 'main' || event.head_repository.full_name !== REPOSITORY || event.conclusion !== 'success') return null;
@@ -72,13 +79,14 @@ async function select() {
   for (;;) {
     const state = await checks(source.sha);
     if (state === 'green') break;
+    if (source.align === true) throw new Error(`Build ${source.sha} is not green on main CI and Ring 1`);
     if (state === 'red') { if (source.channel === 'staging') return; throw new Error('Tagged commit has a failed main CI workflow'); }
     if (source.channel === 'staging') return; // The other workflow's completion will trigger again.
     if (Date.now() >= deadline) throw new Error('Timed out waiting for tagged main CI');
     await sleep(20_000);
   }
   const output = process.env.GITHUB_OUTPUT; if (output === undefined) throw new Error('Missing GITHUB_OUTPUT');
-  appendFileSync(output, `ready=true\nsha=${source.sha}\nchannel=${source.channel}\ntag=${source.tag}\n`);
+  appendFileSync(output, `ready=true\nsha=${source.sha}\nchannel=${source.channel}\ntag=${source.tag}\nalign=${String(source.align === true)}\n`);
 }
 
 /** C25: bind an immutable asset to the exact tag. Existing bytes must match; never clobber.
