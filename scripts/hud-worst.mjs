@@ -38,6 +38,8 @@ const label = arg('label', 'shot'), out = resolve(arg('out', join(homedir(), '.c
 const browsers = arg('browsers', 'chromium,webkit').split(','), sizes = arg('sizes', '402x874,402x654,874x402,1440x900').split(',');
 const modes = arg('dev', 'off,on').split(','), check = process.argv.includes('--check'), menu = process.argv.includes('--menu');
 const chatRev = arg('chat-rev', '');
+/** the hosts a local build loads from: itself, our Vercel blob store and our own domain (J148) */
+const OURS = /^(?:127\.0\.0\.1|localhost|[a-z0-9]+\.public\.blob\.vercel-storage\.com|(?:[a-z0-9-]+\.)*wildshard\.io)$/u;
 mkdirSync(out, { recursive: true });
 
 /** @typedef {{ name: string, left: number, top: number, right: number, bottom: number }} Box */
@@ -194,9 +196,10 @@ for (const kind of browsers) {
       for (const mode of modes) {
         const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}`;
         const context = await browser.newContext(phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } });
-        // our own page only (J148): a request that leaves the loopback host, a redirect included, is refused
+        // our own pages only (J148): the local build and the asset hosts it names (our Vercel blob store, *.wildshard.io); any
+        // other request, a redirect included, is refused and fails the case
         /** @type {string[]} */ const refused = [];
-        await context.route('**/*', route => { const url = new URL(route.request().url()); if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return route.continue(); refused.push(url.origin); return route.abort(); });
+        await context.route('**/*', route => { const url = new URL(route.request().url()); if (OURS.test(url.hostname)) return route.continue(); refused.push(url.origin); return route.abort(); });
         try {
           if (dev) { await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' }); }
           const page = await context.newPage();
@@ -205,7 +208,7 @@ for (const kind of browsers) {
           if (!await enter(page, dev)) {
             const file = join(out, `${name}.png`);
             await page.screenshot({ path: file }); written.push(file);
-            const wrong = [...errors.map(e => `page error: ${e}`), ...[...new Set(refused)].map(o => `a request left localhost: ${o}`)];
+            const wrong = [...errors.map(e => `page error: ${e}`), ...[...new Set(refused)].map(o => `a request left our hosts: ${o}`)];
             console.log(`${wrong.length === 0 ? 'GATE' : 'FAIL'}  ${name}  ${file}\n  the rotate gate is up (the game is portrait-only on phones): no HUD to lay out`);
             for (const problem of wrong) console.log(`  ${problem}`);
             if (wrong.length > 0) failures.push(name);
@@ -237,7 +240,7 @@ for (const kind of browsers) {
           }
           // the page's errors and refused requests, the BAG's included
           for (const error of errors) problems.push(`page error: ${error}`);
-          for (const origin of new Set(refused)) problems.push(`a request left localhost: ${origin}`);
+          for (const origin of new Set(refused)) problems.push(`a request left our hosts: ${origin}`);
           const every = [...b.rest, ...b.guarded, ...b.chat], others = [...new Set(pairs(every, every))];
           console.log(`${problems.length === 0 ? 'PASS' : 'FAIL'}  ${name}  ${file}`);
           console.log(`  on: ${made.on.join(' · ')}`);
