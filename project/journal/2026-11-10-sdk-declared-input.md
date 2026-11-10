@@ -31,3 +31,16 @@ Each complete case has its unchanged 9.5-second timeout and elapsed
 guard, including finally cleanup. No runtime, content, pin, cap or
 inherited test changes here. No full gate or publication is claimed by
 this local preparation; plan Progress stays at 20 of 49.
+
+J206 found a concrete false positive: SaveStore deduplication hid an
+unconditional second locker write. The actual mutation passed the first
+successor. A transparent observer now records and delegates every save
+call to the unchanged real store, alongside the real forwarded document
+checks. The same mutant is rejected; storage deduplication cannot mask
+the original API idempotency law. No persistence result is substituted.
+
+Both SHOULD items are closed: board/item with a missing flag is refused
+through the real command path, and matching observations are restored
+before disposal so a leaked callback can no longer hide behind a false
+enabled predicate. The one-shot review is retained in session-keep;
+there is no second review or assertion/cap relaxation.

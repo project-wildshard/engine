@@ -120,6 +120,10 @@ timed(
       input.executeCommand({ kind: 'press', action: 'harbour.horn', at: 0 })
       assert.deepEqual(scenes, [])
       state.mode = 'board'
+      handles.update()
+      assert.equal(input.active(context), false)
+      input.executeCommand({ kind: 'press', action: 'harbour.horn', at: 0.5 })
+      assert.deepEqual(scenes, [])
       state.flags.push('harbour.castOff')
       handles.update()
       assert.equal(input.active(context), true)
@@ -138,6 +142,9 @@ timed(
         /Unknown declared knob/,
       )
       assert.throws(() => handles.knob('constructor'), /Unknown declared knob/)
+      state.item = 'weapon.harbour.sail'
+      handles.update()
+      assert.equal(input.active(context), true)
     } finally {
       scope.dispose()
     }
@@ -318,14 +325,31 @@ timed(
         { id: 'old-skin', slot: to },
         { id: 'new-skin', slot: to },
       ]
+      const delegated = []
+      const observe = save => ({
+        read: namespace => save.read(namespace),
+        write: (value, namespace) => {
+          delegated.push({ value: structuredClone(value), namespace })
+          return save.write(value, namespace)
+        },
+      })
       const restored = new CosmeticsLocker('harbour', skins, {
         migrations,
         slot: row => row.slot,
-        save: slot,
+        save: observe(slot),
       })
       assert.equal(restored.wearing(to)?.id, 'old-skin')
       assert.deepEqual(slot.read('harbour').worn, { [to]: 'old-skin' })
       assert.equal(writes.length - before, 1)
+      assert.deepEqual(delegated, [
+        {
+          value: {
+            owned: ['old-skin', 'new-skin'],
+            worn: { [to]: 'old-skin' },
+          },
+          namespace: 'harbour',
+        },
+      ])
       await flush()
       const reloadedWrites = [],
         reloaded = new ForwardedStorage(documents, row => {
@@ -338,10 +362,15 @@ timed(
       const again = new CosmeticsLocker('harbour', skins, {
         migrations,
         slot: row => row.slot,
-        save: reloadedSlot,
+        save: observe(reloadedSlot),
       })
       assert.equal(again.wearing(to)?.id, 'old-skin')
       assert.equal(reloadedWrites.length, 0)
+      assert.equal(
+        delegated.length,
+        1,
+        'Store deduplication must not hide a repeated locker save call',
+      )
       assert.equal(await reloaded.settled(), true)
       const collision = { [from]: 'old-skin', [to]: 'new-skin' }
       assert.deepEqual(migrateEquipmentSlots(collision, migrations), {
