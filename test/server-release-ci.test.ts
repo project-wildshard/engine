@@ -245,7 +245,7 @@ globalThis.fetch = async (input, request = {}) => {
       const staging = mode === 'staging', tag = staging ? `server-staging-${build}` : 'v1.2.3';
       const result = spawnSync(process.execPath, ['--import', transport, resolve('scripts/server-release/github.mjs'), 'asset', tag, build, archive,
         staging ? 'staging' : 'production'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
-        env: { PATH: process.env.PATH, GH_TOKEN: 'fixture', FIXTURE_SHA: build, FIXTURE_MODE: mode } });
+        env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: build, FIXTURE_MODE: mode } });
       expect(result.error).toBeUndefined();
       if (mode === 'missing' || mode === 'foreign') {
         expect(result.status).toBe(1);
