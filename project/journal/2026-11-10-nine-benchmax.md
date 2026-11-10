@@ -36,3 +36,5 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
 
 - Memory bank commit: the reservation moved after `preparePageResidency`
   (the route is known there), still before admission.
+
+- Harness commit: benchmax.mjs options above; its numbers go in the plan.
