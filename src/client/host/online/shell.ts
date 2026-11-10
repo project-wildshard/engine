@@ -107,7 +107,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const first = hear(new WebSocketTransport(config.socket)), client = new NetClient(first);
   const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
-  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(config.socket));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);} });
+  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(config.socket));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); } });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
   const offFirst = client.onFrame(() => { offFirst(); arrive({ tick: client.latest?.tick ?? 0, restored: true }); });
   client.hello(config.build, config.identity);

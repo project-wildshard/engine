@@ -146,3 +146,21 @@ test('progress counts dials, the wait to the next, and the time down', () => {
   expect(later.nextDialMs === null || later.nextDialMs <= 4800).toBe(true);
   redial.dispose();
 });
+
+test('a restart close while already dialling changes the cause and says so, with the dial times unchanged', () => {
+  let clock = 0;
+  const links: FakeLink[] = [], first = new FakeLink(), causes: string[] = [];
+  links.push(first);
+  const client = new NetClient(first, () => clock), frames: ((value: DecodedFrame) => void)[] = [], onFrame = client.onFrame.bind(client);
+  vi.spyOn(client, 'onFrame').mockImplementation(fn => { frames.push(fn); return onFrame(fn); });
+  const redial = new Redial({ client, transport: first, now: () => clock, random: () => 0.5, onState: () => undefined, onCause: cause => { causes.push(cause); },
+    dial: () => { const link = new FakeLink(); links.push(link); return link; } });
+  for (const fn of frames) fn(frame);
+  first.fail('lost');
+  for (let t = 0; t < 400; t += 50) { clock += 50; vi.advanceTimersByTime(50); }
+  expect(links).toHaveLength(2);
+  links[1]?.fail('restart');
+  expect(redial.why).toBe('restart');
+  expect(causes).toEqual(['restart']);
+  redial.dispose();
+});

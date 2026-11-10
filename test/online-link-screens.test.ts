@@ -145,3 +145,29 @@ test('a gated client drops a tap the gate refuses, and never sends it late; chat
   expect(link.sent).toBe(2);
   client.dispose();
 });
+
+test('Try again on the lost card gives way to the banner; a cause that changes mid-outage repaints it; a new outage takes the notice away', () => {
+  const { scope, screens, set } = harness();
+  screens.link('lost');
+  click(shown('lost'), 'Try again');
+  screens.link('reconnecting', 'closed');
+  expect(shown('lost')).toBeNull();
+  expect(shown('drop')).not.toBeNull();
+  set({ why: 'restart' }); screens.link('reconnecting', 'restart');
+  expect(shown('restart')?.textContent).toContain('Restarting');
+  screens.link('live');
+  expect(document.querySelectorAll('[data-failmode="reconnected"]')).toHaveLength(1);
+  set({ why: 'closed' }); screens.link('reconnecting', 'closed');
+  expect(document.querySelectorAll('[data-failmode="reconnected"]')).toHaveLength(0);
+  screens.link('live');
+  expect(document.querySelectorAll('[data-failmode="reconnected"]')).toHaveLength(1);
+  scope.dispose();
+  expect(document.querySelectorAll('.ws-link')).toHaveLength(0);
+});
+
+test('a chat line after the world ended is not held', () => {
+  const { scope, screens } = harness();
+  screens.link('ended', 'refused');
+  expect(screens.holdChat('anyone?', () => undefined, () => undefined)).toBe(false);
+  scope.dispose();
+});

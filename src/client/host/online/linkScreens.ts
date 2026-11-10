@@ -134,7 +134,8 @@ function buttons(scope: Scope, actions: readonly { readonly label: string; reado
  *   if (!screens.allow('Talk')) return;   // a tap the world must hear
  */
 export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLElement = document.body): LinkScreens {
-  if (document.getElementById('ws-link-style') === null) { const style = scope.ownNode(make('style')); style.id = 'ws-link-style'; style.textContent = CSS; document.head.append(style); }
+  // the stylesheet lives as long as the document: a second shell (a reload in place) shares it
+  if (document.getElementById('ws-link-style') === null) { const style = make('style'); style.id = 'ws-link-style'; style.textContent = CSS; document.head.append(style); }
   // the banner keeps the old strip's id, so the online proofs still find it
   const banner = scope.ownNode(make('div', 'ws-link ws-link-banner')), head = make('b'), line = make('span');
   banner.id = 'ws-reconnect-strip'; banner.setAttribute('role', 'status'); banner.hidden = true; banner.append(head, line);
@@ -149,6 +150,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
 
   const close = (): void => { open?.scope.dispose(); open = null; };
+  // a card takes the pointer back from the game (desktop pointer lock), so its buttons can be clicked
+  const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
   const paintBanner = (): void => {
     const shown = down();
     banner.hidden = !shown;
@@ -159,12 +162,15 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     banner.dataset['failmode'] = said.ids; banner.dataset['tone'] = said.tone; banner.dataset['state'] = state;
     head.replaceChildren(ring(), said.title); line.textContent = said.line;
   };
+  let noticeScope: Scope | null = null;
+  const unnotice = (): void => { noticeScope?.dispose(); noticeScope = null; };
   const notice = (): void => {
-    const chip = scope.ownNode(make('div', 'ws-link ws-link-notice'));
+    unnotice();
+    const own = noticeScope = scope.child('online.notice'), chip = own.ownNode(make('div', 'ws-link ws-link-notice'));
     chip.dataset['failmode'] = 'reconnected'; chip.dataset['tone'] = 'good'; chip.setAttribute('role', 'status');
     chip.append(make('b', '', 'Reconnected'), make('span', '', 'you\'re back where you were'));
     parent.append(chip);
-    scope.timeout(NOTICE_MS, () => { chip.remove(); });
+    own.timeout(NOTICE_MS, unnotice);
   };
   /** The hold card: the banner opened up, on a tap it can't carry. It repaints each second from the dial's progress. */
   const hold = (what: string, chat: boolean): void => {
@@ -196,7 +202,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       fill.style.width = `${String(Math.max(0, Math.round(heldFor > 0 ? heldFor / HOLD_S * 100 : left / (GIVE_UP_S - HOLD_S) * 100)))}%`;
     };
     paint(); own.interval(1000, paint);
-    parent.append(root);
+    parent.append(root); freePointer();
     open = { scope: own, root, kind: 'hold', paint };
     root.querySelector('button')?.focus();
   };
@@ -208,7 +214,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     if (live !== undefined) { const status = make('p', 'ws-link-facts'); status.setAttribute('role', 'status'); live(status); own.interval(1000, () => { live(status); }); box.append(status); }
     box.append(buttons(own, actions));
     if (detail !== undefined) { const details = make('details'); details.append(make('summary', '', 'Details'), make('p', '', detail)); box.append(details); }
-    parent.append(root);
+    parent.append(root); freePointer();
     open = { scope: own, root, kind: 'stop', paint: () => undefined };
     root.querySelector('button')?.focus();
   };
@@ -217,7 +223,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
     paintBanner();
-    if (down()) { wasDown = true; open?.paint(); return; }
+    // down again: the notice goes, and a stop card (lost, after Try again) gives way to the banner
+    if (down()) { wasDown = true; unnotice(); if (open?.kind === 'stop') close(); open?.paint(); return; }
     if (state === 'live') {
       close();
       if (wasDown) notice();
@@ -259,7 +266,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       return false;
     },
     holdChat: (text, send, drop) => {
-      if (state === 'live') return false;
+      // live: send now. Ended: nothing will carry it, and the card already says why
+      if (state === 'live' || state === 'ended') return false;
       held.push({ text, send, drop });
       if (down() && open?.kind !== 'stop') hold('Send', true);
       return true;

@@ -42,7 +42,7 @@ export class NetPlayer implements PlayerLink {
   /** Its weapons' line to the server: what the next command carries. */
   readonly wire: WeaponWire = {
     // FM4: a swing made while the link is down is dropped and the page's hold card says why: it would otherwise go out late
-    press: (started, heavy = false) => { if (!this.client.allows(started ? 'Attack' : '')) return; this.pressed = true; this.pressStarted ||= started; this.heavyPress ||= heavy; },
+    press: (started, heavy = false) => { if (!this.client.allows('Attack')) return; this.pressed = true; this.pressStarted ||= started; this.heavyPress ||= heavy; },
     hold: heavy => { this.heavy = heavy; },
     secondary: () => { if (this.client.allows('Ability')) this.gust = true; },
     fire: ads => { if (this.client.allows('Fire')) this.launcher = { slot: this.held, ads, fire: true }; },
@@ -53,6 +53,8 @@ export class NetPlayer implements PlayerLink {
     equip: row => {
       const slot = this.slots.get(row);
       if (slot === undefined) return;
+      // FM4: a swap asked while the link is down isn't kept to send later; the hand goes back to what the server holds
+      if (!this.client.allows('Equip')) { this.follow(this.held); return; }
       this.wanted = slot; this.asks = 0; this.askAt = 0; this.heavy = false;
     },
     interact: id => { this.client.act({ kind: 'interact', seq: this.seq, id }); },

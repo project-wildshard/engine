@@ -29,3 +29,16 @@ online shell, replacing the plain strip and the raw error text.
   Reconnected notice. FM3's chaos proof will cover the rest.
 - `restart-blocked` from the title and `deploy-blocked` need the title
   to know the world's state before a link exists; they wait for that.
+
+## J206 review fixes (Codex, NO-GO on f139385)
+
+- An equip asked while down was kept and sent after recovery; now it
+  is refused and the hand goes back to what the server holds.
+- A held melee press (`press(false)`) is a real attack: it is gated as
+  Attack too, and the card's quiet spell stops repeat prompts.
+- Cards release desktop pointer lock, so their buttons can be clicked.
+- `Redial.onCause`: a restart close mid-dial, or a return to the tab
+  after a silent spell, now repaints the banner. Timing is unchanged.
+- Try again on the lost card hands back to the banner; one notice at a
+  time, gone when the link drops again; the stylesheet outlives a
+  shell; chat after the world ended is not held.

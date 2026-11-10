@@ -41,6 +41,8 @@ export interface RedialOptions {
   readonly dial: () => Transport;
   /** The link changed state. */
   readonly onState: (state: LinkState, reason?: string) => void;
+  /** FM4: the cause changed while the link stayed down (a restart close mid-dial, a return to the tab after a silent spell). */
+  readonly onCause?: (cause: LinkCause) => void;
   readonly now?: () => number;
   readonly random?: () => number;
 }
@@ -87,7 +89,7 @@ export class Redial {
   /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once. */
   check(): void {
     const now = this.now();
-    if (this.phase === 'up' && this.heardAt !== null && now - this.heardAt >= STRIP_MS) { this.cause = 'hidden'; this.lose(now); }
+    if (this.phase === 'up' && this.heardAt !== null && now - this.heardAt >= STRIP_MS) { this.because('hidden'); this.lose(now); }
     if (this.phase === 'down') this.dialAt = now;
   }
   /** The player asked to try again, after `lost`. */
@@ -109,7 +111,7 @@ export class Redial {
     if (this.phase === 'up') {
       if (this.heardAt === null) return;
       const silent = now - this.heardAt;
-      if (silent >= STRIP_MS && this.state === 'live') this.cause = 'silent';
+      if (silent >= STRIP_MS && this.state === 'live') this.because('silent');
       if (silent >= DROP_MS) this.lose(now); else if (silent >= STRIP_MS) this.show('reconnecting');
     } else if (this.phase === 'down') this.redial(now);
   }
@@ -138,8 +140,8 @@ export class Redial {
     const now = this.now();
     if (FINAL.has(reason)) { this.stop(); this.show('ended', reason); return; }
     if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }
-    if (this.phase === 'up') { this.cause = reason === 'restart' ? 'restart' : 'closed'; this.lose(now, false); }
-    else if (this.phase === 'down') this.failedDial(now);
+    if (this.phase === 'up') { this.because(reason === 'restart' ? 'restart' : 'closed'); this.lose(now, false); }
+    else if (this.phase === 'down') { if (reason === 'restart') this.because('restart'); this.failedDial(now); }
   }
   /** The link is gone or no use: from now it is dialled, and a player's 35 s count from the last frame. */
   private lose(now: number, close = true): void {
@@ -149,6 +151,12 @@ export class Redial {
   }
   private drop(): void { this.offClose(); this.transport.close('stalled'); }
   private stop(): void { this.phase = 'stopped'; this.dialled = null; this.offClose(); }
+  /** The cause changed: a link already shown down says so at once; timing is untouched. */
+  private because(cause: LinkCause): void {
+    if (cause === this.cause) return;
+    this.cause = cause;
+    if (this.state === 'reconnecting' || this.state === 'resuming') this.options.onCause?.(cause);
+  }
   private show(state: LinkState, reason?: string): void {
     if (state === this.state) return;
     this.state = state;
