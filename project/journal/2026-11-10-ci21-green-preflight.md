@@ -75,3 +75,11 @@ not misclassify a file actually removed to its owner. Existing real timing,
 stale/zero/error/kit and snapshot-lifetime controls still pass in6.20s. This
 adds a gate; no check or original oracle is bypassed. Both manual proofs stay
 outside hooks. Review and the normal publication gate still apply.
+
+After the earlier Vitest batch publishes0a90319, rebase preserves both sides'
+complete localPushObservations arrays. No clock is averaged or replaced.
+Official stamps are regenerated. Current actual plans are full1218/12/max
+227.708s and Ring11130/7/max235.404s; pending inventory still323 and the same
+extension. J206 followup193748 has no MUST or SHOULD. Q265's old immutable
+snapshot conflicts on the shared timing-array append, not a failed oracle;
+the corrected committed history is recaptured once through the normal queue.
