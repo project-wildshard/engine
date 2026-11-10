@@ -20,6 +20,10 @@ guard now compares the exact request URL already selected by Bash.
 Eight outside-hook controls preserve the manifest, report and opaque
 prior log; an identical legacy label resumes. Every empty report is
 explicitly NOT READ, with no PASS or FAIL substituted for missing data.
+The final eight-case run took 1.049 seconds, not the under-one-second
+rounding in the source commit message; its bound stays 10 seconds.
+The 26 existing report/control cases passed in 1.56 seconds. Typed lint
+and the full scripts type project also passed.
 
 The engine no longer declares the phone-loading package command: invoking
 it exits 254. The sweep now uses the original frozen source's direct
