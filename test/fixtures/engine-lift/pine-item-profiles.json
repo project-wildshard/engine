@@ -1,0 +1,111 @@
+{
+  "crossbow": {
+    "family": "firearm",
+    "action": "bolt",
+    "magazine": 1,
+    "reserve": 29,
+    "interval": 0.3,
+    "reload": 1.35,
+    "reloadMode": "single",
+    "autoReload": 1.4,
+    "damageScale": 1,
+    "range": 310,
+    "spreadAds": 0.15,
+    "spreadHip": 0.75,
+    "spreadRadius": "linear",
+    "spreadAxisScale": 2,
+    "bloomShot": 0,
+    "bloomMax": 0,
+    "movingSpread": 0,
+    "movingAimReduction": 0,
+    "projectile": {
+      "kind": "bolt",
+      "delivery": "flight",
+      "speed": 62,
+      "radius": 0.03,
+      "muzzle": 0.35,
+      "flight": {
+        "gravity": 9.8,
+        "drag": 0.012,
+        "windCoupling": 0
+      },
+      "pool": 8,
+      "substeps": 4,
+      "lifetime": 12
+    }
+  },
+  "lever": {
+    "family": "firearm",
+    "action": "lever",
+    "magazine": 7,
+    "reserve": 21,
+    "interval": 0.68,
+    "reload": 0.4,
+    "reloadMode": "perRound",
+    "autoReload": 0.35,
+    "damageScale": 1.5,
+    "range": 320,
+    "spreadAds": 0.06,
+    "spreadHip": 0.9,
+    "spreadRadius": "sqrt",
+    "bloomShot": 0,
+    "bloomMax": 0,
+    "movingSpread": 0.5,
+    "movingAimReduction": 0.6,
+    "lever": {
+      "cycleDelay": 0.12,
+      "cycleTime": 0.56,
+      "reloadIn": 0.22,
+      "reloadOut": 0.2,
+      "ejectAt": 0.34,
+      "cockAt": 0.2,
+      "autoReloadClose": 5
+    },
+    "projectile": {
+      "kind": "bullet",
+      "delivery": "hitscan",
+      "speed": 0,
+      "radius": 0,
+      "flight": {
+        "gravity": 0,
+        "drag": 0,
+        "windCoupling": 0
+      },
+      "pool": 1,
+      "substeps": 1,
+      "lifetime": 1
+    }
+  },
+  "longbow": {
+    "family": "bow",
+    "quiver": 20,
+    "speedBase": 32,
+    "speedDraw": 30,
+    "damageScale": 1.35,
+    "draw": {
+      "drawTime": 0.75,
+      "letdownTime": 0.4,
+      "renockTime": 0.62,
+      "renockEarly": 0.4,
+      "holdSteady": 3,
+      "holdTire": 8,
+      "tiredTime": 1.1
+    },
+    "spread": {
+      "degrees": 0.3,
+      "radius": "sqrt",
+      "axisScale": 1,
+      "aimMultiplier": 0.5,
+      "motion": 0.6
+    },
+    "flight": {
+      "gravity": 6,
+      "drag": 0.014,
+      "windCoupling": 0.25
+    },
+    "muzzle": 0.55,
+    "pool": 8,
+    "substeps": 4,
+    "lifetime": 12
+  }
+}

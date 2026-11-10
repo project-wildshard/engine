@@ -98,6 +98,9 @@ jobs:
       - name: Prove independent native quest seats and saved cable rides
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/quest-seats.proof.mjs
+      - name: Prove actual native item frame continuation and reaction order
+        if: needs.changes.outputs.docs != 'true'
+        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-item-frame.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'

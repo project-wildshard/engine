@@ -1,6 +1,6 @@
 // Frozen native installer at 28bc7527b, before data-frame adoption. Test oracle only.
 import { worldHit } from '@wildshard/engine/physics/query';
-import { LEVER_WEAPON_PROFILE } from '../../../src/shards/pine-hollow/generators/leverProfile';
+import { LEVER_WEAPON_PROFILE } from '../engine-lift/nativeItemProfiles';
 import * as v from 'valibot';
 import { Vector3 } from 'three';
 import type { SimHost } from '@wildshard/engine/sim';

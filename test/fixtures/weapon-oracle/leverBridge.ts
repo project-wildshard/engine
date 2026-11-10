@@ -1,7 +1,7 @@
 import type * as v from 'valibot';
 import { RangedAction, type RangedCycleEvent } from '@wildshard/engine/combat/Firearm';
 import { parseNativeFirearmProfile, type FirearmWeaponProfileSchema } from '@wildshard/format/weaponProfiles';
-import { LEVER_WEAPON_PROFILE } from '../../../src/shards/pine-hollow/generators/leverProfile';
+import { LEVER_WEAPON_PROFILE } from '../engine-lift/nativeItemProfiles';
 import type { FirearmProfile } from './firearmProfile';
 import { AR15 } from './pineFirearmProfile';
 

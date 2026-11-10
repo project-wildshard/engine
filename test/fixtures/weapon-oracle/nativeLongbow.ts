@@ -1,5 +1,5 @@
 // Frozen native installer at 28bc7527b, before data-frame adoption. Test oracle only.
-import { BOW_PROFILE } from '../../../src/shards/pine-hollow/generators/bowProfile';
+import { BOW_PROFILE } from '../engine-lift/nativeItemProfiles';
 import { BowWeaponProfileSchema } from '@wildshard/format/weaponProfiles';
 import * as v from 'valibot';
 import { Vector3 } from 'three';

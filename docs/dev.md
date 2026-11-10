@@ -309,3 +309,22 @@ controlled at authored prompts; this is not a walked journey, a database
 durability proof, or a live-server connection. No flag, ride state, reward
 or controller implementation is forced. The original SDK file remains
 until owner review approves retirement.
+
+## Native item-frame continuation
+
+Install the ordinary Driftwood and Pine pins, then run
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-item-frame.proof.mjs`.
+Three explicit CI cases preserve every original item-frame assertion:
+ordered released input loans and reused arrays, all three ranged legacy
+continuations, contacts and RNG over 1,500 ticks, actual mid-stream native
+restore, atomic invalid reserve refusal, and 420 swept-melee ticks with
+synchronous reaction order and saved state. Each complete case has a
+9.5-second timeout and elapsed guard, including load and cleanup. They
+remain outside hooks and Vitest discovery.
+
+The numerical combat fixture retains its original high-health target so
+all clocks and shots remain observable. It is not an earned-ownership,
+complete authored journey, live-server or phone-rendering proof. Frozen
+legacy algorithms consume preserved profile data; current item rows and
+policies are read independently from actual immutable pinned products.
+No runtime, tuning, pin, reward or test deadline changes here.

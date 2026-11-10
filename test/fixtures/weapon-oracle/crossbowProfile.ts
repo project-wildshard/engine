@@ -1,6 +1,6 @@
 import type * as v from 'valibot';
 import { parseNativeFirearmProfile, type FirearmWeaponProfileSchema } from '@wildshard/format/weaponProfiles';
-import { CROSSBOW_WEAPON_PROFILE } from '../../../src/shards/pine-hollow/generators/crossbowProfile';
+import { CROSSBOW_WEAPON_PROFILE } from '../engine-lift/nativeItemProfiles';
 
 /** The existing flight/view profile with admitted launch/contact clocks; view and stuck-bolt dressing remain native. */
 export interface CrossbowProfile {
