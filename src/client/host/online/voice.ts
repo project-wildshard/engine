@@ -60,7 +60,7 @@ async function fetchIce(url: string): Promise<RTCIceServer[] | null> {
 const MIC: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 
 /** `early` holds candidates heard before the remote description; `held`, our own found before our description went out. */
-interface Link { readonly pc: RTCPeerConnection; readonly offerer: boolean; readonly audio: HTMLAudioElement; readonly early: RTCIceCandidateInit[]; readonly held: RTCIceCandidateInit[]; readonly openedAt: number; described: boolean; heardAt: number; retries: number }
+interface Link { readonly pc: RTCPeerConnection; readonly offerer: boolean; readonly audio: HTMLAudioElement; readonly early: RTCIceCandidateInit[]; readonly held: RTCIceCandidateInit[]; readonly openedAt: number; described: boolean; everLinked: boolean; heardAt: number; retries: number }
 interface Pieces { readonly from: string; readonly n: number; readonly at: number; readonly parts: (string | undefined)[]; got: number }
 type Signal = { readonly sdp: RTCSessionDescriptionInit } | { readonly cand: RTCIceCandidateInit };
 
@@ -265,7 +265,7 @@ export class VoiceChat {
     const pc = new RTCPeerConnection({ iceServers: [...this.ice] }), audio = document.createElement('audio');
     audio.autoplay = true; audio.setAttribute('playsinline', ''); audio.muted = this.muted.has(id); audio.dataset['voicePeer'] = id;
     // Played from memory, never mounted: a hidden element in the page would only be one more node to keep.
-    const link: Link = { pc, offerer, audio, early: [], held: [], openedAt: diagnosticNow(), described: false, heardAt: 0, retries: 0 };
+    const link: Link = { pc, offerer, audio, early: [], held: [], openedAt: diagnosticNow(), described: false, everLinked: false, heardAt: 0, retries: 0 };
     this.links.set(id, link);
     for (const track of this.mic?.getAudioTracks() ?? []) if (this.mic !== null) pc.addTrack(track, this.mic);
     pc.ontrack = event => { audio.srcObject = event.streams[0] ?? new MediaStream([event.track]); void audio.play().catch(() => undefined); };
@@ -274,6 +274,7 @@ export class VoiceChat {
     pc.onconnectionstatechange = () => {
       if (this.links.get(id) !== link) return;
       const peer = this.roster.get(id);
+      if (pc.connectionState === 'connected') link.everLinked = true;
       if (peer !== undefined) { peer.linked = pc.connectionState === 'connected'; this.changed(); }
       // The joiner offered, so the joiner tries again; the other side waits for its fresh offer.
       if (pc.connectionState === 'failed' && link.offerer && link.retries < RETRIES && this.state === 'on') void this.offer(id, link.retries + 1);
@@ -333,8 +334,9 @@ export class VoiceChat {
     }
     for (const [key, held] of this.pieces) if (now - held.at > PIECES_MS) this.pieces.delete(key);
     for (const [id, link] of this.links) {
-      // An offer nobody answered, or a link that never got going: the offerer starts again.
-      if (link.offerer && this.state === 'on' && link.pc.connectionState !== 'connected' && now - link.openedAt > UNANSWERED_MS && link.retries < RETRIES) { void this.offer(id, link.retries + 1); continue; }
+      // An offer nobody answered, or a link that never got going: the offerer starts again. A link that worked and dropped
+      // gets ICE's own recovery first (a phone's blip), and a new offer only once it says failed.
+      if (link.offerer && this.state === 'on' && !link.everLinked && link.pc.connectionState !== 'connected' && now - link.openedAt > UNANSWERED_MS && link.retries < RETRIES) { void this.offer(id, link.retries + 1); continue; }
       const peer = this.roster.get(id);
       if (peer === undefined) continue;
       if (await heardLevel(link.pc) > SPEAKING_LEVEL) link.heardAt = now;
