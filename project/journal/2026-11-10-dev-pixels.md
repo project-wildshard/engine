@@ -23,3 +23,6 @@ screen in Developer mode, six permutations to try.
   sections at the left (the boss bar and the ammo readout had them);
   hud-worst fails refused requests and late page errors and requires the
   fps pill and the memory card each.
+- Third review (verify): GO on the pick and pacing; the gated case now
+  reads errors after its screenshot, and the desktop memory panel rises
+  above the bolts and health readouts at any width.

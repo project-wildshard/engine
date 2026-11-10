@@ -203,8 +203,9 @@ for (const kind of browsers) {
           /** @type {string[]} */ const errors = [];
           page.on('pageerror', error => { errors.push(error.message.slice(0, 160)); });
           if (!await enter(page, dev)) {
-            const file = join(out, `${name}.png`), wrong = [...errors.map(e => `page error: ${e}`), ...[...new Set(refused)].map(o => `a request left localhost: ${o}`)];
+            const file = join(out, `${name}.png`);
             await page.screenshot({ path: file }); written.push(file);
+            const wrong = [...errors.map(e => `page error: ${e}`), ...[...new Set(refused)].map(o => `a request left localhost: ${o}`)];
             console.log(`${wrong.length === 0 ? 'GATE' : 'FAIL'}  ${name}  ${file}\n  the rotate gate is up (the game is portrait-only on phones): no HUD to lay out`);
             for (const problem of wrong) console.log(`  ${problem}`);
             if (wrong.length > 0) failures.push(name);
