@@ -931,6 +931,7 @@
   "test/nine-memory-floor.test.ts": 1.0571314970000003,
   "test/no-base64.test.ts": 1.2661127550000002,
   "test/npc-reading.test.ts": 0.05728630000000004,
+  "test/online-link-screens.test.ts": 2.024294708,
   "test/online-shell.test.ts": 2.38366145,
   "test/open-arena-room.test.ts": 2.4996613990000003,
   "test/output-descriptor.test.ts": 4.151227701000001,

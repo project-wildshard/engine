@@ -80,3 +80,7 @@ online shell, replacing the plain strip and the raw error text.
 - Review of 16c993b (NO-GO): the Tab ring skipped the Details summary.
   It now covers every enabled button and the summary, wraps both ways,
   and pulls focus back in from outside the card.
+
+- 15:12 Cancún, coordinator: job 268 passed the full gate but stopped at the new-test timing step for
+  test/online-link-screens.test.ts. Recorded the gate's own clocks (push-test-timings record 6d1f4f92) and
+  committed the three timing files; no test or oracle changed.

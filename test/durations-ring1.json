@@ -870,6 +870,7 @@
   "test/nightly-tag.test.ts": 0.06253126,
   "test/no-base64.test.ts": 1.5632443420000002,
   "test/npc-reading.test.ts": 0.057654356000000004,
+  "test/online-link-screens.test.ts": 0.191782208,
   "test/online-shell.test.ts": 2.8340488660000007,
   "test/open-arena-room.test.ts": 3.6832563770000006,
   "test/output-lineage-boundary.test.ts": 0.21892252299999995,
