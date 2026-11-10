@@ -43,7 +43,9 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
     if(publishes)throw new Error('Push target requires a clean checked tree; enqueue a committed immutable checkout');
     return null;
   }
-  const excluded=/^(?:WS_PUSH_REFS|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
+  // Ref/destination admission runs before reuse; a full tree proof is independent
+  // of the destination passed by Git versus the queue's preceding gate.
+  const excluded=/^(?:WS_PUSH_REFS|WS_PUSH_DESTINATION|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
   const exclusions=exclusionScope(cwd);
   const runtime=createHash('sha256').update(JSON.stringify({profile,node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions})).digest('hex');

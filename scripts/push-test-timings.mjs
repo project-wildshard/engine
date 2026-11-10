@@ -51,16 +51,39 @@ function inventory(root,ring){
  return new Set(v.parse(v.array(v.object({file:v.string()})),JSON.parse(output)).map(row=>resolve(row.file)));
 }
 
+/** A new ref has no old tip, but its destination can already contain this code.
+ * Query that remote, not a possibly stale/different remote-tracking branch.
+ * Unknown/unrelated history retains the conservative whole-tree check.
+ * @param {string} root @param {string} local @param {string|undefined} destination */
+function publishedBase(root,local,destination){
+ try{
+  // Git's hook supplies its actual push URL ($2), not the fetch remote's name.
+  // The queue's preceding origin gate has no hook arguments yet.
+  const url=destination??git(root,['remote','get-url','--push','origin']);
+  /** @type {import('node:child_process').ExecFileSyncOptionsWithStringEncoding} */
+  const options={cwd:root,encoding:'utf8',timeout:15_000,stdio:['ignore','pipe','ignore']};
+  const advertised=execFileSync('git',['ls-remote','--exit-code','--heads','--',url,'refs/heads/main'],options).trim();
+  const [sha,ref,...extra]=advertised.split(/\s+/u);
+  if(extra.length>0||ref!=='refs/heads/main'||!/^[a-f0-9]{40}$/u.test(sha??''))return null;
+  try{execFileSync('git',['cat-file','-e',`${sha}^{commit}`],options);}catch{
+   // Hydrate only the advertised commit; no checkout, tracking ref or source edit.
+   execFileSync('git',['fetch','--no-tags','--no-write-fetch-head','--no-recurse-submodules','--',url,sha],options);
+  }
+  return execFileSync('git',['merge-base',local,sha],options).trim();
+ }catch{return null;}
+}
+
 /** Only actual additions/renames in the complete pushed ranges; no file-import approximation.
- * @param {string|undefined} refs @param {string} [root] */
-export function missingTestTimings(refs,root=process.cwd()){
+ * @param {string|undefined} refs @param {string} [root] @param {string} [destination] */
+export function missingTestTimings(refs,root=process.cwd(),destination=process.env.WS_PUSH_DESTINATION){
  if(!refs?.trim())return [];
  const added=new Set();
  for(const row of refs.trim().split('\n')){
   const [,local,,remote]=row.trim().split(/\s+/u);
   if(!/^[a-f0-9]{40}$/u.test(local??'')||!/^[a-f0-9]{40}$/u.test(remote??''))throw new Error('Invalid timing admission push range');
   if(/^0+$/u.test(local))continue;
-  const paths=/^0+$/u.test(remote)?git(root,['ls-tree','-r','--name-only','-z',local]):git(root,['diff','--no-renames','--diff-filter=A','--name-only','-z',remote,local]);
+  const base=/^0+$/u.test(remote)?publishedBase(root,local,destination):remote;
+  const paths=base===null?git(root,['ls-tree','-r','--name-only','-z',local]):git(root,['diff','--no-renames','--diff-filter=A','--name-only','-z',base,local]);
   for(const file of paths.split('\0'))if(/^(?:src|test)\/[\s\S]+\.test\.[cm]?[jt]sx?$/u.test(file))added.add(file);
  }
  if(added.size===0)return [];

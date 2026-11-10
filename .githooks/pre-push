@@ -9,4 +9,5 @@ hooks="$(git rev-parse --show-toplevel)/.githooks"
 refs="$(cat)"
 printf '%s\n' "$refs" | node "$hooks/check-push.mjs"
 export WS_PUSH_REFS="$refs"
+export WS_PUSH_DESTINATION="$2"
 exec node "$hooks/run-checks.mjs" push
