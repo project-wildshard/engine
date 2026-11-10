@@ -15,10 +15,21 @@ const localSchema=v.object({...reportSchema.entries,completed:v.literal(true)});
 const hostedSchema=v.object({file:v.string(),sha:v.pipe(v.string(),v.regex(/^[a-f0-9]{40}$/u)),run:v.pipe(v.string(),v.regex(/^\d+$/u)),durationMs:positive,appliedTo:v.array(v.picklist(['full','ring1']))});
 const sourceSchema=v.looseObject({localPushObservations:v.optional(v.array(v.unknown())),additionalFileObservations:v.optional(v.array(v.unknown()))});
 const observationFile='test/durations-observations.jsonl';
+const legacyFile='test/durations-source.json';
 /** @param {string} root @param {string[]} args */
 const git=(root,args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
+/** @param {string} root @param {string} file */
+const committedText=(root,file)=>execFileSync('git',['show',`HEAD:${file}`],{cwd:root,encoding:'utf8',maxBuffer:16*1024*1024});
 /** @param {string} root @param {'full'|'1'} ring @returns {Record<string,number>} */
 const weights=(root,ring)=>v.parse(v.record(v.string(),positive),JSON.parse(readFileSync(resolve(root,ring==='full'?'test/durations.json':'test/durations-ring1.json'),'utf8')));
+/** @param {string} text @returns {v.InferOutput<typeof localSchema>[]} */
+function parseObservationLog(text){
+ return text.split('\n').flatMap((line,index)=>{
+  if(line.trim()==='')return [];
+  try{return [v.parse(localSchema,JSON.parse(line))];}
+  catch{throw new Error(`Invalid timing observation at ${observationFile}:${index+1}`);}
+ });
+}
 /** @param {string} root @returns {v.InferOutput<typeof localSchema>[]} */
 function observationLog(root){
  /** @type {number} */let descriptor;
@@ -26,18 +37,23 @@ function observationLog(root){
  catch(error){if(error!==null&&typeof error==='object'&&'code'in error&&error.code==='ENOENT')return [];throw error;}
  try{
   if(!fstatSync(descriptor).isFile())throw new Error('Timing observations must be a regular file');
-  return readFileSync(descriptor,'utf8').split('\n').flatMap((line,index)=>{
-   if(line.trim()==='')return [];
-   try{return [v.parse(localSchema,JSON.parse(line))];}
-   catch{throw new Error(`Invalid timing observation at ${observationFile}:${index+1}`);}
-  });
+  return parseObservationLog(readFileSync(descriptor,'utf8'));
  }finally{closeSync(descriptor);}
 }
+/** @param {string} root */
+function committedObservationLog(root){
+ const entry=git(root,['ls-tree','HEAD','--',observationFile]);
+ if(entry==='')return [];
+ if(!/^100(?:644|755) blob /u.test(entry))throw new Error('Committed timing observations must be a regular file');
+ return parseObservationLog(committedText(root,observationFile));
+}
 /** Preserve legacy local and hosted facts; new local facts live in the union log.
- * @param {string} root @returns {v.InferOutput<typeof sourceSchema>} */
-const provenance=root=>{
- const legacy=v.parse(sourceSchema,JSON.parse(readFileSync(resolve(root,'test/durations-source.json'),'utf8')));
- return {...legacy,localPushObservations:[...(legacy.localPushObservations??[]),...observationLog(root)]};
+ * @param {string} root @param {boolean} [committed] @returns {v.InferOutput<typeof sourceSchema>} */
+const provenance=(root,committed=false)=>{
+ const text=committed?committedText(root,legacyFile):readFileSync(resolve(root,legacyFile),'utf8');
+ const legacy=v.parse(sourceSchema,JSON.parse(text));
+ const observations=committed?committedObservationLog(root):observationLog(root);
+ return {...legacy,localPushObservations:[...(legacy.localPushObservations??[]),...observations]};
 };
 /** @param {string} value */
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -45,10 +61,10 @@ const digest=value=>createHash('sha256').update(value).digest('hex');
 const blobAt=(root,sha,file)=>{try{return git(root,['rev-parse','--verify',`${sha}:${file}`]);}catch{return null;}};
 
 /** Numeric entries alone cannot admit a new or renamed source blob.
- * @param {string} root @param {string} file @param {'full'|'1'} ring @param {number|undefined} seconds */
-function committedTiming(root,file,ring,seconds){
+ * @param {string} root @param {string} file @param {'full'|'1'} ring @param {number|undefined} seconds @param {v.InferOutput<typeof sourceSchema>} source */
+function committedTiming(root,file,ring,seconds,source){
  if(seconds===undefined||seconds<=0||seconds>60)return false;
- const source=provenance(root),blob=git(root,['rev-parse',`HEAD:${file}`]);
+ const blob=git(root,['rev-parse',`HEAD:${file}`]);
  for(const raw of source.localPushObservations??[]){
   const parsed=v.safeParse(localSchema,raw);if(!parsed.success||parsed.output.ring!==ring)continue;
   if(parsed.output.files.some(row=>row.file===file&&row.blob===blob&&Math.abs(row.durationMs/1000-seconds)<1e-6))return true;
@@ -117,10 +133,11 @@ export function missingTestTimings(refs,root=process.cwd(),destination=process.e
  }
  if(added.size===0)return [];
  const fullFiles=inventory(root,'full'),ringFiles=inventory(root,'1'),full=weights(root,'full'),ring1=weights(root,'1');
+ const source=provenance(root,true);
  return [...added].sort((a,b)=>a.localeCompare(b)).flatMap(file=>{
   /** @type {('full'|'1')[]} */const rings=[];
-  if(fullFiles.has(resolve(root,file))&&!committedTiming(root,file,'full',full[file]))rings.push('full');
-  if(ringFiles.has(resolve(root,file))&&!committedTiming(root,file,'1',ring1[file]))rings.push('1');
+  if(fullFiles.has(resolve(root,file))&&!committedTiming(root,file,'full',full[file],source))rings.push('full');
+  if(ringFiles.has(resolve(root,file))&&!committedTiming(root,file,'1',ring1[file],source))rings.push('1');
   return rings.length===0?[]:[{file,blob:git(root,['rev-parse',`HEAD:${file}`]),rings}];
  });
 }
@@ -183,7 +200,7 @@ export function readTestTimings(directory,root=process.cwd()){
  * @param {string} directory @param {string} [root] */
 export function recordTestTimings(directory,root=process.cwd()){
  const reports=readTestTimings(directory,root);
- provenance(root);
+ const source=provenance(root);
  const observed=new Set(observationLog(root).map(row=>JSON.stringify(row)));
  // Validate every target before changing even one tracked timing table.
  const updates=reports.map(report=>{
@@ -194,7 +211,7 @@ export function recordTestTimings(directory,root=process.cwd()){
   for(const row of report.files){
    const seconds=row.durationMs/1000;
    const existing=current[row.file];
-   if(committedTiming(root,row.file,report.ring,existing)&&(!alreadyLogged||existing!==seconds))throw new Error(`Timing already recorded; refusing to overwrite ${row.file}`);
+   if(committedTiming(root,row.file,report.ring,existing,source)&&(!alreadyLogged||existing!==seconds))throw new Error(`Timing already recorded; refusing to overwrite ${row.file}`);
    if(existing!==seconds){current[row.file]=seconds;changed=true;}
   }
   return {report,current,changed,line:alreadyLogged?null:JSON.stringify(observation)};

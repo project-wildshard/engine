@@ -76,7 +76,12 @@ test('1. a new test file without a committed clock is refused; the local recorde
   const recorded = spawnSync(process.execPath, [preflightCli, 'timings', lane], { cwd: lane, env, encoding: 'utf8' });
   expect(recorded.status, recorded.stderr).toBe(0);
   expect(recorded.stdout).toContain('full:test/load-stalls.test.ts');
-  git(lane, ['commit', '--quiet', '--no-verify', '-m', 'test(ci): record the stall clock', '--', 'test/durations.json', 'test/durations-ring1.json', 'test/durations-source.json']);
+  git(lane, ['commit', '--quiet', '-m', 'test(ci): record the stall weights', '--', 'test/durations.json', 'test/durations-ring1.json']);
+  const uncommitted = check(lane);
+  expect(uncommitted.code).toBe(1);
+  expect(checks(uncommitted.report.refusals)).toEqual(['timings']);
+  git(lane, ['add', '--', 'test/durations-observations.jsonl']);
+  git(lane, ['commit', '--quiet', '-m', 'test(ci): record the stall observations', '--', 'test/durations-observations.jsonl']);
   const clean = check(lane);
   expect(clean.code).toBe(0);
   expect(clean.report.refusals).toEqual([]);
@@ -206,15 +211,19 @@ test('enqueue refuses before capture, and an override is explicit and recorded i
   expect(overridden.status, String(overridden.stderr)).toBe(0);
   const [file] = jobs();
   expect(file).toBeDefined();
-  // Wait for the fixture's worker to finish (its private rebase meets the same conflict), so the
-  // record we read has been rewritten by the worker and still carries the override.
+  // A terminal request can precede worker teardown. Keep the scratch tree until
+  // the worker has released the actual lock that spans its child lifetime.
+  const lock = join(dirname(file ?? ''), 'worker.lock');
+  const released = (): boolean => existsSync(lock)
+    && spawnSync('python3', [join(engine, 'scripts/push-queue-lock.py'), '--held', lock], { cwd: lane, env }).status === 1;
   let job: { state: string; preflight?: { override?: string; refused: string[] } } = { state: 'capturing' };
   for (const started = Date.now(); Date.now() - started < 20_000;) {
     job = JSON.parse(readFileSync(file ?? '', 'utf8')) as typeof job;
-    if (['failed', 'pushed'].includes(job.state)) break;
+    if (['failed', 'pushed'].includes(job.state) && released()) break;
     await new Promise(done => { setTimeout(done, 50); });
   }
   expect(job.state).toBe('failed');
+  expect(released()).toBe(true);
   expect(job.preflight?.override).toBe(reason);
   expect(job.preflight?.refused[0]).toMatch(/^conflicts: /u);
   // The sidecar survives a worker that predates the job field.

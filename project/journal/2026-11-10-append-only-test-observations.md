@@ -53,6 +53,14 @@ Enqueue preflight now names the observation log and the changed weight tables
 in its commit advice. Its legacy merge command still handles older branches
 carrying edits to durations-source.json.
 
+The first preflight consumer kept committing the old path, and its check
+could see an untracked observation the queue would omit. The actual CLI
+accepted committed weights with an uncommitted log. Admission now reads both
+provenance histories from HEAD and the fixture demonstrates refusal until
+the log is committed. In the same fixture, terminal job status can precede
+worker teardown. The test waits for the worker's real lock to release before
+removing its scratch tree, covering the hosted ENOTEMPTY teardown failure.
+
 The existing real timing proof, restoration refusal and annotated-tag/new-ref
 controls pass in4.31s,1.89s and2.99s respectively. These manual outer-edge
 proofs remain outside hooks. J206 review, the normal full publication gate,
