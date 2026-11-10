@@ -22,11 +22,11 @@ export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
 }
 /** The real door on a real localhost port, with its workers on this thread over real ports, the same code a worker runs. */
 export interface RoomBench { readonly url: string; readonly world: World; /** The door's HTTP server: a test may answer requests on it, as `/health` does. */ readonly server: Server; readonly room: (slug: string) => DedicatedRoom | undefined; readonly lines: Record<string, unknown>[]; readonly crashes: unknown[]; restarts: number; close: () => Promise<void> }
-export async function roomBench(options: Partial<WorldOptions> & { readonly holdMs?: number; readonly emptyMs?: number; readonly newsDelayMs?: number } = {}): Promise<RoomBench> {
-  const { holdMs, emptyMs, newsDelayMs = 0, ...door } = options, delivery = new Scope('room bench IPC'), rooms = new Map<string, DedicatedRoom>(), lines: Record<string, unknown>[] = [], crashes: unknown[] = [], stops: (() => void)[] = [], bench: { restarts: number } = { restarts: 0 };
+export async function roomBench(options: Partial<WorldOptions> & { readonly holdMs?: number; readonly emptyMs?: number; readonly newsDelayMs?: number; readonly roomNow?: () => number } = {}): Promise<RoomBench> {
+  const { holdMs, emptyMs, newsDelayMs = 0, roomNow, ...door } = options, delivery = new Scope('room bench IPC'), rooms = new Map<string, DedicatedRoom>(), lines: Record<string, unknown>[] = [], crashes: unknown[] = [], stops: (() => void)[] = [], bench: { restarts: number } = { restarts: 0 };
   const boot = (slugs: readonly string[]): WorkerLink => {
     const { port1, port2 } = new MessageChannel();
-    const held = runCells(port2 as never, { slugs, build: 'bench', bootId: () => 'bench', load: serverInput, memory: () => process.memoryUsage(), booted: (slug, room) => { rooms.set(slug, room); }, ...(holdMs === undefined ? {} : { holdMs }), ...(emptyMs === undefined ? {} : { emptyMs }),...(door.playtest===undefined?{}:{playtest:true}) });
+    const held = runCells(port2 as never, { slugs, build: 'bench', bootId: () => 'bench', load: serverInput, memory: () => process.memoryUsage(), booted: (slug, room) => { rooms.set(slug, room); }, ...(holdMs === undefined ? {} : { holdMs }), ...(emptyMs === undefined ? {} : { emptyMs }), ...(roomNow === undefined ? {} : { roomNow }),...(door.playtest===undefined?{}:{playtest:true}) });
     const stop = (): void => { held.dispose(); port1.close(); };
     stops.push(stop);
     return { send: (order, transfer = []) => { port1.postMessage(order, transfer as Transferable[]); },

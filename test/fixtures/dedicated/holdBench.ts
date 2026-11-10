@@ -19,6 +19,12 @@ interface HoldBench {
   readonly stood: ReturnType<Body['position']['clone']>;
   readonly join: (url: string, device: string, ledger?: number) => Promise<RoomBot>;
   readonly close: () => Promise<void>;
+  /** The room's hold and checkpoint clock, in ms. Ticks, sockets and silence detection keep real time. */
+  readonly roomNow: () => number;
+  /** Move the room's clock to `ms` after `from` on that clock: the outage's idle seconds pass at once. */
+  readonly roomAt: (from: number, ms: number) => void;
+  /** Resolve once the room has run its hold and checkpoint check twice on the current clock. */
+  readonly roomChecked: () => Promise<void>;
 }
 export const holdSleep = (ms: number): Promise<void> => new Promise(resolve => { setTimeout(resolve, ms); });
 export const holdUntil = (done: () => boolean, timeout = 40_000): Promise<void> => vi.waitFor(() => { expect(done()).toBe(true); }, { timeout, interval: 20 });
@@ -29,7 +35,10 @@ export function heldBody(room: DedicatedRoom): Body {
 }
 /** Each real-clock branch owns a fresh room, TCP proxy and two real clients. */
 export async function openHoldBench(): Promise<HoldBench> {
-  const bench = await roomBench(), bots: RoomBot[] = [];
+  let skew = 0;
+  const roomNow = (): number => performance.now() + skew;
+  const bench = await roomBench({ roomNow }), bots: RoomBot[] = [];
+  const roomAt = (from: number, ms: number): void => { const ahead = from + ms - roomNow(); expect(ahead, 'the room clock only moves forward').toBeGreaterThanOrEqual(0); skew += ahead; };
   let puller: TcpPuller | undefined;
   const close = async (): Promise<void> => {
     for (const bot of bots.splice(0)) bot.drop();
@@ -49,7 +58,9 @@ export async function openHoldBench(): Promise<HoldBench> {
     room.cell.owned.of(body.id).file({ grant: 'item', name: 'cape', amount: 1 });
     body.resetPose({ x: body.position.x + 2, y: body.position.y + 0.3, z: body.position.z }, 0);
     await holdSleep(300);
+    // The room checks holds every CHECK_TICKS (30) ticks: 60 ticks after a clock move, two checks have seen it.
+    const roomChecked = async (): Promise<void> => { const from = room.host.state.tick; await holdUntil(() => room.host.state.tick >= from + 60, 10_000); };
     return { bench, puller, through, a, b, room, body, full: body.health.attributes.health,
-      stood: body.position.clone(), join, close };
+      stood: body.position.clone(), join, close, roomNow, roomAt, roomChecked };
   } catch (error) { await close(); throw error; }
 }

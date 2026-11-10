@@ -27,8 +27,8 @@ export interface CellHostOptions {
   /** A fresh id for each boot of a cell, so a restarted cell can't repeat a grant. */
   readonly bootId: () => string;
   readonly load: (slug: string) => Promise<HeadlessRuntimeInput>;
-  /** A proof's overrides. */
-  readonly holdMs?: number; readonly emptyMs?: number;
+  /** A proof's overrides. `roomNow` is the rooms' hold and checkpoint clock; ticks keep real time. */
+  readonly holdMs?: number; readonly emptyMs?: number; readonly roomNow?: () => number;
   /** What this process has resident, for the reading. */
   readonly memory: () => { readonly rss: number; readonly heapUsed: number };
   /** The worker has closed: a worker exits here. */
@@ -53,7 +53,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const post = (news: WorkerNews): void => { port.postMessage(news); };
   const fail = (error: unknown): void => { clock?.pause(); post({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) }); };
   const open = async (slug: string): Promise<DedicatedRoom> => {
-    const begun = diagnosticNow(), room = await DedicatedRoom.boot({ slug, build: options.build, bootId: options.bootId(), input: await options.load(slug), now: diagnosticNow,
+    const begun = diagnosticNow(), room = await DedicatedRoom.boot({ slug, build: options.build, bootId: options.bootId(), input: await options.load(slug), now: options.roomNow ?? diagnosticNow,
       post: news => { if (news.kind === 'left' && news.seats === 0) { const cell = cells.get(slug); if (cell !== undefined) cell.emptySince = diagnosticNow(); } post({ ...news, slug }); },
       reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }),...(options.playtest===true?{playtest:row=>{post({kind:'playtest',slug,row});}}:{}) });
     post({ kind: 'cell', slug, ms: diagnosticNow() - begun });

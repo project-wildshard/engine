@@ -1,21 +1,26 @@
 import { expect, test } from 'vitest';
-import { HOLD_DEVICE, OTHER_DEVICE, HOLD_HIT, heldBody, holdSleep, holdUntil, openHoldBench } from './fixtures/dedicated/holdBench';
+import { HOLD_MS } from '../src/server/host/dedicated/cellProtocol';
+import { HOLD_DEVICE, OTHER_DEVICE, HOLD_HIT, heldBody, holdUntil, openHoldBench } from './fixtures/dedicated/holdBench';
 
-// Retained E7.3b/J114 real 40 s outage. A separate fresh session keeps the
-// original 30 s hold/expiry/return assertions below the existing 60 s file cap.
-test('40 s under: back where it stood with its saved hurt body and pack', { timeout: 150_000 }, async () => {
-  const state = await openHoldBench(), { puller, through, a, room, body, full } = state;
+// Retained E7.3b/J114 40 s outage. The real socket, proxy, silence detection and ticks run on real time; the
+// room's hold clock skips the idle seconds (VITEST-BENCH VB5), so the 30 s hold is the product's own HOLD_MS.
+test('40 s under: back where it stood with its saved hurt body and pack', { timeout: 60_000 }, async () => {
+  const state = await openHoldBench(), { puller, through, a, room, body, full, roomNow, roomAt, roomChecked } = state;
   try {
-    const then = body.position.clone(), gone = performance.now();
+    expect(HOLD_MS, 'J114: the hold is 30 s').toBe(30_000);
+    const then = body.position.clone(), gone = roomNow();
     puller.pull();
-    await holdSleep(29_000);
+    await holdUntil(() => room.holding === 1);
+    roomAt(gone, 28_000);
+    await roomChecked();
+    expect(room.holds(HOLD_DEVICE), 'still held at 28 s and two checks on').toBe(true);
     body.health.attributes.health = full - HOLD_HIT;
     await holdUntil(() => !room.holds(HOLD_DEVICE));
-    const heldFor = (performance.now() - gone) / 1000;
-    expect(heldFor, 'real time, not 33 s').toBeGreaterThan(29);
+    const heldFor = (roomNow() - gone) / 1000;
+    expect(heldFor, 'room time, not 33 s').toBeGreaterThan(29);
     expect(heldFor).toBeLessThan(31.5);
     expect(room.holds(OTHER_DEVICE), 'the other phone stays').toBe(true);
-    await holdSleep(40_000 - (performance.now() - gone));
+    roomAt(gone, 40_000);
     puller.restore();
     const returned = await state.join(through, HOLD_DEVICE, a.client.ledgerSerial);
     expect(JSON.parse(returned.resume ?? '{}').at.x).toBeCloseTo(then.x, 0);
