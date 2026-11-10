@@ -1,6 +1,7 @@
 [
  "test/net-link-play.test.ts",
  "test/engine-rule-successors.test.ts",
+ "test/engine-rule-successors-titan.test.ts",
  "src/client/engine/audio/audio-aac-pair.test.ts",
  "src/test/engine/engine-isolated-declarations.test.ts",
  "src/test/game/isolated-game-ring2-declarations.test.ts",
@@ -87,6 +88,8 @@
  "test/spawn-parts.test.ts",
  "test/standalone-acts.test.ts",
  "test/standalone-grid.test.ts",
+ "test/standalone-grid-lone.test.ts",
+ "test/standalone-grid-restore.test.ts",
  "test/standalone-page-saves.test.ts",
  "test/elite-god.test.ts",
  "test/elite-page-records.test.ts",

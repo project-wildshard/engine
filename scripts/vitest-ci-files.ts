@@ -8,6 +8,7 @@ export const CI_NATIVE_GROUPS = {
     'test/tooling/parity/browser-escape.test.mjs',
     'test/nalati-titan-verbs.test.ts',
     'test/engine-rule-successors.test.ts',
+    'test/engine-rule-successors-titan.test.ts',
   ],
   'network-rewards': [
     'test/net-fuzz.test.ts',
@@ -36,7 +37,7 @@ export const CI_NATIVE_GROUPS = {
   'nalati-awareness': ['test/nalati-awareness-verbs.test.ts'],
   'driftwood-long-session': ['test/driftwood-long-session.test.ts'],
   'open-plots-headless': ['test/physics-open-plots-headless.test.ts'],
-  'standalone-grid': ['test/standalone-grid.test.ts'],
+  'standalone-grid': ['test/standalone-grid.test.ts', 'test/standalone-grid-lone.test.ts', 'test/standalone-grid-restore.test.ts'],
   'native-routes': [
     'test/driftwood-optional-verbs.test.ts',
     'test/driftwood-trade-verbs.test.ts',
