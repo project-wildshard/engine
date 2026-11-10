@@ -546,11 +546,11 @@ async function main() {
   const option = (/** @type {string} */ name) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
   const out = resolvePath(option('out') ?? 'boot-smoke-results'); mkdirSync(out, { recursive: true });
   const external = option('url');
+  const jobs = bootJobs(option('jobs'));
   if (external === undefined && !existsSync(join(root, 'dist/index.html'))) throw new Error('Build dist before running boot smoke');
   const preview = external === undefined ? await serve(root, '', true) : null;
   const base = external ?? preview?.url;
   if (!base) throw new Error('No built preview');
-  const jobs = bootJobs(option('jobs'));
   const pool = browserPool(root, jobs, option('angle') ?? (process.platform === 'darwin' ? 'metal' : 'swiftshader'), true);
   try {
     const browser = await pool.browser(0);

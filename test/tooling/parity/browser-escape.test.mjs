@@ -27,36 +27,43 @@ import {requestNativeRetention} from '../../fixtures/native-retention.mjs';
 // BROWSER-TESTS-BENCH BB3: two cases only wait on clocks inside their own child (the 10 s endpoint deadline, the 5.1 s
 // delivery block). Their children start here, before the warm-up, and run beside every other case; each case still
 // awaits its own child and asserts the same facts. Nothing in those children reads this process's clock.
-/** @typedef {{status: number | null, signal: string | null, stdout: string, stderr: string}} ChildRun */
-/** @type {Promise<unknown>[]} */
-const earlyRuns = [];
-/** spawnSync's facts without blocking this worker: the same SIGTERM at the same timeout.
+/** @typedef {{status: number | null, signal: string | null, stdout: string, stderr: string, error: string | null}} ChildRun */
+// The original spawnSync, unchanged, inside its own small supervisor process: its timeout and SIGTERM are enforced there,
+// so a case that blocks this worker (execFileSync, spawnSync) can't stretch the child's deadline.
+const SUPERVISOR = `const {spawnSync} = require('node:child_process');
+const [args, timeout] = JSON.parse(process.argv[1]);
+const run = spawnSync(process.execPath, args, {encoding: 'utf8', timeout});
+process.stdout.write(JSON.stringify({status: run.status, signal: run.signal, stdout: run.stdout, stderr: run.stderr,
+  error: run.error === undefined ? null : String(Reflect.get(run.error, 'code') ?? run.error)}));`;
+/** spawnSync(process.execPath, args, {encoding: 'utf8', timeout, env}) without blocking this worker.
  * @param {string[]} args @param {number} timeout @param {NodeJS.ProcessEnv} [env] @returns {Promise<ChildRun>} */
 function runChild(args, timeout, env = process.env) {
-  /** @type {Promise<ChildRun>} */
-  const run = new Promise((resolveRun, reject) => {
-    const child = spawn(process.execPath, args, {env, stdio: ['pipe', 'pipe', 'pipe']});
-    child.stdin.end();
-    let stdout = '', stderr = '';
-    child.stdout.setEncoding('utf8').on('data', chunk => {stdout += chunk;});
-    child.stderr.setEncoding('utf8').on('data', chunk => {stderr += chunk;});
-    const timer = setTimeout(() => {child.kill('SIGTERM');}, timeout);
-    child.once('error', error => {clearTimeout(timer); reject(error);});
-    child.once('close', (status, signal) => {clearTimeout(timer); resolveRun({status, signal, stdout, stderr});});
+  return new Promise((resolveRun, reject) => {
+    const supervisor = spawn(process.execPath, ['-e', SUPERVISOR, JSON.stringify([args, timeout])], {env, stdio: ['ignore', 'pipe', 'inherit']});
+    let out = '';
+    supervisor.stdout.setEncoding('utf8').on('data', chunk => {out += chunk;});
+    supervisor.once('error', reject);
+    supervisor.once('close', code => {
+      if (code !== 0) {reject(new Error(`Child supervisor exited ${String(code)}`)); return;}
+      try {resolveRun(JSON.parse(out));} catch (error) {reject(error);}
+    });
   });
-  earlyRuns.push(run.catch(() => undefined));
-  return run;
 }
 /** @type {{root: string, child: Promise<ChildRun>} | undefined} */
 let endpointRun;
-/** @type {{profile: string, runs: Promise<{delay: number, result: ChildRun}[]>} | undefined} */
+/** @type {{profile: string, runs: Promise<{delay: number, result: ChildRun}[]>, checked: boolean} | undefined} */
 let deliveryRun;
-beforeAll(() => { endpointRun = startEndpointRefusal(); deliveryRun = startDelivery(); });
-beforeAll(async () => { warmNativeInventory(); await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
-// A filtered run that skips either case still waits for its child; the endpoint root is always removed, as before.
+beforeAll(() => {
+  // The delivery child's drain lists processes with the native inventory tool, so it is ready before that child starts.
+  warmNativeInventory();
+  endpointRun = startEndpointRefusal(); deliveryRun = startDelivery();
+});
+beforeAll(async () => { await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
+// A filtered run that skips either case still waits for every child it started and removes what that case would have.
 afterAll(async () => {
-  await Promise.all(earlyRuns);
+  await Promise.allSettled([endpointRun?.child, deliveryRun?.runs]);
   if (endpointRun !== undefined) rmSync(endpointRun.root, {recursive: true, force: true});
+  if (deliveryRun !== undefined && !deliveryRun.checked) rmSync(deliveryRun.profile, {recursive: true, force: true});
 }, 30_000);
 
 /** @param {number | undefined} pid */
@@ -337,12 +344,13 @@ function startDelivery() {
     }
     return results;
   })();
-  return {profile, runs};
+  return {profile, runs, checked: false};
 }
 
 test('delayed JS delivery cannot discard a completed native inventory', async () => {
   if (deliveryRun === undefined) throw new Error('Missing delivery child');
   const {profile} = deliveryRun;
+  deliveryRun.checked = true;
   let verified = false;
   try {
     for (const {delay, result} of await deliveryRun.runs) {

@@ -46,3 +46,11 @@ two children now start in a `beforeAll`, before the warm-up, and their
 cases sit last in the file and await them. Nothing in either child reads
 the worker's clock, and every assertion is unchanged. On the Mac the
 file went from 24.3 s to 10.7 s (three runs each).
+
+J206 Codex review (four MUSTs, all on BB3, all fixed): each early child
+now runs the original `spawnSync` inside its own small supervisor
+process, so a case that blocks the worker can't stretch the child's
+timeout. The native inventory tool is built before the delivery child
+starts. `afterAll` waits on the delivery chain, not on a snapshot of
+its first child. A filtered run removes the delivery profile it never
+checked. SHOULD: `--jobs` is checked before the preview server starts.
