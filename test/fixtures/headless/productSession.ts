@@ -16,10 +16,12 @@ export type ProductSessionVariant = Extract<NativeProofKind, 'driftwood' | 'drif
 const variantHosts: Readonly<Record<string, string>> = { 'driftwood': 'driftwood-isle', 'driftwood-trade': 'driftwood-isle', 'sky-verbs': 'far-reach', 'pine-verbs': 'pine-hollow', 'nine-flat': 'nine-dragon-stack', 'nalati-companions': 'nalati-grasslands', 'nalati-weapons': 'nalati-grasslands', 'nalati-predators': 'nalati-grasslands', 'nalati-world': 'nalati-grasslands', 'nalati-stealth': 'nalati-grasslands', 'nalati-verbs': 'nalati-grasslands', 'nalati-kokpar': 'nalati-grasslands', 'nalati-chapter': 'nalati-grasslands', 'nalati-king': 'nalati-grasslands', 'nalati-qara': 'nalati-grasslands', 'nalati-titan': 'nalati-grasslands', 'nalati-practice': 'nalati-grasslands' };
 
 type ProductSimulation=Pick<HeadlessSimulation,'verbTape'|'verbTapePart'|'streamVerbTape'|'journey'|'walkLeg'|'step'|'dispose'|'quarantined'|'checkpoint'>;
+export type ProductWorkerFactory=(...args:Parameters<typeof HeadlessSimulation.create>)=>Promise<ProductSimulation>;
+const defaultProductWorker:ProductWorkerFactory=(...args)=>HeadlessSimulation.create(...args);
 
 /** Start the independent replay owner while its caller records native input.
  * Readiness still awaits the same worker admission and initial checkpoint. */
-export async function beginProductSession(slug:string,variant?:ProductSessionVariant,snapshot?:string):Promise<{ready:()=>Promise<ProductSimulation>;assets:ReadonlyMap<string,Uint8Array>;product:Awaited<ReturnType<typeof loadHeadlessProduct>>}> {
+export async function beginProductSession(slug:string,variant?:ProductSessionVariant,snapshot?:string,createWorker:ProductWorkerFactory=defaultProductWorker):Promise<{ready:()=>Promise<ProductSimulation>;assets:ReadonlyMap<string,Uint8Array>;product:Awaited<ReturnType<typeof loadHeadlessProduct>>}> {
   if(variant!==undefined&&variantHosts[variant]!==slug)throw new Error('Native proof variant does not match product');
   const directory=builtProduct(slug),product=await loadHeadlessProduct(directory),source=product.shardfile;
   const descriptor=outputDescriptor(source);if(descriptor===undefined)throw new Error('Missing admitted headless inventory');
@@ -34,7 +36,7 @@ export async function beginProductSession(slug:string,variant?:ProductSessionVar
   const sections=productHeadlessSections(product);
   const nativeKinds={'driftwood-isle':'driftwood','pine-hollow':'pine','nine-dragon-stack':'nine','nalati-grasslands':'nalati'} as const;
   const nativeKind=variant??(!sections.has('sim/runtime-plan')&&(slug==='driftwood-isle'||slug==='pine-hollow'||slug==='nine-dragon-stack'||slug==='nalati-grasslands')?nativeKinds[slug]:undefined);
-  const pending=nativeKind===undefined?HeadlessSimulation.create(source,assets,snapshot,{deadline:'advisory',sections})
+  const pending=nativeKind===undefined?createWorker(source,assets,snapshot,{deadline:'advisory',sections})
     :createNativeProofWorker(source,assets,nativeKind,snapshot,sections,directory);
   // Observe failure immediately even while the caller is preparing its owner.
   const outcome=(async()=>{try{return {ok:true as const,sim:await pending};}catch(error){return {ok:false as const,error};}})();

@@ -7,13 +7,13 @@ import {ownedSetup} from './ownedSetup';
 
 // The original browser ruler keeps one world alive for each shard. In Nine,
 // the final shaft fall explicitly depends on the safe floor from prior legs.
-export function physicsShardCases(include:(slug:string)=>boolean):void {
+export function physicsShardCases(include:(slug:string)=>boolean,startSession:typeof beginProductSession=beginProductSession):void {
 for(const slug of new Set(physicsRoutes.map(row=>row.slug).filter(candidate=>candidate!=='driftwood-isle'&&include(candidate))))describe(slug,{concurrent:false,shuffle:false},()=>{
   let session:Awaited<ReturnType<typeof openProductSession>>|undefined;
   const setup=ownedSetup(async()=>{
     const start=performance.now(),phase=(name:string):void=>{console.info(JSON.stringify({diagnostic:'native-physics-setup',slug,phase:name,elapsedMs:Math.round(performance.now()-start)}));};
     phase('start');
-    const pending=await beginProductSession(slug);phase('product-and-worker-started');
+    const pending=await startSession(slug);phase('product-and-worker-started');
     const ready={sim:await pending.ready(),product:pending.product};phase('worker-ready');
     return ready;
   },async({sim})=>{
