@@ -57,3 +57,8 @@ external-only receipts, and commits actual remove/re-add and Git rename controls
 Batch dependencies remain the union in the assigned port-map batch: 68 members
 without an individual prerequisite share their batch's harness dependency.
 They are still explicitly owned; no file is retired or called qualified.
+
+A committed removal of the entire schedule previously fell back to the old
+policy. The loader now refuses that transition while any inherited files
+remain. The real Git proof exercises both the refusal and cleanup after the
+last pending file has been ported.

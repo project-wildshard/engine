@@ -59,6 +59,9 @@ export function readLiftPending(root,now){
   const batch=resolveLiftBatches(policy.batchSchedule,paths,{priorDeadline:effectiveDeadline,...(now===undefined?{}:{now}),git});
   return {owner:policy.owner,originalDeadline:policy.deadline,extended:effective!==deadline,reason:policy.reason,files:paths,...batch};
  }
+ if(paths.length>0&&git(['log','-1','--format=%H','-G','"batchSchedule"','--','test/lift-pending-policy.json'])!==''){
+  throw new Error('Cannot remove the committed CI21 batch schedule while inherited files remain');
+ }
  // Git validation can itself cross the deadline. Only an explicitly supplied
  // observation time stays fixed; the ordinary loader decides after validation.
  return {owner:policy.owner,deadline:effectiveDeadline,originalDeadline:policy.deadline,extended:effective!==deadline,reason:policy.reason,files:paths,excluded:(now??Date.now())<effective?paths:[],batches:[]};

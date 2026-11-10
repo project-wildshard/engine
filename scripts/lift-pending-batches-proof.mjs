@@ -88,6 +88,11 @@ try{
   p.batchSchedule.landings['CI21-H1']={...original,landedAt:'2026-11-16T01:00:00Z'};p.batchSchedule=dateLiftBatches(p.batchSchedule);save();run(['commit','--quiet','-am','re-add later receipt']);
   assert.throws(()=>readLiftPending(dir,Date.parse('2026-11-16T02:00:00Z')),/first committed landing/u);
  });
+ fork('schedule-removed',(dir,run,p)=>{
+  Reflect.deleteProperty(p,'batchSchedule');
+  writeFileSync(join(dir,'test/lift-pending-policy.json'),JSON.stringify(p));run(['commit','--quiet','-am','remove the entire dated schedule']);
+  assert.throws(()=>readLiftPending(dir,Date.parse('2026-11-16T02:00:00Z')),/Cannot remove the committed CI21 batch schedule/u);
+ });
  fork('rename',(dir,run,p)=>{
   run(['mv',a,'test/renamed.test.ts']);const batch=p.batchSchedule.batches[0];assert.ok(batch);batch.members=['test/renamed.test.ts'];
   const bytes=`${JSON.stringify([...files,'test/renamed.test.ts'])}\n`;p.inventorySha256=createHash('sha256').update(bytes).digest('hex');
@@ -124,5 +129,7 @@ try{
  assert.equal(read('2026-11-19T01:00:00Z').deadline,'2026-11-20T01:00:00.000Z');
  assert.throws(()=>read('2026-11-20T01:00:00Z'),/deadline missed: TWO/u);
  files=[];put();commit('2026-11-20T02:00:00Z','all tests ported');assert.equal(read('2026-12-01T00:00:00Z').excluded.length,0);
+ Reflect.deleteProperty(policy,'batchSchedule');put();commit('2026-11-20T02:01:00Z','clear completed schedule');
+ assert.equal(read('2026-12-01T00:00:00Z').files.length,0);
  console.log(JSON.stringify({actualGit:true,actualCLI:true,actualProofCache:cacheEnabled,independentBatchExpiry:true,firstLandingFrozen:true,renameAndReaddRefused:true,multiEnablerLastLanding:true,allPorted:true,wallMs:performance.now()-started}));
 }finally{rmSync(root,{recursive:true,force:true});rmSync(published,{recursive:true,force:true});}
