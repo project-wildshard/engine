@@ -482,7 +482,8 @@ export class Player {
     const buttons = (((input?.held('sprint') ?? k.has('ShiftLeft')) || this.touchSprint) ? NET_BUTTONS.sprint : 0)
       | (this.crouchWanted ? NET_BUTTONS.crouch : 0)
       | (((input?.held('dive') ?? k.has('Space')) || this.touchDive) ? NET_BUTTONS.dive : 0)
-      | (((input?.held('surface') ?? (k.has('ShiftLeft') || k.has('ShiftRight'))) || this.touchSurface) ? NET_BUTTONS.surface : 0);
+      | (((input?.held('surface') ?? (k.has('ShiftLeft') || k.has('ShiftRight'))) || this.touchSurface) ? NET_BUTTONS.surface : 0)
+      | (this.hoverBoost && isDev() ? NET_BUTTONS.boost : 0);
     return { steer: { keyX: 0, keyY: 0, stickX: move.x, stickY: move.y }, yaw: this.yaw, pitch: this.pitch, buttons };
   }
 

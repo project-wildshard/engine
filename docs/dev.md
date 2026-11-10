@@ -135,3 +135,22 @@ The ordinary owner and quest placement refusals preserve the remaining
 SDK lifetime laws. Each complete body has a 9.5-second elapsed assertion
 and timeout. Scope and page cleanup always run; the proof opens no
 browser, renderer, server or live socket.
+
+## Hover movement contract
+
+Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hover-boost.proof.mjs`.
+Three CI-only cases stay outside hooks and Vitest inventory. They use the
+real Player, actual pointer input, native Rapier and encoded client/server
+commands. Fixed expected speeds come from displacement, not a tuning
+getter. Developer-off retains the latch but refuses boost; the ordinary
+server also refuses until its standalone capability is granted. Shared
+policy coordinates are controlled inputs, not a grid crossing claim.
+Every body, listener, page and global is retired; cases include cleanup in
+both the 9.5-second timeout and elapsed assertion.
+
+The existing nightly hover phase additionally reads the actual entered
+player cap on the four padding heads, all Open Plots and Driftwood. Their
+real admitted metadata must select 30/14 respectively, before the same
+real-touch mount/unmount proof. Missing original contract heads refuse
+before running. This adds no browser launch or gameplay phase; it does
+not claim physical-phone qualification or a whole-nightly pass.

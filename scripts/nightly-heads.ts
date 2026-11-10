@@ -23,6 +23,11 @@ const {bareSlug} = await import('../src/shared/game/grid/catalogueSlot.ts');
 const [browserName, groupText, directory = 'tmp/nightly/reports', only] = process.argv.slice(2);
 if (browserName !== 'chromium' && browserName !== 'webkit') throw new Error('Choose chromium or webkit');
 const expected = plan(), selected = partition(expected.heads, Number(groupText));
+// SDK hover-row contract: inspect real admitted metadata at actual gameplay.
+const paddingProofHeads: readonly string[] = ['template', 'blender-template', 'pastel-plain', 'ink-cel-valley'];
+for (const slug of [...paddingProofHeads, 'open-plot-ember-forge', 'driftwood-isle']) {
+  if (!expected.heads.some(head => head.slug === slug)) throw new Error(`Hover contract head is missing: ${slug}`);
+}
 if (only !== undefined && !selected.some(row => row.slug === only)) throw new Error('Head outside partition');
 const out = resolvePath(directory), root = process.cwd(), dist = join(root, 'dist');
 mkdirSync(out, {recursive: true});
@@ -106,6 +111,13 @@ try {
       await phase('boot', async () => {
         const boot = await bootCase(activeBrowser, url, mode, evidence, route, true, async page => {
           await phase('hover', async () => {
+            const expectedCap = head.slug === 'driftwood-isle' ? 14 : paddingProofHeads.includes(head.slug) || head.slug.startsWith('open-plot-') ? 30 : undefined;
+            const actualCap = await page.evaluate(() => {
+              const player = window.__wildshard?.world?.player;
+              if (player === undefined) throw new Error('Hover metadata has no entered player');
+              return player.hoverSpeedLimit?.() ?? 14;
+            });
+            if (expectedCap !== undefined && actualCap !== expectedCap) throw new Error(`${head.slug}: admitted hover cap ${actualCap} differs from ${expectedCap}`);
             const control = page.locator('.ws-touch-hover');
             await control.tap({timeout: 5000});
             await page.waitForFunction(() => {
@@ -115,7 +127,7 @@ try {
             }, undefined, {timeout: 10000});
             await control.tap({timeout: 5000});
             await page.waitForFunction(() => window.__wildshard?.world?.player.hover === false, undefined, {timeout: 10000});
-            return {mounted: true, unmounted: true, input: 'real touch'};
+            return {mounted: true, unmounted: true, input: 'real touch', actualCap, expectedCap};
           });
           await phase('draw', async () => {
             // Observe completed engine frames, including shadow/post/held passes.

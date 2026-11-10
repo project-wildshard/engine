@@ -67,6 +67,9 @@ jobs:
       - name: Prove grid-owned quest dialogue lifetime
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/quest-home-lifetime.proof.mjs
+      - name: Prove hover boost through real player and server motors
+        if: needs.changes.outputs.docs != 'true'
+        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hover-boost.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'
