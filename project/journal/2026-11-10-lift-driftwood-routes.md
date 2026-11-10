@@ -19,3 +19,28 @@ exact hosted CI and Ring1 proof are still required before completion credit.
 
 One-shot review has no MUST; its SHOULD is closed by recording all eight exact
 case titles from the actual passing reporter, rather than one summary label.
+
+Actual complete-module local bootstrap clocks (not Linux observations):
+{
+  "clocksMs": {
+    "full": 3484.3267499999997,
+    "1": 3485.756624
+  },
+  "planner": [
+    {
+      "ring": "full",
+      "files": 1203,
+      "shards": 12,
+      "maximumSeconds": 227.13839949265002
+    },
+    {
+      "ring": "1",
+      "files": 1118,
+      "shards": 8,
+      "maximumSeconds": 225.41552396844997
+    }
+  ]
+}
+Both reports bind the unchanged test blob, committed tree and completed zero
+process exit; no skipped or absent cases are used as timing evidence. Existing
+60s file/300s shard budgets, factor1.35, setup70s and20% headroom are unchanged.

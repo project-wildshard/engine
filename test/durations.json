@@ -982,6 +982,7 @@
   "test/phone-loading.test.ts": 0.6121738639999998,
   "test/phone-route.test.ts": 0.8410916609999999,
   "test/physics-grid-admission.test.ts": 0.05675771700000001,
+  "test/physics-headless.test.ts": 3.4843267499999997,
   "test/physics-nalati-headless.test.ts": 37.37430991600001,
   "test/physics-native-cli.test.ts": 0.10798895499999996,
   "test/physics-open-plots-headless.test.ts": 48.139192371,
