@@ -35,7 +35,7 @@ from pathlib import Path
 assert json.loads(Path('boot-dist-plan.json').read_text()) == {'plan':'exact'}
 assert sys.argv[1:] == ['pack','--sha',os.environ['GITHUB_SHA'],'--run','123']
 Path('boot-start').touch()
-if 'BARRIER' in os.environ: urllib.request.urlopen(os.environ['BARRIER']+'/boot',timeout=3).read()
+if 'BARRIER' in os.environ: urllib.request.urlopen(os.environ['BARRIER']+'/boot').read()
 if os.environ.get('FAIL_BOOT_LATE'): raise SystemExit(25)
 if os.environ.get('FAIL_BOOT'): raise SystemExit(23)
 Path('boot-done').touch()
@@ -43,7 +43,10 @@ print('original boot pack')
 ''')
         self.put('scripts/build-vercel-output.mjs', '''import{existsSync,writeFileSync}from'node:fs';
 if(!existsSync('pull-done'))throw Error('packaging raced Vercel setup');
-if(process.env.BOOT_BUILD_BARRIER)await fetch(process.env.BARRIER+'/vercel-build');
+if(process.env.BOOT_BUILD_BARRIER){
+ const response=await fetch(process.env.BARRIER+'/vercel-build');
+ if(!response.ok)throw Error('Release pack rendezvous cancelled');
+}
 writeFileSync('vercel-built','exact dist');console.log('original Vercel build');''')
         self.put('scripts/prebuilt-output.py', '''import os,sys
 from pathlib import Path
@@ -58,7 +61,7 @@ from pathlib import Path
 assert sys.argv[1:] == ['install','--global','vercel@59.11.2']
 Path('npm-start').touch()
 count=Path('npm-count');count.write_text(str(int(count.read_text())+1 if count.exists() else 1))
-if 'BARRIER' in os.environ and not os.environ.get('BOOT_BUILD_BARRIER'): urllib.request.urlopen(os.environ['BARRIER']+'/npm',timeout=3).read()
+if 'BARRIER' in os.environ and not os.environ.get('BOOT_BUILD_BARRIER'): urllib.request.urlopen(os.environ['BARRIER']+'/npm').read()
 if os.environ.get('FAIL_NPM'): raise SystemExit(24)
 if os.environ.get('WAIT_NPM'):
  import time
@@ -90,14 +93,22 @@ Path('pull-done').touch()
     def barrier(self):
         arrived = set()
         condition = threading.Condition()
+        cancelled = False
+
+        def cancel():
+            nonlocal cancelled
+            with condition:
+                cancelled = True
+                condition.notify_all()
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
                 with condition:
                     arrived.add(self.path)
                     condition.notify_all()
-                    ready = condition.wait_for(lambda: len(arrived) == 2, timeout=3)
-                self.send_response(200 if ready else 500)
+                    condition.wait_for(lambda: len(arrived) == 2 or cancelled)
+                    ready = not cancelled
+                self.send_response(200 if ready else 503)
                 self.end_headers()
                 self.wfile.write(b'paired' if ready else b'not concurrent')
 
@@ -105,16 +116,31 @@ Path('pull-done').touch()
                 pass
 
         server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.05}, daemon=True)
         thread.start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
+        self.addCleanup(cancel)
         self.env['BARRIER'] = f'http://127.0.0.1:{server.server_port}'
         return arrived
 
     def run_pack(self, *args):
-        result = subprocess.run(['node', str(SCRIPT), '--sha', self.sha, '--run', '123', *args],
-                                cwd=self.root, env=self.env, capture_output=True, text=True, timeout=12)
+        command = ['node', str(SCRIPT), '--sha', self.sha, '--run', '123', *args]
+        with subprocess.Popen(command, cwd=self.root, env=self.env, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, text=True) as producer:
+            try:
+                stdout, stderr = producer.communicate(timeout=12)
+            except subprocess.TimeoutExpired:
+                # Preserve the producer deadline and let its signal handler drain
+                # detached tool groups before the fixture closes the rendezvous.
+                producer.terminate()
+                try:
+                    producer.communicate(timeout=2)
+                except subprocess.TimeoutExpired:
+                    producer.kill()
+                    producer.communicate()
+                raise
+        result = subprocess.CompletedProcess(command, producer.returncode, stdout, stderr)
         self.assertNotIn('fixture-token', result.stdout + result.stderr)
         return result
 
