@@ -81,3 +81,22 @@ Oxlint on the same configured staged scope, full typecheck and format;
 unknown/missing/non-generated empty selections retain the full fallback.
 No ignore configuration, eight-second cap or full publication gate is
 changed. Regenerate all 26 recovered rows and official revisions.
+
+Exact c342 native Safari reaches Driftwood loader-complete and the first
+game step in its actual IMG fallback. Pine then fails at Spawn detail:
+native Network shows three NPC phone GLBs receiving preview HTML. Those
+URLs are native texture-map source keys outside the boot file lists.
+The whole 28-product, both-tier native model census finds 52 omitted
+original GLBs (Pine/Nalati), 13,773,624 bytes, largest 1,146,512 bytes.
+They are byte-exact public Git blobs in the frozen source 5f70a2dfe4;
+several originals intentionally are not tracked in the split producers.
+
+Pin those originals by immutable public commit/path/SHA-256/length/Git
+blob, downloading into the existing pins cache before any mount ledger
+change. Streams refuse oversized/corrupt bytes; held bytes are rechecked.
+This adds metadata, not 14 MB of duplicate Git binary. No archive,
+admission evidence, source hash, cap, renderer or oracle changes. The
+build guard now covers native model source keys as well as boot images.
+Unused non-model GPU aliases are outside that model claim. The real
+HTTP corruption/cache proof and native-key absence proof bring focused
+checks to 16 cases under one second. Native final closure remains pending.

@@ -10,25 +10,33 @@ import {pinnedPublicAssets} from '../pin-assets.ts';
  * @param {string} root @param {string} publication */
 export function checkBakedTextures(root, publication) {
   const products = resolve(root, 'out'), publicRoot = resolve(publication);
-  const pinned = new Map(pinnedPublicAssets(root).map(row => [row.url, row.body]));
   /** @type {Set<string>} */
   const declared = new Set();
   if (!existsSync(products)) return 0;
+  const owners = [];
+  for (const entry of readdirSync(products, {withFileTypes: true})) {
+    const file = join(products, entry.name, 'shard.json');
+    if (!entry.isDirectory() || entry.name.startsWith('.') || !existsSync(file)) continue;
+    /** @type {{identity?: {slug?: string}}} */
+    const product = JSON.parse(readFileSync(file, 'utf8'));
+    if (typeof product.identity?.slug === 'string') owners.push(product.identity.slug);
+  }
+  const pinned = new Map(pinnedPublicAssets(root, owners.length === 0 ? undefined : owners).map(row => [row.url, row.body]));
   for (const entry of readdirSync(products, {withFileTypes: true})) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
     const discovery = join(products, entry.name, 'mounts/shardfiles', entry.name, 'discovery.json');
     if (!existsSync(join(products, entry.name, 'shard.json')) || !existsSync(discovery)) continue;
-    /** @type {{rows?: {bootBindings?: unknown}}} */
+    /** @type {{rows?: {bootBindings?: unknown}, native?: {ktx2?: unknown}}} */
     const document = JSON.parse(readFileSync(discovery, 'utf8'));
-    /** @type {unknown[]} */
-    const pending = [document.rows?.bootBindings];
+    const pending = [{value: document.rows?.bootBindings, modelsOnly: false}, {value: document.native?.ktx2, modelsOnly: true}];
     while (pending.length > 0) {
-      const value = pending.pop();
-      if (typeof value === 'string' && (/^\/assets\/.+\.(?:png|jpe?g|webp|hdr|avif)$/u.test(value)
+      const current = pending.pop();if (current === undefined) break;
+      const item = current.value, value = typeof item === 'string' ? item.split('#')[0] : item;
+      if (typeof value === 'string' && (!current.modelsOnly && /^\/assets\/.+\.(?:png|jpe?g|webp|hdr|avif)$/u.test(value)
         || /^\/assets\/.+\.(?:glb|gltf)$/u.test(value) && !value.startsWith('/assets/gpu/') && !value.includes('/astc6/')
-        || /^\/assets\/(?:gpu\/)?baked\/[^/]+\/.+\.ktx2$/u.test(value))) declared.add(value);
-      else if (Array.isArray(value)) pending.push(...value);
-      else if (value !== null && typeof value === 'object') pending.push(...Object.keys(value), ...Object.values(value));
+        || !current.modelsOnly && /^\/assets\/(?:gpu\/)?baked\/[^/]+\/.+\.ktx2$/u.test(value))) declared.add(value);
+      else if (Array.isArray(value)) pending.push(...value.map(child => ({value: child, modelsOnly: current.modelsOnly})));
+      else if (value !== null && typeof value === 'object') pending.push(...[...Object.keys(value), ...Object.values(value)].map(child => ({value: child, modelsOnly: current.modelsOnly})));
     }
   }
   const missing = [];

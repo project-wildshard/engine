@@ -35,7 +35,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 import type { PackedIndex } from './pin-packs.ts';
-import { pinnedPublicAssets } from './pin-assets.ts';
+import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 
 interface Pin { readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number }
 interface PinFile { readonly api: string; readonly shards: readonly Pin[] }
@@ -188,6 +188,7 @@ async function install(only: readonly string[]): Promise<void> {
   await prepareAssetDecoders();
   const { shards } = readJson(PINS) as PinFile;
   const pins = only.length === 0 ? shards : shards.filter(row => only.includes(row.slug));
+  await fetchPinnedPublicAssets(process.cwd(), pins.map(row => row.slug));
   const publicAssets = pinnedPublicAssets(process.cwd(), pins.map(row => row.slug));
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
   if (unknown.length > 0) throw new Error(`Not pinned: ${unknown.join(', ')}`);

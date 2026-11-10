@@ -92,3 +92,11 @@ bridge pin when refreshing to a product that carries the same URL; a
 different body is a hard publication collision, never an override. The
 app build checks every declared baked texture mode before bundling and
 again in final output, including the native image fallback.
+
+Larger original model fallbacks use `remote: true` pins from an immutable
+public producer commit (including the frozen singleplayer source). The
+installer downloads them to the normal pins cache, bounds the stream to
+the declared length, and verifies SHA-256 plus the source Git blob before
+publication. No mutable branch, token or private checkout is needed.
+Native model-map source keys are checked as well as the boot file lists;
+CPU model fallbacks must survive final output pruning too.

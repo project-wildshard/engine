@@ -338,6 +338,734 @@
         "path": "public/assets/models/pine-hollow-hero/waystone-lod1/waystone-lod1.glb",
         "blob": "2ebe0ec949221f4df66c1151ac759c6173acefa6"
       }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/balbal.glb",
+      "file": "test/pins/assets/ba0254671c68d3be18e63c331c6751b456fd083017220845b74a8534040fa6f6.glb",
+      "sha256": "ba0254671c68d3be18e63c331c6751b456fd083017220845b74a8534040fa6f6",
+      "bytes": 200076,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/balbal.glb",
+        "blob": "272a09effd7fcb0b50102b73d4181fcbc1b3d658"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/balbal.phone.glb",
+      "file": "test/pins/assets/ff919ac5cd5b5ff5df10179abafa8c2e7881b9b9b70888c08750fc0448c5a4b9.glb",
+      "sha256": "ff919ac5cd5b5ff5df10179abafa8c2e7881b9b9b70888c08750fc0448c5a4b9",
+      "bytes": 80628,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/balbal.phone.glb",
+        "blob": "9f08d248d095152245c98b95cd161d66cd906cec"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/boulder-1.glb",
+      "file": "test/pins/assets/ece5eb37ef73665e14f9065f4d5e610633ed3fe84f90d8fd1d52792b08ea52b9.glb",
+      "sha256": "ece5eb37ef73665e14f9065f4d5e610633ed3fe84f90d8fd1d52792b08ea52b9",
+      "bytes": 78320,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/boulder-1.glb",
+        "blob": "375812877a58d9f79811762d5c3be2b44d875102"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/boulder-1.phone.glb",
+      "file": "test/pins/assets/5feadbc83f2ea4cf0a9448e80b18c3ccf348ea05b35c0be444ab706031f4beb3.glb",
+      "sha256": "5feadbc83f2ea4cf0a9448e80b18c3ccf348ea05b35c0be444ab706031f4beb3",
+      "bytes": 33672,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/boulder-1.phone.glb",
+        "blob": "969008ad41b06f6846c308aed6e9cb4dc6fe1380"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/boulder-2.glb",
+      "file": "test/pins/assets/57b29fa18e264edf7eda56cd79e81cff6f7093164a47deba205b09e7a9969b23.glb",
+      "sha256": "57b29fa18e264edf7eda56cd79e81cff6f7093164a47deba205b09e7a9969b23",
+      "bytes": 55620,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/boulder-2.glb",
+        "blob": "1aa7724fde3d5a164d21af948b87b57ae502a799"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/boulder-2.phone.glb",
+      "file": "test/pins/assets/91342483b61bdce3baefe71596dd88d95ba986d83019d048b05d5473e7526376.glb",
+      "sha256": "91342483b61bdce3baefe71596dd88d95ba986d83019d048b05d5473e7526376",
+      "bytes": 24844,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/boulder-2.phone.glb",
+        "blob": "529cba2b20bd8883b09e0d4617a257d656d94cc9"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/boulder-3.glb",
+      "file": "test/pins/assets/875dc112f1b8173819cc700d610296fd308053fd801e8e7e5b8434e5fcd7e633.glb",
+      "sha256": "875dc112f1b8173819cc700d610296fd308053fd801e8e7e5b8434e5fcd7e633",
+      "bytes": 56116,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/boulder-3.glb",
+        "blob": "31e335e1417f070fa683b6e7a38a9142e4fdf095"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/boulder-3.phone.glb",
+      "file": "test/pins/assets/24b13f577cc8704f5ede2713f86f2300c3001fe58aceebac3e61ab0d9fb64df7.glb",
+      "sha256": "24b13f577cc8704f5ede2713f86f2300c3001fe58aceebac3e61ab0d9fb64df7",
+      "bytes": 25216,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/boulder-3.phone.glb",
+        "blob": "4c0bfd56a49290fc5f125f50ce6a7b84c42bc86d"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/cauldron.glb",
+      "file": "test/pins/assets/57538e183f3081f85fd4b5d746375e091696f3e20b689ac9e796f043d2184872.glb",
+      "sha256": "57538e183f3081f85fd4b5d746375e091696f3e20b689ac9e796f043d2184872",
+      "bytes": 254976,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/cauldron.glb",
+        "blob": "e5847ec6cb8a8cca11cd0d1afe534a8f4628973c"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/cauldron.phone.glb",
+      "file": "test/pins/assets/c024f3903947cdfb9acc993b7e6f9c753675609f78fb6373d28f10a472569b37.glb",
+      "sha256": "c024f3903947cdfb9acc993b7e6f9c753675609f78fb6373d28f10a472569b37",
+      "bytes": 99288,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/cauldron.phone.glb",
+        "blob": "20e9e1671d32ef828c34391d029f9c4abb7ea817"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/chest.glb",
+      "file": "test/pins/assets/f694f58553c70c938225e03443fe4f42c39ee6cd11074890ac46e04c43005d31.glb",
+      "sha256": "f694f58553c70c938225e03443fe4f42c39ee6cd11074890ac46e04c43005d31",
+      "bytes": 285976,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/chest.glb",
+        "blob": "c520bc4af7632fa08a6832552d8bb208547d8bd0"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/chest.phone.glb",
+      "file": "test/pins/assets/f1c59dbcd82f4a47ef081c48932a08af002b60cf9f0df616604c18fe5f0e914f.glb",
+      "sha256": "f1c59dbcd82f4a47ef081c48932a08af002b60cf9f0df616604c18fe5f0e914f",
+      "bytes": 104028,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/chest.phone.glb",
+        "blob": "057a38a0e2b56db178b12aab4fd9d62579866598"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/eagle.glb",
+      "file": "test/pins/assets/ec7ab8e398a5c7cc711a30221f5988b02eddb2a941b169f6d3c9f231fda65b6e.glb",
+      "sha256": "ec7ab8e398a5c7cc711a30221f5988b02eddb2a941b169f6d3c9f231fda65b6e",
+      "bytes": 323772,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/eagle.glb",
+        "blob": "fcaeb36788b29c02df4cf9defe5544ce55dbfc13"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/eagle.phone.glb",
+      "file": "test/pins/assets/5e7f80dbad21caa4d078247e954d6fd50e8a45265944526027ffbf863695d045.glb",
+      "sha256": "5e7f80dbad21caa4d078247e954d6fd50e8a45265944526027ffbf863695d045",
+      "bytes": 158760,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/eagle.phone.glb",
+        "blob": "879c52e50399bbd4420edab203fdb739338373bb"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/firewood.glb",
+      "file": "test/pins/assets/a97deaa4c0938546a20553904020c53922fc3e7335012c10c4cefeff29472b00.glb",
+      "sha256": "a97deaa4c0938546a20553904020c53922fc3e7335012c10c4cefeff29472b00",
+      "bytes": 356708,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/firewood.glb",
+        "blob": "3d269604e017398a880ccd559d6f7da097f2fd05"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/firewood.phone.glb",
+      "file": "test/pins/assets/e0ca248fe088e66adb11f30b7a395da0e5ca8ce5a7eb81a3285c1c3e7babbf47.glb",
+      "sha256": "e0ca248fe088e66adb11f30b7a395da0e5ca8ce5a7eb81a3285c1c3e7babbf47",
+      "bytes": 121408,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/firewood.phone.glb",
+        "blob": "fd4d957ec5b3a3301afa60a6a8a93ddc2034764a"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/horse-saddled.glb",
+      "file": "test/pins/assets/ce8600d883704b5df03e13033e04f95f26e59ac4149a8db2eec5f8541d7ef4f6.glb",
+      "sha256": "ce8600d883704b5df03e13033e04f95f26e59ac4149a8db2eec5f8541d7ef4f6",
+      "bytes": 210524,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/horse-saddled.glb",
+        "blob": "ff39bbeaf37f580dab5123188cf83c22d1f86aa0"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/horse-saddled.phone.glb",
+      "file": "test/pins/assets/20c769be06fcb81d975213493844ca96fd4651398a4076409ce3e8fd1cb9af40.glb",
+      "sha256": "20c769be06fcb81d975213493844ca96fd4651398a4076409ce3e8fd1cb9af40",
+      "bytes": 146840,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/horse-saddled.phone.glb",
+        "blob": "7c586afad683fb120578a6442861e4d181448253"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/kokpar-rider.glb",
+      "file": "test/pins/assets/17a1f677890a8d444c7af0ab5c8bc5344b47e3ffb72370053e4c11c08962aa00.glb",
+      "sha256": "17a1f677890a8d444c7af0ab5c8bc5344b47e3ffb72370053e4c11c08962aa00",
+      "bytes": 245388,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/kokpar-rider.glb",
+        "blob": "a67e5dea4b50a8a3eacb2c36947eadad4d5ed0ce"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/kokpar-rider.phone.glb",
+      "file": "test/pins/assets/91a79b300dfd08596f39147b41f8af2f45b962d0d7d412cac760039444129597.glb",
+      "sha256": "91a79b300dfd08596f39147b41f8af2f45b962d0d7d412cac760039444129597",
+      "bytes": 170376,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/kokpar-rider.phone.glb",
+        "blob": "50f4db96a1d9eda75c342ccc59a0463d552954e3"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/kumis-churn.glb",
+      "file": "test/pins/assets/f5cd5f96e4c1222df72607eb64cc47f054680b5147417545773facc7796ce05d.glb",
+      "sha256": "f5cd5f96e4c1222df72607eb64cc47f054680b5147417545773facc7796ce05d",
+      "bytes": 267824,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/kumis-churn.glb",
+        "blob": "b3c6900ae530ea8a861d16039c9ea599db4892f8"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/kumis-churn.phone.glb",
+      "file": "test/pins/assets/6ee6c606a139e1498d2354551dd4642359c333fd36170cc7d0d07501c84bb9a1.glb",
+      "sha256": "6ee6c606a139e1498d2354551dd4642359c333fd36170cc7d0d07501c84bb9a1",
+      "bytes": 107344,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/kumis-churn.phone.glb",
+        "blob": "75ab5032092ec9e9c9b8752bbfe3f8a38633b9a0"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/saddle.glb",
+      "file": "test/pins/assets/a136b48113c3cbf08aadc92e84027533d37b5c530a7991bc06676827b72f8934.glb",
+      "sha256": "a136b48113c3cbf08aadc92e84027533d37b5c530a7991bc06676827b72f8934",
+      "bytes": 286028,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/saddle.glb",
+        "blob": "eb35f58b9ce72b98b0f78a0c9c7ebfdc5aaa5cbc"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/saddle.phone.glb",
+      "file": "test/pins/assets/2514f61e03bfc58d92c2376f9ceff2461abdbf166be68f8676c4d33e1e72fa6d.glb",
+      "sha256": "2514f61e03bfc58d92c2376f9ceff2461abdbf166be68f8676c4d33e1e72fa6d",
+      "bytes": 108832,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/saddle.phone.glb",
+        "blob": "76c5ffedf960b362ec4d93116f04ec02ae7b4444"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/snow-lotus.glb",
+      "file": "test/pins/assets/51e4fc8949f32a4846a746cfd982500908a33d395a34b2b4e19d14fc98b1f454.glb",
+      "sha256": "51e4fc8949f32a4846a746cfd982500908a33d395a34b2b4e19d14fc98b1f454",
+      "bytes": 371208,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/snow-lotus.glb",
+        "blob": "6501a663e16cb45e8e0f942dcad3bfd80b47a12d"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/snow-lotus.phone.glb",
+      "file": "test/pins/assets/759dfba0194f8128a5a80ecdbe62360f0a069c339969cc05d85d2ce4eaeedf2d.glb",
+      "sha256": "759dfba0194f8128a5a80ecdbe62360f0a069c339969cc05d85d2ce4eaeedf2d",
+      "bytes": 163120,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/snow-lotus.phone.glb",
+        "blob": "1b3b071c7d3cd58a27ad466dc4f7caf2ddb8f2f6"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/watchtower.glb",
+      "file": "test/pins/assets/67877b602702bfb226333a7aa135a0b25fa65f84cb0b7893174855fafcafb1b0.glb",
+      "sha256": "67877b602702bfb226333a7aa135a0b25fa65f84cb0b7893174855fafcafb1b0",
+      "bytes": 165464,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/watchtower.glb",
+        "blob": "52c68a9de45e428f105cddd09c10cbef7d8a4de6"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/nalati/models/watchtower.phone.glb",
+      "file": "test/pins/assets/56b3184d8e3c7fe5e40237e6b36bae39aedb012db7fe4a2ec4699da531083f63.glb",
+      "sha256": "56b3184d8e3c7fe5e40237e6b36bae39aedb012db7fe4a2ec4699da531083f63",
+      "bytes": 99376,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/nalati/models/watchtower.phone.glb",
+        "blob": "18d548b981a26f967ed92a5e7944ae7470d8c641"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/antler-king-rig.phone.rigged.glb",
+      "file": "test/pins/assets/c7a49f19e33504322c060e8e35cd941d5abebfaaa7f0dee9278849fc897bbf81.glb",
+      "sha256": "c7a49f19e33504322c060e8e35cd941d5abebfaaa7f0dee9278849fc897bbf81",
+      "bytes": 743584,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/antler-king-rig.phone.rigged.glb",
+        "blob": "9924171f0e4722adc80a01aad37ac72dfbc9b176"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/antler-king-rig.rigged.glb",
+      "file": "test/pins/assets/33df94fae9fd53b82f73abfb0983d38b8139274fc151760f287ab700c2ed7c38.glb",
+      "sha256": "33df94fae9fd53b82f73abfb0983d38b8139274fc151760f287ab700c2ed7c38",
+      "bytes": 1146512,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/antler-king-rig.rigged.glb",
+        "blob": "1f694ab185ae89df66449d1e96b9401f507cf4b2"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/bear-black.phone.rigged.glb",
+      "file": "test/pins/assets/84fca44ef170f1ec68a3f026f65243547bc7801fd168f11a3f308ebd9a8e9b00.glb",
+      "sha256": "84fca44ef170f1ec68a3f026f65243547bc7801fd168f11a3f308ebd9a8e9b00",
+      "bytes": 239144,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/bear-black.phone.rigged.glb",
+        "blob": "07f0a0ae3b28ad05670af6524c96729d7bc91d44"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/bear-black.rigged.glb",
+      "file": "test/pins/assets/a8b18bdeb90f014c2f3b0b23a14c78139c4fba353d91235774459242b6ec308d.glb",
+      "sha256": "a8b18bdeb90f014c2f3b0b23a14c78139c4fba353d91235774459242b6ec308d",
+      "bytes": 421008,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/bear-black.rigged.glb",
+        "blob": "ceabb3c99edc71ae4017b5d9b843de769a42dadc"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/bear-brown.phone.rigged.glb",
+      "file": "test/pins/assets/b1d58d5376a46bf688449001ad894d98e856783bedfc822623a43d223cb8e953.glb",
+      "sha256": "b1d58d5376a46bf688449001ad894d98e856783bedfc822623a43d223cb8e953",
+      "bytes": 318676,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/bear-brown.phone.rigged.glb",
+        "blob": "43b20184e793e952165df91be575d7350c741a04"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/bear-brown.rigged.glb",
+      "file": "test/pins/assets/57010786295d67b9987c7686bef8c9db9a76737482072d36a5c3ccedea842a82.glb",
+      "sha256": "57010786295d67b9987c7686bef8c9db9a76737482072d36a5c3ccedea842a82",
+      "bytes": 569804,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/bear-brown.rigged.glb",
+        "blob": "41104902ea0468137a67f7e61d9b981a2f15466a"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/boar.phone.rigged.glb",
+      "file": "test/pins/assets/ba0ab60acbfc6d4bf93d136df907cbd406d49e96472982defe72afaa91e75b5f.glb",
+      "sha256": "ba0ab60acbfc6d4bf93d136df907cbd406d49e96472982defe72afaa91e75b5f",
+      "bytes": 277216,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/boar.phone.rigged.glb",
+        "blob": "63b1fcc7cec9dea0db84b1563c9e82e6cf1ac83b"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/boar.rigged.glb",
+      "file": "test/pins/assets/530418e559715198f4b8323149ca829ab965d5e13afdedbaa9c57f56eb33c020.glb",
+      "sha256": "530418e559715198f4b8323149ca829ab965d5e13afdedbaa9c57f56eb33c020",
+      "bytes": 518256,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/boar.rigged.glb",
+        "blob": "a10df50cab357e77798630b92f8e6ab2418043dc"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/deer-hind.phone.rigged.glb",
+      "file": "test/pins/assets/235822651c7ebe85a03aed3c18dd7deb450e845138a199c38eaaf80ad31ca579.glb",
+      "sha256": "235822651c7ebe85a03aed3c18dd7deb450e845138a199c38eaaf80ad31ca579",
+      "bytes": 175452,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/deer-hind.phone.rigged.glb",
+        "blob": "dbfe628d1c211bdbe81d94d8862b91bc316a22f7"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/deer-hind.rigged.glb",
+      "file": "test/pins/assets/ee60283c07a233847a4523cbf41d9f6229d8958252707b9b82d6db2d55bfd2fc.glb",
+      "sha256": "ee60283c07a233847a4523cbf41d9f6229d8958252707b9b82d6db2d55bfd2fc",
+      "bytes": 313740,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/deer-hind.rigged.glb",
+        "blob": "1b14541030706b4429e21beb3e7c2c4cd92b7786"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/deer-stag.phone.rigged.glb",
+      "file": "test/pins/assets/76a05e0cfd77d1ed44a7e4309fd8fe2dc96b99e5b604d0e5af80f97f2f66c1c4.glb",
+      "sha256": "76a05e0cfd77d1ed44a7e4309fd8fe2dc96b99e5b604d0e5af80f97f2f66c1c4",
+      "bytes": 225444,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/deer-stag.phone.rigged.glb",
+        "blob": "18c1601c45e1665d4d543d6d4193ed8f77fabf06"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/deer-stag.rigged.glb",
+      "file": "test/pins/assets/b9c3b668deeb31595909a28eed84e39beb72035678c81d6666fa8b494b4ce8ca.glb",
+      "sha256": "b9c3b668deeb31595909a28eed84e39beb72035678c81d6666fa8b494b4ce8ca",
+      "bytes": 413876,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/deer-stag.rigged.glb",
+        "blob": "93d6ffa5abd079057e07b19e6ded850ed5136467"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/elk-bull.phone.rigged.glb",
+      "file": "test/pins/assets/1dd873de9168663ee884cbd03fff2578c242a6fd2b263b3ab1239f338dccaa4b.glb",
+      "sha256": "1dd873de9168663ee884cbd03fff2578c242a6fd2b263b3ab1239f338dccaa4b",
+      "bytes": 278684,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/elk-bull.phone.rigged.glb",
+        "blob": "2c787e13ee66529df5da1478b9c005c10d8f7c04"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/elk-bull.rigged.glb",
+      "file": "test/pins/assets/03ab1b08e47242701f6296e1c6b4856385b5d103ac4f1166e5371ad98d0f0c14.glb",
+      "sha256": "03ab1b08e47242701f6296e1c6b4856385b5d103ac4f1166e5371ad98d0f0c14",
+      "bytes": 485516,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/elk-bull.rigged.glb",
+        "blob": "17063e96c89b5cb7115894a548b8f29a16c5e3de"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/elk-cow.phone.rigged.glb",
+      "file": "test/pins/assets/69b03cc5bb3f5f048c6036614ce65af10fd058c6ca2ab90d6a09236fec4653a3.glb",
+      "sha256": "69b03cc5bb3f5f048c6036614ce65af10fd058c6ca2ab90d6a09236fec4653a3",
+      "bytes": 199684,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/elk-cow.phone.rigged.glb",
+        "blob": "774920c9a406ddfbdd24463607f5ae96f4bb20d0"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/creatures/elk-cow.rigged.glb",
+      "file": "test/pins/assets/1518e332b520d231dd5e42abb361af4f0ace1fff4698d22ef566d965d3b71b8a.glb",
+      "sha256": "1518e332b520d231dd5e42abb361af4f0ace1fff4698d22ef566d965d3b71b8a",
+      "bytes": 375380,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/creatures/elk-cow.rigged.glb",
+        "blob": "715923e407f65692137513d16d48fd30b80da661"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/life/birds.glb",
+      "file": "test/pins/assets/08056074572b5332d85b58cc0c0591b24a3ab06af2ff80e301cd45cc0574491c.glb",
+      "sha256": "08056074572b5332d85b58cc0c0591b24a3ab06af2ff80e301cd45cc0574491c",
+      "bytes": 282432,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/life/birds.glb",
+        "blob": "cee15c13afaec5b7c5290fc702f1e6672c0ff118"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/life/birds.phone.glb",
+      "file": "test/pins/assets/564c88fc197dd1082765e8067a0ba5aaa6ad8678a6a0688a551a2c0abff3f411.glb",
+      "sha256": "564c88fc197dd1082765e8067a0ba5aaa6ad8678a6a0688a551a2c0abff3f411",
+      "bytes": 275124,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/life/birds.phone.glb",
+        "blob": "7b549157ef51cd6dcdf3584944ea0e289f0c4f92"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/npcs/miller.glb",
+      "file": "test/pins/assets/b5714444b736d9cbfe41cdb8c73c723d0d7f50d56c114a7d9427a84f1a6552e0.glb",
+      "sha256": "b5714444b736d9cbfe41cdb8c73c723d0d7f50d56c114a7d9427a84f1a6552e0",
+      "bytes": 396648,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/npcs/miller.glb",
+        "blob": "44ad060b9b364f497e6e60dccc66520f329fe057"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/npcs/miller.phone.glb",
+      "file": "test/pins/assets/c6f0608d5b7dcfa9fb29d0ace162e5f3b54eae8325cb0c4fb32de93d638f4cc0.glb",
+      "sha256": "c6f0608d5b7dcfa9fb29d0ace162e5f3b54eae8325cb0c4fb32de93d638f4cc0",
+      "bytes": 202808,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/npcs/miller.phone.glb",
+        "blob": "285c265b23a65ceb3517a00272a6a8cd4b0df608"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/npcs/ranger.glb",
+      "file": "test/pins/assets/4c9a460dfe4a6f589ae50e300c588d847368c1328e4a1640649bcf8e17c0de4d.glb",
+      "sha256": "4c9a460dfe4a6f589ae50e300c588d847368c1328e4a1640649bcf8e17c0de4d",
+      "bytes": 434044,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/npcs/ranger.glb",
+        "blob": "390864392dddb49f0098464c62fd00c971591eec"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/npcs/ranger.phone.glb",
+      "file": "test/pins/assets/c8ec12a652332bd22a0b76368d8166b1f35e46b4814e01bccf2452c4d6a69fbf.glb",
+      "sha256": "c8ec12a652332bd22a0b76368d8166b1f35e46b4814e01bccf2452c4d6a69fbf",
+      "bytes": 219608,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/npcs/ranger.phone.glb",
+        "blob": "be48b023e68b0cb62286252922b1f15708ef8f7d"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/npcs/trader.glb",
+      "file": "test/pins/assets/24a36ef0c4fc7ad46501b7f29b22e07d2af3e746002539a33fbb3f5cdd5bb006.glb",
+      "sha256": "24a36ef0c4fc7ad46501b7f29b22e07d2af3e746002539a33fbb3f5cdd5bb006",
+      "bytes": 450176,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/npcs/trader.glb",
+        "blob": "4e6c360ad85a53614ba35e4516793c90ba360b7f"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/pine-hollow/npcs/trader.phone.glb",
+      "file": "test/pins/assets/087c9b42d01dc0cdbcf2a4b13b2766f0579306559ef4cef9f229dfa3d271ee79.glb",
+      "sha256": "087c9b42d01dc0cdbcf2a4b13b2766f0579306559ef4cef9f229dfa3d271ee79",
+      "bytes": 209076,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "5f70a2dfe4b5311c81919b3978ea671ad804f707",
+        "path": "public/assets/pine-hollow/npcs/trader.phone.glb",
+        "blob": "705a6c2d5fe9b4dde607a4cec3b073fe596d18bf"
+      }
     }
   ]
 }

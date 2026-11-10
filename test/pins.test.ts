@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { restorePacks, type PackedIndex } from '../scripts/pin-packs.ts';
-import { pinnedPublicAssets } from '../scripts/pin-assets.ts';
+import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../scripts/pin-assets.ts';
 
 /** The tool's stderr, once it exits. */
 const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[]): Promise<string> => new Promise(resolve => {
@@ -29,9 +29,10 @@ afterEach(() => {
 test('frozen product image fallbacks retain exact producer bytes and reject a corrupted pin',()=>{
   const root=mkdtempSync(resolvePath('tmp/pinned-images-'));folders.push(root);
   mkdirSync(join(root,'test/pins'),{recursive:true});
-  cpSync('test/pins/assets.json',join(root,'test/pins/assets.json'));
+  const local=JSON.parse(readFileSync('test/pins/assets.json','utf8')) as {version:number;assets:{remote?:true}[]};
+  writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({...local,assets:local.assets.filter(row=>row.remote!==true)}));
   cpSync('test/pins/assets',join(root,'test/pins/assets'),{recursive:true});
-  const manifest=JSON.parse(readFileSync('test/pins/assets.json','utf8')) as {assets:{file:string;slug:string;url:string;source:{path:string}}[]};
+  const manifest=JSON.parse(readFileSync(join(root,'test/pins/assets.json'),'utf8')) as {assets:{file:string;slug:string;url:string;source:{path:string}}[]};
   const owners=[...new Set(manifest.assets.map(row=>row.slug))];
   const all=pinnedPublicAssets(root,owners);
   expect(all.map(row=>row.url)).toEqual(manifest.assets.map(row=>row.url));
@@ -48,6 +49,31 @@ test('frozen product image fallbacks retain exact producer bytes and reject a co
   manifest.assets[0]={...first,file:'../outside.jpg'};
   writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,...manifest}));
   expect(()=>pinnedPublicAssets(root,owners)).toThrow('Invalid pinned public asset');
+});
+
+test('remote fallback publication refuses wrong and oversized HTTP bodies and verifies its held cache',async()=>{
+  const root=mkdtempSync(resolvePath('tmp/pinned-http-'));folders.push(root);
+  const body=Buffer.from('authored fallback model'),sha256=createHash('sha256').update(body).digest('hex');
+  const row={slug:'dawn-isle',url:'/assets/dawn-isle/model.glb',file:`test/pins/assets/${sha256}.glb`,sha256,bytes:body.length,remote:true,
+    source:{repo:'shard-dawn',commit:'a'.repeat(40),path:'public/assets/dawn-isle/model.glb',blob:createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex')}};
+  mkdirSync(join(root,'test/pins'),{recursive:true});writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,assets:[row]}));
+  let reply=Buffer.from('wrong'),requests=0;
+  const server=createServer((_,response)=>{requests++;response.end(reply);});servers.push(server);
+  await new Promise<void>(resolve=>{server.listen(0,'127.0.0.1',()=>{resolve();});});
+  const address=server.address();if(address===null||typeof address==='string')throw new Error('No fixture port');
+  const request:typeof fetch=async(input,init)=>{expect(String(input)).toBe(`https://raw.githubusercontent.com/project-wildshard/shard-dawn/${'a'.repeat(40)}/public/assets/dawn-isle/model.glb`);return fetch(`http://127.0.0.1:${address.port}`,init);};
+  const cache=join(root,'cache');
+  await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('Pinned public asset bytes differ');
+  expect(existsSync(cache)).toBe(false);
+  reply=Buffer.concat([body,Buffer.from('extra')]);
+  await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('Pinned public asset bytes differ');
+  expect(existsSync(cache)).toBe(false);
+  reply=body;await fetchPinnedPublicAssets(root,undefined,cache,request);
+  expect(Buffer.from(pinnedPublicAssets(root,undefined,cache)[0]?.body??[])).toEqual(body);
+  await fetchPinnedPublicAssets(root,undefined,cache,request);expect(requests).toBe(3);
+  writeFileSync(join(cache,`${sha256}.glb`),Buffer.alloc(body.length));
+  await expect(fetchPinnedPublicAssets(root,undefined,cache,request)).rejects.toThrow('Pinned public asset bytes differ');
+  expect(requests).toBe(3);
 });
 
 test('every pin names a live head by its hash, and the catalogue holds the same heads', () => {
