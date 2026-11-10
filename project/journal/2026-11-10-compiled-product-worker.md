@@ -57,3 +57,14 @@ This does not finish FL17 or change any quarantine deadline or extension.
 Its changed caller starts a new hosted qualification generation at zero after publication.
 The old receipts remain visible; ten actual green executions still precede removal.
 J206 one-shot review and the normal full queued publication follow this commit.
+
+J206 one-shot review returns no MUST-FIX and one SHOULD.
+The SHOULD asks for the complete final checkpoint envelope, not only snapshot.
+The manual proof now compares the entire checkpoint at both boundaries.
+No second review round is run; the strengthened real proof is rerun normally.
+Review: /Users/raynos/.cache/wildshard/session-keep/reviews/pinefix2-channel-proof-FL17-20261110T003400Z-77400.md
+Review SHA-256: ee660245cd7d326fceaa04ab7fc0757eb9b62fac8ff024676dcd1845e6fb2e05
+Focused typed lint and the strict root test solution both pass.
+The isolated generation collector CLI checks pass6/6 in2.159seconds.
+They retain old receipts, require published-source ancestry, preserve unrelated
+file histories and leave missing-execution receipts neutral and policy untouched.

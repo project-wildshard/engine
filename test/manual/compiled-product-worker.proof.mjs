@@ -63,7 +63,7 @@ try{await test('fixed compiled product code retains the real route and refuses c
     };
     assert.equal(actual.complete,true);assert.equal(actual.out,0);assert.deepEqual(actual.stuck,[]);
     assert.deepEqual(withoutTiming(actual),withoutTiming(expected));
-    assert.equal(compiled.checkpoint?.snapshot,source.checkpoint?.snapshot);
+    assert.deepEqual(compiled.checkpoint,source.checkpoint);
     await compiled.dispose();await assert.rejects(compiled.step());compiled=undefined;
     const workerSource=resolve(mirror,'src/server/host/bake/headlessWorker.ts');
     writeFileSync(workerSource,`${readFileSync(workerSource,'utf8')}\n// Owned control: a different source generation.\n`);
