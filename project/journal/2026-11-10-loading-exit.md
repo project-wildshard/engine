@@ -17,3 +17,20 @@ row; it has the pause menu.
 scripts/title-exit-proof.mjs proves it in a headless browser. It starts
 Driftwood, exits mid-load, opens SHARD SELECT on the title (QA 28: the
 deck, no load), picks Nine Dragon and waits until it is playable.
+
+## QA 28: SHARD SELECT loaded Driftwood
+
+Jake on preview 0641eaa: "pressing shard select loads me instantly into
+driftwood." Same bug as QC2. SHARD SELECT answers its tap on pointerup and
+swaps in the deck. At 402 × 874, ENTER WORLD (y 698–762) lies under the
+card's lower quarter (y 594–748). A scan of preview found 24 of 100 points
+on the card over it. iOS then sends that tap's click to ENTER WORLD.
+`followsTap` dropped such a click only within 500 ms, and a busy page (the
+answer builds the deck and its hero) delivers it later. The fast headless
+runs never reproduce it; a click 700 ms late lands on ENTER WORLD.
+
+The rule no longer uses time: a pointer click where the last answered tap
+was, with no press anywhere since, is that tap's. A new gesture always
+starts with a press, so it still acts, and keyboard clicks (detail 0) act.
+Each tap target's scope watches presses on the document. Five seconds
+remain as a backstop.

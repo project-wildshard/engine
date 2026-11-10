@@ -11,17 +11,32 @@ export function listenDom<K extends string>(scope: Scope, target: EventTarget | 
 // SHARD SELECT clicked the picker's ENTER WORLD and loaded Driftwood).
 // The click is that same touch, so it lands where the tap was; a new tap or click elsewhere in the same half second is its
 // own gesture and acts.
-let tappedAt = -Infinity, tappedX = 0, tappedY = 0;
+// QA 28 (Jake, 2026-11-10, preview on an iPhone: "pressing shard select loads me instantly into driftwood"): the half second
+// was too short. That click comes after the tap's own answer has run, and on a busy page (the deck and its hero art built in
+// that answer) it came later than 500 ms. At 402 px ENTER WORLD sits under SHARD SELECT's lower quarter, so it entered
+// the selected shard. A new gesture always starts with a press, so the rule is now: a pointer click where the last answered
+// tap was, with no press anywhere since, is that tap's. The time bound stays only as a backstop.
+let tappedAt = -Infinity, tappedX = 0, tappedY = 0, pressedSinceTap = true;
+const FOLLOW_MS = 5000;
+const watching = new WeakSet<Scope>();
+/** every press on the page while a tap target lives (once per owning scope): a new gesture is never a follow-through */
+function watchPresses(scope: Scope): void {
+  if (watching.has(scope) || typeof document === 'undefined') return;
+  watching.add(scope);
+  listenPage(scope, 'pointerdown', () => { pressedSinceTap = true; }, { capture: true, passive: true, on: 'document' });
+}
 /** A pointer click that only follows a tap already answered on its pointerup, on this element or any other. */
 export function followsTap(event: MouseEvent): boolean {
-  return event.detail > 0 && event.timeStamp - tappedAt < 500 && Math.abs(event.clientX - tappedX) <= 10 && Math.abs(event.clientY - tappedY) <= 10;
+  return event.detail > 0 && !pressedSinceTap && event.timeStamp - tappedAt < FOLLOW_MS
+    && Math.abs(event.clientX - tappedX) <= 10 && Math.abs(event.clientY - tappedY) <= 10;
 }
 /** Answer an iOS tap before its cancellable synthesized click; keyboard clicks
  * remain active. Both listeners retire with the widget scope. */
 export function listenTap(scope: Scope, target: HTMLElement, fn: () => void): void {
+  watchPresses(scope);
   listenDom(scope, target, 'pointerup', (event) => {
     if (event.button !== 0 || (target instanceof HTMLButtonElement && target.disabled)) return;
-    event.stopPropagation(); tappedAt = event.timeStamp; tappedX = event.clientX; tappedY = event.clientY; fn();
+    event.stopPropagation(); tappedAt = event.timeStamp; tappedX = event.clientX; tappedY = event.clientY; pressedSinceTap = false; fn();
   });
   listenDom(scope, target, 'click', (event) => {
     event.stopPropagation();
