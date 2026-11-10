@@ -38,6 +38,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
         run: printf 'refs/heads/main %s refs/heads/main %s\n' "$GITHUB_SHA" "$BASE_SHA" | node .githooks/check-push.mjs
+      - name: Require this version's changelog section (Jake, 2026-11-10)
+        run: node scripts/changelog.mjs check --at="$GITHUB_SHA"
       - name: Classify from an actually green code-proving ancestor
         id: paths
         env:
@@ -216,6 +218,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      # Jake 2026-11-10: the title's hero stays big and its build label short and clear of the logo
+      - run: WS_TITLE_LAYOUT=tmp/title-layout-shots pnpm exec vitest run test/title-layout.test.ts
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

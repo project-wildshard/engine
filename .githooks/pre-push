@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # 1. Outgoing-commit checks: .githooks/check-push.mjs (reads git's ref
 #    lines on stdin). Bypasses: ALLOW_BIG=1, ALLOW_SECRET=1.
-# 2. Push lane (full `pnpm check`): .githooks/run-checks.mjs.
+# 2. The engine changelog (Jake, 2026-11-10): a pushed main or vX.Y.Z tag
+#    carries its version's CHANGELOG.md section (scripts/changelog.mjs).
+# 3. Push lane (full `pnpm check`): .githooks/run-checks.mjs.
 #    Bypass: SKIP_CHECK=1.
 # Enable once per clone: git config core.hooksPath .githooks
 set -euo pipefail
-hooks="$(git rev-parse --show-toplevel)/.githooks"
+top="$(git rev-parse --show-toplevel)"
+hooks="$top/.githooks"
 refs="$(cat)"
 printf '%s\n' "$refs" | node "$hooks/check-push.mjs"
+if [ -f "$top/scripts/changelog.mjs" ]; then printf '%s\n' "$refs" | node "$top/scripts/changelog.mjs" refs; fi
 export WS_PUSH_REFS="$refs"
 export WS_PUSH_DESTINATION="$2"
 exec node "$hooks/run-checks.mjs" push
