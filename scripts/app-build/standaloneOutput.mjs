@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { build } from 'vite';
 import { rapierAlias } from '../../vite/rapier.ts';
 import { BUILD_ID_EXPRESSION, codeDirectory } from './buildIdentity.mjs';
+import { engineRelease } from '../changelog.mjs';
 
 /** Where a build's emitted shell is served from.
  * @param {string} buildId */
@@ -15,7 +16,8 @@ export async function writeStandaloneOutput(outDir, buildId, root) {
   const directory = standaloneDirectory(buildId);
   await build({
     configFile: false, root, logLevel: 'warn', publicDir: false, resolve: { alias: rapierAlias }, assetsInclude: ['**/*.bin', '**/*.wasm'],
-    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: BUILD_ID_EXPRESSION }, worker: { format: 'es' },
+    // SENTRY-TRIAGE S5: the shells report errors too, under the same wildshard@<version> release as the page
+    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: BUILD_ID_EXPRESSION, __ENGINE_RELEASE__: JSON.stringify(engineRelease(root)) }, worker: { format: 'es' },
     build: {
       outDir: resolve(outDir), emptyOutDir: false, assetsDir: directory, target: 'es2022', sourcemap: false, reportCompressedSize: false,
       rolldownOptions: {

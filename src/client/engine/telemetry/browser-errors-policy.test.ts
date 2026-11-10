@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import type {ErrorEvent} from '@sentry/browser';
-import {browserErrorDeliveryAllowed,browserErrorEnvironment,browserErrorNoise,browserErrorRelease} from './browserErrors';
+import {browserErrorDeliveryAllowed,browserErrorEnvironment,browserErrorNoise,browserErrorRelease,browserErrorDist} from './browserErrors';
 
 const origins=['https://play.example.invalid'] as const;
 test.each([
@@ -67,4 +67,10 @@ test('S5: the release is the app slug at its version, and nothing without both',
   expect(browserErrorRelease(undefined,'0.1.7')).toBeUndefined();
   expect(browserErrorRelease('wildshard',undefined)).toBeUndefined();
   expect(browserErrorRelease('wildshard','')).toBeUndefined();
+});
+test('S5: the build id is the dist up to Sentry\'s 64 characters, else none',()=>{
+  expect(browserErrorDist('727236c-mw2yrdg5')).toBe('727236c-mw2yrdg5');
+  expect(browserErrorDist('a'.repeat(64))).toBe('a'.repeat(64));
+  expect(browserErrorDist('a'.repeat(65))).toBeUndefined();
+  expect(browserErrorDist('')).toBeUndefined();
 });

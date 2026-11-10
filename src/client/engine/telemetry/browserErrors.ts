@@ -1,7 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { harnessPins, installedIdentity } from '../../../shared/engine/app/identity';
 /** Optional, error-only Sentry channel. The existing /api/errors report remains the primary local inbox. */
-import type { captureException, dedupeIntegration, ErrorEvent, getClient, httpContextIntegration, init, withScope } from '@sentry/browser';
+import type { captureException, ErrorEvent, getClient, httpContextIntegration, init, withScope } from '@sentry/browser';
 
 declare const __BUILD_ID__: string;
 /** vite.config.ts: package.json's version (scripts/changelog.mjs); absent under Node */
@@ -22,12 +22,16 @@ const productionDsn = 'https://ccaf25bcd6baa389433fb9efe0117c9b@o451216116541030
 const dsn = String(import.meta.env['VITE_SENTRY_DSN'] ?? (import.meta.env.PROD ? productionDsn : '')).trim();
 interface BrowserSdk {
   init: typeof init; withScope: typeof withScope; captureException: typeof captureException; getClient: typeof getClient;
-  httpContextIntegration: typeof httpContextIntegration; dedupeIntegration: typeof dedupeIntegration;
+  httpContextIntegration: typeof httpContextIntegration;
 }
 
 /** SENTRY-TRIAGE S5: the release is the app's version (`wildshard@0.1.7`); the build id rides as `dist` and the build tag. */
 export function browserErrorRelease(slug: string | undefined, version: string | undefined): string | undefined {
   return slug && version ? `${slug}@${version}` : undefined;
+}
+/** Sentry keeps a dist of at most 64 characters; a longer build id stays in the build tag only. */
+export function browserErrorDist(build: string): string | undefined {
+  return build !== '' && build.length <= 64 ? build : undefined;
 }
 let sdk: Promise<BrowserSdk | null> | null = null;
 
@@ -78,13 +82,14 @@ function loadSdk(): Promise<BrowserSdk | null> {
     sentry.init({
       dsn,
       release: browserErrorRelease(installedIdentity()?.fileSlug, version) ?? __BUILD_ID__,
-      dist: __BUILD_ID__,
+      dist: browserErrorDist(__BUILD_ID__),
       environment,
       // ErrorModal already owns window errors and rejections. Keep the SDK out of the boot's
       // hot path and do not install click/fetch breadcrumbs, tracing, profiling or replay. S5: the page's URL and
-      // user agent only (browser, OS and device tags) and a repeat guard; no global handlers.
+      // user agent only (browser, OS and device tags). No dedupe: deliverBrowserError retries an identical event and
+      // waits for its acknowledgement, which dedupe would swallow.
       defaultIntegrations: false,
-      integrations: [sentry.httpContextIntegration(), sentry.dedupeIntegration()],
+      integrations: [sentry.httpContextIntegration()],
       tracesSampleRate: 0,
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,

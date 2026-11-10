@@ -7,9 +7,12 @@ there were no browser, OS, device or URL tags at all.
 
 The release is now the app slug at package.json's version
 (wildshard@0.1.7), read from the same __ENGINE_RELEASE__ define the
-title uses; the build id moves to dist and stays the build tag. Only
-httpContext (URL and user agent) and dedupe are added: still no global
-handlers, breadcrumbs, tracing or replay. beforeSend keeps just the
+title uses, in the page build and the standalone shells alike; the
+build id moves to dist (up to Sentry's 64 characters) and stays the
+build tag. Only httpContext (URL and user agent) is added: still no
+global handlers, breadcrumbs, tracing or replay. The J206 review caught
+that dedupe would swallow deliverBrowserError's identical retry, which
+waits for an acknowledgement, so dedupe stays out. beforeSend keeps just the
 User-Agent header, so no referrer leaves the page.
 
 Source-map upload is the other half and waits for two things: Jake's
