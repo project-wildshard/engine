@@ -30,6 +30,32 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "test/package-input-boundary.test.ts",
+      "sha": "7c1e029abbfc6859fc2ccb7130e2d75e66885993",
+      "run": "42730613947",
+      "artifact": 13724812468,
+      "report": "shard-7-ordinary.json",
+      "measuredAt": 1794271952411,
+      "durationMs": 597.692819,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Passed Linux full-CI complete module clock including collection, setup, preparation and cases/hooks. Exact source-body blob remains unchanged. Record an actual previously unknown file cost after qualified grid promotion adds its original singleton group back to full discovery. No Ring1 estimate transfer, existing weight replacement, planner/code/cap/group/policy/deadline change; all other unknowns retain sixty seconds."
+    },
+    {
+      "file": "test/species-kinds.test.ts",
+      "sha": "7c1e029abbfc6859fc2ccb7130e2d75e66885993",
+      "run": "42730613947",
+      "artifact": 13724783063,
+      "report": "shard-10-ordinary.json",
+      "measuredAt": 1794271887272,
+      "durationMs": 181.98846299999997,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Passed Linux full-CI complete module clock including collection, setup, preparation and cases/hooks. Exact source-body blob remains unchanged. Record an actual previously unknown file cost after qualified grid promotion adds its original singleton group back to full discovery. No Ring1 estimate transfer, existing weight replacement, planner/code/cap/group/policy/deadline change; all other unknowns retain sixty seconds."
+    },
+    {
       "file": "src/client/engine/boot/no-leave-prompt.test.ts",
       "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
       "run": "42731566380",
