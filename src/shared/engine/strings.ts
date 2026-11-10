@@ -229,6 +229,8 @@ export const ENGINE_STRINGS = {
   "s_loading_tier": "⟦0⟧ · ⟦1⟧ · attempt ⟦2⟧",
   "s_loading_first_visit": "first visit",
   "s_loading_return_visit": "return visit",
+  "s_loading_low_power_likely": "low power likely",
+  "s_loading_low_power_no": "low power no",
   "s_loading_done": "Done · ⟦0⟧",
   "s_loading_left_under": "under 1 s",
   "s_loading_left_seconds": "about ⟦0⟧ s",

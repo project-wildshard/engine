@@ -103,6 +103,7 @@
     "src/client/engine/boot/runtime.ts": "client",
     "src/client/engine/boot/shardPrefetch.ts": "client",
     "src/client/engine/boot/shell.ts": "client",
+    "src/client/engine/boot/lowPower.ts": "client",
     "src/client/engine/boot/stuck.ts": "client",
     "src/client/engine/boot/timeLeft.ts": "client",
     "src/client/engine/boot/stuckStep.ts": "client",

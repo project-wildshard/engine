@@ -1,3 +1,4 @@
+import { lowPowerReading, onLowPowerReading } from '../boot/lowPower';
 import { uiScope, mountUi } from './ownership';
 import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
 import { serverBootProgress } from '../../../shared/engine/boot/serverProgress';
@@ -216,6 +217,7 @@ export class Loading {
     this.attempt = attempt;
     const earlyTiming = bootTiming(); if (earlyTiming !== undefined) earlyTiming.attemptCount = attempt;
     set(this.els.tier, this.tierText());
+    this.scope.onDispose(onLowPowerReading(() => { set(this.els.tier, this.tierText()); }));
     this.rowsEl = this.els.suRows;
     // Start ends here: the game's own code owns the card. A scoped (mid-play) load has no Start.
     this.root.querySelector<HTMLElement>('[data-phase="start"]')?.toggleAttribute('hidden', this.scoped);
@@ -584,7 +586,16 @@ export class Loading {
 
   /** The kept facts (LS2): tier, visit and attempt. A page a service worker already controls is a return visit. */
   private tierText(): string {
-    return engineString('s_loading_tier', [TIER, engineString(navigator.serviceWorker?.controller ? 's_loading_return_visit' : 's_loading_first_visit'), this.attempt]);
+    const tier = engineString('s_loading_tier', [TIER, engineString(navigator.serviceWorker?.controller ? 's_loading_return_visit' : 's_loading_first_visit'), this.attempt]);
+    // Jake (11-10): Low Power Mode as the page can read it (boot/lowPower.ts): Safari caps rAF at 30 Hz there
+    const power = lowPowerReading();
+    return power === null ? tier : `${tier} · ${engineString(power.likely ? 's_loading_low_power_likely' : 's_loading_low_power_no')}`;
+  }
+
+  /** The Copy diagnostics form of the Low Power reading: its verdict, the measured rAF rate and the page it was read on. */
+  private lowPowerLine(): string {
+    const power = lowPowerReading();
+    return power === null ? 'low power: unread' : `low power: ${power.likely ? 'likely' : 'no'} (rAF ${power.rate.toFixed(1)}/s on the ${power.from === 'title' ? 'title' : 'loading page'})`;
   }
 
   private phaseDone(ms: number): string { return engineString('s_loading_done', [seconds(ms)]); }
@@ -661,7 +672,7 @@ export class Loading {
       `Wildshard boot diagnostics · ${new Date().toISOString()}`,
       // LD3 (J208): a human reads the cause first; the same lines lead the JSON below
       ...(Array.isArray(summary) ? summary.filter((line): line is string => typeof line === 'string') : []),
-      `build ${diagnosticBuild(localTiming?.build)} · ${this.tierText()} · ${innerWidth}x${innerHeight} @${devicePixelRatio}x`,
+      `build ${diagnosticBuild(localTiming?.build)} · ${this.tierText()} · ${innerWidth}x${innerHeight} @${devicePixelRatio}x · ${this.lowPowerLine()}`,
       `total ${seconds(times.total)} · start ${seconds(times.start)} · download ${seconds(times.download)} · load ${seconds(times.load)}${this.finished ? '' : ' · not ready'}`,
       `download ${loadingCacheText(transfer)} · files ${transfer.filesDone} of ${transfer.filesTotal} · ${transfer.complete ? 'complete' : 'open'}${transfer.error === null ? '' : ' · error (private text omitted)'}`,
       `scene textures ~${Math.round(this.textureBytes / 1048576)} MiB${this.failedReason === null && !this.view?.error ? '' : ' · failed (private text omitted)'}`,

@@ -25,6 +25,7 @@ import {prepareBootImports} from './bootDownloads';
  * MF3 (FOUNDATIONS): no import is retried in the page (WebKit keeps a failed module URL errored, so a retry in the same
  * document only adds 0.8 + 2.5 s before the same failure); a failed import rejects `entered`, and guardBoot reloads once.
  */
+import { startLowPowerProbe } from '@wildshard/engine/boot/lowPower';
 import { guardBoot } from '@wildshard/engine/boot/stuck';
 import { progressOfCard, stuckMessage, watchStuckStep } from '@wildshard/engine/boot/stuckStep';
 import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/shell';
@@ -67,6 +68,9 @@ installOfflineDownload({
 persistHomeScreen();
 definePageSaveKeys(saves);
 const search = new URLSearchParams(location.search);
+// Jake (11-10): Low Power Mode for the card's tier line and Copy diagnostics, from this document's first second of rAF;
+// a page that opens without a shard is the idle title, whose reading the tab keeps (boot/lowPower.ts)
+startLowPowerProbe(search.get('chunk') === null);
 // A13 (meta MMO-FAILURE-MODES-PLAN): Settings ▸ Developer ▸ Failure screens asks by event. Only a Developer page (`<html data-dev>`,
 // src/client/engine/core/devMode.ts) answers, and only then is the prototype module downloaded: the worker never precaches it
 // (scripts/app-build/serviceWorker.ts), so no player loads or sees it. Developer off closes an open screen.
