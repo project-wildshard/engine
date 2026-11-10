@@ -12,6 +12,7 @@ import { captureBootFrame } from './black-frame.mjs';
 import { observeTitleCapture } from './title-trace.mjs';
 import { gridBootWaitHistory } from './grid-boot-waits.mjs';
 import { gridFloorDocumentIdentity, runFloorGridRoute, gridFloorWitnessFailures } from '../frame-floor-grid.mjs';
+import { finishStallProfile, startStallProfile } from '../loading-flow/stalls.mjs';
 
 /** A locked experimental card is not a public gameplay entry. Its direct chunk
  * page must still hydrate under the unwaived public playing envelope (call44).
@@ -386,6 +387,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     await route.continue();
   });
   const page = await context.newPage();
+  /** @type {import('playwright').CDPSession | null} */ let stallProfile = null;
   registerCaptureTrace(page, out, receipt);
   page.on('framenavigated', frame => {
     if (gridNavigationIntent && frame === page.mainFrame()) gridNavigationObserved = true;
@@ -424,6 +426,9 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     const url = new URL(base);
     for (const [key, value] of Object.entries({ tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0' })) url.searchParams.set(key, value);
     if (mode !== 'grid') url.searchParams.set('chunk', shard);
+    // NINE-DRAGON-BENCHMAX NB6: a standalone load whose props stage sits idle with no named wait is refused at control
+    // (the world may build behind the title, so the profile runs from the document's start)
+    if (mode === 'standalone') stallProfile = await startStallProfile(page);
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
     if (mode !== 'arrival') {
     await until(page, faults, async observed => await page.locator('.ws-main-logo').isVisible() && !(await page.locator('.ws-load').isVisible()) && titleCaptureReady(observed, mode === 'grid'), 'rendered usable title with completed warm-up', deadline);
@@ -468,6 +473,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     }
     }
     let revealSkipped = false;
+    /** @type {Awaited<ReturnType<typeof finishStallProfile>>['stalls'] | null} */ let stalls = null;
     const gameplay = async (/** @type {boolean} */ requireRings) => {
       const value = await page.evaluate(bootObservation);
       // Skip the grid's sky-down reveal with the player's own tap: it still waits for the rings and the home handoff,
@@ -492,6 +498,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     }
     await until(page, faults, () => gameplay(true), `${mode} gameplay`, deadline, mode === 'grid' ? observeGridWait : undefined);
     phases.gameplayMs = Date.now() - started;
+    if (stallProfile !== null) { const read = await finishStallProfile(page, stallProfile); stallProfile = null; stalls = read.stalls; faults.push(...read.faults); }
     const initial = await page.evaluate(bootObservation);
     gameplayFrames.initial = initial.frame;
     phases.framesStartMs = Date.now() - started;
@@ -506,7 +513,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     const roadDeadline = Date.now() + 90000;
     const templateRoad = mode === 'grid' ? await bootTemplateRoad(page, faults, frames, roadDeadline) : null;
     const road = mode === 'grid' ? await bootSignalRoad(page, faults, frames, roadDeadline) : null;
-    const result = { mode, phases, frames, gameplayFrames, gridWaits: gridWaits.samples, templateRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
+    const result = { mode, phases, frames, gameplayFrames, stalls, gridWaits: gridWaits.samples, templateRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
     if (faults.length > 0 || result.fatal.length > 0) throw new Error(JSON.stringify(result));
     if (afterGameplay !== null) await afterGameplay(page);
     if (faults.length > 0) throw new Error(JSON.stringify(faults));

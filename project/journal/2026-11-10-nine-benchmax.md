@@ -50,3 +50,16 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
   4.5 / 4.5 / 6.1 -> 4.0 / 4.2 / 6.1 s. The x8 profile: graph compile
   2.7 -> 1.5 s, graph JSON 0.52 -> 0.16 s, paint read-back off the main
   thread. Reservation 0.58-0.63 -> 0.04 s at x8.
+
+- NB6, the ratchet. A wall-clock budget can't tell a slow runner from a
+  regression, and "no boot event for 1.5 s" fails on Nine's own busy,
+  unnamed stretches at CPU x8 (0.8-1.9 s). What a slower CPU never makes
+  is idle: `scripts/loading-flow/stalls.mjs` reads a 5 ms CPU profile of
+  the boot and refuses a props window of 1.5 s that sits 80 % idle with
+  no named wait open. Nine at x8 peaks at 0.52-0.64 s of such a window,
+  the ring-1 products at 0.24-0.36 s. Ring 1's boot smoke runs it on
+  every standalone case (profile from the document's start: ring
+  products build their world behind the title). Proof, local `pnpm
+  build:ring` + `boot-smoke --case-group=developer`: a deliberate 2 s
+  sleep in data.ts's props step turned it red ("props sat 1.49 s of
+  1.5 s idle"); without it, all three cases green.

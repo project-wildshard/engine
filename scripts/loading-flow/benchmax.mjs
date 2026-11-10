@@ -17,6 +17,7 @@ import { parseArgs } from 'node:util';
 import { chromium, devices } from 'playwright';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
+import { bootTimelineEntries, profileIdle, stageStalls, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
@@ -67,6 +68,11 @@ try {
     const pageEnd = await page.evaluate('performance.now()');
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(values.profile, JSON.stringify({ pageEnd, profile }));
+    // NB6: the ring-1 stall ratchet's own reading of this load (stalls.mjs), every load stage
+    const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, pageEnd);
+    for (const row of stageStalls(entries, idle, ['product', 'sky', 'props', 'level.kit', 'weapon', 'finish', 'shaders', 'firstFrame', 'readyFrame', 'server'])) {
+      console.log(`stall ratchet ${row.stage.padEnd(11)} worst ${(row.idleMs / 1000).toFixed(2)} s idle of a ${(STALL_WINDOW_MS / 1000).toFixed(1)} s window (limit ${(STALL_WINDOW_MS * STALL_IDLE_SHARE / 1000).toFixed(2)})`);
+    }
   }
 
   // the load, from the page's own boot timing (the timeline Copy diagnostics pastes) and the card's phase times
