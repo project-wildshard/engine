@@ -100,3 +100,15 @@ the declared length, and verifies SHA-256 plus the source Git blob before
 publication. No mutable branch, token or private checkout is needed.
 Native model-map source keys are checked as well as the boot file lists;
 CPU model fallbacks must survive final output pruning too.
+
+## Exact item-model admission
+
+The client model owner hashes only the supplied Uint8Array byte span,
+including Node Buffer subclasses backed by a larger allocation. Shared
+models stay live until their last Scope retires; late owners decode anew.
+Run the native client-data proof explicitly, outside hooks:
+`node --import ./scripts/bake-loader.mjs --experimental-transform-types
+--test test/ci/entry-model-values.proof.mjs` as one command. It uses the
+renderer-capable author loader, not the simulation loader or a browser.
+CI runs all three real geometry/lifetime/refusal/span cases with 9.5 s
+timeout and complete-body elapsed limits. No production socket is used.

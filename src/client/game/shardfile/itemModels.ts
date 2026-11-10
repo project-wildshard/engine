@@ -40,7 +40,8 @@ async function parseModel(bytes: Uint8Array): Promise<Group> {
 }
 
 /** Lease static, untextured equipment GLBs by admitted hash. Independent transforms share immutable geometry/materials
- * across live shards; the last scope release disposes them. A late owner reparses after retirement, never a dead model. */
+ * across live shards; the last scope release disposes them. A late owner reparses after retirement, never a dead model.
+ * Hashes cover only each supplied byte span, including Uint8Array subclasses backed by a larger allocation. */
 export async function loadItemModels(items: ShardItems, assets: ReadonlyMap<string, Uint8Array>, scope: Scope): Promise<ReadonlyMap<string, Group>> {
   const result = new Map<string, Group>();
   const assertOwner = (): void => { if (scope.disposed) throw new Error('Equipment model owner retired'); };
@@ -49,7 +50,7 @@ export async function loadItemModels(items: ShardItems, assets: ReadonlyMap<stri
     assertOwner();
     const bytes = assets.get(ref);
     if (bytes === undefined) throw new Error(`Missing admitted equipment model ${ref}`);
-    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes.slice().buffer));
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes).buffer));
     const hash = [...digest].map(byte => byte.toString(16).padStart(2, '0')).join('');
     if (hash !== ref.replace(/^commons:/u, '')) throw new Error('Equipment model hash mismatch');
     assertOwner();
