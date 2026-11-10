@@ -44,13 +44,6 @@
       "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
       "reason": "60-second file budget overrun: 89597 ms, assertion passed; ci 42479173262 shard 5 subsequently exceeded its job clock"
-    },
-    {
-      "file": "test/nalati-awareness-verbs.test.ts",
-      "owner": "codex-pinefix2",
-      "addedAt": "2026-11-08T12:38:22.000Z",
-      "deadline": "2026-11-10T12:37:14.000Z",
-      "reason": "60-second file budget overrun: 84597 ms, assertions passed; ci 42480438365 shard 2"
     }
   ]
 }
