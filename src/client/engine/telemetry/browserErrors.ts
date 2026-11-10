@@ -1,9 +1,11 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { harnessPins, installedIdentity } from '../../../shared/engine/app/identity';
 /** Optional, error-only Sentry channel. The existing /api/errors report remains the primary local inbox. */
-import type { captureException, ErrorEvent, getClient, init, withScope } from '@sentry/browser';
+import type { captureException, dedupeIntegration, ErrorEvent, getClient, httpContextIntegration, init, withScope } from '@sentry/browser';
 
 declare const __BUILD_ID__: string;
+/** vite.config.ts: package.json's version (scripts/changelog.mjs); absent under Node */
+declare const __ENGINE_RELEASE__: { readonly version: string } | undefined;
 
 export interface BrowserErrorTags {
   readonly system: string;
@@ -18,7 +20,15 @@ export interface BrowserErrorTags {
 // A DSN is a public browser endpoint, not an auth token. Only real production pages report.
 const productionDsn = 'https://ccaf25bcd6baa389433fb9efe0117c9b@o4512161165410304.ingest.us.sentry.io/4512161184088064';
 const dsn = String(import.meta.env['VITE_SENTRY_DSN'] ?? (import.meta.env.PROD ? productionDsn : '')).trim();
-interface BrowserSdk { init: typeof init; withScope: typeof withScope; captureException: typeof captureException; getClient: typeof getClient }
+interface BrowserSdk {
+  init: typeof init; withScope: typeof withScope; captureException: typeof captureException; getClient: typeof getClient;
+  httpContextIntegration: typeof httpContextIntegration; dedupeIntegration: typeof dedupeIntegration;
+}
+
+/** SENTRY-TRIAGE S5: the release is the app's version (`wildshard@0.1.7`); the build id rides as `dist` and the build tag. */
+export function browserErrorRelease(slug: string | undefined, version: string | undefined): string | undefined {
+  return slug && version ? `${slug}@${version}` : undefined;
+}
 let sdk: Promise<BrowserSdk | null> | null = null;
 
 /** External error delivery is opt-in by exact app origin and never by a test runner. */
@@ -64,14 +74,17 @@ function loadSdk(): Promise<BrowserSdk | null> {
   if (!productionPage()) return Promise.resolve(null);
   sdk ??= import('@sentry/browser').then((sentry) => {
     const environment = browserErrorEnvironment(location.origin, installedIdentity()?.errorReportEnvironments ?? {});
+    const version = typeof __ENGINE_RELEASE__ === 'object' ? __ENGINE_RELEASE__.version : undefined;
     sentry.init({
       dsn,
-      release: __BUILD_ID__,
+      release: browserErrorRelease(installedIdentity()?.fileSlug, version) ?? __BUILD_ID__,
+      dist: __BUILD_ID__,
       environment,
       // ErrorModal already owns window errors and rejections. Keep the SDK out of the boot's
-      // hot path and do not install click/fetch breadcrumbs, tracing, profiling or replay.
+      // hot path and do not install click/fetch breadcrumbs, tracing, profiling or replay. S5: the page's URL and
+      // user agent only (browser, OS and device tags) and a repeat guard; no global handlers.
       defaultIntegrations: false,
-      integrations: [],
+      integrations: [sentry.httpContextIntegration(), sentry.dedupeIntegration()],
       tracesSampleRate: 0,
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
@@ -80,7 +93,12 @@ function loadSdk(): Promise<BrowserSdk | null> {
       beforeSend(event) {
         if (!productionPage()) return null;
         if (browserErrorNoise(event, { environment, userAgent: navigator.userAgent }) !== null) return null;
-        if (event.request) event.request.url = `${location.origin}${location.pathname}`;
+        if (event.request) {
+          event.request.url = `${location.origin}${location.pathname}`;
+          // The user agent names the browser, OS and device; no referrer or other header leaves the page.
+          const agent = event.request.headers?.['User-Agent'];
+          event.request.headers = agent === undefined ? {} : { 'User-Agent': agent };
+        }
         return event;
       },
     });

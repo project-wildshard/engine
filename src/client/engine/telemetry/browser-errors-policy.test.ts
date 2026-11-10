@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import type {ErrorEvent} from '@sentry/browser';
-import {browserErrorDeliveryAllowed,browserErrorEnvironment,browserErrorNoise} from './browserErrors';
+import {browserErrorDeliveryAllowed,browserErrorEnvironment,browserErrorNoise,browserErrorRelease} from './browserErrors';
 
 const origins=['https://play.example.invalid'] as const;
 test.each([
@@ -60,4 +60,11 @@ test.each([
   ['a frameless real error',thrown('The game stopped loading at step "gap"',[]),page],
 ] as const)('S6 keeps %s',(_name,event,where)=>{
   expect(browserErrorNoise(event,where)).toBeNull();
+});
+
+test('S5: the release is the app slug at its version, and nothing without both',()=>{
+  expect(browserErrorRelease('wildshard','0.1.7')).toBe('wildshard@0.1.7');
+  expect(browserErrorRelease(undefined,'0.1.7')).toBeUndefined();
+  expect(browserErrorRelease('wildshard',undefined)).toBeUndefined();
+  expect(browserErrorRelease('wildshard','')).toBeUndefined();
 });
