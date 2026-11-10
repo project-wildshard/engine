@@ -22,3 +22,11 @@ fixed. Local full/Ring 1 complete-module timings will be recorded as bootstrap
 data, not hosted Linux evidence or a cached green result, before publication.
 There are 383 other paths still requiring individual disposition. This test's
 passing result says nothing about those files.
+
+The clean committed candidate now has actual complete-module bootstrap
+measurements: full 2537.9945 ms and Ring 1 2356.478 ms, one passed case and zero
+unhandled errors in each real process. The public timing reporter and process
+completion hashes supply provenance. Existing weights/observations remain
+identical; only this restored module is added. Full planning is 1199 files,
+12 shards, maximum239.299606s; Ring 1 is 1114 files, eight shards,
+maximum222.729930s. These are local data and models, not hosted saving claims.

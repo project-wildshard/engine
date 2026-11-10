@@ -612,6 +612,7 @@
   "test/collection-game-ports.test.ts": 0.867255185,
   "test/commit-entry.test.ts": 0.29153008399999997,
   "test/commit-lane.test.ts": 0.096708714,
+  "test/commit-message-preflight.test.ts": 2.356478,
   "test/compiler-code-cache.test.ts": 0.7958560189999998,
   "test/compiler-code.test.ts": 0.235677559,
   "test/complete-at-control.test.mjs": 2.6279276809999996,

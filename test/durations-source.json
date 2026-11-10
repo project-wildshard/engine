@@ -357,5 +357,61 @@
       "appliedTo": ["full", "ring1"],
       "basis": "Successful Linux module diagnostic includes test, collection, setup, preparation and environment. This exact pure DOM case has the same happy-dom environment in both rings and reads no pinned product. No global calibration or unmeasured-file bound changes."
     }
+  ],
+  "localPushObservations": [
+    {
+      "schema": "push-test-timing/1",
+      "sha": "8eef8c602dd35658acc6bf85dc2f990e49b03419",
+      "tree": "592f68be74f69804223bcb5904147563370179d0",
+      "profile": "ci21-focused-module-bootstrap",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/commit-message-preflight.test.ts",
+          "blob": "787e3867487d18b42e868db7a2ed6e43f1715423",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 2537.9945
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T06:53:46.084Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "8eef8c602dd35658acc6bf85dc2f990e49b03419",
+      "tree": "592f68be74f69804223bcb5904147563370179d0",
+      "profile": "ci21-focused-module-bootstrap",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/commit-message-preflight.test.ts",
+          "blob": "787e3867487d18b42e868db7a2ed6e43f1715423",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 2356.478
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T06:53:49.002Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    }
   ]
 }
