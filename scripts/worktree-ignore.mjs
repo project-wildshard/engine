@@ -24,11 +24,13 @@ export function isWorktreePath(path) {
 }
 
 /**
- * Watcher ignores (Vite and Vitest `server.watch.ignored`): chokidar matches absolute paths, so the glob is the absolute
- * worktrees folder of this root, with glob syntax in the path escaped.
+ * Watcher ignores (Vite and Vitest `server.watch.ignored`): chokidar matches absolute paths, so this is a RegExp over
+ * the absolute worktrees folder of this root. Not a glob: chokidar turns `\\` into `/` before matching, so a glob could
+ * not escape a checkout path holding `(`, `[` or `{`.
  * @param {string} [root] the repo root, default the working directory
- * @returns {string[]}
+ * @returns {RegExp[]}
  */
 export function worktreeWatchIgnored(root = process.cwd()) {
-  return [`${resolve(root, WORKTREES).replaceAll('\\', '/').replaceAll(/[*?[\]{}()!@+|^$]/gu, String.raw`\$&`)}/**`];
+  const folder = resolve(root, WORKTREES).replaceAll('\\', '/');
+  return [new RegExp(`^${folder.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`)}(?:/|$)`, 'u')];
 }

@@ -23,5 +23,16 @@ parent's lint, format, Vitest list, Git staging and the shardfile hash; with
 `.gitignore` and the shardfile skip reverted it fails three cases.
 
 Clocks for the guard test recorded with `push-preflight.mjs timings`: 2.8 s
-
 in its file, 3.3 s wall.
+
+J206 Codex review (two MUSTs, fixed): the watcher ignore is now a RegExp over
+
+the absolute folder, because chokidar turns backslashes into slashes and a
+
+glob-escaped checkout path holding parentheses never matched; and the guard's
+
+watcher checks compare paths relative to the fixture, so the guard passes
+
+inside a real worktree too (run there: 11 of 11). The format and named-lint
+
+checks now fail on a broken tool run, not only on a planted hit.

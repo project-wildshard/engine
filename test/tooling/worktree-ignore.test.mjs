@@ -6,7 +6,7 @@
 import {spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {dirname, join, resolve} from 'node:path';
+import {dirname, join, relative, resolve} from 'node:path';
 import {afterAll, beforeAll, describe, expect, test} from 'vitest';
 import {createServer} from 'vite';
 import {treeHashes} from '../../scripts/shardfile-cache.mjs';
@@ -45,9 +45,9 @@ function put(root, files) {
 
 /** @type {string[]} */
 const fixtures = [];
-/** @param {Record<string, string>} files */
-function fixture(files) {
-  const root = mkdtempSync(join(tmpdir(), 'worktree-ignore-'));
+/** @param {Record<string, string>} files @param {string} [prefix] */
+function fixture(files, prefix = 'worktree-ignore-') {
+  const root = mkdtempSync(join(tmpdir(), prefix));
   fixtures.push(root);
   put(root, files);
   return root;
@@ -67,10 +67,14 @@ describe('the shared ignore list', () => {
     expect(isWorktreePath('.worktreesx/a.ts')).toBe(false);
     expect(WORKTREE_GLOB).toBe('.worktrees/**');
   });
-  test('anchors the watcher glob at its own root, so a worktree still watches its own files', () => {
-    expect(worktreeWatchIgnored('/a/repo')).toEqual(['/a/repo/.worktrees/**']);
-    expect(worktreeWatchIgnored('/a/repo/.worktrees/p')).toEqual(['/a/repo/.worktrees/p/.worktrees/**']);
-    expect(worktreeWatchIgnored('/a/re(po)')).toEqual(['/a/re\\(po\\)/.worktrees/**']);
+  test('anchors the watcher pattern at its own root, so a worktree still watches its own files', () => {
+    const [outer] = worktreeWatchIgnored('/a/re(po).x'), [inner] = worktreeWatchIgnored('/a/re(po).x/.worktrees/p');
+    expect(outer.test('/a/re(po).x/.worktrees/p/src/a.ts')).toBe(true);
+    expect(outer.test('/a/re(po).x/.worktrees')).toBe(true);
+    expect(outer.test('/a/re(po).x/.worktreesx/a.ts')).toBe(false);
+    expect(outer.test('/a/re(po)Ax/.worktrees/a.ts')).toBe(false);
+    expect(inner.test('/a/re(po).x/.worktrees/p/src/a.ts')).toBe(false);
+    expect(inner.test('/a/re(po).x/.worktrees/p/.worktrees/q/a.ts')).toBe(true);
   });
 });
 
@@ -98,12 +102,17 @@ describe('the parent checkout never sees a planted worktree', () => {
     expect(game.status).toBe(0);
     expect(seen(game.stdout + game.stderr)).toEqual([]);
     const named = run(process.execPath, ['scripts/lint-cli.mjs', '-c', '.oxlintrc.json', '-f', 'json', PLANT]);
-    expect(seen(named.stdout + named.stderr)).toEqual([]);
+    expect(named.stdout).toMatch(/No files found to lint/u);
+    expect(JSON.parse(named.stdout.slice(named.stdout.indexOf('{'))).number_of_files).toBe(0);
   });
 
   test('a whole-root format check lists nothing from it', () => {
     const format = run(join(ROOT, 'node_modules/.bin/npr'), ['oxfmt', '-c', 'src/.oxfmtrc.json', '--list-different', '.']);
+    // --list-different exits 1 when some file differs; anything else, or any stderr, is a broken run.
     expect(format.error).toBeUndefined();
+    expect([0, 1]).toContain(format.status);
+    expect(format.stderr).toBe('');
+    expect(format.stdout.split('\n').filter(Boolean).length).toBeGreaterThan(0);
     expect(seen(format.stdout + format.stderr)).toEqual([]);
   });
 
@@ -117,29 +126,31 @@ describe('the parent checkout never sees a planted worktree', () => {
 });
 
 describe('watchers and whole-root walkers', () => {
-  test("Vite's dev watcher, with the shared ignore, never watches a nested worktree but watches its own tree", async () => {
-    const root = fixture({'index.html': '<!doctype html>\n', 'src/a.ts': 'export {};\n', '.worktrees/p/src/b.ts': 'export {};\n'});
+  /** Start Vite's real dev watcher on `root` with the shared ignore; its watched folders, relative to `root`.
+   * @param {string} root @returns {Promise<string[]>} */
+  async function watched(root) {
     const server = await createServer({configFile: false, root, logLevel: 'silent', appType: 'custom',
       server: {middlewareMode: true, ws: false, watch: {ignored: worktreeWatchIgnored(root)}}, optimizeDeps: {noDiscovery: true, include: []}});
     try {
       server.watcher.add(root);
       await new Promise(done => { server.watcher.once('ready', done); setTimeout(done, 2000); });
-      const watched = Object.keys(server.watcher.getWatched());
-      expect(watched.some(path => path.endsWith('/src'))).toBe(true);
-      expect(watched.filter(path => path.includes('/.worktrees'))).toEqual([]);
+      return Object.keys(server.watcher.getWatched()).map(path => relative(root, path).replaceAll('\\', '/'));
     } finally { await server.close(); }
+  }
+
+  test("Vite's dev watcher, with the shared ignore, never watches a nested worktree but watches its own tree", async () => {
+    // A parenthesised root: chokidar normalizes backslashes, so a glob-escaped path would not match.
+    const root = fixture({'index.html': '<!doctype html>\n', 'src/a.ts': 'export {};\n', '.worktrees/p/src/b.ts': 'export {};\n'}, 'worktree-ignore-(x)-');
+    const folders = await watched(root);
+    expect(folders).toContain('src');
+    expect(folders.filter(path => isWorktreePath(path))).toEqual([]);
   });
 
   test('a worktree that holds the shared ignore still watches all of its own tree', async () => {
-    const parent = fixture({'.worktrees/p/index.html': '<!doctype html>\n', '.worktrees/p/src/a.ts': 'export {};\n'});
-    const root = join(parent, '.worktrees/p');
-    const server = await createServer({configFile: false, root, logLevel: 'silent', appType: 'custom',
-      server: {middlewareMode: true, ws: false, watch: {ignored: worktreeWatchIgnored(root)}}, optimizeDeps: {noDiscovery: true, include: []}});
-    try {
-      server.watcher.add(root);
-      await new Promise(done => { server.watcher.once('ready', done); setTimeout(done, 2000); });
-      expect(Object.keys(server.watcher.getWatched()).some(path => path.endsWith('/.worktrees/p/src'))).toBe(true);
-    } finally { await server.close(); }
+    const parent = fixture({'.worktrees/p/index.html': '<!doctype html>\n', '.worktrees/p/src/a.ts': 'export {};\n', '.worktrees/p/.worktrees/q/b.ts': 'export {};\n'});
+    const folders = await watched(join(parent, '.worktrees/p'));
+    expect(folders).toContain('src');
+    expect(folders.filter(path => isWorktreePath(path))).toEqual([]);
   });
 
   test("the engine's Vite and Vitest configs use the shared ignore and an explicit dependency-scan input", () => {
