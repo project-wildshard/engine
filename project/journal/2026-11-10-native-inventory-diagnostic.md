@@ -35,3 +35,24 @@ the child no longer exists. The final complete file passes 7/7 in
 This is diagnostic coverage and evidence retention, not a claimed flake
 repair or qualification streak. Pine retains the FL ledger and original
 full-gate red. The next real malformed row must establish the root cause.
+
+Q140's first normal publication was refused after 6,084 passing cases:
+net-fuzz's Nalati hostile-client case hit 10 s, and the original native
+writer case reported Command failed: ps. The latter is an exec refusal,
+not the malformed-row refusal; the old callback discarded its useful
+structured fields. The log does not establish whether its unchanged
+500 ms limit fired or another native exit occurred. No root cause is
+claimed and that failed capture is not a green publication.
+
+Retain the command's code, signal, killed flag and elapsed milliseconds,
+plus at most 160 characters each of its message, stdout and stderr.
+Keep the original refusal and every existing bound. An actual owned
+sleeping ps executable is terminated by the same 500 ms exec timeout;
+the control verifies SIGTERM/killed facts, bounded output, no disposal
+and its original marker. Do not infer that controlled cause for Q140.
+The test prints the failed writer profile path, but the queue's failed
+snapshot was later absent; no retained directory or actor is claimed.
+The old-helper/forward exec comparison is red/green on these facts;
+both reject and preserve the profile. The final native file passes 7/7
+in 18.41 s and eligible typed lint is green. The new one-shot read-only
+review reports no MUST/SHOULD findings (Claude quota fallback to Codex).

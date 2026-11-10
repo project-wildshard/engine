@@ -4,8 +4,14 @@ import {execFile} from 'node:child_process';
 /** @typedef {{pid: number, parent: number, group: number, state: string}} NativeProcess */
 /** @returns {Promise<NativeProcess[]>} */
 const processes = () => new Promise((resolve, reject) => {
-  execFile('ps', ['-axo', 'pid=,ppid=,pgid=,stat='], {encoding: 'utf8', timeout: 500}, (error, output) => {
-    if (error) {reject(error); return;}
+  const started = performance.now();
+  execFile('ps', ['-axo', 'pid=,ppid=,pgid=,stat='], {encoding: 'utf8', timeout: 500}, (error, output, stderr) => {
+    if (error) {
+      reject(new Error(`Native process inventory command refused: ${JSON.stringify({code: error.code ?? null,
+        signal: error.signal ?? null, killed: error.killed ?? false, elapsedMs: Math.round(performance.now() - started),
+        message: error.message.slice(0, 160), stdout: output.slice(0, 160), stderr: stderr.slice(0, 160)})}`));
+      return;
+    }
     const rows = output.trim().split('\n').map(line => {
       const [pid, parent, group, state] = line.trim().split(/\s+/u);
       return {pid: Number(pid), parent: Number(parent), group: Number(group), state: state ?? '', inventory: line.slice(0, 160)};

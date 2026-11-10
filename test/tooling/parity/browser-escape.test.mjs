@@ -215,6 +215,20 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
     expect(diagnostic).toMatchObject({pid: null, parent: 1, group: 1, state: 'S', inventory: inventory.slice(0, 160)});
     expect(value.message.length).toBeLessThan(512);
     expect(existsSync(resolve(profile, 'original'))).toBe(true);
+    writeFileSync(resolve(bin, 'ps'), `#!/bin/sh\nprintf '%s\\n' '${'o'.repeat(2000)}'\nprintf '%s\\n' '${'e'.repeat(2000)}' >&2\nexec /bin/sleep 5\n`, {mode: 0o700});
+    const commandRefused = spawnSync(process.execPath, ['--input-type=module', '-e', program,
+      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile],
+    {encoding: 'utf8', timeout: 10_000, env: {...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`}});
+    expect(commandRefused.status).toBe(0);
+    /** @type {unknown} */
+    const commandValue = JSON.parse(commandRefused.stdout);
+    if (typeof commandValue !== 'object' || commandValue === null || !('message' in commandValue) || typeof commandValue.message !== 'string') throw new Error('Missing command refusal facts');
+    expect(commandValue).toMatchObject({disposed: false, profile: true});
+    expect(commandValue.message).toContain('Native process inventory command refused:');
+    /** @type {unknown} */
+    const commandFacts = JSON.parse(commandValue.message.slice(commandValue.message.indexOf('{')));
+    expect(commandFacts).toMatchObject({code: null, signal: 'SIGTERM', killed: true, stdout: 'o'.repeat(160), stderr: 'e'.repeat(160)});
+    expect(commandValue.message.length).toBeLessThan(1024);
     const timed = spawnSync(process.execPath, ['--input-type=module', '-e', program,
       new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, 'hold'],
     {encoding: 'utf8', timeout: 1000, env: {...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`}});
