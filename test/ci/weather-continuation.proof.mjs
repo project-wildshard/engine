@@ -194,6 +194,33 @@ timed(
       assert.equal(strikes.length, 1);
       offTelegraph();
       offStrike();
+      // Same seeded cell, competing point heights: a neighbouring candidate
+      // must beat the original nearest point, not merely beat flat ground.
+      const target = { x: first.x, z: first.z - 8 };
+      const competing = points.map(([x, z, top]) => [
+        x,
+        z,
+        x === target.x && z === target.z ? 100 : top,
+      ]);
+      assert.ok(competing.some(([x, z, top]) => x === target.x && z === target.z && top === 100));
+      await native(async (secondHost) => {
+        const second = await storm(secondHost, 19, competing);
+        Object.assign(second.inputs, { px: 0, pz: 0 });
+        const seen = [];
+        const off = second.on("telegraph", (event) => {
+          seen.push({ ...event });
+        });
+        try {
+          for (let i = 0; i < 1200 && seen.length === 0; i++) second.update(0.1);
+          assert.equal(seen.length, 1);
+          assert.deepEqual(
+            { x: seen[0].x, z: seen[0].z, y: seen[0].y, kind: seen[0].kind },
+            { ...target, y: 100, kind: 1 },
+          );
+        } finally {
+          off();
+        }
+      });
     });
   },
 );

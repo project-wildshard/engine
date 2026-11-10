@@ -20,3 +20,17 @@ old inline guest or terrain stub substitutes for the shipped module.
 The old SDK file stays. No runtime, product, pin, graphical output or
 live service changed. Cases retain 9.5 seconds including cleanup and
 run explicitly in CI, outside the local hook and Vitest inventories.
+
+## One-shot review and stronger highest-point control
+
+J206 GO at 5e88467, no MUST:
+`~/.cache/wildshard/session-keep/reviews/sdk-weather-engine-20261110-SDK-weather-continuation-20261110T093209Z-20307.md`.
+Its math split is honest; Linux native-tail qualification remains an
+explicit hosted prerequisite, not a local cross-platform claim.
+The second SHOULD is fixed with two same-seed actual native storms.
+A neighbouring candidate raised to 100 must beat the original nearest
+50-height point. An actual engine source mutation always taking the
+first candidate passes the old equal-height proof and fails the new
+competing-height control; every production byte is then restored.
+The first six clock/pause/height/atomic mutants also fail. Fourteen
+restored cases pass in 1.386 s total, maximum 290 ms. No second review.
