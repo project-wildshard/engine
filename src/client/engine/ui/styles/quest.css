@@ -1,5 +1,8 @@
-/* ─── the adventure layer (src/game/*/quest/*): the quest chip under the minimap, the NPC dialogue panel, the reward
-   caption ─── prefix ws-quest- ─── */
+/* ─── the adventure layer (src/client/engine/quest/view/ui.ts): the quest chip under the minimap, the NPC dialogue panel, the
+   reward caption ─── prefix ws-quest- ───
+   A14: never write a glob like game-star-slash-quest in a comment here. Its star-slash closed this comment early, the stray word
+   that followed became the next rule's selector (`quest .ws-quest-obj`), which matched nothing, so on every page the quest
+   chip lost its place under the minimap and fell unstyled into the top-left corner under PAUSE. */
 
 /* ── the quest chip (E51, mockup G): ONE slim glass line under the minimap, right-aligned to its right edge (top / right set
    from the minimap's rect in JS) — ◆ GLYPH SHARDS 0/3 | SEA CAVE 230 M ▲. The labels truncate with an ellipsis, the counter
