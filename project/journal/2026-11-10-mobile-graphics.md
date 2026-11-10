@@ -20,3 +20,5 @@ graphics", and "with low, you can just do… 1 time and 1 time".
   code may not name a shard), and game/firstPlay.ts shows the card at
   control: Low / High live, the Low Power line, DONE.
 - MG6: main menu > Settings > First-time setup: Replay.
+- scripts/mobile-graphics-proof.mjs: headless WebKit 390x844, Low Power
+  played as a 30 Hz rAF; MG3-MG6 pass with it on and off.
