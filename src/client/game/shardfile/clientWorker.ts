@@ -98,7 +98,7 @@ interface ShellModule { readonly startStandalone: (config: { slug: string; base:
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
 interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; failed: (message: string) => void }) => Promise<Shell> }
-interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
+interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
 /** How long the card waits for the server's first rows, and how often it looks. A server that has booted says them in a tick. */
@@ -310,7 +310,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   const shell = await (world !== undefined && ports.grid === null && page !== null ? online(world, page) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
-  let ended = false, leaves = (): void => undefined;
+  // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held
+  // body may already be back). Once the page can save, the hold below replaces this one.
+  let ended = false, leaves = shell.leave === undefined ? (): void => undefined : holdLeaving(async () => { shell.pause(); await shell.leave?.(); });
   // Settings stops a server before it touches what the server saves: that stop must not save.
   const stop = (): void => { if (!ended) { ended = true; leaves(); shell.dispose(); } };
   scope.onDispose(serverStopsForImport(stop));
@@ -419,7 +421,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   scope.interval(SAVE_EVERY_MS, () => { void save(); });
   scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') void save(); });
   scope.listen(window, 'pagehide', () => { void save(); });
-  leaves = holdLeaving(() => { shell.pause(); return save(); });
+  // QA row 16: a navigation the game chose (the menu's exit, another world, the doctor) leaves the world's seat at once.
+  leaves(); leaves = holdLeaving(async () => { shell.pause(); await save(); await shell.leave?.(); });
   let firstTick = -1, ticksFrom = started, cost = 0, sampleAt = 0, framesAt = 0, sampledAt = started, presented = started;
   scope.onDispose(client.onTravel(() => { firstTick = -1; ticksFrom = diagnosticNow(); }));
   const sample = (now: number): void => {

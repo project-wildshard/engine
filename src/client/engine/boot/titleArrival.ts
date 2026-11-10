@@ -52,7 +52,8 @@ function valid(raw: string | null, slug: string): TitleArrival | null {
 
 /** Optional display metadata lets the first HTML paint name the destination before application modules arrive. */
 /** LS6: `art` is the destination's own placeholder art (a same-origin path), or '' for none: the card's first frame shows it. */
-export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: string; art?: string }): void {
+/** `tab`: a page reloading itself (QA row 16) hands the tap to its own next document only, never to another tab's bookmark. */
+export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: string; art?: string }, options: { readonly tab?: boolean } = {}): void {
   bootMark('app:navigation-decision', {slug: arrival.slug});
   const timing = bootTiming();
   const raw = JSON.stringify({ ...arrival, at: Date.now(), ...(timing === undefined ? {} : {timing: {
@@ -61,7 +62,12 @@ export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: 
   try { saveStorage('session').setItem(KEY, raw); } catch { /* the local one-shot below can carry the intent */ }
   // iOS home-screen navigation can replace WebContent between the static title and the game document.
   // The backup is consumed once, and expires quickly; it never becomes a remembered last shard.
-  try { saveStorage('device').setItem(BACKUP_KEY, raw); } catch { /* the session copy may still survive */ }
+  if (options.tab !== true) try { saveStorage('device').setItem(BACKUP_KEY, raw); } catch { /* the session copy may still survive */ }
+}
+
+/** A tab's own handoff (`setTitleArrival(…, {tab: true})`) whose reload did not happen. */
+export function dropTabArrival(): void {
+  try { saveStorage('session').removeItem(KEY); } catch { /* nothing was kept */ }
 }
 
 export function consumeTitleArrival(slug: string): TitleArrival | null {

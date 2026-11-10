@@ -14,3 +14,14 @@ export function bootRoute(search: URLSearchParams, previous: { readonly line: st
   for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw']) route.delete(key); // index.html's title-first rule keeps the same list
   return { rescue, titleOnly: rescue || route.size === 0 };
 }
+
+/**
+ * QA row 16 (Jake, 2026-11-10: "you shouldn't be logged in into the world, into the zone, before you press play"). On a build stamped
+ * with a world, a level page seats a body the other players see. So a load that would boot a level (a `?chunk=`, or any other setting
+ * that selects the default one) enters only when a tap brought it here (a fresh title arrival or grid intent), or a harness flag that
+ * already skips the title asks for it. A reopened tab, a bookmark or a crashed session lands on the title, and nothing joins.
+ */
+export function onlineTitleFirst(search: URLSearchParams, online: boolean, tapped: boolean): boolean {
+  if (!online || tapped || search.has('skipintro') || search.has('tour')) return false;
+  return !bootRoute(search, { line: '', level: '' }).titleOnly;
+}

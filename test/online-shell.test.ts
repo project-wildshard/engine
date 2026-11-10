@@ -5,6 +5,7 @@ import type { LinkState } from '../src/client/engine/net/redial';
 import { readSignedRelease } from '../src/client/host/online/release';
 import { connectOnline, type OnlineShell } from '../src/client/host/online/shell';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
+import { World } from '../src/server/host/dedicated/world';
 
 // E7.2d: the page's half of the one world, on the real door and a real socket, as a page calls it. Only the strips are left out.
 const SHARD = 'driftwood-isle', IDENTITY = { player: 'device:online', name: 'Jake' };
@@ -55,4 +56,76 @@ test('a seat in a cell the page has not loaded says so, and takes no body', { ti
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: 'nalati-grasslands', identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: shard => { places.push(shard); } });
   await vi.waitFor(() => { expect(places).toEqual([SHARD]); }, { timeout: 5000 });
   expect(bench.room(SHARD)?.holds(IDENTITY.player)).toBe(false);
+});
+
+// QA row 16: a player who chose to go is gone for everyone at once, not after J114's 30 s hold, and a page that leaves before
+// it was seated never gets a body at all.
+test('a seated page that leaves takes its body with it at once', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  const { client, booted, ready, leave } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await booted;
+  ready();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  await leave();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
+});
+
+test('a page that leaves while it loads never takes a seat', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  const { client, booted, ready, leave } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await booted;
+  void leave();
+  ready();
+  await new Promise(resolve => { setTimeout(resolve, 1000); });
+  expect(bench.room(SHARD)?.holds(IDENTITY.player)).toBe(false);
+  expect(bench.world.health().players).toBe(0);
+});
+
+test('a quit in the same read as the page\'s `ready` takes no seat', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  const { client, booted, ready, leave } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await booted;
+  // Both go in one tick, so one socket read usually takes both. The door's seat order is watched, so a body seated and dropped fails too.
+  const seats = vi.spyOn(World.prototype as unknown as { seat: (...args: unknown[]) => void }, 'seat');
+  ready(); void leave();
+  await new Promise(resolve => { setTimeout(resolve, 1000); });
+  expect(seats, 'the door never seats a player who quit').not.toHaveBeenCalled();
+  expect(bench.world.health().players).toBe(0);
+});
+
+test('a quit on the link that came back for a held body ends the hold at once', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  const first = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  pump = setInterval(() => { first.client.present(); first.client.flush(); }, 16);
+  await first.booted;
+  first.ready();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  clearInterval(pump); first.dispose();
+  await new Promise(resolve => { setTimeout(resolve, 500); });
+  expect(bench.room(SHARD)?.holds(IDENTITY.player), 'a lost link holds its body (J114)').toBe(true);
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  void shell.leave();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
+});
+
+test('a quit while the link is down and redialling still lets the held body go', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  const { client, booted, ready, leave } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await booted;
+  ready();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  // The door drops the link the way a stalled phone's is dropped: the body is held (J114) and the page starts redialling.
+  for (const end of (bench.world as unknown as { ends: Set<{ close: (reason: string) => void }> }).ends) end.close('stalled');
+  await new Promise(resolve => { setTimeout(resolve, 50); });
+  expect(bench.room(SHARD)?.holds(IDENTITY.player), 'a lost link holds its body').toBe(true);
+  await leave();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
 });

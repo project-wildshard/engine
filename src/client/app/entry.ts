@@ -30,7 +30,8 @@ import { progressOfCard, stuckMessage, watchStuckStep } from '@wildshard/engine/
 import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/shell';
 import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wildshard/engine/boot/bootTrace';
 import { Scope } from '@wildshard/engine/app/scope';
-import { bootRoute } from './bootRoute';
+import { bootRoute, onlineTitleFirst } from './bootRoute';
+import { pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
@@ -98,9 +99,17 @@ async function enterPage(): Promise<unknown> {
   }
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
   const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
+  // QA row 16 (GO1): an online level seats a body the world sees, so only a tap enters one. Crash resume is the solo build's.
+  const online = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined;
+  const tapped = requested !== null && (pendingTitleArrival(requested) !== null || pendingGridEntry(requested));
+  if (document.getElementById('ws-shardfile') === null && onlineTitleFirst(search, online, tapped)) {
+    history.replaceState(history.state, '', new URL('/', location.origin));
+    document.documentElement.classList.add('title-first');
+    return showPageTitle();
+  }
   const end = lastEnd();
   const named = search.get('chunk');
-  crashResume = (named === null || [end.slug].includes(named)) && !search.has('explore') ? consumeCrashResume(end, titleRows) : null;
+  crashResume = !online && (named === null || [end.slug].includes(named)) && !search.has('explore') ? consumeCrashResume(end, titleRows) : null;
   // SR4: after an unexpected grid end, the page's place is checked against where the server's durable continuation stands.
   // A failed or slow read keeps the page's own place, as before.
   const server = end.kind === 'unexpected' && end.mode === 'grid' ? await bootTask('app:grid-server-site', serverSites) : undefined;

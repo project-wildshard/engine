@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { freshPageArrival, setTitleArrival, consumeTitleArrival } from '../src/client/engine/boot/titleArrival';
-import { bootRoute } from '../src/client/app/bootRoute';
+import { freshPageArrival, setTitleArrival, consumeTitleArrival, dropTabArrival, pendingTitleArrival } from '../src/client/engine/boot/titleArrival';
+import { saveStorage } from '../src/client/engine/saves/slots';
+import { bootRoute, onlineTitleFirst } from '../src/client/app/bootRoute';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { gridIntents } from '../src/client/game/grid/intent';
 import { travelService, travelSlot } from '../src/client/game/travel/travel';
@@ -96,4 +97,28 @@ test('interrupted explicit level entry still returns to the title', () => {
 test('explicit RELOAD returns to title even with a selected shard URL', () => {
   expect(bootRoute(new URLSearchParams('chunk=driftwood-isle'), { line: '', level: '', reload: true }))
     .toEqual({ rescue: true, titleOnly: true });
+});
+
+test('an online build enters a level only from a tap (QA row 16)', () => {
+  const at = (query: string): URLSearchParams => new URLSearchParams(query);
+  expect(onlineTitleFirst(at('chunk=driftwood-isle'), true, false), 'a reopened tab or bookmark lands on the title').toBe(true);
+  expect(onlineTitleFirst(at('chunk=driftwood-isle'), true, true), 'a title tap or grid intent enters').toBe(false);
+  expect(onlineTitleFirst(at('chunk=driftwood-isle&skipintro=1'), true, false), 'a harness that skips the title enters').toBe(false);
+  expect(onlineTitleFirst(at('chunk=driftwood-isle&tour=1'), true, false)).toBe(false);
+  expect(onlineTitleFirst(at('chunk=driftwood-isle'), false, false), 'the solo build keeps its deep links').toBe(false);
+  expect(onlineTitleFirst(at(''), true, false), 'the plain title is the title already').toBe(false);
+  expect(onlineTitleFirst(at('utm_source=bookmark'), true, false), 'a setting that boots the default level is no tap either').toBe(true);
+  expect(onlineTitleFirst(at('explore=hub'), true, false)).toBe(true);
+  expect(onlineTitleFirst(at('mute=1&v=2'), true, false), 'harness settings alone are the title already').toBe(false);
+});
+
+test('a page reloading itself hands the tap to its own tab only (QA row 16)', () => {
+  vi.stubGlobal('window', {});
+  dropTabArrival();
+  try { saveStorage('device').removeItem('titleArrival.once'); } catch { /* no device storage here */ }
+  setTitleArrival({ slug: 'driftwood-isle', mode: 'enter' }, { tab: true });
+  expect(saveStorage('device').getItem('titleArrival.once'), 'another tab finds nothing to enter with').toBeNull();
+  expect(pendingTitleArrival('driftwood-isle')).toEqual({ slug: 'driftwood-isle', mode: 'enter' });
+  dropTabArrival();
+  expect(pendingTitleArrival('driftwood-isle')).toBeNull();
 });

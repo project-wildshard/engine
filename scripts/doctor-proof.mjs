@@ -118,7 +118,7 @@ try {
   // 3. The join screen's Check connection carries the cell it was loading.
   {
     const { opened, page } = await context();
-    await page.goto(`${base}/?chunk=${SHARD}`, { waitUntil: 'load' });
+    await page.goto(`${base}/?chunk=${SHARD}&skipintro=1`, { waitUntil: 'load' }); // QA row 16: a bare link lands on the title
     await page.locator('#ws-name-box [data-doctor=open]').waitFor({ timeout: 150_000 });
     await page.screenshot({ path: join(shots, 'name-box.png') });
     await page.locator('#ws-name-box [data-doctor=open]').click();
@@ -147,7 +147,7 @@ try {
   // The game itself on that file fails to boot; its failure screen offers the doctor, which carries the screen's report.
   {
     const { opened, page } = await context();
-    await page.goto(`${base}/?chunk=${SHARD}`, { waitUntil: 'load' });
+    await page.goto(`${base}/?chunk=${SHARD}&skipintro=1`, { waitUntil: 'load' }); // QA row 16: a bare link lands on the title
     const door = page.locator('.ws-load-doctor, #wserr .doctor').first();
     await door.waitFor({ timeout: 150_000 });
     const screen = await page.evaluate(() => document.querySelector('.ws-load-error') === null ? 'error modal' : 'LS4 failure screen');

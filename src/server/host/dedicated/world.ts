@@ -22,7 +22,7 @@ import type { ChatReport } from '@wildshard/engine/net/chat';
 import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading } from './cellProtocol';
 import { bodyId } from './seats';
 import type { PlayerDoc } from './playerDoc';
-import { pumpSocket } from './socketPump';
+import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
 import { workerTable } from './workerTable';
@@ -123,6 +123,8 @@ export class World {
   private readonly sockets = new Map<string, number>();
   private readonly connects = new Map<string, ConnectAttempt[]>();
   private readonly ends = new Set<SocketTransport>();
+  /** Links whose player quit (`ready` with `LEAVE_FLAG`) before a body was theirs. */
+  private readonly quits = new WeakSet<SocketTransport>();
   /** Clients loading: each holds a seat, and has no body yet. */
   private readonly pending = new Map<string, PendingSeat>();
   /** Who has a body, by link or by hold, and in which cell. */
@@ -214,6 +216,9 @@ export class World {
       if (reason === 'retry') { const kept = (this.connects.get(ip) ?? []).filter(row => row !== attempt); if (kept.length === 0) this.connects.delete(ip); else this.connects.set(ip, kept); }
       this.ends.delete(end); const left = (this.sockets.get(ip) ?? 1) - 1; if (left === 0) this.sockets.delete(ip); else this.sockets.set(ip, left);
     });
+    // QA row 16: a clean quit counts from the first byte, not only once seated (`pumpSocket`'s own). A quit that lands while the door
+    // still admits this link (in the same read as its `ready`, or before a held body is handed back) ends it with no seat and no hold.
+    end.onControl((control, bytes) => { if (control === 'ready' && new Uint8Array(bytes)[0] === LEAVE_FLAG) { this.quits.add(end); end.close(LEFT); } });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
@@ -236,8 +241,9 @@ export class World {
       return await new Promise((resolve, reject) => {
         this.finds.set(id, resolve);
         scope.timeout(this.options.helloMs ?? HELLO_MS, () => { reject(new Error('Worker lookup timed out')); });
-        scope.onDispose(end.onClose(() => { reject(new Error('Admission closed')); }));
-        if (end.isOpen) this.link(slug).send({ kind: 'find', id, slug, device });
+        // A player who quit still gets the answer: a held body of theirs is let go (`leaveHeld`).
+        scope.onDispose(end.onClose(() => { if (!this.quits.has(end)) reject(new Error('Admission closed')); }));
+        if (end.isOpen || this.quits.has(end)) this.link(slug).send({ kind: 'find', id, slug, device });
       });
     } finally { this.finds.delete(id); scope.dispose(); }
   }
@@ -252,6 +258,7 @@ export class World {
     const device = said.output.player, name = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
     if (holding !== undefined) {
       const found = await this.ask(holding, device, end);
+      if (found.held && this.quits.has(end)) { this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
       if (!end.isOpen || this.draining) return;
       if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
     }
@@ -270,7 +277,7 @@ export class World {
     this.sayCountdown(end);
     await new Promise<void>(resolve => {
       const timer = this.scope.timeout(this.options.readyMs ?? READY_MS, () => { this.refuse('ready-timeout'); end.close('refused'); resolve(); });
-      const off = end.onControl(control => { if (control === 'ready') { off(); this.scope.cancelTimer(timer); resolve(); } });
+      const off = end.onControl((control, flag) => { if (control === 'ready' && new Uint8Array(flag)[0] !== LEAVE_FLAG) { off(); this.scope.cancelTimer(timer); resolve(); } });
       end.onClose(() => { off(); this.scope.cancelTimer(timer); resolve(); });
     });
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
@@ -297,6 +304,12 @@ export class World {
     pumpSocket(end, port1);
     this.voice.attach(end, slug, entry.name);
     this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
+  }
+  /** A held body whose player quit on the link that came back for it: the cell takes it as a seat whose link has already left. */
+  private leaveHeld(slug: string, entry: SeatEntry, hello: ArrayBuffer): void {
+    const { port1, port2 } = new MessageChannel();
+    this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
+    port1.postMessage({ close: LEFT, silentMs: 0 }); port1.close();
   }
   private sayCountdown(end: SocketTransport): void {
     if (this.grace === null) return;
