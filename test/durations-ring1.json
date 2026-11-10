@@ -776,6 +776,7 @@
   "test/held-loadout-platform.test.ts": 3.9719205099999995,
   "test/held-secondary-row.test.ts": 1.0113791099999998,
   "test/home-geometry-snapshot.test.ts": 0.07629136699999996,
+  "test/home-icons.test.ts": 0.108922126,
   "test/inline-save-epoch.test.mjs": 0.144574237,
   "test/inline-shell-css.test.mjs": 0.04464773199999999,
   "test/input-hash-memo.test.ts": 0.111969074,

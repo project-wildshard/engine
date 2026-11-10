@@ -808,6 +808,7 @@
   "test/held-loadout-platform.test.ts": 3.3521026820000004,
   "test/held-secondary-row.test.ts": 1.238340933,
   "test/home-geometry-snapshot.test.ts": 0.05915883899999997,
+  "test/home-icons.test.ts": 0.166481624,
   "test/ink-native-proof.test.ts": 12.292769289,
   "test/inline-save-epoch.test.mjs": 0.07736377100000004,
   "test/inline-shell-css.test.mjs": 0.05152517899999995,

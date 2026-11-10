@@ -31,3 +31,5 @@
   to read at 60 px, so it grew to 0.9 of the iOS coin, 260 px out.
   Left: the worker still lets `/icons/` go to the network, as the old
   root icons did.
+- Recorded `test/home-icons.test.ts` timings with `push-preflight
+  timings` (about 40 ms, full and ring 1) before enqueueing.
