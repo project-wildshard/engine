@@ -9,8 +9,6 @@ import type { LinkCause, LinkProgress, LinkState } from '@wildshard/engine/net/r
 import type { Countdown } from '@wildshard/engine/net/socketFrames';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 
-/** J114: the world holds a dropped character this long. */
-const HOLD_S = 30;
 /** Redial gives up after this long (`redial.ts` GIVE_UP_MS). */
 const GIVE_UP_S = 120;
 /** The Reconnected notice stays this long. */
@@ -98,7 +96,7 @@ export interface LinkScreens {
 
 /** The banner's words and catalogue ids for a link that is down. */
 function bannerFor(state: LinkState, cause: LinkCause, dials: number): { ids: string; tone: 'info' | 'warn'; title: string; line: string } {
-  if (state === 'resuming') return { ids: 'resuming', tone: 'warn', title: 'Still reconnecting', line: 'you\'ll rejoin at your last save' };
+  if (state === 'resuming') return { ids: 'resuming', tone: 'warn', title: 'Still reconnecting', line: 'we\'ll keep trying' };
   if (cause === 'restart') return { ids: 'restart', tone: 'info', title: 'Restarting', line: 'the world is back in a moment' };
   if (cause === 'hidden') return { ids: 'background-short', tone: 'warn', title: 'Reconnecting', line: 'welcome back' };
   if (cause === 'silent') return { ids: 'half-open', tone: 'warn', title: 'Reconnecting', line: dials > 0 ? `try ${String(dials + 1)}` : 'no word from the world' };
@@ -168,7 +166,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     unnotice();
     const own = noticeScope = scope.child('online.notice'), chip = own.ownNode(make('div', 'ws-link ws-link-notice'));
     chip.dataset['failmode'] = 'reconnected'; chip.dataset['tone'] = 'good'; chip.setAttribute('role', 'status');
-    chip.append(make('b', '', 'Reconnected'), make('span', '', 'you\'re back where you were'));
+    chip.append(make('b', '', 'Reconnected'), make('span', '', 'you\'re back online'));
     parent.append(chip);
     own.timeout(NOTICE_MS, unnotice);
   };
@@ -197,9 +195,11 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       const { dials, nextDialMs, downMs } = hooks.progress(), downS = Math.floor(downMs / 1000);
       tries.replaceChildren(ring(), dials > 0 ? `Try ${String(dials + 1)}` : 'Checking the link');
       next.textContent = nextDialMs !== null ? `Next dial in ${String(Math.ceil(nextDialMs / 1000))} s` : downMs === 0 ? 'Listening for the world' : 'Dialling now';
-      const heldFor = HOLD_S - downS, left = heldFor > 0 ? heldFor : GIVE_UP_S - downS;
-      holdLine.textContent = heldFor > 0 ? `Your character is held for ${String(heldFor)} s more` : `You'll rejoin at your last save · we keep trying for ${String(Math.max(0, left))} s more`;
-      fill.style.width = `${String(Math.max(0, Math.round(heldFor > 0 ? heldFor / HOLD_S * 100 : left / (GIVE_UP_S - HOLD_S) * 100)))}%`;
+      // J229 and the Codex plan review: only what this page measured. No server hold or save time is claimed: the bar is the
+      // page's own give-up clock (Redial's 120 s), and the line says how long the world has been quiet
+      const left = Math.max(0, GIVE_UP_S - downS);
+      holdLine.textContent = downMs === 0 ? 'No word from the world for a moment' : `Down for ${String(downS)} s · we'll keep trying for ${String(left)} s more`;
+      fill.style.width = `${String(Math.round(left / GIVE_UP_S * 100))}%`;
     };
     paint(); own.interval(1000, paint);
     parent.append(root); freePointer();
@@ -240,7 +240,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     }
     if (state === 'ended') for (const kept of held.splice(0)) kept.drop();
     if (state === 'lost') {
-      stop('lost', 'bad', 'Connection lost', 'Couldn\'t reconnect', 'We tried for 2 minutes. Everything up to your last save is on the server, so nothing is lost.',
+      stop('lost', 'bad', 'Connection lost', 'Couldn\'t reconnect', 'We tried for 2 minutes and the world didn\'t answer. Anything the world hadn\'t saved yet may need doing again.',
         [{ label: 'Try again', primary: true, busy: 'Reconnecting…', act: () => { hooks.retry(); } }, ...doctor('lost')], `${String(hooks.progress().dials)} dials · last close: ${hooks.why()}`);
     } else if (state === 'full') {
       stop('full', 'warn', 'World is full', 'The world is full', 'Every place is taken. We\'ll ask every 30 seconds and let you in as soon as someone leaves.', doctor('full'),
@@ -249,7 +249,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       stop('replaced', 'info', 'Another tab', 'Playing somewhere else', 'This world is open in another tab or on another device. Only one can play at a time.',
         [{ label: 'Play here', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }], 'close "replaced" (4003)');
     } else if (state === 'ended' && reason !== 'reload') {
-      stop('refused', 'bad', 'Turned away', 'The world turned this connection away', 'The server ended this link and won\'t take it back by itself. Your progress up to your last save is kept.',
+      stop('refused', 'bad', 'Turned away', 'The world turned this connection away', 'The server ended this link and won\'t take it back by itself.',
         [{ label: 'Play again', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }, ...doctor('lost')], `close "${String(reason)}"`);
     }
   };
@@ -257,7 +257,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     link,
     countdown: said => {
       deployLeft = said.seconds;
-      const paint = (): void => { deployLine.textContent = `in ${String(deployLeft)} s · your progress is saved`; deploy.hidden = down() || deployLeft <= 0; };
+      const paint = (): void => { deployLine.textContent = `in ${String(deployLeft)} s · preparing to move`; deploy.hidden = down() || deployLeft <= 0; };
       paint();
       if (deployTicking) return;
       deployTicking = true;
@@ -274,6 +274,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     holdChat: (text, send, drop) => {
       // live: send now. Ended: nothing will carry it, and the card already says why
       if (state === 'live' || state === 'ended') return false;
+      // one held draft at a time (J229, the plan's 16b): a new line replaces the one waiting
+      for (const kept of held.splice(0)) kept.drop();
       held.push({ text, send, drop });
       if (down() && open?.kind !== 'stop') hold('Send', true);
       return true;

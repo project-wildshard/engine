@@ -56,3 +56,10 @@ online shell, replacing the plain strip and the raw error text.
   gate stops. Tab works inside an alertdialog (InputService left it to
   the game), Try now dials without relabelling the cause
   (`Redial.dialNow`), and a held-chat card follows a new cause.
+- J229 (Jake's confirmed defaults) and the Codex plan review: the
+  screens claim only what the page measured. The hold card's 30 s
+  "held for" bar is gone (no server lease confirms it); the bar is
+  the page's own 120 s give-up clock with "down for N s". No save
+  time or "nothing is lost" without a server acknowledgement; the
+  notice says "back online", the deploy banner "preparing to move".
+  Chat keeps one held draft; a new line replaces it.

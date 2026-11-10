@@ -30,7 +30,8 @@ test('a dropped link shows the banner; a tap that needs the world opens its hold
   expect(card?.textContent).toContain('You tapped Talk');
   expect(card?.textContent).toContain('Try 2');
   expect(card?.textContent).toContain('Next dial in 2 s');
-  expect(card?.textContent).toContain('held for 26 s more');
+  expect(card?.textContent).toContain('Down for 4 s');
+  expect(card?.textContent).not.toContain('held for');
   click(card, 'Try now');
   expect(calls).toEqual(['dialNow']);
   click(card, 'Keep waiting');
@@ -45,15 +46,18 @@ test('a dropped link shows the banner; a tap that needs the world opens its hold
   scope.dispose();
 });
 
-test('a chat line typed while down is held, and sent in order when the link is back', () => {
+test('a chat line typed while down is held as one draft, and sent once when the link is back', () => {
   const { scope, screens } = harness(), sent: string[] = [];
   screens.link('reconnecting', 'closed');
-  expect(screens.holdChat('hello', line => { sent.push(line); }, () => undefined)).toBe(true);
+  const dropped: string[] = [];
+  expect(screens.holdChat('hello', line => { sent.push(line); }, () => { dropped.push('hello'); })).toBe(true);
+  // one held draft at a time: a second line replaces the first
   expect(screens.holdChat('anyone?', line => { sent.push(line); }, () => undefined)).toBe(true);
+  expect(dropped).toEqual(['hello']);
   expect(shown('reset-blocked')?.textContent).toContain('Your message will send when you\'re back');
   expect(sent).toEqual([]);
   screens.link('live');
-  expect(sent).toEqual(['hello', 'anyone?']);
+  expect(sent).toEqual(['anyone?']);
   expect(shown('reset-blocked')).toBeNull();
   expect(screens.holdChat('now', () => undefined, () => undefined)).toBe(false);
   scope.dispose();
@@ -85,7 +89,7 @@ test('the banner names the cause: a restart, a silent link, a return to the tab,
   set({ downMs: 41_000 }); screens.link('resuming', 'hidden');
   expect(shown('resuming')?.textContent).toContain('Still reconnecting');
   screens.allow('Talk');
-  expect(shown('resuming-blocked')?.textContent).toContain('You\'ll rejoin at your last save');
+  expect(shown('resuming-blocked')?.textContent).toContain('we\'ll keep trying for 79 s more');
   scope.dispose();
 });
 
