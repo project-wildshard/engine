@@ -35,3 +35,16 @@ reattach the actual damage listener to the restored host, and separately
 require positive post-restore publication. The original positive contact
 assertion remains. All three cases pass after this strengthening; no
 second review, full gate or publication was run.
+## Full-gate fixture type forward
+
+Q180 refused this unpublished row in the real solution typecheck:
+nativeItemProfiles.ts passed `cycle` where the defining parser accepts
+`bolt | lever`. The parser's runtime non-bolt branch already parsed the
+unchanged authored lever profile; using the correct `lever` selector
+preserves that exact branch, tuning and legacy item behavior. No JSON,
+controller, runtime, assertion or cap changes. The later CPU-broker loss
+was a fail-fast shutdown after this type error, not its cause.
+
+Before a fresh changed capture, run the complete kit/layer solution
+typecheck with one builder and all three real native item continuations.
+No unchanged retry, broker runtime patch or global hold is requested.

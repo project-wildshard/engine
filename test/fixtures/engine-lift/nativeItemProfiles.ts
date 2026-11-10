@@ -12,7 +12,7 @@ export const CROSSBOW_WEAPON_PROFILE = parseNativeFirearmProfile(
   'bolt',
 )
 export const BOW_PROFILE = v.parse(BowWeaponProfileSchema, original.longbow)
-const lever = parseNativeFirearmProfile(original.lever, 'cycle')
+const lever = parseNativeFirearmProfile(original.lever, 'lever')
 if (lever.lever === undefined)
   throw new Error('Frozen lever fixture lacks its cycle')
 export const LEVER_WEAPON_PROFILE = { ...lever, lever: lever.lever }
