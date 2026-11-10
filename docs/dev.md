@@ -28,6 +28,10 @@ Run from the repo root.
 - `node src/cli/main.ts --help`: the CLI without installing it. `serve [--port n]` starts the server (default 4402).
 - `pnpm md:wrap`: rewraps Markdown prose to ~72 columns.
 - `src/scripts/ask-new.sh "<Jake's words>"`: opens an ask (`docs/tasks/asks/README.md`).
+- `scripts/browser-lane.sh node scripts/hud-worst.mjs --base=<url>`: the worst-case HUD, every
+  element any shard shows on at once, screenshotted per browser, size and
+  Developer mode, with the layout check (`--check`, `--menu`; A14). The
+  URL is a `scripts/serve-build.sh` build.
 
 ## Progress epochs
 
