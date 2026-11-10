@@ -83,3 +83,10 @@ Official stamps are regenerated. Current actual plans are full1218/12/max
 extension. J206 followup193748 has no MUST or SHOULD. Q265's old immutable
 snapshot conflicts on the shared timing-array append, not a failed oracle;
 the corrected committed history is recaptured once through the normal queue.
+
+Q267's normal hook catches a style error in the ratchet admission line:
+typescript/dot-notation rejects bracket access. Its broker-loss message is
+the fail-fast consequence; no broker fix is inferred. Destructuring the same
+environment value preserves the exact limit/refusal behavior and avoids both
+index-signature and property-style conflicts. Targeted lint now includes all
+changed code paths, not only the timing guard. No unchanged retry or bypass.
