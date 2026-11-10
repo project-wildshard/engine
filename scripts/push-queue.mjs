@@ -11,7 +11,9 @@ import {rebaseQueuedSnapshot} from './push-queue-rebase.mjs';
 import {workerEnvironment} from './push-environment.mjs';
 
 const self=import.meta.filename,lock=fileURLToPath(new URL('push-queue-lock.py',import.meta.url));
-const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0))),error:v.optional(v.string()),seconds:v.optional(v.number()),batch:v.optional(v.array(v.string())),failurePhase:v.optional(v.string())});
+// DS16c: the enqueue preflight's verdict, including a WS_PREFLIGHT_SKIP override.
+const preflightSchema=v.object({sha:v.string(),seconds:v.number(),refused:v.array(v.string()),warnings:v.array(v.string()),override:v.optional(v.string()),checkOnly:v.optional(v.boolean())});
+const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0))),error:v.optional(v.string()),seconds:v.optional(v.number()),batch:v.optional(v.array(v.string())),failurePhase:v.optional(v.string()),preflight:v.optional(preflightSchema)});
 const terminal=new Set(['pushed','checked','already-published','failed','published-unverified','publication-unknown']);
 const pending=new Set(['capturing','queued','retrying','rebasing','installing','waiting-for-hook','checking','publishing-ready','pushing','batching']);
 class RemoteAdvanceError extends Error{name='RemoteAdvanceError';}
@@ -76,7 +78,8 @@ function capture(source,directory,checkOnly,requested){
  const id=`${String(number).padStart(9,'0')}-${randomUUID().slice(0,8)}`,snapshot=join(directory,'snapshots',id),file=join(directory,`${id}.json`);
  const sha=requested??git(source,['rev-parse','HEAD']);if(!/^[a-f0-9]{40}$/u.test(sha)||spawnSync('git',['merge-base','--is-ancestor',sha,'HEAD'],{cwd:source}).status!==0)throw new Error('Queue target must be a full commit on source main');
  const remote=git(source,['remote','get-url','origin']);identity(remote);
- const job={id,source,snapshot,remote,sha,tree:git(source,['rev-parse',`${sha}^{tree}`]),owner:process.pid,checkOnly,state:'capturing',createdAt:new Date().toISOString(),lane:process.env.WS_LANE_NAME??'push-queue'};
+ const preflight=v.safeParse(preflightSchema,(()=>{try{return JSON.parse(process.env.WS_PREFLIGHT_RECORD??'null');}catch{return null;}})());
+ const job={id,source,snapshot,remote,sha,tree:git(source,['rev-parse',`${sha}^{tree}`]),owner:process.pid,checkOnly,state:'capturing',createdAt:new Date().toISOString(),lane:process.env.WS_LANE_NAME??'push-queue',...(preflight.success?{preflight:preflight.output}:{})};
  write(file,job);
  const anchor=join(directory,'snapshots',`${id}.git`);
  try{
@@ -312,7 +315,15 @@ if(mode==='enqueue'){
  const root=resolvePath(args.find(arg=>arg.startsWith('--root='))?.slice(7)??join(homedir(),'.cache/wildshard/push-queue'));
  const directory=join(root,createHash('sha256').update(identity(remote)).digest('hex').slice(0,20));mkdirSync(join(directory,'snapshots'),{recursive:true});
  const commit=args.find(arg=>arg.startsWith('--commit='));
- const output=execFileSync('python3',[lock,join(directory,'capture.lock'),process.execPath,self,'capture',source,directory,...(args.includes('--check-only')?['--check-only']:[]),...(commit===undefined?[]:[commit])],{encoding:'utf8'});process.stdout.write(output);
+ // DS16c: refuse in seconds what the full gate would bounce on bookkeeping.
+ const {admitEnqueue}=await import('./push-preflight.mjs');
+ const preflight=await admitEnqueue(source,{commit:commit?.slice(9),checkOnly:args.includes('--check-only'),lane:process.env.WS_LANE_NAME??'push-queue',skip:process.env.WS_PREFLIGHT_SKIP});
+ if(preflight===null)process.exitCode=1;
+ else{
+  // Capture exactly the commit the preflight checked; a moved HEAD stays an ancestor or is refused.
+  const target=preflight.sha===''?commit:`--commit=${preflight.sha}`;
+  const output=execFileSync('python3',[lock,join(directory,'capture.lock'),process.execPath,self,'capture',source,directory,...(args.includes('--check-only')?['--check-only']:[]),...(target===undefined?[]:[target])],{encoding:'utf8',env:{...process.env,WS_PREFLIGHT_RECORD:JSON.stringify(preflight)}});process.stdout.write(output);
+ }
 }else if(mode==='capture'){
  const [source,directory]=args;if(source===undefined||directory===undefined)throw new Error('Missing queue capture paths');
  console.log(JSON.stringify(capture(source,directory,args.includes('--check-only'),args.find(arg=>arg.startsWith('--commit='))?.slice(9))));
