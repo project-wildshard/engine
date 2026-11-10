@@ -524,6 +524,60 @@
       "finishedAt": "2026-11-10T20:02:42.544Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "ac497552bd6f3e3ba0f161911dfddbcee2d30e5e",
+      "tree": "cfba8962e129c85dfcbee64e3766c707060dbadc",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/fail-screens-catalogue.test.ts",
+          "blob": "9c780c5daf5035e0ba74a2faae9f738bedfe2cae",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 85.50591599999998
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T16:18:51.204Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "ac497552bd6f3e3ba0f161911dfddbcee2d30e5e",
+      "tree": "cfba8962e129c85dfcbee64e3766c707060dbadc",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/fail-screens-catalogue.test.ts",
+          "blob": "9c780c5daf5035e0ba74a2faae9f738bedfe2cae",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 56.57729099999999
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T16:19:29.795Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

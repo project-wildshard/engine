@@ -52,3 +52,6 @@ Driftwood Isle rather than over the title.
   stops, the pair lookup needs a screen, a banner drawn under its card
   counts the card's clock and goes inert, Previous from the gallery
   opens the last screen, and the stylesheet is owned by the screen.
+- The push gate refused the first FM1b push: a new test file needs a
+  committed clock. Recorded `test/fail-screens-catalogue.test.ts` from
+  the gate's own run with `scripts/push-test-timings.mjs record`.

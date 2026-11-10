@@ -662,6 +662,7 @@
   "test/equipment-fault-modal.test.ts": 0.8791335490000002,
   "test/equipment-preparation.test.ts": 0.11899634899999999,
   "test/explorer-smoke.test.ts": 3.5196348509999997,
+  "test/fail-screens-catalogue.test.ts": 0.05657729099999999,
   "test/fast-png.test.ts": 0.11352329899999998,
   "test/fixed-draw-file-only.test.ts": 0.40784513699999997,
   "test/fixed-draw-product-lanes.test.ts": 0.4482442340000001,
