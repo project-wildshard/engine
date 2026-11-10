@@ -1,4 +1,4 @@
-import { lowPowerReading, onLowPowerReading } from '../boot/lowPower';
+import { lowPowerReading, titleLowPowerReading, type LowPowerReading } from '../boot/lowPower';
 import { uiScope, mountUi } from './ownership';
 import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
 import { serverBootProgress } from '../../../shared/engine/boot/serverProgress';
@@ -112,6 +112,8 @@ export class Loading {
   private t0 = performance.now();
   private clockT0 = this.t0;
   private readonly clockScope = this.scope.child('clock');
+  /** This tab's Low Power reading from its title, as the card opened (boot/lowPower.ts). */
+  private readonly titlePower: LowPowerReading | null = titleLowPowerReading();
   private view: ProgressView | null = null;
   private dirty = false;
   private lastPaintAt = 0;
@@ -217,7 +219,6 @@ export class Loading {
     this.attempt = attempt;
     const earlyTiming = bootTiming(); if (earlyTiming !== undefined) earlyTiming.attemptCount = attempt;
     set(this.els.tier, this.tierText());
-    this.scope.onDispose(onLowPowerReading(() => { set(this.els.tier, this.tierText()); }));
     this.rowsEl = this.els.suRows;
     // Start ends here: the game's own code owns the card. A scoped (mid-play) load has no Start.
     this.root.querySelector<HTMLElement>('[data-phase="start"]')?.toggleAttribute('hidden', this.scoped);
@@ -587,15 +588,16 @@ export class Loading {
   /** The kept facts (LS2): tier, visit and attempt. A page a service worker already controls is a return visit. */
   private tierText(): string {
     const tier = engineString('s_loading_tier', [TIER, engineString(navigator.serviceWorker?.controller ? 's_loading_return_visit' : 's_loading_first_visit'), this.attempt]);
-    // Jake (11-10): Low Power Mode as the page can read it (boot/lowPower.ts): Safari caps rAF at 30 Hz there
-    const power = lowPowerReading();
-    return power === null ? tier : `${tier} · ${engineString(power.likely ? 's_loading_low_power_likely' : 's_loading_low_power_no')}`;
+    // Jake (11-10): Low Power Mode as the idle title read it (boot/lowPower.ts: Safari caps rAF at 30 Hz there), fixed
+    // for this card's life, so it never reads as the card moving (DL21's harness counts a tier change as movement)
+    const power = this.titlePower;
+    return power === null || power.verdict === 'unknown' ? tier : `${tier} · ${engineString(power.verdict === 'likely' ? 's_loading_low_power_likely' : 's_loading_low_power_no')}`;
   }
 
   /** The Copy diagnostics form of the Low Power reading: its verdict, the measured rAF rate and the page it was read on. */
   private lowPowerLine(): string {
     const power = lowPowerReading();
-    return power === null ? 'low power: unread' : `low power: ${power.likely ? 'likely' : 'no'} (rAF ${power.rate.toFixed(1)}/s on the ${power.from === 'title' ? 'title' : 'loading page'})`;
+    return power === null ? 'low power: unread' : `low power: ${power.verdict} (rAF ${power.rate.toFixed(1)}/s on the ${power.from === 'title' ? 'title' : 'loading page'})`;
   }
 
   private phaseDone(ms: number): string { return engineString('s_loading_done', [seconds(ms)]); }

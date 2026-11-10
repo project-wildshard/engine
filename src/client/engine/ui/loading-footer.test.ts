@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {Loading, type LoadingDownloadSource} from './Loading';
-import { classifyFrames, lowPowerReading, resetLowPowerProbe, startLowPowerProbe } from '../boot/lowPower';
+import { classifyFrames, lowPowerReading, resetLowPowerProbe, startLowPowerProbe, startTitleLowPowerProbe } from '../boot/lowPower';
 import type { ProgressView } from '../boot/plan';
 import { beginLoadingWait, finishLoadingWait, loadingWaitState, reportLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
@@ -628,41 +628,49 @@ it('retries missing content in the same loading card without a fatal or planned 
   } finally {controller.abort(); loading.scope.dispose();}
 });
 
-it('reads Low Power Mode from the rAF cadence: 30 Hz is likely, 60 Hz is not, even with a busy main thread', () => {
+it('reads the rAF cadence: 30 Hz is slow, 60 Hz is not even with long tasks, a gap or too few frames is no reading', () => {
   const at = (ms: readonly number[]): number[] => { const out = [0]; for (const step of ms) out.push((out.at(-1) ?? 0) + step); return out; };
-  expect(classifyFrames(at(Array.from({ length: 30 }, () => 33.3)))).toEqual({ likely: true, rate: 30 });
-  expect(classifyFrames(at(Array.from({ length: 60 }, () => 16.7)))).toEqual({ likely: false, rate: 59.9 });
+  expect(classifyFrames(at(Array.from({ length: 30 }, () => 33.3)))).toEqual({ slow: true, rate: 30 });
+  expect(classifyFrames(at(Array.from({ length: 60 }, () => 16.7)))).toEqual({ slow: false, rate: 59.9 });
   // a boot's long tasks stretch some intervals; the short end still shows the display's 60 Hz
-  const busy = at(Array.from({ length: 30 }, (_, i) => (i % 3 === 0 ? 120 : 16.7)));
-  expect(classifyFrames(busy)?.likely).toBe(false);
-  // a 30 Hz page under the same long tasks stays likely
-  expect(classifyFrames(at(Array.from({ length: 24 }, (_, i) => (i % 3 === 0 ? 120 : 33.3))))?.likely).toBe(true);
+  expect(classifyFrames(at(Array.from({ length: 30 }, (_, i) => (i % 3 === 0 ? 120 : 16.7))))?.slow).toBe(false);
+  // a 60 Hz page missing every other frame is as slow as Low Power: the cadence alone cannot tell them apart
+  expect(classifyFrames(at(Array.from({ length: 30 }, () => 33.4)))?.slow).toBe(true);
+  // a hidden stretch or one long task in the window: no reading
+  expect(classifyFrames(at([...Array.from({ length: 20 }, () => 16.7), 2000]))).toBeNull();
   expect(classifyFrames(at([33.3, 33.3, 33.3]))).toBeNull();
 });
 
-it('names Low Power on the tier line and in Copy diagnostics, the title reading first', () => {
+it('Low Power: only the idle title says likely; a busy page rules it out or says unknown; the card line never changes', () => {
   resetLowPowerProbe(); saveStorage('session').removeItem('boot.lowPower');
   const frames: ((time: number) => void)[] = [];
   const raf = (frame: (time: number) => void): number => { frames.push(frame); return frames.length; };
-  const run = (step: number, count: number): void => { let time = 0; for (let i = 0; i < count; i++) { const next = frames.shift(); next?.(time); time += step; } };
-  const loading = new Loading({ id: 'power', name: 'Power' }, { scoped: true });
-  const tier = (): string => loading.root.querySelector('[data-el="tier"]')?.textContent ?? '';
+  let clock = 0;
+  const run = (step: number, count: number): void => { for (let i = 0; i < count; i++) { const next = frames.shift(); next?.(clock); clock += step; } };
+  const timers: (() => void)[] = [];
+  const later = (job: () => void): number => { timers.push(job); return timers.length; };
   try {
-    expect(tier()).not.toContain('low power');
-    expect(loading.diagnosticsText()).toContain('low power: unread');
-    // this page's own first second at 60 Hz: the card repaints its tier line when the reading lands
-    startLowPowerProbe(false, raf); run(16.7, 61);
-    expect(tier()).toContain('low power no');
-    expect(loading.diagnosticsText()).toContain('low power: no (rAF 59.9/s on the loading page)');
-    // a fresh title reading of this tab (Low Power on there) is the one shown
-    saveStorage('session').setItem('boot.lowPower', JSON.stringify({ likely: true, rate: 30, at: Date.now() }));
-    expect(lowPowerReading()?.from).toBe('title');
-    expect(loading.diagnosticsText()).toContain('low power: likely (rAF 30.0/s on the title)');
-    // a stale one is not
-    expect(lowPowerReading(Date.now() + 11 * 60_000)).toEqual({ likely: false, rate: 59.9, from: 'page' });
-    // the title page itself keeps its reading for the tab
-    resetLowPowerProbe(); saveStorage('session').removeItem('boot.lowPower');
-    startLowPowerProbe(true, raf); run(33.3, 32);
+    // a loading page missing every other frame at 60 Hz: its own reading is 'unknown', never 'likely'
+    startLowPowerProbe(raf); run(33.4, 32);
+    expect(lowPowerReading()).toEqual({ verdict: 'unknown', rate: 29.9, from: 'page' });
+    const loading = new Loading({ id: 'power', name: 'Power' }, { scoped: true });
+    const tier = (): string => loading.root.querySelector('[data-el="tier"]')?.textContent ?? '';
+    try {
+      expect(tier()).not.toContain('low power');
+      expect(loading.diagnosticsText()).toContain('low power: unknown (rAF 29.9/s on the loading page)');
+    } finally { loading.scope.dispose(); }
+    // the title, two seconds after it shows: a hidden first window is counted again, then a 30 Hz idle second is kept
+    startTitleLowPowerProbe(raf, later);
+    expect(frames).toHaveLength(0); timers.shift()?.();
+    run(16.7, 5); run(2000, 1); run(33.3, 40);
     expect(JSON.parse(saveStorage('session').getItem('boot.lowPower') ?? 'null')).toMatchObject({ likely: true, rate: 30 });
-  } finally { loading.scope.dispose(); resetLowPowerProbe(); saveStorage('session').removeItem('boot.lowPower'); }
+    // the next loading card shows the title's verdict from its first paint and keeps it; diagnostics name the source
+    const next = new Loading({ id: 'power-2', name: 'Power' }, { scoped: true });
+    try {
+      expect(next.root.querySelector('[data-el="tier"]')?.textContent).toContain('low power likely');
+      expect(next.diagnosticsText()).toContain('low power: likely (rAF 30.0/s on the title)');
+    } finally { next.scope.dispose(); }
+    // a stale title reading falls back to this page's own
+    expect(lowPowerReading(Date.now() + 11 * 60_000)?.from).toBe('page');
+  } finally { resetLowPowerProbe(); saveStorage('session').removeItem('boot.lowPower'); }
 });

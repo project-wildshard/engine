@@ -27,3 +27,13 @@ Copy diagnostics keeps the page's own path and hides other origins (`diagnostics
 can start earlier or wait until after the first frame is open (LOADING-SCREEN rows).
 The same paste had 4.6 s of readyFrame with no entry before `wait:Minimap`: the spawn view's fence and its tile settle,
 which the card names but the timeline did not. The readyFrame step now records it as `wait:Spawn view`.
+
+## J206 review of the Low Power reading
+
+Codex one-shot, three MUST-FIXes, all fixed: a busy 60 Hz page missing every other frame ticks at 30 Hz too, so only
+the idle title may say "likely" (it counts a second once it has shown for two seconds); a loading page's own reading
+says "no" or "unknown". The card's tier line takes the title's reading once, as it opens, so it never changes under
+the DL21 harness (which counts a tier change as movement). And the title probe starts where the title actually shows,
+not at the entry, so a recovery boot that picks a shard later is never kept as a title reading. Its SHOULDs: a window
+with a hidden stretch or a half-second gap is no reading and is counted again (up to three times); the tests cover the
+every-other-frame page, the gap, the retry and the card's fixed line. The reset hook stays, named tests-only.
