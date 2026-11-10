@@ -69,9 +69,11 @@ export interface GridRecoveryService {
   /** The last durable place, for a server opening a page's save for the first time. */
   lastPlace: (assembly: GridAssembly) => GridSavedPlace | null;
   /** An abrupt end may resume only an already durable, catalogue-bound checkpoint. SR4: the page's place is lazily committed
-   *  storage and a killed browser can lose its newest writes, while the server's continuation is durable. A place that does
-   *  not stand where `server` does is stale, and resumes nothing: the title's GRID tap resumes the server's own (J190). */
-  restoreLast: (assembly: GridAssembly, server?: GridServerSite) => boolean;
+   *  storage and a killed browser can lose its newest writes, while the server's continuation is durable. `server` is every
+   *  site document of the server's the page could read: a place must stand where each of them does, so whichever one the
+   *  server's own stricter read boots from agrees with it. Otherwise it is stale, and resumes nothing: the title's GRID tap
+   *  resumes the server's own (J190). */
+  restoreLast: (assembly: GridAssembly, server?: readonly GridServerSite[]) => boolean;
   /** A pending reset never boots until the target namespace proves its atomic generation advance. */
   prepareReset: (assembly: GridAssembly, current: { instance: string; slug: string }, road: RoadPoint, target: LocalSaveInstance) => boolean;
   completeReset: (assembly: GridAssembly) => boolean;
@@ -116,7 +118,7 @@ export function gridRecovery(store: SaveStore, now: () => number = Date.now): Gr
         || session.peek() !== null || device.peek() !== null) return false;
       const saved = last.peek();
       if (saved === null || !validSaved(saved, assembly)) return false;
-      if (server !== undefined && placeSite(saved) !== server.site) return false;
+      if (server?.some(row => row.site !== placeSite(saved)) === true) return false;
       return service.write(assembly, saved, saved.road, 'reload');
     },
     prepareReset: (assembly: GridAssembly, current: { instance: string; slug: string }, road: RoadPoint, target: LocalSaveInstance) => {

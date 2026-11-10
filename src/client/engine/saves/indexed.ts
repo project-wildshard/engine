@@ -99,7 +99,8 @@ function siteRow(raw: unknown): { readonly tick: number; readonly site: string |
 /**
  * SR4: where the grid session's durable continuation stands, newest first, from its two site documents (`siteDocuments('grid')` in
  * src/server/host/standalone/continuation.ts). Two reads, not the whole store: a page asks this before it trusts its own place after
- * an unexpected end, because Chromium can lose a killed page's newest localStorage writes while these commit strictly.
+ * an unexpected end, because Chromium can lose a killed page's newest localStorage writes while these commit strictly. The server's
+ * schema is its own (client ↛ server), so this read is looser: it keeps every document the server could boot from, and maybe more.
  */
 export async function readServerSites(prefix: string = installedIdentity()?.savePrefix ?? '', name: string = serverSaveDatabase(prefix)): Promise<{ readonly tick: number; readonly site: string | null }[]> {
   const opening = indexedDB.open(name, 1);

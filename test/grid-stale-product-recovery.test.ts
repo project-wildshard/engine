@@ -70,21 +70,34 @@ test('a grid kill resumes its durable location after sessionStorage is replaced'
   expect(gridRecoveryLoop()).toBe(true);
 });
 
-test('SR4: a grid kill resumes its place only where the server durably stands', () => {
+test('SR4: a grid kill resumes its place only where every server site document stands', () => {
   const f = fixture(), record = f.read();
   if (record === null) throw new Error('Missing admitted road');
   const original = gridRecovery(f.store, () => Date.now());
-  expect(original.save(assembly, home, record.road, { kind: 'road' })).toBe(true);
-  expect(original.clearLoop()).toBe(true);
   const other = assembly.cells.find(cell => cell.instance !== home.instance);
   if (other === undefined) throw new Error('Missing a second catalogue cell');
-  const crash = (server: readonly { site: string | null }[]) => consumeGridRecovery({ assembly, saves: new SaveStore({ local: f.local, session: new Storage() }),
-    now: () => Date.now(), unexpected: true, previous: { ...previous, kind: 'unexpected', mode: 'grid' }, server });
-  // Chromium lost the page's newer place: the server's site says a cell, the page's says the road. The title's tap resumes the server.
+  const crash = (server?: readonly { site: string | null }[]) => {
+    expect(original.clearLoop()).toBe(true);
+    return consumeGridRecovery({ assembly, saves: new SaveStore({ local: f.local, session: new Storage() }),
+      now: () => Date.now(), unexpected: true, previous: { ...previous, kind: 'unexpected', mode: 'grid' }, ...(server === undefined ? {} : { server }) });
+  };
+  expect(original.save(assembly, home, record.road, { kind: 'road' })).toBe(true);
+  // Chromium lost the page's newer place: a server document says a cell, the page's says the road. The title's tap resumes the server.
   expect(crash([{ site: other.instance }, { site: null }])).toBeNull();
   expect(gridRecoveryLoop()).toBe(false);
-  // A site this catalogue has no cell for is skipped, as the server's own boot skips it; the next one agrees.
-  expect(crash([{ site: 'gone-cell' }, { site: null }])).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
+  // A newest document the server's stricter read refuses can't let a stale place through: any disagreement refuses.
+  expect(crash([{ site: null }, { site: other.instance }])).toBeNull();
+  expect(crash([{ site: 'gone-cell' }])).toBeNull();
+  expect(crash([{ site: null }, { site: null }])).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
+  // No document the page can read, or no read at all: the page's own place, as before.
+  expect(crash([])).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
+  expect(crash()).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
+  // A place in a cell agrees only with that cell.
+  const centre = { kind: 'cell' as const, x: 0, y: 1, z: 0, yaw: 0 };
+  expect(original.save(assembly, home, record.road, centre)).toBe(true);
+  expect(crash([{ site: null }])).toBeNull();
+  expect(crash([{ site: other.instance }])).toBeNull();
+  expect(crash([{ site: home.instance }, { site: home.instance }])).toMatchObject({ instance: home.instance, saved: { location: centre } });
 });
 
 test('explicit RELOAD discards its pending grid recovery and stays at the title', () => {

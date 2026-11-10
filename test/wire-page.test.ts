@@ -88,9 +88,12 @@ test('SR4: a page reads where the server durably stands from the two grid site d
   try {
     expect(await readServerSites('w.', 'db')).toEqual([{ tick: 7, site: 'open-plot-4-1' }, { tick: 6, site: null }]);
     expect(asked).toEqual(['w.standalonesite-grid', 'w.standalonesitealt-grid']);
-    documents.set('w.standalonesitealt-grid', '{not json'); documents.delete('w.standalonesite-grid');
+    documents.set('w.standalonesitealt-grid', '{not json');
+    documents.set('w.standalonesite-grid', JSON.stringify({ keys: { continuationSite: { v: 1, data: { tick: -1, site: 4 } } } }));
     expect(await readServerSites('w.', 'db')).toEqual([]);
-    expect(closed).toHaveBeenCalledTimes(2);
+    documents.clear();
+    expect(await readServerSites('w.', 'db')).toEqual([]);
+    expect(closed).toHaveBeenCalledTimes(3);
   } finally { Reflect.set(globalThis, 'indexedDB', before); }
 });
 

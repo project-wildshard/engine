@@ -15,3 +15,9 @@ site. A stale place resumes nothing, so the page lands on the title, and its
 GRID tap resumes the server's continuation, as J190 has a tap and a crash
 recovery do. A current place still auto-resumes, and a failed or missing read
 keeps the old behaviour.
+
+Review (J206, Codex) found the page's read looser than the server's: the
+`SITE` schema lives server-side, and a newest document the server refuses
+could let a stale place through. So the rule is now that every site
+document the page can read must name the place's site; a disagreement
+lands on the title, and its tap resumes the server.

@@ -126,7 +126,7 @@ export function safeGridRecovery(assembly: GridAssembly, now: number): NonNullab
 }
 
 /** Consume recovery metadata before routing/hydration; ordinary boot and unsupported future records select nothing.
- * `server`: the server's durable site documents, newest first, read only after an unexpected grid end (SR4). */
+ * `server`: the server's durable site documents, read only after an unexpected grid end (SR4). */
 export function consumeGridRecovery(options: { assembly?: GridAssembly; saves?: SaveStore; now?: () => number; unexpected?: boolean;
   previous?: LastEnd; search?: URLSearchParams; server?: readonly GridServerSite[] } = {}): NonNullable<GridRecoveryRecord> | null {
   const assembly = options.assembly ?? new GridAssembly(gridMode(DEVSERVER));
@@ -138,11 +138,7 @@ export function consumeGridRecovery(options: { assembly?: GridAssembly; saves?: 
     selected = null; loop = false; refused = discarded.kind === 'refused';
     return null;
   }
-  if (options.previous?.kind === 'unexpected' && options.previous.mode === 'grid') {
-    // The site the server will boot in: its newest document that names the road or a cell of this catalogue (gridServer.ts).
-    const server = options.server?.find(row => row.site === null || assembly.cells.some(cell => cell.instance === row.site));
-    service.restoreLast(assembly, server);
-  }
+  if (options.previous?.kind === 'unexpected' && options.previous.mode === 'grid') service.restoreLast(assembly, options.server);
   let result = service.consume(assembly, options.unexpected);
   const end = options.previous, search = options.search;
   // Older clients consumed their grid intent and cleared chunk before product admission.
