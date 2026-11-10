@@ -202,10 +202,54 @@ function pack(bytes: ArrayLike<number>): string {
   chunks.push(chunk);
   return chunks.join('');
 }
-function* packedPhysics(raw: Uint8Array, basis?: Uint8Array): Generator<undefined, v.InferOutput<typeof packedSnapshot>['physics']> {
+// A headless world's private compression memo owns copied input blocks and
+// immutable encoded strings. Retain a prefix rather than an LRU that thrashes
+// when a complete native continuation is larger than the retained budget.
+const compressionMemoBytes = 48 * 1024 * 1024;
+interface CompressionBlock { readonly raw: Uint8Array; readonly encoded: string; readonly retainedBytes: number }
+class ScopedPhysicsPacker {
+  private readonly blocks: CompressionBlock[] = [];
+  private readonly compress = deflateSync;
+  private retainedBytes = 0;
+  private closed = false;
+  private check(): void { if (this.closed) throw new Error('Snapshot serializer is disposed'); }
+  trim(count: number): void {
+    this.check();
+    while (this.blocks.length > count) this.retainedBytes -= this.blocks.pop()?.retainedBytes ?? 0;
+  }
+  encode(index: number, raw: Uint8Array): string {
+    this.check();
+    const known = this.blocks[index];
+    if (known !== undefined && known.raw.length === raw.length) {
+      const left = new DataView(known.raw.buffer, known.raw.byteOffset, known.raw.byteLength);
+      const right = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+      let at = 0;
+      while (at + 4 <= raw.length && left.getUint32(at, true) === right.getUint32(at, true)) at += 4;
+      while (at < raw.length && known.raw[at] === raw[at]) at++;
+      if (at === raw.length) return known.encoded;
+    }
+    // Every miss has the same independent compressor and fresh level-six
+    // options as the stateless path. No stream/dictionary state is shared.
+    const encoded = pack(this.compress(raw, { level: 6 }));
+    if (index <= this.blocks.length) {
+      const entry = { raw: new Uint8Array(raw), encoded, retainedBytes: raw.length + encoded.length * 2 };
+      this.retainedBytes -= known?.retainedBytes ?? 0;
+      this.blocks[index] = entry;
+      this.retainedBytes += entry.retainedBytes;
+      while (this.retainedBytes > compressionMemoBytes) this.retainedBytes -= this.blocks.pop()?.retainedBytes ?? 0;
+    }
+    return encoded;
+  }
+  dispose(): void { this.closed = true; this.blocks.length = 0; this.retainedBytes = 0; }
+}
+function* packedPhysics(raw: Uint8Array, basis?: Uint8Array, packer?: ScopedPhysicsPacker): Generator<undefined, v.InferOutput<typeof packedSnapshot>['physics']> {
   const references = encodePhysicsReferences(raw, basis), chunks: string[] = [];
+  packer?.trim(Math.ceil(references.length / physicsBlockBytes));
   yield;
-  for (let offset = 0; offset < references.length; offset += physicsBlockBytes) chunks.push(pack(deflateSync(references.subarray(offset, offset + physicsBlockBytes), { level: 6 })));
+  for (let offset = 0; offset < references.length; offset += physicsBlockBytes) {
+    const block = references.subarray(offset, offset + physicsBlockBytes);
+    chunks.push(packer === undefined ? pack(deflateSync(block, { level: 6 })) : packer.encode(offset / physicsBlockBytes, block));
+  }
   const hash = checksum(raw);
   // Tiny or incompressible continuations retain the original canonical encoding.
   if (chunks.reduce((size, chunk) => size + chunk.length + 3, 64) >= Math.ceil(raw.length / 3) * 4) return { encoding: 'base64', data: pack(raw), checksum: hash };
@@ -330,15 +374,36 @@ export function checkSnapshotDataWire(input: SimSnapshot | SimSnapshotBytes, api
 /** Internal packed wire writer, in stages a caller may spread over frames (rt3-freeze: one regional autosave was a
  *  1–2.7 s main-thread task). Each `yield` is a safe pause: the input is read in the first stage only, so later stages
  *  touch nothing the live simulation can change. */
-export function* serializeSnapshotDataSteps(input: SimSnapshot | SimSnapshotBytes, apiVersion: number, physicsBasis?: Uint8Array): Generator<undefined, string> {
+function* serializedSteps(input: SimSnapshot | SimSnapshotBytes, apiVersion: number, physicsBasis?: Uint8Array, packer?: ScopedPhysicsPacker): Generator<undefined, string> {
   // The byte array is checked in one flat pass; every other field keeps the strict JSON-tree and schema validation.
   // Freeze the caller's typed input as bytes, just as physicsArray freezes legacy arrays. No boxed number[] is
-  // created; cancellation and interleaved jobs own only their transient byte buffers, with no retained workspace.
+  // created. Each job owns its transient bytes; only an optional headless-world
+  // packer retains bounded copied compression blocks, until its owner disposes it.
   const { raw, saved } = prepareSnapshot(input, apiVersion);
   yield;
-  const physics = yield* packedPhysics(raw, physicsBasis);
+  const physics = yield* packedPhysics(raw, physicsBasis, packer);
   yield;
   return stringify({ format: 'sim.snapshot', version: saved.version, snapshot: { ...saved, physics } });
+}
+/** The public staged/stateless writer keeps no retained workspace. */
+export function* serializeSnapshotDataSteps(input: SimSnapshot | SimSnapshotBytes, apiVersion: number, physicsBasis?: Uint8Array): Generator<undefined, string> {
+  return yield* serializedSteps(input, apiVersion, physicsBasis);
+}
+/** Private world-owned synchronous writer. Dispose with its headless world;
+ * the ordinary stateless/page APIs never create this retained memo. */
+export function createSnapshotDataSerializer(apiVersion: number): {
+  serialize: (input: SimSnapshot | SimSnapshotBytes, physicsBasis?: Uint8Array) => string;
+  dispose: () => void;
+} {
+  const packer = new ScopedPhysicsPacker();
+  let closed = false;
+  return {
+    serialize: (input, physicsBasis) => {
+      if (closed) throw new Error('Snapshot serializer is disposed');
+      return finishSteps(serializedSteps(input, apiVersion, physicsBasis, packer));
+    },
+    dispose: () => { closed = true; packer.dispose(); },
+  };
 }
 /** Internal packed wire writer; the defining public entry supplies its current engine version. */
 export function serializeSnapshotData(input: SimSnapshot | SimSnapshotBytes, apiVersion: number, physicsBasis?: Uint8Array): string {

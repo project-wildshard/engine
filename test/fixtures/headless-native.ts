@@ -13,7 +13,7 @@ import { MoverScriptDriver, type MoverRuntime } from '../../src/server/game/plug
 import { installCableModes } from '../../src/shared/engine/player/modes';
 import { createNativeCombatFrame } from '../../src/server/game/plugin/nativeItems';
 import { createSimHost, type SimHost , type SimCommand } from '../../src/server/engine/sim';
-import { admitSimSnapshotBytes, decodeSimSnapshotBytes, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '../../src/shared/engine/sim/snapshot';
+import { createSimSnapshotSerializer, admitSimSnapshotBytes, decodeSimSnapshotBytes, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '../../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../../src/server/engine/sim/restore';
 import { simPlayerCommand, type HeadlessCommand, type HeadlessEffect } from '../../src/shared/host/tickProtocol';
 import type { TickWorkerAdapter } from '../../src/server/host/tickWorkerLoop';
@@ -96,6 +96,7 @@ export async function createNativeProofResident(preparation: HeadlessRuntimeInpu
 /** Worker-side composition only: owns one trusted resident (its real SimHost, native continuation and scoped installers). */
 export async function createNativeProofAdapter(preparation: HeadlessRuntimeInput, prepare: PrepareHeadlessRuntime, snapshot?: string): Promise<TickWorkerAdapter> {
   const resident = await createNativeProofResident(preparation, prepare, snapshot), { host } = resident;
+  const serializer=createSimSnapshotSerializer();
   const tape=createTrustedHeadlessTape(host,input=>resident.step(input),()=>resident.effects);
   let retireWalkBodies=()=>{/* No temporary walk bodies exist before preparation. */},walkPrepared=false;
   const prepareWalk=():void=>{
@@ -106,8 +107,8 @@ export async function createNativeProofAdapter(preparation: HeadlessRuntimeInput
     step: input => { resident.step(input); },
     verbTape:plan=>{if(plan.segments.some(segment=>segment.route!==undefined||segment.frames!==undefined))prepareWalk();return tape(plan);},
     journey: plan => { if(plan.start!==undefined)prepareWalk();return runHeadlessJourney(host,input=>resident.step(input),plan); },
-    commit: () => ({ tick: host.state.tick, snapshot: serializeSimSnapshot(snapshotSimHostBytes(host)), effects: [...resident.effects] }),
+    commit: () => ({ tick: host.state.tick, snapshot: serializer.serialize(snapshotSimHostBytes(host)), effects: [...resident.effects] }),
     finish: () => ({ ticks: host.state.tick, lanes: 0, steps: 0 }),
-    dispose: () => { retireWalkBodies();resident.dispose(); },
+    dispose: () => { try { retireWalkBodies();resident.dispose(); } finally { serializer.dispose(); } },
   };
 }

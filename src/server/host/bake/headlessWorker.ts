@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import * as v from 'valibot';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import { proveAuthoredGrid, createShardfileSim, bindShardfileSim, type ShardfileSimulation } from '@wildshard/engine/game/plugin/simulation';
-import { snapshotSimHostBytes, serializeSimSnapshot, decodeSimSnapshot, checkSimSnapshotWire } from '@wildshard/engine/sim/snapshot';
+import { createSimSnapshotSerializer, snapshotSimHostBytes, decodeSimSnapshot, checkSimSnapshotWire } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 
 import type { SimCommand } from '@wildshard/engine/sim';
@@ -87,6 +87,7 @@ await runTickWorker(async raw => {
       if(script?.modules.some(module=>module.failures>0||module.disabled))throw new Error('Headless script call failed');
       if(sim.decisions?.host.metrics().some(row=>row.refusals>0||row.disabled))throw new Error('Headless decision call failed');
   };
+  const serializer=createSimSnapshotSerializer();
   const tape=createTrustedHeadlessTape(sim.host,step,()=>effects);
   return {
     step,
@@ -107,7 +108,7 @@ await runTickWorker(async raw => {
       if (sim.decisions?.host.metrics().some(row => row.refusals > 0 || row.disabled)) throw new Error('Headless decision call failed');
       // A sleeping lane retains its last counters; report only fuel consumed by this completed global tick.
       const fuelUsed = script?.tick === sim.host.state.tick ? script.used.fuel : 0;
-      return { tick: sim.host.state.tick, snapshot: serializeSimSnapshot(snapshotSimHostBytes(sim.host)), effects, fuelUsed: fuelUsed + decisionFuel, scriptMicros, ...(sim.decisions === undefined ? {} : { decisions: sim.decisions.publication() }) };
+      return { tick: sim.host.state.tick, snapshot: serializer.serialize(snapshotSimHostBytes(sim.host)), effects, fuelUsed: fuelUsed + decisionFuel, scriptMicros, ...(sim.decisions === undefined ? {} : { decisions: sim.decisions.publication() }) };
     },
     authorProof: plan => proveAuthoredGrid(shard, payload.assets, ports,
       { ticks: plan.tape.length, checkpointTick: plan.checkpointTick, requiredFacts: plan.requiredFacts },
@@ -126,6 +127,6 @@ await runTickWorker(async raw => {
         commands = numeric; return player;
       }),
     finish: () => ({ ticks: sim.host.state.tick, ...proveShardfileEntries(shard, sim, payload.assets, ports) }),
-    dispose: () => { sim.dispose(); },
+    dispose: () => { try { sim.dispose(); } finally { serializer.dispose(); } },
   };
 });

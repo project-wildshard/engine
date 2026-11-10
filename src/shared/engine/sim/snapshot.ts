@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import { serializeSnapshotData, serializeSnapshotDataSteps, decodeSnapshotData, decodeSnapshotDataBytes, admitSnapshotDataBytes, finishSteps, checkSnapshotDataWire } from './snapshotData';
+import { createSnapshotDataSerializer, serializeSnapshotData, serializeSnapshotDataSteps, decodeSnapshotData, decodeSnapshotDataBytes, admitSnapshotDataBytes, finishSteps, checkSnapshotDataWire } from './snapshotData';
 import { byteArray } from './snapshotPhysics';
 import type { QuestBookSaved } from '../quest/players';
 import type { SimHost, SimLevel, SimSlots, SimValue } from '../../../server/engine/sim';
@@ -123,6 +123,10 @@ export type SimSnapshotBytes = Omit<SimSnapshot, 'physics'> & { physics: Uint8Ar
 export function admitSimSnapshotBytes(saved: SimSnapshot | SimSnapshotBytes): SimSnapshotBytes {
   return admitSnapshotDataBytes(saved, SIM_API_VERSION);
 }
+
+/** One headless world's disposable compression context. Existing stateless
+ * and page writers remain unchanged; no context is shared between worlds. */
+export const createSimSnapshotSerializer = (): ReturnType<typeof createSnapshotDataSerializer> => createSnapshotDataSerializer(SIM_API_VERSION);
 
 /** Serialize exact physics (≤32 MB) in bounded lossless blocks; optional immutable fresh-world bytes serve as a checked basis. */
 export function serializeSimSnapshot(saved: SimSnapshot | SimSnapshotBytes, physicsBasis?: Uint8Array): string {

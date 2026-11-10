@@ -4,7 +4,7 @@ import * as v from 'valibot';
 import { beforeAll, expect, test } from 'vitest';
 import { createSimHost } from '../src/server/engine/sim';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { decodeSimSnapshot, decodeSimSnapshotBytes, snapshotSimHostBytes, serializeSimSnapshot, SnapshotBasisMismatchError } from '../src/shared/engine/sim/snapshot';
+import { createSimSnapshotSerializer, decodeSimSnapshot, decodeSimSnapshotBytes, snapshotSimHostBytes, serializeSimSnapshot, SnapshotBasisMismatchError } from '../src/shared/engine/sim/snapshot';
 import { prepareSimHostRestore, restoreSimHost } from '../src/server/engine/sim/restore';
 import { canonicalSimDigest } from './fake/simState';
 import { SIM_LEVEL, fightCommand } from './fixtures/sim-level/level';
@@ -38,6 +38,18 @@ test.each(['base64', 'deflate', 'basis'] as const)('native %s decode retains exa
     ? new Uint8Array([0, 21, 255, 17, 91]) : new Uint8Array(4096).fill(73);
   const basis = encoding === 'basis' ? physics.slice() : undefined;
   const wire = serializeSimSnapshot({ ...original, physics }, basis);
+  const scoped = createSimSnapshotSerializer(), independent = createSimSnapshotSerializer();
+  try {
+    expect(scoped.serialize({ ...original, physics }, basis)).toBe(wire);
+    expect(scoped.serialize({ ...original, physics }, basis)).toBe(wire);
+    expect(independent.serialize({ ...original, physics }, basis)).toBe(wire);
+    const backing = new Uint8Array(physics.length + 13), changed = backing.subarray(7, 7 + physics.length);
+    changed.set(physics); changed[0] = (changed[0] ?? 0) ^ 1;
+    expect(scoped.serialize({ ...original, physics: changed }, basis)).toBe(serializeSimSnapshot({ ...original, physics: changed }, basis));
+    changed.set(physics);
+    expect(scoped.serialize({ ...original, physics: changed }, basis)).toBe(wire);
+  } finally { scoped.dispose(); independent.dispose(); }
+  expect(() => scoped.serialize({ ...original, physics }, basis)).toThrow('disposed');
   const expectedEncoding = encoding === 'base64' ? 'base64' : 'deflate-lz-base64-v1';
   expect(v.parse(record, v.parse(record, v.parse(record, JSON.parse(wire))['snapshot'])['physics'])['encoding']).toBe(expectedEncoding);
   const legacy = decodeSimSnapshot(wire, basis), decoded = decodeSimSnapshotBytes(wire, basis);
@@ -71,15 +83,21 @@ test('typed offset-view restore preserves DB1 transaction, detached native world
   const backing = new Uint8Array(typed.physics.length + 19).fill(42), offset = backing.subarray(7, 7 + typed.physics.length);
   offset.set(typed.physics); typed.physics = offset;
   const target = prepareSimHostRestore(SIM_LEVEL, { rapier: R }), expected = restoreSimHost(SIM_LEVEL, { rapier: R }, legacy);
+  const serializer = createSimSnapshotSerializer();
   try {
     target.restore(typed);
     expect(serializeSimSnapshot(snapshotSimHostBytes(target.host))).toBe(checkpoint);
+    expect(serializer.serialize(snapshotSimHostBytes(target.host))).toBe(checkpoint);
+    expect(serializer.serialize(snapshotSimHostBytes(target.host))).toBe(checkpoint);
     expect(offset.byteOffset).toBe(7); offset.fill(0); backing.fill(0);
     for (let tick = 12; tick < 24; tick++) {
       target.host.step(leadCommands(target.host, fightCommand(tick))); expected.step(leadCommands(expected, fightCommand(tick)));
-      expect(serializeSimSnapshot(snapshotSimHostBytes(target.host))).toBe(serializeSimSnapshot(snapshotSimHostBytes(expected)));
+      const saved = snapshotSimHostBytes(target.host), wire = serializer.serialize(saved), control = snapshotSimHostBytes(expected);
+      expect(serializeSimSnapshot(saved)).toBe(serializeSimSnapshot(control));
+      expect(wire).toBe(serializeSimSnapshot(control));
+      expect(canonicalSimDigest(decodeSimSnapshotBytes(wire))).toBe(canonicalSimDigest(control));
     }
-  } finally { target.host.dispose(); expected.dispose(); }
+  } finally { serializer.dispose(); target.host.dispose(); expected.dispose(); }
 });
 
 test.each(['registration', 'duplicate', 'legacy-byte', 'other-view'] as const)('typed and legacy %s restore retain strict refusal and target disposal', async kind => {

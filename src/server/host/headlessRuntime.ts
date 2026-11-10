@@ -24,7 +24,7 @@ import { installRoomRespawn } from '@wildshard/engine/game/roomRespawn';
 import type { GrappleTickContext } from '@wildshard/engine/game/grapple/native';
 import { serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
-import { admitSimSnapshotBytes, checkSimSnapshotWire, decodeSimSnapshotBytes, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '@wildshard/engine/sim/snapshot';
+import { createSimSnapshotSerializer, admitSimSnapshotBytes, checkSimSnapshotWire, decodeSimSnapshotBytes, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -279,6 +279,7 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
 export async function createTrustedHeadlessAdapter(preparation: HeadlessRuntimeInput, snapshot?: string): Promise<TickWorkerAdapter> {
   const resident = await createTrustedHeadlessResident(preparation, snapshot), { host } = resident;
   const tape=createTrustedHeadlessTape(host,input=>resident.step(input),()=>resident.effects);
+  const serializer=createSimSnapshotSerializer();
   return {
     step: input => { resident.step(input); },
     observe: () => {
@@ -287,9 +288,9 @@ export async function createTrustedHeadlessAdapter(preparation: HeadlessRuntimeI
     },
     verbTape:tape,
     journey: plan => runHeadlessJourney(host,input=>resident.step(input),plan),
-    commit: () => ({ tick: host.state.tick, snapshot: serializeSimSnapshot(snapshotSimHostBytes(host)), effects: [...resident.effects] }),
+    commit: () => ({ tick: host.state.tick, snapshot: serializer.serialize(snapshotSimHostBytes(host)), effects: [...resident.effects] }),
     finish: () => ({ ticks: host.state.tick, lanes: 0, steps: 0 }),
-    dispose: () => { resident.dispose(); },
+    dispose: () => { try { resident.dispose(); } finally { serializer.dispose(); } },
   };
 }
 
