@@ -30,16 +30,18 @@ import {requestNativeRetention} from '../../fixtures/native-retention.mjs';
 /** @typedef {{status: number | null, signal: string | null, stdout: string, stderr: string, error: string | null}} ChildRun */
 // The original spawnSync, unchanged, inside its own small supervisor process: its timeout and SIGTERM are enforced there,
 // so a case that blocks this worker (execFileSync, spawnSync) can't stretch the child's deadline.
-const SUPERVISOR = `const {spawnSync} = require('node:child_process');
-const [args, timeout] = JSON.parse(process.argv[1]);
-const run = spawnSync(process.execPath, args, {encoding: 'utf8', timeout});
+// The supervisor itself starts with no NODE_OPTIONS or other inherited settings; the child gets the case's env verbatim.
+const SUPERVISOR = `const {spawnSync} = require('node:child_process'), {readFileSync} = require('node:fs');
+const [args, timeout, env] = JSON.parse(readFileSync(0, 'utf8'));
+const run = spawnSync(process.execPath, args, {encoding: 'utf8', timeout, env});
 process.stdout.write(JSON.stringify({status: run.status, signal: run.signal, stdout: run.stdout, stderr: run.stderr,
   error: run.error === undefined ? null : String(Reflect.get(run.error, 'code') ?? run.error)}));`;
 /** spawnSync(process.execPath, args, {encoding: 'utf8', timeout, env}) without blocking this worker.
  * @param {string[]} args @param {number} timeout @param {NodeJS.ProcessEnv} [env] @returns {Promise<ChildRun>} */
 function runChild(args, timeout, env = process.env) {
   return new Promise((resolveRun, reject) => {
-    const supervisor = spawn(process.execPath, ['-e', SUPERVISOR, JSON.stringify([args, timeout])], {env, stdio: ['ignore', 'pipe', 'inherit']});
+    const supervisor = spawn(process.execPath, ['-e', SUPERVISOR], {env: {}, stdio: ['pipe', 'pipe', 'inherit']});
+    supervisor.stdin.end(JSON.stringify([args, timeout, env]));
     let out = '';
     supervisor.stdout.setEncoding('utf8').on('data', chunk => {out += chunk;});
     supervisor.once('error', reject);
@@ -57,6 +59,8 @@ beforeAll(() => {
   // The delivery child's drain lists processes with the native inventory tool, so it is ready before that child starts.
   warmNativeInventory();
   endpointRun = startEndpointRefusal(); deliveryRun = startDelivery();
+  // Handled at once, so a supervisor failure is never an unhandled rejection; the owning case still awaits the original.
+  endpointRun.child.catch(() => undefined); deliveryRun.runs.catch(() => undefined);
 });
 beforeAll(async () => { await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
 // A filtered run that skips either case still waits for every child it started and removes what that case would have.
