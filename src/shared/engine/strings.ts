@@ -9,6 +9,8 @@ export const ENGINE_STRINGS = {
   "s_loading_quick_steps": "⟦0⟧ quick steps",
   "s_loading_retry": "Retry",
   "s_perf_worst_frame": "max ⟦0⟧ ms⟦1⟧",
+  "s_perf_tier_buffer": "⟦0⟧ · ⟦1⟧× · ⟦2⟧×⟦3⟧ · ⟦4⟧ MP⟦5⟧",
+  "s_perf_tier_dev": " · dev ⟦0⟧×/⟦1⟧×",
   "s_loading_modules": "Application modules",
   "s_loading_code": "Downloading game code",
   "s_loading_gap_setup": "gap before setup",

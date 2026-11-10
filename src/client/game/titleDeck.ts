@@ -1,4 +1,5 @@
 import { titleAssetURL } from './titleAssets';
+import { titleDevPixels } from './titleDevPixels';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { isDev } from '@wildshard/engine/core/devMode';
 import { followsTap, listenDom, listenTap } from '@wildshard/engine/input/dom';
@@ -331,6 +332,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   onTap(required(root, '.ws-menu-play'), activate);
   onTap(required(root, '.ws-menu-explore'), () => { const c = entries[index]; if (c?.shard && canExplore(c, mode())) opts.onExplore(c.shard); });
   onTap(required(root, '.ws-menu-settings'), opts.onSettings);
+  // QA row 25: the Developer's pixel picks, under SETTINGS (a temporary home, Jake's word)
+  if (isDev()) required(root, '.ws-menu-row').after(titleDevPixels(onTap));
 
   // hero art is ~0.2–0.3 MB a file and every card has two (portrait + landscape): only the selected card's, in the
   // orientation on screen, loads with the deck. A neighbour's loads when a swipe or a dot press starts toward it, so the

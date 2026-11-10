@@ -51,7 +51,8 @@ import { sustainedFrames } from './sustainedFrames';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
-import { isDev } from './devMode';
+import { isDev, onDev } from './devMode';
+import { DEV_PIXELS_EVENT, drawingPixelRatio } from '../render/devPixels';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
 import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/memorySaver';
 import { dropShadowColour } from '../world/shadowVariants';
@@ -513,7 +514,15 @@ export class Game {
       throw error;
     }
     if (tracedBoot) recordGpuCheckpoint(this.renderer, 'renderer:created');
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, TIER_CONFIG.dpr));
+    // QA row 25: a Developer's screen × density pick (render/devPixels.ts) stands in for the tier's cap; it applies live
+    this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr));
+    const repixel = (): void => {
+      const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr);
+      if (ratio === this.renderer.getPixelRatio()) return;
+      this.renderer.setPixelRatio(ratio); this.fitSize(); this.kickLoop();
+    };
+    this.engineScope.listen(document, DEV_PIXELS_EVENT, repixel);
+    this.engineScope.onDispose(onDev(repixel));
     this.renderer.setSize(window.innerWidth, viewportHeight());
     this.renderer.toneMapping = THREE.NoToneMapping; // tone mapping happens in the composer
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;

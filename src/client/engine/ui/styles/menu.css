@@ -60,6 +60,18 @@
 .ws-menu-mode.ws-menu-explore:hover, .ws-menu-mode.ws-menu-explore:focus-visible { background: rgba(255, 181, 71, 0.2); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 32px rgba(255, 181, 71, 0.35); }
 .ws-menu-mode.ws-menu-explore.off { display: none; }
 .ws-menu .ws-menu-row { display: flex; justify-content: center; gap: 22px; margin-top: 16px; }
+/* QA row 25: the Developer's pixel picks under SETTINGS (src/client/game/titleDevPixels.ts): two segmented switches and the drawing
+   buffer they give this screen */
+.ws-menu .ws-menu-devpx { display: flex; flex-direction: column; align-items: center; gap: 5px; margin: 10px auto 0; padding: 6px 8px; max-width: min(360px, calc(100vw - 24px)); box-sizing: border-box; border: 1px dashed var(--ws-cyan-line); background: rgba(6, 10, 18, 0.72); font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ws-text-dim); pointer-events: auto; }
+.ws-menu .ws-menu-devpx-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.ws-menu .ws-menu-devpx-k { font-style: normal; color: var(--ws-cyan); min-width: 54px; text-align: right; }
+.ws-menu .ws-menu-devpx-seg { display: inline-flex; border: 1px solid var(--ws-cyan-line); }
+.ws-menu .ws-menu-devpx-seg button { min-width: 40px; min-height: 34px; padding: 0 8px; appearance: none; -webkit-appearance: none; border: 0; border-left: 1px solid var(--ws-cyan-line); background: transparent; color: var(--ws-text); font: inherit; letter-spacing: 0.08em; touch-action: manipulation; cursor: pointer; }
+.ws-menu .ws-menu-devpx-seg button:first-child { border-left: 0; }
+.ws-menu .ws-menu-devpx-seg button[aria-pressed='true'] { background: var(--ws-cyan); color: #06121a; }
+.ws-menu .ws-menu-devpx-seg button:disabled { opacity: 0.35; cursor: default; }
+.ws-menu .ws-menu-devpx-help { font-size: 8px; letter-spacing: 0.06em; text-transform: none; }
+.ws-menu .ws-menu-devpx-out { color: var(--ws-text); letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
 /* DEV (E140): SOUND's sibling — the same text + square; a button, so its chrome is reset. The padding / negative margin
    give it a ~40 px tall tap target without moving the row */
 .ws-menu .ws-menu-settings { min-width: 44px; min-height: 44px; box-sizing: border-box; touch-action: manipulation; padding: 3px 9px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.06); border: 1px solid var(--ws-cyan-line); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-cyan); pointer-events: auto; cursor: pointer; flex: none; white-space: nowrap; } /* main menu ▸ Settings (src/client/engine/ui/BootSettings.ts, E55) */

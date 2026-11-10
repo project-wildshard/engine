@@ -208,6 +208,7 @@
     "./boot/liveJsonParser": "./src/client/engine/boot/liveJsonParser.ts",
     "./boot/download": "./src/client/engine/boot/download.ts",
     "./boot/loadingWaits": "./src/shared/engine/boot/loadingWaits.ts",
+    "./render/devPixels": "./src/client/engine/render/devPixels.ts",
     "./render/lightmaps": "./src/client/engine/render/lightmaps.ts",
     "./render/layeredMaps": "./src/client/engine/render/layeredMaps.ts",
     "./ai/director": "./src/shared/engine/ai/director.ts",
