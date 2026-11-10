@@ -21,10 +21,19 @@ already merged each layout. The full product is preferred, Ring 1 takes
 its slice, which carries identical bytes. Every lifetime assertion is
 kept: donors survive, site buffers release their GPU ledger, every
 geometry collects under real GC, and the page stays live. One new check
-names the consumed facts. Its real-GC child now runs in `node`, engine's
-environment, rather than singleplayer's `happy-dom`, where Vite's URL
-rewrite broke a script import. Skipping the site scope's dispose fails
-it.
+names the consumed facts. Its real-GC child now runs in `node`, the
+environment engine gives the parent and its shared `realGc` child, not
+singleplayer's `happy-dom` default; the proof passes in either. Skipping
+the site scope's dispose fails it.
 
 Neither file stays in the lint ignore list. No other inventory path,
 quarantine, bar or deadline is changed.
+
+Both files had only stale singleplayer clocks in `ci-module-durations`.
+Their real local module clocks, measured by the push timing reporter and
+written by `push-test-timings.mjs record`, are seated-figure-host 0.20 s
+and world-site-lifetime 3.01 s for the full suite, 0.20 s and 3.02 s for
+Ring 1. The recorder re-sorts and re-indents the three timing files.
+After rebasing onto codex-mock's commit-preflight disposition, both
+lanes' removals stay and the digest covers the combined inventory; the
+clocks were re-recorded on top so its observations are kept.

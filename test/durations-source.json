@@ -1,363 +1,4 @@
 {
-  "full": {
-    "run": "42501721151",
-    "sha": "1b5e70576bbb17bca297c7e35a167e70fe2c79a2",
-    "wallSeconds": 245.741,
-    "fileSeconds": 1718.371002223001,
-    "calibration": {
-      "factor": 1.35,
-      "setupSeconds": 70
-    },
-    "basis": "Complete module diagnostics for 1162 files after the real hold split; exact workflow green. Wall is maximum explicit first-step receipt before artifact upload, not total GitHub job time. One platform-skipped module contributes its observed preparation only."
-  },
-  "ring1": {
-    "run": "42501721107",
-    "sha": "1b5e70576bbb17bca297c7e35a167e70fe2c79a2",
-    "wallSeconds": 166.003,
-    "fileSeconds": 1238.3574388939994,
-    "calibration": {
-      "factor": 1.35,
-      "setupSeconds": 70
-    },
-    "basis": "Complete module diagnostics for 1085 files after the real hold split; exact workflow green. Wall is maximum explicit first-step receipt before artifact upload, not total GitHub job time. One platform-skipped module contributes its observed preparation only."
-  },
-  "additionalGreenRuns": ["42497139602", "42497612035", "42499045493", "42499045448"],
-  "unmeasuredFileBoundSeconds": 60,
-  "additionalFileObservations": [
-    {
-      "file": "test/net-fuzz.test.ts",
-      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
-      "bodyBlob": "8829d3b7143c2080b5efc6979c692121f02e1007",
-      "run": "42755566618",
-      "artifact": 13735562753,
-      "artifactSha256": "5f274b9c89c79696de7c766a308f64f5b20f54a46e8a6de4b4df2c572013ed3d",
-      "report": "shard-2-native.json",
-      "measuredAt": 1794284974324,
-      "durationMs": 22525.067709,
-      "clock": {
-        "file": "test/net-fuzz.test.ts",
-        "state": "passed",
-        "durationMs": 22525.067709,
-        "testAndHookMs": 17393.455131000002,
-        "collectMs": 5012.021675999999
-      },
-      "appliedTo": ["full"],
-      "basis": "Actual passed Linux full module including collection/setup/environment at this exact unchanged test body. Replaces only this file unknown sixty-second planning weight; runtime file/case caps, calibration, planner and other unknown bounds are unchanged."
-    },
-    {
-      "file": "test/engine-rule-successors.test.ts",
-      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
-      "bodyBlob": "e9921d8f40e96686e0d754c4bd26594fd56a9501",
-      "run": "42755566618",
-      "artifact": 13735492568,
-      "artifactSha256": "c9fccc119993507c17d2c8258bd47d841bb73167ee030955f8d28f37b89e3b91",
-      "report": "shard-3-native.json",
-      "measuredAt": 1794284966714,
-      "durationMs": 55079.462956999996,
-      "clock": {
-        "file": "test/engine-rule-successors.test.ts",
-        "state": "passed",
-        "durationMs": 55079.462956999996,
-        "testAndHookMs": 49166.763513,
-        "collectMs": 5880.497583
-      },
-      "appliedTo": ["full"],
-      "basis": "Actual passed Linux full module including collection/setup/environment at this exact unchanged test body. Replaces only this file unknown sixty-second planning weight; runtime file/case caps, calibration, planner and other unknown bounds are unchanged."
-    },
-    {
-      "file": "test/cook-validation.test.ts",
-      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
-      "bodyBlob": "812f28bcafc57775198ea369caa619721a47a37e",
-      "run": "42755566618",
-      "artifact": 13734919744,
-      "artifactSha256": "d5857bd9fbb9b68a880bdab4608c95adb93a2b5e635515d5ce5e2a0e3003e353",
-      "report": "shard-8-ordinary.json",
-      "measuredAt": 1794285082120,
-      "durationMs": 21825.218664,
-      "clock": {
-        "file": "test/cook-validation.test.ts",
-        "state": "passed",
-        "durationMs": 21825.218664,
-        "testAndHookMs": 20480.543909,
-        "collectMs": 1265.457277
-      },
-      "appliedTo": ["full"],
-      "basis": "Actual passed Linux full module including collection/setup/environment at this exact unchanged test body. Replaces only this file unknown sixty-second planning weight; runtime file/case caps, calibration, planner and other unknown bounds are unchanged."
-    },
-    {
-      "file": "test/nalati-awareness-verbs.test.ts",
-      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
-      "run": "42758135313",
-      "artifact": 13736970806,
-      "report": "results-1-of-3.json.timings.json",
-      "measuredAt": 1794286420409,
-      "durationMs": 59627.331532000004,
-      "appliedTo": ["full"],
-      "basis": "Maximum full Linux module clock across the ten consecutive qualifying current-body native-placement runs, including collection/setup/environment (59587.607693 ms case/hooks and 7.368234 ms collection in this maximum). Original Ring2 classification, native singleton, 60-second file gate, 175-second child/180-second case clocks, factor and 240-second shard headroom are unchanged. Prior 60.523-second actual failure remains in qualification history; this timing record does not erase it. Ring1 excludes this existing Ring2 file and gains no invented weight."
-    },
-    {
-      "file": "test/physics-open-plots-headless.test.ts",
-      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
-      "run": "42738123700",
-      "artifact": 13727249179,
-      "report": "results-2-of-3.json.timings.json",
-      "measuredAt": 1794275510136,
-      "durationMs": 48139.192371,
-      "appliedTo": ["full"],
-      "basis": "Conservative maximum complete module clock across all15 consecutive current-generation green CI executions, each19passes/0failed/0skipped and <=60000ms under published native placement. Exact current body and rawcase/clock identities verified. Replaces the old precompiled-caller estimate; original Ring2 omission stays, no Ring1transfer or cap change."
-    },
-    {
-      "file": "test/tooling/chrome-keychain.test.mjs",
-      "sha": "b17d8b7a0df7e88719dd3a1176e3b67aec800684",
-      "run": "42743123394",
-      "artifact": 13729968712,
-      "report": "shard-10-ordinary.json",
-      "measuredAt": 1794278091633,
-      "durationMs": 2449.271175,
-      "appliedTo": ["full"],
-      "basis": "Passed current Linux full-CI complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Replaces only this full-CI previously unknown estimate; the separate OpenPlots estimate uses its observed current-generation maximum. No Ring1transfer, other existing weight, fallback/cap/planner/group/deadline change."
-    },
-    {
-      "file": "test/tooling/check-page-events.test.mjs",
-      "sha": "b34773847338c43a2d1edefa88746296f233cb33",
-      "run": "local",
-      "report": "node scripts/vitest-tmp.ts run test/tooling/check-page-events.test.mjs, three runs",
-      "measuredAt": 1794277006934,
-      "durationMs": 1000,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Not a Linux CI clock: a new file with no CI run yet. Three local macOS (Apple M5 Max, Node 24.18.1) whole-module runs took 236 to 241 ms (vitest Duration, import 60%, tests 18%); the file builds seven temp trees and imports the TypeScript parser, no browser, product or pins. Recorded at 1 s, about four times the local clock, for Linux. Replace it with the first passing CI module clock. Other unknowns keep sixty seconds; no planner, cap or policy changes."
-    },
-    {
-      "file": "src/client/engine/boot/stale-build-cover-order.test.ts",
-      "sha": "a6c8928f951e01ba53271a45662a874a4911d405",
-      "run": "42740442778",
-      "artifact": 13729870489,
-      "report": "shard-2-ordinary.json",
-      "measuredAt": 1794276635447,
-      "durationMs": 789.3755950000001,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks. Exact current test-body blob matches. Both are pure happy-dom reload fixtures with identical environments in both rings, no pinned product and no catalogue branch. No planner/scheduler/cap/quarantine/deadline edit; all other unknowns keep sixty seconds."
-    },
-    {
-      "file": "src/client/engine/ui/build-row.test.ts",
-      "sha": "a6c8928f951e01ba53271a45662a874a4911d405",
-      "run": "42740442778",
-      "artifact": 13729660697,
-      "report": "shard-5-ordinary.json",
-      "measuredAt": 1794276608184,
-      "durationMs": 807.184358,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks. Exact current test-body blob matches. Both are pure happy-dom reload fixtures with identical environments in both rings, no pinned product and no catalogue branch. No planner/scheduler/cap/quarantine/deadline edit; all other unknowns keep sixty seconds."
-    },
-    {
-      "file": "src/client/engine/input/key-swallow.test.ts",
-      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
-      "run": "42739378617",
-      "artifact": 13729550078,
-      "report": "shard-2-ordinary.json",
-      "measuredAt": 1794276251616,
-      "durationMs": 572.008825,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
-    },
-    {
-      "file": "src/client/engine/input/keycap.test.ts",
-      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
-      "run": "42739378617",
-      "artifact": 13728931286,
-      "report": "shard-3-ordinary.json",
-      "measuredAt": 1794276260520,
-      "durationMs": 209.67717100000002,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
-    },
-    {
-      "file": "src/client/engine/ui/first-hints-keys.test.ts",
-      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
-      "run": "42739378617",
-      "artifact": 13728567119,
-      "report": "shard-4-ordinary.json",
-      "measuredAt": 1794276261969,
-      "durationMs": 1168.231615,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
-    },
-    {
-      "file": "src/client/engine/ui/leaveGuard.test.ts",
-      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
-      "run": "42739378617",
-      "artifact": 13729045782,
-      "report": "shard-5-ordinary.json",
-      "measuredAt": 1794276264679,
-      "durationMs": 1518.9869139999998,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
-    },
-    {
-      "file": "src/client/game/inputContexts.test.ts",
-      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
-      "run": "42739378617",
-      "artifact": 13729505230,
-      "report": "shard-6-ordinary.json",
-      "measuredAt": 1794276248079,
-      "durationMs": 546.453084,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
-    },
-    {
-      "file": "src/client/engine/boot/diagnostics-summary.test.ts",
-      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
-      "run": "42738124187",
-      "artifact": 13728480838,
-      "report": "shard-1-ordinary.json",
-      "measuredAt": 1794275531888,
-      "durationMs": 594.787261,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks; exact source body matches this forward. Both are pure happy-dom diagnostics/cache fixtures, with identical ring environments and no pinned product or catalogue branch. Other unknowns retain sixty seconds; no planner, scheduler, cap, policy or deadline changes."
-    },
-    {
-      "file": "test/spawn-check-lanes.test.ts",
-      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
-      "run": "42738124187",
-      "artifact": 13728292220,
-      "report": "shard-5-ordinary.json",
-      "measuredAt": 1794275571372,
-      "durationMs": 804.7169220000001,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks; exact source body matches this forward. Both are pure happy-dom diagnostics/cache fixtures, with identical ring environments and no pinned product or catalogue branch. Other unknowns retain sixty seconds; no planner, scheduler, cap, policy or deadline changes."
-    },
-    {
-      "file": "test/package-input-boundary.test.ts",
-      "sha": "7c1e029abbfc6859fc2ccb7130e2d75e66885993",
-      "run": "42730613947",
-      "artifact": 13724812468,
-      "report": "shard-7-ordinary.json",
-      "measuredAt": 1794271952411,
-      "durationMs": 597.692819,
-      "appliedTo": ["full"],
-      "basis": "Passed Linux full-CI complete module clock including collection, setup, preparation and cases/hooks. Exact source-body blob remains unchanged. Record an actual previously unknown file cost after qualified grid promotion adds its original singleton group back to full discovery. No Ring1 estimate transfer, existing weight replacement, planner/code/cap/group/policy/deadline change; all other unknowns retain sixty seconds."
-    },
-    {
-      "file": "test/species-kinds.test.ts",
-      "sha": "7c1e029abbfc6859fc2ccb7130e2d75e66885993",
-      "run": "42730613947",
-      "artifact": 13724783063,
-      "report": "shard-10-ordinary.json",
-      "measuredAt": 1794271887272,
-      "durationMs": 181.98846299999997,
-      "appliedTo": ["full"],
-      "basis": "Passed Linux full-CI complete module clock including collection, setup, preparation and cases/hooks. Exact source-body blob remains unchanged. Record an actual previously unknown file cost after qualified grid promotion adds its original singleton group back to full discovery. No Ring1 estimate transfer, existing weight replacement, planner/code/cap/group/policy/deadline change; all other unknowns retain sixty seconds."
-    },
-    {
-      "file": "src/client/engine/boot/no-leave-prompt.test.ts",
-      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
-      "run": "42731566380",
-      "artifact": 13724997136,
-      "report": "shard-1-ordinary.json",
-      "measuredAt": 1794272071976,
-      "durationMs": 265.62591199999997,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
-    },
-    {
-      "file": "src/client/engine/boot/stale-build-reload.test.ts",
-      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
-      "run": "42731566380",
-      "artifact": 13724128689,
-      "report": "shard-2-ordinary.json",
-      "measuredAt": 1794272065566,
-      "durationMs": 776.8750659999998,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
-    },
-    {
-      "file": "src/client/engine/ui/reloadCover.test.ts",
-      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
-      "run": "42731566380",
-      "artifact": 13723999768,
-      "report": "shard-3-ordinary.json",
-      "measuredAt": 1794272093486,
-      "durationMs": 717.492283,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
-    },
-    {
-      "file": "src/client/engine/ui/update-hang-offline.test.ts",
-      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
-      "run": "42731566380",
-      "artifact": 13724114477,
-      "report": "shard-4-ordinary.json",
-      "measuredAt": 1794272084634,
-      "durationMs": 760.455571,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
-    },
-    {
-      "file": "src/client/engine/ui/update-hang-online.test.ts",
-      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
-      "run": "42731566380",
-      "artifact": 13725640567,
-      "report": "shard-5-ordinary.json",
-      "measuredAt": 1794272103724,
-      "durationMs": 765.7435820000001,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
-    },
-    {
-      "file": "test/declared-kit-items.test.ts",
-      "sha": "17b936e595f674e9c75d64a068b2a205cd98aa63",
-      "run": "42718338723",
-      "artifact": 13719890211,
-      "report": "shard-2-ordinary.json",
-      "measuredAt": 1794266151918,
-      "durationMs": 6072.365115999999,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux Ring 1 module includes 5423.357833 ms collection plus setup and 591.539543 ms cases/hooks. It opens only the pinned _template product with the same Node environment in both rings. Other unknowns keep sixty seconds, and no global calibration or gate changes."
-    },
-    {
-      "file": "test/connection-doctor.test.ts",
-      "sha": "906dfd51f6d2df39c33b0ec83977861fe73ca1f7",
-      "run": "42709241950",
-      "artifact": 13715591117,
-      "report": "shard-1-ordinary.json",
-      "measuredAt": 1794262280637,
-      "durationMs": 11570.329586,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Passed Linux module includes 6654.948388 ms collection plus setup/environment and 4793.522035 ms cases/hooks. Both rings use the identical Node environment and roomBench opens only the same pinned Driftwood product, with real loopback HTTP/WebSocket fixtures; there is no full-catalogue branch. Other unknowns keep sixty seconds, and no global calibration or gate changes."
-    },
-    {
-      "file": "test/cook-cpu-limit.test.ts",
-      "sha": "32f182df49688e4e70331dc33d5f7a4e66566220",
-      "run": "42703311246",
-      "report": "engine-ci-6/shard-6-ordinary.json",
-      "measuredAt": 1794260137151,
-      "durationMs": 4824.455306,
-      "appliedTo": ["full"],
-      "basis": "Passed Linux module includes collection, setup and environment, not only the 2092.880604 ms case/hook sum. Moving this unchanged actual encoder proof to its own native group keeps the ordinary two-worker phase from overlapping its uncapped no-grant branch. No calibration, cap or deadline change."
-    },
-    {
-      "file": "test/cook-cpu-limit.test.ts",
-      "sha": "32f182df49688e4e70331dc33d5f7a4e66566220",
-      "run": "42703311121",
-      "artifact": 13711789837,
-      "report": "shard-1-ordinary.json",
-      "measuredAt": 1794260053802,
-      "durationMs": 4946.377766,
-      "appliedTo": ["ring1"],
-      "basis": "Separate passed Ring 1 Linux module includes collection, setup and environment. Unchanged real q11 bytes, worker counts and all three cases remain; the native singleton is scheduled independently with the existing safety factor and full sixty-second bound for other unknown files."
-    },
-    {
-      "file": "src/client/engine/ui/load-failure-copy.test.ts",
-      "sha": "299fb0ad890e0f7587f7d527fa8ed309aaa2596b",
-      "run": "42699787431",
-      "artifact": 13710457844,
-      "report": "shard-1-ordinary.json",
-      "measuredAt": 1794258690435,
-      "durationMs": 1050.5239569999999,
-      "appliedTo": ["full", "ring1"],
-      "basis": "Successful Linux module diagnostic includes test, collection, setup, preparation and environment. This exact pure DOM case has the same happy-dom environment in both rings and reads no pinned product. No global calibration or unmeasured-file bound changes."
-    }
-  ],
   "localPushObservations": [
     {
       "schema": "push-test-timing/1",
@@ -412,6 +53,520 @@
       "finishedAt": "2026-11-10T06:53:49.002Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "dac18b9d52b7410bc81e6258e3c2df3feb6852ab",
+      "tree": "2f73affafc5468959f485d515c5e563cd29c5d5b",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "src/client/game/riding/seated-figure-host.test.ts",
+          "blob": "4be472a060eae8357fd23718815c7d6ee28c50a3",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 196.60487499999996
+        },
+        {
+          "file": "src/client/game/shardfile/world-site-lifetime.test.ts",
+          "blob": "56885104f2bdae1d443f51f19c7ac0e585c9834d",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 3009.1724990000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T07:10:02.154Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "dac18b9d52b7410bc81e6258e3c2df3feb6852ab",
+      "tree": "2f73affafc5468959f485d515c5e563cd29c5d5b",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "src/client/game/riding/seated-figure-host.test.ts",
+          "blob": "4be472a060eae8357fd23718815c7d6ee28c50a3",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 195.485625
+        },
+        {
+          "file": "src/client/game/shardfile/world-site-lifetime.test.ts",
+          "blob": "56885104f2bdae1d443f51f19c7ac0e585c9834d",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 3023.854167999999
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T07:10:05.755Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
-  ]
+  ],
+  "additionalFileObservations": [
+    {
+      "file": "test/net-fuzz.test.ts",
+      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
+      "bodyBlob": "8829d3b7143c2080b5efc6979c692121f02e1007",
+      "run": "42755566618",
+      "artifact": 13735562753,
+      "artifactSha256": "5f274b9c89c79696de7c766a308f64f5b20f54a46e8a6de4b4df2c572013ed3d",
+      "report": "shard-2-native.json",
+      "measuredAt": 1794284974324,
+      "durationMs": 22525.067709,
+      "clock": {
+        "file": "test/net-fuzz.test.ts",
+        "state": "passed",
+        "durationMs": 22525.067709,
+        "testAndHookMs": 17393.455131000002,
+        "collectMs": 5012.021675999999
+      },
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Actual passed Linux full module including collection/setup/environment at this exact unchanged test body. Replaces only this file unknown sixty-second planning weight; runtime file/case caps, calibration, planner and other unknown bounds are unchanged."
+    },
+    {
+      "file": "test/engine-rule-successors.test.ts",
+      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
+      "bodyBlob": "e9921d8f40e96686e0d754c4bd26594fd56a9501",
+      "run": "42755566618",
+      "artifact": 13735492568,
+      "artifactSha256": "c9fccc119993507c17d2c8258bd47d841bb73167ee030955f8d28f37b89e3b91",
+      "report": "shard-3-native.json",
+      "measuredAt": 1794284966714,
+      "durationMs": 55079.462956999996,
+      "clock": {
+        "file": "test/engine-rule-successors.test.ts",
+        "state": "passed",
+        "durationMs": 55079.462956999996,
+        "testAndHookMs": 49166.763513,
+        "collectMs": 5880.497583
+      },
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Actual passed Linux full module including collection/setup/environment at this exact unchanged test body. Replaces only this file unknown sixty-second planning weight; runtime file/case caps, calibration, planner and other unknown bounds are unchanged."
+    },
+    {
+      "file": "test/cook-validation.test.ts",
+      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
+      "bodyBlob": "812f28bcafc57775198ea369caa619721a47a37e",
+      "run": "42755566618",
+      "artifact": 13734919744,
+      "artifactSha256": "d5857bd9fbb9b68a880bdab4608c95adb93a2b5e635515d5ce5e2a0e3003e353",
+      "report": "shard-8-ordinary.json",
+      "measuredAt": 1794285082120,
+      "durationMs": 21825.218664,
+      "clock": {
+        "file": "test/cook-validation.test.ts",
+        "state": "passed",
+        "durationMs": 21825.218664,
+        "testAndHookMs": 20480.543909,
+        "collectMs": 1265.457277
+      },
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Actual passed Linux full module including collection/setup/environment at this exact unchanged test body. Replaces only this file unknown sixty-second planning weight; runtime file/case caps, calibration, planner and other unknown bounds are unchanged."
+    },
+    {
+      "file": "test/nalati-awareness-verbs.test.ts",
+      "sha": "1808f1f4d53e4ad3e64e93f1ab84a96c1256f146",
+      "run": "42758135313",
+      "artifact": 13736970806,
+      "report": "results-1-of-3.json.timings.json",
+      "measuredAt": 1794286420409,
+      "durationMs": 59627.331532000004,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Maximum full Linux module clock across the ten consecutive qualifying current-body native-placement runs, including collection/setup/environment (59587.607693 ms case/hooks and 7.368234 ms collection in this maximum). Original Ring2 classification, native singleton, 60-second file gate, 175-second child/180-second case clocks, factor and 240-second shard headroom are unchanged. Prior 60.523-second actual failure remains in qualification history; this timing record does not erase it. Ring1 excludes this existing Ring2 file and gains no invented weight."
+    },
+    {
+      "file": "test/physics-open-plots-headless.test.ts",
+      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
+      "run": "42738123700",
+      "artifact": 13727249179,
+      "report": "results-2-of-3.json.timings.json",
+      "measuredAt": 1794275510136,
+      "durationMs": 48139.192371,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Conservative maximum complete module clock across all15 consecutive current-generation green CI executions, each19passes/0failed/0skipped and <=60000ms under published native placement. Exact current body and rawcase/clock identities verified. Replaces the old precompiled-caller estimate; original Ring2 omission stays, no Ring1transfer or cap change."
+    },
+    {
+      "file": "test/tooling/chrome-keychain.test.mjs",
+      "sha": "b17d8b7a0df7e88719dd3a1176e3b67aec800684",
+      "run": "42743123394",
+      "artifact": 13729968712,
+      "report": "shard-10-ordinary.json",
+      "measuredAt": 1794278091633,
+      "durationMs": 2449.271175,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Passed current Linux full-CI complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Replaces only this full-CI previously unknown estimate; the separate OpenPlots estimate uses its observed current-generation maximum. No Ring1transfer, other existing weight, fallback/cap/planner/group/deadline change."
+    },
+    {
+      "file": "test/tooling/check-page-events.test.mjs",
+      "sha": "b34773847338c43a2d1edefa88746296f233cb33",
+      "run": "local",
+      "report": "node scripts/vitest-tmp.ts run test/tooling/check-page-events.test.mjs, three runs",
+      "measuredAt": 1794277006934,
+      "durationMs": 1000,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Not a Linux CI clock: a new file with no CI run yet. Three local macOS (Apple M5 Max, Node 24.18.1) whole-module runs took 236 to 241 ms (vitest Duration, import 60%, tests 18%); the file builds seven temp trees and imports the TypeScript parser, no browser, product or pins. Recorded at 1 s, about four times the local clock, for Linux. Replace it with the first passing CI module clock. Other unknowns keep sixty seconds; no planner, cap or policy changes."
+    },
+    {
+      "file": "src/client/engine/boot/stale-build-cover-order.test.ts",
+      "sha": "a6c8928f951e01ba53271a45662a874a4911d405",
+      "run": "42740442778",
+      "artifact": 13729870489,
+      "report": "shard-2-ordinary.json",
+      "measuredAt": 1794276635447,
+      "durationMs": 789.3755950000001,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks. Exact current test-body blob matches. Both are pure happy-dom reload fixtures with identical environments in both rings, no pinned product and no catalogue branch. No planner/scheduler/cap/quarantine/deadline edit; all other unknowns keep sixty seconds."
+    },
+    {
+      "file": "src/client/engine/ui/build-row.test.ts",
+      "sha": "a6c8928f951e01ba53271a45662a874a4911d405",
+      "run": "42740442778",
+      "artifact": 13729660697,
+      "report": "shard-5-ordinary.json",
+      "measuredAt": 1794276608184,
+      "durationMs": 807.184358,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks. Exact current test-body blob matches. Both are pure happy-dom reload fixtures with identical environments in both rings, no pinned product and no catalogue branch. No planner/scheduler/cap/quarantine/deadline edit; all other unknowns keep sixty seconds."
+    },
+    {
+      "file": "src/client/engine/input/key-swallow.test.ts",
+      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
+      "run": "42739378617",
+      "artifact": 13729550078,
+      "report": "shard-2-ordinary.json",
+      "measuredAt": 1794276251616,
+      "durationMs": 572.008825,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
+    },
+    {
+      "file": "src/client/engine/input/keycap.test.ts",
+      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
+      "run": "42739378617",
+      "artifact": 13728931286,
+      "report": "shard-3-ordinary.json",
+      "measuredAt": 1794276260520,
+      "durationMs": 209.67717100000002,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
+    },
+    {
+      "file": "src/client/engine/ui/first-hints-keys.test.ts",
+      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
+      "run": "42739378617",
+      "artifact": 13728567119,
+      "report": "shard-4-ordinary.json",
+      "measuredAt": 1794276261969,
+      "durationMs": 1168.231615,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
+    },
+    {
+      "file": "src/client/engine/ui/leaveGuard.test.ts",
+      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
+      "run": "42739378617",
+      "artifact": 13729045782,
+      "report": "shard-5-ordinary.json",
+      "measuredAt": 1794276264679,
+      "durationMs": 1518.9869139999998,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
+    },
+    {
+      "file": "src/client/game/inputContexts.test.ts",
+      "sha": "892acc6fd11ff3aff98ff122903b65acff06597d",
+      "run": "42739378617",
+      "artifact": 13729505230,
+      "report": "shard-6-ordinary.json",
+      "measuredAt": 1794276248079,
+      "durationMs": 546.453084,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Pure input/scope/happy-dom fixtures have identical environments in full and Ring1, with no pinned product or ring-specific branch. No planner/scheduler/cap/quarantine/deadline edit; every other unknown remains sixty seconds."
+    },
+    {
+      "file": "src/client/engine/boot/diagnostics-summary.test.ts",
+      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
+      "run": "42738124187",
+      "artifact": 13728480838,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794275531888,
+      "durationMs": 594.787261,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks; exact source body matches this forward. Both are pure happy-dom diagnostics/cache fixtures, with identical ring environments and no pinned product or catalogue branch. Other unknowns retain sixty seconds; no planner, scheduler, cap, policy or deadline changes."
+    },
+    {
+      "file": "test/spawn-check-lanes.test.ts",
+      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
+      "run": "42738124187",
+      "artifact": 13728292220,
+      "report": "shard-5-ordinary.json",
+      "measuredAt": 1794275571372,
+      "durationMs": 804.7169220000001,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks; exact source body matches this forward. Both are pure happy-dom diagnostics/cache fixtures, with identical ring environments and no pinned product or catalogue branch. Other unknowns retain sixty seconds; no planner, scheduler, cap, policy or deadline changes."
+    },
+    {
+      "file": "test/package-input-boundary.test.ts",
+      "sha": "7c1e029abbfc6859fc2ccb7130e2d75e66885993",
+      "run": "42730613947",
+      "artifact": 13724812468,
+      "report": "shard-7-ordinary.json",
+      "measuredAt": 1794271952411,
+      "durationMs": 597.692819,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Passed Linux full-CI complete module clock including collection, setup, preparation and cases/hooks. Exact source-body blob remains unchanged. Record an actual previously unknown file cost after qualified grid promotion adds its original singleton group back to full discovery. No Ring1 estimate transfer, existing weight replacement, planner/code/cap/group/policy/deadline change; all other unknowns retain sixty seconds."
+    },
+    {
+      "file": "test/species-kinds.test.ts",
+      "sha": "7c1e029abbfc6859fc2ccb7130e2d75e66885993",
+      "run": "42730613947",
+      "artifact": 13724783063,
+      "report": "shard-10-ordinary.json",
+      "measuredAt": 1794271887272,
+      "durationMs": 181.98846299999997,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Passed Linux full-CI complete module clock including collection, setup, preparation and cases/hooks. Exact source-body blob remains unchanged. Record an actual previously unknown file cost after qualified grid promotion adds its original singleton group back to full discovery. No Ring1 estimate transfer, existing weight replacement, planner/code/cap/group/policy/deadline change; all other unknowns retain sixty seconds."
+    },
+    {
+      "file": "src/client/engine/boot/no-leave-prompt.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13724997136,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794272071976,
+      "durationMs": 265.62591199999997,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/boot/stale-build-reload.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13724128689,
+      "report": "shard-2-ordinary.json",
+      "measuredAt": 1794272065566,
+      "durationMs": 776.8750659999998,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/ui/reloadCover.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13723999768,
+      "report": "shard-3-ordinary.json",
+      "measuredAt": 1794272093486,
+      "durationMs": 717.492283,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/ui/update-hang-offline.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13724114477,
+      "report": "shard-4-ordinary.json",
+      "measuredAt": 1794272084634,
+      "durationMs": 760.455571,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/ui/update-hang-online.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13725640567,
+      "report": "shard-5-ordinary.json",
+      "measuredAt": 1794272103724,
+      "durationMs": 765.7435820000001,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "test/declared-kit-items.test.ts",
+      "sha": "17b936e595f674e9c75d64a068b2a205cd98aa63",
+      "run": "42718338723",
+      "artifact": 13719890211,
+      "report": "shard-2-ordinary.json",
+      "measuredAt": 1794266151918,
+      "durationMs": 6072.365115999999,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 module includes 5423.357833 ms collection plus setup and 591.539543 ms cases/hooks. It opens only the pinned _template product with the same Node environment in both rings. Other unknowns keep sixty seconds, and no global calibration or gate changes."
+    },
+    {
+      "file": "test/connection-doctor.test.ts",
+      "sha": "906dfd51f6d2df39c33b0ec83977861fe73ca1f7",
+      "run": "42709241950",
+      "artifact": 13715591117,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794262280637,
+      "durationMs": 11570.329586,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux module includes 6654.948388 ms collection plus setup/environment and 4793.522035 ms cases/hooks. Both rings use the identical Node environment and roomBench opens only the same pinned Driftwood product, with real loopback HTTP/WebSocket fixtures; there is no full-catalogue branch. Other unknowns keep sixty seconds, and no global calibration or gate changes."
+    },
+    {
+      "file": "test/cook-cpu-limit.test.ts",
+      "sha": "32f182df49688e4e70331dc33d5f7a4e66566220",
+      "run": "42703311246",
+      "report": "engine-ci-6/shard-6-ordinary.json",
+      "measuredAt": 1794260137151,
+      "durationMs": 4824.455306,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Passed Linux module includes collection, setup and environment, not only the 2092.880604 ms case/hook sum. Moving this unchanged actual encoder proof to its own native group keeps the ordinary two-worker phase from overlapping its uncapped no-grant branch. No calibration, cap or deadline change."
+    },
+    {
+      "file": "test/cook-cpu-limit.test.ts",
+      "sha": "32f182df49688e4e70331dc33d5f7a4e66566220",
+      "run": "42703311121",
+      "artifact": 13711789837,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794260053802,
+      "durationMs": 4946.377766,
+      "appliedTo": [
+        "ring1"
+      ],
+      "basis": "Separate passed Ring 1 Linux module includes collection, setup and environment. Unchanged real q11 bytes, worker counts and all three cases remain; the native singleton is scheduled independently with the existing safety factor and full sixty-second bound for other unknown files."
+    },
+    {
+      "file": "src/client/engine/ui/load-failure-copy.test.ts",
+      "sha": "299fb0ad890e0f7587f7d527fa8ed309aaa2596b",
+      "run": "42699787431",
+      "artifact": 13710457844,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794258690435,
+      "durationMs": 1050.5239569999999,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Successful Linux module diagnostic includes test, collection, setup, preparation and environment. This exact pure DOM case has the same happy-dom environment in both rings and reads no pinned product. No global calibration or unmeasured-file bound changes."
+    }
+  ],
+  "full": {
+    "run": "42501721151",
+    "sha": "1b5e70576bbb17bca297c7e35a167e70fe2c79a2",
+    "wallSeconds": 245.741,
+    "fileSeconds": 1718.371002223001,
+    "calibration": {
+      "factor": 1.35,
+      "setupSeconds": 70
+    },
+    "basis": "Complete module diagnostics for 1162 files after the real hold split; exact workflow green. Wall is maximum explicit first-step receipt before artifact upload, not total GitHub job time. One platform-skipped module contributes its observed preparation only."
+  },
+  "ring1": {
+    "run": "42501721107",
+    "sha": "1b5e70576bbb17bca297c7e35a167e70fe2c79a2",
+    "wallSeconds": 166.003,
+    "fileSeconds": 1238.3574388939994,
+    "calibration": {
+      "factor": 1.35,
+      "setupSeconds": 70
+    },
+    "basis": "Complete module diagnostics for 1085 files after the real hold split; exact workflow green. Wall is maximum explicit first-step receipt before artifact upload, not total GitHub job time. One platform-skipped module contributes its observed preparation only."
+  },
+  "additionalGreenRuns": [
+    "42497139602",
+    "42497612035",
+    "42499045493",
+    "42499045448"
+  ],
+  "unmeasuredFileBoundSeconds": 60
 }
