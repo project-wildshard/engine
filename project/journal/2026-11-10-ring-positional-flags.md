@@ -39,3 +39,8 @@ The unchanged real step validates240ticks on all seven product cases.
 All seven canonical expected hashes match, with no update mode.
 The step stage takes20seconds and is green.
 The one-shot J206 review returns GO, no MUST or SHOULD.
+
+Both official source stamp writers run twice and remain deterministic.
+Only owned private flag and three generated book outputs are restored.
+Their before/HEAD hashes remain in the private evidence receipt.
+No peer source, record mode or expected checkpoint hash is modified.
