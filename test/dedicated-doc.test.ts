@@ -17,10 +17,18 @@ import { serverInput } from './fixtures/dedicated/roomBench';
 const SHARD = 'driftwood-isle', RING = 'sealed-ring';
 interface Phone { readonly device: string; readonly client: NetClient; readonly link: DirectLoopback }
 let clock = 0;
+// VITEST-BENCH VB16: the shipped input (product, assets, Rapier) is immutable, so it loads once per file;
+// every room is still booted fresh in each case.
+const inputs = new Map<string, ReturnType<typeof serverInput>>();
+function shippedInput(slug: string): ReturnType<typeof serverInput> {
+  let found = inputs.get(slug);
+  if (found === undefined) { found = serverInput(slug); inputs.set(slug, found); }
+  return found;
+}
 const rooms: DedicatedRoom[] = [], writes: SaveWrite[] = [];
 const post = (row: RoomNews): void => { if (row.kind === 'save') writes.push(row.write); else if (row.kind === 'refused') throw new Error(row.reason); };
 async function open(boot: string): Promise<DedicatedRoom> {
-  const room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: boot, input: await serverInput(SHARD), now: () => clock, post });
+  const room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: boot, input: await shippedInput(SHARD), now: () => clock, post });
   rooms.push(room);
   return room;
 }
@@ -186,7 +194,7 @@ test('a doc is the same after Postgres, and a stale write cannot land', { timeou
 test('an incompatible continuation refuses the seat and never writes fresh state', async () => {
   const source = await open('before'), saved = quit(enter(source, 'device:incompatible')), doc = readBack(saved);
   if (doc === null) throw new Error('No doc');
-  const news: RoomNews[] = [], room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'after', input: await serverInput(SHARD), now: () => clock, post: row => { news.push(row); } });
+  const news: RoomNews[] = [], room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'after', input: await shippedInput(SHARD), now: () => clock, post: row => { news.push(row); } });
   rooms.push(room);
   const link = directLoopback(); let reason = '';
   link.server.onClose(word => { reason = word; });
@@ -256,7 +264,7 @@ test('an incomplete ledger event is rejected before any room tick', async () => 
 test.each([{ axis: 'x', value: 1e308 }, { axis: 'z', value: 1e308 }, { axis: 'x', value: 100_000 }, { axis: 'z', value: 100_000 }])('an outside-world saved $axis=$value cannot reach the next room tick', { timeout: 9000 }, async ({ axis, value }) => {
   const source = await open('place-source'), saved = quit(enter(source, 'device:place')), doc = readBack(saved);
   if (doc === null) throw new Error('No document');
-  const news: RoomNews[] = [], room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'place-target', input: await serverInput(SHARD), now: () => clock, post: row => { news.push(row); } }); rooms.push(room);
+  const news: RoomNews[] = [], room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'place-target', input: await shippedInput(SHARD), now: () => clock, post: row => { news.push(row); } }); rooms.push(room);
   const link = directLoopback(); let closed = ''; link.server.onClose(reason => { closed = reason; });
   room.seat({ device: 'device:place', name: 'P', body: 'p.place', doc: { ...doc, at: { ...doc.at, [axis]: value } }, seq: saved.seq }, link.server, () => undefined);
   expect(() => { room.tick(); }).not.toThrow(); expect(closed).toBe('refused'); expect(room.taken).toBe(0);
@@ -303,7 +311,7 @@ test('a mismatched recovered fact refuses its seat without throwing or saving', 
   if (fact === undefined || doc === null) throw new Error('No fact');
   const identity: unknown = JSON.parse(fact.factId); if (!Array.isArray(identity) || typeof identity[4] !== 'number') throw new Error('Bad fact identity');
   identity[4]++;
-  const news: RoomNews[] = [], fresh = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'fact-target', input: await serverInput(SHARD), now: () => clock, post: row => { news.push(row); } }); rooms.push(fresh);
+  const news: RoomNews[] = [], fresh = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'fact-target', input: await shippedInput(SHARD), now: () => clock, post: row => { news.push(row); } }); rooms.push(fresh);
   const link = directLoopback(); let closed = ''; link.server.onClose(reason => { closed = reason; });
   expect(() => { fresh.seat({ device: phone.device, name: 'F', body: 'p.fact', doc, seq: paid.seq, recovery: [{ ...fact, serial: 1, factId: JSON.stringify(identity) }] }, link.server, () => undefined); }).not.toThrow();
   expect(closed).toBe('refused'); expect(fresh.taken).toBe(0); fresh.drain(); expect(news.filter(row => row.kind === 'save')).toHaveLength(0);

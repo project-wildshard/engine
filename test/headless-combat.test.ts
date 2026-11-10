@@ -47,7 +47,15 @@ type StandCommand = Extract<HeadlessCommand, { kind: 'player' }>;
 let restore = (): void => undefined;
 afterEach(() => { restore(); restore = () => undefined; });
 
-async function shipped(slug: string) {
+// VITEST-BENCH VB16: a shard's shipped bytes, product and Rapier are immutable, so each loads once per file;
+// every resident is still created fresh in each case.
+const loaded = new Map<string, ReturnType<typeof load>>();
+function shipped(slug: string): ReturnType<typeof load> {
+  let found = loaded.get(slug);
+  if (found === undefined) { found = load(slug); loaded.set(slug, found); }
+  return found;
+}
+async function load(slug: string) {
   const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
