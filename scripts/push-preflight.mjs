@@ -312,7 +312,7 @@ export async function preflight(root,options={}){
   missing=rows.map(row=>row.file);
   if(rows.length>0)report.refusals.push({check:'timings',
    message:`new test files without committed timings: ${rows.map(row=>`${row.file} (${row.rings.map(ring=>ring==='1'?'Ring 1':'full').join(' + ')})`).join(', ')}; the gate's timing step refuses after the full suite ("New test files need committed timings")`,
-   fix:'node scripts/push-preflight.mjs timings (runs only these files with the gate\'s timing reporter and records them), then commit test/durations.json test/durations-ring1.json test/durations-source.json'});
+   fix:'node scripts/push-preflight.mjs timings (runs only these files with the gate\'s timing reporter and records them), then commit test/durations.json test/durations-ring1.json test/durations-source.json with a project/journal/ line (the record is 30+ lines, so the D25 pre-commit rule asks for one)'});
  });
 
  // 3: a new test file the gate would wholly skip can never get a clock: the
@@ -446,7 +446,7 @@ async function recordLocalTimings(root){
   timings.completeTestTimings(request,0);
  }
  const recorded=timings.recordTestTimings(evidence.directory,root);
- console.log(`Recorded ${recorded.join(', ')}; commit test/durations.json test/durations-ring1.json test/durations-source.json and enqueue normally.`);
+ console.log(`Recorded ${recorded.join(', ')}; commit test/durations.json test/durations-ring1.json test/durations-source.json with a project/journal/ line (30+ lines, D25) and enqueue normally.`);
 }
 
 /** Resolve a conflicted test/durations-source.json mid-rebase or merge by
