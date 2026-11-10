@@ -754,6 +754,7 @@
   "test/group-notices.test.ts": 0.07532308599999997,
   "test/headless-assembly.test.ts": 1.0278296450000002,
   "test/headless-combat-motion.test.ts": 1.915072027,
+  "test/headless-direct-worker.test.ts": 10.447850750999999,
   "test/headless-journey-worker.test.ts": 13.188308608000002,
   "test/headless-journey.test.ts": 0.041618731,
   "test/headless-launcher-commands.test.ts": 3.2069637690000006,

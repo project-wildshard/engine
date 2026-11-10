@@ -21,3 +21,12 @@ publication; they are not Linux measurements or a full-suite green receipt.
 Only this one inventory path is removed and its digest refreshed. Owner, first
 registration and original November 10 18:00 UTC deadline remain fixed. There
 are 380 paths still awaiting individual disposition.
+
+The clean candidate now has complete-module bootstrap clocks from actual
+two-slot admitted full/Ring 1 processes:10434.909626/10447.850751ms, all3cases
+passed with zero unhandled errors. Each existing case remains under ten
+seconds in the named root probe; its three sequential native scenarios plus
+collection/setup account for the longer module total. These are local
+measurements, not Linux clocks or changed time limits. Existing weights and
+records are unchanged. Planning passes full1201files/12shards/max233.955377s
+and Ring11117files/8shards/max224.760469s under the original240s ceiling.

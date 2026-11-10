@@ -129,6 +129,60 @@
       "finishedAt": "2026-11-10T07:10:05.755Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "c76cf13c1707da46e88188ea05da6a7a0321761e",
+      "tree": "92fe3f210a05d5a6844d2ce8a392245afe59e5ce",
+      "profile": "ci21-native-two-slot-focused-module-bootstrap",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/headless-direct-worker.test.ts",
+          "blob": "b4207bcdd8b3e3f2e3133d75551ae392aa75a74c",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 10434.909626
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T07:52:31.539Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "c76cf13c1707da46e88188ea05da6a7a0321761e",
+      "tree": "92fe3f210a05d5a6844d2ce8a392245afe59e5ce",
+      "profile": "ci21-native-two-slot-focused-module-bootstrap",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/headless-direct-worker.test.ts",
+          "blob": "b4207bcdd8b3e3f2e3133d75551ae392aa75a74c",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 10447.850750999998
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T07:52:42.746Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

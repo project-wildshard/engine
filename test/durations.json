@@ -786,6 +786,7 @@
   "test/headless-bounds.test.ts": 0.5573274699999999,
   "test/headless-combat-motion.test.ts": 2.332337551,
   "test/headless-combat.test.ts": 17.803917134999995,
+  "test/headless-direct-worker.test.ts": 10.434909626000001,
   "test/headless-journey-worker.test.ts": 6.638541697,
   "test/headless-journey.test.ts": 0.06183516,
   "test/headless-launcher-commands.test.ts": 3.251571157,
