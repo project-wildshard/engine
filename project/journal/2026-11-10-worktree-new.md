@@ -35,3 +35,5 @@ only while it still points at the base).
 
 Re-measured after the fixes: 15.4 s on a quieter machine (checkout 3.0, install
 1.2, pins 10.2); tracked tree 0.4 MiB unique.
+
+Clocks for `test/tooling/worktree.test.mjs` recorded with `push-preflight.mjs timings`.
