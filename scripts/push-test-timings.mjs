@@ -1,7 +1,7 @@
 // New and restored test files need a committed clock before publication.
 import {execFileSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
-import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {closeSync,constants,fstatSync,mkdirSync,openSync,readFileSync,readSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -14,12 +14,31 @@ const reportSchema=v.object({...timingRequestSchema.entries,reason:v.literal('pa
 const localSchema=v.object({...reportSchema.entries,completed:v.literal(true)});
 const hostedSchema=v.object({file:v.string(),sha:v.pipe(v.string(),v.regex(/^[a-f0-9]{40}$/u)),run:v.pipe(v.string(),v.regex(/^\d+$/u)),durationMs:positive,appliedTo:v.array(v.picklist(['full','ring1']))});
 const sourceSchema=v.looseObject({localPushObservations:v.optional(v.array(v.unknown())),additionalFileObservations:v.optional(v.array(v.unknown()))});
+const observationFile='test/durations-observations.jsonl';
 /** @param {string} root @param {string[]} args */
 const git=(root,args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 /** @param {string} root @param {'full'|'1'} ring @returns {Record<string,number>} */
 const weights=(root,ring)=>v.parse(v.record(v.string(),positive),JSON.parse(readFileSync(resolve(root,ring==='full'?'test/durations.json':'test/durations-ring1.json'),'utf8')));
-/** @param {string} root */
-const provenance=root=>v.parse(sourceSchema,JSON.parse(readFileSync(resolve(root,'test/durations-source.json'),'utf8')));
+/** @param {string} root @returns {v.InferOutput<typeof localSchema>[]} */
+function observationLog(root){
+ /** @type {number} */let descriptor;
+ try{descriptor=openSync(resolve(root,observationFile),constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);}
+ catch(error){if(error!==null&&typeof error==='object'&&'code'in error&&error.code==='ENOENT')return [];throw error;}
+ try{
+  if(!fstatSync(descriptor).isFile())throw new Error('Timing observations must be a regular file');
+  return readFileSync(descriptor,'utf8').split('\n').flatMap((line,index)=>{
+   if(line.trim()==='')return [];
+   try{return [v.parse(localSchema,JSON.parse(line))];}
+   catch{throw new Error(`Invalid timing observation at ${observationFile}:${index+1}`);}
+  });
+ }finally{closeSync(descriptor);}
+}
+/** Preserve legacy local and hosted facts; new local facts live in the union log.
+ * @param {string} root @returns {v.InferOutput<typeof sourceSchema>} */
+const provenance=root=>{
+ const legacy=v.parse(sourceSchema,JSON.parse(readFileSync(resolve(root,'test/durations-source.json'),'utf8')));
+ return {...legacy,localPushObservations:[...(legacy.localPushObservations??[]),...observationLog(root)]};
+};
 /** @param {string} value */
 const digest=value=>createHash('sha256').update(value).digest('hex');
 /** @param {string} root @param {string} sha @param {string} file */
@@ -164,24 +183,51 @@ export function readTestTimings(directory,root=process.cwd()){
  * @param {string} directory @param {string} [root] */
 export function recordTestTimings(directory,root=process.cwd()){
  const reports=readTestTimings(directory,root);
- const metadata=resolve(root,'test/durations-source.json');
- const source=provenance(root);
+ provenance(root);
+ const observed=new Set(observationLog(root).map(row=>JSON.stringify(row)));
  // Validate every target before changing even one tracked timing table.
  const updates=reports.map(report=>{
+  const observation={...report,completed:true,basis:'Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof.'};
+  const alreadyLogged=observed.has(JSON.stringify(v.parse(localSchema,observation)));
   const current=weights(root,report.ring);
-  for(const row of report.files){if(committedTiming(root,row.file,report.ring,current[row.file]))throw new Error(`Timing already recorded; refusing to overwrite ${row.file}`);current[row.file]=row.durationMs/1000;}
-  return {report,current};
+  let changed=false;
+  for(const row of report.files){
+   const seconds=row.durationMs/1000;
+   const existing=current[row.file];
+   if(committedTiming(root,row.file,report.ring,existing)&&(!alreadyLogged||existing!==seconds))throw new Error(`Timing already recorded; refusing to overwrite ${row.file}`);
+   if(existing!==seconds){current[row.file]=seconds;changed=true;}
+  }
+  return {report,current,changed,line:alreadyLogged?null:JSON.stringify(observation)};
  });
- for(const {report,current} of updates){
+ // Publish the observation before its weights. A failed append leaves both
+ // tables untouched. Replaying the same sealed evidence can finish a table
+ // write without appending a duplicate or overwriting a different clock.
+ const descriptor=openSync(resolve(root,observationFile),constants.O_RDWR|constants.O_APPEND|constants.O_CREAT|constants.O_NOFOLLOW|constants.O_NONBLOCK,0o644);
+ try{
+  const info=fstatSync(descriptor);
+  if(!info.isFile())throw new Error('Timing observations must be a regular file');
+  const lines=updates.flatMap(update=>update.line===null?[]:[update.line]);
+  if(lines.length>0){
+   const lastByte=Buffer.alloc(1);
+   if(info.size>0&&readSync(descriptor,lastByte,0,1,info.size-1)!==1)throw new Error('Timing observation tail changed while recording');
+   const separator=info.size>0&&lastByte[0]!==10?'\n':'';
+   writeFileSync(descriptor,`${separator}${lines.join('\n')}\n`);
+  }
+ }finally{closeSync(descriptor);}
+ for(const {report,current,changed} of updates){
+  if(!changed)continue;
   const path=resolve(root,report.ring==='full'?'test/durations.json':'test/durations-ring1.json');
-  writeFileSync(path,`${JSON.stringify(Object.fromEntries(Object.entries(current).sort(([a],[b])=>a.localeCompare(b))),null,2)}\n`);
+  const temporary=`${path}.${randomUUID()}.tmp`;
+  const output=openSync(temporary,'wx');
+  try{
+   try{writeFileSync(output,`${JSON.stringify(Object.fromEntries(Object.entries(current).sort(([a],[b])=>a.localeCompare(b))),null,2)}\n`);}finally{closeSync(output);}
+   renameSync(temporary,path);
+  }finally{rmSync(temporary,{force:true});}
  }
- source.localPushObservations=[...(source.localPushObservations??[]),...reports.map(report=>({...report,completed:true,basis:'Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof.'}))];
- writeFileSync(metadata,`${JSON.stringify(source,null,2)}\n`);
  return reports.flatMap(report=>report.files.map(file=>`${report.ring}:${file.file}`));
 }
 
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  if(process.argv[2]!=='record'||process.argv[3]===undefined)throw new Error('Usage: push-test-timings.mjs record <Git-private-evidence-directory>');
- console.log(`Recorded ${recordTestTimings(process.argv[3]).join(', ')}; commit the three timing files and push normally.`);
+ console.log(`Recorded ${recordTestTimings(process.argv[3]).join(', ')}; commit the changed weight tables and ${observationFile} with a journal entry, then push normally.`);
 }

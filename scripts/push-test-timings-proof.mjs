@@ -48,8 +48,12 @@ try{
  }
  writeFileSync(reportPath,original);renameSync(reportPath,`${reportPath}.saved`);assert.throws(()=>recordTestTimings(evidence.directory,root));renameSync(`${reportPath}.saved`,reportPath);
  writeFileSync(join(root,file),`${body}// changed source\n`);assert.throws(()=>recordTestTimings(evidence.directory,root),/clean checked source/u);writeFileSync(join(root,file),body);
- const recorded=execFileSync(process.execPath,[resolve('scripts/push-test-timings.mjs'),'record',evidence.directory],{cwd:root,encoding:'utf8'});assert.match(recorded,/Recorded full:/u);assert.equal(JSON.parse(readFileSync(join(root,'test/durations-source.json'),'utf8')).localPushObservations[0].platform,process.platform);
- git(['commit','--quiet','-m','record actual clocks','--','test/durations.json','test/durations-ring1.json','test/durations-source.json']);git(['push','--quiet','origin','main']);
+ const legacy=readFileSync(join(root,'test/durations-source.json'),'utf8');
+ const recorded=execFileSync(process.execPath,[resolve('scripts/push-test-timings.mjs'),'record',evidence.directory],{cwd:root,encoding:'utf8'});assert.match(recorded,/Recorded full:/u);
+ assert.equal(readFileSync(join(root,'test/durations-source.json'),'utf8'),legacy);
+ const observations=readFileSync(join(root,'test/durations-observations.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
+ assert.equal(observations.length,2);assert.ok(observations.every(row=>row.platform===process.platform&&row.completed===true));
+ git(['add','test/durations-observations.jsonl']);git(['commit','--quiet','-m','record actual clocks','--','test/durations.json','test/durations-ring1.json','test/durations-observations.jsonl']);git(['push','--quiet','origin','main']);
  assert.equal(git(['--git-dir',remote,'rev-parse','main']),git(['rev-parse','HEAD']));assert.deepEqual(missingTestTimings(`refs/heads/main ${git(['rev-parse','HEAD'])} refs/heads/main ${before}`,root),[]);
  writeFileSync(join(root,file),`${body}// actual changed test blob\n`);git(['commit','--quiet','-m','change the measured test','--',file]);assert.equal(missingTestTimings(`refs/heads/main ${git(['rev-parse','HEAD'])} refs/heads/main ${before}`,root).length,1);
  console.log(JSON.stringify({realGitRefusal:true,realVitestRings:2,passedTestsPerRing:1,failedMissingZeroStaleRefused:true,unhandledErrorRefused:true,bareAndStaleCommittedWeightsRefused:true,kitTestNotSentToVitest:true,evidenceSurvivesSnapshotDeletion:true,sourceNotChangedByMeasurement:true,committedClockAdmitted:true,seconds:(performance.now()-began)/1000}));

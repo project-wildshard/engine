@@ -19,3 +19,5 @@
 test/fixtures/** -whitespace
 public/** -whitespace
 *.patch -whitespace
+# Complete immutable timing records stay one physical line each.
+/test/durations-observations.jsonl merge=union
