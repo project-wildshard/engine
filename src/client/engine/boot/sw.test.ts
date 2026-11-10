@@ -55,6 +55,8 @@ test('adoption skips stale workers, fences its controller and retires unavailabl
   announced.state='activating';announced.dispatchEvent(new Event('statechange'));container.dispatchEvent(new Event('controllerchange'));
   await vi.advanceTimersByTimeAsync(0);expect(replace).not.toHaveBeenCalled();
   announced.state='activated';announced.dispatchEvent(new Event('statechange'));await adoption;
+  // RL3: the page leaves one painted frame later (leaveAfterPaint), never in the turn the hand-over lands in
+  expect(replace).not.toHaveBeenCalled();await vi.advanceTimersByTimeAsync(100);
   expect(replace).toHaveBeenCalledExactlyOnceWith('/resume');
   // DL1: an update installs shell-only; one whose code cannot be precached is never activated.
   const unheld=new WorkerHandle();unheld.precached=false;wsSw.waiting=registration.waiting=unheld;
@@ -72,7 +74,7 @@ test('adoption skips stale workers, fences its controller and retires unavailabl
   const claimed=new WorkerHandle();wsSw.waiting=registration.waiting=claimed;const claim=swAdopt('/claimed');await vi.waitFor(()=>{expect(claimed.messages).toContainEqual({type:'SKIP_WAITING'});});
   container.controller=claimed;container.dispatchEvent(new Event('controllerchange'));
   claimed.state='activated';claimed.dispatchEvent(new Event('statechange'));
-  expect(await claim).toBe(true);expect(wsSw.waiting).toBeNull();
+  expect(await claim).toBe(true);expect(wsSw.waiting).toBeNull();await vi.advanceTimersByTimeAsync(100);
   expect(replace).toHaveBeenLastCalledWith('/claimed');
   expect(replace).toHaveBeenCalledTimes(2);
   const expired=new WorkerHandle();wsSw.waiting=registration.waiting=expired;
@@ -90,7 +92,7 @@ test('adoption skips stale workers, fences its controller and retires unavailabl
   const nextDocument=new WorkerHandle();wsSw.waiting=registration.waiting=nextDocument;
   const nextAdoption=swAdopt('/title','next document');await vi.waitFor(()=>{expect(nextDocument.messages).toContainEqual({type:'SKIP_WAITING'});});
   nextDocument.state='activated';nextDocument.dispatchEvent(new Event('statechange'));
-  expect(await nextAdoption).toBe(true);expect(replace).toHaveBeenLastCalledWith('/title');
+  expect(await nextAdoption).toBe(true);await vi.advanceTimersByTimeAsync(100);expect(replace).toHaveBeenLastCalledWith('/title');
   expect(container.controller).not.toBe(nextDocument);
   container.controller.build='old-build-stamp';
   const recovered=new WorkerHandle();recovered.build='new-build-stamp';

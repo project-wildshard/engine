@@ -3,6 +3,7 @@ import { saveStorage } from '../saves/slots';
 import { countReload } from '../core/reloadGuard';
 import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { markReload, type ReloadReason } from './lastEnd';
+import { leaveAfterPaint } from './leaveAfterPaint';
 import { createChunkRecovery, reloadIntoNewerBuild, type ChunkRecoveryPorts } from './chunkRecovery';
 
 declare const __BUILD_ID__: string;
@@ -76,11 +77,12 @@ export async function reloadPastWorker(): Promise<void> {
   settleRefusedBuild();
   await leavePastWorker('new build panel');
 }
-/** Drop this tab's worker, then reload: the next document comes from the network. */
-async function leavePastWorker(why: string): Promise<void> {
+/** Drop this tab's worker, then reload: the next document comes from the network. `cover`: the RELOADING cover going up,
+ * which the reload waits for too, then leaves one painted frame later (leaveAfterPaint). */
+async function leavePastWorker(why: string, cover: Promise<void> = Promise.resolve()): Promise<void> {
   // RL5: dropping the worker gets 3 s (reloadCover.ts RELOAD_FALLBACK_MS); a hung unregister never keeps the tap from reloading
-  try { await Promise.race([dropWorker(), new Promise<void>(resolve => { pageScope.timeout(3000, resolve); })]); } catch { /* The reload goes anyway. */ }
-  countReload(); markReload(why, 'background'); location.reload();
+  try { await Promise.race([Promise.all([dropWorker(), cover]), new Promise<void>(resolve => { pageScope.timeout(3000, resolve); })]); } catch { /* The reload goes anyway. */ }
+  leaveAfterPaint(() => { countReload(); markReload(why, 'background'); location.reload(); });
 }
 
 /** RL8: this build's own file is gone from the server. When /version.json names another build, this tab's build is out
@@ -96,9 +98,18 @@ export async function reloadIfStaleBuild(): Promise<boolean> {
     if (store.getItem('boot.staleBuild') === __BUILD_ID__) return false;
     store.setItem('boot.staleBuild', __BUILD_ID__);
   } catch { return false; }
-  document.dispatchEvent(new CustomEvent('ws:reloading', { detail: 'This build is out of date · getting the new one' }));
-  void leavePastWorker('stale build: its files are gone from the server');
+  const cover = showReloadingSoon('This build is out of date · getting the new one');
+  void leavePastWorker('stale build: its files are gone from the server', cover);
   return true;
+}
+
+/** The RELOADING cover, in this turn when its module is loaded (it answers `ws:reloading` with preventDefault). In an
+ * unbundled dev page this can run before any module that imports the cover has; then the cover's module is loaded now
+ * and shown, and the reload waits for it (inside the worker drop's 3 s). Resolves once the cover is up. A bundled stale build already holds the cover (its own files are
+ * gone, so it could not load a chunk now); its import failing leaves only the reload. */
+function showReloadingSoon(line: string): Promise<void> {
+  if (!document.dispatchEvent(new CustomEvent('ws:reloading', { detail: line, cancelable: true }))) return Promise.resolve();
+  return import('../ui/reloadCover').then(cover => { if (!cover.reloadingShown()) cover.showReloading(null, line); return undefined; }, () => undefined);
 }
 
 let installed = false;

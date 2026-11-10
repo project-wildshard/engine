@@ -1,5 +1,6 @@
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
-import { leaveAfterPaint, showReloading } from './reloadCover';
+import { showReloading } from './reloadCover';
+import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { engineString } from '../../../shared/engine/strings';
 import type { LoadFailure } from '../core/errorReport';
 import { app } from '../app/runtime';

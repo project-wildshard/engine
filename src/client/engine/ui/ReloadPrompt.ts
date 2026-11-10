@@ -2,7 +2,8 @@
 import { RELOAD_PARAM } from '../core/GpuRecovery';
 import { settingsReloadUrl } from './Settings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
-import { leaveAfterPaint, showReloading } from './reloadCover';
+import { showReloading } from './reloadCover';
+import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 
 interface Pose { x: number; y: number; z: number; yaw: number; pitch: number }
 let poseOf: () => Pose | null = () => null;

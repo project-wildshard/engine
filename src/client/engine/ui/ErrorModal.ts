@@ -33,7 +33,8 @@ import { hasOnlineWorld, openDoctorPage } from './errorScreen';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { TIER } from '../core/tier';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
-import { leaveAfterPaint, showReloading } from './reloadCover';
+import { showReloading } from './reloadCover';
+import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { captureBrowserError } from '../telemetry/browserErrors';
 import { bootDiagnostic, bootDiagnosticJson } from '../boot/bootTrace';
 // reloads from this modal (and the boot's stuck-loader recovery, src/client/engine/boot/stuck.ts) inside RELOAD_WINDOW_MS before

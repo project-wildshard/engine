@@ -38,3 +38,18 @@ z-index, above the cover, and its handler navigated in the same turn,
 which stops WebKit painting at once. The cover now takes the top
 z-index, and every reload leaves one painted frame after showing it
 (at most 100 ms).
+
+Settings ▸ Build (R9, opus-reload3). The title's and the pause menu's
+Settings get one compact row beside the Connection doctor: the running
+build, CHECK (reads /version.json) and RELOAD. RELOAD is the pill's own
+reload, moved to ui/playerReload.ts so both share it; CHECK announces
+what it read (ws-live-build), so the pill lights from it too and a
+controlling worker hears of the build. Both buttons are 44 px tall.
+The review's two should-fixes: sw.ts adopt now leaves through
+leaveAfterPaint (its own module, boot/leaveAfterPaint.ts, so the
+worker boot doesn't pull the cover in), and the stale-build reload
+waits for the cover, loading its module if nobody answered the ask
+(an unbundled dev page could reach it first). iOS Simulator: in Device
+Hub a click lands ~26 pt above where the screen draws it (measured
+with a touch probe page); taps 3 pt inside RELOAD's top edge hit, in
+Safari and as a Home Screen web app.

@@ -20,7 +20,8 @@ import { pageScope } from '../../../shared/engine/app/resources';
  *   ready: Promise<void>        resolves at once: a controlled document, an uncontrolled one (registration is background work), or
  *                               service workers off (`?sw=0`, dev without `?sw=1`, no SW support).
  *   waiting: ServiceWorker|null the newest discovered build is installed and waiting; null otherwise.
- *   adopt(to?, why?, within?): Promise<boolean> explicit recovery: activate, then reload/replace once; true if sent.
+ *   adopt(to?, why?, within?): Promise<boolean> explicit recovery: activate, then reload/replace once, one painted frame
+ *                               later (leaveAfterPaint); true if sent.
  *                               False means unavailable, retired or (with `within`) not handed over in time; the caller
  *                               then reloads hard. RL3: a player's tap passes `within` (3 s) so a reload never waits on the
  *                               new build's whole precache.
@@ -35,6 +36,7 @@ import { pageScope } from '../../../shared/engine/app/resources';
  */
 
 import { markReload } from './lastEnd'; // E179: the page's "why did it reload" record — imported first, so its beat is the page's
+import { leaveAfterPaint } from './leaveAfterPaint';
 
 declare const __BUILD_ID__: string;
 
@@ -187,9 +189,13 @@ async function adopt(to?: string, why = 'new build adopted', within?: number): P
   // both clocks start at the tap, so a slow registration read or version fetch eats into the same 3 s
   const handed = within === undefined ? activateWaiting() : Promise.race([activateWaiting(lapse(Math.round(within * 2 / 3))), lapse(within)]);
   if (!await handed) return false;
-  markReload(`${why}: the new service worker took over`);
-  if (to === undefined) location.reload();
-  else location.replace(to);
+  // RL3: a fast hand-over still leaves one painted frame after the tap's RELOADING cover (WebKit stops painting a page
+  // whose navigation started in the same turn); the answer is true at once, so the caller never reloads a second way
+  leaveAfterPaint(() => {
+    markReload(`${why}: the new service worker took over`);
+    if (to === undefined) location.reload();
+    else location.replace(to);
+  });
   return true;
 }
 

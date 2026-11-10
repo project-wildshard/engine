@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
-import { hideReloading, leaveAfterPaint, reloadingLine, reloadingShown, showReloading } from './reloadCover';
+import { hideReloading, reloadingLine, reloadingShown, showReloading } from './reloadCover';
+import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 
 afterEach(() => { hideReloading(); document.body.replaceChildren(); });
 

@@ -38,17 +38,18 @@ const marks = { markReload: (): void => undefined, markUnload: (): void => undef
 // RL3/RL4 (reloadCover.ts): the cover's own calls, as ports. The cover and the one-frame paint wait are not what this file
 // proves; whether the navigation waits for the save is, so the frame wait runs its leave at once.
 const cover = { showReloading: (): void => undefined, reloadingLine: (): void => undefined, leaveAfterPaint: (go: () => void): void => { go(); }, RELOAD_FALLBACK_MS: 3000 };
-const pill = { ...cover, el: null, newer: false, engineString: (key: string) => key, diagnosticNow: () => 0 };
+// the pill and Settings ▸ Build share one reload (src/client/engine/ui/playerReload.ts)
+const pill = { ...cover, reloadingShown: () => false, engineString: (key: string) => key, diagnosticNow: () => 0 };
 
 const paths: readonly (readonly [string, (at: ReturnType<typeof page>) => () => void])[] = [
-  ['the update pill', at => {
-    const reload = slice('src/client/engine/ui/Update.ts', 'function reload(): void {', '\n// pointerup as well', 'reload', { ...marks, ...pill, location: at.location, titleBoundary: () => false, window: {} }, 'let busy = false;\n');
-    return () => { reload(); };
+  ['the update pill (and Settings ▸ Build)', at => {
+    const reload = slice('src/client/engine/ui/playerReload.ts', 'export function reloadForPlayer', '', 'reloadForPlayer', { ...marks, ...pill, location: at.location, titleShowing: () => false, window: {} });
+    return () => { reload(null); };
   }],
   ['the update pill through a waiting worker', at => {
     const adopt = (): Promise<boolean> => { at.went.push('adopted'); return Promise.resolve(true); };
-    const reload = slice('src/client/engine/ui/Update.ts', 'function reload(): void {', '\n// pointerup as well', 'reload', { ...marks, ...pill, location: at.location, titleBoundary: () => false, window: { __ws_sw: { adopt } } }, 'let busy = false;\n');
-    return () => { reload(); };
+    const reload = slice('src/client/engine/ui/playerReload.ts', 'export function reloadForPlayer', '', 'reloadForPlayer', { ...marks, ...pill, location: at.location, titleShowing: () => false, window: { __ws_sw: { adopt } } });
+    return () => { reload(null); };
   }],
   ['the reload prompt', at => {
     const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [] });

@@ -22,7 +22,8 @@ import { clearDownloads, freedBytes, lastClear, mbText, storageUsed } from '../b
 import { EARLY_PROGRAMS_SLOT } from '../boot/earlyPrograms';
 import { RELOAD_PARAM } from '../core/GpuRecovery';
 import { leaveSaved, markReload } from '../boot/lastEnd';
-import { leaveAfterPaint, showReloading } from './reloadCover';
+import { showReloading } from './reloadCover';
+import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { OPTION_VALUES, saveSetting, setting, settingsReloadUrl } from './Settings';
 import type { DebugRowSpec } from '../../../server/engine/level/context';
 import { isDev, onDev } from '../core/devMode';

@@ -27,9 +27,11 @@ import { TITLE_SKIPPERS } from './debugOptions';
 import { MODEL_CREDIT, MUSIC_CREDIT, sfxCredit } from '../audio/credits';
 import { BOOT_OPTIONS, getSfxSet, pendingReload, saveSetting, savedSetting, settingFromUrl, settingParams, settingsReloadUrl, type OptionKey, type OptionValue } from './Settings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
-import { leaveAfterPaint, showReloading } from './reloadCover';
+import { showReloading } from './reloadCover';
+import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { buildOfflineRow } from './offlineDownload';
 import { buildConnectionRow } from './errorScreen';
+import { buildBuildRow } from './buildRow';
 import { buildMusicStyleRow } from './musicStyleRow';
 
 const el = (cls: string, html = '', tag = 'div'): HTMLElement => { const e = document.createElement(tag); e.className = cls; if (html) e.innerHTML = html; return e; };
@@ -145,6 +147,7 @@ function build(): HTMLElement {
     buildMusicStyleRow(scope),
     ...offline === null ? [] : [offline], // G727 / I9: Download everything, before the first shard
     buildConnectionRow(scope), // E7.5 prep: the Connection doctor, for everyone
+    buildBuildRow(scope), // R9: the running build, Check and Reload, beside the doctor
     ...devSwitchRows(), // developer mode (E140): live, no reload
     tools, dbg);
   // the agents' screenshot URLs carry params that win over the saved picks for that load: say so

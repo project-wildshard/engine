@@ -206,6 +206,17 @@
 .ws-gmenu .ws-gmenu-unlock { flex: none; padding: 7px 14px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.16); border: 1px solid var(--ws-cyan); color: #fff; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; }
 .ws-gmenu .ws-gmenu-unlock:disabled { opacity: 0.5; }
 .ws-gmenu .ws-gmenu-note { flex: none; margin: 0 2px 8px; font-size: 10px; line-height: 1.5; color: var(--ws-text-dim); }
+/* Settings ▸ Build (src/client/engine/ui/buildRow.ts, R9): one row, the running build and its status beside CHECK and RELOAD (44 px: iOS web-app taps) */
+.ws-gmenu .ws-gmenu-build { flex: none; display: flex; flex-direction: column; }
+.ws-gmenu .ws-gmenu-buildrow { flex-wrap: nowrap; gap: 8px; padding: 6px 6px 6px 12px; }
+.ws-gmenu .ws-gmenu-buildinfo { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ws-gmenu .ws-gmenu-buildid { color: #fff; }
+.ws-gmenu .ws-gmenu-buildstatus { font-size: 9px; letter-spacing: 0.06em; text-transform: none; color: var(--ws-text-dim); overflow-wrap: anywhere; }
+.ws-gmenu .ws-gmenu-buildrow.newer .ws-gmenu-buildstatus { color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-buildbtn { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 64px; min-height: 44px; padding: 0 12px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); color: #fff; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; touch-action: manipulation; }
+.ws-gmenu .ws-gmenu-buildbtn.primary { border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.2); box-shadow: 0 0 14px rgba(143, 227, 255, 0.2); }
+.ws-gmenu .ws-gmenu-buildbtn:active { background: rgba(143, 227, 255, 0.28); }
+.ws-gmenu .ws-gmenu-buildbtn:disabled:not([data-reloading]) { opacity: 0.55; }
 .ws-gmenu .ws-gmenu-mem { white-space: pre-line; font-variant-numeric: tabular-nums; } /* Debug ▸ Memory: one line per resident shard (Menu.ts paintMemory, E155) */
 /* the music / sfx picker while a pick decodes from the offline cache for more than 300 ms (src/client/engine/audio/preload.ts trackBusy) */
 .ws-gmenu .ws-gmenu-row.busy .ws-gmenu-swlabel::after { content: ''; display: inline-block; width: 9px; height: 9px; margin-left: 8px; vertical-align: -1px; border: 1.5px solid var(--ws-cyan); border-right-color: transparent; border-radius: 50%; animation: ws-gmenu-spin 0.8s linear infinite; }

@@ -40,9 +40,14 @@ let restore: (() => void)[] = [];
 let watching = false;
 
 // RL8: code that must not pull this module into its graph (boot's stale-build reload) asks by event, in its own turn.
+// The answer is `preventDefault`: an unanswered ask (this module not loaded yet, as in an unbundled dev page) loads it
+// and asks again (src/client/engine/boot/browserChunkRecovery.ts `showReloadingSoon`).
 // Guarded: node-side importers (debug/probe.ts through debugOptions.ts) load this module with no document.
 if (typeof document !== 'undefined') {
-  pageScope.listen(document, 'ws:reloading', event => { showReloading(null, event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : ''); });
+  pageScope.listen(document, 'ws:reloading', event => {
+    event.preventDefault();
+    showReloading(null, event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : '');
+  });
 }
 
 /** The tapped control as a loading button: disabled, busy, a spinner and "Reloading". */
@@ -92,17 +97,6 @@ export function reloadingLine(text: string, tone: keyof typeof LINE_COLOR = 'pla
   if (words === null) return;
   words.style.cssText = `${LINE};color:${LINE_COLOR[tone]}`;
   words.textContent = text;
-}
-
-/** iOS Simulator, 2026-11-09: WebKit stops painting a page as soon as a navigation starts in the same turn, so the load
- * failure screen's RELOAD showed no cover at all. Navigate one painted frame after showReloading; a page that gets no
- * frames (hidden) goes after LEAVE_FRAME_MS anyway. */
-const LEAVE_FRAME_MS = 100;
-export function leaveAfterPaint(go: () => void): void {
-  let gone = false;
-  const once = (): void => { if (gone) return; gone = true; go(); };
-  pageScope.raf(() => { pageScope.timeout(0, once); });
-  pageScope.timeout(LEAVE_FRAME_MS, once);
 }
 
 /** Whether a reload is on screen (tests, and callers that must not start a second one). */
