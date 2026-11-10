@@ -352,3 +352,47 @@ changed; this is not a rendered input, physical key, live-server or
 visible cosmetic proof. Every complete case, including cleanup, has a
 9.5-second timeout and elapsed guard outside hooks and Vitest. The
 inherited SDK file stays excluded and retained for its owner to retire.
+
+## Local failure proxy
+
+`node scripts/chaos-proxy.mjs --work=tmp/chaos-owned` opens only loopback
+listeners: page 18791, world 18792 and optional TLS world 18793. Its default
+upstreams are page 18798, world 18797 and signed release 18799. Supply both
+`--tls-cert=<owned PEM>` and `--tls-key=<owned private PEM>` for TLS. Tests
+may pass zero ports. No upstream URL may leave 127.0.0.1 or include a path,
+credentials, query or fragment. The optional API upstream is explicit;
+without it `/api/` returns unavailable rather than reaching a live API.
+
+The single readiness JSON line names an exclusive 0600 token file beneath
+the work directory. Read it in the Node driver, never in page JavaScript.
+Authenticated GET/POST `/__chaos` use `Authorization: Bearer <token>`.
+POST atomically replaces `{scenario, rules}`; an empty array heals. GET
+reports actual route matches, forwarded/dropped traffic and connections.
+The control route has no permissive CORS. Invalid controls leave the
+previous rules intact. No UI state or scenario mapping lives in the proxy.
+
+Faults cover HTTP latency, status/Retry-After, stall, reset, bandwidth,
+truncation and body replacement, and WebSocket refused upgrade, terminate,
+half-open, coded close, seeded loss and delayed frames (plus bandwidth).
+Socket direction is down by default, with explicit up/both. Seeded loss
+can drop only binary prefix 1; reliable, ping/pong and voice prefix 8 are
+preserved. Rule activation applies to existing sockets too. Healing
+releases delayed traffic; half-open drops are not replayed later.
+
+Pack classification learns the real root book and declared manifest/member
+URLs; unrelated assets are not guessed to be packs. Truncation leaves JSON
+metadata intact and damages only a declared binary member, with an honest
+short Content-Length and no-store response. The unchanged client must
+still reject bad length/hash bytes. Doctor entry modules are learned from
+the actual doctor document. The direct server release bypasses faults.
+
+Control bodies are bounded at 128 KiB/32 rules, metadata at 2 MiB, pending
+socket payload at 8 MiB and event samples at 256 entries. Backpressure
+pauses the native source. Shutdown and parent EOF retire only owned
+listeners, sockets, timers and the exclusively created token path.
+
+Run `node --test scripts/chaos-proxy-proof.mjs` explicitly. It uses the real
+CLI, HTTP/WebSocket/TLS upstreams and native byte/close observations. All
+13 faults, seeded controls, token/config/bind refusal, healing and parent
+EOF run under ten seconds. This manual/Ring 2 proof never enters pre-push;
+it does not qualify a game failure screen or replace FM3's browser census.
