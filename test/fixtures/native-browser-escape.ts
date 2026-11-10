@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Preserve the original complete strict event assertion.
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Find an installed browser without installing a dependency in CI.
-import {openSync, readSync, closeSync} from 'node:fs';
+import {openSync, readSync, closeSync, existsSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Own and remove this fixture's exact browser profile.
 import {mkdtemp, rm} from 'node:fs/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep the browser profile under the repository scratch root.
@@ -13,6 +13,7 @@ import {nativeChromeExecutable} from '../../scripts/warm-native-chrome.mjs';
 import {nativeSocketTemporary} from './native-socket-temp.mjs';
 import {drainNativeBrowser} from './native-browser-drain.mjs';
 import {warmNativeInventory} from './native-process-inventory.mjs';
+import {requestNativeRetention} from './native-retention.mjs';
 import { KEYCHAIN_ARGS } from '../../scripts/chromium-keychain.mjs';
 
 warmNativeInventory();
@@ -61,7 +62,11 @@ let closing: Promise<void> | undefined;
 const close = (): Promise<void> => (closing ??= (async () => {
   try {await drainNativeBrowser(child, requestClose, async () => {
     try {await socketTemp.dispose();} finally {await rm(directory, {recursive: true, force: true});}
-  });} finally {socket?.close();}
+  });} catch (error) {
+    if (existsSync(directory)) try {requestNativeRetention('native-escape', directory);}
+    catch (retentionError) {console.error(`Native retained-profile request refused: ${String(retentionError).slice(0, 240)}`);}
+    throw error;
+  } finally {socket?.close();}
 })());
 const terminate = (): void => {void close().catch(error => {console.error(error);}).finally(() => {process.exitCode = 143;});};
 process.once('SIGTERM', terminate);

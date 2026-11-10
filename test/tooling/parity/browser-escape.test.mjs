@@ -16,6 +16,7 @@ import {once} from 'node:events';
 import {nativeSocketTemporary} from '../../fixtures/native-socket-temp.mjs';
 import {drainNativeBrowser} from '../../fixtures/native-browser-drain.mjs';
 import {warmNativeInventory} from '../../fixtures/native-process-inventory.mjs';
+import {requestNativeRetention} from '../../fixtures/native-retention.mjs';
 
 // Singleplayer prepared these exact executable/resource pages before its
 // isolated Escape job. The lift kept the helper but lost that workflow step.
@@ -150,6 +151,7 @@ test('native cleanup drains a detached descendant writer after its browser paren
   const child = spawn(process.execPath, ['-e', parent, profile], {detached: true, stdio: ['ignore', 'pipe', 'inherit']});
   let writerPid;
   let drained = false;
+  let cleanupFailed = false;
   try {
     const [ready] = await once(child.stdout, 'data');
     writerPid = Number(String(ready).trim());
@@ -161,14 +163,14 @@ test('native cleanup drains a detached descendant writer after its browser paren
       catch { /* A writer already gone would not establish the original race. */ }
     });
     let disposed = false;
-    await drainNativeBrowser(child, () => {child.kill('SIGTERM');}, async () => {
+    try {await drainNativeBrowser(child, () => {child.kill('SIGTERM');}, async () => {
       expect(child.exitCode).toBe(0);
       const table = execFileSync('ps', ['-axo', 'pid=,stat='], {encoding: 'utf8'});
       const live = table.split('\n').map(line => line.trim().split(/\s+/u))
         .find(([pid, state]) => Number(pid) === writerPid && !state?.startsWith('Z'));
       expect(live).toBeUndefined();
       await rm(profile, {recursive: true}); disposed = true;
-    });
+    });} catch (error) {cleanupFailed = true; throw error;}
     drained = true;
     expect(disposed).toBe(true);
     expect(parentExitedWithWriter).toBe(true);
@@ -176,7 +178,11 @@ test('native cleanup drains a detached descendant writer after its browser paren
   } finally {
     for (const pid of [writerPid, child.pid]) stopFixturePid(pid);
     if (drained) rmSync(profile, {recursive: true, force: true});
-    else console.error(`Native writer-drain profile retained after refusal: ${JSON.stringify(profile)}`);
+    else {
+      console.error(`Native writer-drain profile retained after refusal: ${JSON.stringify(profile)}`);
+      if (cleanupFailed && existsSync(profile)) try {requestNativeRetention('native-writer-drain', profile);}
+      catch (error) {console.error(`Native retained-profile request refused: ${String(error).slice(0, 240)}`);}
+    }
   }
 });
 
