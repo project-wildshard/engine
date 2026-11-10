@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ENV, ok, roots, sandbox } from './test-helpers.mjs';
@@ -66,5 +66,24 @@ describe('pre-push hook', () => {
     const result = box.push();
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stderr, /1 outgoing commit\(s\)/);
+  });
+  test('a push that only deletes plan/* branches skips the gate; anything else keeps it (J240)', () => {
+    const box = withRemote();
+    box.commit({ 'a.txt': 'a\n' }, MSG);
+    assert.equal(box.push().status, 0);
+    for (const branch of ['plan/foo', 'plan/bar', 'feature']) {
+      assert.equal(box.git(['push', '-q', 'origin', `main:refs/heads/${branch}`]).status, 0);
+    }
+    // From here on the push gate always fails, so only a skipped gate lets a push out.
+    box.write('package.json', JSON.stringify({ scripts: { check: 'exit 1' } }));
+    mkdirSync(join(box.root, 'node_modules'), { recursive: true });
+    const gone = box.git(['push', '-q', 'origin', '--delete', 'plan/foo', 'plan/bar']);
+    assert.equal(gone.status, 0, gone.stderr);
+    assert.match(gone.stderr, /delete-only push of refs\/heads\/plan\/bar, refs\/heads\/plan\/foo: no commit leaves this machine/);
+    assert.notEqual(box.git(['push', '-q', 'origin', '--delete', 'feature']).status, 0, 'a non-plan deletion keeps the gate');
+    box.commit({ 'b.txt': 'b\n' }, MSG);
+    const mixed = box.git(['push', '-q', 'origin', 'main', ':refs/heads/feature']);
+    assert.notEqual(mixed.status, 0, 'a deletion pushed alongside an update keeps the gate');
+    assert.doesNotMatch(mixed.stderr, /delete-only push/);
   });
 });
