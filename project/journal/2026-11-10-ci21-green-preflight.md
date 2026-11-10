@@ -37,3 +37,13 @@ One fixture wrote through os.tmpdir(). Move that owned temporary policy tree
 under the repository's ignored tmp instead; case names, counts, inputs and
 every refusal assertion stay unchanged. Fresh clocks will bind the changed
 test blob. No actual screen, browser, deployment or live MMO check is involved.
+
+The J206 review found no MUST-FIX. Its concurrency SHOULD identified two
+Oxlint children in the restored schema test that did not honor a worker
+bound. A real negative CLI control returned success with an invalid declared
+limit before the fix (six cases pass, one fails). The ratchet now forwards
+the existing WS_PUSH_LINT_THREADS limit to Oxlint and rejects invalid limits;
+both restored child paths explicitly use one thread. All seven cases pass
+with every original assertion retained plus the new CLI refusal. Refresh this
+file's full/Ring1 clock for its new blob before publication. Final concurrent
+gate and hosted qualification remain pending.

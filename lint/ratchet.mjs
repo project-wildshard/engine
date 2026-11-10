@@ -68,11 +68,13 @@ function counts(root, baselineFile, files = null, /** @type {{guardRequirement?:
   // G8 counts generated-JSON imports in tools/tests too. Other debt retains
   // its existing src-only scope; the same lint invocation supplies both.
   const selected = measuredFiles ?? fullRatchetFiles(root, readJSON(measuredConfig).ignorePatterns ?? []);
+  const threads = process.env['WS_PUSH_LINT_THREADS'];
+  if (threads !== undefined && !/^[1-9]\d*$/u.test(threads)) throw new Error('Invalid push lint worker limit');
   const current = {};
   // Explicit paths avoid ignored mirror parents; bounded argv also fits macOS.
   for (let start = 0; start < selected.length; start += 256) {
     const batch = selected.slice(start, start + 256);
-    const result = spawnSync(process.execPath, [resolve(REPO, 'node_modules/oxlint/bin/oxlint'), '-c', measuredConfig, '-f', 'json', ...batch], {
+    const result = spawnSync(process.execPath, [resolve(REPO, 'node_modules/oxlint/bin/oxlint'), '-c', measuredConfig, '-f', 'json', ...(threads === undefined ? [] : ['--threads', threads]), ...batch], {
       cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024,
       env: { ...process.env, WILDSHARD_RATCHET_FILE: baselineFile, WS_HTML_LINT_FILES: measuredFiles === null ? undefined : JSON.stringify(measuredFiles) },
     });

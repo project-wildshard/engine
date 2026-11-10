@@ -59,7 +59,7 @@ test('ordinary fast lint admits only recorded identities and count mode exposes 
  const run=(source:string,count=false)=>{
   writeFileSync(target,prefix+source);
   writeFileSync(config,JSON.stringify({jsPlugins:[resolve('lint/wildshard-plugin.js')],categories:{correctness:'off'},rules:{[SCHEMA_TYPE_RULE]:['error',{count}]}}));
-  return spawnSync(execPath,[resolve('node_modules/oxlint/bin/oxlint'),'-c',config,'--no-ignore',target],{encoding:'utf8',env:{...env,WILDSHARD_RATCHET_FILE:baseline}});
+  return spawnSync(execPath,[resolve('node_modules/oxlint/bin/oxlint'),'--threads','1','-c',config,'--no-ignore',target],{encoding:'utf8',env:{...env,WILDSHARD_RATCHET_FILE:baseline}});
  };
  try{
   writeFileSync(baseline,JSON.stringify({allow:{[SCHEMA_TYPE_RULE]:{[`${file}#OldSchema`]:'existing'}},[SCHEMA_TYPE_RULE]:{[file]:1}}));
@@ -81,9 +81,13 @@ test('the real ratchet update lowers counts and retires paid-down identity allow
   writeFileSync(target,`${prefix}export const PaidSchema:v.GenericSchema=v.object({}); export const OldSchema=v.string();`);
   writeFileSync(baseline,JSON.stringify({allow:{[SCHEMA_TYPE_RULE]:{[`${file}#PaidSchema`]:'existing',[`${file}#OldSchema`]:'existing'}},[SCHEMA_TYPE_RULE]:{[file]:2}}));
   const paths=resolve(root,'paths.json');writeFileSync(paths,JSON.stringify([file]));
-  const update=spawnSync(execPath,[resolve('lint/ratchet.mjs'),'--root',root,'--baseline',baseline,'--update','--files-from',paths],{encoding:'utf8'});
+  const command=[resolve('lint/ratchet.mjs'),'--root',root,'--baseline',baseline,'--update','--files-from',paths];
+  const update=spawnSync(execPath,command,{encoding:'utf8',env:{...env,WS_PUSH_LINT_THREADS:'1'}});
   expect(update.status,update.stdout+update.stderr).toBe(0);
   expect(JSON.parse(readFileSync(baseline,'utf8'))).toEqual({allow:{[SCHEMA_TYPE_RULE]:{[`${file}#OldSchema`]:'existing'}},[SCHEMA_TYPE_RULE]:{[file]:1}});
+  const invalid=spawnSync(execPath,command,{encoding:'utf8',env:{...env,WS_PUSH_LINT_THREADS:'invalid'}});
+  expect(invalid.status,invalid.stdout+invalid.stderr).toBe(1);
+  expect(invalid.stderr).toContain('Invalid push lint worker limit');
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 
