@@ -4,18 +4,24 @@ import {mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync
 import {join, resolve} from 'node:path';
 import {expect, test} from 'vitest';
 import {previewServer} from './fixtures/preview-server';
-import {crossroadsConfig} from '@wildshard/format/contentBounds';
 import {record} from '../scripts/phone-loading/model';
-import {CROSSROADS_CONFIG} from '../api/_crossroadsConfig';
 
-test('the real preview accepts and records exact production-valid telemetry; real refusals remain', async () => {
+// CI21 (J232): the production clean and its refusals moved with the
+// cleaner to api-server (src/server/routes/telemetry-payloads.test.ts,
+// src/server/telemetry/record.test.ts). The preview keeps the raw body, so
+// this proves the preview's own recorder: exact bytes and payload, never
+// served back, and its own transport refusals.
+
+const RECORDER_LIMIT = 1 << 20;
+
+test('the real preview records exact telemetry bytes and payloads; its own refusals remain', async () => {
   mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolve('tmp/preview-telemetry-'));
   mkdirSync(join(root, 'dist')); writeFileSync(join(root, 'dist/index.html'), 'fixture');
   const directory = join(root, 'records'), server = await previewServer(root, directory);
   const payloads = [
     {kind: 'session', build: 'fixture', install: 'local', end: 'clean', heartbeat: {session: 's', level: 'driftwood-isle', stage: 'title', fps: 30}, extra: 'same 原始 payload'},
     {kind: 'analytics', build: 'fixture', install: 'local', events: [{name: 'level.time', data: {level: 'driftwood-isle', seconds: 12}}]},
-    {kind: 'crossroads', build: 'fixture', install: 'local', rig: {rigVersion: 1, run: 'fixture/1', series: 'fixture', iteration: 1, stage: 'started', config: crossroadsConfig(),
+    {kind: 'crossroads', build: 'fixture', install: 'local', rig: {rigVersion: 1, run: 'fixture/1', series: 'fixture', iteration: 1, stage: 'started',
       context: {userAgent: 'fixture', viewport: [402, 874], dpr: 3, standalone: false, origin: 'local'}}},
   ];
   try {
@@ -28,18 +34,13 @@ test('the real preview accepts and records exact production-valid telemetry; rea
       if (typeof bodyFile !== 'string' || typeof receivedAt !== 'string') throw new Error('Missing telemetry bytes or date');
       expect(bodyFile).toBe(`${String(id)}.bin`); expect(saved['bodyBytes']).toBe(Buffer.byteLength(body));
       expect(readFileSync(join(directory, bodyFile))).toEqual(Buffer.from(body)); expect(saved['payload']).toEqual(payload);
-      expect(saved['record']).toMatchObject({kind: payload.kind, build: 'fixture', install: 'local', receivedAt});
-      if (payload.kind === 'session') expect(saved['record']).toEqual({kind: 'session', build: 'fixture', install: 'local', receivedAt,
-        session: 's', end: 'clean', shard: 'driftwood-isle', stage: 'title', fps: 30});
-      if (payload.kind === 'analytics') expect(record(saved['record'])['events']).toEqual([{name: 'shard.time', data: {shard: 'driftwood-isle', seconds: 12}}]);
-      if (payload.kind === 'crossroads') expect(record(record(saved['record'])['rig'])['stats']).toBeNull();
+      // The preview never cleans: its record is the payload exactly as sent.
+      expect(saved['record']).toEqual(payload);
       const privateRead = await fetch(new URL(`records/${String(id)}.json`, server.base), {headers: {accept: 'application/json'}});
       expect(privateRead.status).toBe(404);
     }
-    const bad = ['{', JSON.stringify({kind: 'session', build: 'fixture', install: 'local', end: 'invented', heartbeat: {session: 's'}}),
-      JSON.stringify({kind: 'analytics', build: 'fixture', install: 'local', events: [{name: 'invented', data: {}}]})];
-    for (const body of bad) expect((await fetch(new URL('api/telemetry', server.base), {method: 'POST', body})).status).toBe(400);
-    expect((await fetch(new URL('api/telemetry', server.base), {method: 'POST', body: 'x'.repeat(16_385)})).status).toBe(413);
+    expect((await fetch(new URL('api/telemetry', server.base), {method: 'POST', body: '{'})).status).toBe(400);
+    expect((await fetch(new URL('api/telemetry', server.base), {method: 'POST', body: 'x'.repeat(RECORDER_LIMIT + 1)})).status).toBe(413);
     expect((await fetch(new URL('api/errors', server.base), {method: 'POST', body: '{}'})).status).toBe(405);
     expect((await fetch(new URL('api/telemetry', server.base))).status).toBe(405);
     expect(readdirSync(directory)).toHaveLength(payloads.length * 2);
@@ -93,7 +94,3 @@ test('public static cache entries are Origin-invariant without changing API or p
     }
   } finally {server.close(); rmSync(root, {recursive: true, force: true});}
 }, 15_000);
-
-test('the API keeps format\'s exact crossroads experiment', () => {
-  expect(CROSSROADS_CONFIG).toEqual(crossroadsConfig());
-});

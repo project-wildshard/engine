@@ -8166,5 +8166,54 @@
       "driftwood-isle > boat: completes native physics route without a snag"
     ],
     "ringReason": "Needs the complete admitted Driftwood product. Real Ring1 installs a server slice without named GLB bodies; the unchanged product-session reader validates/owns every named product asset before native boot. Actual Ring1 failed ENOENT before eight cases. Preserve full product admission and every original route assertion in blocking full CI and full pre-push; do not weaken the reader or inflate the three-product Ring1 setup."
+  },
+  {
+    "repo": "api-server",
+    "file": "test/telemetry-record.test.mjs",
+    "outcome": "migrated",
+    "target": "src/server/telemetry/record.test.ts",
+    "landed": "api-server@2a0b82d",
+    "decision": "Ported to the owner of the telemetry cleaner and digest. Every DL20 download.parts case and expected value is unchanged, against api-server's record.ts and digest.ts (singleplayer api/ never came to engine). J206 Codex review GO after one fix.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "a download.parts count that is missing or not a nonnegative integer makes the boot unknown, never 0",
+      "well-formed counts, the outcome and the loose fetches made are kept",
+      "the daily digest counts a replayed outcome once and groups boots without their ids"
+    ],
+    "sourceRevision": "2cafaa4490287d83655bf93eb8e1b1d4fd34c7d4",
+    "sourceBlob": "4b81a07b2207b5e9adc0d86cbf025599f18168e4"
+  },
+  {
+    "repo": "api-server",
+    "file": "test/telemetry-cold-start.test.ts",
+    "outcome": "migrated",
+    "target": "src/tools/build-vercel.test.ts",
+    "landed": "api-server@2a0b82d",
+    "decision": "Ported to the owner of the deployed function. The real built bundle, loaded alone with no workspace package, answers OPTIONS 204, unconfigured GET 503 and an empty POST 400 on /api/telemetry; the old tsc emit plus fake @wildshard/format package is what the bundle replaced.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "starts the compiled telemetry handler without source workspace exports"
+    ],
+    "sourceRevision": "2cafaa4490287d83655bf93eb8e1b1d4fd34c7d4",
+    "sourceBlob": "6f7fc2af9438ce1999683325aee9c38cb7a3f37f"
+  },
+  {
+    "repo": "engine",
+    "file": "test/preview-telemetry.test.ts",
+    "outcome": "restored",
+    "target": "test/preview-telemetry.test.ts",
+    "decision": "Split. The production clean, its refusals and format's crossroads experiment moved to api-server src/server/routes/telemetry-payloads.test.ts (api-server@2a0b82d, 2f1c298). Engine keeps its own preview recorder: exact bytes and payload recorded (the preview no longer cleans, so record equals payload), records never served, bad JSON 400, over 1 MiB 413, wrong method 405, an unwritable target 500 and Origin-invariant static CORS. The two server cases are unchanged.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "the real preview accepts and records exact production-valid telemetry; real refusals remain",
+      "an unwritable telemetry target is an HTTP500, never a silent acknowledgement",
+      "public static cache entries are Origin-invariant without changing API or preflight CORS",
+      "the API keeps format\\"
+    ],
+    "sourceRevision": "2cafaa4490287d83655bf93eb8e1b1d4fd34c7d4",
+    "sourceBlob": "16901832c3340020bb964bbe9326e0c156ba292f"
   }
 ]
