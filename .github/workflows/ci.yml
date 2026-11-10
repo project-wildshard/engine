@@ -70,6 +70,11 @@ jobs:
       - name: Prove hover boost through real player and server motors
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hover-boost.proof.mjs
+      - name: Prove earned coin and barter transactions
+        if: needs.changes.outputs.docs != 'true'
+        run: |
+          node scripts/pins.ts install driftwood-isle pine-hollow
+          node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/net-exchange.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'

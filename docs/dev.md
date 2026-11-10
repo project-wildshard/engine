@@ -160,3 +160,22 @@ in both engines with at most two jobs at once. It reuses the entire cold
 cook/boot/touch/draw/explorer path and validates each exact-SHA report
 against committed pins. Only small JSON receipts are uploaded. This is a
 partial SDK-row qualification; it cannot stand in for the full nightly.
+
+## Native exchange edges
+
+Install the two ordinary pinned products with
+`node scripts/pins.ts install driftwood-isle pine-hollow`, then run
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/net-exchange.proof.mjs`.
+CI runs both cases explicitly, outside hooks and Vitest discovery. Each
+9.5-second timeout and elapsed assertion includes native product loading,
+real physics, network input and cleanup.
+
+Driftwood earns its coins through actual combat, refuses a card at one
+coin short, and observes the already-paid purse in the real ownership
+callback. Pine earns its hide by killing and harvesting a boar, takes two
+placed resin pickups, refuses incomplete payment and keeps another
+player from spending that stock. The authoritative rows reach actual
+NetClients. Player placement isolates the transaction laws; it is not a
+walked-journey proof. The real server stores acknowledge an in-process
+forwarder, so this makes no database durability claim. No live server,
+browser, forced health or synthetic reward is used.
