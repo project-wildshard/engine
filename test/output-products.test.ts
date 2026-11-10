@@ -18,10 +18,11 @@ function files(root: string): Record<string,string> {
 it('publishes every declared baked mode for both tiers and refuses a missing fallback before or after copying',()=>{
   const root=mkdtempSync(resolve('tmp/app-baked-'));
   const desktop='/assets/baked/dawn-isle/tex/sky.jpg',phone='/assets/baked/dawn-isle/tex/sky.phone.webp',gpu='/assets/gpu/baked/dawn-isle/tex/sky-01234567.ktx2';
+  const horizon='/assets/horizon/dawn-isle-day-phone.webp';
   try{
     write(root,'out/dawn/shard.json','{}');
     const modes={phone:{img:{baked:[phone]},ktx2:{baked:[gpu]}},desktop:{img:{baked:[desktop]},ktx2:{baked:[gpu]}}};
-    for(const url of [desktop,phone,gpu])write(root,`public${url}`,'authored texture');
+    for(const url of [desktop,phone,gpu,horizon])write(root,`public${url}`,'authored texture');
     const declarations=[
       {$call:'pageModeBoot',args:[{grid:{modes},shard:{modes}}]},
       {files:{modes}},
@@ -29,12 +30,12 @@ it('publishes every declared baked mode for both tiers and refuses a missing fal
       {sources:{baked:{source:{urls:{phone:[phone],desktop:[desktop]}}},gpu:{source:{urls:[gpu]}}}},
     ];
     for(const bindings of declarations){
-      write(root,'out/dawn/mounts/shardfiles/dawn/discovery.json',JSON.stringify({rows:{bootBindings:bindings}}));
-      expect(checkBakedTextures(root,join(root,'public'))).toBe(3);
+      write(root,'out/dawn/mounts/shardfiles/dawn/discovery.json',JSON.stringify({rows:{bootBindings:{...bindings,sky:[horizon]}}}));
+      expect(checkBakedTextures(root,join(root,'public'))).toBe(4);
     }
-    expect(checkBakedTextures(root,join(root,'public'))).toBe(3);
+    expect(checkBakedTextures(root,join(root,'public'))).toBe(4);
     copyDeferredPublic(root,join(root,'dist'));pruneLooseCopies(join(root,'dist'));
-    expect(checkBakedTextures(root,join(root,'dist'))).toBe(3);
+    expect(checkBakedTextures(root,join(root,'dist'))).toBe(4);
     rmSync(join(root,`public${phone}`));
     expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow(phone);
     rmSync(join(root,`dist${desktop}`));

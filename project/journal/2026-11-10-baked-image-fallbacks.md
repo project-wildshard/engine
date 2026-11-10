@@ -45,3 +45,16 @@ verifies immutable pin bytes in public and final output, including
 zero-length and corrupt existing files, and tests cover direct modes,
 lookup-map keys, fixed sources, tiers and both page flows. It checks
 explicit declarations, not invented implicit filename alternatives.
+
+The quiet native candidate proof then got Driftwood to Ready in 7.2 s
+with no console errors, but Pine exposed the next real omission: its
+phone horizon. A census of all explicit image-mode declarations, beyond
+baked textures, found eleven more missing images (Far Reach five, Pine
+four, Driftwood two). The bridge now holds seventeen unchanged producer
+Git blobs, 2,192,121 bytes. The guard checks declared raw image modes as
+well as baked compressed textures; unused non-baked GPU alias banks are
+not claimed as selected reads. All source mount lists are extended too.
+
+Pinned files are bounded and required to be regular files before their
+contents are read. Their SHA-256, length and producer Git blob remain
+verified afterward. No source/receipt/archive is rewritten.

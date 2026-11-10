@@ -4,7 +4,7 @@ import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 import {pinnedPublicAssets} from '../pin-assets.ts';
 
-/** Every declared texture mode is a supported path, including the native
+/** Every declared image mode is a supported path, including the native
  * compressed-texture probe's image fallback. Check all tiers before bundling
  * and again after output publication, independently of the build machine GPU.
  * @param {string} root @param {string} publication */
@@ -24,7 +24,8 @@ export function checkBakedTextures(root, publication) {
     const pending = [document.rows?.bootBindings];
     while (pending.length > 0) {
       const value = pending.pop();
-      if (typeof value === 'string' && /^\/assets\/(?:gpu\/)?baked\/[^/]+\/.+\.(?:png|jpe?g|webp|ktx2|hdr|avif)$/u.test(value)) declared.add(value);
+      if (typeof value === 'string' && (/^\/assets\/.+\.(?:png|jpe?g|webp|hdr|avif)$/u.test(value)
+        || /^\/assets\/(?:gpu\/)?baked\/[^/]+\/.+\.ktx2$/u.test(value))) declared.add(value);
       else if (Array.isArray(value)) pending.push(...value);
       else if (value !== null && typeof value === 'object') pending.push(...Object.keys(value), ...Object.values(value));
     }
@@ -39,7 +40,7 @@ export function checkBakedTextures(root, publication) {
       if (expected === undefined || actual.length !== expected.length || createHash('sha256').update(actual).digest('hex') !== createHash('sha256').update(expected).digest('hex')) throw new Error(`Published pinned baked texture bytes differ: ${url}`);
     }
   }
-  if (missing.length > 0) throw new Error(`Declared baked textures absent from ${publicRoot} (all tiers/modes):\n${missing.sort().join('\n')}`);
+  if (missing.length > 0) throw new Error(`Declared boot image/baked textures absent from ${publicRoot} (all tiers/modes):\n${missing.sort().join('\n')}`);
   return declared.size;
 }
 
