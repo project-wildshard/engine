@@ -295,4 +295,4 @@
 
 /* QA row 42: no BOOST button. A double tap of HOVER latches Developer boost; the tab burns amber while it moves the board
    (ui/hoverBoost.ts `.boost`), as do the board's repulsors. */
-#hud .ws-touch .ws-touch-hover.on.boost { color: var(--ws-amber); border-color: var(--ws-amber); background: rgba(60, 38, 8, 0.9); box-shadow: inset 0 0 14px rgba(255, 181, 71, 0.45), 0 0 16px rgba(255, 181, 71, 0.55); text-shadow: 0 0 6px rgba(255, 181, 71, 0.8); }
+#hud .ws-touch .ws-touch-hover.on.boost { color: #2a1600; border-color: var(--ws-amber); background: var(--ws-amber); box-shadow: 0 0 0 2px rgba(255, 181, 71, 0.35), 0 0 18px rgba(255, 181, 71, 0.75); text-shadow: none; font-weight: 700; }

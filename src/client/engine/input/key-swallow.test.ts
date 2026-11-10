@@ -89,15 +89,17 @@ test('FM4: a failure card keeps Tab, Space and Enter for its buttons, and a key 
   card.remove();
 });
 
-test('QA row 43: Escape in a field still pauses, unless the field owns Escape (the open chat closes on it instead)', () => {
+test('QA row 43: Escape in a field still pauses, unless a panel around it owns Escape (the open chat closes on it instead)', () => {
   const { input } = fixture();
-  const name = document.createElement('input'), chat = document.createElement('input');
-  chat.dataset['wsOwnEscape'] = '';
-  document.body.append(name, chat);
+  const name = document.createElement('input'), panel = document.createElement('div'), chat = document.createElement('input'), mute = document.createElement('button');
+  panel.dataset['wsOwnEscape'] = ''; panel.append(chat, mute);
+  document.body.append(name, panel);
   press(name, 'Escape');
   expect(input.pressed('pause')).toBe(true);
   input.consume('pause');
   press(name, 'Escape', {}, 'keyup');
   press(chat, 'Escape');
+  press(chat, 'Escape', {}, 'keyup');
+  press(mute, 'Escape');
   expect(input.pressed('pause')).toBe(false);
 });

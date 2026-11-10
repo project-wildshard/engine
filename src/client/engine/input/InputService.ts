@@ -301,9 +301,10 @@ export class InputService {
       const target = event.target;
       // a key typed into a text field never presses an action; its release always lands, so a key held when a field took
       // focus (W walking into a name box) is not stuck down after it (E355)
-      // Escape still pauses from a field, unless the field closes itself on it (`data-ws-own-escape`: the open chat, QA row 43)
-      if (on && target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-        && (event.code !== 'Escape' || target.dataset['wsOwnEscape'] !== undefined)) return;
+      if (on && event.code !== 'Escape' && target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      // Escape still pauses from a field, except inside a panel that closes itself on it (`data-ws-own-escape`: the open
+      // chat, QA row 43: its input, a Mute or a Report button)
+      if (on && event.code === 'Escape' && target instanceof Element && target.closest('[data-ws-own-escape]') !== null) return;
       // KP3: a key the game owns does nothing in the browser while the world has the keys (no control focused): Alt+← is
       // not Back, Alt+F / Alt+E not Chrome's menu, Alt alone not Windows' menu focus, the arrows and Space never scroll.
       // ⌘W / ⌘T / ⌘N reach the page only in tab fullscreen (Chrome reserves them otherwise); there they are taken too.

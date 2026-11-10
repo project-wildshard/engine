@@ -61,3 +61,13 @@ chat overlay that takes up way more space ... not a modal."
   its BOOST button) and after, at 402x874 and 1440x900 in Chromium and
   WebKit. The closed state is a tap outside, not Escape: on the old build
   Escape from the chat opened PAUSE and froze the boost shots.
+- J206 Codex review (a92de6c..17f99d8): one MUST, fixed. Escape on a
+  focused Mute or Report button in the open chat reached PAUSE. Now the
+  open chat box carries `data-ws-own-escape`, InputService leaves an
+  Escape from anything inside it alone, and the box closes on it. Its
+  SHOULD, also done: hud-worst `--states` now fails `--check` when the
+  corner hasn't faded, the open chat lacks a line or the players, or a
+  tap outside leaves the chat open or its field focused. It no longer
+  force-blurs on a QA 43 build. The HOVER tab's boost look is now solid
+  amber: the outline-only amber was easy to miss on the phone shots.
+- New test files' clocks recorded with `push-preflight.mjs timings`.

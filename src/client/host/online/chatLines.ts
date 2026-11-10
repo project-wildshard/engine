@@ -64,7 +64,7 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
   head.dataset['head'] = ''; title.textContent = 'Chat';
   close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Close chat');
   head.append(title, close);
-  field.dataset['wsOwnEscape'] = ''; field.placeholder = 'Say something'; field.enterKeyHint = 'send'; field.autocomplete = 'off'; field.style.cssText = FIELD;
+  field.placeholder = 'Say something'; field.enterKeyHint = 'send'; field.autocomplete = 'off'; field.style.cssText = FIELD;
   form.append(field); box.append(head, list, form); parent.append(box);
 
   let open = false;
@@ -80,10 +80,15 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
     if (next === open) return;
     open = next;
     box.toggleAttribute('data-open', open);
-    if (open) { fit(); toBottom(); } else if (document.activeElement === field) field.blur();
+    // the open chat keeps Escape for itself (InputService lets it be), from its input or any of its buttons
+    box.toggleAttribute('data-ws-own-escape', open);
+    const focused = document.activeElement;
+    if (open) { fit(); toBottom(); } else if (focused instanceof HTMLElement && box.contains(focused)) focused.blur();
   };
   scope.listen(field, 'focus', () => { corner('focus'); });
   scope.listen(close, 'click', () => { corner('close'); });
+  // Escape on a focused Mute or Report button (the input's own Escape is handled below, where its keys stop)
+  scope.listen(box, 'keydown', event => { if (open && event instanceof KeyboardEvent && event.key === 'Escape') { event.preventDefault(); corner('close'); } });
   if (typeof visualViewport !== 'undefined' && visualViewport !== null) scope.listen(visualViewport, 'resize', () => { if (open) fit(); });
   // a tap anywhere else closes it, and still reaches the game: nothing here stops it (not a modal)
   listenPage(scope, 'pointerdown', event => {

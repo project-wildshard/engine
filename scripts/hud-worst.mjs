@@ -198,7 +198,7 @@ async function stateShots(page, name, phone, dev, written, problems) {
     /** @param {Element} el */
     const seen = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0.05; };
     const rows = [...document.querySelectorAll('#ws-chat [data-lines] > *')], peers = document.getElementById('ws-voice-peers'), mic = document.getElementById('ws-voice');
-    return { open: box instanceof HTMLElement && box.dataset['open'] !== undefined, lines: rows.length, shownLines: rows.filter(seen).length, peers: peers !== null && !peers.hidden && seen(peers), mic: mic !== null && seen(mic) };
+    return { open: box instanceof HTMLElement && box.dataset.open !== undefined, lines: rows.length, shownLines: rows.filter(seen).length, peers: peers !== null && !peers.hidden && seen(peers), mic: mic !== null && seen(mic) };
   });
   await page.waitForTimeout(6000);
   await shot('chat-faded');
@@ -208,12 +208,23 @@ async function stateShots(page, name, phone, dev, written, problems) {
   await shot('chat-open');
   const opened = await chat();
   console.log(`  chat open: ${opened.open ? 'expanded' : 'not expanded'}, ${String(opened.shownLines)} lines, players list ${opened.peers ? 'shown' : 'hidden'}`);
-  // a tap outside the chat (not on a control: the page itself), then the field let go, as a phone's keyboard does
-  await page.evaluate(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  // a tap outside the chat (not on a control: the page itself). A build from before QA row 43 has no open chat to close and
+  // never lets the field go on its own: it is let go here, as a phone's keyboard would, so its boost shots can run
+  const calm = opened.open;
+  await page.evaluate(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); });
+  if (!calm) await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
   await page.waitForTimeout(400);
   await shot('chat-closed');
   const closed = await chat();
   if (!closed.mic) problems.push('the mic is gone after the chat closed');
+  if (calm) {
+    // QA row 43's states, checked: the corner faded to the input and the mic, the open chat lists every line and the
+    // players on voice, and a tap outside closes it and lets the field go
+    if (faded.shownLines > 0 || faded.peers) problems.push(`the calm corner still shows ${String(faded.shownLines)} line(s)${faded.peers ? ' and the players list' : ''} after 6 s`);
+    if (opened.shownLines !== opened.lines || !opened.peers) problems.push('the open chat does not list every line and the players on voice');
+    const held = await page.evaluate(() => document.activeElement?.closest('#ws-chat') !== null && document.activeElement !== null && document.activeElement !== document.body);
+    if (closed.open || closed.shownLines > 0 || held) problems.push('a tap outside did not close the chat and let its field go');
+  } else console.log('  (a build before QA row 43: no open chat)');
   if (!dev) return;
   await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; p.setBoost?.(false); p.hoverBoost = false; p.setHover(true); });
   await page.waitForTimeout(900);

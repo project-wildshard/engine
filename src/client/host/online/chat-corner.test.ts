@@ -78,8 +78,17 @@ test('QA row 43: focusing the input expands the chat; a tap inside keeps it, a t
   box.querySelector<HTMLButtonElement>('[data-head] button')?.click();
   expect(open(box)).toBe(false);
   field.focus();
+  expect(box.dataset['wsOwnEscape']).toBe('');
   field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   expect(open(box)).toBe(false);
+  expect(box.dataset['wsOwnEscape']).toBeUndefined();
+  // Escape from a button in the open chat (a Mute, a Report, the ×) closes it too, and lets the button go
+  field.focus();
+  const button = box.querySelector<HTMLButtonElement>('[data-head] button');
+  button?.focus();
+  button?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  expect(open(box)).toBe(false);
+  expect(document.activeElement).not.toBe(button);
 });
 
 test('QA row 43: the open chat sends and stays open; an empty Enter closes it; keys never reach the game', () => {
