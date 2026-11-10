@@ -632,6 +632,104 @@
       "finishedAt": "2026-11-10T20:10:48.391Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "6b34a4dfdb6db76233916370e9265e1c40b0c286",
+      "tree": "87034530351ae8be3b8bf293f98d460fbd735461",
+      "profile": "local-Vitest-opus-titleversion",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "src/client/engine/input/tap-follow.test.ts",
+          "blob": "b71dfcbf2626a62f3ba9a7bf0c626fc62ca6c71d",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 573.349917
+        },
+        {
+          "file": "src/client/engine/ui/loading-menu.test.ts",
+          "blob": "c1ce861305abcc993a48f0e7b7309325c209987d",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 1173.9677510000001
+        },
+        {
+          "file": "test/changelog.test.ts",
+          "blob": "fc80d41a8f1bcd031a737f19e0e72b4fb80e4181",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 6,
+          "durationMs": 159.34104200000004
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T20:12:34.972Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "6b34a4dfdb6db76233916370e9265e1c40b0c286",
+      "tree": "87034530351ae8be3b8bf293f98d460fbd735461",
+      "profile": "local-Vitest-opus-titleversion",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "src/client/engine/input/tap-follow.test.ts",
+          "blob": "b71dfcbf2626a62f3ba9a7bf0c626fc62ca6c71d",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 271.06424899999996
+        },
+        {
+          "file": "src/client/engine/ui/loading-menu.test.ts",
+          "blob": "c1ce861305abcc993a48f0e7b7309325c209987d",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 493.185833
+        },
+        {
+          "file": "test/changelog.test.ts",
+          "blob": "fc80d41a8f1bcd031a737f19e0e72b4fb80e4181",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 6,
+          "durationMs": 98.72820900000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T20:12:36.319Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

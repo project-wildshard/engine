@@ -57,3 +57,12 @@ SHOULDs: the layout test now turns the phone (874 × 402) and asserts the
 open box's exact bullets on screen. Real-hook fixture cases for the
 pre-push step are still open; scripts/changelog.mjs's pushProblems is
 unit-tested instead.
+
+## New-test clocks
+
+Job 269 stopped at the new-test timing step for tap-follow, loading-menu
+and changelog. The gate's batch evidence also named another lane's
+online-link-screens test, which this tree does not hold, so
+`push-test-timings.mjs record` refused it. The same helpers and timing
+reporter measured the three files here instead, in both rings. All 13
+cases passed, and the clocks are in test/durations*.json.
