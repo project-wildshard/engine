@@ -15,6 +15,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { constants, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { WORKTREES } from './worktree-ignore.mjs';
 
 const KEY_VERSION = 'shardfile-key/2';
 export const KEY_FILE = '.build-key';
@@ -24,8 +25,8 @@ export function readBuildKey(directory) {
   try { const key=JSON.parse(readFileSync(join(directory,'validation.json'),'utf8')).buildKey;return typeof key==='string'?key:''; } catch { return ''; }
 }
 const ENTRY = /^[a-f0-9]{64}$/u;
-// Top-level entries no shardfile build reads (outputs, docs, native shells, side sites, local caches).
-const SKIP_TOP = new Set(['.git', '.github', '.githooks', '.claude', '.cache', '.review', '.vercel', '.native-build', '.tsc-layers',
+// Top-level entries no shardfile build reads (outputs, docs, native shells, side sites, local caches, plan worktrees: DS11).
+const SKIP_TOP = new Set(['.git', WORKTREES, '.github', '.githooks', '.claude', '.cache', '.review', '.vercel', '.native-build', '.tsc-layers',
   'node_modules', 'tmp', 'out', 'dist', 'dist-native', 'dist-drafts', 'dist-admin', 'coverage',
   'art', 'progress', 'sources', 'docs', 'admin', 'drafts', 'ios', 'android', 'api', 'deploy', 'project', 'calibration']);
 const SKIP_ANYWHERE = new Set(['node_modules', '.git', '.wildshard', '.DS_Store']);

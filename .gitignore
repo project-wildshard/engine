@@ -8,10 +8,9 @@ blob-report/
 .DS_Store
 .env
 .env.*
-# Plan worktrees live at .worktrees/<slug> on plan/<slug> (J221, J240, DEV-SPEED DS6);
-# never part of the canonical tree. DS11 removes the old .claude/worktrees/ entries.
+# Plan worktrees live at .worktrees/<slug> on plan/<slug> (J221, J240, DEV-SPEED DS6); never part of the
+# canonical tree. Every repo tool skips them too (DS11, scripts/worktree-ignore.mjs).
 /.worktrees/
-.claude/worktrees/
 
 # Lifted from singleplayer (P3).
 node_modules
@@ -23,8 +22,6 @@ dist-native
 dist-drafts
 dist-admin
 .native-build
-# Claude-managed nested checkout; it has its own Git state and must not be nested in this repo.
-/.claude/worktrees/
 # Local capture scratch and an already archived HUD mockup source (the JPEG lives in art/hud/round-7-sword-touch/).
 /cap2.png
 /iso-test.png

@@ -102,7 +102,7 @@ it('refuses generated paths, media outside public/, the removed progress guards 
   f.commit();
   const cases: [string, string | Buffer, RegExp][] = [
     ['dist/app.js', 'x', /generated/u], ['scripts/dist-native/a.js', 'x', /generated/u], ['tmp/run/log.txt', 'x', /generated/u],
-    ['node_modules/pkg/index.js', 'x', /generated/u], ['.claude/worktrees/lane/a.ts', 'x', /generated/u],
+    ['node_modules/pkg/index.js', 'x', /generated/u], ['.claude/worktrees/lane/a.ts', 'x', /generated/u], ['.worktrees/plan/a.ts', 'x', /generated/u],
     ['media-cache/art/a.jpg', 'x', /generated/u], ['progress/run/boot-smoke-results/a.json', '{}', /generated/u],
     ['art/clip.mp4', 'x', /forbidden outside public/u], ['docs/guide.pdf', 'x', /PDFs stay out/u],
     ['sources/model.blend', 'x', /\.blend is never committed/u], ['progress/soak/raw.jsonl', '{}', /raw soak/u],

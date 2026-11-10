@@ -23,7 +23,7 @@ const CEILINGS = { maxBlobBytes: MB, maxJsonBlobBytes: 5 * MB, maxPreviewBytes: 
 /** Shipped bytes: the website, the native app resources and each shard's content-addressed runtime assets. */
 const RUNTIME_ROOTS = ['public/', 'android/app/src/main/res/', 'ios/App/App/Assets.xcassets/'];
 const SHARD_ASSETS = /^src\/shards\/[^/]+\/assets\//u;
-const GENERATED = /(?:^|\/)(?:node_modules|dist|dist-[^/]+|\.native-build|\.wildshard|\.tsc-layers|boot-smoke-results|scratchpad|tmp|media-cache)(?:\/|$)|(?:^|\/)\.claude\/worktrees(?:\/|$)/u;
+const GENERATED = /(?:^|\/)(?:node_modules|dist|dist-[^/]+|\.native-build|\.wildshard|\.tsc-layers|boot-smoke-results|scratchpad|tmp|media-cache)(?:\/|$)|(?:^|\/)\.claude\/worktrees(?:\/|$)|^\.worktrees(?:\/|$)/u;
 const NESTED_GIT = /(?:^|\/)\.git(?:\/|$)/u;
 const FORBIDDEN = /\.(?:mp4|m4v|mov|webm|mkv|avi|gif|mp3|m4a|wav|ogg|opus|flac|aac|aiff|zip|gz|tgz|br|zst|xz|bz2|7z|rar|tar|jsonl|pdf|blend\d*)$|\.heap\.json$/iu;
 const PICTURE = /\.(?:png|jpe?g|webp|avif)$/iu;

@@ -3,7 +3,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WIDTH, breakable, findLong, reflow, width } from '../src/scripts/md-wrap.mjs';
@@ -88,5 +88,22 @@ describe('md-wrap CLI and hook', () => {
     assert.equal(hook('fine.md').status, 0);
     writeFileSync(join(box.root, 'code.ts'), `// ${long(30)}\n`);
     assert.equal(hook('code.ts').status, 0);
+  });
+  test('a plan worktree file is checked against that worktree, not the canonical checkout (DS11)', () => {
+    const box = sandbox();
+    box.commit({ 'old.md': 'short\n' }, ok('docs: add old'));
+    assert.equal(box.git(['worktree', 'add', '-q', '-b', 'plan/p', '.worktrees/p']).status, 0);
+    const tree = join(box.root, '.worktrees', 'p');
+    mkdirSync(join(tree, 'src', 'scripts'), { recursive: true });
+    copyFileSync(join(ROOT, 'src/scripts/md-wrap.mjs'), join(tree, 'src', 'scripts', 'md-wrap.mjs'));
+    writeFileSync(join(tree, 'new.md'), `${long(20)}\n`);
+    // The worktree's own md-wrap runs in the worktree on its worktree-relative path, against the worktree's HEAD.
+    const advised = spawnSync('bash', [join(ROOT, '.claude/hooks/md-prose-width.sh')], {
+      cwd: box.root, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: box.root },
+      input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(tree, 'new.md') } }),
+    });
+    assert.equal(advised.status, 2, advised.stderr);
+    assert.match(advised.stderr, /^ {2}new\.md:1: \d+ chars/mu);
+    assert.doesNotMatch(advised.stderr, /\.worktrees/u);
   });
 });

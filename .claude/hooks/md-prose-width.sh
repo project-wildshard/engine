@@ -25,8 +25,15 @@ case "$file" in "$root"/*) ;; *) exit 0 ;; esac
 # Match the skipped folders against the repo-relative path: the absolute
 # path may itself sit under /tmp (Linux temp dirs, CI sandboxes).
 rel="${file#"$root"/}"
+# A plan worktree (DS11) is its own checkout: check the file against that
+# worktree's HEAD and tools, never the canonical checkout's.
 case "$rel" in
-  node_modules/*|*/node_modules/*|.claude/worktrees/*|project/archive/*|tmp/*) exit 0 ;;
+  .worktrees/*/*)
+    slug="${rel#.worktrees/}"; slug="${slug%%/*}"
+    root="$root/.worktrees/$slug"; rel="${rel#.worktrees/"$slug"/}" ;;
+esac
+case "$rel" in
+  node_modules/*|*/node_modules/*|.worktrees/*|project/archive/*|tmp/*) exit 0 ;;
 esac
 [ -f "$file" ] && [ -f "$root/src/scripts/md-wrap.mjs" ] || exit 0
 
