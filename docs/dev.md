@@ -270,3 +270,24 @@ These are non-rendering scheduling/lifetime contracts on a real App and
 scope, with no GL, pixel or shipped-scene claim. Each complete case keeps
 9.5 s including scope cleanup; none runs in hooks or Vitest. Old tests,
 runtime, pins and generated tables remain untouched.
+
+## Climate wire owner contracts
+
+After ordinary Pine/Nalati pin installs, run
+`node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/net-climate.proof.mjs`.
+Eight explicit CI-only cases map all nine original groups. Actual local
+Rapier hosts, NetRooms, NetClients and lossless loopback packets carry
+day/weather acts and authoritative rows. The sky is a real shipped
+WeatherContinuation; a public forwarding adapter records its accepted
+calls without replacing its behavior. Unknown names, paused clocks and
+shared rooms cannot accept a lone setting. A weatherless room continues
+normally. Declared data climate advances all 1,200 ticks and quantised
+day/weather rows reach the real client.
+
+WirePage queues preferences until real frames, retains mode on a real
+room/client rebind and consumes a phase jump once. This is a connection
+boundary, not a walked grid crossing. The page clock follows actual rows
+and remains frozen while paused. No fabricated client.latest, stateField
+spy, fake weather, live server, renderer or browser is involved. Each
+complete case keeps 9.5 s including clients, rooms and host disposal;
+none runs in hooks or Vitest, and no old SDK file or runtime changes.

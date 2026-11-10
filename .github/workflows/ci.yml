@@ -92,6 +92,9 @@ jobs:
       - name: Prove actual admitted entry render fences and refusal drain
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hybrid-render-preparation.proof.mjs
+      - name: Prove actual climate acts and page rows through local rooms
+        if: needs.changes.outputs.docs != 'true'
+        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/net-climate.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'
