@@ -3,21 +3,29 @@ import {relative} from 'node:path';
 import {holdCpu} from './cpu-admission.mjs';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
 import {CI_SERIAL_TESTS} from './vitest-ci-files.ts';
+import {PUSH_BUDGET} from './push-budget.mjs';
 
+interface CookEnvironment extends NodeJS.ProcessEnv { WS_CPU_SLOTS?:string }
 const {WS_CPU_ADMISSION:enabled}=process.env;
 if(enabled==='1'){
   assertHeavyLease('full-test');
   const filename=expect.getState().testPath;
   if(filename===undefined)throw new Error('Missing CPU-admitted test file');
   const file=relative(process.cwd(),filename).replaceAll('\\','/');
-  // Performance and uncapped encoder proofs reserve the complete managed budget.
-  // No environment variable is claimed to cap their native inner workers.
-  const exclusive=file==='test/net-bots.test.ts'||file==='test/cook-worker.test.ts'||file==='test/cook-cpu-limit.test.ts';
+  // The explicit no-grant encoder proof still needs the whole machine budget.
+  // Production cook jobs now consume the real admitted grant (e1946bc).
+  const cook=file==='test/cook-worker.test.ts';
+  const exclusive=file==='test/net-bots.test.ts'||file==='test/cook-cpu-limit.test.ts';
   const native=new Set<string>(CI_SERIAL_TESTS).has(file);
-  const lease=await holdCpu(exclusive?'all':native?2:1);
+  const lease=await holdCpu(exclusive?'all':cook?PUSH_BUDGET.cookSlots:native?2:1);
+  const cookEnvironment:CookEnvironment=process.env,previousCookGrant=cookEnvironment.WS_CPU_SLOTS;
+  if(cook)cookEnvironment.WS_CPU_SLOTS=String(lease.proof.slots);
+  const restoreCookGrant=():void=>{
+    if(cook){if(previousCookGrant===undefined)delete cookEnvironment.WS_CPU_SLOTS;else cookEnvironment.WS_CPU_SLOTS=previousCookGrant;}
+  };
   void (async()=>{await lease.lost;console.error(`CPU admission lost: ${file}`);process.kill(process.pid,'SIGTERM');})();
   // Setup admission occurs before collection and case clocks; teardown stays
   // inside the grant. Default stacked afterAll runs this after file cleanup.
-  afterAll(async()=>{await lease.release();});
-  process.once('exit',()=>{void lease.release();});
+  afterAll(async()=>{try{await lease.release();}finally{restoreCookGrant();}});
+  process.once('exit',()=>{restoreCookGrant();void lease.release();});
 }
