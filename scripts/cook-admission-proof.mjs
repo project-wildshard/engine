@@ -11,7 +11,7 @@ if(process.argv.slice(2).some(arg=>arg!=='--worker'&&!arg.startsWith('--out=')))
 const directory=resolvePath(process.argv.find(arg=>arg.startsWith('--out='))?.slice(6)??'tmp/cook-admission-proof');mkdirSync(directory,{recursive:true});
 const work=mkdtempSync(join(directory,'run-')),report=join(work,'results.json'),began=performance.now();
 const scheduler=process.env.WS_HEAVY_SCHEDULER_ROOT??join(homedir(),'.wildshard-heavy-lanes');
-const child=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/vitest-tmp.ts','run',worker?'test/cook-worker.test.ts':'test/cook-cpu-limit.test.ts','--maxWorkers=1','--reporter=default','--reporter=json',`--outputFile=${report}`],
+const child=spawn('python3',['scripts/heavy-lane.py','full-test','--checkout-scope','--',process.execPath,'scripts/vitest-tmp.ts','run',...(worker?['test/cook-worker.test.ts','test/cook-worker-publish.test.ts','test/cook-worker-limits.test.ts']:['test/cook-cpu-limit.test.ts']),'--maxWorkers=1','--reporter=default','--reporter=json',`--outputFile=${report}`],
  {env:{...process.env,WS_FULL_SUITE:'1',WS_CPU_ADMISSION:'1',WS_PUSH_GATE_PROFILE:'full-v1'},stdio:'inherit'});
 /** @type {{slots:number,capacity:number}[]} */const samples=[];
 /** @type {Map<number,boolean>} */const owned=new Map();
@@ -37,6 +37,6 @@ try{
  const results=JSON.parse(readFileSync(report,'utf8'));
  assert.equal(results.numPassedTests,worker?23:3);assert.equal(results.numFailedTests,0);assert.equal(results.numPendingTests,0);
  assert.ok(samples.length>0,'Actual machine admission must be observed');
- assert.ok(samples.every(row=>row.slots===(worker?4:row.capacity)),worker?'The bounded cook file must own exactly four actual slots':'Uncapped no-grant proof must own all CPU slots');
+ assert.ok(samples.every(row=>row.slots===(worker?4:row.capacity)),worker?'The bounded cook files must own exactly four actual slots':'Uncapped no-grant proof must own all CPU slots');
  console.log(JSON.stringify({actualCookCases:results.numPassedTests,grants:samples.length,slots:worker?4:'all',seconds:(performance.now()-began)/1000}));
 }finally{clearInterval(timer);rmSync(work,{recursive:true,force:true});}
