@@ -7,12 +7,12 @@ import {dirname,join,resolve as resolvePath} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import * as v from 'valibot';
 import {rebaseQueuedSnapshot} from './push-queue-rebase.mjs';
+import {workerEnvironment} from './push-environment.mjs';
 
 const self=import.meta.filename,lock=fileURLToPath(new URL('push-queue-lock.py',import.meta.url));
 const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0))),error:v.optional(v.string()),seconds:v.optional(v.number()),batch:v.optional(v.array(v.string())),failurePhase:v.optional(v.string())});
 const terminal=new Set(['pushed','checked','already-published','failed','published-unverified','publication-unknown']);
 const pending=new Set(['capturing','queued','retrying','rebasing','installing','waiting-for-hook','checking','publishing-ready','pushing','batching']);
-const keepalive='ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes';
 class RemoteAdvanceError extends Error{name='RemoteAdvanceError';}
 class PublicationUnknownError extends Error{name='PublicationUnknownError';}
 const batchOwnerSchema=v.object({schema:v.literal('queue-batch/1'),queue:v.string(),root:v.string(),owner:v.pipe(v.number(),v.integer(),v.minValue(1)),jobs:v.array(v.pipe(v.string(),v.regex(/^\d{9,}-[a-f0-9]{8}$/u)))});
@@ -35,18 +35,6 @@ function notify(job,state,message){
  const file=resolvePath(process.env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
  const lane=/^[a-z][a-z0-9_-]*$/u.test(job.lane??'')?job.lane:'push-queue';
  try{mkdirSync(dirname(file),{recursive:true});appendFileSync(file,`${new Date().toISOString().slice(11,16)} ${lane} push queue ${job.id} ${state}: ${message.replaceAll(/\s+/gu,' ').slice(0,1000)}\n`);}catch(error){console.error('Push queue receipt unavailable',error);}
-}
-/** A worker outlives its enqueuer and can drain other lanes' jobs. Carry only
- * tool/OS/auth transport settings, never gate bypasses, loaders or test modes.
- * @param {NodeJS.ProcessEnv} [source] */
-function workerEnvironment(source=process.env){
- const allowed=new Set(['HOME','PATH','USER','LOGNAME','SHELL','TMPDIR','TMP','TEMP','LANG','TZ','TERM','COLORTERM','NO_COLOR','FORCE_COLOR',
-  'PNPM_HOME','XDG_CONFIG_HOME','XDG_CACHE_HOME','XDG_DATA_HOME','SSH_AUTH_SOCK','SSH_AGENT_PID',
-  'HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy',
-  'SSL_CERT_FILE','SSL_CERT_DIR','NODE_EXTRA_CA_CERTS','CPATH','LIBRARY_PATH','MANPATH','SDKROOT',
-  'WS_LANE_RECEIPTS']);
- const environment=Object.fromEntries(Object.entries(source).filter(([key])=>allowed.has(key)||/^LC_[A-Z_]+$/u.test(key)));
- return {...environment,WS_FULL_SUITE:'1',GIT_TERMINAL_PROMPT:'0',GIT_SSH_COMMAND:keepalive};
 }
 /** A broken record fails only itself; a minimal invalid receipt is not a publication proof.
  * @param {string} directory @param {string} name */

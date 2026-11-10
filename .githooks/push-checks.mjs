@@ -7,11 +7,12 @@ import {PUSH_BUDGET, PUSH_PROFILE} from '../scripts/push-budget.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 import {missingTestTimings,prepareTestTimings,readTestTimings,completeTestTimings} from '../scripts/push-test-timings.mjs';
+import {gateEnvironment} from '../scripts/push-environment.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
 export function pushEnvironment(environment=process.env){
-  const env={...environment,WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
+  const env={...gateEnvironment(environment),PWD:process.cwd(),WS_PUSH_GATE_PROFILE:PUSH_PROFILE,WS_VITEST_MAX_WORKERS:String(PUSH_BUDGET.workers),
     WS_PUSH_LINT_THREADS:String(PUSH_BUDGET.lintThreads),GOMAXPROCS:String(PUSH_BUDGET.lintGo),UV_THREADPOOL_SIZE:'1',WS_CPU_ADMISSION:'1',
     WS_HEAVY_SCHEDULER_ROOT:resolve(environment.WS_HEAVY_SCHEDULER_ROOT??environment.WS_HEAVY_ROOT??resolve(homedir(),'.wildshard-heavy-lanes'))};
   // Git prepends its exec directory when it invokes a hook. Execute both gate

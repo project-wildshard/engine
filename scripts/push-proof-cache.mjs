@@ -1,9 +1,23 @@
 import {execFileSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
-import {existsSync,mkdirSync,readFileSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
+import {existsSync,lstatSync,mkdirSync,readFileSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
+import {homedir,hostname} from 'node:os';
 import * as v from 'valibot';
 import {readLiftPending} from './lift-pending.mjs';
+import {pushDependencyIdentity} from './push-dependencies.mjs';
+
+/** The scope is the actual publishing repository, never a caller's cache key.
+ * @param {string} root @param {NodeJS.ProcessEnv} env @param {string} tree @param {string} runtime */
+function sharedProofFile(root,env,tree,runtime){
+ try{
+  const remote=execFileSync('git',['remote','get-url','--push','origin'],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+  if(/^https?:\/\//u.test(remote)){const url=new URL(remote);if(url.username||url.password||url.search||url.hash)return null;}
+  const identity=remote.replace(/^git@([^:]+):/u,'https://$1/').replace(/^ssh:\/\/git@/u,'https://').replace(/\.git\/?$/u,'').replace(/\/$/u,'');
+  const scope=createHash('sha256').update(identity).digest('hex').slice(0,20);
+  return resolve(env.XDG_CACHE_HOME??resolve(homedir(),'.cache'),'wildshard','full-push-proofs',scope,`${tree}-${runtime}.json`);
+ }catch{return null;}
+}
 
 const exclusionsSchema=v.object({files:v.array(v.string()),deadline:v.nullable(v.string())});
 const receiptSchema=v.object({version:v.literal(2),tree:v.string(),runtime:v.string(),run:v.string(),commit:v.string(),
@@ -45,24 +59,33 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   }
   // Ref/destination admission runs before reuse; a full tree proof is independent
   // of the destination passed by Git versus the queue's preceding gate.
-  const excluded=/^(?:WS_PUSH_REFS|WS_PUSH_DESTINATION|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
+  // The gate normalizes its actual PWD to its checked root. Its absolute clone
+  // location is metadata; installed bytes, host and compiler inputs still bind.
+  const excluded=/^(?:PWD|WS_PUSH_REFS|WS_PUSH_DESTINATION|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
   const exclusions=exclusionScope(cwd);
-  const runtime=createHash('sha256').update(JSON.stringify({profile,node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions})).digest('hex');
-  return {tree,commit,runtime,root:resolve(cwd),exclusions,file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
+  const dependencies=pushDependencyIdentity(cwd);
+  const runtime=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,dependencies})).digest('hex');
+  return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
 
 /** A partial result covers only its own complete selection, never a full fallback.
  * @param {NonNullable<ReturnType<typeof capturePushTree>>} context
  * @param {{mode:'full'|'related'|'docs',files:string[]}} selection */
 export function readPushProof(context,selection){
+  if(context.dependencies===null)return null;
+  for(const file of [context.file,context.sharedFile]){
+  if(file===null)continue;
   try{
-    const proof=v.parse(receiptSchema,JSON.parse(readFileSync(context.file,'utf8')));
-    if(proof.tree!==context.tree||proof.runtime!==context.runtime||!Number.isFinite(Date.parse(proof.finished))||proof.seconds<0||proof.run==='')return null;
-    if(JSON.stringify(proof.exclusions)!==JSON.stringify(context.exclusions)||JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions))return null;
-    const covers=proof.mode==='full'||(proof.mode===selection.mode&&selection.files.every(file=>proof.files.includes(file)));
-    return covers&&scopeLive(context.exclusions)?proof:null;
-  }catch{return null;}
+    const info=lstatSync(file);if(!info.isFile()||info.uid!==process.getuid?.()||(info.mode&0o022)!==0)continue;
+    const proof=v.parse(receiptSchema,JSON.parse(readFileSync(file,'utf8')));
+    if(proof.tree!==context.tree||proof.runtime!==context.runtime||!Number.isFinite(Date.parse(proof.finished))||proof.seconds<0||proof.run==='')continue;
+    if(JSON.stringify(proof.exclusions)!==JSON.stringify(context.exclusions)||JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions))continue;
+    const covers=proof.mode==='full'||(proof.mode===selection.mode&&selection.files.every(selected=>proof.files.includes(selected)));
+    if(covers&&scopeLive(context.exclusions))return proof;
+  }catch{ /* An absent or invalid candidate never substitutes for the gate. */ }
+  }
+  return null;
 }
 
 /** Call only after the complete selected gate succeeds and a second clean-tree capture agrees.
@@ -74,6 +97,10 @@ export function writePushProof(context,selection,seconds){
     finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:context.exclusions};
   mkdirSync(dirname(context.file),{recursive:true});
   const temporary=`${context.file}.${process.pid}`;writeFileSync(temporary,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(temporary,context.file);
-  if(!scopeLive(context.exclusions)){unlinkSync(context.file);throw new Error('Push proof exclusion scope changed while writing; rerun the full gate');}
+  if(selection.mode==='full'&&context.sharedFile!==null){
+    mkdirSync(dirname(context.sharedFile),{recursive:true,mode:0o700});
+    const shared=`${context.sharedFile}.${process.pid}.tmp`;writeFileSync(shared,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(shared,context.sharedFile);
+  }
+  if(!scopeLive(context.exclusions)){unlinkSync(context.file);if(selection.mode==='full'&&context.sharedFile!==null)unlinkSync(context.sharedFile);throw new Error('Push proof exclusion scope changed while writing; rerun the full gate');}
   return proof;
 }
