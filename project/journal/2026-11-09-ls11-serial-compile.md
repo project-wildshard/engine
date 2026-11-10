@@ -48,3 +48,12 @@ What is left is the floor: each world slice that builds a new pipeline is one Sw
 stand-ins off it barely moved (1.3-1.5 s), a rasterizer-discard pre-draw built nothing measurable, and a plain
 MeshBasicMaterial costs about what a graph material does, so the cost is the per-pipeline routine JIT, not our
 draw. It scales with the shared Mac's load: 1.1-1.5 s at load 4-6, 1.2-1.9 s at 11-35, 2-9.6 s at 50-60.
+
+Review (Codex, J206) of the second pass, three MUST-FIXes and a SHOULD-FIX, all fixed:
+
+- The parts now follow three's real list order (`firstViewOrder` replays r186 `projectObject` and sorts with
+  `gltfOpaqueSort` and three's reverse painter sort: group order, render order, far to near), not scene order.
+- A first draw that fails before its view keeps every map it touched due again, and the incoming flags.
+- On a serial GPU an image upload or a post draw is credited after its settled pause, never before it.
+- The named test pins the order against conflicting keys (group order over render order, declaration over native
+  id, depth over scene order); a second pins credit-after-settle and no credit on a failed wait.

@@ -1400,7 +1400,9 @@ export class Game {
    */
   private async firstViewParts(cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, units: FencedUnits,
     onUnit: (done: number) => void): Promise<void> {
-    const map = this.renderer.shadowMap, { order, opaque } = firstViewOrder(this.rootScene, cam.layers);
+    // three's render poses a root camera before it lists the scene: the order is listed from the same pose
+    if (cam.parent === null && cam.matrixWorldAutoUpdate) cam.updateMatrixWorld();
+    const map = this.renderer.shadowMap, { order, opaque } = firstViewOrder(this.rootScene, cam);
     for (let k = 1; k <= FIRST_VIEW_UNITS; k++) {
       const upto = firstViewCut(k, opaque, order.length, FIRST_VIEW_PARTS);
       const mapAuto = map.autoUpdate, mapNeeds = map.needsUpdate;
@@ -1423,15 +1425,18 @@ export class Game {
   private async fencedDraw(cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, units: FencedUnits,
     onUnit: (done: number, detail: string) => void, onMapPart?: (done: number) => void): Promise<void> {
     const r = this.renderer, map = r.shadowMap;
-    const flags = this.shadowCasters(cam).map(({ shadow }) => ({ shadow, auto: shadow.autoUpdate }));
+    const flags = this.shadowCasters(cam).map(({ shadow }) => ({ shadow, auto: shadow.autoUpdate, needs: shadow.needsUpdate }));
     const prev = r.getRenderTarget(), face = r.getActiveCubeFace(), mip = r.getActiveMipmapLevel();
-    const mapAuto = map.autoUpdate;
+    const mapAuto = map.autoUpdate, mapNeeds = map.needsUpdate;
     const casters = onMapPart !== undefined && flags.length > 0 ? casterOrder(this.rootScene) : [];
+    // LS11: a map this draw touched (a caster prefix included) stays due again unless the whole draw completes
+    const touched = new Set<THREE.LightShadow>();
+    let drawn = false;
     try {
       for (const [i, { shadow }] of flags.entries()) {
         const drawMap = (hidden: readonly THREE.Object3D[]): void => {
           for (const other of flags) { other.shadow.autoUpdate = false; other.shadow.needsUpdate = other.shadow === shadow; }
-          map.needsUpdate = true;
+          map.needsUpdate = true; touched.add(shadow);
           this.parkedRender(cam, target, hidden);
         };
         if (i === 0 && onMapPart !== undefined) {
@@ -1448,10 +1453,11 @@ export class Game {
       if (flags.length > 0) { map.autoUpdate = false; map.needsUpdate = false; }
       r.setRenderTarget(target);
       r.render(this.rootScene, cam);
+      drawn = true;
     } finally {
       r.setRenderTarget(prev, face, mip);
-      for (const { shadow, auto } of flags) { shadow.autoUpdate = auto; shadow.needsUpdate = false; }
-      map.autoUpdate = mapAuto; map.needsUpdate = false;
+      for (const { shadow, auto, needs } of flags) { shadow.autoUpdate = auto; shadow.needsUpdate = !drawn && (needs || touched.has(shadow)); }
+      map.autoUpdate = mapAuto; map.needsUpdate = !drawn && (mapNeeds || touched.size > 0);
     }
     await units.submit(() => { onUnit(flags.length + 1, 'view'); });
   }

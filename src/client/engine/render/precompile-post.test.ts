@@ -91,6 +91,23 @@ test('linked post draws use existing targets with a restored paint between each'
   } finally { f.dispose(); }
 });
 
+test('LS11: on a serial GPU a post draw is credited only once its settled pause has seen the GPU finish it', async () => {
+  const f = warmFixture(), events: string[] = [];
+  try {
+    await warmPostJobs(f.renderer, f.jobs, async () => { events.push(`settled ${String(f.draws.length)}`); await Promise.resolve(); },
+      () => true, done => { events.push(`credit ${String(done)}`); }, true);
+    expect(events).toEqual(['settled 1', 'credit 1', 'settled 2', 'credit 2']);
+    // a failed fence wait or a lost context credits nothing; nor does an owner that left during the wait
+    events.length = 0;
+    await expect(warmPostJobs(f.renderer, f.jobs, () => Promise.reject(new Error('fence wait failed')), () => true,
+      done => { events.push(`credit ${String(done)}`); }, true)).rejects.toThrow('fence wait failed');
+    let current = true;
+    await expect(warmPostJobs(f.renderer, f.jobs, async () => { current = false; await Promise.resolve(); }, () => current,
+      done => { events.push(`credit ${String(done)}`); }, true)).rejects.toThrow('owner left');
+    expect(events).toEqual([]);
+  } finally { f.dispose(); }
+});
+
 test('a post material that samples its stand-in target is left to the real composer draw (no feedback loop)', async () => {
   const f = warmFixture(), depth = new DepthTexture(8, 8);
   f.target.depthTexture = depth;

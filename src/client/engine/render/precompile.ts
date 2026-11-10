@@ -795,7 +795,9 @@ export function postJobs(composer: Pick<EffectComposer, 'passes'>, rt: THREE.Web
  * the real composer overwrites these temporary pixels. Target face/mip are restored on failure and cancellation. */
 export async function warmPostJobs(renderer: Pick<Renderer, 'getRenderTarget' | 'getActiveCubeFace' | 'getActiveMipmapLevel' | 'setRenderTarget' | 'render'>,
   jobs: readonly CompileJob[], pause: () => Promise<void>, current: () => boolean,
-  onProgress?: (done: number, total: number, detail: string) => void): Promise<void> {
+  onProgress?: (done: number, total: number, detail: string) => void,
+  /** LS11: `pause` settles the GPU (gpuSettled): each draw is credited only once it has, never before */
+  settles = false): Promise<void> {
   // Some passes bind their sample arrays only inside render (desktop AO).
   // Linking is safe before that binding; a stand-in draw is not. Leave those
   // materials to their real pass rather than inventing values or advancing it.
@@ -820,8 +822,10 @@ export async function warmPostJobs(renderer: Pick<Renderer, 'getRenderTarget' | 
     const target = renderer.getRenderTarget(), face = renderer.getActiveCubeFace(), mip = renderer.getActiveMipmapLevel();
     try { renderer.setRenderTarget(job.rt); renderer.render(job.root, camera); }
     finally { renderer.setRenderTarget(target, face, mip); }
-    onProgress?.(index + 1, drawable.length, `${index + 1} / ${drawable.length} post pipelines drawn`);
+    const report = (): void => { onProgress?.(index + 1, drawable.length, `${index + 1} / ${drawable.length} post pipelines drawn`); };
+    if (!settles) report();
     await pause();
+    if (settles) { if (!current()) throw new Error('Shader warm-up owner left'); report(); }
   }
   if (!current()) throw new Error('Shader warm-up owner left');
 }
@@ -1519,14 +1523,19 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
         renderer.initTexture(tex);
       }
     }
-    onProgress?.(base + i + 1, base + uploadTextures.length, `${i + 1} / ${uploadTextures.length} textures uploaded`);
+    // LS11: a serial GPU's image upload is credited only once its settled pause says the GPU finished it
+    const settles = linkPerJob && imageUpload && !compressed && batch === undefined;
+    if (!settles) onProgress?.(base + i + 1, base + uploadTextures.length, `${i + 1} / ${uploadTextures.length} textures uploaded`);
     if (imageUpload) { imageBytes += bytes; slowestUpload = Math.max(slowestUpload, performance.now() - tUpload); }
     // DL21: name an upload that held a loading frame (Nine's Shardfile cold card sat 1.0 s on '30 / 33 textures uploaded')
     if (isDev() && performance.now() - tUpload >= SLOW_UPLOAD_MS) slowUpload(tex, tUpload, compressed ? 0 : bytes);
     if (compressed) { checkCurrent(); tSlice = performance.now(); batch?.reset(); }
     else if (batch !== undefined) { if (imageUpload) batch.add(bytes, performance.now() - tUpload); }
     // LS11: one image upload a settled pause, so its GPU copy and mips land before the next and none queue behind a paint
-    else if (linkPerJob && imageUpload) { await settledPause(); checkCurrent(); tSlice = performance.now(); }
+    else if (settles) {
+      await settledPause(); checkCurrent(); tSlice = performance.now();
+      onProgress?.(base + i + 1, base + uploadTextures.length, `${i + 1} / ${uploadTextures.length} textures uploaded`);
+    }
     else if (isolateImageUploads ? imageUpload : performance.now() - tSlice > heldBudget(sliceMs)) { await pause(); checkCurrent(); tSlice = performance.now(); }
   }
   // The batch's last uploads keep their own drawn frame before whatever follows warm-up, as isolation did.
@@ -1790,10 +1799,10 @@ export async function precompileLevel(game: Pick<Game, 'renderer' | 'camera' | '
     const report = await runPrecompile(game.renderer, game.camera, jobs, materials, progress, collectTextures(jobs), options.current, options.isolateImageUploads, options.pause, options.uploadBudget, options.onStage, options.sliceMs);
     if (warm.length > 0) {
       // LS11: on a serial GPU each post draw's pipeline lands before the next (the last one draws to the canvas)
-      const postPause = serialLoading(game.renderer, options.isolateImageUploads === true)
-        ? gpuSettled(game.renderer, options.pause ?? frame, options.current ?? (() => true)) : options.pause ?? frame;
+      const serial = serialLoading(game.renderer, options.isolateImageUploads === true);
+      const postPause = serial ? gpuSettled(game.renderer, options.pause ?? frame, options.current ?? (() => true)) : options.pause ?? frame;
       await warmPostJobs(game.renderer, warm, postPause, options.current ?? (() => true),
-        (done, count, detail) => { onProgress?.(completed + done, total + count, detail); });
+        (done, count, detail) => { onProgress?.(completed + done, total + count, detail); }, serial);
     }
     if (tracedBoot) recordGpuCheckpoint(game.renderer, 'compile:after');
     return report.materials;
