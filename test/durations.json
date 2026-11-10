@@ -624,7 +624,7 @@
   "test/cook-validation.test.ts": 21.825218664,
   "test/cook-worker-limits.test.ts": 35.176410290999996,
   "test/cook-worker-publish.test.ts": 21.673452791,
-  "test/cook-worker.test.ts": 138.97,
+  "test/cook-worker.test.ts": 38.468033248,
   "test/core-heap-diagnostic.test.ts": 0.7439951820000001,
   "test/crack-every-player.test.ts": 0.49834773000000004,
   "test/creature-residency-contract.test.ts": 0.6515862419999999,

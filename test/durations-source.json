@@ -2314,6 +2314,19 @@
         "full"
       ],
       "basis": "Actual successful same-source Linux schema2 complete-module diagnostic, including collection/setup/environment and exact case outcomes, CI42800111977. Replaces only this full-plan unknown60s fallback with its measured clock. No planner/calibration/group/cap change; no Ring1 measurement or membership inferred."
+    },
+    {
+      "file": "test/cook-worker.test.ts",
+      "sha": "3e9c1293c4086efa2ff2e8202fa5c85cf1305567",
+      "run": "42910568715",
+      "artifact": 13806623697,
+      "zipSha256": "770e5586e73368af99812abe258e673fd996aaa6f19f288079e07ccb91796f05",
+      "report": "results-1-of-3.json.timings.json",
+      "durationMs": 38468.033248,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Largest actual complete-module clock among the ten consecutive qualifying hosted runs of the split quarantined file (d0de4e3 onward; 25.7-38.5 s, 3/3 cases each), not the fastest or a local estimate. Replaces the stale pre-split 138.97 s weight. Same three case bodies and the 60 s budget; no planner/calibration/group/cap change. Ring 2 classification is unchanged, so no Ring 1 weight."
     }
   ],
   "full": {

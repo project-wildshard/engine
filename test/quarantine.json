@@ -4,19 +4,6 @@
   "createdAt": "2026-11-08T11:13:28.000Z",
   "entries": [
     {
-      "file": "test/cook-worker.test.ts",
-      "owner": "codex-pinefix2",
-      "addedAt": "2026-11-08T12:05:02.000Z",
-      "deadline": "2026-11-10T12:04:31.000Z",
-      "reason": "CI4 60-second file budget overrun: 111595 ms, assertions passed; ci 42478017721 shard 2",
-      "extension": {
-        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 23 original cases passed, full module73.233s; streak0/10 after executed reset73.233s in CI42764703480. The bounded producer is in, but cold/validation/encoder cost still overruns. Preserve all23 cold/warm/security/terminal cases while profiling the remaining real producer cost; no successor covers that complete edge. One48h extension; no second.",
-        "grantedAt": "2026-11-10T06:02:19.000Z",
-        "decidedBy": "codex-pinefix2",
-        "deadline": "2026-11-12T12:04:31.000Z"
-      }
-    },
-    {
       "file": "test/nalati-headless-population.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:05:02.000Z",
