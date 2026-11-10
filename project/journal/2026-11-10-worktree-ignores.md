@@ -21,3 +21,7 @@ watcher. A Vitest list inside the worktree still finds all its 1,240 files.
 `test/tooling/worktree-ignore.test.mjs` plants a worktree and runs the
 parent's lint, format, Vitest list, Git staging and the shardfile hash; with
 `.gitignore` and the shardfile skip reverted it fails three cases.
+
+Clocks for the guard test recorded with `push-preflight.mjs timings`: 2.8 s
+
+in its file, 3.3 s wall.
