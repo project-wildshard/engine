@@ -213,6 +213,30 @@ timed(
       const before = JSON.stringify(rows),
         prepared = bindInteractPlacements(rows, sites),
         handle = prepared.rows[0]
+      const expected = {
+        external: ['talked:castaway'],
+        rows: [
+          {
+            kind: 'lever',
+            id: 'handle',
+            label: 'Pull',
+            at: { poi: 'world', x: 10, y: 3, z: 20, yaw: 0 },
+            requires: { all: ['talked:castaway'] },
+            latch: true,
+          },
+          {
+            kind: 'door',
+            id: 'gate',
+            look: 'sluice',
+            w: 2,
+            h: 2,
+            at: { poi: 'world', x: 20, y: 4, z: 30, yaw: 1 },
+            opensWhen: { all: ['lever:handle'] },
+          },
+        ],
+      }
+      assert.deepEqual(prepared, expected)
+      assert.equal(JSON.stringify(prepared), JSON.stringify(expected))
       assert.equal(JSON.stringify(rows), before)
       assert.deepEqual(
         prepared.rows.map(row => row.id),

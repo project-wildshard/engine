@@ -30,3 +30,18 @@ not hooks or Vitest. Stock data, runtime, pins and old SDK files stay.
 Six real source mutants reject: SDK row reversal and wrong-kind bypass;
 engine inclusive reach, override dy, inherited frame and unlocked lever.
 Every temporary production source byte is restored.
+
+## One-shot review finding closed
+
+J206 originally says NO-GO at engine 51e33ff / SDK 6fee75b:
+`~/.cache/wildshard/session-keep/reviews/sdk-placement-engine-20261110-SDK-interaction-placement-20261110T085537Z-69881.md`.
+Its sole MUST is fixed, no SHOULD. The SDK comparison used its frozen
+engine, so the current binder could wrongly retain old at coordinates
+without either replacement failing. That real source mutation passes
+the old engine proof. Add independent complete expected-table and JSON
+checks at current HEAD, including both relocated poses and retained row
+laws; the same unchanged mutation now fails. Byte-restored source passes.
+This seventh mutant closes the missing current-owner value coverage.
+No second review; the original report remains as the evidence. The safe
+helper used ephemeral read-only Codex because Opus quota was exhausted
+or unverified and wrote nothing to either reviewed tree.
