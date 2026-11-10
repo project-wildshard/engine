@@ -17,6 +17,7 @@ import { DefaultLoadingManager } from 'three';
 import { TIER, TIER_CONFIG } from '../core/tier';
 import { standIn, texMode, type TexMode } from './gpuFiles';
 import { decodeImageBitmap } from './imageDecode';
+import { waitFor } from '../../../shared/engine/boot/waits';
 
 import { pageScope } from '../../../shared/engine/app/resources';
 import { presenting } from '../../../shared/engine/core/framePacing';
@@ -234,7 +235,9 @@ export async function fetchImage(file: string, maxSize: typeof Infinity = Infini
           opts.resizeWidth = Math.round(dim.w * k); opts.resizeHeight = Math.round(dim.h * k); opts.resizeQuality = 'medium';
         }
       }
-      return await decodeImageBitmap(blob, opts);
+      // QA row 27 (Jake's Nine, Low Power): Props waited 7.7 s on the image decode worker's paint WebPs with no request
+      // and no name on the card; each decode now names its file, as a GLTF decode does
+      return await waitFor(`Image decode ${new URL(url, location.href).href}`, decodeImageBitmap(blob, opts), 'work');
     } catch { /* fall through */ }
   }
   const src = URL.createObjectURL(blob);

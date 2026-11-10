@@ -53,11 +53,11 @@ const NAMED_OPERATIONS=new Set(['download:cache-check','app:session-code-ready',
     'first-body-preparation-end','first-body-preparation-start','hello-send','launch-complete','rapier-held-bytes','rapier-initialize',
     'ready-received','ready-send','road-collision-inputs','road-physics-and-collision','simulation-and-collision-create',
     'welcome-receive','worker-bootstrap-ready','worker-runtime-import'].map(name=>`server:${name}`)]);
-/** LD3: the loading waits a paste may name, exactly as the engine writes them; `GLTF decode <url>` names its file the way
- *  every resource is named. Any other label stays private. */
+/** LD3: the loading waits a paste may name, exactly as the engine writes them; `GLTF decode <url>` and `Image decode
+ *  <url>` name their file the way every resource is named. Any other label stays private. */
 const WAIT_LABELS=new Set(['GLTF decode (owned bytes)','GLTF decode pacing','Grid road grain','Grid road signs','Horizon paintings',
   'Minimap','Read Model data','Read Product data','Read Product data section','Read Product descriptor','Read Program data',
-  'Read Texture data','Read grid session module','Spawn download','Startup stylesheets']);
+  'Read Texture data','Read grid session module','Spawn download','Spawn view','Startup stylesheets']);
 const SAFE_SEGMENT=/^[A-Za-z0-9._-]{1,96}$/u, CONTENT_V=/^[a-f0-9]{8,64}$/u;
 /** LD3: the build's public routes. Same origin alone does not make a file public (Codex review of ca3c1d8). */
 const PUBLIC_DIRECTORIES=new Set(['b','assets','shardfiles','basis','fonts','programs','sw-core','calibration']);
@@ -136,9 +136,9 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
     if(NAMED_OPERATIONS.has(value)||/^(?:game-)?stage:/u.test(value)&&STEPS.has(value.replace(/^(?:game-)?stage:/u,'')))return value;
     if(/^(?:worker:[0-9]{1,5}:)?server:verified-input:[a-f0-9]{64}$/u.test(value))return value; // a content hash
     if(value.startsWith('wait:')){
-      const label=value.slice(5),decode=/^GLTF decode (https?:\/\/\S+)$/iu.exec(label)?.[1];
+      const label=value.slice(5),decode=/^(GLTF|Image) decode (https?:\/\/\S+)$/iu.exec(label);
       if(WAIT_LABELS.has(label)||/^Link [0-9]{1,4} shader programs$/u.test(label))return value;
-      if(decode!==undefined)return `wait:GLTF decode ${url(decode)??'resource'}`;
+      if(decode!==null)return `wait:${decode[1]?.toLowerCase()==='image'?'Image':'GLTF'} decode ${url(decode[2])??'resource'}`;
     }
     const part=/^((?:worker:[0-9]{1,5}:)?(?:download:|server:fetch-headers:|server:read-body:|server:verified-input:))(.+)$/u.exec(value);
     return part===null?fallback:`${part[1]??''}${url(part[2])??'resource'}`;

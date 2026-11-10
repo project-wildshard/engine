@@ -1,5 +1,5 @@
 import type { BuiltWorld } from './context';
-import { bootMark } from '@wildshard/engine/boot/timing';
+import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { Rng } from '@wildshard/engine/core/rng';
 import { gridCells } from '../plugin/context';
@@ -247,7 +247,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     const readyUnits = loadingUnits('Ready jobs', 3);
     let readyDone = 0;
     const counted = <T>(job: Promise<T>): Promise<T> => job.then(value => { readyUnits(++readyDone); return value; });
-    await spawnViewThenNamed(counted(prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); }), 'camera', settlingTiles)),
+    // QA row 27: Jake's Nine paste had 4.6 s of readyFrame with no entry before 'wait:Minimap': the spawn view's fence and
+    // its tile settle, which the card names but the boot timeline did not; it is a named wait there too now
+    await spawnViewThenNamed(counted(bootTask('wait:Spawn view', () => prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); }), 'camera', settlingTiles))),
       [['Minimap', counted(waitEntryWork(game.levelScope, () => ctx.minimap.prepare()))], ['Horizon paintings', counted(edgeDressing.horizonReady)]]);
   });
   // P0: the phone's spawn programs settle while loading still covers the reveal.

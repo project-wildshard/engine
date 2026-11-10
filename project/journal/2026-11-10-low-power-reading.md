@@ -16,3 +16,14 @@ says `low power: likely (rAF 30.0/s on the title)`, or `unread`. Diagnostics onl
 Tests in `loading-footer.test.ts`: 30 Hz is likely and 60 Hz is not, with and without long tasks between frames; too
 few frames is no reading; the tier line repaints when the reading lands; a fresh title reading wins, a stale one does
 not; a title page keeps its reading. Not read on a real phone yet: Jake's next Copy diagnostics paste is the proof.
+
+## The same paste's unnamed waits (QA row 27)
+
+Jake's Nine load (preview `0641eaa`, Low Power on) held Props 7.7 s after its last model read with no request: the main
+thread's longest gap was 195 ms while the image decode worker exchanged 11 messages, so Props waited on the paint WebPs
+(`/assets/nine-dragon/paint/*.phone.webp`, leaf atlas, scroll) decoding off-thread at Low Power clocks. `fetchImage` now
+names each decode as `Image decode <url>`, a wait on the card and an entry in the boot timeline, as a GLTF decode is;
+Copy diagnostics keeps the page's own path and hides other origins (`diagnostics-summary.test.ts`). Whether those decodes
+can start earlier or wait until after the first frame is open (LOADING-SCREEN rows).
+The same paste had 4.6 s of readyFrame with no entry before `wait:Minimap`: the spawn view's fence and its tile settle,
+which the card names but the timeline did not. The readyFrame step now records it as `wait:Spawn view`.

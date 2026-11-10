@@ -83,3 +83,16 @@ it('keeps every counter when two of this page\'s files share one path (LS4: the 
     [`wait:GLTF decode ${own}`]: { loaded: 1, total: null, unit: 'units', at: 1, events: 1 }, [`wait:gltf decode ${own}`]: { loaded: 2, total: null, unit: 'units', at: 2, events: 1 } } }) as { counters: Record<string, { loaded: number }> };
   expect(Object.entries(waits.counters).map(([key, row]) => [key, row.loaded])).toEqual([['wait:GLTF decode /b/a.js', 1], ['wait:GLTF decode /b/a.js#2', 2]]);
 });
+
+it('QA row 27: a paste names image decodes by their file and the spawn view fence, and still hides other origins', () => {
+  const paint = `${location.origin}/assets/nine-dragon/paint/leaf-atlas.phone.webp?v=0123abcd`;
+  const timing = { version: 1, build: 'd91507e-mw810im4', attempt: '1', attemptCount: 1, timeOrigin: 1,
+    entries: [`wait:Image decode ${paint}`, 'wait:Image decode https://private.invalid/PRIVATE.webp', 'wait:Spawn view'].map((operation, index) =>
+      ({ id: index + 1, build: null, attempt: '1', realm: 'page', operation, start: 1, end: 2, result: 'complete', detail: {} })),
+    resources: [], counters: {}, active: [],
+  } as unknown as BootTiming;
+  const out = safeBootDiagnostics(timing) as { entries: { operation: string }[] };
+  expect(out.entries.map(row => row.operation)).toEqual(['wait:Image decode /assets/nine-dragon/paint/leaf-atlas.phone.webp?v=0123abcd',
+    'wait:Image decode resource-1', 'wait:Spawn view']);
+  expect(JSON.stringify(out)).not.toContain('PRIVATE');
+});
