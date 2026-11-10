@@ -464,8 +464,7 @@
     }
    ],
    "proof": "flow:hurt",
-   "why": "C2 moved the server's blows to ports.hurt -> PlayerHurt.serverHit, which flow:hurt proves with page damage 0.",
-   "debt": "No wired producer: a server-owned page settles no fall (PlayerHurt.fall) and no blow on its own pipeline, so this listener runs only off the wire. Retire it, or prove an unlinked page that still settles a fall."
+   "why": "C2 moved the server's blows to ports.hurt -> PlayerHurt.serverHit (flow:hurt, page damage 0). The listener stays for the unlinked page: a practice room cuts the link, so PlayerHurt.fall files a hard landing on the page pipeline and this listener flashes it, while the server's row keeps the health (flow:hurt's practice-room step)."
   },
   {
    "id": "audio.scene-frame",

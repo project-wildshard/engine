@@ -60,5 +60,33 @@ export async function hurt(browser, phone, base, step) {
       const out = await page.evaluate(() => ({ ...(/** @type {RepairWindow} */ (window)).__hurtProof, hp: (/** @type {RepairWindow} */ (window)).__workerClient().hp, falls: (/** @type {RepairWindow} */ (window)).__workerClient().falls }));
       return { ok: out.hits.some(hit => !hit.blow) && out.arcs.length === 0 && out.grunts === 0 && out.shoves === 0 && out.hp > 0 && out.falls === 0 && out.pageDamage === 0, ...out };
     });
+    // SR12: a practice room cuts the link (`ws:practice-active`), so the page walks alone and files its own hard landing:
+    // PlayerHurt.fall hits the page's pipeline, and PlayerHurt's own `damage.dealt` listener flashes it. The server's row
+    // still sets the health each frame, so the page's number does not keep the fall.
+    await step('hurt: an unlinked practice room files its own hard landing, and the page listener flashes it', async () => {
+      await page.waitForTimeout(1600);
+      await page.evaluate(() => {
+        const w = /** @type {RepairWindow} */ (window);
+        w.__hurtProof = { flashes: 0, grunts: 0, combat: 0, shoves: 0, arcs: [], bearings: [], hits: [], pageDamage: 0 };
+        const { hud } = w.__wildshard.world;
+        if (hud.onArena === undefined) throw new Error('This page has no practice room');
+        hud.onArena();
+      });
+      await page.waitForFunction(() => (/** @type {RepairWindow} */ (window)).__wildshard.world.player.link === null, undefined, { timeout: 30_000 });
+      await page.waitForTimeout(2500);
+      const inside = await page.evaluate(() => {
+        const w = /** @type {RepairWindow} */ (window), { world } = w.__wildshard;
+        const read = { unlinked: world.player.link === null, y: world.player.position.y, health: world.game.app.player?.attributes.health ?? 0, flashes: w.__hurtProof.flashes };
+        world.player.position.y += 8; // the room's floor is flat: a drop is the only way down onto it hard
+        return read;
+      });
+      await page.waitForTimeout(3000);
+      const out = await page.evaluate(() => {
+        const w = /** @type {RepairWindow} */ (window), { world } = w.__wildshard;
+        return { ...w.__hurtProof, unlinked: world.player.link === null, health: world.game.app.player?.attributes.health ?? 0 };
+      });
+      await page.evaluate(() => { (/** @type {RepairWindow} */ (window)).__wildshard.world.arena?.exit(); });
+      return { ok: inside.unlinked && out.unlinked && inside.flashes === 0 && out.pageDamage > 0 && out.flashes > 0 && out.hits.length === 0 && out.grunts === 0 && out.shoves === 0 && out.health > 0, inside, ...out };
+    });
   } finally { await context.close(); }
 }
