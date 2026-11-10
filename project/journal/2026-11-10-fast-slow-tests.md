@@ -21,3 +21,11 @@ slow. Each now skips the idle part and keeps its assertions.
 - FS3 bot taming: 14,600 of 18,153 ticks were the bot re-earning a
   thrown stallion's trust. It is put back on with `forceBreak()`, as
   the original's first break already was: 2,359 ticks, all five rounds.
+- FS5 discovery: the replay worker, not the recorder, set the pace,
+  because every 512-tick part ended in a full ~13 MB checkpoint (15 in
+  all). A part takes exactly one segment, and one streamed tape trips
+  the worker's 30 s stream watchdog on a slow runner, so the replay now
+  checks every 2,048 ticks: four parts, every input still replayed, the
+  same exact feet, flags and owner state at each boundary and the end.
+  A replay that drops one input fails both versions on the same
+  position equality.

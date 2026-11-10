@@ -16,6 +16,10 @@ import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
+// FAST-SLOW-TESTS FS5: each replay part costs a full ~13 MB worker checkpoint, so the independent replay checks its
+// state every 2,048 recorded ticks (four parts) instead of every 512 (fifteen). Every input is still replayed and the
+// final feet, flags and owner state still match exactly.
+const PART=2048;
 const session=await beginProductSession('nalati-grasslands','nalati-world');
 let first:Awaited<ReturnType<typeof createNativeProofResident>>|undefined;
 let stopReplay:(()=>Promise<void>)|undefined;
@@ -50,7 +54,7 @@ try{
     assert.equal(host.adapters.get('nalati.world'),owner,'the recorder retains its actual observation owner');
     const state=owner.snapshot();if(typeof state!=='string')throw new Error('Discovery owner requires its actual JSON wire');
     const expected={tick:frames.length,position:leadPlayer(host).position.toArray(),flags:[...host.flags.all],state};
-    const chunk=frames.slice(offset);assert.ok(chunk.length>0&&chunk.length<=512);
+    const chunk=frames.slice(offset);assert.ok(chunk.length>0&&chunk.length<=PART);
     assert.equal(expected.tick,offset+chunk.length,'every recorded boundary is consumed once, in order');
     const index=marks.length;marks.push(expected);
     // The preceding checked request must settle before this one is offered.
@@ -81,7 +85,7 @@ try{
       assert.equal(effect.kind,'hint','discovery cannot grant quest facts, inventory or damage');
       if(effect.kind==='hint')notices.set(effect.text,(notices.get(effect.text)??0)+1);
     }
-    if(frames.length%512===0)await mark();
+    if(frames.length%PART===0)await mark();
   };
   await step([]);
   assert.equal(arrived.size,0,'the entry cannot pre-discover distant places');
