@@ -5,13 +5,17 @@
 // any of the seven shards can show turned on at once: the touch layer's every disc and tab (LOCK, USE, SWAP, HORSE, GUST,
 // SPRINT), the status column's rows (VITALS, BOLTS, STEED, HIDDEN, coins), the quest chip, toasts, the kill feed, the pickup
 // card, the hit marker and aim line, the weather chip and GET LOW, the boss bar, the online chat row with its voice mic, players
-// and tip, and in Developer mode the dock (fps pill, memory card), the hover BOOST and a Developer alert. Writes one screenshot
-// per browser × size × Developer mode, then checks the layout (below) and lists what overlaps.
+// and tip, and in Developer mode the dock (fps pill, memory card) and a Developer alert (and the hover BOOST button on a build
+// from before QA row 42). Writes one screenshot per browser × size × Developer mode, then checks the layout (below) and lists
+// what overlaps.
 //
 //   scripts/serve-build.sh                                       # prints the build's URL
 //   scripts/browser-lane.sh node scripts/hud-worst.mjs --base=http://127.0.0.1:4401/ [--out=<dir>] [--label=after]
-//        [--browsers=chromium,webkit] [--sizes=402x874,402x654,874x402,1440x900] [--dev=off,on] [--menu] [--check] [--chat-rev=<rev>]
+//        [--browsers=chromium,webkit] [--sizes=402x874,402x654,874x402,1440x900] [--dev=off,on] [--menu] [--states] [--check] [--chat-rev=<rev>]
 //   --chat-rev draws the chat row from that commit's modules (a before shot against an older build).
+//   --states (QA rows 42, 43) adds a shot per state after the union one (itself the fresh-lines shot): -chat-faded (6 s on: the
+//   lines have faded), -chat-open (the input focused: the open chat), -chat-closed (a tap outside), and in Developer mode -boost-off
+//   (riding) and -boost-on (a double tap of HOVER / H; on an older build, its BOOST button).
 //
 // The layout check (exit 1 with --check): no Developer surface (the dock's chips, a panel that shows unasked, BOOST, an alert)
 // overlaps the quest chip, PAUSE, the minimap, the crosshair, the chat or a touch control; the chat (its row, lines, voice tip and
@@ -36,7 +40,7 @@ if (base === '') throw new Error('Requires --base=<a served build> (scripts/serv
 if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//u.test(base)) throw new Error('hud-worst drives our own local build only (J148)');
 const label = arg('label', 'shot'), out = resolve(arg('out', join(homedir(), '.cache/wildshard/hud-worst')));
 const browsers = arg('browsers', 'chromium,webkit').split(','), sizes = arg('sizes', '402x874,402x654,874x402,1440x900').split(',');
-const modes = arg('dev', 'off,on').split(','), check = process.argv.includes('--check'), menu = process.argv.includes('--menu');
+const modes = arg('dev', 'off,on').split(','), check = process.argv.includes('--check'), menu = process.argv.includes('--menu'), states = process.argv.includes('--states');
 const chatRev = arg('chat-rev', '');
 /** the hosts a local build loads from: itself, our Vercel blob store and our own domain (J148) */
 const OURS = /^(?:127\.0\.0\.1|localhost|[a-z0-9]+\.public\.blob\.vercel-storage\.com|(?:[a-z0-9-]+\.)*wildshard\.io)$/u;
@@ -52,7 +56,10 @@ async function chatBundle(rev) {
   let entry = resolve('scripts/hud-worst/chat.ts');
   if (rev !== '') {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    for (const file of ['chatLines.ts', 'voiceUi.ts', 'voice.ts']) writeFileSync(join(dir, 'src', file), execFileSync('git', ['show', `${rev}:src/client/host/online/${file}`]));
+    for (const file of ['chatLines.ts', 'voiceUi.ts', 'voice.ts', 'chatCorner.ts']) {
+      // chatCorner.ts is QA row 43's: a rev from before it has none, and its chatLines.ts doesn't import it
+      try { writeFileSync(join(dir, 'src', file), execFileSync('git', ['show', `${rev}:src/client/host/online/${file}`], { stdio: ['ignore', 'pipe', 'ignore'] })); } catch (error) { if (file !== 'chatCorner.ts') throw error; }
+    }
     const text = readFileSync(entry, 'utf8').replaceAll('../../src/client/host/online/', './src/').replace('../../src/shared/engine/app/scope.ts', resolve('src/shared/engine/app/scope.ts'));
     entry = join(dir, 'chat.ts'); writeFileSync(entry, text);
   }
@@ -112,7 +119,7 @@ function union(dev) {
   // the online page's chat row, its mic, the players on voice and four lines
   step('chat + voice', () => { page.__hudWorstChat([['Maren', 'anyone at the pier?'], ['You', 'on my way'], ['Kai', 'boss is up at the shrine, bring the sword'], ['Maren', 'ok']], 'on', ['Maren', 'Kai', 'Tomo']); });
   if (dev) {
-    step('dev: BOOST', () => show('.ws-touch-boost'));
+    if (document.querySelector('.ws-touch-boost') !== null) step('dev: BOOST (a build before QA row 42)', () => show('.ws-touch-boost'));
     step('dev: alert', () => { H.devAlert('quest/fire.ts disabled: TypeError: castaway.flags is undefined'); });
   }
   // play.ts rewrites the prompt, the aim line and the hit marker every frame: hold them for the shot
@@ -179,6 +186,50 @@ async function enter(page, dev) {
   return true;
 }
 
+/** QA rows 42 and 43: the calm chat corner's states and Developer boost, one shot each after the union shot.
+ * @param {import('playwright').Page} page @param {string} name @param {boolean} phone @param {boolean} dev
+ * @param {string[]} written @param {string[]} problems */
+async function stateShots(page, name, phone, dev, written, problems) {
+  /** @param {string} state */
+  const shot = async state => { const file = join(out, `${name}-${state}.png`); await page.screenshot({ path: file }); written.push(file); return file; };
+  /** @returns {Promise<{ open: boolean, lines: number, shownLines: number, peers: boolean, mic: boolean }>} */
+  const chat = () => page.evaluate(() => {
+    const box = document.getElementById('ws-chat');
+    /** @param {Element} el */
+    const seen = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity) > 0.05; };
+    const rows = [...document.querySelectorAll('#ws-chat [data-lines] > *')], peers = document.getElementById('ws-voice-peers'), mic = document.getElementById('ws-voice');
+    return { open: box instanceof HTMLElement && box.dataset['open'] !== undefined, lines: rows.length, shownLines: rows.filter(seen).length, peers: peers !== null && !peers.hidden && seen(peers), mic: mic !== null && seen(mic) };
+  });
+  await page.waitForTimeout(6000);
+  await shot('chat-faded');
+  const faded = await chat();
+  console.log(`  chat faded: ${String(faded.shownLines)} of ${String(faded.lines)} lines showing, players list ${faded.peers ? 'shown' : 'hidden'}`);
+  await page.focus('#ws-chat input'); await page.waitForTimeout(500);
+  await shot('chat-open');
+  const opened = await chat();
+  console.log(`  chat open: ${opened.open ? 'expanded' : 'not expanded'}, ${String(opened.shownLines)} lines, players list ${opened.peers ? 'shown' : 'hidden'}`);
+  // a tap outside the chat (not on a control: the page itself), then the field let go, as a phone's keyboard does
+  await page.evaluate(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  await page.waitForTimeout(400);
+  await shot('chat-closed');
+  const closed = await chat();
+  if (!closed.mic) problems.push('the mic is gone after the chat closed');
+  if (!dev) return;
+  await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; p.setBoost?.(false); p.hoverBoost = false; p.setHover(true); });
+  await page.waitForTimeout(900);
+  await shot('boost-off');
+  const boost = await page.evaluate(() => document.querySelector('.ws-touch-boost') !== null);
+  if (boost) await page.evaluate(() => { document.querySelector('.ws-touch-boost')?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); });
+  else if (phone) {
+    for (const _ of [0, 1]) { await page.evaluate(() => { document.querySelector('.ws-touch-hover')?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); }); await page.waitForTimeout(120); }
+  } else { await page.keyboard.press('KeyH'); await page.waitForTimeout(120); await page.keyboard.press('KeyH'); }
+  await page.waitForTimeout(900);
+  await shot('boost-on');
+  const on = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { hover: p.hover === true, boost: p.hoverBoost === true, amber: document.querySelector('.ws-touch-hover.boost') !== null }; });
+  console.log(`  boost: ${boost ? 'BOOST button' : phone ? 'HOVER double tap' : 'H double press'} → riding ${String(on.hover)}, boost ${String(on.boost)}, HOVER amber ${String(on.amber)}`);
+  if (!on.hover || !on.boost) problems.push('a double tap of HOVER did not latch boost on the board');
+}
+
 /** @param {import('playwright').Page} page */
 const openBag = page => page.evaluate(() => { /** @type {any} */ (window).__wildshard.world.hud.menu.open('inventory'); });
 /** @param {import('playwright').Page} page */
@@ -229,6 +280,7 @@ for (const kind of browsers) {
             if (!named.has(need)) problems.push(`the ${need} is not on screen: nothing to check it against`);
           if (b.mic === null) problems.push('the mic is not on screen');
           else if (!b.mic.ok) problems.push(`the mic's centre is covered by ${String(b.mic.at)}`);
+          if (states) await stateShots(page, name, phone, dev, written, problems);
           if (menu && phone) {
             await openBag(page); await page.waitForTimeout(500);
             const open = await page.evaluate(boxes), shot = join(out, `${name}-bag-open.png`);

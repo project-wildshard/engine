@@ -57,3 +57,7 @@ chat overlay that takes up way more space ... not a modal."
   its chat-rev copy tolerates a rev with no chatCorner.ts.
 - The CI hover proof now drives the double tap through the real Player
   and the HOVER tab's amber look, instead of the removed button.
+- hud-worst `--states` commit: the shots for Jake's board, before (a92de6c,
+  its BOOST button) and after, at 402x874 and 1440x900 in Chromium and
+  WebKit. The closed state is a tap outside, not Escape: on the old build
+  Escape from the chat opened PAUSE and froze the boost shots.
