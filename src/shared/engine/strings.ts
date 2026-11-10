@@ -230,6 +230,7 @@ export const ENGINE_STRINGS = {
   "s_loading_first_visit": "first visit",
   "s_loading_return_visit": "return visit",
   "s_loading_done": "Done · ⟦0⟧",
+  "s_loading_left_under": "under 1 s",
   "s_loading_left_seconds": "about ⟦0⟧ s",
   "s_loading_left_minutes": "about ⟦0⟧ min ⟦1⟧ s",
   "s_loading_start_page": "Page",

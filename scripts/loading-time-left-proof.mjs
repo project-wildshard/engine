@@ -35,18 +35,16 @@ const title = /id="ws-title-rows"[^>]*>(.*?)<\/script>/su.exec(html)?.[1];
 if (title === undefined || !(/** @type {{slug: string}[]} */ (JSON.parse(title))).some(row => row.slug === 'driftwood-isle'))
   throw new Error('Built catalogue lacks driftwood-isle; run pnpm build:game');
 
-/** Browser-side recorder: one row per animation frame once the game's card exists. */
+/** Browser-side recorder: one row per animation frame, the card's estimate and the whole seconds it shows. */
 function recordTimeLeft() {
   /** @type {{t: number, left: number | null, seconds: number | null}[]} */
   const frames = []; Reflect.set(window, '__timeLeftLog', frames);
+  /** @param {string | undefined} value */
+  const read = value => value === undefined || value === '' ? null : Number(value);
   const tick = () => {
     const card = document.querySelector('.ws-load');
-    const value = card instanceof HTMLElement ? card.dataset.timeLeft : undefined;
-    const text = card?.querySelector('[data-el=left]')?.textContent ?? '';
-    const seconds = /(\d+) min (\d+) s/u.exec(text) ?? /(\d+) s/u.exec(text);
-    frames.push({ t: performance.now(), left: value === undefined || value === '' ? null : Number(value),
-      seconds: value === undefined || value === '' || seconds === null ? null
-        : seconds.length === 3 ? Number(seconds[1]) * 60 + Number(seconds[2]) : Number(seconds[1]) });
+    const data = card instanceof HTMLElement ? card.dataset : {};
+    frames.push({ t: performance.now(), left: read(data.timeLeft), seconds: read(data.timeLeftSeconds) });
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -108,8 +106,8 @@ try {
         const first = s.firstShown === null ? 'never' : `${(s.firstShown / 1000).toFixed(1)} s`;
         const worst = s.worstAt === null ? '' : `, worst ${Math.round(100 * s.worst)} % at ${(s.worstAt / 1000).toFixed(1)} s`;
         console.log(`${tag}: ready ${(result.readyAt / 1000).toFixed(1)} s, last half from ${(s.half / 1000).toFixed(1)} s: shown ${s.shown} of ${s.frames} frames `
-          + `(${Math.round(100 * s.shown / Math.max(1, s.frames))} %), within 25 % or 0.5 s ${pct(s.within)}, within 25 % ${pct(s.strict)}, `
-          + `${s.rises} rises, ${s.flickers} flickers, first shown ${first}${worst}`);
+          + `(${Math.round(100 * s.shown / Math.max(1, s.frames))} %, ${s.gaps} gaps), shown figure within 25 % ${pct(s.within)}, `
+          + `ms estimate within 25 % ${pct(s.strict)}, ${s.rises} rises, ${s.flickers} flickers, first shown ${first}${worst}`);
       } finally { await browser.close(); }
     }
   }

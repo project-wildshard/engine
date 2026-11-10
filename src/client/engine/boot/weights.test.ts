@@ -61,6 +61,15 @@ describe('LS5 time left (J188: real numbers only)', () => {
     expect(overrun).toBeGreaterThan(fresh - firstFrame);
     expect(overrun).toBeGreaterThan(0.2 + 0.3 * 1.8);
   });
+
+  it('never rests at zero while a row runs past its cost: half its overrun stays, so a stuck row raises the number', () => {
+    const rows = (ms: number): TimeLeftRow[] => boot(3, 0.3, { ms });
+    const due = 0.2 + 0.3 * 1.8;
+    expect(timeLeftSeconds(rows(due * 1000))).toBeCloseTo(0, 6);
+    const late = timeLeftSeconds(rows(due * 1000 + 2000)) ?? 0, stuck = timeLeftSeconds(rows(due * 1000 + 10_000)) ?? 0;
+    expect(late).toBeGreaterThan(0.5);
+    expect(stuck).toBeGreaterThan(late);
+  });
 });
 
 describe('LS5 shown time left: whole seconds that count down, rise only for real, never flicker', () => {
@@ -85,6 +94,15 @@ describe('LS5 shown time left: whole seconds that count down, rise only for real
     expect(rises).toEqual([]);
   });
 
+  it('holds a risen number a second, so a reading that rises and falls back cannot flicker it', () => {
+    const clock = new TimeLeftClock(), shown: number[] = [];
+    // readings at 200 ms: 5 s left, then 7 s for four paints, then 3 s (the Codex review's case)
+    for (const [index, reading] of [5, 7, 7, 7, 7, 3, 3, 3, 3, 3, 3, 3].entries()) shown.push(clock.read(index * 200, reading)?.seconds ?? -1);
+    const rise = shown.findIndex((value, index) => index > 0 && value > (shown[index - 1] ?? 0));
+    expect(rise).toBeGreaterThan(0);
+    for (let index = rise; index < shown.length && index * 200 < rise * 200 + 1000; index++) expect(shown[index]).toBeGreaterThanOrEqual(shown[rise] ?? 0);
+  });
+
   it('hides on a null reading and starts afresh', () => {
     const clock = new TimeLeftClock();
     expect(clock.read(0, 30)?.seconds).toBe(30);
@@ -93,7 +111,8 @@ describe('LS5 shown time left: whole seconds that count down, rise only for real
   });
 
   it('writes seconds, then minutes and seconds', () => {
-    expect(timeLeftText(0.2)).toBe('about 1 s');
+    expect(timeLeftText(0.2)).toBe('under 1 s');
+    expect(timeLeftText(0.6)).toBe('about 1 s');
     expect(timeLeftText(42.4)).toBe('about 42 s');
     expect(timeLeftText(65)).toBe('about 1 min 5 s');
   });

@@ -27,6 +27,8 @@ export interface TimeLeftRow {
 
 /** Finished phone-profile seconds before this device's speed is a reading. */
 export const TIME_LEFT_MIN_READ_SECONDS = 1;
+/** The share of a running row's overrun that stays as its rest. */
+const OVERRUN_REST = 0.5;
 /** Rows below this many phone-profile seconds are too short to read a speed from (their ms is mostly scheduling). */
 const MIN_ROW_SECONDS = 0.05;
 /** `modules`' row starts at the document, so its ms repeats Start; `finish` is the parent that stays open until ready. */
@@ -51,17 +53,21 @@ export function timeLeftSeconds(rows: readonly TimeLeftRow[]): number | null {
   const place = Math.max(fitted, dy / dd);
   let left = 0;
   for (const row of work) {
-    if (row.state === 'todo') left += cost(row, place);
-    else if (row.state === 'on') left += Math.max(0, cost(row, place) - row.ms / 1000);
+    const due = cost(row, place), ran = row.ms / 1000;
+    if (row.state === 'todo') left += due;
+    // A row past its cost has an end nothing measured: half its overrun so far stays as its rest, so a slow or stuck
+    // row raises the number instead of leaving it at zero while work remains.
+    else if (row.state === 'on') left += ran <= due ? due - ran : (ran - due) * OVERRUN_REST;
   }
   return left;
 }
 
 /** How fast the shown finish follows a new reading (seconds of time constant). */
 const FOLLOW_SECONDS = 0.6;
-/** A shown number rises only once the estimate is a whole second past it, so a reading near x.5 cannot flicker x / x+1:
- *  the risen number then stands at least half a second before the countdown takes it back down. */
+/** A shown number rises only once the estimate is a whole second past it, so a reading near x.5 cannot flicker x / x+1. */
 const RISE_SECONDS = 1;
+/** A risen number stands this long before it may fall again, whatever the next reading says. */
+const RISE_HOLD_MS = 1000;
 
 /**
  * The card's number: a projected finish time that follows each reading smoothly, shown in whole seconds that count down
@@ -70,25 +76,31 @@ const RISE_SECONDS = 1;
 export class TimeLeftClock {
   private finishAt = Number.NaN;
   private at = Number.NaN;
-  private shownSeconds = 0;
+  /** Whole seconds on the card; -1 while hidden. 0 reads "under 1 s". */
+  private shownSeconds = -1;
+  private holdUntil = Number.NEGATIVE_INFINITY;
 
   /** `now` in ms; `seconds` the latest estimate, or `null` to hide. */
   read(now: number, seconds: number | null): { readonly ms: number; readonly seconds: number } | null {
-    if (seconds === null || !Number.isFinite(seconds) || seconds < 0) { this.finishAt = Number.NaN; this.shownSeconds = 0; return null; }
+    if (seconds === null || !Number.isFinite(seconds) || seconds < 0) { this.finishAt = Number.NaN; this.shownSeconds = -1; return null; }
     const target = now + seconds * 1000;
     if (!Number.isFinite(this.finishAt)) this.finishAt = target;
     else this.finishAt += (target - this.finishAt) * (1 - Math.exp(-Math.max(0, now - this.at) / (FOLLOW_SECONDS * 1000)));
     this.at = now;
     const ms = Math.max(0, this.finishAt - now), exact = ms / 1000;
-    let whole = Math.max(1, Math.round(exact));
-    if (this.shownSeconds > 0 && whole > this.shownSeconds && exact < this.shownSeconds + RISE_SECONDS) whole = this.shownSeconds;
+    const shown = this.shownSeconds;
+    let whole = Math.round(exact);
+    if (shown >= 0 && whole > shown && exact < shown + RISE_SECONDS) whole = shown;
+    if (shown >= 0 && whole < shown && now < this.holdUntil) whole = shown;
+    if (shown >= 0 && whole > shown) this.holdUntil = now + RISE_HOLD_MS;
     this.shownSeconds = whole;
     return { ms: Math.round(ms), seconds: whole };
   }
 }
 
-/** "about 8 s", "about 1 min 5 s": the card's figure. */
+/** "under 1 s", "about 8 s", "about 1 min 5 s": the card's figure for whole seconds. */
 export function timeLeftText(seconds: number): string {
-  const whole = Math.max(1, Math.round(seconds));
+  const whole = Math.max(0, Math.round(seconds));
+  if (whole === 0) return engineString('s_loading_left_under');
   return whole < 60 ? engineString('s_loading_left_seconds', [whole]) : engineString('s_loading_left_minutes', [Math.floor(whole / 60), whole % 60]);
 }

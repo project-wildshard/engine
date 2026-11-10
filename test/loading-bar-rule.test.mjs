@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { barStalls, untracedChanges } from '../scripts/loading-bar-rule.mjs';
-import { timeLeftScore } from '../scripts/loading-time-left-rule.mjs';
+import { shownError, timeLeftScore } from '../scripts/loading-time-left-rule.mjs';
 
 /** @param {number} t @param {string} bar @param {number} pct @param {Partial<import('../scripts/loading-bar-rule.mjs').BarRow>} [rest] */
 const row = (t, bar, pct, rest = {}) => ({ t, bar, pct, step: '', atomic: 0, bytes: 0, files: 0, ...rest });
@@ -61,36 +61,46 @@ test('J188: control-ready retains exact row credit until its final completion pa
 });
 
 
-/** LS5: a boot that ends at `ready` ms, painted every 100 ms, with the card showing `estimate(t)` (null hides). */
+/** LS5: a boot that ends at `ready` ms, painted every 100 ms, with the card showing `estimate(t)` (null hides) as the
+ *  card rounds it: whole seconds, 0 for "under 1 s". */
 const timeLeftBoot = (ready, estimate) => {
   const frames = [];
   for (let t = 0; t < ready + 300; t += 100) {
     const left = estimate(t);
-    frames.push({ t, left, seconds: left === null ? null : Math.max(1, Math.round(left / 1000)) });
+    frames.push({ t, left, seconds: left === null ? null : Math.round(left / 1000) });
   }
   return frames;
 };
 
-test('LS5: a true time left passes; only the last half of the boot is scored', () => {
+test('LS5: a true time left passes, scored on the figure the card shows, in the last half of the boot only', () => {
   const score = timeLeftScore(timeLeftBoot(20000, t => (t < 4000 ? 60000 : 20000 - t)), 20000);
-  expect(score).toMatchObject({ half: 10000, frames: 100, shown: 100, within: 100, strict: 100, flickers: 0, pass: true });
+  expect(score).toMatchObject({ half: 10000, frames: 100, shown: 100, within: 100, strict: 100, flickers: 0, gaps: 0, pass: true });
+  // "about 3 s" covers 2.5-3.5 s; "under 1 s" covers below a second
+  expect(shownError(3, 3400)).toBe(0);
+  expect(shownError(3, 4500)).toBe(1000);
+  expect(shownError(0, 900)).toBe(0);
+  expect(shownError(0, 1600)).toBe(600);
 });
 
-test('LS5: 25 % off fails; under half a second off passes at the end, where 25 % is less than the card shows', () => {
-  const late = timeLeftScore(timeLeftBoot(20000, t => 1.3 * (20000 - t)), 20000);
+test('LS5: 50 % late fails until the shown figure\'s own half second covers it; a figure that sits at zero fails', () => {
+  const late = timeLeftScore(timeLeftBoot(20000, t => 1.5 * (20000 - t)), 20000);
   expect(late.pass).toBe(false);
-  // 30 % late is under half a second only in the last 1.6 s
-  expect(late.within).toBe(16);
-  expect(late.worst).toBeCloseTo(0.3, 6);
-  const end = timeLeftScore(timeLeftBoot(20000, t => 20000 - t + 400), 20000);
-  expect(end.pass).toBe(true);
-  expect(end.strict).toBeLessThan(end.within);
+  expect(late.within).toBeLessThan(late.shown / 2);
+  expect(late.worst).toBeGreaterThan(0.25);
+  // a figure that reaches "under 1 s" with three seconds still to go fails, however small its millisecond error looks
+  const stuck = timeLeftScore(timeLeftBoot(20000, t => Math.max(0, 17000 - t)), 20000);
+  expect(stuck.pass).toBe(false);
+  expect(stuck.worstAt).toBeGreaterThanOrEqual(16500);
 });
 
-test('LS5: hidden frames are honest and pass, but a boot that never shows a number does not', () => {
+test('LS5: hidden frames are honest, but the number must show for half the last half and then stay shown', () => {
   const late = timeLeftScore(timeLeftBoot(20000, t => (t < 15000 ? null : 20000 - t)), 20000);
   expect(late).toMatchObject({ frames: 100, shown: 50, pass: true, firstShown: 15000 });
   expect(timeLeftScore(timeLeftBoot(20000, () => null), 20000).pass).toBe(false);
+  // one right frame at the very end is not a proof
+  expect(timeLeftScore(timeLeftBoot(20000, t => (t < 19900 ? null : 20000 - t)), 20000).pass).toBe(false);
+  const gap = timeLeftScore(timeLeftBoot(20000, t => (t > 14000 && t < 15000 ? null : 20000 - t)), 20000);
+  expect(gap).toMatchObject({ gaps: 9, pass: false });
 });
 
 test('LS5: a rise is allowed; a rise taken back within half a second is a flicker', () => {

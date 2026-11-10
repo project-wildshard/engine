@@ -24,3 +24,9 @@ The proof (`scripts/loading-time-left-proof.mjs`, rule in `scripts/loading-time-
 estimate against the real time left on every painted frame and scores the last half of each boot. The tests ride in
 existing files (`weights.test.ts`, `loading-calibration.test.ts`, `loading-bar-rule.test.mjs`), so CI's shard planner
 charges no unmeasured file. Plan: meta `docs/plans/LOADING-SCREEN-PLAN.md` LS5.
+
+J206 Codex review (one-shot, `pushclone-LS5-20261110T021956Z-47271.md`), its three must-fixes fixed: a running row past
+its cost kept half its overrun as its rest, so a stuck Worker boot raises the number instead of sitting at "about 1 s";
+the proof scores the figure the player reads ("about N s" is N ± 0.5 s, "under 1 s" below a second) with no extra
+floor; and a boot passes only when the number shows for half the last half and stays shown. Its should-fix too: a
+risen number holds a second, so 5 → 6 → 5 within a paint cannot happen.

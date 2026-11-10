@@ -480,15 +480,16 @@ export class Loading {
   private paintTimeLeft(timeline: TimelineSnapshot): void {
     const row = this.els.leftRow;
     if (this.finished || this.scoped || this.view?.error || this.failedReason !== null) {
-      row.hidden = true; delete row.dataset['shown']; setData(this.root, 'timeLeft', ''); return;
+      row.hidden = true; delete row.dataset['shown']; setData(this.root, 'timeLeft', ''); setData(this.root, 'timeLeftSeconds', ''); return;
     }
     const transfer = this.downloadProgress();
     const honest = this.configured && (this.downloadSource === undefined || transfer.complete) && !this.measuredSlowGpu(timeline);
     const shown = this.timeLeft.read(performance.now(), honest ? timeLeftSeconds(timeline.rows) : null);
-    if (shown === null) { delete row.dataset['shown']; setData(this.root, 'timeLeft', ''); return; }
+    if (shown === null) { delete row.dataset['shown']; setData(this.root, 'timeLeft', ''); setData(this.root, 'timeLeftSeconds', ''); return; }
     set(this.els.left, timeLeftText(shown.seconds));
     row.dataset['shown'] = '';
-    setData(this.root, 'timeLeft', String(shown.ms));
+    // the estimate, and the whole seconds the card shows (the LS5 proof scores what the player reads)
+    setData(this.root, 'timeLeft', String(shown.ms)); setData(this.root, 'timeLeftSeconds', String(shown.seconds));
     if (!this.timeLeftShown) { this.timeLeftShown = true; bootMark('app:time-left-shown', { seconds: shown.seconds }); }
   }
 
