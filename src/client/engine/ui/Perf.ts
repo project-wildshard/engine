@@ -1,7 +1,7 @@
 import { appIdentity, currentProbe } from '../../../shared/engine/app/identity';
 import { uiScope, mountUi } from './ownership';
 import { perfDockChip, perfDockSections } from './perfDock';
-import { activeDevPixels, drawingBuffer } from '../render/devPixels';
+import { activeDevPixels, drawingBuffer } from '../core/devPixels';
 import { viewportHeight } from '../core/viewport';
 import { engineString } from '../../../shared/engine/strings';
 import { saveStorage } from '../saves/slots';
@@ -335,7 +335,7 @@ export class Perf {
     R.p95.textContent = engineString('s_f3813306296c', [p95.toFixed(1)]);
     R.calls.textContent = String(r.calls);
     R.tris.textContent = k(r.triangles);
-    // QA row 25: the drawing buffer the ratio makes, so a screenshot carries the Developer pixel pick (render/devPixels.ts)
+    // QA row 25: the drawing buffer the ratio makes, so a screenshot carries the Developer pixel pick (core/devPixels.ts)
     // (the size Game.fitSize gives the canvas at this ratio)
     const ratio = g.renderer.getPixelRatio(), buffer = drawingBuffer(window.innerWidth, viewportHeight(), ratio), pick = activeDevPixels();
     R.tier.textContent = engineString('s_perf_tier_buffer', [TIER, ratio.toFixed(2), buffer.width, buffer.height, (buffer.pixels / 1e6).toFixed(2), pick === null ? '' : engineString('s_perf_tier_dev', [pick.screen, pick.density])]);

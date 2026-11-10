@@ -17,7 +17,7 @@ import { engineString } from '../../../shared/engine/strings';
  * ones that skip the title, so the reload lands back on this title screen. Reuses the in-game menu's look (gmenu.css).
  */
 import { automaticTier, TIER, gfxPrefs, saveGfxPrefs } from '../core/tier';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode } from '../render/graphicsMode';
+import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode } from '../core/graphicsMode';
 import { firstPlayDone, resetFirstPlay } from '../boot/firstPlayMark';
 
 import { isDev, onDev } from '../core/devMode';
@@ -140,7 +140,7 @@ function build(): HTMLElement {
   const registry = el('ws-gmenu-debugslot');
   debug = buildDebugMenu(registry, { onPick: repaint });
   dbg.append(registry);
-  // MG2: a phone picks Low or High graphics (render/graphicsMode.ts), live, saved on the device; the finer render scale is a
+  // MG2: a phone picks Low or High graphics (core/graphicsMode.ts), live, saved on the device; the finer render scale is a
   // Developer's (desktop keeps it in the open, as before)
   const phone = TIER === 'phone';
   const scale = seg(engineString('s_2dee7435d0fe'), false, dprOpts, () => gfxPrefs.dpr, (v) => { if (v === 'auto' || v === '1' || v === '1.25' || v === '1.5' || v === '2' || v === 'native') { gfxPrefs.dpr = v; saveGfxPrefs(); } });

@@ -2,7 +2,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { listenTap } from '@wildshard/engine/input/dom';
 import { mountUi } from '@wildshard/engine/ui/ownership';
 import { FIRST_PLAY_EVENT, finishFirstPlay, firstPlayPending, takeFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode, type GraphicsMode } from '@wildshard/engine/render/graphicsMode';
+import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode, type GraphicsMode } from '@wildshard/engine/core/graphicsMode';
 import './firstPlay.css';
 
 /**

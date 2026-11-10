@@ -5,7 +5,7 @@ Jake's iPhone in Low Power Mode drops Driftwood to 19-23 fps (p50
 on a 3× screen. He asked for 2× / 1× pixel density and 3× / 2× / 1×
 screen in Developer mode, six permutations to try.
 
-- `render/devPixels.ts`: screen = the device-pixel-ratio cap, density =
+- `core/devPixels.ts`: screen = the device-pixel-ratio cap, density =
   the render scale on top (2× = 1, 1× = ¾). A ½ scale would make two of
   the six the same buffer (2× screen at 1× = 1× screen at 2×); ¾ gives
   3, 2.25, 2, 1.5, 1 and 0.75 on a 3× phone: six buffers, from 3.16 MP

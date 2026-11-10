@@ -52,8 +52,8 @@ import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 import { isDev, onDev } from './devMode';
-import { activeDevPixels, drawingPixelRatio } from '../render/devPixels';
-import { graphicsMode, noteFastFrames, PIXELS_EVENT } from '../render/graphicsMode';
+import { activeDevPixels, drawingPixelRatio } from './devPixels';
+import { graphicsMode, noteFastFrames, PIXELS_EVENT } from './graphicsMode';
 import { classifyFrames } from '../boot/lowPower';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
 import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/memorySaver';
@@ -516,8 +516,8 @@ export class Game {
       throw error;
     }
     if (tracedBoot) recordGpuCheckpoint(this.renderer, 'renderer:created');
-    // QA row 25 / MG2: a Developer's screen × density pick (render/devPixels.ts), else a phone's Low graphics
-    // (render/graphicsMode.ts), stands in for the tier's cap; either applies live
+    // QA row 25 / MG2: a Developer's screen × density pick (core/devPixels.ts), else a phone's Low graphics
+    // (core/graphicsMode.ts), stands in for the tier's cap; either applies live
     this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics));
     // the new ratio waits for the frame that draws (RT3: never in the task that decided it, whose cleared canvas nothing
     // would replace; under a menu or the title the world stays as it was until play draws again)
@@ -1652,7 +1652,7 @@ export class Game {
       try {
         // RT3: a new render scale lands in the frame that draws (stepFrame draws nothing): never in the task that decided it,
         // whose cleared canvas nothing would replace
-        // QA row 25: a Developer pixel pick (render/devPixels.ts) holds against the software pacing's scale while it is set
+        // QA row 25: a Developer pixel pick (core/devPixels.ts) holds against the software pacing's scale while it is set
         const paced = this.stepOnly ? null : this.slowPacing?.takeRatio() ?? null, picked = this.stepOnly ? null : this.pickedRatio;
         if (picked !== null) this.pickedRatio = null;
         const ratio = picked ?? (paced !== null && activeDevPixels() === null ? paced : null);

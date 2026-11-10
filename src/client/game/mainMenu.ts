@@ -13,9 +13,9 @@
  * A compact DEV switch beside SETTINGS flips Settings ▸ Developer from the menu itself (E483).
  */
 import { titleAssetURL } from './titleAssets';
-import { TIER } from '@wildshard/engine/core/tier';
+import { mobileDevice } from '@wildshard/engine/boot/titleArrival';
 import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
-import { lowPowerOn } from '@wildshard/engine/render/graphicsMode';
+import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type TitleCard, type TitleDeck, type TitleDeckOptions } from './titleDeck';
@@ -93,6 +93,8 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const { notice, onGrid, screen: first, cards = titleCards(), whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
   let firstEntry: TitleCard | null = null; // MG5: the card the first PLAY is entering
   // leaving the title for a world resets it: pause ▸ EXIT TO MAIN opens on the main menu again
+  // MG4 / MG5: a phone, by the rule the tier uses (core/tier.ts), read here without the tier's render tables (the title's graph)
+  const phone = mobileDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
   const deck = buildTitleDeck({ ...deckOpts, cards,
     // MG5: an entry that is not the first PLAY's own drops a first play armed and never reached
     onEnter: (card) => { if (card !== firstEntry) dropFirstPlay(); firstEntry = null; leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
@@ -133,7 +135,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   }
   // MG4: while the idle title reads Low Power Mode as likely (boot/lowPower.ts, a second of rAF after two on screen), a phone
   // says so under the logo; the reading lands after the title shows, and goes when Low Power does, so it is re-read each second
-  if (TIER === 'phone') {
+  if (phone) {
     const power = document.createElement('div');
     power.className = 'ws-main-notice ws-main-power'; power.setAttribute('role', 'status'); power.textContent = LOW_POWER_BANNER;
     const paint = (): void => { power.hidden = !lowPowerOn(); };
@@ -178,7 +180,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // The deck's own entry decides (its admission rules: a draft, a locked or unavailable card enters nothing); when it enters
   // nothing, SHARD SELECT opens as usual
   const play = (): void => {
-    if (TIER === 'phone' && !firstPlayDone()) {
+    if (phone && !firstPlayDone()) {
       deck.select(0, false);
       const entered = deck.activate();
       if (entered !== null) { firstEntry = startFirstPlay(entered.slug) ? entered : null; return; }

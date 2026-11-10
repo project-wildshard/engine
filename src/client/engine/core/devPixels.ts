@@ -1,4 +1,4 @@
-import { isDev } from '../core/devMode';
+import { isDev } from './devMode';
 import { jsonSlot } from '../saves/slots';
 import { graphicsMode, LOW_PIXEL_RATIO, PIXELS_EVENT } from './graphicsMode';
 /**

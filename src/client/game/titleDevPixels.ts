@@ -1,11 +1,11 @@
-import { DENSITY_SCALE, devPixelRatio, drawingBuffer, saveDevPixels, savedDevPixels, type DevDensity, type DevPixels, type DevScreen } from '@wildshard/engine/render/devPixels';
+import { DENSITY_SCALE, devPixelRatio, drawingBuffer, saveDevPixels, savedDevPixels, type DevDensity, type DevPixels, type DevScreen } from '@wildshard/engine/core/devPixels';
 
 /**
  * QA row 25 (Jake, 2026-11-10: "when developer mode is on, allow me to switch between 2x and 1x pixel density. Allow me to switch
  * between 3x screen, 2x screen, 1x screen ... 6 permutations"): a Developer-only card on the shard-select screen (a temporary
  * home, his word). SCREEN is the device-pixel-ratio cap (AUTO = the tier's own, no override); DENSITY the render scale on top
  * (2× = 1, 1× = ¾). Its last line names the drawing buffer the pick gives this screen, and the frame meter's TIER · DPR row
- * shows the same in play. Saved on the device (render/devPixels.ts); the game applies it live.
+ * shows the same in play. Saved on the device (core/devPixels.ts); the game applies it live.
  */
 export function titleDevPixels(onTap: (el: HTMLElement, fn: () => void) => void): HTMLElement {
   const root = document.createElement('div');

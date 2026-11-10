@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { dropFirstPlay, finishFirstPlay, firstPlayDone, firstPlayPending, resetFirstPlay, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
-import { graphicsMode, saveGraphicsMode } from '@wildshard/engine/render/graphicsMode';
+import { graphicsMode, saveGraphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { installFirstPlay } from './firstPlay';
 
 const scopes: Scope[] = [];
