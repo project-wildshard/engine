@@ -24,3 +24,4 @@ api-server and the MMO backend. This is the MMO backend's half.
   queues (the SDK runs in `setImmediate`, at most 32 waiting), and the
   scrub drops `extra`, where a thrown plain object kept its fields. The
   SHOULD (one outer deadline on flush) is in too.
+- Timings for `test/dedicated-sentry.test.ts` recorded with `push-preflight.mjs timings` (about 3.3 s; the hanging-Sentry case waits out FLUSH_MS on purpose).

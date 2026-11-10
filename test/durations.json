@@ -650,6 +650,7 @@
   "test/dedicated-save-safety.test.ts": 26.875716862999994,
   "test/dedicated-saves.test.ts": 12.088020569000001,
   "test/dedicated-seats.test.ts": 10.225888316,
+  "test/dedicated-sentry.test.ts": 3.204634874999999,
   "test/dedicated-table.test.ts": 0.05646344299999998,
   "test/dedicated-transient.test.ts": 6.730825779,
   "test/dedicated-two-cells.test.ts": 14.406614912,
