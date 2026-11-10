@@ -1656,7 +1656,9 @@ export class Game {
       this.frameCount++;
       this.updateMs[this.frameI] = renderAt - lastRun; this.renderMs[this.frameI] = done - renderAt;
       if (on) frameCost.end(realDt * 1000, renderAt - lastRun, done - renderAt, cap > 0 ? 1000 / cap : 0);
-      sustainedFrames.frame(done, realDt * 1000, renderAt - lastRun, done - renderAt, cap > 0 ? 1000 / cap : 0); // QA row 31
+      // QA row 31: play's sustained fps (a paused game's frames are not play)
+      if (!this.app.clock.paused) sustainedFrames.frame(done, realDt * 1000, renderAt - lastRun, done - renderAt, cap > 0 ? 1000 / cap : 0);
+      else sustainedFrames.frame(done, Infinity, 0, 0, 0);
       this.lastFrame.calls = this.renderer.info.render.calls; this.lastFrame.triangles = this.renderer.info.render.triangles;
       this.frameMs[this.frameI] = realDt * 1000; this.frameI = (this.frameI + 1) % this.frameMs.length;
       this.stats.frames++; this.stats.acc += realDt;

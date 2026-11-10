@@ -547,10 +547,18 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // after the card showed the authored spawn, the next one the saved place, because this page took the server's first
   // owner block only at its first game frame. It takes it here, under the card (bounded as the first rows are), and the
   // loader draws one more hidden frame from it (finish.ts), so the reveal opens where the player is.
+  // A poll that a level left mid-boot settles at once (a cancelled timer alone would leave the boot's waits open).
+  const poll = (): Promise<void> => new Promise<void>(resolve => {
+    if (scope.disposed || scope.disposing) { resolve(); return; }
+    const off = scope.capture('disposers', resolve);
+    scope.timeout(FIRST_ROWS_POLL_MS, () => { off(); resolve(); });
+  });
   const firstBy = diagnosticNow() + FIRST_ROWS_MS;
-  while (client.latest === null && diagnosticNow() < firstBy && !scope.disposed) await new Promise<void>(resolve => { scope.timeout(FIRST_ROWS_POLL_MS, () => { resolve(); }); });
+  while (client.latest === null && diagnosticNow() < firstBy && !scope.disposed && !scope.disposing) await poll();
+  if (scope.disposed || scope.disposing) return;
   net.reconcile(false);
-  bootMark('server:first-owner-adopted');
+  // the mark says whether the page took the server's place (a crossing's frame or a held respawn does not)
+  bootMark(net.joined ? 'server:first-owner-adopted' : 'server:first-owner-unadopted');
   if (ports.linkBodies === undefined) { bootMark('server:launch-complete'); return; }
   bootMark('server:first-body-preparation-start');
   let first = -1;
@@ -559,9 +567,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     renderTick = client.present();
     if (first === -1 && client.latest !== null) first = client.latest.tick;
     if (first !== -1 && renderTick >= first) break;
-    await new Promise<void>(resolve => { scope.timeout(FIRST_ROWS_POLL_MS, () => { resolve(); }); });
+    await poll();
+    if (scope.disposed || scope.disposing) return;
   }
-  if (first === -1 || !net.inCell(client.latest?.cell ?? -1)) return; // a crossing's rows are its next world's
+  if (first === -1 || !net.inCell(client.latest?.cell ?? -1)) { bootMark('server:launch-complete'); return; } // a crossing's rows are its next world's
   syncCreatures(client, grid === null ? ports.animals : grid.animals(), bodies, retired, spawnMs, poses);
   bootMark('server:first-body-preparation-end');
   if (bodies.size > 0) await bootTask('server:first-body-links', ports.linkBodies);

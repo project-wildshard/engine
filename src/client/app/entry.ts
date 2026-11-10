@@ -167,7 +167,6 @@ async function enterPage(): Promise<unknown> {
   })();
 }
 async function showPageTitle(refusal = ''): Promise<void> {
-  startTitleLowPowerProbe(); // Jake (11-10): the idle title reads Low Power Mode for the tab (boot/lowPower.ts)
   const [{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }] = await Promise.all([import('@wildshard/engine/ui/StartTitle'), import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel')]);
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
   const grid = installGridTitle();
@@ -187,6 +186,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
   });
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
+  startTitleLowPowerProbe(); // Jake (11-10): the shown title, once idle, reads Low Power Mode for the tab (boot/lowPower.ts)
   void (async () => { const { warmShaderCompiler } = await import('@wildshard/engine/boot/earlyPrograms'); warmShaderCompiler(entryScope); })();
 }
 

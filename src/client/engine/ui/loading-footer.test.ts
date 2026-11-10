@@ -689,7 +689,8 @@ it('QA row 31: sustained fps and gpu~ p95 per minute since control, and a flag w
   sustained.start(0);
   let at = run(0, 1, 33.4, 10);
   sustained.frame(at, 33.4, 5, 5, 33.3); // closes minute 1
-  expect(sustained.minutes()).toEqual([{ minute: 1, fps: 30, gpuP95: 0.1, frames: 1797 }]);
+  expect(sustained.minutes()).toMatchObject([{ minute: 1, gpuP95: 0.1, frames: 1797 }]);
+  expect(sustained.minutes()[0]?.fps).toBeCloseTo(30, 0);
   expect(sustained.falling()).toBeNull();
   // the phone heats: frames of 62.5 ms (16 fps), the extra wait all gpu~
   at = run(at, 2, 62.5, 10);
@@ -698,12 +699,44 @@ it('QA row 31: sustained fps and gpu~ p95 per minute since control, and a flag w
   expect(fall?.to.fps).toBeLessThan(17);
   expect(fall?.to.gpuP95).toBeGreaterThan(29);
   const lines = sustained.lines(at);
-  expect(lines[0]).toMatch(/^sustained since control \(3\.0 min\), per minute: 1: 30\.0 fps, gpu~ p95 0\.1 ms · 2: /u);
-  expect(lines[1]).toMatch(/^sustained: FALLING from minute 1 \(30\.0 fps, gpu~ 0\.1 ms\) to minute 3 \(16\.\d fps, gpu~ 29\.\d ms\): likely thermal$/u);
+  expect(lines[0]).toMatch(/^sustained since control \(3\.0 min\), per minute: 1: 29\.9 fps, gpu~ p95 0\.1 ms · 2: /u);
+  expect(lines[1]).toMatch(/^sustained: FALLING from minute 1 \(29\.9 fps, gpu~ 0\.1 ms\) to minute \d \(16\.\d fps, gpu~ 29\.\d ms\): likely thermal$/u);
   // a new world's control starts the window again
   sustained.start(at); expect(sustained.minutes()).toHaveLength(0);
   // Copy diagnostics carries the page's reading
   const loading = new Loading({ id: 'sustained', name: 'Sustained' }, { scoped: true });
   try { expect(loading.diagnosticsText()).toContain(sustainedFrames.lines(0)[0]?.slice(0, 10) ?? 'missing'); }
   finally { loading.scope.dispose(); }
+});
+
+it('QA row 31: an idle stretch or a pause never reads as a fall; fps and gpu~ fall on their own; minutes keep counting', () => {
+  const minute = (sustained: SustainedFrames, from: number, frameMs: number, workMs: number, capMs = 33.3): number => {
+    let at = from;
+    for (const end = from + 60_000; at <= end + frameMs; at += frameMs) sustained.frame(at, frameMs, workMs / 2, workMs / 2, capMs);
+    return at;
+  };
+  // 50 fps, then the page hidden for three minutes, then 50 fps again: no empty minutes, no fall
+  const idle = new SustainedFrames(); idle.start(0);
+  let at = minute(idle, 0, 20, 10, 0);
+  at += 180_000; idle.frame(at, 180_000, 5, 5, 0);
+  minute(idle, at, 20, 10, 0);
+  expect(idle.minutes()).toHaveLength(2);
+  expect(idle.minutes().every(row => Math.abs(row.fps - 50) < 0.5)).toBe(true);
+  expect(idle.falling()).toBeNull();
+  // fps alone: 30 -> 20 with no gpu~ (a CPU-bound slowdown, the work fills each frame)
+  const slower = new SustainedFrames(); slower.start(0);
+  at = minute(slower, 0, 33.4, 10); minute(slower, at, 50, 50);
+  expect(slower.falling()?.to.gpuP95).toBe(0);
+  // gpu~ alone: the same 30 fps, but a frame now waits 23 ms beyond its work with no cap to explain it
+  const hotter = new SustainedFrames(); hotter.start(0);
+  at = minute(hotter, 0, 33.4, 10); minute(hotter, at, 33.4, 10, 0);
+  const fall = hotter.falling();
+  expect(Math.abs((fall?.to.fps ?? 0) - (fall?.from.fps ?? 0))).toBeLessThan(0.5);
+  expect(fall?.to.gpuP95).toBeGreaterThan(23);
+  // minute numbers count on past the retained window, which keeps the opening minute
+  const long = new SustainedFrames(); long.start(0);
+  for (let m = 0, t = 0; m < 125; m++) t = minute(long, t, 100, 10, 0);
+  expect(long.minutes()).toHaveLength(120);
+  expect(long.minutes()[0]?.minute).toBe(1);
+  expect(long.minutes().at(-1)?.minute).toBe(125);
 });

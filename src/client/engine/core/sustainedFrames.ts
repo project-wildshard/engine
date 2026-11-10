@@ -8,7 +8,7 @@
  */
 export interface SustainedMinute { readonly minute: number; readonly fps: number; readonly gpuP95: number; readonly frames: number }
 
-const MINUTE_MS = 60_000, MAX_FRAMES = 8192, KEEP = 120;
+const MINUTE_MS = 60_000, MAX_FRAMES = 8192, KEEP = 120, GAP_MS = 1000;
 /** A later minute "falls" below 80 % of the opening minute's fps, or its gpu~ p95 climbs past 125 % of it (and 4 ms). */
 const FPS_FALL = 0.8, GPU_RISE = 1.25, GPU_FLOOR_MS = 4;
 
@@ -18,14 +18,18 @@ export class SustainedFrames {
   private frames = 0;
   private readonly gpu = new Float32Array(MAX_FRAMES);
   private readonly done: SustainedMinute[] = [];
+  private count = 0;
 
   /** Control: the window starts here; a new world's control starts it again. */
-  start(now: number): void { this.from = now; this.minuteAt = now; this.frames = 0; this.done.length = 0; }
+  start(now: number): void { this.from = now; this.minuteAt = now; this.frames = 0; this.done.length = 0; this.count = 0; }
 
   /** Each drawn frame: its interval, update and render work and the cap's interval (0 = none), all ms. */
   frame(now: number, frameMs: number, updateMs: number, renderMs: number, capMs: number): void {
     if (this.from < 0) return;
-    while (now - this.minuteAt >= MINUTE_MS) this.close(this.minuteAt + MINUTE_MS);
+    // a hidden page or a paused game draws nothing (or far less): a gap of a second drops the minute under way and the
+    // next one starts here, so an idle stretch is never read as the phone slowing down
+    if (frameMs >= GAP_MS) { this.minuteAt = now; this.frames = 0; return; }
+    if (now - this.minuteAt >= MINUTE_MS) this.close(now);
     const gpu = Math.max(0, frameMs - Math.max(updateMs + renderMs, capMs));
     if (this.frames < MAX_FRAMES) this.gpu[this.frames] = gpu;
     this.frames++;
@@ -33,7 +37,7 @@ export class SustainedFrames {
 
   private close(at: number): void {
     const n = Math.min(this.frames, MAX_FRAMES), sorted = Array.from(this.gpu.subarray(0, n)).sort((a, b) => a - b);
-    this.done.push({ minute: this.done.length + 1, fps: Math.round(this.frames / ((at - this.minuteAt) / 1000) * 10) / 10,
+    this.done.push({ minute: ++this.count, fps: Math.round(this.frames / ((at - this.minuteAt) / 1000) * 10) / 10,
       gpuP95: Math.round((sorted[Math.min(n - 1, Math.floor(n * 0.95))] ?? 0) * 10) / 10, frames: this.frames });
     if (this.done.length > KEEP) this.done.splice(1, 1); // the opening minute always stays: it is the baseline
     this.minuteAt = at; this.frames = 0;

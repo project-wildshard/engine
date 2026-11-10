@@ -20,3 +20,12 @@ minute's drawn fps and gpu~ p95 (frameCost's term, computed for every drawn fram
 one float a frame, a summary per minute), and Copy diagnostics prints them with a FALLING flag when a later minute
 drops below 80 % of the opening minute's fps or its gpu~ p95 climbs past 125 % (and 4 ms): likely thermal.
 Test in `loading-footer.test.ts`.
+
+J206 review (Codex, one-shot) of both, two MUST-FIXes, fixed: a hidden page or a paused game no longer closes empty
+minutes that read as a fall (a frame interval of a second or more, or a paused game's frame, drops the minute under way
+and starts the next there), and the first-frame polls settle when the level leaves mid-boot (a cancelled timer had left
+the boot's waits open). Its SHOULDs: the boot mark says whether the page actually took the server's place
+(`server:first-owner-adopted` or `-unadopted`), a crossing's early return still marks `server:launch-complete`, the
+title's Low Power count starts once the title has been built, and minute numbers count on past the kept 120. Tests
+cover an idle gap, an fps-only fall, a gpu~-only rise and the numbering. The forced hidden frame after the server step
+runs a whole frame (input, fixed steps, update), as readyFrame's hidden frames already do under the same card.
