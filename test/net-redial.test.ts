@@ -105,3 +105,44 @@ test('a restart is redialled, and a page back in view redials at once', () => {
   expect(links).toHaveLength(3);
   redial.dispose();
 });
+
+// FM4: the screens say why the link is down and how the dial is doing, without changing when it dials.
+test('a down link says why: closed, a restart, silence, a return to the tab', () => {
+  const reasons = (fail: (h: ReturnType<typeof harness>) => void): (string | undefined)[] => {
+    const h = harness(), said: (string | undefined)[] = [];
+    // the harness's own listener keeps states; a second Redial would dial twice, so read the cause off the first
+    h.heard(); fail(h); h.run(100); said.push(h.redial.why); h.redial.dispose();
+    return said;
+  };
+  expect(reasons(h => { h.links[0]?.fail('lost'); })).toEqual(['closed']);
+  expect(reasons(h => { h.links[0]?.fail('restart'); })).toEqual(['restart']);
+  expect(reasons(h => { h.run(1100); })).toEqual(['silent']);
+  expect(reasons(h => { h.run(1050); h.redial.check(); })).toEqual(['hidden']);
+});
+
+test('the reason rides onState for reconnecting and resuming', () => {
+  let clock = 0;
+  const first = { stats: { rttMs: 0, lossPct: 0, sentBytes: 0, recvBytes: 0 }, closes: new Set<(reason: string) => void>(), send(): void { /* none */ }, onMessage: () => () => undefined,
+    onClose(listener: (reason: string) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }, close(): void { /* none */ } };
+  const client = new NetClient(first, () => clock), said: [string, string | undefined][] = [];
+  const redial = new Redial({ client, transport: first, now: () => clock, random: () => 0.5, dial: () => ({ ...first, closes: new Set(), onClose: () => () => undefined }), onState: (state, reason) => { said.push([state, reason]); } });
+  for (const listener of first.closes) listener('restart');
+  clock += 100; vi.advanceTimersByTime(100);
+  expect(said[0]).toEqual(['reconnecting', 'restart']);
+  redial.dispose(); client.dispose();
+});
+
+test('progress counts dials, the wait to the next, and the time down', () => {
+  const { heard, run, links, redial, failDials } = harness();
+  expect(redial.progress).toEqual({ dials: 0, nextDialMs: null, downMs: 0 });
+  heard(); failDials('lost'); links[0]?.fail('lost');
+  run(100);
+  const early = redial.progress;
+  expect(early.downMs).toBeGreaterThanOrEqual(100);
+  run(5000);
+  const later = redial.progress;
+  expect(later.dials).toBeGreaterThan(1);
+  expect(later.downMs).toBeGreaterThan(early.downMs);
+  expect(later.nextDialMs === null || later.nextDialMs <= 4800).toBe(true);
+  redial.dispose();
+});

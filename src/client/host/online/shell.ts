@@ -5,7 +5,7 @@ import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
 import { GUEST, type NetIdentity } from '@wildshard/engine/net/identity';
-import { Redial, type LinkState } from '@wildshard/engine/net/redial';
+import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
 import { decodeCountdown, type Countdown } from '@wildshard/engine/net/socketFrames';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
 import {NetRecords} from '@wildshard/engine/net/netRecord';
@@ -18,7 +18,8 @@ import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
 import { askName } from './nameBox';
 import { fetchSignedRelease } from './release';
-import { countdownStrip, newBuildPanel, reconnectStrip } from './reconnectStrip';
+import { newBuildPanel } from './reconnectStrip';
+import { linkScreens } from './linkScreens';
 
 /** `ready` with this byte is a clean quit: the door drops the body at once instead of holding it (server `socketPump.ts` `LEAVE_FLAG`). */
 const LEAVE_FLAG = 1;
@@ -59,6 +60,9 @@ export interface OnlineShell {
   /** The page came back into view: check the link now. */
   visible: () => void;
   retry: () => void;
+  /** FM4: the dial's progress and why the link is down, for the screens that show them. */
+  progress: () => LinkProgress;
+  why: () => LinkCause;
   pause: () => void; resume: () => void; hold: (on: boolean) => void; bossGod: () => void; hardHits: (by: number) => void;
   place: (x: number, y: number, z: number, yaw: number) => void; raise: (flag: string) => void;
   /** QA row 16: the player chose to go (the menu's exit, another world). The body leaves now, not after J114's hold.
@@ -109,7 +113,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   client.hello(config.build, config.identity);
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
   return { client, voice, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
-    visible: () => { redial.check(); }, retry: () => { redial.retry(); },
+    visible: () => { redial.check(); }, retry: () => { redial.retry(); }, progress: () => redial.progress, why: () => redial.why,
     pause: idle, resume: idle, hold: idle, bossGod: idle, hardHits: idle, place: idle, raise: idle,
     // The door hears a quit on any link of this build: seated, still admitted, or handed a held body back. A link that is down (a redial's
     // wait) gets a fresh one to say it on, so a held body goes too. No redial follows: the page is going.
@@ -150,7 +154,6 @@ export interface StartOnline {
   readonly identity: (name?: string) => NetIdentity;
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
-  readonly failed: (message: string) => void;
   readonly recordTag?:string;
 }
 /** E7.5 prep: ask the page to leave for the Connection doctor, saying which screen asked. The page's own bundle answers
@@ -159,7 +162,7 @@ const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent(
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
-  const { failed, release: at, key, identity, recordTag, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;
+  const { release: at, key, identity, recordTag, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { setTitleArrival({ slug, mode: 'enter' }, { tab: true }); };
   const stale = async (): Promise<boolean> => { entering(link.loaded); const going = await reloadStale(); if (!going) dropTabArrival(); return going; };
@@ -167,24 +170,30 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
   const held = identity(), named = held.name === GUEST.name ? identity(await askName(scope, () => { doctor('join'); })) : held;
-  let retry = (): void => undefined, waitingForSeat = false;
+  let shellNow: OnlineShell | null = null, waitingForSeat = false;
   scope.interval(SEAT_WAIT_BEAT_MS, () => { if (waitingForSeat) seatWaitBeat(); });
-  const showLink = reconnectStrip(scope, () => { retry(); }, document.body, doctor), showCountdown = countdownStrip(scope);
-  const ended = async (reason: string | undefined): Promise<void> => {
-    if (reason !== 'reload') { failed(reason === 'replaced' ? 'This world is open in another tab.' : `The server closed this link (${String(reason)}).`); return; }
-    if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); });
-  };
+  // FM4: the banner, the Reconnected notice, the cards and the hold cards (meta MMO-FAILURE-MODES-PLAN)
+  const screens = linkScreens(scope, {
+    retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.visible(); }, doctor,
+    // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
+    reload: () => { entering(link.loaded); void reloadByHand(); },
+    progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
+  });
+  // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
+  const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   const shell = connectOnline({ ...link, socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
-    link: (state, reason) => { waitingForSeat = state === 'full'; showLink(state); if (state === 'ended') void ended(reason); },
-    countdown: said => { showCountdown(said); preload(); },
+    link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
+    countdown: said => { screens.countdown(said); preload(); },
     elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); markUnload(`online seat elsewhere (${seat})`); location.replace(url); },
   });
-  retry = shell.retry;
+  shellNow = shell;
+  // a tap the world must hear waits for the link: the hold card says so, and the tap is never sent late
+  shell.client.gateActions(what => screens.allow(what));
   void settled(shell.booted);
-  const chat = chatLines(scope, shell.client);
+  const chat = chatLines(scope, shell.client, document.body, screens.holdChat);
   voiceUi(scope, new VoiceChat(scope, shell.voice), chat);
   scope.listen(window,'pagehide',()=>{shell.flushRecords();});
-  scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') shell.visible(); });
+  scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') { shell.visible(); screens.visible(); } });
   return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); } };
 }

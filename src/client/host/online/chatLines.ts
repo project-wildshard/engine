@@ -31,8 +31,9 @@ const FIELD = 'pointer-events:auto;flex:1;min-width:0;width:100%;box-sizing:bord
 
 /** The chat box's parts, so voice can sit in its row (J218). */
 export interface ChatBox { readonly box: HTMLElement; readonly form: HTMLFormElement }
-/** E7.6 (Q88): room chat, with a report on every line someone else said. The input takes a phone's own keyboard, at 16 px so iOS doesn't zoom. */
-export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement = document.body): ChatBox {
+/** E7.6 (Q88): room chat, with a report on every line someone else said. The input takes a phone's own keyboard, at 16 px so iOS doesn't zoom.
+ *  `hold` (FM4) takes a line typed while the link is down: it shows as unsent and goes out in order when the link is back. */
+export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement = document.body, hold?: (text: string, send: (text: string) => void, drop: () => void) => boolean): ChatBox {
   const box = scope.ownNode(document.createElement('div')), list = document.createElement('div'), form = document.createElement('form'), field = document.createElement('input');
   const style = scope.ownNode(document.createElement('style'));
   style.textContent = CSS; document.head.append(style);
@@ -44,7 +45,14 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
   scope.listen(form, 'submit', event => {
     event.preventDefault();
     const text = field.value.trim();
-    if (text !== '') client.say('room', text);
+    if (text !== '') {
+      const row = document.createElement('div');
+      const send = (line: string): void => { row.remove(); client.say('room', line); };
+      if (hold?.(text, send, () => { row.remove(); }) === true) {
+        row.style.cssText = `${LINE};opacity:.6`; row.dataset['unsent'] = 'true'; row.textContent = `${text} · unsent`;
+        list.append(row);
+      } else client.say('room', text);
+    }
     field.value = ''; field.blur();
   });
   const own = (): string | undefined => client.welcome === null ? undefined : String(client.welcome.handle);

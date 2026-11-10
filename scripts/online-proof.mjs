@@ -82,9 +82,10 @@ try {
   // The strips, on a server that goes away and comes back: this is E7.5's restart on two pages. A socket that won't connect is the browser's own console line.
   const before = await matt.page.evaluate(() => ({ x: (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().serverX, z: (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().serverZ }));
   await rig.stop();
-  await jake.page.locator('#ws-reconnect-strip', { hasText: 'Reconnecting' }).waitFor({ timeout: 8000 });
+  // FM4: the banner names the cause (Reconnecting, or Restarting for a server that says so)
+  await jake.page.locator('#ws-reconnect-strip').waitFor({ state: 'visible', timeout: 8000 });
   await jake.page.screenshot({ path: join(shots, '5-the-strip.png') });
-  note('the strip says Reconnecting', true);
+  note('the banner says the link is down', true, { said: await jake.page.locator('#ws-reconnect-strip').textContent() });
   rig.start();
   await jake.page.locator('#ws-reconnect-strip').waitFor({ state: 'hidden', timeout: 30_000 });
   await seeing(jake.page, rows => rows.some(row => row.name === 'Matt' && row.modelled), 'the strip clears, and Jake sees Matt again');
@@ -93,7 +94,7 @@ try {
   if (nextBuild !== '') {
     const at = await matt.page.evaluate(() => ({ x: (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().serverX, z: (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().serverZ }));
     rig.publish(2, nextBuild);
-    await jake.page.locator('#ws-countdown-strip', { hasText: 'Updating in' }).waitFor({ timeout: 15_000 });
+    await jake.page.locator('#ws-countdown-strip', { hasText: 'World update' }).waitFor({ timeout: 15_000 });
     await jake.page.screenshot({ path: join(shots, '6-the-countdown.png') });
     note('the countdown shows, and play goes on', await jake.page.evaluate(() => (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().closed === null));
     await rig.pagesServe(nextDist);
@@ -112,7 +113,7 @@ try {
   if (seats !== '') {
     // J178: a full world turns the next page away, and lets it in when a seat frees: a held seat lasts J114's 30 s, and the page tries each 30 s.
     const ann = await enterPage(launched, phone, `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`, 'Ann');
-    await ann.page.locator('#ws-reconnect-strip', { hasText: 'World is full' }).waitFor({ timeout: 90_000 });
+    await ann.page.locator('[data-failmode="full"]').waitFor({ timeout: 90_000 });
     note('the third page is told World is full', true);
     await ann.page.waitForTimeout(1500);
     await ann.page.screenshot({ path: join(shots, '8-world-is-full.png') });
@@ -120,7 +121,7 @@ try {
     const leaving = Date.now();
     await matt.context.close();
     opened = [jake, ann];
-    await ann.page.locator('#ws-reconnect-strip').waitFor({ state: 'hidden', timeout: 75_000 });
+    await ann.page.locator('[data-failmode="full"]').waitFor({ state: 'detached', timeout: 75_000 });
     await intoWorld(ann.page);
     note('a seat frees, and the page comes in by itself', true, { seconds: Math.round((Date.now() - leaving) / 1000) });
     await seeing(jake.page, rows => rows.some(row => row.name === 'Ann' && row.modelled), 'Jake sees Ann');

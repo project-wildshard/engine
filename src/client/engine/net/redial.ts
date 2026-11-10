@@ -6,6 +6,12 @@ import type { NetClient } from './client';
 
 /** What the player is told. `full` waits for a seat. `ended` is a word no redial can answer: a stale build, another tab. */
 export type LinkState = 'live' | 'reconnecting' | 'resuming' | 'lost' | 'full' | 'ended';
+/** Why a link is down, as far as a browser can tell (meta MMO-FAILURE-MODES-PLAN FM4): `silent` stopped carrying frames (a half-open
+ *  socket), `closed` was closed with no word (1006, a reset), `restart` was closed by a restarting server, `hidden` went quiet while the
+ *  page was out of view. It rides `onState`'s reason for `reconnecting` and `resuming`. */
+export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden';
+/** Where the dial is, for a screen that shows it: dials so far, the wait to the next (null while one is out), and how long it's been down. */
+export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number }
 
 /** No frame for this long: say so. The predictor's ring is full by then, so the player holds still. */
 const STRIP_MS = 1000;
@@ -60,6 +66,7 @@ export class Redial {
   private dialAt = 0;
   private dialled: number | null = null;
   private waitingForSeat = false;
+  private cause: LinkCause = 'closed';
   constructor(options: RedialOptions) {
     this.options = options; this.transport = options.transport; this.now = options.now ?? diagnosticNow; this.random = options.random ?? jitterFrom(this.now());
     this.offFrame = options.client.onFrame(() => { this.heard(); });
@@ -70,10 +77,17 @@ export class Redial {
   get told(): LinkState { return this.state; }
   /** Dials made so far. */
   get attempts(): number { return this.dials; }
+  /** Why the link is down now. */
+  get why(): LinkCause { return this.cause; }
+  /** The dial's progress now. */
+  get progress(): LinkProgress {
+    const now = this.now(), down = this.phase !== 'up';
+    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0 };
+  }
   /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once. */
   check(): void {
     const now = this.now();
-    if (this.phase === 'up' && this.heardAt !== null && now - this.heardAt >= STRIP_MS) this.lose(now);
+    if (this.phase === 'up' && this.heardAt !== null && now - this.heardAt >= STRIP_MS) { this.cause = 'hidden'; this.lose(now); }
     if (this.phase === 'down') this.dialAt = now;
   }
   /** The player asked to try again, after `lost`. */
@@ -95,6 +109,7 @@ export class Redial {
     if (this.phase === 'up') {
       if (this.heardAt === null) return;
       const silent = now - this.heardAt;
+      if (silent >= STRIP_MS && this.state === 'live') this.cause = 'silent';
       if (silent >= DROP_MS) this.lose(now); else if (silent >= STRIP_MS) this.show('reconnecting');
     } else if (this.phase === 'down') this.redial(now);
   }
@@ -123,7 +138,7 @@ export class Redial {
     const now = this.now();
     if (FINAL.has(reason)) { this.stop(); this.show('ended', reason); return; }
     if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }
-    if (this.phase === 'up') this.lose(now, false);
+    if (this.phase === 'up') { this.cause = reason === 'restart' ? 'restart' : 'closed'; this.lose(now, false); }
     else if (this.phase === 'down') this.failedDial(now);
   }
   /** The link is gone or no use: from now it is dialled, and a player's 35 s count from the last frame. */
@@ -137,6 +152,6 @@ export class Redial {
   private show(state: LinkState, reason?: string): void {
     if (state === this.state) return;
     this.state = state;
-    this.options.onState(state, reason);
+    this.options.onState(state, reason ?? (state === 'reconnecting' || state === 'resuming' ? this.cause : undefined));
   }
 }

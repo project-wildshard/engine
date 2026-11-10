@@ -97,7 +97,7 @@ interface ShellModule { readonly startStandalone: (config: { slug: string; base:
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; failed: (message: string) => void }) => Promise<Shell> }
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity }) => Promise<Shell> }
 interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
@@ -298,7 +298,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // E7.2d: a build stamped with a world puts a one-shard page in it, and nothing else does (no URL switches). Everything below runs the same on either.
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { startOnline } = await bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as OnlineModule;
-    return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name), failed: message => { showError(message); } });
+    return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   const shell = await (world !== undefined && ports.grid === null && page !== null ? online(world, page) : standalone()), { client } = shell;

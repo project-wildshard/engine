@@ -40,6 +40,9 @@ function decodeColumns(columns: NetClass<never>['row'], values: ArrayLike<number
 }
 
 /** The client's end of the wire. */
+/** FM4: the acts a player taps, by the word their hold card echoes. Chat holds itself (chatLines.ts); reports, poses and climate are never
+ *  a tap that waits on the world. */
+const GATED_ACTS: Partial<Record<NetRoomAct['kind'], string>> = { interact: 'Interact', reload: 'Reload', equip: 'Equip', ride: 'Ride', wear: 'Wear', board: 'Board', buy: 'Buy' };
 export class NetClient {
   /** The server's welcome, once it arrives. */
   welcome: NetWelcome | null = null;
@@ -92,6 +95,9 @@ export class NetClient {
   private off: (() => void)[];
   private said: { readonly build: string; readonly identity: NetIdentity } = { build: '', identity: GUEST };
   private readonly rejoins = new Set<() => void>();
+  /** FM4 (meta MMO-FAILURE-MODES-PLAN): asked before a tap the world must hear goes out. False holds it: the online page's hold card
+   *  says why, and the tap is dropped, never sent late. Null (the default, and every bot) lets everything through. */
+  private gate: ((what: string) => boolean) | null = null;
   constructor(transport: Transport, now: () => number = diagnosticNow) {
     installPortableMath();
     this.transport = transport; this.now = now;
@@ -188,7 +194,15 @@ export class NetClient {
     this.transport.send('unreliable', encodeCommands(this.writer, { ackFrame, commands }, id => this.ids.get(id) ?? 0));
   }
   /** Send a non-movement action on the reliable channel. */
-  act(act: NetRoomAct): void { this.transport.send('reliable', encodeAct(this.writer, act)); }
+  act(act: NetRoomAct): void {
+    const what = GATED_ACTS[act.kind];
+    if (what !== undefined && !this.allows(what)) return;
+    this.transport.send('reliable', encodeAct(this.writer, act));
+  }
+  /** Set what decides whether a tap may go out now (FM4); null lets everything through. */
+  gateActions(gate: ((what: string) => boolean) | null): void { this.gate = gate; }
+  /** May a tap named `what` go out now? Asking may show the player why not; an empty `what` asks without showing anything. */
+  allows(what: string): boolean { return this.gate === null || this.gate(what); }
   /** Stop listening; the transport stays with its owner. */
   dispose(): void { for (const off of this.off) off(); this.listeners.clear(); this.presented.clear(); this.corrected.clear(); this.fights.clear(); this.deaths.clear(); this.travels.clear(); this.rejoins.clear(); }
 

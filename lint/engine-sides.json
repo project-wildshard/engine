@@ -1046,6 +1046,7 @@
     "src/client/host/online/doctor.ts": "client",
     "src/client/host/online/doctorPage.ts": "client",
     "src/client/host/online/doctorView.ts": "client",
+    "src/client/host/online/linkScreens.ts": "client",
     "src/client/host/online/nameBox.ts": "client",
     "src/client/host/online/reconnectStrip.ts": "client",
     "src/client/host/online/release.ts": "client",

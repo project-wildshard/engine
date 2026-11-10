@@ -41,10 +41,11 @@ export class NetPlayer implements PlayerLink {
   readonly attacks: AttackPrediction = new AttackPrediction();
   /** Its weapons' line to the server: what the next command carries. */
   readonly wire: WeaponWire = {
-    press: (started, heavy = false) => { this.pressed = true; this.pressStarted ||= started; this.heavyPress ||= heavy; },
+    // FM4: a swing made while the link is down is dropped and the page's hold card says why: it would otherwise go out late
+    press: (started, heavy = false) => { if (!this.client.allows(started ? 'Attack' : '')) return; this.pressed = true; this.pressStarted ||= started; this.heavyPress ||= heavy; },
     hold: heavy => { this.heavy = heavy; },
-    secondary: () => { this.gust = true; },
-    fire: ads => { this.launcher = { slot: this.held, ads, fire: true }; },
+    secondary: () => { if (this.client.allows('Ability')) this.gust = true; },
+    fire: ads => { if (this.client.allows('Fire')) this.launcher = { slot: this.held, ads, fire: true }; },
     afterStep: run => { this.afterStep = run; },
     steps: () => this.frameSteps,
     nextSeq: () => (this.seq + 1) & 0xffff,

@@ -51,14 +51,26 @@ test.skipIf(FOLDER === undefined)('a browser sees the strip appear when the link
     puller.pull();
     await page.locator(STRIP).waitFor({ state: 'visible', timeout: 3000 });
     const shownAfter = performance.now() - pulled;
-    expect(await page.locator(STRIP).innerText()).toContain('Reconnecting');
+    expect((await page.locator(STRIP).innerText()).toLowerCase()).toContain('reconnecting');
     await page.screenshot({ path: join(FOLDER, '2-reconnecting.png') });
-    await new Promise(wait => { setTimeout(wait, 1500); });
+    // FM4: a tap the world must hear opens the banner's hold card and isn't sent; a chat line is held for the way back
+    await page.evaluate(() => { (window as unknown as { tap: () => void }).tap(); });
+    const hold = page.locator('[data-failmode$="-blocked"]');
+    await hold.waitFor({ state: 'visible', timeout: 2000 });
+    expect(await hold.innerText()).toContain('Interact');
+    await new Promise(wait => { setTimeout(wait, 400); });
+    await page.screenshot({ path: join(FOLDER, '2b-hold-card.png') });
+    await page.evaluate(() => { (window as unknown as { say: (text: string) => void }).say('held line'); });
+    // the link stays pulled 1.5 s in all, as before the hold card: one dial brings it back
+    await new Promise(wait => { setTimeout(wait, 1100); });
     puller.restore();
     await page.locator(STRIP).waitFor({ state: 'hidden', timeout: 10_000 });
+    await hold.waitFor({ state: 'detached', timeout: 2000 });
+    await page.locator('[data-failmode="reconnected"]').waitFor({ state: 'visible', timeout: 2000 });
     const clearedAfter = performance.now() - pulled;
     await page.screenshot({ path: join(FOLDER, '3-clear.png') });
-    const report = await page.evaluate(() => (window as unknown as { proof: { states: string[]; frames: number; rejoins: number; welcome: string | null } }).proof);
+    const report = await page.evaluate(() => (window as unknown as { proof: { states: string[]; frames: number; rejoins: number; welcome: string | null; said: string[] } }).proof);
+    expect(report.said).toEqual(['held line']);
     console.info(`browser strip: shown ${shownAfter.toFixed(0)} ms after the pull, cleared at ${clearedAfter.toFixed(0)} ms, ${JSON.stringify(report)}`);
     expect(report.states).toEqual(['reconnecting', 'live']);
     expect(report.rejoins).toBe(1);
