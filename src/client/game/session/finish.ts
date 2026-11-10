@@ -251,7 +251,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     // QA row 27: Jake's Nine paste had 4.6 s of readyFrame with no entry before 'wait:Minimap': the spawn view's fence and
     // its tile settle, which the card names but the boot timeline did not; it is a named wait there too now
     await spawnViewThenNamed(counted(bootTask('wait:Spawn view', () => prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); }), 'camera', settlingTiles))),
-      [['Minimap', counted(waitEntryWork(game.levelScope, () => ctx.minimap.prepare()))], ['Horizon paintings', counted(edgeDressing.horizonReady)]]);
+      // NB3: their own spans from their start too (the card names them only once the spawn view ends)
+      [['Minimap', counted(bootTask('app:ready-minimap', () => waitEntryWork(game.levelScope, () => ctx.minimap.prepare())))],
+        ['Horizon paintings', counted(bootTask('app:ready-horizon', () => edgeDressing.horizonReady))]]);
   });
   // P0: the phone's spawn programs settle while loading still covers the reveal.
   // Undrawn world programs remain in the sliced after-control warm-up below.
