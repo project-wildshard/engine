@@ -315,7 +315,7 @@ function shaderMaterial(glsl: GraphGlsl, opts: GraphShaderOptions): GraphShaderM
  *  and nothing writes a GraphGlsl after emission, so every compile of one validated IR under the same options (a shard's
  *  graph file compiled by each of its material catalogues: Nine's architecture graphs three times, ~110 ms each at CPU
  *  x8) shares it. Keyed weakly: it lives as long as the validated IR that its caller holds (clientGraphs' file memo). */
-const emissions = new WeakMap<object, Map<string, GraphGlsl>>();
+const emissions = new WeakMap<object, Map<string, GraphGlsl>>(), EMISSIONS_PER_GRAPH = 4;
 function emittedGraph(input: unknown, emit: Omit<ClassicGraphOptions, 'toon' | 'textures' | 'fog' | 'weighted'>, toon: ToonLook | undefined): GraphGlsl {
   const lower = (): GraphGlsl => emitClassicGraph(input, { ...emit, ...(toon === undefined ? {} : { toonLook: toon }) });
   const { validated, ...rest } = emit;
@@ -328,6 +328,8 @@ function emittedGraph(input: unknown, emit: Omit<ClassicGraphOptions, 'toon' | '
   const glsl = lower();
   if (byOptions === undefined) { byOptions = new Map(); emissions.set(input, byOptions); }
   byOptions.set(key, glsl);
+  // a toon look's params move with the day: keep the last few lowerings of one IR, not one per snapshot
+  for (const oldest of byOptions.keys()) { if (byOptions.size <= EMISSIONS_PER_GRAPH) break; byOptions.delete(oldest); }
   return glsl;
 }
 

@@ -38,3 +38,15 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
   (the route is known there), still before admission.
 
 - Harness commit: benchmax.mjs options above; its numbers go in the plan.
+
+- Codex J206 reviews of NB2-NB4: no MUST-FIX. Follow-ups: one IR keeps at
+  most 4 lowerings (toon params move with the day);
+  `scripts/loading-flow/layer-parity-proof.mjs` decodes all 9 of Nine's
+  paint layers both ways from the served build: byte-identical in
+  Chromium and in WebKit; readyFrame's minimap and horizon jobs get their
+  own spans from their start (`app:ready-minimap`, `app:ready-horizon`).
+- Numbers, NB1 harness, Mac load 11-17: CPU x8 props 12.1 s median ->
+  11.4 s (3 pairs, every pair lower, -0.7 to -1.7 s); CPU x4 props
+  4.5 / 4.5 / 6.1 -> 4.0 / 4.2 / 6.1 s. The x8 profile: graph compile
+  2.7 -> 1.5 s, graph JSON 0.52 -> 0.16 s, paint read-back off the main
+  thread. Reservation 0.58-0.63 -> 0.04 s at x8.
