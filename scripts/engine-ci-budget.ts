@@ -12,17 +12,20 @@ export default class EngineBudget implements Reporter{
     if(!Number.isFinite(limit)||limit<1)throw new Error('Invalid CI file budget');
     this.limit=Math.min(limit,60_000);
   }
-  onTestRunEnd(modules:readonly TestModule[],_errors:readonly unknown[],reason:TestRunEndReason):void{
+  onTestRunEnd(modules:readonly TestModule[],errors:readonly unknown[],reason:TestRunEndReason):void{
     const files=modules.map(module=>{
       const diagnostic=module.diagnostic();
-      return {file:relative(process.cwd(),module.moduleId).replaceAll('\\','/'),state:module.state(),
+      const cases=[...module.children.allTests()].map(test=>({name:test.fullName,state:test.result().state,mode:test.options.mode}));
+      const caseCounts={total:cases.length,passed:0,failed:0,skipped:0,pending:0};
+      for(const test of cases)caseCounts[test.state]++;
+      return {file:relative(process.cwd(),module.moduleId).replaceAll('\\','/'),state:module.state(),errorCount:module.errors().length,caseCounts,cases,
         durationMs:diagnostic.duration+diagnostic.collectDuration+diagnostic.setupDuration+diagnostic.prepareDuration+diagnostic.environmentSetupDuration,
         testAndHookMs:diagnostic.duration,collectMs:diagnostic.collectDuration};
     });
     const slow=files.filter(file=>file.durationMs>this.limit);
     const {WS_CI_TIMINGS:timings,GITHUB_SHA:sha,GITHUB_RUN_ID:run}=process.env;
     const out=resolve(timings??`tmp/engine-ci/timings-${process.pid}.json`);mkdirSync(dirname(out),{recursive:true});
-    writeFileSync(out,`${JSON.stringify({sha:sha??null,run:run??null,reason,startedAt:this.began,endedAt:Date.now(),files},null,2)}\n`);
+    writeFileSync(out,`${JSON.stringify({schema:'engine-ci-budget/2',sha:sha??null,run:run??null,attempt:process.env.GITHUB_RUN_ATTEMPT??null,reason,errorCount:errors.length,startedAt:this.began,endedAt:Date.now(),files},null,2)}\n`);
     for(const file of slow)console.error(`::error file=${file.file}::CI test file ${file.durationMs.toFixed(0)} ms exceeds ${this.limit} ms`);
     if(slow.length>0)process.exitCode=1;
   }
