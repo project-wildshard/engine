@@ -23,8 +23,8 @@ import type { LookInstance } from './lentLooks';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { buildYield, workSlice } from '@wildshard/engine/core/workSlice';
 import { loadLookGraphCompiler, bindGraphMeshMap } from '@wildshard/engine/render/graphBackend';
-import { curvedParams, graphFileTextureRefs, materialTextureRefs } from '@wildshard/format/materials';
-import { clientGraphs, graphOutlineHook, isGraphEntry, type GraphOutlineHook, type GraphReadout, type GraphSources } from './clientGraphs';
+import { curvedParams, materialTextureRefs } from '@wildshard/format/materials';
+import { clientGraphs, graphOutlineHook, isGraphEntry, keptGraphFileTextureRefs, type GraphOutlineHook, type GraphReadout, type GraphSources } from './clientGraphs';
 import { parseSkinFile, skinLookParameters } from '@wildshard/format/skinAssets';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import type { PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
@@ -150,7 +150,7 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   const named = shard.props === null ? undefined : propMaterialsOf(shard.props);
   const splat = shard.props === null ? undefined : splatTerrainOf(shard.props);
   const splatRefs = new Set(splat === undefined ? [] : splatTextureRefs(splat, splatDrawTier()));
-  const refs = new Set([...materialTextureRefs(sampledMaterials), ...graphFileTextureRefs(sampledMaterials, (hash) => assets.get(hash)), ...(shard.props?.textures.map((entry) => entry.colour) ?? []), ...propMaterialTextureRefs(named), ...splatRefs]);
+  const refs = new Set([...materialTextureRefs(sampledMaterials), ...keptGraphFileTextureRefs(sampledMaterials, (hash) => assets.get(hash)), ...(shard.props?.textures.map((entry) => entry.colour) ?? []), ...propMaterialTextureRefs(named), ...splatRefs]);
   // LS8 (J204): a caller's loading step (a sky backdrop's looks: 1.5 s of Driftwood's sky at 4x CPU) may count each
   // texture transcoded and the graph compiler loaded, so it moves while they land
   const loadsCompiler = graphsOn && carriesGraph(shard, assets);

@@ -310,13 +310,34 @@ function shaderMaterial(glsl: GraphGlsl, opts: GraphShaderOptions): GraphShaderM
   return m;
 }
 
+/** NINE-DRAGON-BENCHMAX NB2: a validated graph's lowering, by its validated IR's identity and the emitter's options. The
+ *  lowering is a pure function of the two (param values become uniforms, read at material creation, never in the text),
+ *  and nothing writes a GraphGlsl after emission, so every compile of one validated IR under the same options (a shard's
+ *  graph file compiled by each of its material catalogues: Nine's architecture graphs three times, ~110 ms each at CPU
+ *  x8) shares it. Keyed weakly: it lives as long as the validated IR that its caller holds (clientGraphs' file memo). */
+const emissions = new WeakMap<object, Map<string, GraphGlsl>>();
+function emittedGraph(input: unknown, emit: Omit<ClassicGraphOptions, 'toon' | 'textures' | 'fog' | 'weighted'>, toon: ToonLook | undefined): GraphGlsl {
+  const lower = (): GraphGlsl => emitClassicGraph(input, { ...emit, ...(toon === undefined ? {} : { toonLook: toon }) });
+  const { validated, ...rest } = emit;
+  if (validated === undefined || validated.graph !== input || typeof input !== 'object' || input === null || emit.reportExecutionCost === true) return lower();
+  // a toon graph lowers the family's preset built from the look's current params: those are part of the key
+  const key = JSON.stringify([rest, toon === undefined ? null : toon.params]);
+  let byOptions = emissions.get(input);
+  const known = byOptions?.get(key);
+  if (known !== undefined) return known;
+  const glsl = lower();
+  if (byOptions === undefined) { byOptions = new Map(); emissions.set(input, byOptions); }
+  byOptions.set(key, glsl);
+  return glsl;
+}
+
 /**
  * Compile a graph to its classic material. Throws (with every reason) when validation refuses it. A `model: 'toon'`
  * graph needs the family look (`toon`); a material selecting a declared fog needs `fog`.
  */
 export function compileClassicGraph(input: unknown, opts: ClassicGraphOptions = {}): ClassicGraph {
   const { toon, textures, fog: fogFor, weighted, ...emit } = opts;
-  const glsl = emitClassicGraph(input, { ...emit, ...(toon === undefined ? {} : { toonLook: toon }) }), ir = glsl.ir;
+  const glsl = emittedGraph(input, emit, toon), ir = glsl.ir;
   const selected = ir.effectState?.fog;
   const fog = typeof selected === 'string' ? fogFor?.(selected) : undefined;
   if (typeof selected === 'string' && fog === undefined) throw new Error(`material graph: fog ${selected} needs a fog resolver`);

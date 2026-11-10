@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { Material, ShaderMaterial, Vector3 } from 'three';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
 import { classicLookCompiler } from './fixtures/classicLookCompiler';
-import { clientGraphs } from '../src/client/game/shardfile/clientGraphs';
+import { clientGraphs, forgetValidatedGraphFiles } from '../src/client/game/shardfile/clientGraphs';
 import { emptyShardfile } from '../src/shared/host/author';
 import { validateGraph } from '@wildshard/format/materialGraph';
 
@@ -72,4 +72,46 @@ test('scalar uniforms preserve signed zero and refuse invalid writes before chan
     expect(uniform.value).toBe(0.25);
     expect(material.version).toBe(version);
   } finally { compiled.material.dispose(); }
+});
+
+test('NB2: a graph file validates once per admitted lists and every compile keeps its own material and uniforms', () => {
+  const source = emptyShardfile({ slug: 'memo-fixture', name: 'Memo', author: 'Test', seed: 1, revision: 1 });
+  const hash = 'b'.repeat(64), bytes = new TextEncoder().encode(JSON.stringify({ version: 1, kind: 'material', model: 'unlit',
+    params: { tint: { type: 'vec3', value: [0.2, 0.3, 0.4], min: 0, max: 1 } },
+    nodes: { tint: { op: 'param', param: 'tint' } }, stages: { surface: { colour: 'tint' } } }));
+  forgetValidatedGraphFiles();
+  let reads = 0;
+  const port = { compiler: classicLookCompiler(), fallback: (): never => { throw new Error('Unexpected fallback'); },
+    textures: (): never => { throw new Error('Unexpected texture'); }, file: (asked: string) => { reads++; return asked === hash ? bytes : undefined; } };
+  const first = clientGraphs(source, port), second = clientGraphs(source, port);
+  const a = first.compile({ family: 'graph', file: hash }), b = second.compile({ family: 'graph', file: hash });
+  try {
+    expect(reads).toBe(1);
+    if (!(a instanceof ShaderMaterial) || !(b instanceof ShaderMaterial)) throw new Error('Missing graph material');
+    expect(a).not.toBe(b);
+    expect(b.fragmentShader).toBe(a.fragmentShader);
+    first.setParam(a, 'tint', [0.9, 0.9, 0.9]);
+    expect(a.uniforms['wsP_tint']?.value.toArray()).toEqual([0.9, 0.9, 0.9]);
+    expect(b.uniforms['wsP_tint']?.value.toArray()).toEqual([0.2, 0.3, 0.4]);
+    // other admitted lists are another validation: the file is read again
+    clientGraphs(source, { ...port, trustedGraphs: true }).compile({ family: 'graph', file: hash }).dispose();
+    expect(reads).toBe(2);
+  } finally { a.dispose(); b.dispose(); forgetValidatedGraphFiles(); }
+});
+
+test('NB2: one validated graph lowers once per emitter options, each compile with its own uniforms', () => {
+  const checked = validateGraph({ version: 1, kind: 'material', model: 'unlit',
+    params: { amount: { type: 'float', value: 0.5, min: 0, max: 1 } },
+    nodes: { amount: { op: 'param', param: 'amount' } }, stages: { surface: { colour: [1, 1, 1], alpha: 'amount' } } });
+  if (!checked.ok) throw new Error(checked.errors.join('; '));
+  const a = compileClassicGraph(checked.graph, { validated: checked }), b = compileClassicGraph(checked.graph, { validated: checked });
+  const other = compileClassicGraph(checked.graph, { validated: checked, cascades: 1 });
+  try {
+    expect(b.glsl).toBe(a.glsl);
+    expect(other.glsl).not.toBe(a.glsl);
+    expect(b.material).not.toBe(a.material);
+    a.setParam('amount', 0.25);
+    expect(a.material.uniforms['wsP_amount']?.value).toBe(0.25);
+    expect(b.material.uniforms['wsP_amount']?.value).toBe(0.5);
+  } finally { a.material.dispose(); b.material.dispose(); other.material.dispose(); }
 });

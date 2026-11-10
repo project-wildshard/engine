@@ -24,7 +24,8 @@ import { readProductDescriptor, browserContentHash, browserProductCache, type Ad
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { runtimeBoundWorldFiles } from '../../../shared/game/plugin/runtimeRows';
 import { clientMaterials } from './clientMaterials';
-import { graphFileTextureRefs, materialTextureRefs } from '@wildshard/format/materials';
+import { materialTextureRefs } from '@wildshard/format/materials';
+import { keptGraphFileTextureRefs } from './clientGraphs';
 import type { ShardContext } from '../plugin/context';
 import { readAsset } from './readAsset';
 import { legacyAsset } from './legacyAsset';
@@ -374,7 +375,7 @@ export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'ga
   const assets = new Map(product.assets.retained);
   const files = Object.values(shard.look.materials).flatMap(entry => entry.family === 'graph' && 'file' in entry ? [entry.file] : []);
   for (const ref of files) assets.set(ref, await product.assets.read(ref));
-  for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...graphFileTextureRefs(shard.look.materials, hash => assets.get(hash))])) assets.set(ref, await product.assets.read(ref));
+  for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...keptGraphFileTextureRefs(shard.look.materials, hash => assets.get(hash))])) assets.set(ref, await product.assets.read(ref));
   if (ctx.scope.disposed) throw new Error('Runtime look scope unloaded while reading materials');
   return clientMaterials(shard, assets, renderer, ctx.scope, { trustedGraphs: true, ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) });
 }

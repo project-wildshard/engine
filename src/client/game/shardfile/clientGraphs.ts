@@ -27,11 +27,11 @@ import { sceneScalarValue } from './sceneInputs';
  */
 import type { ToonLook } from '@wildshard/engine/render/families/toon';
 import { Color, Mesh, PointsMaterial, SRGBColorSpace, type Material, type Object3D, type Texture } from 'three';
-import { DEFAULT_GRAPH_BUDGET, validateGraph, type GraphBinding, type GraphBudget, type GraphIr, type GraphParamType, type GraphLiteral } from '@wildshard/format/materialGraph';
+import { DEFAULT_GRAPH_BUDGET, validateGraph, type GraphBinding, type GraphValidation, type GraphBudget, type GraphIr, type GraphParamType, type GraphLiteral } from '@wildshard/format/materialGraph';
 import { DATA_LOOK_DAY, dataLookClock, lookSample, sampleLook, type LookSample } from '@wildshard/engine/render/dataLook';
 import { graphMeshMapBase, type LookGraphCompiler, type LookGraphFog } from '@wildshard/engine/render/graphBackend';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { graphBindingSources, graphFileJson, presetLooks } from '@wildshard/format/materials';
+import { graphBindingSources, graphFileJson, graphFileTextureRefs, presetLooks } from '@wildshard/format/materials';
 import { GRAPH_PRESET_VERSION, parseFamilyMaterial } from '@wildshard/format/materialFamilies';
 import { familyPresetGraph, PRESET_CLOCK_PARAMS, PRESET_GRAPH_BUDGET } from '@wildshard/engine/render/graph/presets';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -177,7 +177,41 @@ export function graphFallbackEntry(graph: Pick<GraphIr, 'model' | 'doubleSided' 
  * `trustedGraphs` is host authority from an admitted runtime, never a field read from graph JSON.
  * An explicit budget refuses on admission failure instead of using a family material.
  */
-export function clientGraphs(source: Pick<Shardfile, 'identity' | 'look' | 'state'> & Partial<Pick<Shardfile, 'runtime' | 'questHost'>>, options: { compiler: LookGraphCompiler | null; toon?: ToonLook; trustedGraphs?: boolean; fallback: (entry: Readonly<Record<string, unknown>>) => Material; textures: (ref: string, role?: 'colour' | 'data') => Texture; file?: (hash: string) => Uint8Array | undefined }): {
+/**
+ * NINE-DRAGON-BENCHMAX NB2: graph files' passing validations, by file hash and the admitted lists they passed under. A
+ * file's hash names its bytes, so a second compile of that file under the same lists (every material catalogue of a world
+ * compiles its own copy: Nine's props compiled each architecture graph three times) skips the parse and the validation,
+ * and hands the emitter the same validated IR, whose lowering it keeps too (glslMaterial's `emittedGraph`). Least
+ * recently used first out past VALIDATED_FILES_KEPT, so a long session's shards never pile up.
+ */
+const VALIDATED_FILES_KEPT = 96;
+const validatedFiles = new Map<string, Extract<GraphValidation, { ok: true }>>();
+const fileTextureRefs = new Map<string, readonly string[]>();
+function keepValidatedFile(key: string, checked: Extract<GraphValidation, { ok: true }>): void {
+  validatedFiles.set(key, checked);
+  for (const oldest of validatedFiles.keys()) { if (validatedFiles.size <= VALIDATED_FILES_KEPT) break; validatedFiles.delete(oldest); }
+}
+/** Forget every kept graph file validation and texture list (tests). */
+export function forgetValidatedGraphFiles(): void { validatedFiles.clear(); fileTextureRefs.clear(); }
+
+/** NB2: each graph file's texture params, by hash (`graphFileTextureRefs` parses every graph file of a catalogue to read
+ *  them, and every material catalogue of a world asked again: Nine's ~370 ms of JSON at CPU x8). Same refs, same order. */
+export function keptGraphFileTextureRefs(materials: Shardfile['look']['materials'], bytes: (hash: string) => Uint8Array | undefined): string[] {
+  const refs: string[] = [];
+  for (const [id, material] of Object.entries(materials)) {
+    if (material.family !== 'graph' || !('file' in material)) continue;
+    const known = fileTextureRefs.get(material.file);
+    if (known !== undefined) { fileTextureRefs.delete(material.file); fileTextureRefs.set(material.file, known); refs.push(...known); continue; }
+    // a missing file names none and is not kept: its bytes may be admitted later
+    if (bytes(material.file) === undefined) continue;
+    const read = graphFileTextureRefs({ [id]: material }, bytes);
+    fileTextureRefs.set(material.file, read); refs.push(...read);
+    for (const oldest of fileTextureRefs.keys()) { if (fileTextureRefs.size <= VALIDATED_FILES_KEPT) break; fileTextureRefs.delete(oldest); }
+  }
+  return refs;
+}
+
+export function clientGraphs(source:Pick<Shardfile, 'identity' | 'look' | 'state'> & Partial<Pick<Shardfile, 'runtime' | 'questHost'>>, options: { compiler: LookGraphCompiler | null; toon?: ToonLook; trustedGraphs?: boolean; fallback: (entry: Readonly<Record<string, unknown>>) => Material; textures: (ref: string, role?: 'colour' | 'data') => Texture; file?: (hash: string) => Uint8Array | undefined }): {
   /** Update a compiled material uniform; unknown/fallback materials and invalid values refuse. */
   setParam: (material: Material, name: string, value: GraphLiteral) => void;
   /** Lend a compiled material's `role: 'lent'` texture param its texture; unknown/fallback materials refuse. */
@@ -219,13 +253,19 @@ export function clientGraphs(source: Pick<Shardfile, 'identity' | 'look' | 'stat
     material.userData['graphPrimitive'] = 'points';
     return material;
   };
+  // NB2: a graph file's passing validation under these lists, as validateFile keeps it
+  const fileLists = JSON.stringify([dayKeys, stateFields, options.trustedGraphs === true]);
   const compile = (entry: GraphMaterialEntry): Material => {
     const carried = fogCarriers.get(entry); if (carried !== undefined) return carried;
-    const resolved = resolve(entry), graph = resolved.graph, budget = resolved.budget;
+    const fileKey = entry.preset === undefined && typeof entry.file === 'string' ? `${entry.file}|${fileLists}` : null;
+    const known = fileKey === null ? undefined : validatedFiles.get(fileKey);
+    if (known !== undefined && fileKey !== null) { validatedFiles.delete(fileKey); validatedFiles.set(fileKey, known); }
+    const resolved = known === undefined ? resolve(entry) : { graph: known.graph, budget: DEFAULT_GRAPH_BUDGET, preset: false, family: null }, graph = resolved.graph, budget = resolved.budget;
     // a preset reference while the row is off draws its own family: the preset is held to parity with it
     if (resolved.family !== null && lookCompiler === null) { readout.fallback++; readout.reasons.push('graph materials row off'); return options.fallback(resolved.family); }
     // validation with the admitted lists first: a refusal (an unknown binding, a bad program) throws, row on or off
-    const checked = validateGraph(graph, { dayKeys, stateFields, budget, trustedBudget: options.trustedGraphs === true });
+    const checked = known ?? validateGraph(graph, { dayKeys, stateFields, budget, trustedBudget: options.trustedGraphs === true });
+    if (known === undefined && fileKey !== null && checked.ok) keepValidatedFile(fileKey, checked);
     if (!checked.ok) {
       if (typeof graph === 'object' && graph !== null && Reflect.has(graph, 'budget')) throw new Error(`material graph refused: ${checked.errors.join('; ')}`);
       const refusals = checked.errors.filter((error) => !error.startsWith('budget:'));
