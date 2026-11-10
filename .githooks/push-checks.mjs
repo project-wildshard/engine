@@ -6,6 +6,7 @@ import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE} from '../scripts/push-budget.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
+import {missingTestTimings,prepareTestTimings,readTestTimings,completeTestTimings} from '../scripts/push-test-timings.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -95,7 +96,9 @@ async function main(){
   const env=pushEnvironment();
   const began=Date.now();
   let selection=pushSelection(env.WS_PUSH_REFS);
-  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,selection);
+  const missing=missingTestTimings(env.WS_PUSH_REFS);
+  const timing=missing.length===0?null:prepareTestTimings(missing,PUSH_PROFILE);
+  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null||timing!==null?null:readPushProof(context,selection);
   console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths`);
   if(proof!==null){
     console.error(`  - exact-tree green reuse: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
@@ -132,8 +135,21 @@ async function main(){
     {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
     {name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},
-    {name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])]]},
-  ],{env});
+    {name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...(timing?.requests.full===undefined?[]:['--reporter=default',`--reporter=${resolve('scripts/push-timing-reporter.ts')}`]),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])]]},
+  ],{env:timing?.requests.full===undefined?env:{...env,WS_PUSH_TIMING_REQUEST:timing.requests.full}});
+  if(result.ok&&timing!==null){
+    if(timing.requests.full!==undefined)completeTestTimings(timing.requests.full,0);
+    if(timing.requests['1']!==undefined){
+      const ring=await parallelChecks([{name:'vitest (new Ring 1 timing)',commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...missing.filter(file=>file.rings.includes('1')).map(file=>file.file),'--reporter=default',`--reporter=${resolve('scripts/push-timing-reporter.ts')}`]]}],
+        {env:{...env,WILDSHARD_RING:'1',WS_PUSH_TIMING_REQUEST:timing.requests['1']}});
+      if(!ring.ok){process.exitCode=1;return;}
+      completeTestTimings(timing.requests['1'],0);
+    }
+    readTestTimings(timing.directory);
+    console.error(`timing-evidence: ${JSON.stringify({directory:timing.directory,files:missing.map(file=>file.file)})}`);
+    console.error(`  X New test files need committed timings: ${missing.map(file=>file.file).join(', ')}. Real local full/Ring 1 clocks saved; no checked tree was changed. Run: node scripts/push-test-timings.mjs record ${timing.directory}; commit the timing data and push normally.`);
+    process.exitCode=1;return;
+  }
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);
   console.error(`  - push lane ${result.ok?'green':'RED'} in ${seconds.toFixed(1)} s; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);

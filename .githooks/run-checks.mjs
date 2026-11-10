@@ -33,8 +33,9 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   const {PUSH_PROFILE}=await import('../scripts/push-budget.mjs');
   const {pushSelection}=await import('../scripts/push-selection.mjs');
   const {capturePushTree,readPushProof}=await import('../scripts/push-proof-cache.mjs');
+  const {missingTestTimings}=await import('../scripts/push-test-timings.mjs');
   const env = pushEnvironment(Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))));
-  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,pushSelection(env.WS_PUSH_REFS));
+  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null||missingTestTimings(env.WS_PUSH_REFS).length>0?null:readPushProof(context,pushSelection(env.WS_PUSH_REFS));
   // Outgoing history/secrets have already passed in pre-push. Reusing a proved
   // tree starts no heavy work, so it must not wait behind a later full suite.
   if(proof!==null){
