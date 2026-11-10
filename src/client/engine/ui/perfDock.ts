@@ -5,7 +5,8 @@ import { mountUi } from './ownership';
  * The Developer dock (A14, Jake 2026-11-10: "the screen is chaotic"): every Developer readout lives in one of two places.
  *
  *   chips     small cards on one row with the frame meter's pill (`.ws-perf-dock`, perf.css): on phones PAUSE's row, right
- *             of PAUSE and left of the minimap; on desktop the top-right line. The memory card ("mem 1.13") sits here.
+ *             of PAUSE and left of the minimap; on desktop the line under the bolts readout, bottom right. The memory
+ *             card ("mem 1.13") sits here.
  *   sections  blocks inside the frame meter's details panel, right under its header: a tap on the fps pill opens them.
  *             The worker client's net readout (delay, jitter, corrections, queue, …) is one.
  *
