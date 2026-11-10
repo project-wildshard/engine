@@ -2,6 +2,7 @@ export const SIDES: readonly string[];
 export const LAYERS: readonly string[];
 export const PLAN_FILE: string;
 export const FROZEN: RegExp;
+export const AGENTS_MARKER: string;
 export interface Tree {
   readonly head: string;
   readonly paths: Set<string>;

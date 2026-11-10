@@ -9,7 +9,7 @@ import {compareSideEdges} from '../lint/engine-sides.mjs';
 import {unsortedPath} from '../lint/layer-exports.mjs';
 import {spelledPathFailures} from '../scripts/check-spelled-paths.mjs';
 import {compareCounts} from '../scripts/guard-counts.mjs';
-import {appliedTree,applyPlan,carryWorkingText,GATE_PHASES,gatePhaseCommand,headTree,main,planFailures,planMove,planSort} from '../scripts/sort-sides.mjs';
+import {AGENTS_MARKER,appliedTree,applyPlan,carryWorkingText,GATE_PHASES,gatePhaseCommand,headTree,main,planFailures,planMove,planSort} from '../scripts/sort-sides.mjs';
 
 const roots:string[]=[];
 afterEach(()=>{for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
@@ -118,6 +118,18 @@ test('rewrites every spelling that names a moved path',()=>{
   expect(plan.writes.has('AGENTS.md')).toBe(false);
   expect(Object.keys(json(text('lint/ratchet.json'))['wildshard/rule']??{})).toEqual(['src/client/engine/core/view.ts','src/client/engine/ui/hud.ts']);
   expect(json(text('scripts/check-paths.allow.json'))['0']).toMatchObject({path:'../../../budgets/a.json',file:'src/cook/game/bake.ts'});
+});
+
+test('rewrites AGENTS.md only below its J241 marker',()=>{
+  const root=fixture(),top='# AGENTS.md\n\nJake: see `src/engine/ui/hud.ts`.\n\n';
+  put(root,{'AGENTS.md':`${top}${AGENTS_MARKER}\n\n## Agent-written\n\n- Do not touch \`src/engine/ui/hud.ts\`.\n`});
+  commit(root);
+  const tree=headTree(root),plan=planSort(tree),after=appliedTree(tree,plan).text.get('AGENTS.md')??'';
+  const moved=plan.moves.get('src/engine/ui/hud.ts');
+  expect(moved).toBeDefined();
+  expect(after.startsWith(`${top}${AGENTS_MARKER}\n`)).toBe(true);
+  expect(after).toContain(`- Do not touch \`${moved}\`.`);
+  expect(planFailures(tree,plan,root).filter(failure=>failure.includes('AGENTS.md'))).toEqual([]);
 });
 
 test('refuses an untagged file by name',()=>{

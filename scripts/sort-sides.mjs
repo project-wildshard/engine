@@ -30,8 +30,12 @@ const CODE = /\.(?:[cm]?[jt]s|tsx)$/u;
 const TAGGED = /\.[cm]?[jt]sx?$/u;
 const TEST = /\.test\.[cm]?[jt]sx?$/u;
 const TEXT = /\.(?:[cm]?[jt]sx?|css|html|json|md|sh|py|ya?ml|toml|txt)$|(?:^|\/)\.[^/]*ignore$|(?:^|\/)[^./]+$/u;
-/** History and receipts keep the paths they were written with; AGENTS.md and README.md are Jake's to change. */
-export const FROZEN = /^(?:progress|project|art|public|ios|android|sources|calibration|docs\/tasks|docs\/reviews)\/|^(?:AGENTS|README|CLAUDE)\.md$|^pnpm-lock\.yaml$|(?:^|\/)node_modules\//u;
+/** History and receipts keep the paths they were written with; README.md is Jake's to change, and AGENTS.md is his
+ * above its J241 marker (see AGENTS_MARKER). */
+export const FROZEN = /^(?:progress|project|art|public|ios|android|sources|calibration|docs\/tasks|docs\/reviews)\/|^(?:README|CLAUDE)\.md$|^pnpm-lock\.yaml$|(?:^|\/)node_modules\//u;
+/** J241: AGENTS.md is Jake's above this line and agent-written below it. A sort rewrites only below it, and leaves a
+ * file without the line untouched; repo-kit's commit hook refuses an AI commit that changes a line above it. */
+export const AGENTS_MARKER = '<!-- agents-below: everything under this line is agent-written (Claude, Codex); agents never edit above it (J241) -->';
 /** Each side segment a regular expression may meet once a path is sorted; the group keeps it true before and after. */
 const SIDE_GROUP = String.raw`(?:(?:client|cook|server|shared)\/)?`;
 const MAX_TEXT = 8 * 1024 * 1024;
@@ -478,8 +482,24 @@ function rewriteSource(tree, index, moves, dirMoves, path, source, notes) {
   return applyEdits(source, edits);
 }
 
-/** One file's text after a plan's moves: HEAD's bytes, or a lane's working bytes of the same file. */
+/** One file's text after a plan's moves: HEAD's bytes, or a lane's working bytes of the same file. AGENTS.md is
+ * rewritten only below its J241 marker line. */
 function rewriteText(tree, placement, dirMoves, path, before, notes) {
+  const cut = frozenPrefix(path, before);
+  if (cut === 0) return rewriteWhole(tree, placement, dirMoves, path, before, notes);
+  return before.slice(0, cut) + rewriteWhole(tree, placement, dirMoves, path, before.slice(cut), notes);
+}
+
+/** How many leading characters of a file a sort keeps: AGENTS.md through its J241 marker line, all of it without one. */
+function frozenPrefix(path, text) {
+  if (path !== 'AGENTS.md') return 0;
+  const at = text.startsWith(AGENTS_MARKER) ? 0 : text.indexOf(`\n${AGENTS_MARKER}`);
+  if (at === -1) return text.length;
+  const end = text.indexOf('\n', at === 0 ? 0 : at + 1);
+  return end === -1 ? text.length : end + 1;
+}
+
+function rewriteWhole(tree, placement, dirMoves, path, before, notes) {
   const { moves, index, stale } = placement;
   let after = rewriteSource(tree, index, moves, dirMoves, path, before, notes);
   if (CODE.test(path) && after.includes('src/')) after = applyEdits(after, rewriteDivided(path, after, rewriteTokens(after, path, tree, moves, dirMoves, []), moves, dirMoves, notes));
@@ -600,7 +620,7 @@ export function planFailures(tree, plan, root = process.cwd()) {
   if (again.moves.size + again.writes.size > 0) failures.push(`idempotent: a second run would move ${again.moves.size} and rewrite ${again.writes.size}: ${[...again.moves.keys(), ...again.writes.keys()].slice(0, 5).join(', ')}`);
   for (const note of plan.notes) if (note.kind === 'divided-literal' || note.kind === 'divided-glob') failures.push(`${note.kind}: ${note.file} names ${note.value}, which is on several sides`);
   for (const path of [...after.text.keys()].filter(file => !plan.moves.has(file))) {
-    const text = after.text.get(path) ?? '';
+    const whole = after.text.get(path) ?? '', text = whole.slice(frozenPrefix(path, whole));
     for (const match of text.matchAll(PATH_TOKEN)) {
       const rest = (match[2] ?? '').replace(/[./]+$/u, ''), old = `src/${match[1]}/${rest}`;
       if (plan.moves.has(old) && !plan.dirMoves.divided.has(old)) failures.push(`stale: ${path} still names ${old}`);
