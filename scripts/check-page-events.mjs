@@ -6,19 +6,24 @@
 //
 // Every subscription in src/client and src/shared needs a row in lint/page-events.json naming a production producer and
 // the proof that drives it for real:
-//   - a literal `.on('<event>'`, on any receiver (the page bus, ctx, a scope's events, a host bus in shared code);
-//   - a dynamic `.on(<expr>` on a bus (`events`, `*.events`, `ctx`, `context`), whose event comes from data;
-//   - a callback tap: an assignment to `.onKill`, `.onWindup`, `.onDamage` or `.onSound`, or `tap(x, '<tap>', ...)`.
+//   - a literal `.on('<event>', fn)`, on any receiver (the page bus, ctx, a scope's events, a host bus in shared code);
+//   - a dynamic `.on(<expr>, fn)` on any receiver, whose event comes from data or a forwarder;
+//   - a callback tap: an assignment of `.onKill`, `.onWindup`, `.onDamage` or `.onSound`, or `tap(x, '<tap>', ...)`.
+// `.on(ref, 'click', fn)` (a string second argument) is the panel/DOM API, not an event bus, and clearing a tap to
+// undefined or null installs nothing.
 // A row is { id, kind, name, bus, listeners: [file], producers: [{ file, emits }], proof, why?, debt? }. It is red when:
 //   - a listener has no row for its kind, name and file (a new listener);
 //   - a row's listener file no longer subscribes there (a stale row: drop the file);
-//   - a producer's file is gone, or no longer contains its `emits` text (the producer left);
-//   - a producer is reached only by tests: it is not in the import closure of its bus's entries. The page closure starts
-//     at the page entries and never crosses into src/server, so a producer that moved to the server's bus is not a page
-//     producer. A src/client listener is always on a `page` row;
-//   - a proof is neither `flow:<name>` that worker-client-proof runs nor an existing repo file.
-// `debt` names an open finding on its row: the check prints the count and stays green. `ignore` rows name a site that is
-// not a game-event listener (DOM, Sentry, a day-cycle phase, a ctx.on forwarder) and say why.
+//   - a producer's file is gone, or its `emits` text no longer appears in its code (comments do not count);
+//   - a producer is not reachable from its bus's production entries: neither its file, by the runtime import closure,
+//     nor each named function around its `emits`, by a reference in that closure. The page closure never crosses into
+//     src/server and never follows a worker URL (another realm, another bus), so a producer that moved to the server's
+//     bus is not a page producer. A src/client listener is always on a `page` row;
+//   - a proof is neither `flow:<name>` that worker-client-proof dispatches, `local`, nor an existing repo script.
+// What this proves is that a production producer still exists and is wired by name; that it fires for the listener is
+// the proof flow's job. `local` is allowed only when every producer is src/client code: page and listener share a
+// process, the case the split could not break. `debt` names an open finding or a missing proof on its row: the check
+// prints the count and stays green. `ignore` rows name a site that is not a game-event listener and say why.
 //   node scripts/check-page-events.mjs           check (exit 1 on any red line)
 //   node scripts/check-page-events.mjs --list    every listener site found, one per line
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -30,10 +35,10 @@ export const TABLE = 'lint/page-events.json';
 export const TAPS = ['onKill', 'onWindup', 'onDamage', 'onSound'];
 /** @type {('page' | 'host')[]} */
 export const BUSES = ['page', 'host'];
+export const RUNNER = 'scripts/worker-client-proof.mjs';
 const KINDS = ['event', 'dynamic', 'tap'];
 const SCANNED = ['src/client', 'src/shared'];
 const SOURCE = /\.(?:ts|tsx|mts)$/u;
-const BUS = /^(?:.*\.)?events$|^ctx$|^context$/u;
 
 /** @param {string} path */
 export const isTestPath = path => /\.(?:test|proof)\.m?[jt]sx?$/u.test(path) || /\.d\.m?ts$/u.test(path)
@@ -58,6 +63,13 @@ const parse = (root, file) => ts.createSourceFile(file, readFileSync(join(root, 
 
 /** @param {ts.Node} node @returns {string | null} a string literal's text */
 const literal = node => ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? node.text : null;
+/** @param {ts.Node} node @returns {string | null} the member a property or literal element access names */
+const member = node => ts.isPropertyAccessExpression(node) ? node.name.text
+  : ts.isElementAccessExpression(node) ? literal(node.argumentExpression) : null;
+/** @param {ts.Node} node */
+const isFunction = node => ts.isArrowFunction(node) || ts.isFunctionExpression(node);
+/** @param {ts.Node} node */
+const isNothing = node => node.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(node) && node.text === 'undefined');
 
 /**
  * @typedef {{ file: string, line: number, kind: 'event' | 'dynamic' | 'tap', name: string }} Site
@@ -71,19 +83,19 @@ export function sitesIn(source) {
   const visit = node => {
     if (ts.isCallExpression(node)) {
       const callee = node.expression, [first, second] = node.arguments;
-      if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'on' && first !== undefined) {
-        const name = literal(first), receiver = callee.expression.getText(source).replaceAll(/\s+/gu, '').replace(/\?$/u, '');
+      if (member(callee) === 'on' && first !== undefined && (second === undefined || literal(second) === null)) {
+        const name = literal(first), receiver = /** @type {ts.PropertyAccessExpression | ts.ElementAccessExpression} */ (callee).expression;
         if (name !== null && name !== '') sites.push({ file, line: line(node), kind: 'event', name });
-        else if (name === null && BUS.test(receiver)) sites.push({ file, line: line(node), kind: 'dynamic', name: receiver });
+        else if (name === null && !isFunction(first) && second !== undefined) {
+          sites.push({ file, line: line(node), kind: 'dynamic', name: receiver.getText(source).replaceAll(/\s+/gu, '').replace(/\?$/u, '') });
+        }
       }
-      if (ts.isIdentifier(callee) && callee.text === 'tap' && second !== undefined) {
-        const name = literal(second);
-        if (name !== null && TAPS.includes(name)) sites.push({ file, line: line(node), kind: 'tap', name });
-      }
+      const tapName = second === undefined ? null : literal(second);
+      if (((ts.isIdentifier(callee) && callee.text === 'tap') || member(callee) === 'tap') && tapName !== null && TAPS.includes(tapName)) sites.push({ file, line: line(node), kind: 'tap', name: tapName });
     }
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-      && ts.isPropertyAccessExpression(node.left) && TAPS.includes(node.left.name.text)) {
-      sites.push({ file, line: line(node), kind: 'tap', name: node.left.name.text });
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && !isNothing(node.right)) {
+      const name = member(node.left);
+      if (name !== null && TAPS.includes(name)) sites.push({ file, line: line(node), kind: 'tap', name });
     }
     ts.forEachChild(node, visit);
   };
@@ -123,20 +135,37 @@ function resolveSpec(root, from, spec, exported) {
 function globbed(root, from, pattern) {
   const full = relative(root, resolve(root, dirname(from), pattern.replace(/^!/u, ''))).split(sep).join('/');
   const slash = full.lastIndexOf('/'), dir = full.slice(0, slash), leaf = full.slice(slash + 1);
-  if (dir.includes('*') || !existsSync(join(root, dir))) return [];
+  if (dir.includes('*')) throw new Error(`check-page-events: ${from} globs a directory wildcard (${pattern}); teach globbed() to walk it`);
+  if (!existsSync(join(root, dir))) return [];
   const match = new RegExp(`^${leaf.replaceAll(/[.+^${}()|[\]\\]/gu, String.raw`\$&`).replaceAll('*', '[^/]*')}$`, 'u');
   return readdirSync(join(root, dir)).filter(entry => match.test(entry)).map(entry => `${dir}/${entry}`);
 }
 
-/** @param {string} root @param {string} file @param {Record<string, string>} exported @returns {string[]} files this one loads at runtime */
-function runtimeImports(root, file, exported) {
+/** @param {ts.Expression | undefined} options @returns {boolean} an eager glob that evaluates modules, not a lazy or raw-text one */
+function evaluatesModules(options) {
+  if (options === undefined || !ts.isObjectLiteralExpression(options)) return false;
+  const props = new Map(options.properties.filter(ts.isPropertyAssignment).map(prop => [prop.name.getText(), prop.initializer]));
+  return props.get('eager')?.kind === ts.SyntaxKind.TrueKeyword && !props.has('query') && !props.has('as');
+}
+
+/**
+ * @param {string} root @param {string} file @param {ts.SourceFile | null} source @param {Record<string, string>} exported
+ * @returns {string[]} files this one evaluates in its own realm: static and literal dynamic imports, eager module globs,
+ * an HTML page's module scripts. A worker URL is another realm with its own bus, so it is never an edge here.
+ */
+function runtimeImports(root, file, source, exported) {
   if (file.endsWith('.html')) {
-    const html = readFileSync(join(root, file), 'utf8');
-    return [...html.matchAll(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["']/gu)]
-      .map(([, src = '']) => resolveSpec(root, file, src.startsWith('/') ? src : `./${src}`, exported)).filter(path => path !== null);
+    const html = readFileSync(join(root, file), 'utf8'), out = /** @type {string[]} */ ([]);
+    for (const [tag] of html.matchAll(/<script\b[^>]*>/gu)) {
+      const src = /\bsrc=["']([^"']+)["']/u.exec(tag)?.[1];
+      if (src === undefined || !/\btype=["']module["']/u.test(tag)) continue;
+      const path = resolveSpec(root, file, src.startsWith('/') ? src : `./${src}`, exported);
+      if (path !== null) out.push(path);
+    }
+    return out;
   }
-  if (!SOURCE.test(file)) return [];
-  const source = parse(root, file), out = /** @type {string[]} */ ([]);
+  if (source === null) return [];
+  const out = /** @type {string[]} */ ([]);
   /** @param {string} spec */
   const add = spec => { const path = resolveSpec(root, file, spec, exported); if (path !== null) out.push(path); };
   /** @param {ts.Node} node */
@@ -147,17 +176,14 @@ function runtimeImports(root, file, exported) {
       if (!typeOnly && spec !== null) add(spec);
     }
     if (ts.isCallExpression(node)) {
-      const [first] = node.arguments, spec = first === undefined ? null : literal(first);
+      const [first, second] = node.arguments, spec = first === undefined ? null : literal(first);
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword && spec !== null) add(spec);
-      if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'glob' && node.expression.expression.getText(source) === 'import.meta' && first !== undefined) {
+      if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'glob' && node.expression.expression.getText(source) === 'import.meta'
+        && first !== undefined && evaluatesModules(second)) {
         const patterns = (ts.isArrayLiteralExpression(first) ? first.elements.map(literal) : [spec]).filter(pattern => pattern !== null);
         const drop = new Set(patterns.filter(pattern => pattern.startsWith('!')).flatMap(pattern => globbed(root, file, pattern)));
         for (const pattern of patterns.filter(row => !row.startsWith('!'))) out.push(...globbed(root, file, pattern).filter(path => !drop.has(path)));
       }
-    }
-    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'URL') {
-      const [first, second] = node.arguments ?? [], spec = first === undefined ? null : literal(first);
-      if (spec !== null && second !== undefined && second.getText(source) === 'import.meta.url') add(spec);
     }
     ts.forEachChild(node, visit);
   };
@@ -166,27 +192,92 @@ function runtimeImports(root, file, exported) {
 }
 
 /**
+ * @typedef {{ files: Set<string>, names: Map<string, number> }} Reach
  * @param {string} root @param {string[]} entries @param {(file: string) => boolean} [stop] a file the walk never enters
- * @returns {Set<string>} every file the entries load at runtime, transitively (type-only imports excluded)
+ * @returns {Reach} every file the entries evaluate, transitively (type-only imports excluded), and how often each
+ * identifier or string literal appears in their non-test code
  */
 export function productionReach(root, entries, stop = () => false) {
-  const exported = exportMap(root), seen = new Set(), queue = entries.filter(entry => existsSync(join(root, entry)));
+  const exported = exportMap(root), files = new Set(), names = new Map(), queue = entries.filter(entry => existsSync(join(root, entry)));
+  /** @param {ts.Node} node */
+  const count = node => {
+    const name = ts.isIdentifier(node) || ts.isPrivateIdentifier(node) ? node.text : ts.isStringLiteral(node) ? node.text : null;
+    if (name !== null) names.set(name, (names.get(name) ?? 0) + 1);
+    ts.forEachChild(node, count);
+  };
   while (queue.length > 0) {
     const file = /** @type {string} */ (queue.pop());
-    if (seen.has(file)) continue;
-    seen.add(file);
-    for (const next of runtimeImports(root, file, exported)) if (!seen.has(next) && !stop(next)) queue.push(next);
+    if (files.has(file)) continue;
+    files.add(file);
+    const source = SOURCE.test(file) ? parse(root, file) : null;
+    if (source !== null && !isTestPath(file)) count(source);
+    for (const next of runtimeImports(root, file, source, exported)) if (!files.has(next) && !stop(next)) queue.push(next);
   }
-  return seen;
+  return { files, names };
 }
 
-/** @param {string} root @returns {Set<string>} the flows `worker-client-proof.mjs --play --only=<flow>` runs */
+/** @param {ts.SourceFile} source @returns {string} the file's text with every comment blanked to spaces */
+export function codeOnly(source) {
+  const text = source.text, chars = text.split(''), seen = new Set();
+  /** @param {ts.CommentRange[] | undefined} ranges */
+  const blank = ranges => {
+    for (const { pos, end } of ranges ?? []) {
+      if (seen.has(pos)) continue;
+      seen.add(pos);
+      for (let at = pos; at < end; at++) if (chars[at] !== '\n') chars[at] = ' ';
+    }
+  };
+  /** @param {ts.Node} node */
+  const visit = node => {
+    blank(ts.getLeadingCommentRanges(text, node.pos));
+    blank(ts.getTrailingCommentRanges(text, node.end));
+    for (const child of node.getChildren(source)) visit(child);
+  };
+  visit(source);
+  return chars.join('');
+}
+
+/** @param {ts.Node} fn @returns {ts.Node | null} the name node a function is called by, if it has one */
+function calledBy(fn) {
+  if ((ts.isFunctionDeclaration(fn) || ts.isMethodDeclaration(fn) || ts.isGetAccessor(fn) || ts.isSetAccessor(fn)) && fn.name !== undefined) return fn.name;
+  if (ts.isConstructorDeclaration(fn)) return ts.isClassLike(fn.parent) ? fn.parent.name ?? null : null;
+  if (!isFunction(fn)) return null;
+  const { parent } = fn;
+  if ((ts.isVariableDeclaration(parent) || ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent)) && parent.initializer === fn) return parent.name;
+  if (ts.isBinaryExpression(parent) && parent.right === fn && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+    return ts.isPropertyAccessExpression(parent.left) ? parent.left.name : ts.isIdentifier(parent.left) ? parent.left : null;
+  }
+  return null; // a callback argument or an IIFE runs when its caller does
+}
+
+/**
+ * @param {ts.SourceFile} source @param {number} at
+ * @returns {string[]} the names of every named function enclosing a position, innermost first
+ */
+function enclosingNames(source, at) {
+  /** @type {ts.Node | null} */
+  let deepest = null;
+  /** @param {ts.Node} node */
+  const find = node => { if (node.getStart(source) <= at && at < node.end) { deepest = node; ts.forEachChild(node, find); } };
+  find(source);
+  const out = [];
+  for (let node = /** @type {ts.Node | null} */ (deepest); node !== null && node !== undefined; node = node.parent) {
+    const name = ts.isFunctionLike(node) ? calledBy(node) : null;
+    if (name !== null && (ts.isIdentifier(name) || ts.isPrivateIdentifier(name) || ts.isStringLiteral(name))) out.push(name.text);
+  }
+  return out;
+}
+
+/** @param {string} root @param {string} file @returns {string} a script's code, comments blanked */
+const scriptCode = (root, file) => codeOnly(ts.createSourceFile(file, readFileSync(join(root, file), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS));
+
+/** @param {string} root @returns {Set<string>} the flows `worker-client-proof.mjs --only=<flow>` dispatches: the `only` and `runs` names in the dispatchers it imports */
 export function proofFlows(root) {
-  const flows = new Set(), dir = join(root, 'scripts');
-  if (!existsSync(dir)) return flows;
-  for (const entry of readdirSync(dir).filter(name => /^worker-client-.*\.mjs$/u.test(name))) {
-    const code = readFileSync(join(dir, entry), 'utf8');
-    for (const [, only, runs] of code.matchAll(/\bonly === '([a-z0-9-]+)'|\bruns\('([a-z0-9-]+)'\)/gu)) flows.add(only ?? runs);
+  const flows = new Set();
+  if (!existsSync(join(root, RUNNER))) return flows;
+  const dispatchers = [...scriptCode(root, RUNNER).matchAll(/\bimport\('\.\/(worker-client-[\w-]+\.mjs)'\)/gu)].map(([, name]) => `scripts/${name}`);
+  for (const file of dispatchers.filter(path => existsSync(join(root, path)))) {
+    for (const [, only, runs] of scriptCode(root, file).matchAll(/\bonly === '([a-z0-9-]+)'|\bruns\('([a-z0-9-]+)'\)/gu)) flows.add(only ?? runs);
   }
   return flows;
 }
@@ -247,7 +338,7 @@ export function judgePageEvents(root, table) {
     page: productionReach(root, table.entries.page, file => file.startsWith('src/server/')),
     host: productionReach(root, table.entries.host),
   };
-  const flows = proofFlows(root);
+  const flows = proofFlows(root), sources = new Map();
   for (const row of table.rows) {
     for (const file of row.listeners) {
       if (!found.has(key(row.kind, row.name, file))) failures.push(`row ${row.id}: ${file} no longer listens to ${row.kind} ${row.name}: drop it from the row`);
@@ -255,18 +346,25 @@ export function judgePageEvents(root, table) {
     }
     for (const { file, emits } of row.producers) {
       if (!existsSync(join(root, file))) { failures.push(`row ${row.id}: producer ${file} is gone`); continue; }
-      if (!readFileSync(join(root, file), 'utf8').includes(emits)) { failures.push(`row ${row.id}: producer ${file} no longer has \`${emits}\``); continue; }
-      if (isTestPath(file)) failures.push(`row ${row.id}: producer ${file} is test code, not a production producer`);
-      else if (row.bus === 'page' && !reach.page.has(file) && reach.host.has(file)) failures.push(`row ${row.id}: producer ${file} runs only on the server, never on the page`);
-      else if (!reach[row.bus].has(file)) failures.push(`row ${row.id}: producer ${file} is reached only by tests, not from a production ${row.bus} entry`);
+      if (!sources.has(file)) { const source = parse(root, file); sources.set(file, { source, code: codeOnly(source) }); }
+      const { source, code } = sources.get(file), at = code.indexOf(emits);
+      if (at === -1) { failures.push(`row ${row.id}: producer ${file} no longer has \`${emits}\` in its code`); continue; }
+      if (isTestPath(file)) { failures.push(`row ${row.id}: producer ${file} is test code, not a production producer`); continue; }
+      if (!reach[row.bus].files.has(file)) {
+        failures.push(row.bus === 'page' && reach.host.files.has(file) ? `row ${row.id}: producer ${file} runs only on the server, never on the page`
+          : `row ${row.id}: producer ${file} is not reachable from the production ${row.bus} entries (only tests, or nothing, load it)`);
+        continue;
+      }
+      // Each named function around the emit must be referenced by name in production code beyond its own declaration.
+      const uncalled = enclosingNames(source, at).filter(name => (reach[row.bus].names.get(name) ?? 0) < 2);
+      if (uncalled.length > 0) failures.push(`row ${row.id}: producer ${file} emits inside ${uncalled.join(', ')}, which no production ${row.bus} code names`);
     }
-    const flow = /^flow:([a-z0-9-]+)$/u.exec(row.proof)?.[1];
+    const flow = /^flow:([a-z0-9-]+)$/u.exec(row.proof)?.[1], script = row.proof.split(' ')[0] ?? '';
     if (row.proof === 'local') {
-      // A listener whose every producer is page code shares its process: the split could not move the producer away.
       const away = row.producers.filter(({ file }) => !file.startsWith('src/client/')).map(({ file }) => file);
       if (row.bus !== 'page' || away.length > 0 || row.why === undefined) failures.push(`row ${row.id}: a local proof needs a page row, a why, and every producer in src/client (not ${away.join(', ') || row.bus})`);
-    } else if (flow !== undefined) { if (!flows.has(flow)) failures.push(`row ${row.id}: proof flow ${flow} is not one worker-client-proof runs`); }
-    else if (!existsSync(join(root, row.proof.split(' ')[0] ?? ''))) failures.push(`row ${row.id}: proof ${row.proof} is neither flow:<name>, local, nor an existing repo script`);
+    } else if (flow !== undefined) { if (!flows.has(flow)) failures.push(`row ${row.id}: proof flow ${flow} is not one ${RUNNER} dispatches`); }
+    else if (!/^scripts\/[\w.-]+\.m?[jt]s$/u.test(script) || !existsSync(join(root, script)) || !statSync(join(root, script)).isFile()) failures.push(`row ${row.id}: proof ${row.proof} is neither flow:<name>, local, nor an existing repo script`);
     if (row.debt !== undefined) debt.push(`${row.id}: ${row.debt}`);
   }
   return { failures, debt, sites, rows: table.rows.length };

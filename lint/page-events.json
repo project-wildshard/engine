@@ -464,7 +464,8 @@
     }
    ],
    "proof": "flow:hurt",
-   "why": "C2: the server's blows present through ports.hurt -> PlayerHurt.serverHit, not this event; the listener presents only a fall the page settles itself, off the wire."
+   "why": "C2 moved the server's blows to ports.hurt -> PlayerHurt.serverHit, which flow:hurt proves with page damage 0.",
+   "debt": "No wired producer: a server-owned page settles no fall (PlayerHurt.fall) and no blow on its own pipeline, so this listener runs only off the wire. Retire it, or prove an unlinked page that still settles a fall."
   },
   {
    "id": "audio.scene-frame",
@@ -579,8 +580,7 @@
    "listeners": [
     "src/client/game/population/pageLife.ts",
     "src/client/game/quest/chapter.ts",
-    "src/shared/game/loot/deaths.ts",
-    "src/shared/game/population/pageHomes.ts"
+    "src/shared/game/loot/deaths.ts"
    ],
    "producers": [
     {
@@ -593,15 +593,16 @@
     }
    ],
    "proof": "flow:creature-hit",
-   "why": "C6, C7, C26: the server's NetDied re-emits on the page with the row body's own actor. pageHomes' herdless homes match no body today (C12)."
+   "why": "C6, C7, C26: the server's NetDied re-emits on the page with the row body's own actor."
   },
   {
-   "id": "actor.died.returns",
+   "id": "actor.died.dormant",
    "kind": "event",
    "name": "actor.died",
    "bus": "page",
    "listeners": [
-    "src/client/game/population/pageReturns.ts"
+    "src/client/game/population/pageReturns.ts",
+    "src/shared/game/population/pageHomes.ts"
    ],
    "producers": [
     {
@@ -614,7 +615,8 @@
     }
    ],
    "proof": "flow:creature-returns",
-   "why": "S3, proved by a real kill and its return."
+   "why": "S3: the server owns returns; flow:creature-returns proves them with zero page population.",
+   "debt": "Dormant: RowBodies is always herdless, so pageReturns returns before it subscribes and pageHomes matches no body. The producer reaches neither. Retire both listeners."
   },
   {
    "id": "ai.windup",
@@ -796,7 +798,26 @@
     }
    ],
    "proof": "flow:nalati-signals",
-   "why": "A page crowd's own FlockBrain bleats; the server's copy reaches the page as creature.sound (row creature.sound)."
+   "why": "A page crowd's own FlockBrain bleats; the server's copy reaches the page as creature.sound (row creature.sound).",
+   "debt": "Proof missing: nalati-signals asserts the stampede, the guardian's bark and the bite, not a page FlockBrain bleat. Add a flow step that hears one."
+  },
+  {
+   "id": "weather.reactions",
+   "kind": "dynamic",
+   "name": "reactions",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/weather/forest.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/weather/netClimate.ts",
+     "emits": "for (const listener of this.listeners.get(event) ?? []) listener(record);"
+    }
+   ],
+   "proof": "local",
+   "why": "NetClimate.sync copies the server's replicated reaction records and calls the storm cues' listeners (audit: a working state-to-event adapter).",
+   "debt": "Proof missing: no flow asserts a replicated weather reaction reaching its cue. Add a storm step that hears one."
   },
   {
    "id": "host.actor.died.declared",
@@ -868,6 +889,11 @@
    "file": "src/client/engine/level/installation.ts",
    "name": "app.events",
    "why": "Forwards each ctx.on registration to the page bus; every registration is a scanned listener with its own row."
+  },
+  {
+   "file": "src/shared/engine/world/dayCycle.ts",
+   "name": "this",
+   "why": "DayCycle.onPhase, its own phase emitter (this.on(null, fn)); the replicated phase setter runs checkPhase on the page."
   },
   {
    "file": "src/client/game/shard/retainedHooks.ts",
