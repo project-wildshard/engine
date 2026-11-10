@@ -40,3 +40,7 @@ It no longer substitutes the generic package branch for engine admission.
 
 The operator's next release remains the end-to-end DS2 observation. This
 source proof does not claim the plan's next-release acceptance criterion.
+
+The official renderer revision was regenerated from the committed DS2 source;
+the validation revision did not change. Final publication keeps the normal
+full hook and its fixed budgets, with one engine queue request for this row.
