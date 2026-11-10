@@ -66,6 +66,15 @@ installOfflineDownload({
 persistHomeScreen();
 definePageSaveKeys(saves);
 const search = new URLSearchParams(location.search);
+// A13 (meta MMO-FAILURE-MODES-PLAN): Settings ▸ Developer ▸ Failure screens asks by event. Only a Developer page (`<html data-dev>`,
+// src/client/engine/core/devMode.ts) answers, and only then is the prototype module downloaded: no player loads or sees it.
+entryScope.listen(document, 'ws:failscreen', event => {
+  if (!Object.hasOwn(document.documentElement.dataset, 'dev')) return;
+  const id = event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : 'gallery';
+  void (async (): Promise<void> => {
+    try { (await import('./failScreens')).showFailScreen(id); } catch (error) { console.warn('[failScreens] did not load', error); }
+  })();
+});
 // Do not depend on the sibling sw.ts module finishing first; both entry points share the same consumed record.
 inspectPreviousBoot();
 // Safari may reload the same document after WebContent dies. Keep that automatic retry on the

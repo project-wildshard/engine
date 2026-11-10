@@ -170,6 +170,12 @@ const clearDownloadsRow = action('clearDownloads', 'tools', engineString('s_59cb
 });
 
 
+/** A13 (meta MMO-FAILURE-MODES-PLAN): every screen a player sees when the world's link fails, as prototypes over this page. The
+ *  entry answers the event only with Developer on, and only then downloads them (src/client/app/failScreens.ts). */
+const failScreensRow = action('failScreens', 'tools', engineString('s_debug_fail_screens'), engineString('s_debug_fail_screens_open'), () => {
+  document.dispatchEvent(new CustomEvent('ws:failscreen', { detail: 'gallery' }));
+}, { purpose: 'developer', ask: 'E133', reviewBy: '2026-12-30', note: engineString('s_debug_fail_screens_note') });
+
 export const DEBUG_ROWS: readonly DebugRow[] = [
   // ── Look ──
 
@@ -187,6 +193,7 @@ export const DEBUG_ROWS: readonly DebugRow[] = [
 
   // ── Developer tools ──
   weatherRow,
+  failScreensRow,
 
 ];
 
