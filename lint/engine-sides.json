@@ -1262,6 +1262,7 @@
     "src/server/host/dedicated/saves/writeQueue.ts": "server",
     "src/server/host/dedicated/seats.ts": "server",
     "src/server/host/dedicated/serverReports.ts": "server",
+    "src/server/host/dedicated/serverSentry.ts": "server",
     "src/server/host/dedicated/shopGate.ts": "server",
     "src/server/host/dedicated/socketPump.ts": "server",
     "src/server/host/dedicated/socketTransport.ts": "server",

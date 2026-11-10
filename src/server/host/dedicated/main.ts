@@ -20,14 +20,20 @@ import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
 import { savesUrl } from './saves/pgDatabase';
 import { ServerReports } from './serverReports';
+import { sendSentryTest, serverSentry } from './serverSentry';
 import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
 
 declare const __BUILD_ID__: string;
+/** scripts/build-server.mjs: package.json's version, the Sentry release (S8). */
+declare const __ENGINE_VERSION__: string | undefined;
 const need = (name: string): string => { const value = process.env[name]; if (value === undefined || value === '') throw new Error(`The server needs ${name}`); return value; };
 const log = (line: Record<string, unknown>): void => { console.info(JSON.stringify(line)); };
+const engineVersion = typeof __ENGINE_VERSION__ === 'string' ? __ENGINE_VERSION__ : undefined;
+// S8: `node main.mjs --sentry-test` sends one deliberate event with the unit's env, then exits. It refuses any channel but staging.
+if (process.argv.includes('--sentry-test')) process.exit(await sendSentryTest({ env: process.env, build: process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, version: engineVersion, log }));
 const build = process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, origin = need('PACK_ORIGIN'), cache = process.env['PACK_CACHE'] ?? '/var/lib/wildshard/packs';
 const port = Number(process.env['PORT'] ?? 8790), host = process.env['HOST'] ?? '127.0.0.1', started = Date.now();
 // C5, C11: one cell first. The list is fixed at startup, and a player with no save lands in the first.
@@ -54,7 +60,8 @@ const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: Pla
 const hold = process.env['HOLD_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
-const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
+const sentry = serverSentry({ dsn: setting('SENTRY_DSN'), version: engineVersion, build, channel: release.channel });
+const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, sentry, ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
 const recordTag=setting('RECORD_TAG');
 const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;

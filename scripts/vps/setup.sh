@@ -173,6 +173,8 @@ BUNDLE_ORIGIN=https://github.com/project-wildshard/engine/releases/download
 # E7.8a: what leaves the box. Room records are refused until api-server's telemetry lists them.
 TELEMETRY_URL=https://api.wildshard.io/api/telemetry
 ERRORS_URL=https://api.wildshard.io/api/errors
+# SENTRY-TRIAGE S8: the wildshard-server project's DSN. Blank sends nothing.
+SENTRY_DSN=
 RECORD_TAG=
 HOST=127.0.0.1
 PORT=$port

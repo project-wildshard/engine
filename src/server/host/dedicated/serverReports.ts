@@ -2,6 +2,7 @@
 // fails is logged and forgotten, so no tick and no save waits on one. `api-server`'s telemetry takes this kind only once `cleanTelemetryRecord` lists it.
 import { Scope } from '@wildshard/engine/app/scope';
 import type { WorkerReading } from './cellProtocol';
+import type { ServerSentry } from './serverSentry';
 
 /** How often a record goes, in ms. */
 const RECORD_MS = 60_000;
@@ -17,6 +18,8 @@ export interface ServerReportsOptions {
   readonly tag: string | undefined;
   readonly log: (line: Record<string, unknown>) => void;
   readonly everyMs?: number;
+  /** SENTRY-TRIAGE S8: errors also go to Sentry when the channel's env names a DSN. */
+  readonly sentry?: ServerSentry | undefined;
 }
 const peak = (rows: readonly WorkerReading[], read: (row: WorkerReading) => number): number => rows.reduce((top, row) => Math.max(top, read(row)), 0);
 const total = (rows: readonly WorkerReading[], read: (row: WorkerReading) => number): number => rows.reduce((sum, row) => sum + read(row), 0);
@@ -45,9 +48,10 @@ export class ServerReports {
   error(error: unknown): void {
     const { build, errorsUrl } = this.options, stack = error instanceof Error ? error.stack ?? '' : '';
     if (errorsUrl !== undefined) this.post(errorsUrl, { message: String(error), stack, fatal: true, system: 'server', context: { build } });
+    this.options.sentry?.capture(error, { system: 'server', fatal: true });
   }
   /** Every report on its way has landed or failed: an ending process waits for this. */
-  async settled(): Promise<void> { await Promise.all(this.flying); }
+  async settled(): Promise<void> { await Promise.all([...this.flying, this.options.sentry?.flush()]); }
   dispose(): void { this.scope.dispose(); }
   private record(): void {
     const { build, channel, tag, telemetryUrl } = this.options, rows = this.rows.splice(0), { players, held } = this, latest = [...this.latest.values()];

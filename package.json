@@ -49,6 +49,7 @@
     "@dimforge/rapier3d-simd": "0.21.0",
     "@hono/node-server": "2.1.5",
     "@sentry/browser": "11.0.0",
+    "@sentry/core": "11.0.0",
     "@valibot/to-json-schema": "1.8.0",
     "@wildshard/format": "github:project-wildshard/shardfile#4f8280c58ab6e527aa9735eaa80fccf1f34ab6d3",
     "ajv": "6.15.0",

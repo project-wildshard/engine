@@ -68,6 +68,23 @@ a disposable test database. No production wipe or sudo SQL cleanup is
 part of setup or proof preparation. Codex-port owns the page/proof guard;
 codex-j189 owns the runbook and VPS channel setup.
 
+## Sentry (SENTRY-TRIAGE S8)
+
+A channel's server sends its errors to Sentry's `wildshard-server`
+project when its env file has a `SENTRY_DSN` row with the project's DSN
+(Sentry, project settings, Client Keys). A blank or missing row sends
+nothing. Events carry release `wildshard@<version>`, the build as
+`dist` and the channel as environment, and no host, player or request.
+After adding the row, restart the unit, then check it as the unit runs:
+
+```sh
+sudo systemctl restart wildshard-server@staging
+sudo -u wildshard sh -c 'set -a; . /etc/wildshard/staging.env; RELEASE_CHANNEL=staging node /var/lib/wildshard/staging/current/main.mjs --sentry-test'
+```
+
+`--sentry-test` sends one deliberate event and exits 0 when Sentry took
+it. It refuses every channel but staging.
+
 Both public loopback targets have an owned health stub while waiting for
 their first signed release, including staging. The owned pull timers
 verify and download before starting the game units, whose conflicts

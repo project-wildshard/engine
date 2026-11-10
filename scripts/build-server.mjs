@@ -11,6 +11,8 @@ import { parseArgs } from 'node:util';
 import { build } from 'rolldown';
 
 const ROOT = resolve(import.meta.dirname, '..'), require = createRequire(join(ROOT, 'package.json'));
+// SENTRY-TRIAGE S8: the server's Sentry release is `wildshard@<version>`, as the client's (S5).
+const VERSION = /** @type {{ version: string }} */ (JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))).version;
 const { values } = parseArgs({ options: { build: { type: 'string', default: 'dev' }, out: { type: 'string', default: 'dist/server' }, entry: { type: 'string', multiple: true, default: [] }, tar: { type: 'string' } } });
 const OUT = resolve(ROOT, values.out), DEDICATED = join(ROOT, 'src/server/host/dedicated');
 
@@ -25,7 +27,7 @@ const rapier = { name: 'rapier', resolveId: source => {
 const extra = Object.fromEntries(values.entry.map(row => { const [name, path] = row.split('='); return [name, resolve(ROOT, path)]; }));
 // Separate self-contained entries preserve the dedicated archive contract.
 for (const [name,input] of Object.entries({main:join(DEDICATED,'main.ts'),cellWorker:join(DEDICATED,'cellWorker.ts'),...extra})) {
-  await build({input,platform:'node',transform:{target:'node24',define:{__BUILD_ID__:JSON.stringify(values.build)}},
+  await build({input,platform:'node',transform:{target:'node24',define:{__BUILD_ID__:JSON.stringify(values.build),__ENGINE_VERSION__:JSON.stringify(VERSION)}},
     plugins:[rapier],external:['pg-native'],output:{file:join(OUT,`${name}.mjs`),format:'esm',codeSplitting:false}});
 }
 mkdirSync(OUT, { recursive: true });

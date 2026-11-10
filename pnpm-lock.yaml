@@ -23,6 +23,9 @@ importers:
       '@sentry/browser':
         specifier: 11.0.0
         version: 11.0.0
+      '@sentry/core':
+        specifier: 11.0.0
+        version: 11.0.0
       '@valibot/to-json-schema':
         specifier: 1.8.0
         version: 1.8.0(valibot@1.5.0(typescript@6.0.3))
