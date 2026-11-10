@@ -8,10 +8,11 @@ const processes = () => new Promise((resolve, reject) => {
     if (error) {reject(error); return;}
     const rows = output.trim().split('\n').map(line => {
       const [pid, parent, group, state] = line.trim().split(/\s+/u);
-      return {pid: Number(pid), parent: Number(parent), group: Number(group), state: state ?? ''};
+      return {pid: Number(pid), parent: Number(parent), group: Number(group), state: state ?? '', inventory: line.slice(0, 160)};
     });
-    if (rows.some(row => !Number.isSafeInteger(row.pid) || row.pid <= 0 || !Number.isSafeInteger(row.parent)
-      || !Number.isSafeInteger(row.group) || row.state.length === 0)) {reject(new Error('Invalid native process inventory')); return;}
+    const invalid = rows.find(row => !Number.isSafeInteger(row.pid) || row.pid <= 0 || !Number.isSafeInteger(row.parent)
+      || !Number.isSafeInteger(row.group) || row.state.length === 0);
+    if (invalid !== undefined) {reject(new Error(`Invalid native process inventory: ${JSON.stringify(invalid)}`)); return;}
     resolve(rows);
   });
 });

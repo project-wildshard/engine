@@ -4,7 +4,7 @@ import {nativeChromeExecutable, warmNativeChrome} from '../../../scripts/warm-na
 import {execFileSync, spawnSync, spawn} from 'node:child_process';
 
 // oxlint-disable-next-line import/no-nodejs-modules -- Own the bounded startup-refusal executable under repository scratch.
-import {mkdtempSync, writeFileSync, rmSync, existsSync, mkdirSync, realpathSync} from 'node:fs';
+import {mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, realpathSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise strict native profile removal after actual writer drain.
 import {rm, rmdir} from 'node:fs/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the isolated native startup fixture.
@@ -148,6 +148,7 @@ test('native cleanup drains a detached descendant writer after its browser paren
   mkdirSync(resolve(profile, 'Default'));
   const child = spawn(process.execPath, ['-e', parent, profile], {detached: true, stdio: ['ignore', 'pipe', 'inherit']});
   let writerPid;
+  let drained = false;
   try {
     const [ready] = await once(child.stdout, 'data');
     writerPid = Number(String(ready).trim());
@@ -167,12 +168,64 @@ test('native cleanup drains a detached descendant writer after its browser paren
       expect(live).toBeUndefined();
       await rm(profile, {recursive: true}); disposed = true;
     });
+    drained = true;
     expect(disposed).toBe(true);
     expect(parentExitedWithWriter).toBe(true);
     expect(existsSync(profile)).toBe(false);
   } finally {
     for (const pid of [writerPid, child.pid]) stopFixturePid(pid);
-    rmSync(profile, {recursive: true, force: true});
+    if (drained) rmSync(profile, {recursive: true, force: true});
+    else console.error(`Native writer-drain profile retained after refusal: ${JSON.stringify(profile)}`);
+  }
+});
+
+test('inventory refusal retains its bounded raw row and never disposes the owned profile', () => {
+  const root = mkdtempSync(resolve('tmp/native-inventory-refusal-'));
+  const profile = resolve(root, 'profile'), bin = resolve(root, 'bin');
+  let verified = false;
+  try {
+    mkdirSync(profile); mkdirSync(bin); writeFileSync(resolve(profile, 'original'), 'preserved');
+    const inventory = `not-a-pid 1 1 S ${'x'.repeat(2000)}`;
+    writeFileSync(resolve(bin, 'ps'), `#!/bin/sh\nprintf '%s\\n' '${inventory}'\n`, {mode: 0o700});
+    const program = `import {spawn} from 'node:child_process';
+      import {once} from 'node:events';import {existsSync,writeFileSync} from 'node:fs';
+      const {drainNativeBrowser}=await import(process.argv[1]),profile=process.argv[2];
+      const child=spawn(process.execPath,['-e',"console.log('ready');setInterval(()=>{},1000)"],{detached:true,stdio:['ignore','pipe','inherit']});
+      let stopping;
+      const stop=()=>stopping??=(async()=>{if(child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGKILL');await exited;}})();
+      const terminate=()=>{void stop().then(()=>{writeFileSync(profile+'/terminated',String(child.pid));process.exit(143);});};
+      process.on('SIGTERM',terminate);process.on('SIGINT',terminate);
+      await once(child.stdout,'data');let disposed=false;
+      if(process.argv[3]==='hold')await new Promise(()=>{});
+      try{await drainNativeBrowser(child,undefined,async()=>{disposed=true;});throw Error('Invalid inventory was admitted');}
+      catch(error){console.log(JSON.stringify({message:String(error),disposed,profile:existsSync(profile+'/original')}));}
+      finally{await stop();}`;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', program,
+      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile],
+    {encoding: 'utf8', timeout: 10_000, env: {...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`}});
+    expect(result.status).toBe(0);
+    /** @type {unknown} */
+    const value = JSON.parse(result.stdout);
+    if (typeof value !== 'object' || value === null || !('message' in value) || typeof value.message !== 'string'
+      || !('disposed' in value) || !('profile' in value)) throw new Error('Missing native inventory refusal facts');
+    expect(value.disposed).toBe(false); expect(value.profile).toBe(true);
+    expect(value.message).toContain('Invalid native process inventory:');
+    /** @type {unknown} */
+    const diagnostic = JSON.parse(value.message.slice(value.message.indexOf('{')));
+    expect(diagnostic).toMatchObject({pid: null, parent: 1, group: 1, state: 'S', inventory: inventory.slice(0, 160)});
+    expect(value.message.length).toBeLessThan(512);
+    expect(existsSync(resolve(profile, 'original'))).toBe(true);
+    const timed = spawnSync(process.execPath, ['--input-type=module', '-e', program,
+      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, 'hold'],
+    {encoding: 'utf8', timeout: 1000, env: {...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`}});
+    expect(timed.error).toMatchObject({code: 'ETIMEDOUT'});
+    const stopped = Number(readFileSync(resolve(profile, 'terminated'), 'utf8'));
+    if (!Number.isSafeInteger(stopped) || stopped <= 1) throw new Error('Timed wrapper did not await its owned child');
+    expect(() => process.kill(stopped, 0)).toThrow();
+    verified = true;
+  } finally {
+    if (verified) rmSync(root, {recursive: true, force: true});
+    else console.error(`Native inventory control retained after refusal: ${JSON.stringify(root)}`);
   }
 });
 
