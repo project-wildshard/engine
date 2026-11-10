@@ -5,6 +5,7 @@ import { runtimePacksOn } from '@wildshard/engine/boot/loadingPacks';
 import { beginLoadingWait, finishLoadingWait, reportLoadingWait } from '@wildshard/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '@wildshard/engine/boot/timeline';
 import { observeReads } from '@wildshard/engine/boot/waits';
+import { bootTask } from '@wildshard/engine/boot/timing';
 import { streamingDistance, streamingVisible, type StreamingPoint, type StreamingView } from './streamingView';
 
 type Point = StreamingPoint;
@@ -71,12 +72,15 @@ export async function prepareSpawnView(radius: number = spawnViewRadius(), settl
     // what the fence saw, for the loading rulers (a viewer far from its jobs runs nothing)
     performance.mark('wildshard.spawn-view', { detail: [...queues].map(queue => queue.describe()) });
     for (const queue of queues) queue.wake();
-    for (;;) {
-      refused(); report();
-      const open = [...queues].filter(queue => queue.spawnViewOpen());
-      if (open.length === 0) break;
-      await Promise.all(open.map(queue => queue.spawnViewIdle()));
-    }
+    // NB3: the fence's own jobs after the settle (each job's reads and decodes are named inside it)
+    await bootTask('app:spawn-view-fence', async () => {
+      for (;;) {
+        refused(); report();
+        const open = [...queues].filter(queue => queue.spawnViewOpen());
+        if (open.length === 0) break;
+        await Promise.all(open.map(queue => queue.spawnViewIdle()));
+      }
+    });
     refused();
     // what the fence left (DL17's complete-at-control gate refuses a level whose queues still wait here)
     performance.mark('wildshard.spawn-view.done', { detail: [...queues].map(queue => queue.describe()) });

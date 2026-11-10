@@ -49,6 +49,8 @@ export const diagnosticBuild=(value:unknown):string=>typeof value==='string'&&/^
  *  any `app:<text>` through). A name not listed here or in OPERATIONS still becomes `operation-N`. */
 const NAMED_OPERATIONS=new Set(['download:cache-check','app:session-code-ready','app:session-start','app:first-game-step-start',
   'app:first-game-frame-opportunity','app:first-game-frame-submitted','app:shader-work-count','worker:configuration-send',
+  // NINE-DRAGON-BENCHMAX NB3: the readyFrame spawn view's parts (game/shardfile/tileDriver.ts, controlRefinement.ts)
+  'app:spawn-view-frame','app:spawn-view-tiles','app:spawn-view-fence',
   ...['await-booted','boot-configuration','descriptor-read-and-verification','first-authoritative-frame','first-body-links',
     'first-body-preparation-end','first-body-preparation-start','hello-send','launch-complete','rapier-held-bytes','rapier-initialize',
     'ready-received','ready-send','road-collision-inputs','road-physics-and-collision','simulation-and-collision-create',

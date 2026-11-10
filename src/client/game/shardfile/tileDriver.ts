@@ -23,6 +23,7 @@ import { pageScope } from '@wildshard/engine/app/resources';
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { bootTask, bootWork } from '@wildshard/engine/boot/timing';
 import { FENCE_LANES, SPAWN_VIEW_M, spawnViewUsesCamera } from './controlRefinement';
 import { streamingDistance, streamingOrder, type StreamingBounds, type StreamingPoint, type StreamingView } from './streamingView';
 
@@ -45,8 +46,10 @@ const VIEW_DEFER_MS = 3000;
 export async function settleTileDrivers(frame?: () => void, stallMs = 20000): Promise<void> {
   loaderMode = true;
   try {
-    frame?.();
-    for (const driver of Array.from(liveDrivers)) await driver.settle(stallMs);
+    // NINE-DRAGON-BENCHMAX NB3: the readyFrame's spawn view names its parts in the boot timeline (the phone's paste had
+    // ~4.6 s of it unnamed): the hidden frame that asks for the ring's content, then the tile attaches it waits on
+    if (frame !== undefined) bootWork('app:spawn-view-frame', frame);
+    await bootTask('app:spawn-view-tiles', async () => { for (const driver of Array.from(liveDrivers)) await driver.settle(stallMs); });
   } finally { loaderMode = false; }
 }
 /** DL21: while the loader settles, the render tiles inside its fence across the live drivers and how many are complete (the
