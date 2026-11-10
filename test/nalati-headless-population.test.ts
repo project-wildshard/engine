@@ -8,7 +8,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
-import { HeadlessSimulation } from '../src/server/host/headless';
+import { compileProductWorker } from './fixtures/headless/compileProductWorker';
 import { productHeadlessSections } from '../src/shared/host/headlessSections';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
@@ -97,15 +97,21 @@ test('Nalati runs its whole population headless from the product: roster, wolves
   } finally { restored?.dispose(); live.dispose(); }
 }, 180_000);
 
-test('Nalati\'s worker runs the product\'s world: a route and its checkpoint match a resident exactly', async () => {
+test('Nalati\'s worker runs the product\'s world: a route and its checkpoint match a resident exactly', async ({signal}) => {
   const { directory, product, assets, resident } = await shipped();
   const shard = product.shardfile, sections = productHeadlessSections(product), plan = { ticks: 240, points: [{ x: 0, z: 232 }, { x: 40, z: 180 }] };
   const options = { deadline: 'advisory' as const, product: directory, sections };
-  const worker = await HeadlessSimulation.create(shard, assets, undefined, options);
-  let second: HeadlessSimulation | undefined;
-  const live = await resident();
+  // Fresh fixed code only: both workers still admit every original byte and own
+  // independent worlds. Compilation and startup remain inside this case clock.
+  const prepared = await compileProductWorker(undefined, signal);
+  let worker: Awaited<ReturnType<typeof prepared.create>> | undefined;
+  let second: Awaited<ReturnType<typeof prepared.create>> | undefined;
+  let live: TrustedHeadlessResident | undefined;
   try {
-    const walked = await worker.walkLeg(plan), expected = runHeadlessJourney(live.host, input => { live.step(input); }, plan);
+    worker = await prepared.create(shard, assets, undefined, options);
+    live = await resident();
+    const current = live;
+    const walked = await worker.walkLeg(plan), expected = runHeadlessJourney(current.host, input => { current.step(input); }, plan);
     expect(walked.final).toEqual(expected.final);
     const saved = worker.checkpoint;
     if (saved === undefined) throw new Error('The worker kept no checkpoint');
@@ -116,10 +122,13 @@ test('Nalati\'s worker runs the product\'s world: a route and its checkpoint mat
     expect([...live.host.entities.keys()].filter(id => id.startsWith('creature:'))).toHaveLength(35);
 
     // a second worker carries on from that checkpoint: a restore is the same world
-    second = await HeadlessSimulation.create(shard, assets, saved.snapshot, options);
+    second = await prepared.create(shard, assets, saved.snapshot, options);
     const commit = await second.step([]);
     live.step([]);
     expect(commit.tick).toBe(saved.tick + 1);
     expect(commit.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
-  } finally { live.dispose(); await second?.dispose(); await worker.dispose(); }
+  } finally {
+    try { live?.dispose(); await second?.dispose(); await worker?.dispose(); }
+    finally { prepared.dispose(); }
+  }
 }, 120_000);
