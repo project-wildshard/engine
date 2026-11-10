@@ -64,6 +64,9 @@ jobs:
       - name: Prove exact compressed model admission and scope lifetime
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/entry-model-values.proof.mjs
+      - name: Prove grid-owned quest dialogue lifetime
+        if: needs.changes.outputs.docs != 'true'
+        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/quest-home-lifetime.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'

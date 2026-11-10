@@ -117,3 +117,21 @@ Run the native client-data proof explicitly, outside hooks:
 renderer-capable author loader, not the simulation loader or a browser.
 CI runs all three real geometry/lifetime/refusal/span cases with 9.5 s
 timeout and complete-body elapsed limits. No production socket is used.
+
+## Quest dialogue home lifetime
+
+Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/quest-home-lifetime.proof.mjs`.
+CI runs these two cases explicitly; local hooks and Vitest discovery do
+not add them. Happy DOM supplies the complete page environment; this is
+not a renderer, road-travel or phone-layout claim.
+
+The real grid cell event producer drives `HybridShardPlugin` entry,
+leave, neighboring-cell entry and retained-home return. A minimal authored
+plugin opens a real dialogue through `QuestViews`; no retained hook is
+activated directly. It proves closed DOM/input, cancellation of a due
+real timer, no completion on leave, a fresh reading clock on return,
+working new input/timers, retained authored state and final teardown.
+The ordinary owner and quest placement refusals preserve the remaining
+SDK lifetime laws. Each complete body has a 9.5-second elapsed assertion
+and timeout. Scope and page cleanup always run; the proof opens no
+browser, renderer, server or live socket.
