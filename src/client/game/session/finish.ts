@@ -1,6 +1,7 @@
 import type { BuiltWorld } from './context';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { sustainedFrames } from '@wildshard/engine/core/sustainedFrames';
 import { Rng } from '@wildshard/engine/core/rng';
 import { gridCells } from '../plugin/context';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
@@ -277,6 +278,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     plan.fail(error instanceof Error ? error.message : String(error));
     throw error;
   }
+  // QA row 29: the canvas still held readyFrame's view from the authored spawn; draw it again from the place the server's
+  // first owner block put the player (clientWorker.ts), so the first revealed frame is already there
+  game.hiddenFrame();
   // Let first-row activation finish before the recovery menu parks the page.
   // Its captured resume state is play, after the loader's app transition above.
   if (resuming && !ctx.continuingGridEntry) hud.setPaused(true); // Graphics recovery needs RESUME; a planned update retains the original tap.
@@ -388,6 +392,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   afterControl(game.levelScope, run => { game.onLate(run, 'game.boot.background'); },
     () => hud.entered && !hud.paused && !app.clock.paused && game.frameGate(), () => {
       document.dispatchEvent(new Event('ws:control-ready'));
+      sustainedFrames.start(diagnosticNow()); // QA row 31: the sustained fps window opens at control
       reachControl(game.levelScope);
       if (deferredAudio || hasLateAudio(files)) void decodeAfterBoot();
       void backgroundDownloads();

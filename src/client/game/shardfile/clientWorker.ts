@@ -543,6 +543,14 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // DL21, DL24: a page on a server builds no bodies of its own, so the first rows were the first its creature programs were asked
   // for: they linked inside the first presented frame, at control (Pine's task of 985 ms at phone CPU, 0.5-2.7 s of 'Final activation'
   // on the Simulator, cold only). The first frame's rows take their bodies here, and their links run under the card.
+  // QA row 29 (Jake, 11-10: "the teleporting of locations when you load into the game is a bit jarring"): the first frame
+  // after the card showed the authored spawn, the next one the saved place, because this page took the server's first
+  // owner block only at its first game frame. It takes it here, under the card (bounded as the first rows are), and the
+  // loader draws one more hidden frame from it (finish.ts), so the reveal opens where the player is.
+  const firstBy = diagnosticNow() + FIRST_ROWS_MS;
+  while (client.latest === null && diagnosticNow() < firstBy && !scope.disposed) await new Promise<void>(resolve => { scope.timeout(FIRST_ROWS_POLL_MS, () => { resolve(); }); });
+  net.reconcile(false);
+  bootMark('server:first-owner-adopted');
   if (ports.linkBodies === undefined) { bootMark('server:launch-complete'); return; }
   bootMark('server:first-body-preparation-start');
   let first = -1;

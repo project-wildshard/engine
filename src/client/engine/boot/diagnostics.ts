@@ -13,7 +13,7 @@ const OPERATIONS=new Set([
   'app:first-game-step-end','app:loader-complete','app:loader-failed','app:navigation-decision','app:first-frame-work-count',
   'worker:constructor','worker:fetch-evaluate-start','worker:constructor-to-first-message','worker:clock-roundtrip',
   'worker:module-body','worker:code-ready','worker:configuration-received','server:world-boot','server:booted-send',
-  'server:booted-receive','server:first-rows','server:identity-module','server:storage-module','server:shell-module',
+  'server:booted-receive','server:first-rows','server:first-owner-adopted','server:identity-module','server:storage-module','server:shell-module',
   'server:product-inputs','server:previous-session-close','server:indexed-saves-open','server:page-save-carry','server:reward-reconcile',
   'sw:request','sw:handler-received','sw:cache-hit','sw:cache-miss','sw:cache-match-ignore-search','sw:discard-html',
   'sw:shared-cache-open','sw:shared-cache-match','sw:discard-shared-html','sw:legacy-cache-list','sw:legacy-cache-open',

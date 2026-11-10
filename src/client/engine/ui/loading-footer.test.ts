@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {Loading, type LoadingDownloadSource} from './Loading';
+import { SustainedFrames, sustainedFrames } from '../core/sustainedFrames';
 import { classifyFrames, lowPowerReading, resetLowPowerProbe, startLowPowerProbe, startTitleLowPowerProbe } from '../boot/lowPower';
 import type { ProgressView } from '../boot/plan';
 import { beginLoadingWait, finishLoadingWait, loadingWaitState, reportLoadingWait } from '../../../shared/engine/boot/loadingWaits';
@@ -673,4 +674,36 @@ it('Low Power: only the idle title says likely; a busy page rules it out or says
     // a stale title reading falls back to this page's own
     expect(lowPowerReading(Date.now() + 11 * 60_000)?.from).toBe('page');
   } finally { resetLowPowerProbe(); saveStorage('session').removeItem('boot.lowPower'); }
+});
+
+it('QA row 31: sustained fps and gpu~ p95 per minute since control, and a flag when a later minute falls (likely thermal)', () => {
+  const sustained = new SustainedFrames();
+  // a minute at 30 fps against a 33.3 ms cap: gpu~ is what each frame waited beyond its 10 ms of work and the cap
+  const run = (from: number, minutes: number, frameMs: number, workMs: number): number => {
+    let at = from;
+    for (const end = from + minutes * 60_000; at < end; at += frameMs) sustained.frame(at, frameMs, workMs / 2, workMs / 2, 33.3);
+    return at;
+  };
+  expect(sustained.lines(0)).toEqual(['sustained: no control yet']);
+  sustained.frame(0, 16.7, 1, 1, 33.3); // before control: not counted
+  sustained.start(0);
+  let at = run(0, 1, 33.4, 10);
+  sustained.frame(at, 33.4, 5, 5, 33.3); // closes minute 1
+  expect(sustained.minutes()).toEqual([{ minute: 1, fps: 30, gpuP95: 0.1, frames: 1797 }]);
+  expect(sustained.falling()).toBeNull();
+  // the phone heats: frames of 62.5 ms (16 fps), the extra wait all gpu~
+  at = run(at, 2, 62.5, 10);
+  sustained.frame(at + 1, 62.5, 5, 5, 33.3);
+  const fall = sustained.falling();
+  expect(fall?.to.fps).toBeLessThan(17);
+  expect(fall?.to.gpuP95).toBeGreaterThan(29);
+  const lines = sustained.lines(at);
+  expect(lines[0]).toMatch(/^sustained since control \(3\.0 min\), per minute: 1: 30\.0 fps, gpu~ p95 0\.1 ms · 2: /u);
+  expect(lines[1]).toMatch(/^sustained: FALLING from minute 1 \(30\.0 fps, gpu~ 0\.1 ms\) to minute 3 \(16\.\d fps, gpu~ 29\.\d ms\): likely thermal$/u);
+  // a new world's control starts the window again
+  sustained.start(at); expect(sustained.minutes()).toHaveLength(0);
+  // Copy diagnostics carries the page's reading
+  const loading = new Loading({ id: 'sustained', name: 'Sustained' }, { scoped: true });
+  try { expect(loading.diagnosticsText()).toContain(sustainedFrames.lines(0)[0]?.slice(0, 10) ?? 'missing'); }
+  finally { loading.scope.dispose(); }
 });

@@ -309,6 +309,7 @@
     "./boot/gpuFiles": "./src/client/engine/boot/gpuFiles.ts",
     "./boot/idle": "./src/client/engine/boot/idle.ts",
     "./boot/lowPower": "./src/client/engine/boot/lowPower.ts",
+    "./core/sustainedFrames": "./src/client/engine/core/sustainedFrames.ts",
     "./boot/lastEnd": "./src/client/engine/boot/lastEnd.ts",
     "./boot/loadingPacks": "./src/client/engine/boot/loadingPacks.ts",
     "./boot/earlyPrograms": "./src/client/engine/boot/earlyPrograms.ts",

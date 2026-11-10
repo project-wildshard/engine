@@ -1,4 +1,5 @@
 import { lowPowerReading, titleLowPowerReading, type LowPowerReading } from '../boot/lowPower';
+import { sustainedFrames } from '../core/sustainedFrames';
 import { uiScope, mountUi } from './ownership';
 import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
 import { serverBootProgress } from '../../../shared/engine/boot/serverProgress';
@@ -678,6 +679,7 @@ export class Loading {
       `total ${seconds(times.total)} · start ${seconds(times.start)} · download ${seconds(times.download)} · load ${seconds(times.load)}${this.finished ? '' : ' · not ready'}`,
       `download ${loadingCacheText(transfer)} · files ${transfer.filesDone} of ${transfer.filesTotal} · ${transfer.complete ? 'complete' : 'open'}${transfer.error === null ? '' : ' · error (private text omitted)'}`,
       `scene textures ~${Math.round(this.textureBytes / 1048576)} MiB${this.failedReason === null && !this.view?.error ? '' : ' · failed (private text omitted)'}`,
+      ...sustainedFrames.lines(diagnosticNow()),
       'load rows:',
       ...all.rows.map(row => `  ${row.number}. ${diagnosticStep(row.key,row.number)} · ${row.state} · ${Math.round(row.ms)} ms`),
       ...all.gaps.map(gap => `  gap · ${gap.state} · ${Math.round(gap.ms)} ms`),

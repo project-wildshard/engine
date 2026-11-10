@@ -47,6 +47,7 @@ import { ownComposerDepth } from '../render/composerDepth';
 import { noteDrawnEnvironment } from '../render/drawnEnvironment';
 import { makeSystem, setLoopState, systemFault, type GameSystem } from '../../../shared/engine/core/faults';
 import { frameCost } from '../../../shared/engine/core/frameCost';
+import { sustainedFrames } from './sustainedFrames';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
@@ -1655,6 +1656,7 @@ export class Game {
       this.frameCount++;
       this.updateMs[this.frameI] = renderAt - lastRun; this.renderMs[this.frameI] = done - renderAt;
       if (on) frameCost.end(realDt * 1000, renderAt - lastRun, done - renderAt, cap > 0 ? 1000 / cap : 0);
+      sustainedFrames.frame(done, realDt * 1000, renderAt - lastRun, done - renderAt, cap > 0 ? 1000 / cap : 0); // QA row 31
       this.lastFrame.calls = this.renderer.info.render.calls; this.lastFrame.triangles = this.renderer.info.render.triangles;
       this.frameMs[this.frameI] = realDt * 1000; this.frameI = (this.frameI + 1) % this.frameMs.length;
       this.stats.frames++; this.stats.acc += realDt;
