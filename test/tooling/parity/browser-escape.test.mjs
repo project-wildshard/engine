@@ -196,7 +196,8 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
     writeFileSync(resolve(bin, 'ps'), `#!/bin/sh\nprintf '%s\\n' '${inventory}'\n`, {mode: 0o700});
     const program = `import {spawn} from 'node:child_process';
       import {once} from 'node:events';import {existsSync,writeFileSync} from 'node:fs';
-      const {drainNativeBrowser}=await import(process.argv[1]),profile=process.argv[2];
+      const {drainNativeBrowser}=await import(process.argv[1]),profile=process.argv[2],inventoryScript=process.argv[4];
+      if(typeof inventoryScript!=='string')throw Error('Missing owned inventory script');
       const child=spawn(process.execPath,['-e',"console.log('ready');setInterval(()=>{},1000)"],{detached:true,stdio:['ignore','pipe','inherit']});
       let stopping;
       const stop=()=>stopping??=(async()=>{if(child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGKILL');await exited;}})();
@@ -204,12 +205,12 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
       process.on('SIGTERM',terminate);process.on('SIGINT',terminate);
       await once(child.stdout,'data');let disposed=false;
       if(process.argv[3]==='hold')await new Promise(()=>{});
-      try{await drainNativeBrowser(child,undefined,async()=>{disposed=true;},{executable:'ps',args:['-axo','pid=,ppid=,pgid=,stat=']});throw Error('Invalid inventory was admitted');}
+      try{await drainNativeBrowser(child,undefined,async()=>{disposed=true;},{executable:'/bin/sh',args:[inventoryScript]});throw Error('Invalid inventory was admitted');}
       catch(error){console.log(JSON.stringify({message:String(error),disposed,profile:existsSync(profile+'/original')}));}
       finally{await stop();}`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', program,
-      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile],
-    {encoding: 'utf8', timeout: 10_000, env: {...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`}});
+      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, 'run', resolve(bin, 'ps')],
+    {encoding: 'utf8', timeout: 10_000});
     expect(result.status).toBe(0);
     /** @type {unknown} */
     const value = JSON.parse(result.stdout);
@@ -224,8 +225,8 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
     expect(existsSync(resolve(profile, 'original'))).toBe(true);
     writeFileSync(resolve(bin, 'ps'), `#!/bin/sh\nprintf '%s\\n' '${'o'.repeat(2000)}'\nprintf '%s\\n' '${'e'.repeat(2000)}' >&2\nexec /bin/sleep 5\n`, {mode: 0o700});
     const commandRefused = spawnSync(process.execPath, ['--input-type=module', '-e', program,
-      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile],
-    {encoding: 'utf8', timeout: 10_000, env: {...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`}});
+      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, 'run', resolve(bin, 'ps')],
+    {encoding: 'utf8', timeout: 10_000});
     expect(commandRefused.status).toBe(0);
     /** @type {unknown} */
     const commandValue = JSON.parse(commandRefused.stdout);
@@ -237,8 +238,8 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
     expect(commandFacts).toMatchObject({code: 'ETIMEDOUT', signal: 'SIGTERM', killed: true, stdout: 'o'.repeat(160), stderr: 'e'.repeat(160)});
     expect(commandValue.message.length).toBeLessThan(1024);
     const timed = spawnSync(process.execPath, ['--input-type=module', '-e', program,
-      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, 'hold'],
-    {encoding: 'utf8', timeout: 1000, env: {...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`}});
+      new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, 'hold', resolve(bin, 'ps')],
+    {encoding: 'utf8', timeout: 1000});
     expect(timed.error).toMatchObject({code: 'ETIMEDOUT'});
     const stopped = Number(readFileSync(resolve(profile, 'terminated'), 'utf8'));
     if (!Number.isSafeInteger(stopped) || stopped <= 1) throw new Error('Timed wrapper did not await its owned child');
