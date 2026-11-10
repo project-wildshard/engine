@@ -1740,6 +1740,52 @@
       "finishedAt": "2026-11-10T21:45:28.146Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "3544f1609425e25acc29776c6350fbccacb627b6",
+      "tree": "5e82090f54220754746a5c4c25742147f34ff98c",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/engine-rule-successors-titan.test.ts",
+          "blob": "b2f199dc8df24ba8edfafc7c8972c2158fe748f7",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 13,
+          "durationMs": 19974.415709
+        },
+        {
+          "file": "test/standalone-grid-lone.test.ts",
+          "blob": "ec11da731fb70e58637b56454286196ac3f4f600",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 15611.924792
+        },
+        {
+          "file": "test/standalone-grid-restore.test.ts",
+          "blob": "936721bf87e2aa3078562b0cb7fad59e911ea411",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 10531.699791
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T22:01:47.406Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

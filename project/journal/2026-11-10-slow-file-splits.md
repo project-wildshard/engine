@@ -43,3 +43,6 @@ no entry there, so product preflight never covered it; the J206 review caught
 that, and each grid file now lists the products it was seen to load
 (road walk: Sunscar, Driftwood; lone: Sunscar, Pastel; restore: Sunscar,
 Nine Dragon, Nalati).
+
+The three new files got their first clocks from `push-preflight.mjs timings`
+(the gate's own timing reporter), committed with `test/durations*.json`.
