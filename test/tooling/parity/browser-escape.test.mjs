@@ -1,4 +1,4 @@
-import {beforeAll, test, expect} from 'vitest';
+import {afterAll, beforeAll, test, expect} from 'vitest';
 import {nativeChromeExecutable, warmNativeChrome} from '../../../scripts/warm-native-chrome.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The original trusted-input assertion must execute in a real, leased browser and isolated child.
 import {execFileSync, spawnSync, spawn} from 'node:child_process';
@@ -24,7 +24,40 @@ import {requestNativeRetention} from '../../fixtures/native-retention.mjs';
 // Reading the complete installed binary/resources can exceed Vitest's default
 // 10 s hook on a cold shared runner. Bound only that disk preparation at 60 s;
 // the actual endpoint, child-process and trusted-input clocks stay unchanged.
+// BROWSER-TESTS-BENCH BB3: two cases only wait on clocks inside their own child (the 10 s endpoint deadline, the 5.1 s
+// delivery block). Their children start here, before the warm-up, and run beside every other case; each case still
+// awaits its own child and asserts the same facts. Nothing in those children reads this process's clock.
+/** @typedef {{status: number | null, signal: string | null, stdout: string, stderr: string}} ChildRun */
+/** @type {Promise<unknown>[]} */
+const earlyRuns = [];
+/** spawnSync's facts without blocking this worker: the same SIGTERM at the same timeout.
+ * @param {string[]} args @param {number} timeout @param {NodeJS.ProcessEnv} [env] @returns {Promise<ChildRun>} */
+function runChild(args, timeout, env = process.env) {
+  /** @type {Promise<ChildRun>} */
+  const run = new Promise((resolveRun, reject) => {
+    const child = spawn(process.execPath, args, {env, stdio: ['pipe', 'pipe', 'pipe']});
+    child.stdin.end();
+    let stdout = '', stderr = '';
+    child.stdout.setEncoding('utf8').on('data', chunk => {stdout += chunk;});
+    child.stderr.setEncoding('utf8').on('data', chunk => {stderr += chunk;});
+    const timer = setTimeout(() => {child.kill('SIGTERM');}, timeout);
+    child.once('error', error => {clearTimeout(timer); reject(error);});
+    child.once('close', (status, signal) => {clearTimeout(timer); resolveRun({status, signal, stdout, stderr});});
+  });
+  earlyRuns.push(run.catch(() => undefined));
+  return run;
+}
+/** @type {{root: string, child: Promise<ChildRun>} | undefined} */
+let endpointRun;
+/** @type {{profile: string, runs: Promise<{delay: number, result: ChildRun}[]>} | undefined} */
+let deliveryRun;
+beforeAll(() => { endpointRun = startEndpointRefusal(); deliveryRun = startDelivery(); });
 beforeAll(async () => { warmNativeInventory(); await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
+// A filtered run that skips either case still waits for its child; the endpoint root is always removed, as before.
+afterAll(async () => {
+  await Promise.all(earlyRuns);
+  if (endpointRun !== undefined) rmSync(endpointRun.root, {recursive: true, force: true});
+}, 30_000);
 
 /** @param {number | undefined} pid */
 function stopFixturePid(pid) {
@@ -80,39 +113,6 @@ test('native startup refusal retains its signal and bounded stderr, never claims
     expect(existsSync(resolve(alias, '..'))).toBe(false);
   } finally {rmSync(root, {recursive: true, force: true});}
 });
-
-test('the original native startup deadline retains process and endpoint-file facts without accepting an unannounced endpoint', () => {
-  const root = mkdtempSync(resolve('tmp/native-endpoint-refusal-'));
-  try {
-    const binary = resolve(root, 'native-no-endpoint.mjs');
-    writeFileSync(binary, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';
-      const arg=process.argv.find(value=>value.startsWith('--user-data-dir='));
-      if(!arg)throw Error('Missing owned profile');
-      writeFileSync(arg.slice('--user-data-dir='.length)+'/DevToolsActivePort','9\\n/devtools/browser/diagnostic-only\\n');
-      console.error('Original no-endpoint sentinel');setInterval(()=>{},1000);`, {mode: 0o700});
-    const child = spawnSync(process.execPath, ['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'],
-      {encoding: 'utf8', timeout: 25_000, env: {...process.env, CHROME_PATH: binary}});
-    expect(child.status).toBe(1);
-    expect(child.stderr).toContain('Native Escape startup endpoint deadline');
-    expect(child.stderr).toContain('Original no-endpoint sentinel');
-    expect(child.stdout).not.toContain('original trusted Escape pair preserved');
-    const raw = /Native startup state: ([^\n]+)/u.exec(child.stderr)?.[1];
-    if (raw === undefined) throw new Error('Missing native startup state');
-    /** @type {unknown} */
-    const state = JSON.parse(raw);
-    expect(state).toMatchObject({deadlineMs: 10_000, endpointFile: '9\n/devtools/browser/diagnostic-only\n'});
-    if (typeof state !== 'object' || state === null || !('elapsedMs' in state) || typeof state.elapsedMs !== 'number'
-      || !('firstStderrAt' in state) || typeof state.firstStderrAt !== 'number') throw new Error('Missing monotonic startup times');
-    expect(state.firstStderrAt).toBeLessThan(state.elapsedMs);
-    const rawProfile = /profile=("[^"\n]+")/.exec(child.stderr)?.[1];
-    if (rawProfile === undefined) throw new Error('Missing owned profile');
-    /** @type {unknown} */
-    const profile = JSON.parse(rawProfile);
-    if (typeof profile !== 'string' || !profile.startsWith(resolve('tmp/escape-control-'))) throw new Error('Foreign profile');
-    expect(existsSync(profile)).toBe(false);
-  } finally {rmSync(root, {recursive: true, force: true});}
-});
-
 
 test('long native Unix socket paths refuse while the short alias binds to profile-owned data', async () => {
   const root = mkdtempSync(resolve('tmp/native-socket-control-'));
@@ -251,38 +251,6 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
   }
 });
 
-test('delayed JS delivery cannot discard a completed native inventory', () => {
-  const profile = mkdtempSync(resolve('tmp/native-inventory-delivery-'));
-  let verified = false;
-  try {
-    const program = `import{spawn}from'node:child_process';import{once}from'node:events';import{rmSync,existsSync}from'node:fs';
-      const{drainNativeBrowser}=await import(process.argv[1]),profile=process.argv[2];
-      const child=spawn(process.execPath,['-e',"console.log('ready');setInterval(()=>{},1000)"],{detached:true,stdio:['ignore','pipe','inherit']});
-      let stopping;const stop=()=>stopping??=(async()=>{if(child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGKILL');await exited;}})();
-      process.once('SIGTERM',()=>{void stop().then(()=>process.exit(143));});
-      let facts;
-      try{await once(child.stdout,'data');let disposed=false,failure=null;
-      const pending=drainNativeBrowser(child,()=>child.kill('SIGTERM'),async()=>{rmSync(profile,{recursive:true});disposed=true;});
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,Number(process.argv[3]));
-      try{await pending;}catch(error){failure=String(error);}
-      facts={disposed,profile:existsSync(profile),failure};
-      }finally{await stop();}
-      console.log(JSON.stringify({...facts,childStopped:child.exitCode!==null||child.signalCode!==null}));`;
-    for (const delay of [650, 5100]) {
-      mkdirSync(profile, {recursive: true});
-      const result = spawnSync(process.execPath, ['--input-type=module', '-e', program,
-        new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, String(delay)], {encoding: 'utf8', timeout: 10_000});
-      expect(result.status).toBe(0);
-      if (delay === 650) expect(JSON.parse(result.stdout)).toEqual({disposed: true, profile: false, failure: null, childStopped: true});
-      else expect(JSON.parse(result.stdout)).toEqual({disposed: false, profile: true, failure: expect.stringContaining('did not drain in 5000ms'), childStopped: true});
-    }
-    verified = true;
-  } finally {
-    if (verified) rmSync(profile, {recursive: true, force: true});
-    else console.error(`Native delivery control retained after refusal: ${JSON.stringify(profile)}`);
-  }
-}, 10_000);
-
 test('a real profile removal failure rejects cleanup instead of publishing completion', async () => {
   const profile = mkdtempSync(resolve('tmp/native-writer-refusal-'));
   writeFileSync(resolve(profile, 'original'), 'preserved');
@@ -303,3 +271,88 @@ test('a real profile removal failure rejects cleanup instead of publishing compl
     rmSync(profile, {recursive: true, force: true});
   }
 });
+
+// BB3: the two early children's cases come last, so the cases above run while those children wait on their clocks.
+/** The endpoint-deadline child: a fake browser that writes a DevToolsActivePort but never announces it. */
+function startEndpointRefusal() {
+  const root = mkdtempSync(resolve('tmp/native-endpoint-refusal-'));
+  const binary = resolve(root, 'native-no-endpoint.mjs');
+  writeFileSync(binary, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';
+      const arg=process.argv.find(value=>value.startsWith('--user-data-dir='));
+      if(!arg)throw Error('Missing owned profile');
+      writeFileSync(arg.slice('--user-data-dir='.length)+'/DevToolsActivePort','9\\n/devtools/browser/diagnostic-only\\n');
+      console.error('Original no-endpoint sentinel');setInterval(()=>{},1000);`, {mode: 0o700});
+  return {root, child: runChild(['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'], 25_000,
+    {...process.env, CHROME_PATH: binary})};
+}
+
+test('the original native startup deadline retains process and endpoint-file facts without accepting an unannounced endpoint', async () => {
+  if (endpointRun === undefined) throw new Error('Missing endpoint-deadline child');
+  const {root} = endpointRun;
+  try {
+    const child = await endpointRun.child;
+    expect(child.status).toBe(1);
+    expect(child.stderr).toContain('Native Escape startup endpoint deadline');
+    expect(child.stderr).toContain('Original no-endpoint sentinel');
+    expect(child.stdout).not.toContain('original trusted Escape pair preserved');
+    const raw = /Native startup state: ([^\n]+)/u.exec(child.stderr)?.[1];
+    if (raw === undefined) throw new Error('Missing native startup state');
+    /** @type {unknown} */
+    const state = JSON.parse(raw);
+    expect(state).toMatchObject({deadlineMs: 10_000, endpointFile: '9\n/devtools/browser/diagnostic-only\n'});
+    if (typeof state !== 'object' || state === null || !('elapsedMs' in state) || typeof state.elapsedMs !== 'number'
+      || !('firstStderrAt' in state) || typeof state.firstStderrAt !== 'number') throw new Error('Missing monotonic startup times');
+    expect(state.firstStderrAt).toBeLessThan(state.elapsedMs);
+    const rawProfile = /profile=("[^"\n]+")/.exec(child.stderr)?.[1];
+    if (rawProfile === undefined) throw new Error('Missing owned profile');
+    /** @type {unknown} */
+    const profile = JSON.parse(rawProfile);
+    if (typeof profile !== 'string' || !profile.startsWith(resolve('tmp/escape-control-'))) throw new Error('Foreign profile');
+    expect(existsSync(profile)).toBe(false);
+  } finally {rmSync(root, {recursive: true, force: true});}
+});
+
+/** The delivery child, each delay in turn on one profile: a 650 ms block drains, a 5.1 s block outlives the 5 s drain. */
+function startDelivery() {
+  const profile = mkdtempSync(resolve('tmp/native-inventory-delivery-'));
+  const program = `import{spawn}from'node:child_process';import{once}from'node:events';import{rmSync,existsSync}from'node:fs';
+      const{drainNativeBrowser}=await import(process.argv[1]),profile=process.argv[2];
+      const child=spawn(process.execPath,['-e',"console.log('ready');setInterval(()=>{},1000)"],{detached:true,stdio:['ignore','pipe','inherit']});
+      let stopping;const stop=()=>stopping??=(async()=>{if(child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGKILL');await exited;}})();
+      process.once('SIGTERM',()=>{void stop().then(()=>process.exit(143));});
+      let facts;
+      try{await once(child.stdout,'data');let disposed=false,failure=null;
+      const pending=drainNativeBrowser(child,()=>child.kill('SIGTERM'),async()=>{rmSync(profile,{recursive:true});disposed=true;});
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,Number(process.argv[3]));
+      try{await pending;}catch(error){failure=String(error);}
+      facts={disposed,profile:existsSync(profile),failure};
+      }finally{await stop();}
+      console.log(JSON.stringify({...facts,childStopped:child.exitCode!==null||child.signalCode!==null}));`;
+  const runs = (async () => {
+    const results = [];
+    for (const delay of [650, 5100]) {
+      mkdirSync(profile, {recursive: true});
+      results.push({delay, result: await runChild(['--input-type=module', '-e', program,
+        new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, String(delay)], 10_000)});
+    }
+    return results;
+  })();
+  return {profile, runs};
+}
+
+test('delayed JS delivery cannot discard a completed native inventory', async () => {
+  if (deliveryRun === undefined) throw new Error('Missing delivery child');
+  const {profile} = deliveryRun;
+  let verified = false;
+  try {
+    for (const {delay, result} of await deliveryRun.runs) {
+      expect(result.status).toBe(0);
+      if (delay === 650) expect(JSON.parse(result.stdout)).toEqual({disposed: true, profile: false, failure: null, childStopped: true});
+      else expect(JSON.parse(result.stdout)).toEqual({disposed: false, profile: true, failure: expect.stringContaining('did not drain in 5000ms'), childStopped: true});
+    }
+    verified = true;
+  } finally {
+    if (verified) rmSync(profile, {recursive: true, force: true});
+    else console.error(`Native delivery control retained after refusal: ${JSON.stringify(profile)}`);
+  }
+}, 10_000);

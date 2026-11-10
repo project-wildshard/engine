@@ -38,3 +38,11 @@ and with chromium-headless-shell:
   done before the build; the wait step took 0 s.
 - ci's `e2e` job (BB5 allows only this) installs `--only-shell` from a
   cache: both its specs already launched the shell.
+
+BB3: `browser-escape.test.mjs` spent 10.2 s of its 24 s waiting on the
+fixture's own 10 s endpoint deadline, and 5.9 s on the delivery case's
+5.1 s block. Both clocks run inside their own child process, so those
+two children now start in a `beforeAll`, before the warm-up, and their
+cases sit last in the file and await them. Nothing in either child reads
+the worker's clock, and every assertion is unchanged. On the Mac the
+file went from 24.3 s to 10.7 s (three runs each).
