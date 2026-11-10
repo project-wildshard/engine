@@ -269,6 +269,7 @@
   "src/client/game/boot/boot-timeline.test.ts": 0.054383931,
   "src/client/game/boot/spawn-download-card.test.ts": 0.3175847289999999,
   "src/client/game/compendium/journal-lazy-view.test.ts": 0.43450187300000004,
+  "src/client/game/error-report-origins.test.ts": 0.13664433399999998,
   "src/client/game/first-play.test.ts": 0.23690645800000004,
   "src/client/game/grid/approach-product-inputs.test.ts": 0.5548396990000001,
   "src/client/game/grid/cell-clip-defines.test.ts": 0.153247493,

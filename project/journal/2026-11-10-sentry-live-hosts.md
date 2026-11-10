@@ -18,3 +18,6 @@ error, QB8's deliberate test error outside staging, headless and
 Playwright user agents (a CDP-attached agent may leave webdriver
 false), ResizeObserver loop warnings and an opaque Script error. with
 no frames. The rule is a pure function so each case has a fixture.
+
+The new origin test needed committed clocks before the push gate let
+it in, so its real local full and Ring 1 timings are recorded too.

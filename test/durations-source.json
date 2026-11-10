@@ -1786,6 +1786,60 @@
       "finishedAt": "2026-11-10T22:01:47.406Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "ed65bca21dde2e017b076374aa4488b6fea6d186",
+      "tree": "c54aa1ac64a0e099d8564e846b8ab5a4a5a14731",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "src/client/game/error-report-origins.test.ts",
+          "blob": "90bfcce6b45b7fc630763419891847c1c062f6a7",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 11,
+          "durationMs": 740.7641680000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:34:29.447Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "ed65bca21dde2e017b076374aa4488b6fea6d186",
+      "tree": "c54aa1ac64a0e099d8564e846b8ab5a4a5a14731",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "src/client/game/error-report-origins.test.ts",
+          "blob": "90bfcce6b45b7fc630763419891847c1c062f6a7",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 11,
+          "durationMs": 136.644334
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:34:32.070Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [
