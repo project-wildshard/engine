@@ -72,16 +72,30 @@ test.each(HOME_ICON_CHANNELS)('the %s build links, declares and ships only its o
   } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
-/** A point on the coin's face left of the letter in the touch icon (badges.mjs centres the coin at 808 of 1024, face r 140). */
-async function badgePixel(channel: string): Promise<[number, number, number]> {
-  const left = Math.round(180 * (808 - 105) / 1024), top = Math.round(180 * 808 / 1024);
-  const { data } = await sharp(`public/icons/${channel}/apple-touch-icon.png`).extract({ left, top, width: 1, height: 1 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+async function pixel(file: string, left: number, top: number): Promise<[number, number, number]> {
+  const { data } = await sharp(file).extract({ left, top, width: 1, height: 1 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   return [data[0] ?? 0, data[1] ?? 0, data[2] ?? 0];
 }
+/** A point on the coin's face left of the letter in the touch icon (badges.mjs centres the coin at 808 of 1024, face r 140). */
+const badgePixel = (channel: string): Promise<[number, number, number]> =>
+  pixel(`public/icons/${channel}/apple-touch-icon.png`, Math.round(180 * (808 - 105) / 1024), Math.round(180 * 808 / 1024));
 
 test('staging wears the amber S, preview the violet P, production neither', async () => {
   const [sr, sg, sb] = await badgePixel('staging'), [pr, pg, pb] = await badgePixel('preview'), [dr, dg] = await badgePixel('production');
   expect(sr > 200 && sg > 120 && sb < 120).toBe(true);
   expect(pb > 200 && pr > 120 && pg < pr).toBe(true);
   expect(dr < 100 && dg < 100).toBe(true);
+});
+
+test('the maskable badge sits inside the 80 % safe circle: coin inside, no coin past its edge', async () => {
+  // The maskable coin is badges.mjs's scaled 0.9 about a centre 260/1024 out at 45°: face r 126, navy ring r 142.
+  const centre = 256 + 130 / Math.SQRT2, face = Math.round(centre - 0.9 * 105 / 2), edge = Math.round(256 + 0.42 * 512 / Math.SQRT2);
+  const [sr, sg, sb] = await pixel('public/icons/staging/maskable-512.png', face, Math.round(centre));
+  const [pr, pg, pb] = await pixel('public/icons/preview/maskable-512.png', face, Math.round(centre));
+  expect(sr > 200 && sg > 120 && sb < 120).toBe(true);
+  expect(pb > 200 && pr > 120 && pg < pr).toBe(true);
+  for (const channel of HOME_ICON_CHANNELS) {
+    const [r, g, b] = await pixel(`public/icons/${channel}/maskable-512.png`, edge, edge);
+    expect(Math.max(r, g, b), channel).toBeLessThan(120);
+  }
 });

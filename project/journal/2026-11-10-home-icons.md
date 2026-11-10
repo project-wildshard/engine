@@ -23,4 +23,11 @@
   accents 8fe3ff / ffb547 / b18cff), which reproduce the approved PNGs
   to the byte.
 - The root `/apple-touch-icon.png`, `/favicon.png`, `/icon-192.png`,
-  `/icon-512.png` are gone; diagnostics treats `/icons/` as public.
+  `/icon-512.png` stay in public/ unreferenced: deleting a tracked
+  public file trips the pre-commit typecheck, whose renderer revision
+  lstats every file HEAD lists. Diagnostics treats `/icons/` as public.
+- Codex review: no MUSTs. Acted on: a test that the maskable coin sits
+  inside the safe circle, and this line. The coin was also too small
+  to read at 60 px, so it grew to 0.9 of the iOS coin, 260 px out.
+  Left: the worker still lets `/icons/` go to the network, as the old
+  root icons did.
