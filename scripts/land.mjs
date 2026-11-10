@@ -272,15 +272,11 @@ class Landing{
    if(verdict.summary!==last){this.say('ci',`${what} ${short(sha)}: ${verdict.summary}`);last=verdict.summary;}
    if(verdict.state==='green'){for(const run of Object.values(verdict.runs))this.runs.push(run.id);return verdict;}
    if(verdict.state==='red'){
-    // Only blocking jobs decide: a run red solely from non-blocking quarantine jobs counts as green. A red run whose
-    // failed jobs can't be listed, or that lists none, stays red (fail closed).
+    // The run conclusion decides, never a job list: quarantine jobs are continue-on-error, so they can't make a run
+    // red on their own, and a list (paged, re-run, cancelled) can't prove the blocking jobs passed. The stop line
+    // names the blocking failures and sets the quarantine reds apart, so nobody chases a non-blocking job.
     const reds=Object.entries(verdict.runs).filter(([,run])=>run.conclusion!=='success').map(([name,run])=>({name,run,jobs:runFailures(this.repo,run.id)}));
-    if(reds.every(red=>red.jobs.blocking.length===0&&red.jobs.nonblocking.length>0)){
-     this.say('ci',`${what} ${short(sha)}: only non-blocking quarantine jobs are red (${reds.flatMap(red=>red.jobs.nonblocking).join('; ')}); green`);
-     for(const run of Object.values(verdict.runs))this.runs.push(run.id);
-     return {...verdict,state:'green'};
-    }
-    const failed=reds.map(({name,run,jobs})=>`${name} run ${run.id} ${run.conclusion}: ${jobs.blocking.join('; ')||'no failed job listed'}${jobs.nonblocking.length===0?'':` (non-blocking: ${jobs.nonblocking.join('; ')})`}${run.url===''?'':` ${run.url}`}`);
+    const failed=reds.map(({name,run,jobs})=>`${name} run ${run.id} ${run.conclusion}: ${jobs.blocking.join('; ')||'no blocking failed job listed'}${jobs.nonblocking.length===0?'':` (non-blocking: ${jobs.nonblocking.join('; ')})`}${run.url===''?'':` ${run.url}`}`);
     return {...verdict,failed};
    }
    if(Object.keys(verdict.runs).length===0&&Date.now()>appear)throw new StopError(`no hosted ci/ring-1 run for ${short(sha)} after ${this.options.appearMinutes} min; are ci.yml and ring-1.yml triggered on plan/** pushes?`);

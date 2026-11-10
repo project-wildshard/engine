@@ -217,26 +217,19 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.read(f.files.receipts)).toMatch(/STOP hosted CI red .*tests \(3\)/u);
   }, 60_000);
 
-  test('non-blocking quarantine reds alone never stop a landing; with a blocking red they are named as non-blocking', () => {
+  test('a red stop line names blocking failures and sets quarantine reds apart as non-blocking', () => {
     const f = fixture();
-    const wt = f.worktree('foo');
+    const wt = f.worktree('bar');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.state({ red: { 'plan/foo': { ci: 'quarantine (1)', 'ring-1': 'quarantine (2)' } } });
-    const landed = f.land(wt);
-    expect(landed.status, landed.stdout).toBe(0);
-    expect(landed.stdout).toMatch(/only non-blocking quarantine jobs are red \(quarantine \(1\) \(failure\); quarantine \(2\) \(failure\)\); green/u);
-    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature');
-    const g = fixture();
-    const other = g.worktree('bar');
-    g.commit(other, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    const before = g.remoteMain();
-    g.state({ red: { 'plan/bar': { ci: 'quarantine (1)', 'ring-1': 'tests (3)' } } });
-    const stopped = g.land(other);
+    const before = f.remoteMain();
+    f.state({ red: { 'plan/bar': { ci: 'quarantine (1)', 'ring-1': 'tests (3)' } } });
+    const stopped = f.land(wt);
     expect(stopped.status).toBe(1);
     expect(stopped.stdout).toMatch(/ring-1 run \d+ failure: tests \(3\) \(failure\)/u);
-    expect(stopped.stdout).toMatch(/ci run \d+ failure: no failed job listed \(non-blocking: quarantine \(1\) \(failure\)\)/u);
-    expect(g.remoteMain()).toBe(before);
-  }, 90_000);
+    // The run conclusion still decides: a red run whose only listed failure is a quarantine job stops too.
+    expect(stopped.stdout).toMatch(/ci run \d+ failure: no blocking failed job listed \(non-blocking: quarantine \(1\) \(failure\)\)/u);
+    expect(f.remoteMain()).toBe(before);
+  }, 60_000);
 
   test('a rebase conflict stops with the conflicting paths and leaves the worktree as it was', () => {
     const f = fixture();

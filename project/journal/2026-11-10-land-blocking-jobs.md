@@ -9,3 +9,9 @@ failed jobs: quarantine jobs are named as non-blocking, a run red only from
 them counts as green, and a run whose failed jobs can't be listed stays red.
 Also: the commit-entry worktree test checks `git`'s exit status (J206
 SHOULD on 983d09e).
+
+J206 Codex review (three MUSTs): don't override the run conclusion with a job
+list at all. Pages, re-runs and cancelled runs can hide a blocking failure,
+and main's reuse requires real run success anyway. Quarantine jobs can't make
+a run red alone (continue-on-error), so the conclusion stays authoritative and
+`land` only names quarantine reds as non-blocking in its stop line.
