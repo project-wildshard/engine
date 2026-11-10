@@ -1,0 +1,9 @@
+J189's Pine adapter twice expired its five-minute global full-test acquisition before pnpm check began, behind admitted engine gates longer than350 seconds. Plain shard and shardfile checks have no inner CPU consumer; setting checkout scope or WS_CPU_ADMISSION would pretend a reservation that does not exist.
+
+Expose a bounded explicit FIFO admission wait on full-test, separately from owned-command time. Defaults remain five minutes; explicit wait is positive/finite and at most6000 seconds, matching the existing100-minute queue wait. Case, file, shard, command timeout and pre-push warning budgets are unchanged. A plain non-engine hook remains a real global full-test owner and therefore waits conservatively for scoped engine gates rather than claiming an unimplemented parallel profile.
+
+Supported invocation from the non-engine checkout after publication: WS_FULL_SUITE=1 python3 <engine>/scripts/heavy-lane.py full-test --admission-wait-seconds 6000 -- git push origin main, with normal SSH keepalives. No checkout-scope or WS_CPU_ADMISSION flag. The complete Git hook and pnpm check still execute.
+
+The quick manual proof holds an actual scoped engine lease with an actual live broker grant; a0.15s admission refuses before its plain check starts, then a4s FIFO waiter stays blocked until the engine owner releases and executes its real pnpm check. All owned children/grants settle normally. Actual5.087s, no hook bypass. One-shot review and publication pending.
+
+One-shot publication-engine-ci15-non-engine-admission-20261110T025819Z-3874 has no MUST. All three SHOULDs are fixed: explicit option presence enforces full-test-only even for300; resource and scheduler diagnostics share the actual selected wait label; the proof asserts holder exit0 after real broker release/close. The extended CLI proof passes1.927s, including explicit build300 rejection before checks. Typed lint and forced full layers pass. No second review round.

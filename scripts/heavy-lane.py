@@ -47,6 +47,10 @@ def read_entry(path):
         return {}
 
 
+def wait_label(seconds):
+    return '5 min' if seconds == WAIT_SECONDS else '%gs' % seconds
+
+
 def queue_timeout(root, entry):
     slots = set(slot for resource in entry['resources'] for slot in (BUILD_SLOTS if resource == 'build' else (resource,)))
     if 'full-test' in slots:
@@ -56,7 +60,9 @@ def queue_timeout(root, entry):
     holders.extend('queue head ' + holder('/'.join(row['resources']), row) for row in queued
                    if row['token'] != entry['token'] and row['ticket'] < entry['ticket']
                    and set(row['resources']).intersection(entry['resources']) and alive(row['pid']))
-    return TimeoutError('heavy-lane: timed out after 5 min waiting for resources; ' + '; '.join(holders))
+    wait = entry.get('admissionWaitSeconds', WAIT_SECONDS)
+    label = wait_label(wait)
+    return TimeoutError('heavy-lane: timed out after ' + label + ' waiting for resources; ' + '; '.join(holders))
 
 
 # SF74 W1 (Jake, G280 / process audit 2026-10-09): no local full suite (since 2026-10-15 not even the push gate's). Lanes still ran 56 full
@@ -119,7 +125,7 @@ def owns(root, resource, token, family):
 
 
 @contextlib.contextmanager
-def scheduler(root, deadline=None):
+def scheduler(root, deadline=None, wait_seconds=WAIT_SECONDS):
     if deadline is None:
         deadline = time.monotonic() + WAIT_SECONDS
     with (root / 'scheduler.lock').open('a+') as lock:
@@ -135,7 +141,7 @@ def scheduler(root, deadline=None):
                         owner = json.load(lock)
                     except ValueError:
                         owner = {}
-                    raise TimeoutError('heavy-lane: timed out after 5 min waiting for scheduler; ' + holder('scheduler', owner))
+                    raise TimeoutError('heavy-lane: timed out after ' + wait_label(wait_seconds) + ' waiting for scheduler; ' + holder('scheduler', owner))
                 time.sleep(min(.1, remaining))
         lock.seek(0)
         lock.truncate()
@@ -189,7 +195,7 @@ def remove_ticket(root, token, deadline=None):
 
 
 def acquire(root, entry, deadline=None):
-    with scheduler(root, deadline) as state:
+    with scheduler(root, deadline, entry.get('admissionWaitSeconds', WAIT_SECONDS)) as state:
         ordered = sorted(state['queue'], key=lambda row: (row['priority'], row['ticket']))
         # FIFO per resource. An older request for the independent lane does not block us.
         for previous in ordered:
@@ -354,11 +360,18 @@ def main():
     parser.add_argument('--quiet', action='store_true', help='log output; print only a verdict or failing tail')
     parser.add_argument('--background', action='store_true', help='yield unattended generation/builds with utility QoS')
     parser.add_argument('--checkout-scope', action='store_true', help='one coordinated push per checkout, with shared CPU admission')
+    parser.add_argument('--admission-wait-seconds', type=float, default=None,
+                        help='FIFO resource wait (default 300), separate from command time; at most 100 minutes')
     parser.add_argument('--max', type=float, default=30, help='owned command timeout in minutes; queue time is separate')
     argv = sys.argv[1:]
     separator = argv.index('--') if '--' in argv else len(argv)
     command = argv[separator + 1:]
     args = parser.parse_args(argv[:separator])
+    admission_wait_seconds = WAIT_SECONDS if args.admission_wait_seconds is None else args.admission_wait_seconds
+    if not math.isfinite(admission_wait_seconds) or not 0 < admission_wait_seconds <= 6000:
+        parser.error('admission wait must be positive and at most 6000 seconds')
+    if args.admission_wait_seconds is not None and args.kind != 'full-test':
+        parser.error('explicit admission waiting is only supported for full-test gates')
     if args.checkout_scope and args.kind != 'full-test':
         parser.error('checkout scope is only valid for a coordinated full-test gate')
     if args.background:
@@ -400,6 +413,7 @@ def main():
         parser.error('cannot upgrade an inherited lane; release it before requesting different resources')
     token = uuid.uuid4().hex
     entry = {'token': token, 'pid': os.getpid(), 'runnerPid': os.getpid(), 'childPid': None,
+             'admissionWaitSeconds': admission_wait_seconds,
              'resources': resources, 'priority': 1,
              'cwd': os.getcwd(), 'command': command, 'queuedAt': time.time(),
              'lane': os.environ.get('SERVE_OWNER') or os.environ.get('HERDR_PANE_ID') or os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CODEX_SESSION_ID') or 'unknown'}
@@ -408,13 +422,13 @@ def main():
             parser.error('checkout-scoped pushes require CPU admission')
         entry['checkout'] = str(Path.cwd().resolve())
     held, child, started, load, code = None, None, None, None, 130
-    deadline = time.monotonic() + WAIT_SECONDS
+    deadline = time.monotonic() + admission_wait_seconds
     def interrupted(_signal, _frame):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
     try:
-        with scheduler(root, deadline) as state:
+        with scheduler(root, deadline, admission_wait_seconds) as state:
             entry['ticket'] = state['next']
             state['next'] += 1
             state['queue'].append(entry)
