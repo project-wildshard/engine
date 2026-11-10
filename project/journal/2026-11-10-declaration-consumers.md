@@ -34,3 +34,7 @@ stay as they are.
 Ring 2 stays ring 2: ten of the game files were in `test/pins/ring-2-tests.json`,
 so hosted ring-1 runs skipped them. Their blocks live in
 `isolated-game-ring2-declarations.test.ts`, which takes their place in that list.
+
+The recorded clocks follow: `test/durations.json` and `test/durations-ring1.json` drop the
+31 folded files and record the three new ones and the two hold files from a local
+one-worker run (bootstrap data, as hosted timings replace it).
