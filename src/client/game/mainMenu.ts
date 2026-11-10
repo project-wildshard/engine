@@ -13,6 +13,9 @@
  * A compact DEV switch beside SETTINGS flips Settings ▸ Developer from the menu itself (E483).
  */
 import { titleAssetURL } from './titleAssets';
+import { TIER } from '@wildshard/engine/core/tier';
+import { firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
+import { lowPowerOn } from '@wildshard/engine/render/graphicsMode';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type TitleDeck, type TitleDeckOptions } from './titleDeck';
@@ -27,6 +30,9 @@ import { GAME_STRINGS } from '../../shared/game/strings';
 import { WHATS_NEW, type WhatsNew } from './whatsNew';
 import { buildWhatsNewBanner, type HiddenStore } from './whatsNewBanner';
 import './mainMenu.css';
+/** MOBILE-GRAPHICS MG4 (Jake: "put a fucking banner on the homepage saying low power mode is on. You're automatically going
+ *  into low graphics") */
+const LOW_POWER_BANNER = 'Low Power Mode is on, so you\'re on Low graphics. Turn it off for High.';
 /** the hero (G341 layouts, G344 interim pick): real in-engine aerials over the central roundabout at a phone-1x lens
  * (art/main-menu-hero/round-3-square): LS-c full-bleed on landscape screens, the square SQ-c as the centre band on
  * portrait screens. mainMenu.css picks one per orientation, so a screen downloads only its own image. */
@@ -123,6 +129,15 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     line.textContent = notice;
     required(main, '.ws-main-head', HTMLElement).append(line);
   }
+  // MG4: while the idle title reads Low Power Mode as likely (boot/lowPower.ts, a second of rAF after two on screen), a phone
+  // says so under the logo; the reading lands after the title shows, and goes when Low Power does, so it is re-read each second
+  if (TIER === 'phone') {
+    const power = document.createElement('div');
+    power.className = 'ws-main-notice ws-main-power'; power.setAttribute('role', 'status'); power.textContent = LOW_POWER_BANNER;
+    const paint = (): void => { power.hidden = !lowPowerOn(); };
+    paint(); owner.interval(1000, paint);
+    required(main, '.ws-main-head', HTMLElement).append(power);
+  }
   // SF60 / G214 (Jake: B, a slim banner under the logo): Developer on and the day's lines; folded it is one line
   const banner = buildWhatsNewBanner({ news: whatsNew, developer: mode().developer, onTap: deck.onTap,
     ...(whatsNewStore === undefined ? {} : { store: whatsNewStore }) });
@@ -154,7 +169,15 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     deck.root.inert = next !== 'select';
     if (next === 'main') selectCard.focus({ preventScroll: true });
   };
-  deck.onTap(selectCard, () => { show('select'); deck.start(); });
+  // MOBILE-GRAPHICS MG5: a phone's first PLAY (no `firstPlayDone` mark on the device) skips SHARD SELECT for the deck's first
+  // playable card (Driftwood), where the first-play card waits (firstPlay.ts); every later PLAY, and every desktop one, opens
+  // SHARD SELECT as before
+  const play = (): void => {
+    const firstCard = TIER === 'phone' && !firstPlayDone() ? cards.find((card) => card.upgrade === undefined && card.unavailable === undefined) : undefined;
+    if (firstCard !== undefined) { startFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(firstCard); return; }
+    show('select'); deck.start();
+  };
+  deck.onTap(selectCard, play);
   const gridCard = main.querySelector('.ws-main-grid');
   if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode())) { onGrid(); leaveTitle(); } });
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
@@ -201,7 +224,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     // the HUD's arrow keys move the deck; on the main menu they wait for SHARD SELECT
     select: (i, smooth) => { deck.select(i, smooth); },
     // the HUD's confirm / any key: the main menu's first card opens the deck, the deck enters its card
-    activate: () => { if (screen === 'main') { show('select'); deck.start(); } else deck.activate(); },
+    activate: () => { if (screen === 'main') play(); else deck.activate(); },
     start: () => { deck.start(); startPrefetch(); if (screen === 'main') selectCard.focus({ preventScroll: true }); },
     dispose: () => { owner.dispose(); deck.dispose(); },
   };

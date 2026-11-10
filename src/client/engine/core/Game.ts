@@ -522,6 +522,8 @@ export class Game {
     // would replace; under a menu or the title the world stays as it was until play draws again)
     const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, TIER === 'phone' && gfxPrefs.dpr === 'auto'); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; };
     this.engineScope.listen(document, PIXELS_EVENT, repixel);
+    // MG3: Low Power Mode is switched in the phone's own settings, away from the page: read it again as the page comes back
+    this.engineScope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') repixel(); });
     this.engineScope.onDispose(onDev(repixel));
     this.renderer.setSize(window.innerWidth, viewportHeight());
     this.renderer.toneMapping = THREE.NoToneMapping; // tone mapping happens in the composer

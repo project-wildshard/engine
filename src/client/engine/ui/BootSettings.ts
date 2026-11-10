@@ -17,7 +17,8 @@ import { engineString } from '../../../shared/engine/strings';
  * ones that skip the title, so the reload lands back on this title screen. Reuses the in-game menu's look (gmenu.css).
  */
 import { automaticTier, TIER, gfxPrefs, saveGfxPrefs } from '../core/tier';
-import { graphicsMode, saveGraphicsMode } from '../render/graphicsMode';
+import { graphicsMode, lowPowerOn, lowPowerRefusal, saveGraphicsMode } from '../render/graphicsMode';
+import { firstPlayDone, resetFirstPlay } from '../boot/firstPlayMark';
 
 import { isDev, onDev } from '../core/devMode';
 import { activeLevel } from '../../../shared/engine/level/selection';
@@ -143,12 +144,24 @@ function build(): HTMLElement {
   // Developer's (desktop keeps it in the open, as before)
   const phone = TIER === 'phone';
   const scale = seg(engineString('s_2dee7435d0fe'), false, dprOpts, () => gfxPrefs.dpr, (v) => { if (v === 'auto' || v === '1' || v === '1.25' || v === '1.5' || v === '2' || v === 'native') { gfxPrefs.dpr = v; saveGfxPrefs(); } });
-  const mobile = phone ? [seg(engineString('s_gfx_mode'), false, [{ v: 'low', text: engineString('s_gfx_low') }, { v: 'high', text: engineString('s_gfx_high') }], graphicsMode, (v) => { if (v === 'low' || v === 'high') saveGraphicsMode(v); })] : [];
+  // MG3: under Low Power Mode the row reads Low, and High is refused with the reason under it
+  const refusal = words('ws-gmenu-note', lowPowerRefusal());
+  const showRefusal = (refused: boolean): void => { refusal.hidden = !refused && !lowPowerOn(); };
+  const mobile = phone ? [seg(engineString('s_gfx_mode'), false, [{ v: 'low', text: engineString('s_gfx_low') }, { v: 'high', text: engineString('s_gfx_high') }], graphicsMode, (v) => { if (v === 'low' || v === 'high') showRefusal(!saveGraphicsMode(v)); }), refusal] : [];
+  paints.push(() => { showRefusal(false); }); showRefusal(false);
   const scaleShown = (): void => { scale.hidden = phone && !isDev(); };
+  // MG6 (Jake: "something in settings that allows me to… clear the first time thing and go back to the first time flow")
+  const replay = phone ? [(() => {
+    const line = el('ws-gmenu-row', engineString('s_135d0923e690', [engineString('s_first_play_row'), '']));
+    const b = words('ws-gmenu-segbtn', engineString('s_first_play_replay'), 'button') as HTMLButtonElement; b.type = 'button';
+    const paint = (): void => { const armed = !firstPlayDone(); b.disabled = armed; b.textContent = engineString(armed ? 's_first_play_armed' : 's_first_play_replay'); };
+    listenTap(scope, b, () => { resetFirstPlay(); paint(); });
+    paints.push(paint); paint(); line.append(b); return line;
+  })()] : [];
   scaleShown();
   dbg.hidden = !isDev(); tools.hidden = !isDev(); onDev((on) => { dbg.hidden = !on; tools.hidden = !on; scaleShown(); if (on) { debug?.paint(); developerTools?.paint(); } });
   p.append(running,
-    el('ws-gmenu-label', engineString('s_a874fca87cdd')), ...mobile, row('tier', LABELS.tier), scale,
+    el('ws-gmenu-label', engineString('s_a874fca87cdd')), ...mobile, ...replay, row('tier', LABELS.tier), scale,
     seg(engineString('s_c77c3af22c64'), false, aaOpts, () => gfxPrefs.aa, (v) => { if (v === 'auto' || v === 'on' || v === 'off') { gfxPrefs.aa = v; saveGfxPrefs(); } }),
     el('ws-gmenu-label', engineString('s_799c26913574')), row('touch', LABELS.touch),
     buildMusicStyleRow(scope),

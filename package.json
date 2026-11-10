@@ -310,6 +310,7 @@
     "./boot/filePolicy": "./src/client/engine/boot/filePolicy.ts",
     "./boot/gpuFiles": "./src/client/engine/boot/gpuFiles.ts",
     "./boot/idle": "./src/client/engine/boot/idle.ts",
+    "./boot/firstPlayMark": "./src/client/engine/boot/firstPlayMark.ts",
     "./boot/lowPower": "./src/client/engine/boot/lowPower.ts",
     "./core/sustainedFrames": "./src/client/engine/core/sustainedFrames.ts",
     "./boot/lastEnd": "./src/client/engine/boot/lastEnd.ts",

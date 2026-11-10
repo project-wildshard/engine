@@ -1,0 +1,17 @@
+/* ─── MOBILE-GRAPHICS MG5: the first-play card (src/client/game/firstPlay.ts) ─── prefix ws-firstplay- ───
+   Once per device, in Driftwood, once the player has control: Low / High with a live toggle, and what Low Power Mode does. It
+   sits in the screen's middle band, under the minimap and over the thumb row, so the world it talks about stays in view. */
+.ws-firstplay { position: absolute; left: 50%; top: calc(var(--ws-top, 16px) + 150px); z-index: calc(var(--ws-layer-hud) + 60); transform: translateX(-50%);
+  width: min(360px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px 12px; border: 1px solid var(--ws-cyan-line); background: rgba(6, 10, 18, 0.94);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5); color: var(--ws-text); font-family: var(--ws-mono); pointer-events: auto; touch-action: manipulation; }
+.ws-firstplay-kicker { display: block; font-style: normal; font-size: 8.5px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-firstplay-title { margin: 4px 0 10px; font-family: var(--ws-display); font-size: 20px; letter-spacing: 0.06em; text-transform: uppercase; }
+.ws-firstplay-seg { display: flex; border: 1px solid var(--ws-cyan-line); margin-bottom: 10px; }
+.ws-firstplay-seg button { flex: 1; min-height: 44px; appearance: none; -webkit-appearance: none; border: 0; border-left: 1px solid var(--ws-cyan-line); background: transparent; color: var(--ws-text); font: inherit; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; }
+.ws-firstplay-seg button:first-child { border-left: 0; }
+.ws-firstplay-seg button[aria-pressed='true'] { background: var(--ws-cyan); color: #06121a; }
+.ws-firstplay-text { margin: 0 0 6px; font-size: 11px; line-height: 1.4; letter-spacing: 0.02em; color: var(--ws-text-dim); }
+.ws-firstplay-note { margin: 8px 0 10px; padding: 6px 8px; font-size: 11px; line-height: 1.4; border-left: 3px solid var(--ws-cyan-line); background: rgba(143, 227, 255, 0.06); }
+.ws-firstplay-note[data-tone='on'], .ws-firstplay-note[data-tone='refused'] { border-left-color: #ffc56b; color: #ffe2b0; }
+.ws-firstplay-done { width: 100%; min-height: 44px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.12); color: var(--ws-cyan); font: inherit; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; cursor: pointer; }
+#hud.intro .ws-firstplay { display: none; }

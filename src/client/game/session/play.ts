@@ -110,6 +110,7 @@ import { gridCells, gridHomeSim, pageMode } from '../plugin/context';
 import type { RowBodies } from '@wildshard/engine/entities/RowBodies';
 import { whenControl } from '@wildshard/engine/boot/prefetch';
 import { installMemoryWarning, residentOverLimit } from '../grid/memoryWarning';
+import { installFirstPlay } from '../firstPlay';
 import { ACCENTS } from '@wildshard/format/accent';
 import { installShardHoverSpeed } from '../../../shared/game/grid/rules';
 import { findShard } from '../shard/registry';
@@ -132,6 +133,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // G628 M4: a shard page's Developer warning chip; a grid page's resident over-limit is a line of its memory strip instead,
   // and a neighbour's cold estimate shows nowhere (the G217 blocked cell screen reads the policy, not the chip)
   if (session.memory !== undefined && pageMode() !== 'grid') installMemoryWarning(session.memory, game.levelScope, manifest.slug);
+  installFirstPlay(game.levelScope, hud.root); // MOBILE-GRAPHICS MG5: the title's first play, once the player has control
 
   let playground: Playground | null = null;
   const away = (): boolean => getArena()?.entered === true || playground?.entered === true;

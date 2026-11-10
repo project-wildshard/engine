@@ -11,3 +11,12 @@ graphics", and "with low, you can just do… 1 time and 1 time".
   frame. Main menu > Settings > Graphics shows Low / High on a phone;
   the finer render scale is Developer-only there now. Desktop keeps
   everything as it was.
+- MG3: graphicsMode reads boot/lowPower.ts (the idle title's reading,
+  QA 27): "likely" runs Low and refuses High with the plan's words;
+  Game re-reads it when the page comes back into view.
+- MG4: a notice under the title logo on phones while it reads likely.
+- MG5: a phone's first PLAY (device mark firstPlayDone, engine
+  boot/firstPlayMark.ts) enters the deck's first card, Driftwood (game
+  code may not name a shard), and game/firstPlay.ts shows the card at
+  control: Low / High live, the Low Power line, DONE.
+- MG6: main menu > Settings > First-time setup: Replay.
