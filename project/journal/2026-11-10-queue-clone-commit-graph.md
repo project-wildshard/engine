@@ -20,3 +20,6 @@ does, like the real ssh one.
 graph off. The clone never needs it and the resulting repository keeps no
 trace of the setting. `test/push-queue-clone.test.ts` builds that snapshot and
 fails with the same error without the fix. The batch proof stays green.
+
+The first queue run (job 244) passed the full suite but the gate refused the
+new test file without committed clocks; its own measured timings are recorded.

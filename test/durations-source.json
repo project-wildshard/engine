@@ -264,6 +264,60 @@
       "finishedAt": "2026-11-10T14:57:03.407Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "79b42379d1f27150b9580c79ea5c0c1971388d6d",
+      "tree": "0ef55c1c7d4bca3fcab2038fcdc53cf8eb5d75e7",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/push-queue-clone.test.ts",
+          "blob": "b12e98b56e53eefdc8c6dde7a37fec1c5d0bfeb9",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 22588.552126000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T18:55:47.585Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "79b42379d1f27150b9580c79ea5c0c1971388d6d",
+      "tree": "0ef55c1c7d4bca3fcab2038fcdc53cf8eb5d75e7",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/push-queue-clone.test.ts",
+          "blob": "b12e98b56e53eefdc8c6dde7a37fec1c5d0bfeb9",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 219.86966599999997
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T18:55:48.944Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

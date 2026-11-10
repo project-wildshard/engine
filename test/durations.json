@@ -1030,6 +1030,7 @@
   "test/projectile-law.test.ts": 0.26149368900000003,
   "test/prune-deployments.test.ts": 0.044120875999999996,
   "test/push-input-cache.test.ts": 0.261574388,
+  "test/push-queue-clone.test.ts": 22.588552126000003,
   "test/pwa-update-cache.test.ts": 0.304062049,
   "test/pwa-worker-lifecycle.test.ts": 0.573194489,
   "test/python-partition.test.ts": 0.057230384000000016,
