@@ -5,7 +5,7 @@ import {createVitest} from 'vitest/node';
 const now=Date.now;
 const argv=process.argv;
 try{
- process.argv=[argv[0],argv[1],'list'];
+ process.argv=[argv[0]??process.execPath,argv[1]??'scripts/lift-pending-proof.mjs','list'];
  const {readLiftPending}=await import('./lift-pending.mjs');
  const policy=readLiftPending();
  assert.equal(policy.owner,'codex-mock');

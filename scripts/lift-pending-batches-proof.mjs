@@ -41,13 +41,13 @@ try{
  batchSchedule.landings['CI21-H1']={repository:'project-wildshard/engine',commit:first,landedAt:'2026-11-15T01:00:00Z',evidence:'Actual committed first enabler source; this receipt must never reset'};
  policy.batchSchedule=dateLiftBatches(batchSchedule);put();commit('2026-11-15T01:01:00Z','record first landing');
  const landed=read('2026-11-16T02:00:00Z');assert.equal(landed.batches.find(item=>item.id==='ONE')?.deadline,'2026-11-17T01:00:00.000Z');assert.deepEqual(landed.batches.find(item=>item.id==='TWO')?.waitingFor,['CI21-H2']);
- refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);s.batches[1].deadline='2026-11-18T01:00:00Z';},/date must be derived/u);
- refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);s.batches[1].windowHours=72;},/immutable/u);
+ refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);const batch=s.batches[1];assert.ok(batch);batch.deadline='2026-11-18T01:00:00Z';},/date must be derived/u);
+ refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);const batch=s.batches[1];assert.ok(batch);batch.windowHours=72;},/immutable/u);
  refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);s.landings['CI21-H1']=null;},/cannot be reset/u);
  refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);const landing=s.landings['CI21-H1'];assert.ok(landing);landing.landedAt='2026-11-16T01:00:00Z';},/first committed landing/u);
  refused(()=>{files.push(a);},/deadline missed: READY/u);
  refused(()=>{files.push('test/unassigned.test.ts');},/Unscheduled/u);
- refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);s.batches[0].id='RENAMED';},/immutable/u);
+ refused(()=>{const s=/** @type {typeof batchSchedule} */(policy.batchSchedule);const batch=s.batches[0];assert.ok(batch);batch.id='RENAMED';},/immutable/u);
  assert.throws(()=>read('2026-11-17T01:00:00Z'),/deadline missed: ONE/u);
  files=[c];put();commit('2026-11-17T02:00:00Z','port one-enabler batch');
  writeFileSync(join(root,'enabler-two'),'actual second enabler source');git(['add','enabler-two']);git(['commit','--quiet','-m','land H2'],'2026-11-18T01:00:00Z');const second=git(['rev-parse','HEAD']);

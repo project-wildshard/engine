@@ -95,13 +95,14 @@ export function resolveLiftBatches(value,files,context){
  }
  const assigned=new Set(schedule.batches.flatMap(batch=>batch.members));
  if(files.some(file=>!assigned.has(file)))throw new Error('Unscheduled file cannot enter the J237 CI21 exclusion');
- const active=new Set(files),observed=context.now??Date.now();
+ const active=new Set(files);
  const batches=schedule.batches.map(batch=>{
   const deadline=due(batch,schedule);
   if(batch.deadline!==deadline)throw new Error(`CI21 batch ${batch.id} date must be derived from its immutable enabler landings`);
   return {id:batch.id,owner:batch.owner,files:batch.members.filter(file=>active.has(file)),deadline,
    waitingFor:batch.requires.filter(id=>schedule.landings[id]===null)};
  });
+ const observed=context.now??Date.now();
  const missed=batches.filter(batch=>batch.files.length>0&&batch.deadline!==null&&observed>=Date.parse(batch.deadline));
  if(missed.length>0)throw new Error(`CI21 batch deadline missed: ${missed.map(batch=>`${batch.id} (${batch.files.length} pending, ${batch.deadline}, owner ${batch.owner})`).join('; ')}`);
  const next=batches.flatMap(batch=>batch.files.length>0&&batch.deadline!==null?[Date.parse(batch.deadline)]:[]);
