@@ -31,7 +31,7 @@ test('frozen product image fallbacks retain exact producer bytes and reject a co
   mkdirSync(join(root,'test/pins'),{recursive:true});
   cpSync('test/pins/assets.json',join(root,'test/pins/assets.json'));
   cpSync('test/pins/assets',join(root,'test/pins/assets'),{recursive:true});
-  const manifest=JSON.parse(readFileSync('test/pins/assets.json','utf8')) as {assets:{file:string;slug:string;url:string}[]};
+  const manifest=JSON.parse(readFileSync('test/pins/assets.json','utf8')) as {assets:{file:string;slug:string;url:string;source:{path:string}}[]};
   const owners=[...new Set(manifest.assets.map(row=>row.slug))];
   const all=pinnedPublicAssets(root,owners);
   expect(all.map(row=>row.url)).toEqual(manifest.assets.map(row=>row.url));
@@ -41,6 +41,10 @@ test('frozen product image fallbacks retain exact producer bytes and reject a co
   writeFileSync(file,Buffer.concat([body,Buffer.from([0])]));
   expect(()=>pinnedPublicAssets(root,owners)).toThrow('Pinned public asset bytes differ');
   writeFileSync(file,body);
+  const alias=first.url.replace('/tex/','/tex/./');
+  manifest.assets[0]={...first,url:alias,source:{...first.source,path:`public${alias}`}};
+  writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,...manifest}));
+  expect(()=>pinnedPublicAssets(root,owners)).toThrow('Invalid pinned public asset');
   manifest.assets[0]={...first,file:'../outside.jpg'};
   writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,...manifest}));
   expect(()=>pinnedPublicAssets(root,owners)).toThrow('Invalid pinned public asset');

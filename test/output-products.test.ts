@@ -5,6 +5,7 @@ import {cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, r
 import {dirname, join, resolve} from 'node:path';
 import {copyDeferredPublic, deferredPublicCopy, copyOutputProducts, pruneLooseCopies} from '../scripts/app-build/outputProducts.mjs';
 import {checkBakedTextures} from '../scripts/app-build/bakedTextures.mjs';
+import {pinnedPublicAssets} from '../scripts/pin-assets.ts';
 
 function write(root: string, name: string, body: string): void {
   mkdirSync(dirname(join(root,name)),{recursive:true});writeFileSync(join(root,name),body);
@@ -20,9 +21,17 @@ it('publishes every declared baked mode for both tiers and refuses a missing fal
   try{
     write(root,'out/dawn/shard.json','{}');
     const modes={phone:{img:{baked:[phone]},ktx2:{baked:[gpu]}},desktop:{img:{baked:[desktop]},ktx2:{baked:[gpu]}}};
-    const bindings={$call:'pageModeBoot',args:[{grid:{modes}}]};
-    write(root,'out/dawn/mounts/shardfiles/dawn/discovery.json',JSON.stringify({rows:{bootBindings:bindings}}));
     for(const url of [desktop,phone,gpu])write(root,`public${url}`,'authored texture');
+    const declarations=[
+      {$call:'pageModeBoot',args:[{grid:{modes},shard:{modes}}]},
+      {files:{modes}},
+      {files:{tiers:{phone:[phone],desktop:[desktop]}},gpuFiles:{phone:{[phone]:gpu},desktop:{[desktop]:gpu}}},
+      {sources:{baked:{source:{urls:{phone:[phone],desktop:[desktop]}}},gpu:{source:{urls:[gpu]}}}},
+    ];
+    for(const bindings of declarations){
+      write(root,'out/dawn/mounts/shardfiles/dawn/discovery.json',JSON.stringify({rows:{bootBindings:bindings}}));
+      expect(checkBakedTextures(root,join(root,'public'))).toBe(3);
+    }
     expect(checkBakedTextures(root,join(root,'public'))).toBe(3);
     copyDeferredPublic(root,join(root,'dist'));pruneLooseCopies(join(root,'dist'));
     expect(checkBakedTextures(root,join(root,'dist'))).toBe(3);
@@ -30,6 +39,26 @@ it('publishes every declared baked mode for both tiers and refuses a missing fal
     expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow(phone);
     rmSync(join(root,`dist${desktop}`));
     expect(()=>checkBakedTextures(root,join(root,'dist'))).toThrow(desktop);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+it('refuses corrupt pinned image bytes in public and final output even when each file exists',()=>{
+  const root=mkdtempSync(resolve('tmp/app-baked-pins-'));
+  try{
+    mkdirSync(join(root,'test/pins'),{recursive:true});
+    cpSync('test/pins/assets.json',join(root,'test/pins/assets.json'));
+    cpSync('test/pins/assets',join(root,'test/pins/assets'),{recursive:true});
+    const assets=pinnedPublicAssets(root),first=assets[0];
+    if(first===undefined)throw new Error('Expected a real frozen image pin');
+    write(root,'out/owner/shard.json','{}');
+    write(root,'out/owner/mounts/shardfiles/owner/discovery.json',JSON.stringify({rows:{bootBindings:{files:{modes:{phone:{img:[first.url]},desktop:{img:[first.url]}}}}}}));
+    for(const row of assets){mkdirSync(dirname(join(root,`public${row.url}`)),{recursive:true});writeFileSync(join(root,`public${row.url}`),row.body);}
+    copyDeferredPublic(root,join(root,'dist'));
+    expect(checkBakedTextures(root,join(root,'public'))).toBe(1);
+    expect(checkBakedTextures(root,join(root,'dist'))).toBe(1);
+    writeFileSync(join(root,`public${first.url}`),new Uint8Array());
+    expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow('Published pinned baked texture bytes differ');
+    writeFileSync(join(root,`dist${first.url}`),Buffer.concat([first.body,Buffer.from([0])]));
+    expect(()=>checkBakedTextures(root,join(root,'dist'))).toThrow('Published pinned baked texture bytes differ');
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 describe('app public copy before final product publication',()=>{

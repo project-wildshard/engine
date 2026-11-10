@@ -17,16 +17,16 @@ const AssetPins = v.strictObject({version: v.literal(1), assets: v.pipe(v.array(
 
 /** Verify exact bytes before a caller publishes them through its ordinary
  * collision-checked mount ledger. No private producer checkout is needed. */
-export function pinnedPublicAssets(root: string, slugs: readonly string[]): readonly {url: string; body: Uint8Array}[] {
+export function pinnedPublicAssets(root: string, slugs?: readonly string[]): readonly {url: string; body: Uint8Array}[] {
   const manifest = resolve(root, 'test/pins/assets.json');
   if (!existsSync(manifest)) return [];
   const pins = v.parse(AssetPins, JSON.parse(readFileSync(manifest, 'utf8'))), seen = new Set<string>();
   return pins.assets.flatMap(row => {
     const extension = row.url.slice(row.url.lastIndexOf('.'));
     if (row.file !== `test/pins/assets/${row.sha256}${extension}` || row.source.path !== `public${row.url}`
-      || row.url.split('/').includes('..') || seen.has(row.url)) throw new Error(`Invalid pinned public asset: ${row.url}`);
+      || row.url.split('/').some(part => part === '.' || part === '..') || seen.has(row.url)) throw new Error(`Invalid pinned public asset: ${row.url}`);
     seen.add(row.url);
-    if (!slugs.includes(row.slug)) return [];
+    if (slugs !== undefined && !slugs.includes(row.slug)) return [];
     const body = readFileSync(resolve(root, row.file));
     const hash = createHash('sha256').update(body).digest('hex');
     const blob = createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex');

@@ -36,3 +36,12 @@ the complete layer typecheck successfully, without suppressions. The
 existing committed publication facts already contain these six source
 images. Regenerating against the repaired actual public inventory now
 keeps their byte/version rows, with the official renderer stamp.
+
+J206 review found one MUST: a dot-segment URL alias could bypass the
+literal ledger collision check. A real pinned reader accepted the alias
+on the old code (the new refusal test failed); the forward rejects both
+dot forms before publication. Both SHOULDs are addressed: the census
+verifies immutable pin bytes in public and final output, including
+zero-length and corrupt existing files, and tests cover direct modes,
+lookup-map keys, fixed sources, tiers and both page flows. It checks
+explicit declarations, not invented implicit filename alternatives.
