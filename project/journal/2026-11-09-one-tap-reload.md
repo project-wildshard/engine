@@ -53,3 +53,7 @@ waits for the cover, loading its module if nobody answered the ask
 Hub a click lands ~26 pt above where the screen draws it (measured
 with a touch probe page); taps 3 pt inside RELOAD's top edge hit, in
 Safari and as a Home Screen web app.
+J206 Codex review of e1f55e4: no MUST-FIX. Its should-fixes are done:
+the pill's and Check's /version.json reads share one order
+(checkLiveBuild), so a slow earlier read never takes back a newer
+build; and a worker drop that fails still waits for the cover.

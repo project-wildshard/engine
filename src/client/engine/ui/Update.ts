@@ -18,7 +18,7 @@ import { engineString } from '../../../shared/engine/strings';
  */
 import { isDev, onDev } from '../core/devMode';
 import { reloadForPlayer } from './playerReload';
-import { applyLiveBuild, liveBuild, liveBuildOf, shortBuild, workerControlled } from './buildCheck';
+import { checkLiveBuild, liveBuildOf, shortBuild, workerControlled } from './buildCheck';
 
 
 // The update pill exists before content is selected; keep App and Three out of the entry graph.
@@ -76,12 +76,7 @@ scope.listen(window, 'ws-sw-waiting', event => {
   else if ('build' in value && typeof value.build === 'string') lightUp(shortBuild(value.build));
 });
 
-let discovery = 0;
-async function check(): Promise<void> {
-  const started = ++discovery;
-  const build = await liveBuild();
-  if (started === discovery && build !== null) applyLiveBuild(build);
-}
+const check = (): Promise<unknown> => checkLiveBuild();
 // any read of /version.json (this pill's, or Settings ▸ Build's Check): a page a worker controls lights the pill only once
 // that worker has installed the build (`ws-sw-waiting` above); any other page reloads straight into it
 scope.listen(window, 'ws-live-build', event => {

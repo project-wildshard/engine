@@ -1,7 +1,7 @@
 import type { Scope } from '../../../shared/engine/app/scope';
 import { engineString } from '../../../shared/engine/strings';
 import { listenTap } from '../input/dom';
-import { applyLiveBuild, liveBuild, liveBuildOf, runningBuild, shortBuild, workerControlled } from './buildCheck';
+import { checkLiveBuild, liveBuildOf, runningBuild, shortBuild, workerControlled } from './buildCheck';
 import { reloadForPlayer } from './playerReload';
 
 /**
@@ -58,11 +58,11 @@ export function buildBuildRow(owner: Scope): HTMLElement {
   listenTap(owner, check, () => {
     const started = ++checking;
     check.disabled = true; say(engineString('s_build_checking'));
-    void liveBuild().then(live => {
+    // announced (ws-live-build): the row, the pill and the worker all answer it
+    void checkLiveBuild().then(live => {
       if (started !== checking) return undefined;
       check.disabled = false;
       if (live === null) say(engineString(navigator.onLine ? 's_build_failed' : 's_build_offline'));
-      else applyLiveBuild(live); // the row, the pill and the worker all answer it
       return undefined;
     });
   });

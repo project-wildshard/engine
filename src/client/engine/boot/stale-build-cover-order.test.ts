@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, expect, test, vi } from 'vitest';
 
 // This file never imports the cover first: an unbundled dev page can reach the stale-build reload before any module that
 // imports src/client/engine/ui/reloadCover.ts has run, so nobody answers `ws:reloading` (J206 review, opus-reload2).
 afterEach(() => { document.body.replaceChildren(); sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+// the losing 3 s worker-drop timer lives on the page scope
+afterAll(async () => { (await import('../../../shared/engine/app/resources')).pageScope.dispose(); });
 
 test('RL8: a stale-build reload puts the RELOADING cover up even when the cover module had not loaded, before the page leaves', async () => {
   vi.stubGlobal('__BUILD_ID__', '40e08ff-old');

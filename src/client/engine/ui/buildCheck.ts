@@ -33,6 +33,17 @@ export function applyLiveBuild(build: string): void {
   window.dispatchEvent(new CustomEvent('ws-live-build', { detail: { build } }));
 }
 
+let asked = 0, announced = 0;
+/** Read the live build and announce it, for the pill and Settings ▸ Build alike. One order across both: an answer that
+ * lands after a later-asked one was announced is dropped, so a slow read never takes back a newer build. Resolves the
+ * build read (announced or not), or null. */
+export async function checkLiveBuild(): Promise<string | null> {
+  const ticket = ++asked;
+  const build = await liveBuild();
+  if (build !== null && ticket > announced) { announced = ticket; applyLiveBuild(build); }
+  return build;
+}
+
 /** The `ws-live-build` event's build, or null for anything else. */
 export function liveBuildOf(event: Event): string | null {
   if (!(event instanceof CustomEvent)) return null;

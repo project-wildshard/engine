@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, expect, test, vi } from 'vitest';
 
 // the page scope is not disposed between tests: a closed one runs no timers, and leaveAfterPaint's frame wait lives on it
 let owners: { dispose: () => void }[] = [];
@@ -32,6 +32,7 @@ async function settingsBuild(running: string, live: string, where: 'title' | 'pa
   if (!(check instanceof HTMLButtonElement) || !(reload instanceof HTMLButtonElement)) throw new Error('Missing Build buttons');
   return { row, check, reload, status: () => row.querySelector('[role="status"]')?.textContent ?? '', fetches, location };
 }
+afterAll(async () => { (await import('../../../shared/engine/app/resources')).pageScope.dispose(); });
 const tap = (button: HTMLElement): void => { button.dispatchEvent(new PointerEvent('pointerup', { button: 0 })); button.click(); };
 
 test('R9: Settings ▸ Build shows the running build; Check reads /version.json and says the page is up to date', async () => {
@@ -46,7 +47,7 @@ test('R9: Settings ▸ Build shows the running build; Check reads /version.json 
   expect(check.disabled).toBe(false);
 });
 
-test('R9: a newer live build lights the row and its Reload, and the build pill hears the same read', async () => {
+test('R9: a newer live build lights the row and its Reload, and Check announces it (ws-live-build) for the pill and the worker', async () => {
   const { row: box, check, reload, status } = await settingsBuild('40e08ff-1762700000', 'd91507e-1762800000', 'pause');
   const row = box.querySelector('.ws-gmenu-buildrow');
   const pill: (string | null)[] = [], { liveBuildOf } = await import('./buildCheck');
@@ -54,7 +55,7 @@ test('R9: a newer live build lights the row and its Reload, and the build pill h
   tap(check);
   await vi.waitFor(() => { expect(status()).toBe('New version d91507e · reload to switch'); });
   expect(row?.classList.contains('newer')).toBe(true); expect(reload.classList.contains('primary')).toBe(true);
-  expect(pill).toEqual(['d91507e-1762800000']); // the build pill hears the same read
+  expect(pill).toEqual(['d91507e-1762800000']); // the announcement the pill (Update.ts) and the worker (sw.ts) listen for
 });
 
 test('R9 (R3 / R4): Reload in the pause menu answers in the tap\'s own turn with the loading button and the cover, then reloads in place', async () => {
@@ -72,7 +73,7 @@ test('R9 (R3 / R4): Reload in the pause menu answers in the tap\'s own turn with
   expect(location.reload).toHaveBeenCalledOnce();
 });
 
-test('R9 (QC3 / RL5): on the title, Reload adopts a waiting worker within the 3 s budget and loads a fresh title', async () => {
+test('R9 (QC3 / RL5): on the title, Reload offers a waiting worker the 3 s budget; one it cannot adopt is a fresh title', async () => {
   vi.useFakeTimers();
   const adopt = vi.fn((_to?: string, _why?: string, _within?: number) => Promise.resolve(false));
   Object.defineProperty(window, '__ws_sw', { configurable: true, value: { waiting: { state: 'installed' }, adopt } });
@@ -93,4 +94,19 @@ test('R9: offline, Check asks nothing and says it cannot check', async () => {
   tap(check);
   await vi.waitFor(() => { expect(status()).toBe('Offline · can\'t check'); });
   expect(fetches).toEqual([]);
+});
+
+test('R9: a slow earlier read never takes back a newer one (the pill\'s and Check\'s reads share one order)', async () => {
+  const { check, status } = await settingsBuild('40e08ff-1762700000', 'unused', 'pause');
+  const answers: ((build: string) => void)[] = [];
+  vi.stubGlobal('fetch', () => new Promise<Response>(resolve => { answers.push(build => { resolve(Response.json({ build })); }); }));
+  const { checkLiveBuild } = await import('./buildCheck');
+  const announced: (string | null)[] = [], { liveBuildOf } = await import('./buildCheck');
+  window.addEventListener('ws-live-build', event => { announced.push(liveBuildOf(event)); });
+  const slow = checkLiveBuild(); // the pill's read, asked first
+  tap(check); // Settings' Check, asked second
+  await vi.waitFor(() => { expect(answers).toHaveLength(2); });
+  answers[1]?.('d91507e-1762800000'); await vi.waitFor(() => { expect(status()).toBe('New version d91507e · reload to switch'); });
+  answers[0]?.('40e08ff-1762700000'); await slow;
+  expect(announced).toEqual(['d91507e-1762800000']); expect(status()).toBe('New version d91507e · reload to switch');
 });

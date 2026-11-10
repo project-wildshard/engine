@@ -80,8 +80,9 @@ export async function reloadPastWorker(): Promise<void> {
 /** Drop this tab's worker, then reload: the next document comes from the network. `cover`: the RELOADING cover going up,
  * which the reload waits for too, then leaves one painted frame later (leaveAfterPaint). */
 async function leavePastWorker(why: string, cover: Promise<void> = Promise.resolve()): Promise<void> {
-  // RL5: dropping the worker gets 3 s (reloadCover.ts RELOAD_FALLBACK_MS); a hung unregister never keeps the tap from reloading
-  try { await Promise.race([Promise.all([dropWorker(), cover]), new Promise<void>(resolve => { pageScope.timeout(3000, resolve); })]); } catch { /* The reload goes anyway. */ }
+  // RL5: dropping the worker gets 3 s (reloadCover.ts RELOAD_FALLBACK_MS); a hung unregister never keeps the tap from reloading,
+  // and a failed one still waits for the cover
+  try { await Promise.race([Promise.all([dropWorker().catch(() => undefined), cover]), new Promise<void>(resolve => { pageScope.timeout(3000, resolve); })]); } catch { /* The reload goes anyway. */ }
   leaveAfterPaint(() => { countReload(); markReload(why, 'background'); location.reload(); });
 }
 
