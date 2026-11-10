@@ -302,6 +302,8 @@ void test(
         f.settle()
       }
       assert.equal(f.lines().get('item.amber-resin'), 2)
+      assert.equal(f.client.owned.get('item.boar-hide'), 1)
+      assert.equal(f.client.owned.get('item.amber-resin'), 2)
       const other = f.join(f.host.addPlayer('exchange.other'), 'Other')
       f.settle()
       other.client.act({ kind: 'buy', seq: 0, good: offer })

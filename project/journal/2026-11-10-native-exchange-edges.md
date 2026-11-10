@@ -35,3 +35,10 @@ trader mutation failed the preserved hide assertion in 2.345 seconds.
 Both production files were restored byte-for-byte after the experiments.
 Targeted strict lint and workflow actionlint passed. CI installs the
 same two pinned products before running the explicit native proof.
+
+J206 reviewed e7e7084 once, read-only, using the quota-safe review helper:
+`~/.cache/wildshard/session-keep/reviews/sdk-exchange-engine-20261110-SDK-net-exchange-20261110T063619Z-58771.md`.
+No MUST-FIX. Its one SHOULD is fixed: positive hide/resin balances are
+asserted on the buyer client before purchase, so the final zero checks
+prove replicated removal rather than absent rows. The review wrote no
+source; the checkout was clean before this narrow improvement.
