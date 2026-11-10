@@ -81,7 +81,7 @@ describe('check:page-events (SR12)', () => {
   test('red on a page listener whose producer moved to the server', () => {
     const {root} = tree();
     expect(judge(root, table({producers: [{file: 'src/server/sim.ts', emits: "host.emit('creature.died')"}]})))
-      .toEqual(['row creature.died: producer src/server/sim.ts is reached only by tests, not from a production page entry']);
+      .toEqual(['row creature.died: producer src/server/sim.ts runs only on the server, never on the page']);
     expect(judge(root, table({bus: 'host', producers: [{file: 'src/server/sim.ts', emits: "host.emit('creature.died')"}]})))
       .toEqual(["row creature.died: src/client/hud.ts is page code, so its row's bus must be page"]);
   });

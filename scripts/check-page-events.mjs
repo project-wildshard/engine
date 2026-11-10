@@ -257,6 +257,7 @@ export function judgePageEvents(root, table) {
       if (!existsSync(join(root, file))) { failures.push(`row ${row.id}: producer ${file} is gone`); continue; }
       if (!readFileSync(join(root, file), 'utf8').includes(emits)) { failures.push(`row ${row.id}: producer ${file} no longer has \`${emits}\``); continue; }
       if (isTestPath(file)) failures.push(`row ${row.id}: producer ${file} is test code, not a production producer`);
+      else if (row.bus === 'page' && !reach.page.has(file) && reach.host.has(file)) failures.push(`row ${row.id}: producer ${file} runs only on the server, never on the page`);
       else if (!reach[row.bus].has(file)) failures.push(`row ${row.id}: producer ${file} is reached only by tests, not from a production ${row.bus} entry`);
     }
     const flow = /^flow:([a-z0-9-]+)$/u.exec(row.proof)?.[1];
