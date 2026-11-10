@@ -15,7 +15,7 @@ test('a wrong build hears `reload`, and no seat is made', { timeout: 60_000 }, a
   bench = await roomBench();
   const stale = bot(bench.url, 'an-old-build', 'device:stale');
   expect(await stale.ended()).toBe('reload');
-  expect(bench.world.health()).toEqual({ build: 'bench', cells: 1, workers: 1, awake: 0, players: 0 });
+  expect(bench.world.health()).toEqual({ build: 'bench', cells: 1, workers: 1, awake: 0, players: 0, table: { [SHARD]: 0 } });
   expect(bench.world.refusals).toEqual({ 'stale-build': 1 });
 });
 
@@ -25,7 +25,7 @@ test('the right build loads in the first cell, then takes its seat', { timeout: 
   expect(await phone.arrived()).toBe(true);
   expect(JSON.parse(phone.resume ?? '{}')).toMatchObject({ shard: SHARD });
   await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds('device:one')).toBe(true); });
-  expect(bench.world.health()).toEqual({ build: 'bench', cells: 1, workers: 1, awake: 1, players: 1 });
+  expect(bench.world.health()).toEqual({ build: 'bench', cells: 1, workers: 1, awake: 1, players: 1, table: { [SHARD]: 0 } });
   expect(bench.room(SHARD)?.bodyOf('device:one')?.id).toBe('actor.player');
 });
 

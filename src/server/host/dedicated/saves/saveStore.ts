@@ -13,6 +13,8 @@ export interface SaveReceipt { readonly serial: number; readonly factId: string;
 /** One player's save on one shard. `seq` only ever rises for a player and a shard, and an older write never lands on a newer one. The epoch is the store's, from the release. */
 export interface SaveWrite {
   readonly player: string; readonly name: string; readonly shard: string;
+  /** GO3 (ZS7): the grid instance the doc was written in, the player's place. Left out, the shard's name stands for it. */
+  readonly cell?: string;
   readonly build: string; readonly saveVersion: number; readonly seq: number; readonly reason: string;
   readonly doc: unknown; readonly receipts: readonly SaveReceipt[];
 }
@@ -24,6 +26,7 @@ export type SaveParse<Doc> = (doc: unknown, saveVersion: number) => Doc | null;
 // `pg` reads a bigint as a string, and PGlite as a number.
 const Whole = v.pipe(v.union([v.number(), v.string(), v.bigint()]), v.transform(Number));
 const CellSchema = v.array(v.object({ shard: v.string() }));
+const PlaceSchema = v.array(v.object({ cell: v.string() }));
 const RowSchema = v.array(v.object({ doc: v.unknown(), previous: v.unknown(), seq: Whole, revision: Whole, save_version: Whole }));
 
 const WRITE_PLAYER = 'insert into player (id, name) values ($1, $2) on conflict (id) do update set name = excluded.name, seen_at = now()';
@@ -32,7 +35,12 @@ const WRITE_SAVE = `insert into player_save (player_id, epoch, shard, revision, 
   values ($1, $2, $3, 1, $4, $5, $6, $7, $8::jsonb)
   on conflict (player_id, epoch, shard) do update set revision = player_save.revision + 1, build = excluded.build, save_version = excluded.save_version,
     seq = excluded.seq, reason = excluded.reason, doc = excluded.doc, previous = player_save.doc, updated_at = now()
-  where player_save.seq < excluded.seq`;
+  where player_save.seq < excluded.seq
+  returning seq`;
+// ZS7 (GO3, MP1.4's `player.at`): one place a player and epoch, moved by every doc that lands. `pose` is that doc's own stand.
+const WRITE_PLACE = `insert into player_place (player_id, epoch, cell, pose, reason) values ($1, $2, $3, $4::jsonb, $5)
+  on conflict (player_id, epoch) do update set cell = excluded.cell, pose = excluded.pose, reason = excluded.reason, updated_at = now()`;
+const READ_PLACE = 'select cell from player_place where player_id = $1 and epoch = $2';
 // Only `fact_id` may repeat. A serial on a different fact is a book restarted without its save, and it must fail loudly: a bare
 // `do nothing` would drop a real grant in silence.
 const WRITE_RECEIPT = `insert into ledger_receipt (player_id, epoch, shard, serial, fact_id, grant_kind, name, amount)
@@ -42,11 +50,15 @@ const LAST_CELL = 'select shard from player_save where player_id = $1 and epoch 
 // The bad copy stays in `previous` to be looked at, and the next write replaces it. `seq` is checked so a newer write stands.
 const HEAL = 'update player_save set doc = previous, previous = doc where player_id = $1 and epoch = $2 and shard = $3 and seq = $4';
 
+/** Where a doc stands, if it says: a room's doc always does. */
+function poseOf(doc: unknown): unknown { return typeof doc === 'object' && doc !== null && 'at' in doc ? doc.at ?? null : null; }
 /** Write a player's doc and its receipts in one transaction. Receipts stand even if an older doc doesn't land: they are facts. */
 export async function writeSave(db: Database, epoch: number, write: SaveWrite): Promise<void> {
   await db.transaction(async (sql: Sql) => {
     await sql.query(WRITE_PLAYER, [write.player, write.name]);
-    await sql.query(WRITE_SAVE, [write.player, epoch, write.shard, write.build, write.saveVersion, write.seq, write.reason, JSON.stringify(write.doc)]);
+    const landed = await sql.query(WRITE_SAVE, [write.player, epoch, write.shard, write.build, write.saveVersion, write.seq, write.reason, JSON.stringify(write.doc)]);
+    // An older doc that doesn't land doesn't move the player either.
+    if (landed.rows.length > 0) await sql.query(WRITE_PLACE, [write.player, epoch, write.cell ?? write.shard, JSON.stringify(poseOf(write.doc)), write.reason]);
     for (const row of write.receipts) await sql.query(WRITE_RECEIPT, [write.player, epoch, write.shard, row.serial, row.factId, row.grant, row.name, row.amount]);
   });
 }
@@ -56,6 +68,11 @@ async function within<Result>(ms: number, read: () => Promise<Result>): Promise<
   try {
     return await Promise.race([read(), new Promise<never>((_resolve, reject) => { scope.timeout(ms, () => { reject(new Error(`Save read took over ${String(ms)} ms`)); }); })]);
   } finally { scope.dispose(); }
+}
+/** ZS7: the place row's cell, this epoch, or null for a player whose docs all predate it. */
+export async function placeOf(db: Database, epoch: number, player: string): Promise<string | null> {
+  const [row] = v.parse(PlaceSchema, (await within(READ_MS, () => db.query(READ_PLACE, [player, epoch]))).rows);
+  return row?.cell ?? null;
 }
 /** The cell this player last stood in, this epoch: where they load. */
 export async function lastCell(db: Database, epoch: number, player: string): Promise<string | null> {

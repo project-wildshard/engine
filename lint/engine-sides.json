@@ -1244,6 +1244,7 @@
     "src/server/game/weather/reactions.ts": "server",
     "src/server/game/weather/wire.ts": "server",
     "src/server/host/bake/headlessWorker.ts": "server",
+    "src/server/host/dedicated/gridCells.ts": "server",
     "src/server/host/dedicated/cellHost.ts": "server",
     "src/server/host/dedicated/cellProtocol.ts": "server",
     "src/server/host/dedicated/cellWorker.ts": "server",

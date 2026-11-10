@@ -5,6 +5,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { ServerClock } from '@wildshard/engine/net/serverClock';
 import { DedicatedRoom } from './dedicatedRoom';
+import { cellShard } from './gridCells';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { CellOrder, WorkerNews, WorkerReading } from './cellProtocol';
 import { SeatTransport } from './socketPump';
@@ -22,10 +23,11 @@ const EMPTY_MS = 300_000;
 export interface CellPort { postMessage: (message: unknown, transfer?: readonly Transferable[]) => void; on?: (event: 'message', listener: (message: unknown) => void) => unknown; onmessage?: ((event: MessageEvent<unknown>) => void) | null }
 /** What a worker needs from where it runs. */
 export interface CellHostOptions {
-  /** Its row of the table: fixed at startup, and a cell never moves (J182). */
+  /** Its row of the table, by grid instance: fixed at startup, and a cell never moves (J182). */
   readonly slugs: readonly string[]; readonly build: string;
   /** A fresh id for each boot of a cell, so a restarted cell can't repeat a grant. */
   readonly bootId: () => string;
+  /** A shard's server inputs, by its slug. */
   readonly load: (slug: string) => Promise<HeadlessRuntimeInput>;
   /** A proof's overrides. `roomNow` is the rooms' hold and checkpoint clock; ticks keep real time. */
   readonly holdMs?: number; readonly emptyMs?: number; readonly roomNow?: () => number;
@@ -52,8 +54,9 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   let clock: ServerClock | undefined, disposed = false, ready = false, ticks: number[] = [], ticked = 0, readAt = started, dropsAt = 0;
   const post = (news: WorkerNews): void => { port.postMessage(news); };
   const fail = (error: unknown): void => { clock?.pause(); post({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) }); };
+  // GO3: a row names cells by grid instance; each loads its shard's pack.
   const open = async (slug: string): Promise<DedicatedRoom> => {
-    const begun = diagnosticNow(), room = await DedicatedRoom.boot({ slug, build: options.build, bootId: options.bootId(), input: await options.load(slug), now: options.roomNow ?? diagnosticNow,
+    const shard = cellShard(slug), begun = diagnosticNow(), room = await DedicatedRoom.boot({ slug: shard, cell: slug, build: options.build, bootId: options.bootId(), input: await options.load(shard), now: options.roomNow ?? diagnosticNow,
       post: news => { if (news.kind === 'left' && news.seats === 0) { const cell = cells.get(slug); if (cell !== undefined) cell.emptySince = diagnosticNow(); } post({ ...news, slug }); },
       reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }),...(options.playtest===true?{playtest:row=>{post({kind:'playtest',slug,row});}}:{}) });
     post({ kind: 'cell', slug, ms: diagnosticNow() - begun });

@@ -25,6 +25,7 @@ import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
+import { cellShard, worldCells } from './gridCells';
 
 declare const __BUILD_ID__: string;
 /** scripts/build-server.mjs: package.json's version, the Sentry release (S8). */
@@ -36,8 +37,6 @@ const engineVersion = typeof __ENGINE_VERSION__ === 'string' ? __ENGINE_VERSION_
 if (process.argv.includes('--sentry-test')) process.exit(await sendSentryTest({ env: process.env, build: process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, version: engineVersion, log }));
 const build = process.env['WILDSHARD_BUILD'] ?? __BUILD_ID__, origin = need('PACK_ORIGIN'), cache = process.env['PACK_CACHE'] ?? '/var/lib/wildshard/packs';
 const port = Number(process.env['PORT'] ?? 8790), host = process.env['HOST'] ?? '127.0.0.1', started = Date.now();
-// C5, C11: one cell first. The list is fixed at startup, and a player with no save lands in the first.
-const cells = (process.env['WORLD_CELLS'] ?? 'driftwood-isle').split(',');
 const releaseAt = need('RELEASE_URL'), releaseKey = need('RELEASE_PUBLIC_KEY'), channel = process.env['RELEASE_CHANNEL'] ?? 'production';
 const readRelease = async (): Promise<ReleaseFile> => {
   const file = await fetchReleaseFile(releaseAt, releaseKey);
@@ -54,8 +53,9 @@ async function installedRelease(): Promise<ReleaseFile> {
   return selected;
 }
 const release = await installedRelease();
-const named = new Set(release.shards.map(shard => shard.slug));
-for (const cell of cells) if (!named.has(cell)) throw new Error(`The release has no ${cell}`);
+// C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
+// the release names, home first. A cell runs its shard's pack, and the release must name that shard.
+const cells = worldCells(process.env['WORLD_CELLS'] ?? 'driftwood-isle', release.shards.map(shard => shard.slug)), shards = [...new Set(cells.map(cellShard))];
 const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: PlayerSaves = url === 'memory:' ? memoryPlayerSaves() : await openPlayerSaves(url, new URL('migrations/', import.meta.url), release.saveEpoch, log);
 const hold = process.env['HOLD_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
 // An env file's blank row means unset.
@@ -118,10 +118,10 @@ async function pullBundle(script: string): Promise<void> {
   const [code] = await once(spawn(process.execPath, [script, '--fetch'], { stdio: ['ignore', 'inherit', 'inherit'] }), 'exit') as [number | null];
   if (code !== 0) throw new Error('The pull refused this release');
 }
-const watch = new ReleaseWatch({ read: readRelease, serving: release, cells, ...(poll === undefined ? {} : { everyMs: Number(poll) }), failed: error => { log({ at: 'release.failed', error: String(error) }); },
+const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: shards, ...(poll === undefined ? {} : { everyMs: Number(poll) }), failed: error => { log({ at: 'release.failed', error: String(error) }); },
   changed: async next => {
     if (pullScript !== undefined) await pullBundle(pullScript);
-    for (const slug of cells) await readPackProduct(slug, next.engineBuild, await rapier(), { origin, cache }, reads);
+    for (const slug of shards) await readPackProduct(slug, next.engineBuild, await rapier(), { origin, cache }, reads);
     world.beginGrace(next.engineBuild);
   } });
 process.once('SIGTERM', () => { watch.dispose(); stop(0); });

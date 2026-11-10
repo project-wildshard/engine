@@ -115,7 +115,10 @@ const fetchOnly = process.argv.includes('--fetch');
 try {
   const text = (await get(need('RELEASE_URL'))).toString('utf8'), release = readRelease(text), held = heldRelease(current);
   const named = new Set(release.shards.map(row => row.slug));
-  for (const cell of (process.env.WORLD_CELLS ?? 'driftwood-isle').split(',')) if (!named.has(cell)) throw new Error(`The release has no ${cell}`);
+  // GO3: `grid` opens whatever grid cells the release names, and the server checks those against the catalogue it carries.
+  // A plain slug list is still checked here, before anything moves.
+  const listed = process.env.WORLD_CELLS ?? 'driftwood-isle';
+  if (listed.trim() !== 'grid') for (const cell of listed.split(',')) if (!named.has(cell.trim())) throw new Error(`The release has no ${cell}`);
   forwardOnly(release, held);
   const folder = join(bundles, release.engineBuild);
   forwardOnly(release, heldRelease(folder, true));

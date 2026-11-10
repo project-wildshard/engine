@@ -7,6 +7,7 @@ import { openPg, savesUrl } from '../src/server/host/dedicated/saves/pgDatabase'
 import { lastCell, readSave, writeSave, type SaveParse, type SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { SaveWriteQueue } from '../src/server/host/dedicated/saves/writeQueue';
 import { openPglite } from './fixtures/pgliteDatabase';
+import { playerSavesOver } from '../src/server/host/dedicated/playerSaves';
 
 // E7.4b, the store half: `0001-saves.sql` on real Postgres (PGlite), in-process, and through the shipped `pg` driver over TCP. The VPS's
 // apt Postgres waits for its setup (J180).
@@ -21,9 +22,9 @@ const cell = async (db: Database, text: string): Promise<unknown> => { const { r
 test('migrations apply once, in order', async () => {
   const db = await openPglite();
   closers.push(db.close);
-  expect([await migrate(db), await migrate(db)]).toEqual([['0001-saves.sql', '0002-report-delivery.sql'], []]);
+  expect([await migrate(db), await migrate(db)]).toEqual([['0001-saves.sql', '0002-report-delivery.sql', '0003-place.sql'], []]);
   const { rows } = await db.query('select table_name from information_schema.tables where table_schema = \'public\' order by table_name');
-  expect(rows).toEqual(['chat_report', 'ledger_receipt', 'player', 'player_save', 'schema_migrations'].map(table_name => ({ table_name })));
+  expect(rows).toEqual(['chat_report', 'ledger_receipt', 'player', 'player_place', 'player_save', 'schema_migrations'].map(table_name => ({ table_name })));
 });
 
 test('a write moves `doc` to `previous`, and an older write never lands on a newer one', async () => {
@@ -92,6 +93,22 @@ test('a player loads in the cell they last stood in', async () => {
   expect(await lastCell(db, 0, 'device:a')).toBe('nalati-grasslands');
 });
 
+test('ZS7: the place row is where a player resumes; a player with none resumes their newest save; only a doc that lands moves it', async () => {
+  const db = await fresh(), saves = playerSavesOver(db, 0, () => undefined), at = { x: 1, y: 2, z: 3, yaw: 0 };
+  expect(await saves.where('device:a'), 'a fresh player: the first cell').toBeNull();
+  await writeSave(db, 0, write(1, 1));
+  await db.exec('delete from player_place');
+  expect(await saves.where('device:a'), 'saved before the place row: their newest save').toBe('driftwood-isle');
+  await writeSave(db, 0, write(1, 1, { shard: 'open-plot-night-market', cell: 'open-plot-nw', doc: { coins: 1, at } }));
+  expect(await saves.where('device:a'), 'by grid instance, not shard').toBe('open-plot-nw');
+  expect(await cell(db, 'select cell, pose, reason from player_place')).toEqual({ cell: 'open-plot-nw', pose: at, reason: 'checkpoint' });
+  await writeSave(db, 0, write(1, 9, { reason: 'stale' }));
+  expect(await saves.where('device:a'), 'an older Driftwood doc is refused, and the player stays put').toBe('open-plot-nw');
+  await writeSave(db, 0, write(2, 2, { reason: 'leave' }));
+  expect(await cell(db, 'select cell, pose, reason from player_place')).toEqual({ cell: 'driftwood-isle', pose: null, reason: 'leave' });
+  expect(await cell(db, 'select count(*)::int as rows from player_place'), 'one row a player and epoch').toEqual({ rows: 1 });
+});
+
 test('two channels, two databases, one local socket, and nothing for preview', () => {
   expect(savesUrl('production')).toBe('postgresql:///saves_production?host=/var/run/postgresql');
   expect(savesUrl('staging')).toBe('postgresql:///saves_staging?host=/var/run/postgresql');
@@ -143,7 +160,7 @@ test('the shipped `pg` driver over TCP: migrations, writes, a corrupt doc, and a
   url.username = 'postgres'; url.searchParams.set('sslmode', 'disable');
   const db = openPg(url.href);
   closers.push(async () => { await db.close(); await server.stop(); await held.close(); });
-  expect(await migrate(db)).toEqual(['0001-saves.sql', '0002-report-delivery.sql']);
+  expect(await migrate(db)).toEqual(['0001-saves.sql', '0002-report-delivery.sql', '0003-place.sql']);
   await writeSave(db, 0, write(1, 10, { receipts: [{ serial: 1, factId: 'a', grant: 'coins', name: 'coins', amount: 2.5 }] }));
   await writeSave(db, 0, write(2, 20));
   expect(await readSave(db, 0, 'device:a', 'driftwood-isle', parse), '`pg` reads a bigint as a string').toEqual({ doc: { coins: 20 }, previous: { coins: 10 }, source: 'doc', seq: 2, revision: 2 });

@@ -22,6 +22,7 @@ import { ShopGate } from './shopGate';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
 import { LEFT } from './socketPump';
 import type {PlaytestHit} from './playtest';
+import { cellFrame, cellName } from './gridCells';
 import {hitHistoryOf} from '@wildshard/engine/combat/rewind';
 
 /** A fresh seat's step aside from the spawn, in metres, in turn. */
@@ -48,7 +49,10 @@ interface Seat {
 }
 /** How a room is built. */
 export interface DedicatedRoomOptions {
+  /** The shard it runs: its pack, its stores and its save rows. */
   readonly slug: string; readonly build: string;
+  /** GO3: the grid instance this room is, which names it everywhere else and numbers its frames. Left out, the shard's own grid cell. */
+  readonly cell?: string;
   /** Stamped on every grant id, so a restarted room can't repeat one (E7.4). */
   readonly bootId: string;
   readonly input: HeadlessRuntimeInput;
@@ -82,7 +86,7 @@ export class DedicatedRoom {
   private readonly blank: PlayerDoc;
   private constructor(options: DedicatedRoomOptions, cell: CellWorld, seats: Map<string, Seat>, bodies: Map<string, Seat>, playerRefusals: Map<string, string>) {
     this.options = options; this.cell = cell; this.host = cell.host; this.seats = seats; this.bodies = bodies; this.playerRefusals = playerRefusals;
-    this.sim = new SimNetWorld(this.host, 1, () => this.filings());
+    this.sim = new SimNetWorld(this.host, cellFrame(this.name), () => this.filings());
     this.sim.identified = (body, identity): boolean => {
       const seat = bodies.get(body);
       if (seat === undefined || seat.device !== identity.player) { playerRefusals.set(body, 'identity'); return false; }
@@ -103,6 +107,8 @@ export class DedicatedRoom {
     delete actRoutes(this.host).day;
     this.blank = exportPlayer(this.host, this.lead, { store: {}, ledger: { serial: 0, rows: [] } });
   }
+  /** The grid instance this room is (GO3). */
+  get name(): string { return this.options.cell ?? cellName(this.options.slug); }
   /** Open the shard's world, with nobody in it. */
   static async boot(options: DedicatedRoomOptions): Promise<DedicatedRoom> {
     const { input, slug } = options, seats = new Map<string, Seat>(), bodies = new Map<string, Seat>(), playerRefusals = new Map<string, string>();
@@ -111,7 +117,7 @@ export class DedicatedRoom {
       if (seat === undefined) throw new Error(`No seat for ${body}`);
       return seat;
     };
-    const cell = await openCellWorld({ instance: slug }, input, undefined, { saves, lone: true, wholeSolids: true, pageless: true,
+    const cell = await openCellWorld({ instance: options.cell ?? cellName(slug) }, input, undefined, { saves, lone: true, wholeSolids: true, pageless: true,
       owned: body => seated(body).store.slots,
       profiles: {
         read: identity => seats.get(identity)?.store.rewards.read(slug).players[identity] ?? null,
@@ -208,7 +214,7 @@ export class DedicatedRoom {
     if (player === undefined) return;
     const ledger = book.rowOf(seat.body), receipts = ledger.rows.filter(row => row.serial > seat.receipted).map(row => ({ serial: row.serial, factId: row.id, grant: row.grant, name: row.name, amount: row.amount }));
     seat.receipted = ledger.serial; seat.seq++; seat.dirtyAt = null; seat.savedAt = options.now();
-    options.post({ kind: 'save', write: { player: seat.device, name: seat.name, shard: options.slug, build: options.build, saveVersion: PLAYER_DOC_VERSION, seq: seat.seq, reason, receipts, doc: exportPlayer(this.host, player, { store: seat.store.documents(), ledger }) } });
+    options.post({ kind: 'save', write: { player: seat.device, name: seat.name, shard: options.slug, cell: this.name, build: options.build, saveVersion: PLAYER_DOC_VERSION, seq: seat.seq, reason, receipts, doc: exportPlayer(this.host, player, { store: seat.store.documents(), ledger }) } });
   }
   private rejoin(seat: Seat, transport: Transport, hello: () => void): void {
     const old = seat.transport;

@@ -26,6 +26,7 @@ import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
 import { workerTable } from './workerTable';
+import { cellName, cellShard } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 
 /** J174: what a deploy gives everyone before they move together. */
@@ -66,8 +67,9 @@ export interface WorkerLink {
 export interface SavedPlayer { readonly doc: PlayerDoc | null; readonly seq: number; readonly recovery?: readonly SaveReceipt[]; readonly previous?: SavedCheckpoint }
 /** Where a player's save lives. */
 export interface PlayerSaves {
-  /** The cell this player last stood in, this epoch. */
+  /** The cell this player last stood in, this epoch: a grid instance (ZS7's place row), or an older save's shard. */
   where: (device: string) => Promise<string | null>;
+  /** A player's doc on one shard: a cell's progress is kept under its shard's slug. */
   read: (device: string, shard: string) => Promise<SavedPlayer>;
   /** Promote a previous copy only after a room imports it, and only while its sequence is unchanged. */
   recover?: (device: string, shard: string, seq: number) => Promise<void>;
@@ -81,7 +83,7 @@ export interface PlayerSaves {
 /** How the world is built. */
 export interface WorldOptions {
   readonly build: string;
-  /** The cells it opens, fixed at startup. A player with no save lands in the first. */
+  /** The cells it opens, by grid instance (GO3), fixed at startup. A player with no save lands in the first. */
   readonly cells: readonly string[];
   /** C4's key. */
   readonly secret: string;
@@ -161,9 +163,9 @@ export class World {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
     else if (news.kind === 'left') this.seated.delete(news.device);
     else if (news.kind === 'refused') this.refuse(news.reason);
-    else if (news.kind === 'recovered') void this.recover(news.device, news.slug, news.seq);
+    else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);
     else if (news.kind === 'save') this.options.saves.write(news.write);
-    else if (news.kind === 'report') { if (!this.options.saves.report(news.report, news.slug)) this.refuse('report-backlog'); }
+    else if (news.kind === 'report') { if (!this.options.saves.report(news.report, cellShard(news.slug))) this.refuse('report-backlog'); }
     else if(news.kind==='playtest')this.options.playtest?.(news.row);
     else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
     else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
@@ -269,11 +271,12 @@ export class World {
     end.onClose(() => { if (this.pending.get(device)?.end === end) this.pending.delete(device); });
     const last = await saves.where(device);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    const slug = this.cellFor(last), saved = await saves.read(device, slug);
+    const slug = this.cellFor(last), saved = await saves.read(device, cellShard(slug));
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const { spawn } = await this.ask(slug, device, end);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    end.control('resume', new TextEncoder().encode(JSON.stringify({ shard: slug, at: saved.doc?.at ?? spawn })).buffer);
+    // GO3: `shard` is what a one-shard page loads, `cell` the grid instance a grid page stands in.
+    end.control('resume', new TextEncoder().encode(JSON.stringify({ shard: cellShard(slug), cell: slug, at: saved.doc?.at ?? spawn })).buffer);
     this.sayCountdown(end);
     await new Promise<void>(resolve => {
       const timer = this.scope.timeout(this.options.readyMs ?? READY_MS, () => { this.refuse('ready-timeout'); end.close('refused'); resolve(); });
@@ -287,7 +290,8 @@ export class World {
   private cellFor(last: string | null): string {
     const first = this.options.cells[0];
     if (first === undefined) throw new Error('A world has at least one cell');
-    return last !== null && this.links.has(last) ? last : first;
+    const cell = last === null ? null : cellName(last);
+    return cell !== null && this.links.has(cell) ? cell : first;
   }
   private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer): void {
     if (!end.isOpen || this.draining) return;
@@ -324,9 +328,10 @@ export class World {
     for (const end of this.ends) this.sayCountdown(end);
     this.scope.timeout(ms, () => { this.options.restart(); });
   }
-  /** What `/health` says: no player data. */
-  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number } {
-    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size };
+  /** What `/health` says: no player data. `table` is each open cell and the worker it runs on (GO3, MP1.4). */
+  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number; readonly table: Readonly<Record<string, number>> } {
+    const table = Object.fromEntries([...this.links].map(([cell, link]) => [cell, this.workers.indexOf(link)]));
+    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size, table };
   }
   /** Stop: everyone is saved and told `restart`, and the queue gets its time. */
   async drain(): Promise<boolean> {
