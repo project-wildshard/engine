@@ -36,3 +36,11 @@ normal full hook/hosted verdict remain open at this local commit.
 The ordinary input generator also emptied three local boot tables. They
 are excluded from source. The committed source will publish from a clean
 view with the official stamp, preserving the creator's generated files.
+
+Manual hover-contract qualification runs the six original heads in both
+engines through the unchanged complete nightly head path. Twelve jobs,
+max two concurrent, upload only small named JSON reports. Independent
+receipt checks bind exact Git SHA, committed pin hash/test-list digest,
+every unique phase and actual cap/touch result. This partial manual run
+cannot qualify the whole nightly or remove its J167 tag hold. Estimate:
+about 24 hosted runner-minutes once; no additional scheduled workflow.

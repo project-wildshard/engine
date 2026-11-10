@@ -154,3 +154,9 @@ real admitted metadata must select 30/14 respectively, before the same
 real-touch mount/unmount proof. Missing original contract heads refuse
 before running. This adds no browser launch or gameplay phase; it does
 not claim physical-phone qualification or a whole-nightly pass.
+
+The manual `hover-contract.yml` qualification runs the original six heads
+in both engines with at most two jobs at once. It reuses the entire cold
+cook/boot/touch/draw/explorer path and validates each exact-SHA report
+against committed pins. Only small JSON receipts are uploaded. This is a
+partial SDK-row qualification; it cannot stand in for the full nightly.

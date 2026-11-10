@@ -1,0 +1,85 @@
+name: hover-contract
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  head:
+    name: ${{ matrix.browser }} ${{ matrix.head.slug }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        browser: [chromium, webkit]
+        head:
+          - {slug: template, cap: 30}
+          - {slug: blender-template, cap: 30}
+          - {slug: pastel-plain, cap: 30}
+          - {slug: ink-cel-valley, cap: 30}
+          - {slug: open-plot-ember-forge, cap: 30}
+          - {slug: driftwood-isle, cap: 14}
+    env:
+      PROOF_BROWSER: ${{ matrix.browser }}
+      PROOF_HEAD: ${{ matrix.head.slug }}
+      PROOF_CAP: ${{ matrix.head.cap }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - run: node scripts/pins.ts install
+      - run: pnpm exec playwright install --with-deps "$PROOF_BROWSER"
+      - run: pnpm build:game
+        env:
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      - name: Prove the exact admitted head through the unchanged nightly path
+        shell: bash
+        run: |
+          proof_group=$(node --input-type=module -e '
+            import {plan, partition} from "./scripts/nightly-model.ts";
+            const heads = plan().heads;
+            const groups = Array.from({length:4}, (_, i) => i).filter(group =>
+              partition(heads, group).some(head => head.slug === process.env.PROOF_HEAD));
+            if (groups.length !== 1) throw new Error("Head has no unique nightly partition");
+            console.log(groups[0]);
+          ')
+          scripts/browser-lane.sh node scripts/nightly-heads.ts "$PROOF_BROWSER" "$proof_group" tmp/hover-contract/reports "$PROOF_HEAD"
+          PROOF_GROUP="$proof_group" node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import {readFileSync} from "node:fs";
+            import {execFileSync} from "node:child_process";
+            import {digest} from "./scripts/nightly-model.ts";
+            const {PROOF_BROWSER: browser, PROOF_GROUP: group, PROOF_HEAD: slug, PROOF_CAP: cap, GITHUB_SHA: sha} = process.env;
+            const report = JSON.parse(readFileSync("tmp/hover-contract/reports/heads-" + browser + "-" + group + ".json", "utf8"));
+            const committed = file => JSON.parse(execFileSync("git", ["show", sha + ":" + file], {encoding:"utf8"}));
+            const pins = committed("test/pins/shardfiles.json").shards;
+            const pin = pins.find(head => head.slug === slug); assert.ok(pin);
+            assert.equal(report.sha, sha); assert.equal(report.browser, browser);
+            assert.equal(report.kind, "heads"); assert.equal(report.group, Number(group));
+            assert.equal(report.pins, digest(pins));
+            assert.equal(report.testList, digest(committed("test/pins/ring-2-tests.json")));
+            assert.equal(report.results.length, 1);
+            const [head] = report.results; assert.equal(head.slug, slug);
+            assert.equal(head.hash, pin.hash);
+            assert.equal(head.phases.length, 5); assert.ok(head.phases.every(phase => phase.ok));
+            assert.deepEqual(head.phases.map(phase => phase.name).sort(), ["cook", "boot", "hover", "draw", "explorer"].sort());
+            const hover = head.phases.find(phase => phase.name === "hover");
+            assert.equal(hover.detail.actualCap, Number(cap));
+            assert.equal(hover.detail.expectedCap, Number(cap));
+            assert.equal(hover.detail.mounted, true); assert.equal(hover.detail.unmounted, true);
+          '
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hover-${{ matrix.browser }}-${{ matrix.head.slug }}
+          path: tmp/hover-contract/reports/heads-*.json
+          if-no-files-found: error
+          retention-days: 7
