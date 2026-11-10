@@ -130,7 +130,7 @@ function boxes() {
   const all = (sel, name) => [...document.querySelectorAll(sel)].filter(seen).map((el, i) => rect(el, `${name ?? sel}${i === 0 ? '' : `#${String(i)}`}`));
   const cx = innerWidth / 2, cy = innerHeight / 2;
   const guarded = [
-    ...all('.ws-touch-pause', 'PAUSE'), ...all('.ws-quest-obj.show', 'quest chip'), ...all('.ws-minimap', 'minimap'), ...all('.ws-boss-bar.show', 'boss bar'),
+    ...all('.ws-touch-pause', 'PAUSE'), ...all('.ws-quest-obj.show', 'quest chip'), ...all('.ws-minimap', 'minimap'), ...all('.ws-boss-bar.show', 'boss bar'), ...all('.ws-game-ammo', 'bolts readout'), ...all('.ws-game-health', 'health readout'),
     { name: 'crosshair', left: cx - 20, top: cy - 20, right: cx + 20, bottom: cy + 20 },
     ...all('.ws-touch button:not(.ws-touch-boost):not(.ws-touch-pause)', 'touch control'), ...all('.ws-touch-bar', 'touch bar'), ...all('.ws-touch-swap', 'SWAP'),
   ];
@@ -140,7 +140,7 @@ function boxes() {
   const clipped = b => clip === undefined ? b : { ...b, top: Math.max(b.top, clip.top), bottom: Math.min(b.bottom, clip.bottom) };
   const chat = [...all('#ws-chat form', 'chat row'), ...all('#ws-chat > [data-lines] > *', 'chat line'), ...all('#ws-voice-peers', 'voice players'), ...all('#ws-voice-tip', 'voice tip')]
     .map(clipped).filter(b => b.bottom - b.top > 1);
-  const developer = [...all('.ws-perf-dock > *', 'dock chip'), ...all('.ws-touch-boost', 'BOOST'), ...all('.ws-perf-panel', 'Developer panel'),
+  const developer = [...all('.ws-perf-dock > .ws-perf', 'fps pill'), ...all('.ws-perf-dock > .ws-grid-budget', 'memory card'), ...all('.ws-perf-dock > :not(.ws-perf):not(.ws-grid-budget)', 'dock chip'), ...all('.ws-touch-boost', 'BOOST'), ...all('.ws-perf-panel', 'Developer panel'),
     ...all('.ws-grid-budget-detail', 'memory panel'), ...all('.ws-game-dev-alert, .ws-game-developer, .ws-memory-warning, .ws-game-boundary.show', 'Developer alert')];
   const rest = ['.ws-touch-status > *', '.ws-loot-chip', '.ws-game-toast', '.ws-game-feed-item', '.ws-icard-pop', '.ws-game-weather', '.ws-game-getlow', '.ws-elite-banner', '.ws-game-aim', '.ws-touch-use.show', '.ws-hint-tag.show', '.ws-touch-sprint']
     .flatMap(sel => all(sel));
@@ -195,16 +195,19 @@ for (const kind of browsers) {
         const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}`;
         const context = await browser.newContext(phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } });
         // our own page only (J148): a request that leaves the loopback host, a redirect included, is refused
-        await context.route('**/*', route => { const { hostname } = new URL(route.request().url()); return hostname === '127.0.0.1' || hostname === 'localhost' ? route.continue() : route.abort(); });
+        /** @type {string[]} */ const refused = [];
+        await context.route('**/*', route => { const url = new URL(route.request().url()); if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return route.continue(); refused.push(url.origin); return route.abort(); });
         try {
           if (dev) { await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' }); }
           const page = await context.newPage();
           /** @type {string[]} */ const errors = [];
           page.on('pageerror', error => { errors.push(error.message.slice(0, 160)); });
           if (!await enter(page, dev)) {
-            const file = join(out, `${name}.png`);
+            const file = join(out, `${name}.png`), wrong = [...errors.map(e => `page error: ${e}`), ...[...new Set(refused)].map(o => `a request left localhost: ${o}`)];
             await page.screenshot({ path: file }); written.push(file);
-            console.log(`GATE  ${name}  ${file}\n  the rotate gate is up (the game is portrait-only on phones): no HUD to lay out`);
+            console.log(`${wrong.length === 0 ? 'GATE' : 'FAIL'}  ${name}  ${file}\n  the rotate gate is up (the game is portrait-only on phones): no HUD to lay out`);
+            for (const problem of wrong) console.log(`  ${problem}`);
+            if (wrong.length > 0) failures.push(name);
             continue;
           }
           await page.waitForTimeout(6000); // the quest chip, the minimap and the dock settle; the first hints run their course
@@ -217,9 +220,8 @@ for (const kind of browsers) {
           const problems = [...pairs(b.developer, [...b.guarded, ...b.chat]), ...pairs(b.chat, b.guarded)];
           // a check over nothing passes nothing: what it guards and what it moved must be on screen
           const named = new Set([...b.guarded, ...b.chat, ...b.developer].map(x => x.name.replace(/#\d+$/u, '')));
-          for (const need of [...(phone ? ['PAUSE', 'touch bar'] : []), 'quest chip', 'minimap', 'chat row', ...(dev ? ['dock chip'] : [])])
+          for (const need of [...(phone ? ['PAUSE', 'touch bar'] : []), 'quest chip', 'minimap', 'chat row', ...(dev ? ['fps pill', 'memory card'] : [])])
             if (!named.has(need)) problems.push(`the ${need} is not on screen: nothing to check it against`);
-          for (const error of errors) problems.push(`page error: ${error}`);
           if (b.mic === null) problems.push('the mic is not on screen');
           else if (!b.mic.ok) problems.push(`the mic's centre is covered by ${String(b.mic.at)}`);
           if (menu && phone) {
@@ -232,6 +234,9 @@ for (const kind of browsers) {
             await page.screenshot({ path: after }); written.push(after);
             if (!closed.chatShown || closed.mic?.ok !== true) problems.push('the chat row and the mic did not come back when the BAG closed');
           }
+          // the page's errors and refused requests, the BAG's included
+          for (const error of errors) problems.push(`page error: ${error}`);
+          for (const origin of new Set(refused)) problems.push(`a request left localhost: ${origin}`);
           const every = [...b.rest, ...b.guarded, ...b.chat], others = [...new Set(pairs(every, every))];
           console.log(`${problems.length === 0 ? 'PASS' : 'FAIL'}  ${name}  ${file}`);
           console.log(`  on: ${made.on.join(' · ')}`);

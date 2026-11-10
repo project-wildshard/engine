@@ -52,7 +52,7 @@ import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 import { isDev, onDev } from './devMode';
-import { DEV_PIXELS_EVENT, drawingPixelRatio } from '../render/devPixels';
+import { DEV_PIXELS_EVENT, activeDevPixels, drawingPixelRatio } from '../render/devPixels';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
 import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/memorySaver';
 import { dropShadowColour } from '../world/shadowVariants';
@@ -516,11 +516,9 @@ export class Game {
     if (tracedBoot) recordGpuCheckpoint(this.renderer, 'renderer:created');
     // QA row 25: a Developer's screen × density pick (render/devPixels.ts) stands in for the tier's cap; it applies live
     this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr));
-    const repixel = (): void => {
-      const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr);
-      if (ratio === this.renderer.getPixelRatio()) return;
-      this.renderer.setPixelRatio(ratio); this.fitSize(); this.kickLoop();
-    };
+    // the new ratio waits for the frame that draws (RT3: never in the task that decided it, whose cleared canvas nothing
+    // would replace; under a menu or the title the world stays as it was until play draws again)
+    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; };
     this.engineScope.listen(document, DEV_PIXELS_EVENT, repixel);
     this.engineScope.onDispose(onDev(repixel));
     this.renderer.setSize(window.innerWidth, viewportHeight());
@@ -1543,6 +1541,8 @@ export class Game {
     this.pacedProbe.port2.postMessage(0);
   }
 
+  /** QA row 25: a Developer pixel pick waiting for the next drawn frame */
+  private pickedRatio: number | null = null;
   resize(): void { this.fitSize(); this.kickLoop(); }
   private fitSize(): void {
     const w = window.innerWidth, h = viewportHeight();
@@ -1625,7 +1625,10 @@ export class Game {
       try {
         // RT3: a new render scale lands in the frame that draws (stepFrame draws nothing): never in the task that decided it,
         // whose cleared canvas nothing would replace
-        const ratio = this.stepOnly ? null : this.slowPacing?.takeRatio() ?? null;
+        // QA row 25: a Developer pixel pick (render/devPixels.ts) holds against the software pacing's scale while it is set
+        const paced = this.stepOnly ? null : this.slowPacing?.takeRatio() ?? null, picked = this.stepOnly ? null : this.pickedRatio;
+        if (picked !== null) this.pickedRatio = null;
+        const ratio = picked ?? (paced !== null && activeDevPixels() === null ? paced : null);
         if (ratio !== null) { this.renderer.setPixelRatio(ratio); this.fitSize(); }
         sky.update(realDt);
         // planet + sun disc travel with the camera so they stay "infinitely" far

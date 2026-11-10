@@ -53,7 +53,7 @@ export function resetLegacy(local: SaveStorage | null, session: SaveStorage | nu
       } catch { /* A malformed old document has no preferences to carry. */ }
       local.setItem(`${app.savePrefix}${scope}`, JSON.stringify({ keys }));
     };
-    copy('device', ['devMode', 'debug.open', 'ui.fold', 'perf.probe', 'perf.rec', 'perf.lap', 'ktx2set', 'boot.times', 'boot.trace', 'boot.reports', 'err.queue', 'storage.persisted']);
+    copy('device', ['devMode', 'debug.open', 'ui.fold', 'perf.probe', 'perf.rec', 'perf.lap', 'ktx2set', 'boot.times', 'boot.trace', 'boot.reports', 'err.queue', 'storage.persisted', 'devPixels']);
     copy('global', ['settings', 'gfx']);
     return;
   }

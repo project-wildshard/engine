@@ -2,8 +2,9 @@
    details panel over the minimap (E47) */
 /* A14 (Jake, 2026-11-10: "the screen is chaotic"): the Developer dock (src/client/engine/ui/perfDock.ts), one row that holds the
    pill and the other readouts' small cards (the memory card); it takes no touch itself, its cards do */
-/* desktop: the bottom-right corner, which nothing else holds (the top edge is the boss bar's and the minimap's) */
-.ws-perf-dock { position: fixed; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: calc(var(--ws-layer-hud) + 55); display: flex; align-items: center; gap: 6px; pointer-events: none; }
+/* desktop: the strip under the bolts readout (game.css .ws-game-ammo, right / bottom 22 px), which nothing else holds; the top
+   edge is the boss bar's and the minimap's */
+.ws-perf-dock { position: fixed; right: 22px; bottom: calc(3px + env(safe-area-inset-bottom, 0px)); z-index: calc(var(--ws-layer-hud) + 55); display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .ws-perf-dock:empty { display: none; }
 .ws-perf { position: relative; display: flex; align-items: baseline; gap: 5px; margin: 0; padding: 2px 5px; border: 0; appearance: none; -webkit-appearance: none; pointer-events: none; font-family: var(--ws-mono); font-size: 8px; letter-spacing: 0.04em; line-height: 1; text-align: left; color: rgba(196, 220, 232, 0.55); background: rgba(6, 10, 18, 0.45); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ws-perf b { font-family: var(--ws-mono); font-weight: 500; font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.85); }
@@ -72,10 +73,11 @@
   .ws-perf-panel .ws-perf-ab { margin: 0; padding: 5px 7px; }
   .ws-perf-panel .ws-perf-ab.off { background: var(--ws-cyan); color: #06121a; }
 }
-/* A14: desktop has no panel (its line is click-through); the alerts and labels a phone keeps in the panel stand at the top left,
-   where nothing else sits on desktop, and the net block stays a phone's tap away */
+/* A14: desktop has no panel (its line is click-through); the alerts and labels a phone keeps in the panel stand at the left,
+   over the coins and the health readout and under the chat (the top edge is the boss bar's), and the net block stays a
+   phone's tap away */
 @media (min-width: 701px) and (pointer: fine) {
-  .ws-perf-panel:has(.ws-perf-section:not([hidden]):not(.ws-perf-net)) { display: block; position: fixed; left: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); z-index: calc(var(--ws-layer-hud) + 55); width: min(420px, 36vw); pointer-events: none; }
+  .ws-perf-panel:has(.ws-perf-section:not([hidden]):not(.ws-perf-net)) { display: block; position: fixed; left: 12px; top: auto; bottom: calc(130px + env(safe-area-inset-bottom, 0px)); z-index: calc(var(--ws-layer-hud) + 55); width: min(420px, 36vw); max-height: 40vh; overflow-y: auto; pointer-events: none; }
   .ws-perf-panel > :not(.ws-perf-sections), .ws-perf-panel .ws-perf-net { display: none; }
   .ws-perf-panel .ws-perf-sections { border: 0; }
 }

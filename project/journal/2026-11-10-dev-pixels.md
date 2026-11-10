@@ -17,3 +17,9 @@ screen in Developer mode, six permutations to try.
   home is fine) with the two segmented switches and the buffer the
   pick gives this screen. The frame meter's TIER · DPR row now reads
   "phone · 1.50× · 603×1311 · 0.79 MP · dev 2×/1×".
+- Second J206 review (Codex, NO-GO): the live pick now waits for the frame
+  that draws (RT3), and holds against the software pacing; epochs carry
+  devPixels; the desktop dock sits under the bolts readout and its alert
+  sections at the left (the boss bar and the ammo readout had them);
+  hud-worst fails refused requests and late page errors and requires the
+  fps pill and the memory card each.
