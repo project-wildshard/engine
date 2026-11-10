@@ -130,7 +130,7 @@ function boxes() {
   const all = (sel, name) => [...document.querySelectorAll(sel)].filter(seen).map((el, i) => rect(el, `${name ?? sel}${i === 0 ? '' : `#${String(i)}`}`));
   const cx = innerWidth / 2, cy = innerHeight / 2;
   const guarded = [
-    ...all('.ws-touch-pause', 'PAUSE'), ...all('.ws-quest-obj.show', 'quest chip'), ...all('.ws-minimap', 'minimap'),
+    ...all('.ws-touch-pause', 'PAUSE'), ...all('.ws-quest-obj.show', 'quest chip'), ...all('.ws-minimap', 'minimap'), ...all('.ws-boss-bar.show', 'boss bar'),
     { name: 'crosshair', left: cx - 20, top: cy - 20, right: cx + 20, bottom: cy + 20 },
     ...all('.ws-touch button:not(.ws-touch-boost):not(.ws-touch-pause)', 'touch control'), ...all('.ws-touch-bar', 'touch bar'), ...all('.ws-touch-swap', 'SWAP'),
   ];
@@ -142,7 +142,7 @@ function boxes() {
     .map(clipped).filter(b => b.bottom - b.top > 1);
   const developer = [...all('.ws-perf-dock > *', 'dock chip'), ...all('.ws-touch-boost', 'BOOST'), ...all('.ws-perf-panel', 'Developer panel'),
     ...all('.ws-grid-budget-detail', 'memory panel'), ...all('.ws-game-dev-alert, .ws-game-developer, .ws-memory-warning, .ws-game-boundary.show', 'Developer alert')];
-  const rest = ['.ws-touch-status > *', '.ws-loot-chip', '.ws-game-toast', '.ws-game-feed-item', '.ws-icard-pop', '.ws-game-weather', '.ws-game-getlow', '.ws-boss-bar', '.ws-elite-banner', '.ws-game-aim', '.ws-touch-use.show', '.ws-hint-tag.show', '.ws-touch-sprint']
+  const rest = ['.ws-touch-status > *', '.ws-loot-chip', '.ws-game-toast', '.ws-game-feed-item', '.ws-icard-pop', '.ws-game-weather', '.ws-game-getlow', '.ws-elite-banner', '.ws-game-aim', '.ws-touch-use.show', '.ws-hint-tag.show', '.ws-touch-sprint']
     .flatMap(sel => all(sel));
   const mic = document.getElementById('ws-voice'), box = document.getElementById('ws-chat');
   let micHit = null;
