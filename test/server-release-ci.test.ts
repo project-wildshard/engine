@@ -1,5 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Ephemeral Ed25519 keys and a real body digest.
 import { createHash, generateKeyPairSync } from 'node:crypto';
+// oxlint-disable-next-line import/no-nodejs-modules -- Run the real asset CLI on test-owned Git history.
+import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real local publication boundary.
 import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Test-owned bundle bytes and the workflow file.
@@ -7,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Vitest owns this temporary root.
 import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths belong to this test run.
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { S3Client } from '@aws-sdk/client-s3';
 import { afterAll, expect, test } from 'vitest';
 import { createTempRepo } from '../src/test/helpers/git.ts';
@@ -186,4 +188,73 @@ test('J234: every run signs with main\'s publisher and builds in the source\'s o
   const sign = publish.slice(publish.indexOf('Sign and advance the channel release file'));
   expect(sign).not.toMatch(/working-directory/u);
   expect(sign).toContain('node scripts/server-release/publish.mjs');
+});
+
+test('production release creation needs only the already-pushed tag and cannot create metadata for a different tag', () => {
+  const repo = createTempRepo();
+  try {
+    const build = repo.commit({ 'entry.txt': 'published source' }, 'Tagged source');
+    repo.git(['update-ref', 'refs/remotes/origin/main', build]);
+    const archive = join(repo.dir, `engine-server-${build}.tar.gz`), transport = join(repo.dir, 'github-fixture.mjs');
+    writeFileSync(archive, 'immutable bundle');
+    writeFileSync(transport, `
+import assert from 'node:assert/strict';
+const sha = process.env.FIXTURE_SHA, mode = process.env.FIXTURE_MODE;
+const tag = mode === 'staging' ? 'server-staging-' + sha : 'v1.2.3';
+const tagObject = 'a'.repeat(40);
+const record = { id: 1, upload_url: 'https://uploads.github.com/releases/1/assets{?name}', assets: [] };
+let checked = 0, created = false;
+globalThis.fetch = async (input, request = {}) => {
+  const url = new URL(input), path = url.pathname.replace(/^\\/repos\\/project-wildshard\\/engine\\//u, '');
+  const method = request.method ?? 'GET';
+  assert.equal(new Headers(request.headers).get('authorization'), 'Bearer fixture');
+  if (url.origin === 'https://uploads.github.com') {
+    assert.equal(method, 'POST');
+    assert.equal(url.searchParams.get('name'), 'engine-server-' + sha + '.tar.gz');
+    assert.equal(request.body.toString(), 'immutable bundle');
+    assert.equal(checked, mode === 'staging' ? 1 : 2);
+    assert.ok(created);
+    return Response.json({});
+  }
+  assert.equal(url.origin, 'https://api.github.com');
+  if (path === 'releases/tags/' + tag) return new Response(null, { status: 404 });
+  if (path === 'git/ref/tags/' + tag) {
+    if (mode === 'missing') return new Response(null, { status: 404 });
+    return Response.json({ object: { type: 'tag', sha: tagObject } });
+  }
+  if (path === 'git/tags/' + tagObject) {
+    checked++;
+    return Response.json({ object: { type: 'commit', sha: mode === 'foreign' ? 'b'.repeat(40) : sha } });
+  }
+  assert.equal(path, 'releases');
+  assert.equal(method, 'POST');
+  const body = JSON.parse(request.body);
+  assert.equal(body.tag_name, tag);
+  assert.equal(body.prerelease, mode === 'staging');
+  if (mode === 'staging') assert.equal(body.target_commitish, sha);
+  else {
+    if (Object.hasOwn(body, 'target_commitish')) return new Response(null, { status: 403 });
+    assert.equal(mode, 'production', 'Never create a release for an unverified version tag');
+    assert.equal(checked, 1);
+  }
+  created = true;
+  return Response.json(record);
+};
+`);
+    for (const mode of ['production', 'staging', 'missing', 'foreign']) {
+      const staging = mode === 'staging', tag = staging ? `server-staging-${build}` : 'v1.2.3';
+      const result = spawnSync(process.execPath, ['--import', transport, resolve('scripts/server-release/github.mjs'), 'asset', tag, build, archive,
+        staging ? 'staging' : 'production'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
+        env: { PATH: process.env.PATH, GH_TOKEN: 'fixture', FIXTURE_SHA: build, FIXTURE_MODE: mode } });
+      expect(result.error).toBeUndefined();
+      if (mode === 'missing' || mode === 'foreign') {
+        expect(result.status).toBe(1);
+        expect(result.stderr).toMatch(mode === 'missing' ? /GET git\/ref\/tags.*404/u : /names another commit/u);
+        expect(result.stdout).toBe('');
+      } else {
+        expect(result.status, result.stderr).toBe(0);
+        expect(JSON.parse(result.stdout)).toMatchObject({ tag, asset: `engine-server-${build}.tar.gz` });
+      }
+    }
+  } finally { repo.cleanup(); }
 });

@@ -77,6 +77,15 @@ and timestamps, and `gzip -n` make retries reproducible on the runner.
 An existing tag must resolve to that SHA and an existing asset must have
 the same digest. CI never overwrites a differing asset.
 
+Production verifies the remote version tag before creating its release
+record and leaves `target_commitish` unset. An explicit target that differs
+from main under `.github/workflows/` can require workflow-write permission.
+v0.1.6 release creation returned 403 with Contents write enabled. The same
+workflow uploaded and signed successfully after a maintainer created the
+record with `gh release create --verify-tag`. Staging still supplies its
+SHA when creating its auxiliary tag.
+[GitHub release creation](https://docs.github.com/en/rest/releases/releases#create-a-release)
+
 The signed body has `channel`, monotonically increasing `serial`,
 `engineBuild` (the full source SHA), `saveEpoch` from root
 `save-epoch.json` (at least 1), pinned `shards`, `bundle` (`name`,

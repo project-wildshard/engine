@@ -12,8 +12,8 @@ const REPOSITORY = 'project-wildshard/engine', VERSION = /^v\d+\.\d+\.\d+$/u;
 const Run = v.object({ id: v.number(), head_sha: v.string(), head_branch: v.nullable(v.string()), event: v.string(), status: v.string(), conclusion: v.nullable(v.string()) });
 const Release = v.object({ id: v.number(), upload_url: v.string(), assets: v.array(v.object({ name: v.string(), browser_download_url: v.string() })) });
 class GitHubError extends Error {
-  /** @param {number} status */
-  constructor(status) { super(`GitHub request failed (${String(status)})`); this.name = 'GitHubError'; this.status = status; }
+  /** @param {number} status @param {string} operation */
+  constructor(status, operation) { super(`GitHub ${operation} failed (${String(status)})`); this.name = 'GitHubError'; this.status = status; }
 }
 /** @param {string} path @param {RequestInit} [options] @returns {Promise<unknown>} */
 async function api(path, options = {}) {
@@ -21,7 +21,7 @@ async function api(path, options = {}) {
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/vnd.github+json'); headers.set('Authorization', `Bearer ${token}`); headers.set('X-GitHub-Api-Version', '2022-11-28');
   const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, { ...options, headers });
-  if (!response.ok) throw new GitHubError(response.status);
+  if (!response.ok) throw new GitHubError(response.status, `${options.method ?? 'GET'} ${path}`);
   return response.json();
 }
 /** @param {string[]} args @returns {string} */
@@ -89,6 +89,14 @@ async function select() {
   appendFileSync(output, `ready=true\nsha=${source.sha}\nchannel=${source.channel}\ntag=${source.tag}\nalign=${String(source.align === true)}\n`);
 }
 
+const TagReference = v.object({ object: v.object({ type: v.string(), sha: v.string() }) });
+/** @param {string} tag @param {string} sha */
+async function verifyReleaseTag(tag, sha) {
+  let object = v.parse(TagReference, await api(`git/ref/tags/${encodeURIComponent(tag)}`)).object;
+  for (let depth = 0; object.type === 'tag' && depth < 5; depth++) object = v.parse(TagReference, await api(`git/tags/${object.sha}`)).object;
+  if (object.type !== 'commit' || object.sha !== sha) throw new Error('GitHub release tag names another commit');
+}
+
 /** C25: bind an immutable asset to the exact tag. Existing bytes must match; never clobber.
  * @param {string} tag @param {string} sha @param {string} archive @param {string} channel @returns {Promise<void>} */
 async function asset(tag, sha, archive, channel) {
@@ -100,14 +108,16 @@ async function asset(tag, sha, archive, channel) {
   try { release = v.parse(Release, await api(`releases/tags/${encodeURIComponent(tag)}`)); }
   catch (error) {
     if (!(error instanceof GitHubError && error.status === 404)) throw error;
+    // Production already has an exact, checked version tag. Supplying the
+    // older SHA as target_commitish asks GitHub to check workflow-write scope
+    // when main's workflow files have moved. Staging still creates its own tag.
+    if (channel === 'production') await verifyReleaseTag(tag, sha);
     release = v.parse(Release, await api('releases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      tag_name: tag, target_commitish: sha, name: `Dedicated server ${tag}`, draft: false, prerelease: channel === 'staging', make_latest: 'false',
+      tag_name: tag, ...(channel === 'staging' ? { target_commitish: sha } : {}),
+      name: `Dedicated server ${tag}`, draft: false, prerelease: channel === 'staging', make_latest: 'false',
     }) }));
   }
-  const reference = v.object({ object: v.object({ type: v.string(), sha: v.string() }) });
-  let object = v.parse(reference, await api(`git/ref/tags/${encodeURIComponent(tag)}`)).object;
-  for (let depth = 0; object.type === 'tag' && depth < 5; depth++) object = v.parse(reference, await api(`git/tags/${object.sha}`)).object;
-  if (object.type !== 'commit' || object.sha !== sha) throw new Error('GitHub release tag names another commit');
+  await verifyReleaseTag(tag, sha);
   const name = basename(archive), bytes = readFileSync(archive), digest = createHash('sha256').update(bytes).digest('hex'), existing = release.assets.find(row => row.name === name);
   if (existing !== undefined) {
     const response = await fetch(existing.browser_download_url); if (!response.ok) throw new Error('Cannot verify existing server asset');
@@ -118,7 +128,7 @@ async function asset(tag, sha, archive, channel) {
   const upload = new URL(release.upload_url.replace(/\{.*$/u, '')); upload.searchParams.set('name', name);
   if (upload.origin !== 'https://uploads.github.com') throw new Error('Unexpected GitHub asset upload origin');
   const response = await fetch(upload, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/gzip' }, body: bytes });
-  if (!response.ok) throw new GitHubError(response.status);
+  if (!response.ok) throw new GitHubError(response.status, 'release asset upload');
   console.log(JSON.stringify({ tag, asset: name, sha256: digest }));
 }
 
