@@ -856,6 +856,30 @@ export function collectTextures(jobs: CompileJob[]): THREE.Texture[] {
 
 const frame = (): Promise<void> => new Promise((resolve) => { pageScope.raf(() => { pageScope.timeout(0, resolve); }); }); // a real paint between (the page's: no ambient owner read mid-build, SF57)
 
+/** Whether this preparation links one job at a time (LS11): a GPU without parallel compile, under a loading screen. */
+const serialLoading = (renderer: Renderer, isolateImageUploads: boolean): boolean =>
+  !renderer.extensions.has('KHR_parallel_shader_compile') && !isolateImageUploads && !presenting();
+
+/**
+ * LS11 (J204): `pause`, repeated until the GPU has finished what was submitted before it (a WebGL2 fence, asked once a
+ * pause, never waited on). SwiftShader at 4x CPU ran the shaders step's 19 texture uploads and two post draws in 50 ms of
+ * script, then held the main thread 1.1 s in the canvas read-back that waited for all of it. Ends early on a lost context,
+ * a failed wait or a retired owner (the caller's own check then throws).
+ */
+function gpuSettled(renderer: Renderer, pause: () => Promise<void>, current: () => boolean): () => Promise<void> {
+  return async () => {
+    const gl = renderer.getContext();
+    if (!('fenceSync' in gl)) { await pause(); return; }
+    const sync = gl.isContextLost() ? null : gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    if (sync === null) { await pause(); return; }
+    try {
+      gl.flush();
+      do await pause();
+      while (current() && !gl.isContextLost() && gl.clientWaitSync(sync, 0, 0) === gl.TIMEOUT_EXPIRED);
+    } finally { gl.deleteSync(sync); }
+  };
+}
+
 /**
  * A per-frame budget for live image uploads (op-hitch32). Isolated preparation (WebKit's entered world) uploads one image
  * per drawn frame, and other browsers check 12 ms only after each upload; with a budget, a frame takes uploads while their
@@ -1153,6 +1177,12 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
   checkCurrent();
   for (const texture of collectTextures(jobs)) watch(texture);
   const parallel = renderer.extensions.has('KHR_parallel_shader_compile');
+  // LS11 (J204): without parallel compile (SwiftShader reports serial) the GPU process compiles and links each program in
+  // the order issued, so issuing a run's every job before its first resolve left that resolve waiting on all of them:
+  // Driftwood's shaders step at 4x CPU, 123 jobs issued in 0.2 s, then the main thread held 0.74 s in the first link
+  // query, and the bar sat still while its total grew by 75 programs. Under a loading screen each job's new programs are
+  // resolved inside its own slice, so the slice clock counts the link and the painted pause follows it.
+  const linkPerJob = serialLoading(renderer, isolateImageUploads), settledPause = gpuSettled(renderer, pause, current);
   const before = snapshotPrograms(renderer);
   const created: ProgramLike[] = [];
   // op-hitch31: the programs the jobs' materials compiled to, including ones issued before `before` (a captured
@@ -1315,6 +1345,10 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     if (made > 0 && job.kind !== undefined) programsByKind.set(job.kind, (programsByKind.get(job.kind) ?? 0) + made);
     if (isolateImageUploads) {
       for (const program of acquired ?? []) if (!before.has(program) || jobPrograms.has(program)) queue(program);
+    }
+    if (linkPerJob && issuedPrograms.size > 0) {
+      for (const program of snapshotPrograms(renderer)) if (issuedPrograms.has(program) && needsPreparation(program)) await resolveProgram(program, tFrame);
+      checkCurrent();
     }
     onProgress?.(i + 1, total(), `${materials} materials · ${i + 1} / ${jobs.length} batches · ${mode}`);
     // op-hitch37: a live WebKit warm-up also yields once a slice has issued LIVE_PROGRAMS_PER_FRAME programs: WebKit
@@ -1482,6 +1516,8 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     if (isDev() && performance.now() - tUpload >= SLOW_UPLOAD_MS) slowUpload(tex, tUpload, compressed ? 0 : bytes);
     if (compressed) { checkCurrent(); tSlice = performance.now(); batch?.reset(); }
     else if (batch !== undefined) { if (imageUpload) batch.add(bytes, performance.now() - tUpload); }
+    // LS11: one image upload a settled pause, so its GPU copy and mips land before the next and none queue behind a paint
+    else if (linkPerJob && imageUpload) { await settledPause(); checkCurrent(); tSlice = performance.now(); }
     else if (isolateImageUploads ? imageUpload : performance.now() - tSlice > heldBudget(sliceMs)) { await pause(); checkCurrent(); tSlice = performance.now(); }
   }
   // The batch's last uploads keep their own drawn frame before whatever follows warm-up, as isolation did.
@@ -1743,8 +1779,13 @@ export async function precompileLevel(game: Pick<Game, 'renderer' | 'camera' | '
     };
     if (live) { await setup.yield(); if (options.current?.() === false) throw new Error('Shader warm-up owner left'); }
     const report = await runPrecompile(game.renderer, game.camera, jobs, materials, progress, collectTextures(jobs), options.current, options.isolateImageUploads, options.pause, options.uploadBudget, options.onStage, options.sliceMs);
-    if (warm.length > 0) await warmPostJobs(game.renderer, warm, options.pause ?? frame, options.current ?? (() => true),
-      (done, count, detail) => { onProgress?.(completed + done, total + count, detail); });
+    if (warm.length > 0) {
+      // LS11: on a serial GPU each post draw's pipeline lands before the next (the last one draws to the canvas)
+      const postPause = serialLoading(game.renderer, options.isolateImageUploads === true)
+        ? gpuSettled(game.renderer, options.pause ?? frame, options.current ?? (() => true)) : options.pause ?? frame;
+      await warmPostJobs(game.renderer, warm, postPause, options.current ?? (() => true),
+        (done, count, detail) => { onProgress?.(completed + done, total + count, detail); });
+    }
     if (tracedBoot) recordGpuCheckpoint(game.renderer, 'compile:after');
     return report.materials;
 
