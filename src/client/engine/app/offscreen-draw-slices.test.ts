@@ -1,10 +1,12 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { BoxGeometry, InstancedMesh, Mesh, MeshBasicMaterial, PerspectiveCamera, PMREMGenerator, Points, Scene, WebGLRenderer, WebGLRenderTarget, type Object3D } from 'three';
 import { Scope } from '../../../shared/engine/app/scope';
 import { registerOffscreenPreparation } from '../render/offscreenPreparation';
 import { warmOffscreenPasses, type OffscreenWarmRenderer, type ParkedDrawBudget } from '../render/parkedDraws';
 import { warmOffscreenBuild } from '../render/offscreenBuild';
 import { SkyEnvironment } from '../render/skyEnvironment';
+import type { ProgramLike } from '../boot/perflog';
+import { linkedGl } from '../../../test/engine/linkedGl';
 
 /** The slicing rules at one native unit a slice (the WebKit live budget before G782 raised it to two, D152). */
 const ONE_UNIT: ParkedDrawBudget = { drawables: 8, newMaterials: 1, newBindings: 1, bufferBytes: 256 * 1024 };
@@ -81,4 +83,45 @@ test('a sky warm-up builds nothing outside WebKit, and a primed generator draws 
   env.dispose();
   expect(freed).toEqual(['late', 'warmed']);
   source.dispose();
+});
+
+test('a WebKit sky warm-up links what its build would draw, draws nothing and frees the output (DL23)', async () => {
+  vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+  vi.stubGlobal('requestAnimationFrame', (draw: (at: number) => void): number => Number(setTimeout(() => { draw(performance.now()); }, 0)));
+  vi.stubGlobal('cancelAnimationFrame', (id: number): void => { clearTimeout(id); });
+  const renderer: unknown = Object.create(WebGLRenderer.prototype);
+  if (!(renderer instanceof WebGLRenderer)) throw new Error('Renderer missing');
+  const programs: ProgramLike[] = [], compiled: unknown[] = [], drawn: unknown[] = [];
+  let target: unknown = null;
+  for (const [key, value] of Object.entries({
+    info: { programs, render: { frame: 0 } }, extensions: { has: (name: string): boolean => name === 'KHR_parallel_shader_compile' },
+    properties: { has: (): boolean => true, get: (): object => ({ programs: new Map(programs.map(program => [program.cacheKey, program])) }) },
+    getContext: linkedGl, getRenderTarget: (): unknown => target, setRenderTarget: (next: unknown): void => { target = next; },
+    getActiveCubeFace: (): number => 0, getActiveMipmapLevel: (): number => 0, autoClear: true, toneMapping: 0, xr: { enabled: false },
+    render: (root: unknown): void => { drawn.push(root); },
+    compile: (root: Scene): void => {
+      root.traverse(object => {
+        if (!(object instanceof Mesh)) return;
+        compiled.push(object.material);
+        const id = programs.length;
+        programs.push({ type: 'test', name: `program-${id}`, cacheKey: `program-${id}`, usedTimes: 1, id, program: {}, isReady: () => true, getUniforms: () => ({}) });
+      });
+    },
+  })) Reflect.set(renderer, key, value);
+  const geometry = new BoxGeometry(), material = new MeshBasicMaterial(), pass = new Mesh(geometry, material), camera = new PerspectiveCamera();
+  const into = new WebGLRenderTarget(4, 4);
+  let freed = 0;
+  try {
+    for (const owned of [true, false]) {
+      const output = new WebGLRenderTarget(2, 2); output.addEventListener('dispose', () => { freed++; });
+      let live = true;
+      const warm = warmOffscreenBuild(renderer, (commands) => {
+        commands.setRenderTarget(into); commands.render(pass, camera); live = owned; return output;
+      }, () => live, { webKitOnly: true });
+      await (owned ? warm : expect(warm).rejects.toThrow('owner left'));
+    }
+    expect(drawn).toEqual([]);
+    expect(compiled[0]).toBe(material);
+    expect(freed).toBe(2);
+  } finally { vi.unstubAllGlobals(); geometry.dispose(); material.dispose(); into.dispose(); }
 });

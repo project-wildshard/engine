@@ -361,13 +361,6 @@ function compileObjects(root: THREE.Object3D, visit: (object: THREE.Object3D) =>
   };
   walk(root);
 }
-/**
- * A detached stand-in for `mesh` that computes the same program: `clone(false)` keeps the
- * instancing / skinning / morph flags, geometry and skeleton. BatchedMesh.copy in r186 never
- * copies `_colorsTexture` (it tests the destination, which is null), yet `batchingColor` is a
- * cache-key bit — carry the reference over, or the forest's four materials and three depth
- * variants compile again at the first frame.
- */
 /** NF15: a classic graph that reads instance colours gives the live mesh its white ones first (its draw hook gives them
  *  only after a frame), so a copy compiles the coloured program the draws use */
 function prepareInstances(mesh: MeshLike): void {
@@ -376,6 +369,13 @@ function prepareInstances(mesh: MeshLike): void {
     if (typeof prepare === 'function') Reflect.apply(prepare, material, [mesh]);
   }
 }
+/**
+ * A detached stand-in for `mesh` that computes the same program: `clone(false)` keeps the
+ * instancing / skinning / morph flags, geometry and skeleton. BatchedMesh.copy in r186 never
+ * copies `_colorsTexture` (it tests the destination, which is null), yet `batchingColor` is a
+ * cache-key bit — carry the reference over, or the forest's four materials and three depth
+ * variants compile again at the first frame.
+ */
 function standIn(mesh: MeshLike): MeshLike {
   prepareInstances(mesh);
   const copy = mesh.clone(false) as BatchedLike;
