@@ -177,9 +177,13 @@ test('DL21: a staged world names each world part under the world data span, and 
     expect(seen).toEqual(['world data', 'World data 1 / 10 · library', 'World data 2 / 10 · materials', 'World data 3 / 10 · looks']);
     expect(ctx.progress.set).toHaveBeenLastCalledWith(3, 10, 'looks');
     expect(detail()).toBe('World data 3 / 10 · looks');
+    // a longer mode's extra parts stay inside the count, on the card and in the world's own progress
+    for (let part = 4; part <= 11; part++) worldStep(ctx, `part ${String(part)}`);
+    expect(detail()).toBe('World data 10 / 10 · part 11');
+    expect(ctx.progress.set).toHaveBeenLastCalledWith(10, 10, 'part 11');
     region.end();
   } finally { uninstall(); }
   // outside a loading step only the world's own progress hears it
   worldStep(ctx, 'skins');
-  expect(ctx.progress.set).toHaveBeenLastCalledWith(4, 10, 'skins');
+  expect(ctx.progress.set).toHaveBeenLastCalledWith(10, 10, 'skins');
 });

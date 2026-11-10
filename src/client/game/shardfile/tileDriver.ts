@@ -415,7 +415,7 @@ export function residentTiles(resident: Scope, contents: readonly TileContent[],
     // 1.7-2.8 s on the Simulator with no count)
     const keys = tileKeys(order.tiles.filter(tile => order.rank(tile) === 0)), units = loadingUnits('Spawn tiles', keys.length);
     units(0);
-    // DL21: the coarse cover starts once the arrival tile is attached, beside the rest of the spawn tiles, whose count
+    // DL21: the coarse cover starts once the first spawn tile is attached, beside the rest of them, whose count
     // moves the card meanwhile. Warm Nine's cover re-reads its kit's files through the service worker, and WebKit's
     // Cache Storage held the first of them 1.0 s (a hit, its cache handle already open) after the spawn tiles' ~2 s
     // without one: 'Spawn tiles 9 / 9 · coarse cover' sat still for that second. A failed tile still refuses the boot

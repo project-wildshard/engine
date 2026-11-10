@@ -179,7 +179,7 @@ test('a failed resident boot remains refused without publishing or retrying its 
     await expect(residentTiles(scope, [source], { x: 0, z: 0 }, [], tileRing)).rejects.toBe(failure);
     await expect(residentTiles(scope, [source], { x: 0, z: 0 }, [], tileRing)).rejects.toBe(failure);
     expect(attach).toHaveBeenCalledTimes(1);
-    // DL21: the cover started after the arrival tile (an empty key of this content); it is never asked again
+    // DL21: the cover started after the first spawn tile (an empty key of this content); it is never asked again
     expect(coarse).toHaveBeenCalledTimes(1);
     expect(followResidentTiles(scope, () => ({ x: 0, z: 0 }))).toBeNull();
   } finally { warning.mockRestore(); scope.dispose(); }
@@ -197,48 +197,54 @@ test('retiring a resident during coarse preparation refuses publication', async 
   } finally { coarse.release(); scope.dispose(); }
 });
 
-test('DL21: the coarse cover starts after the arrival tile, beside the other spawn tiles, and gates publication', async () => {
-  const scope = new Scope('cover-beside-spawn'), made = content(), second = gate(), secondStarted = gate(), coarse = gate(), events: string[] = [];
+test('DL21: the coarse cover starts after the first spawn tile, beside the others, and gates publication', async () => {
+  const scope = new Scope('cover-beside-spawn'), made = content(), first = gate(), firstStarted = gate(), second = gate(), secondStarted = gate();
+  const coarse = gate(), events: string[] = [];
   let attaches = 0;
   const source: TileContent = { ...made, attach: async (key, owner) => {
     attaches++; events.push(`attach ${String(attaches)}`);
+    if (attaches === 1) { firstStarted.release(); await first.promise; }
     if (attaches === 2) { secondStarted.release(); await second.promise; }
     await made.attach(key, owner);
   }, coarse: () => { events.push('coarse'); return coarse.promise; } };
+  // spawn tiles fully in: render and colliders attached for every rank-0 tile (the content's own record)
+  const colliders = (): number => [...made.attached.keys()].filter(key => key.startsWith('c')).length;
   const pending = residentTiles(scope, [source], { x: 0, z: 0 }, [], tileRing);
+  let ready = false;
+  void pending.then(() => { ready = true; return undefined; });
   try {
-    await secondStarted.promise; await Promise.resolve();
-    // the arrival tile is in, the second still attaching: the cover is already under way
+    await firstStarted.promise;
+    for (let i = 0; i < 5; i++) await new Promise(resolve => { setTimeout(resolve, 0); });
+    expect(events).toEqual(['attach 1']); // no cover before the first spawn tile is in
+    first.release(); await secondStarted.promise;
+    // the first spawn tile is in, the second still attaching: the cover is already under way
     expect(events).toEqual(['attach 1', 'coarse', 'attach 2']);
     second.release();
-    let ready = false;
-    void pending.then(() => { ready = true; return undefined; });
-    const attached = (): number => attaches;
-    for (let i = 0; i < 50 && attached() < 9; i++) await new Promise(resolve => { setTimeout(resolve, 0); });
-    expect(attaches).toBe(9);
+    for (let i = 0; i < 100 && colliders() < 9; i++) await new Promise(resolve => { setTimeout(resolve, 0); });
+    expect(colliders()).toBe(9);
     expect(events.filter(event => event === 'coarse')).toHaveLength(1);
     // every spawn tile is in, but the cover is not: nothing publishes yet
-    await new Promise(resolve => { setTimeout(resolve, 0); });
+    for (let i = 0; i < 5; i++) await new Promise(resolve => { setTimeout(resolve, 0); });
     expect(ready).toBe(false);
     expect(followResidentTiles(scope, () => ({ x: 0, z: 0 }))).toBeNull();
     coarse.release(); await pending;
     expect(followResidentTiles(scope, () => ({ x: 0, z: 0 }))).not.toBeNull();
-  } finally { second.release(); coarse.release(); await Promise.allSettled([pending]); scope.dispose(); }
+  } finally { first.release(); second.release(); coarse.release(); await Promise.allSettled([pending]); scope.dispose(); }
 });
 
 test('DL21: a spawn tile failing beside a running cover refuses the boot only once the cover has settled', async () => {
-  const scope = new Scope('cover-then-failure'), made = content(), failure = new Error('second tile failed'), coarse = gate(), coarseStarted = gate();
+  const scope = new Scope('cover-then-failure'), made = content(), failure = new Error('second tile failed'), coarse = gate(), coarseStarted = gate(), thrown = gate();
   let attaches = 0, rejected = false;
   const source: TileContent = { ...made, attach: async (key, owner) => {
     attaches++;
-    if (attaches === 2) { await coarseStarted.promise; throw failure; }
+    if (attaches === 2) { await coarseStarted.promise; thrown.release(); throw failure; }
     await made.attach(key, owner);
   }, coarse: () => { coarseStarted.release(); return coarse.promise; } };
   const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   const pending = residentTiles(scope, [source], { x: 0, z: 0 }, [], tileRing);
   void pending.catch(() => { rejected = true; });
   try {
-    await coarseStarted.promise;
+    await thrown.promise; // the spawn failure has happened; the cover still runs
     for (let i = 0; i < 5; i++) await new Promise(resolve => { setTimeout(resolve, 0); });
     expect(rejected).toBe(false);
     coarse.release();
@@ -247,6 +253,29 @@ test('DL21: a spawn tile failing beside a running cover refuses the boot only on
   } finally { warning.mockRestore(); coarse.release(); await Promise.allSettled([pending]); scope.dispose(); }
 });
 
+test('DL21: a cover failing while spawn tiles still attach refuses the boot with its error once they are in', async () => {
+  const scope = new Scope('failure-then-spawn'), made = content(), failure = new Error('cover failed'), second = gate(), secondStarted = gate();
+  let attaches = 0, rejected = false, coarseCalls = 0;
+  const source: TileContent = { ...made, attach: async (key, owner) => {
+    attaches++;
+    if (attaches === 2) { secondStarted.release(); await second.promise; }
+    await made.attach(key, owner);
+  }, coarse: () => { coarseCalls++; return Promise.reject(failure); } };
+  const pending = residentTiles(scope, [source], { x: 0, z: 0 }, [], tileRing);
+  void pending.catch(() => { rejected = true; });
+  try {
+    await secondStarted.promise;
+    for (let i = 0; i < 5; i++) await new Promise(resolve => { setTimeout(resolve, 0); });
+    // the cover has failed, a spawn tile still attaches: no refusal, no publication, no unhandled rejection yet
+    expect(coarseCalls).toBe(1);
+    expect(rejected).toBe(false);
+    expect(followResidentTiles(scope, () => ({ x: 0, z: 0 }))).toBeNull();
+    second.release();
+    await expect(pending).rejects.toBe(failure);
+    expect(coarseCalls).toBe(1);
+    expect(followResidentTiles(scope, () => ({ x: 0, z: 0 }))).toBeNull();
+  } finally { second.release(); await Promise.allSettled([pending]); scope.dispose(); }
+});
 
 test.each(['render', 'colliders'] as const)('cached %s stages share the drawn-frame budget', async layer => {
   const owner = new Scope('paced-tile-stages'), key = 36, visited: number[] = [], turns: number[] = [];

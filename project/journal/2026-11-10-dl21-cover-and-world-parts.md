@@ -19,11 +19,12 @@ WebKit's). The cover's other reads took 1-3 ms each; 85 of its 97 reads re-read 
 
 The page cannot make WebKit answer faster without a second copy of the bytes (the service worker's design keeps no
 body memo and no timers, and `ClientAssets` keeps no settled read by design, js-heap H6). It can stop waiting on it alone:
-the cover now starts once the arrival tile is attached, beside the other eight spawn tiles, whose count moves the card
+the cover now starts once the first spawn tile is attached, beside the other eight spawn tiles, whose count moves the card
 meanwhile. Publication still waits for both; a failed spawn tile still refuses the boot, once the cover has settled, so
-no cover work outlives a refused boot. On a cold load the cover's reads come from the packs already in memory, and in
-a Shardfile-mode cold load they start only after the arrival tile (H3's rule for the entered-tile streamer: the
-arrival first, then the rest together).
+no cover work outlives a refused boot. On a cold load on packs the cover's reads come from the packs already in memory. In
+a Shardfile-mode cold load its network reads now overlap the other spawn tiles' reads (the first spawn tile is the
+row-first rank-0 tile, not the arrival tile; H3's arrival-first rule belongs to the entered-tile streamer); the sweep's
+Shardfile pairs (DL5) read that.
 
 ## Pine warm: 'Region world · world data' for 1.0 s
 
@@ -50,3 +51,8 @@ for the cover now being asked once on such a boot); a staged world's parts name 
 (`client-preparation-timing.test.ts`, fails without the report).
 
 The world-part naming is its own commit after the cover (`perf(boot): name each world data part`).
+
+J206 review (Codex, one-shot): no MUST-FIX. Its SHOULDs are done: the cover tests gate the first spawn tile too and wait
+on explicit milestones (every collider attached, the spawn failure thrown), the inverse order (the cover fails while a
+spawn tile still attaches) is a test, and the world-part test covers counts past ten. Its NIT: 'arrival tile' was the
+wrong name for the first rank-0 key, now 'first spawn tile'.
