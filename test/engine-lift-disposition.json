@@ -8013,5 +8013,67 @@
       "../src/shards/open-plots/generators/tiledPlot.mjs"
     ],
     "sourceRevision": "b70e59b10166fae172fc3f2043f0f26fd12d53f1"
+  },
+  {
+    "repo": "engine",
+    "file": "test/gen-docs.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: the helper replaces every generator/docs writer with private export-name stubs and asserts their exact call order. It pins the retired monorepo generation pipeline, not a real built product. The referenced docs entry is absent from engine and now belongs to sharddev. No successor equivalence is claimed.",
+    "originalTests": [
+      "all generation modes exclude derived docs; docs keeps every writer and propagates failure"
+    ],
+    "sourceRevision": "a8144a50e79afe7e66a8ecdce9406e152518c916",
+    "sourceBlob": "0bf170e0e986b3e6313a542aa0b3043c37865065",
+    "retirementProof": "Body-reviewed J186 decision, not flaky-test removal, execution qualification or successor equivalence."
+  },
+  {
+    "repo": "engine",
+    "file": "test/recent-ci-tests.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: the wrapper executes private Python cache/selection unit checks through runpy and mock patches; its implementation script is absent from engine and remains in the singleplayer shell. This does not exercise the engine public cook/boot/play edge. No shell test or source is changed, and no successor equivalence is claimed.",
+    "originalTests": [
+      "recent CI test paths retain exact source identity, expiry and observation budgets"
+    ],
+    "sourceRevision": "a8144a50e79afe7e66a8ecdce9406e152518c916",
+    "sourceBlob": "b4097a6f4db796b409bc29b12f8917c4e517cca8",
+    "retirementProof": "Body-reviewed J186 decision, not flaky-test removal, execution qualification or successor equivalence."
+  },
+  {
+    "repo": "engine",
+    "file": "test/sweep-guard.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: the original wrapper tests a repository-local agent Bash policy file that engine does not own or ship; all assertions classify developer command text. It is not a game/product boundary. Personal hook policy is not copied, removed or changed by retiring this orphan engine wrapper.",
+    "originalTests": [
+      "the single safety guard requires commit.sh and refuses whole-tree staging"
+    ],
+    "sourceRevision": "a8144a50e79afe7e66a8ecdce9406e152518c916",
+    "sourceBlob": "72684a7f693d753465b2c38c1333ecd49d23dfe3",
+    "retirementProof": "Body-reviewed J186 decision, not flaky-test removal, execution qualification or successor equivalence."
+  },
+  {
+    "repo": "engine",
+    "file": "test/shard-platform-cli.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: both cases substitute the CLI work module with a load-hook stub and pin a former private construction/import-cycle arrangement. The engine entry now deliberately refuses because the author CLI belongs to sharddev. Retire the obsolete engine-copy contract; do not borrow SDK private paths or claim its successor is equivalent.",
+    "originalTests": [
+      "runs cycle-free in the original CLI process and propagates failure=%s"
+    ],
+    "sourceRevision": "a8144a50e79afe7e66a8ecdce9406e152518c916",
+    "sourceBlob": "b1afcef2a1c09258b636ae051432a22142d43ea9",
+    "retirementProof": "Body-reviewed J186 decision, not flaky-test removal, execution qualification or successor equivalence."
+  },
+  {
+    "repo": "engine",
+    "file": "test/precommit-ratchet.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: one helper builds private staged protocol files and substitutes the checker with a diagnostic-count stub; the other two cases call the private approval helper directly with synthetic ratchet rows. These pin internal hook representation and exact row/count rules, rather than a real product or public CLI. Existing actual Git/hook publication guards remain unchanged; no successor equivalence is claimed.",
+    "originalTests": [
+      "staged ratchet compares missing entries to HEAD and honors new staged entries",
+      "approval trailers match every exact increase once in the footer",
+      "one removed row can move to one new key at the same or lower count"
+    ],
+    "sourceRevision": "a8144a50e79afe7e66a8ecdce9406e152518c916",
+    "sourceBlob": "01c1ae217d1ca3b5f23795627d3ad96a95650726",
+    "retirementProof": "Body-reviewed J186 decision, not flaky-test removal, execution qualification or successor equivalence."
   }
 ]
