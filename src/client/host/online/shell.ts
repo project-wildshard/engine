@@ -12,6 +12,8 @@ import {NetRecords} from '@wildshard/engine/net/netRecord';
 import {onlineTelemetry} from '@wildshard/engine/telemetry/runtime';
 import type {NetRecord,NetCorrection} from '@wildshard/engine/net/measurements';
 import { chatLines } from './chatLines';
+import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
+import { voiceUi } from './voiceUi';
 import { askName } from './nameBox';
 import { fetchSignedRelease } from './release';
 import { countdownStrip, newBuildPanel, reconnectStrip } from './reconnectStrip';
@@ -42,6 +44,8 @@ export interface OnlineView {
 /** A running online session. */
 export interface OnlineShell {
   readonly client: NetClient;
+  /** J218: voice chat's signalling, on whichever socket is live. */
+  readonly voice: VoiceLink;
   /** Tells a page its link looks after itself: a close is not the end of its server. */
   readonly redials: true;
   /** Resolves when the door has a seat for this player, or a held one comes back. */
@@ -66,10 +70,19 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   let playtest=false;
   let loaded = false, link: WebSocketTransport | null = null, unseated: WebSocketTransport | null = null, arrive: (value: { tick: number; restored: boolean }) => void = () => undefined;
   const booted = new Promise<{ tick: number; restored: boolean }>(resolve => { arrive = resolve; });
+  const voices = new Set<(word: VoiceHeard) => void>(), encoder = new TextEncoder(), decoder = new TextDecoder();
+  const voice: VoiceLink = { send: word => { link?.control('voice', encoder.encode(JSON.stringify(word)).buffer); },
+    on: listener => { voices.add(listener); return () => { voices.delete(listener); }; } };
   const hear = (transport: WebSocketTransport): WebSocketTransport => {
     link = transport;
     transport.onControl((control, bytes) => {
       if(control==='playtest'){playtest=true;return;}
+      if (control === 'voice') {
+        let word: VoiceHeard;
+        try { word = JSON.parse(decoder.decode(bytes)) as VoiceHeard; } catch { return; }
+        for (const listener of voices) listener(word);
+        return;
+      }
       if (control === 'countdown') { const said = decodeCountdown(bytes); if (said !== null) view.countdown(said); return; }
       if (control !== 'resume') return;
       const seat = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))).shard;
@@ -87,7 +100,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const offFirst = client.onFrame(() => { offFirst(); arrive({ tick: client.latest?.tick ?? 0, restored: true }); });
   client.hello(config.build, config.identity);
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
-  return { client, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
+  return { client, voice, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
     visible: () => { redial.check(); }, retry: () => { redial.retry(); },
     pause: idle, resume: idle, hold: idle, bossGod: idle, hardHits: idle, place: idle, raise: idle,
     save: () => Promise.resolve({ tick: tickOf(), ok: true }), probe: () => Promise.resolve({ tick: tickOf(), tickMs: 0, rows: [] }),
@@ -148,7 +161,8 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   });
   retry = shell.retry;
   void settled(shell.booted);
-  chatLines(scope, shell.client);
+  const chat = chatLines(scope, shell.client);
+  voiceUi(scope, new VoiceChat(scope, shell.voice), chat);
   scope.listen(window,'pagehide',()=>{shell.flushRecords();});
   scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') shell.visible(); });
   return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); } };

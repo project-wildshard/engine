@@ -28,3 +28,7 @@ WebKit gathers candidates before setLocalDescription settles, so a link
 holds its own candidates until its offer or answer has gone out.
 Playwright's WebKit can't finish ICE on one Mac (mDNS host candidates, no
 srflx), so its proof is the iOS Simulator on staging.
+
+The client half: one RTCPeerConnection per peer, the joiner offers, a
+chat-row mic button with off/asking/on/talking/blocked states, B on a
+keyboard, one tip under chat, and name chips that glow and mute.

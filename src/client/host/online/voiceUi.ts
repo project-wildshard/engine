@@ -1,0 +1,133 @@
+import type { Scope } from '@wildshard/engine/app/scope';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { listenPage } from '@wildshard/engine/input/dom';
+import type { ChatBox } from './chatLines';
+import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './voice';
+
+// J218: voice's controls live in the chat row, so the one mic button is both the phone's HUD toggle and the prompt "near the
+// chat". On a keyboard `B` toggles it (no binding uses B: `src/client/game/inputContexts.ts`). Under the row, one tip says
+// what to do next, and while voice is on, each player on it is a chip that glows as they talk and mutes on a tap.
+
+const CYAN = '#8fe3ff', NAVY = 'rgba(9,22,36,.86)', RED = '#ff7a7a', AMBER = '#ffc56b';
+/** The first-time tip, and the "you're on, alone" tip, go after this long. */
+const FIRST_TIP_MS = 15_000, ALONE_TIP_MS = 5000;
+const CSS = `
+#ws-voice{flex:none;position:relative;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(143,227,255,.5);background:${NAVY};color:#9fb3c8;display:grid;place-items:center;padding:0;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:box-shadow .12s,background .2s,border-color .2s}
+#ws-voice svg{width:20px;height:20px}
+#ws-voice[data-state=asking],#ws-voice[data-state=joining]{color:${CYAN};border-color:${CYAN};animation:ws-voice-pulse 1s ease-in-out infinite}
+#ws-voice[data-state=on]{color:#04121d;background:${CYAN};border-color:${CYAN}}
+#ws-voice[data-state=denied],#ws-voice[data-state=failed]{color:${RED};border-color:${RED}}
+#ws-voice[data-state=full]{color:${AMBER};border-color:${AMBER}}
+#ws-voice .ws-voice-key{position:absolute;right:-5px;bottom:-5px;min-width:14px;height:14px;border-radius:3px;background:#0b1a2a;border:1px solid rgba(143,227,255,.6);color:${CYAN};font:700 9px/13px system-ui,sans-serif;text-align:center}
+@keyframes ws-voice-pulse{50%{box-shadow:0 0 0 5px rgba(143,227,255,.25)}}
+#ws-voice-tip{display:flex;gap:8px;align-items:center;align-self:flex-start;max-width:100%;padding:5px 6px 5px 9px;border-radius:8px;background:rgba(6,16,28,.9);border:1px solid rgba(143,227,255,.35);color:#dff6ff;font:600 12px/1.3 system-ui,sans-serif;pointer-events:auto}
+#ws-voice-tip[data-tone=bad]{border-color:rgba(255,122,122,.6)}
+#ws-voice-tip button{flex:none;border:0;background:none;color:#9fb3c8;font:inherit;font-size:14px;padding:0 4px;cursor:pointer}
+#ws-voice-peers{display:flex;flex-wrap:wrap;gap:4px;pointer-events:auto}
+#ws-voice-peers button{display:flex;gap:5px;align-items:center;padding:3px 8px 3px 6px;border-radius:999px;border:1px solid rgba(143,227,255,.3);background:rgba(8,14,24,.7);color:#dff6ff;font:600 12px/1.2 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:box-shadow .12s,border-color .12s}
+#ws-voice-peers button i{width:7px;height:7px;border-radius:50%;background:#4a6378}
+#ws-voice-peers button[data-linked=true] i{background:#5fd3a0}
+#ws-voice-peers button[data-speaking=true]{border-color:${CYAN};box-shadow:0 0 0 2px rgba(143,227,255,.45),0 0 10px rgba(143,227,255,.5)}
+#ws-voice-peers button[data-speaking=true] i{background:${CYAN}}
+#ws-voice-peers button[data-muted=true]{color:#7d8d9c;text-decoration:line-through}
+#ws-voice-peers button[data-linked=false]{opacity:.6}
+#ws-voice-tip[hidden],#ws-voice-peers[hidden]{display:none}
+`;
+const MIC = '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
+const icon = (slashed: boolean): string => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">${MIC}${slashed ? '<path d="M4 4l16 16"/>' : ''}</svg>`;
+const touchFirst = (): boolean => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
+/** How to let the mic back in, in the words of the browser this is. */
+function deniedHelp(): string {
+  const agent = navigator.userAgent;
+  if (/iPhone|iPad|iPod/u.test(agent) || (/Macintosh/u.test(agent) && touchFirst())) return 'Microphone blocked. Tap aA in the address bar, Website Settings, Microphone: Allow. Then tap the mic again.';
+  if (/Android/u.test(agent)) return 'Microphone blocked. Tap the icon left of the address, Permissions, Microphone: Allow. Then tap the mic again.';
+  return 'Microphone blocked. Click the icon left of the address, allow the Microphone, then press B again.';
+}
+const names = (peers: readonly VoicePeer[]): string => peers.length === 1 ? `${peers[0]?.name ?? 'Someone'} is` : peers.length === 2 ? `${peers[0]?.name ?? ''} and ${peers[1]?.name ?? ''} are` : `${String(peers.length)} players are`;
+
+/** Put voice's controls in the chat box, and `B` on the keyboard. */
+export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
+  if (voice.state === 'unsupported') return;
+  const style = scope.ownNode(document.createElement('style'));
+  style.textContent = CSS; document.head.append(style);
+  const button = document.createElement('button'), tip = document.createElement('div'), peers = document.createElement('div');
+  button.id = 'ws-voice'; button.type = 'button';
+  tip.id = 'ws-voice-tip'; peers.id = 'ws-voice-peers';
+  chat.form.append(button); chat.box.append(tip, peers);
+  const touch = touchFirst(), act = touch ? 'Tap the mic' : 'Press B';
+  let dismissed = '', firstUntil = voicePrefs.read().seen ? 0 : diagnosticNow() + FIRST_TIP_MS, aloneUntil = 0, was: VoiceState = voice.state;
+  const seen = (): void => { voicePrefs.write({ seen: true }); firstUntil = 0; };
+  scope.listen(button, 'click', event => { event.preventDefault(); seen(); voice.toggle(); button.blur(); });
+  listenPage(scope, 'keydown', event => {
+    const target = event.target as HTMLElement | null;
+    if (event.code !== 'KeyB' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (target !== null && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/u.test(target.tagName))) return;
+    seen(); voice.toggle();
+  }, { capture: true });
+
+  const tipFor = (): { key: string; text: string; tone: 'ok' | 'bad' } | null => {
+    const others = [...voice.roster.values()], now = diagnosticNow();
+    const { state } = voice;
+    if (state === 'asking') return { key: 'asking', text: 'Allow the microphone when your browser asks.', tone: 'ok' };
+    if (state === 'joining') return { key: 'joining', text: 'Joining voice…', tone: 'ok' };
+    if (state === 'denied') return { key: 'denied', text: deniedHelp(), tone: 'bad' };
+    if (state === 'failed') return { key: 'failed', text: 'No microphone was found. Check it is plugged in and allowed.', tone: 'bad' };
+    if (state === 'full') return { key: 'full', text: 'Voice is full here: 8 players are on it already.', tone: 'bad' };
+    if (state === 'on') return others.length === 0 && now < aloneUntil ? { key: 'alone', text: 'You\'re on voice. Players here hear you once they join.', tone: 'ok' } : null;
+    if (state !== 'off') return null;
+    if (others.length > 0) return { key: `join:${others.map(peer => peer.id).join(',')}`, text: `${names(others)} on voice. ${act} to join.`, tone: 'ok' };
+    if (now < firstUntil) return { key: 'first', text: touch ? 'Tap the mic to talk with players here.' : 'Press B (or click the mic) to talk with players here.', tone: 'ok' };
+    return null;
+  };
+  let drawnOff: boolean | null = null, drawnTip: string | null = null;
+  const chips = new Map<string, { readonly chip: HTMLButtonElement; readonly label: HTMLSpanElement }>();
+  const chipFor = (peer: VoicePeer): HTMLButtonElement => {
+    let held = chips.get(peer.id);
+    if (held === undefined) {
+      const chip = document.createElement('button'), dot = document.createElement('i'), label = document.createElement('span');
+      chip.type = 'button'; chip.dataset['peer'] = peer.id; chip.append(dot, label);
+      scope.listen(chip, 'click', () => { const now = voice.roster.get(peer.id); if (now !== undefined) voice.mute(peer.id, !now.muted); });
+      held = { chip, label }; chips.set(peer.id, held);
+    }
+    const { chip, label } = held;
+    chip.dataset['speaking'] = String(peer.speaking); chip.dataset['muted'] = String(peer.muted); chip.dataset['linked'] = String(peer.linked);
+    chip.title = peer.muted ? `Unmute ${peer.name}` : `Mute ${peer.name}`;
+    label.textContent = peer.muted ? `${peer.name} (muted)` : peer.name;
+    return chip;
+  };
+  /** Draw what changed; a button or chip being tapped is never swapped out from under the finger. */
+  const render = (): void => {
+    if (voice.state === 'on' && was !== 'on') aloneUntil = diagnosticNow() + ALONE_TIP_MS;
+    was = voice.state;
+    const off = voice.state !== 'on' && voice.state !== 'asking' && voice.state !== 'joining';
+    button.dataset['state'] = voice.state;
+    if (off !== drawnOff) {
+      drawnOff = off;
+      button.innerHTML = icon(off) + (touch ? '' : '<span class="ws-voice-key">B</span>');
+      button.setAttribute('aria-label', off ? 'Turn voice on' : 'Turn voice off');
+      button.setAttribute('aria-pressed', String(!off));
+    }
+    button.style.boxShadow = voice.state === 'on' && voice.speaking ? `0 0 0 ${String(2 + Math.round(voice.level * 6))}px rgba(143,227,255,.45)` : '';
+    button.dataset['speaking'] = String(voice.state === 'on' && voice.speaking);
+    const said = tipFor(), shown = said === null || said.key === dismissed ? null : said;
+    if ((shown === null ? '' : `${shown.key}|${shown.text}`) !== drawnTip) {
+      drawnTip = shown === null ? '' : `${shown.key}|${shown.text}`;
+      tip.hidden = shown === null;
+      if (shown !== null) {
+        tip.dataset['tone'] = shown.tone; tip.dataset['key'] = shown.key.split(':')[0] ?? shown.key;
+        const text = document.createElement('span'), close = document.createElement('button');
+        text.textContent = shown.text; close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Dismiss');
+        scope.listen(close, 'click', () => { dismissed = shown.key; if (shown.key === 'first') seen(); render(); });
+        tip.replaceChildren(text, close);
+      }
+    }
+    for (const id of chips.keys()) if (!voice.roster.has(id)) { chips.get(id)?.chip.remove(); chips.delete(id); }
+    peers.hidden = voice.state !== 'on' || voice.roster.size === 0;
+    for (const peer of voice.roster.values()) { const chip = chipFor(peer); if (chip.parentElement !== peers) peers.append(chip); }
+  };
+  scope.onDispose(voice.onChange(render));
+  // The first-time and alone tips time out on their own.
+  scope.interval(1000, render);
+  render();
+}
