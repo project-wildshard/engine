@@ -14,10 +14,12 @@ import {productTarball} from '../src/cook/game/productTarball';
 import {collectGarbage, createCookWorker, indexKey, notifyServer, objectHeaders, readCapped, runJob, storeUsage, type CookIndex, type JobLauncher, type ShardfileSource} from '../src/cook/game/cookWorker';
 import {runCookJob, ShardfileRefusedError} from '../src/cook/game/cookJob';
 import {folderStore, r2Store, type PackStore} from '../src/cook/game/packStore';
+import {compileCookWorker} from './fixtures/compileCookWorker';
 
 /** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. */
 const root = process.cwd(), slug = 'sunscar-dunes', hashOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
-const launcher = (script: string = join(root, 'scripts/cook-job.mjs'), limits: Partial<JobLauncher['limits']> = {}): JobLauncher => ({root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 120, memoryMB: 4096, heapMB: 2048, ...limits}});
+let prepared:Awaited<ReturnType<typeof compileCookWorker>>|undefined;
+const launcher = (script?: string, limits: Partial<JobLauncher['limits']> = {}): JobLauncher => ({root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), get script(){if(script!==undefined)return script;if(prepared===undefined)throw new Error('Cook preparation is missing');return prepared.script;}, wrap: [], limits: {seconds: 120, memoryMB: 4096, heapMB: 2048, ...limits}});
 const pack = (files: ReadonlyMap<string, Uint8Array>): Uint8Array => writeTar(files);
 
 /** A ustar with one entry `writeTar` would never write, its checksum right, so only a reader's rules refuse it. */
@@ -39,11 +41,14 @@ describe('the cook worker', () => {
   });
   const worker = (blobs: ReadonlyMap<string, Uint8Array>, build = 'b1', folder = 'store', budgetBytes?: number): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(scratch, folder)), source: source(blobs), launcher: launcher(), serverPacks: join(scratch, 'server'), scratch: join(scratch, 'work'), ...(budgetBytes === undefined ? {} : {budgetBytes})});
 
-  beforeAll(() => {
+  const preparationScope=new AbortController();
+  let preparing:ReturnType<typeof compileCookWorker>|undefined;
+  beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), 'cook-worker-'));
     real = productTarball(join('out', slug)); files = new Map(readTar(real)); store = folderStore(join(scratch, 'store'));
+    preparing=compileCookWorker(preparationScope.signal);prepared=await preparing;
   });
-  afterAll(() => { rmSync(scratch, {recursive: true, force: true}); });
+  afterAll(async () => { preparationScope.abort();await preparing?.catch(()=>undefined);prepared?.dispose();rmSync(scratch, {recursive: true, force: true}); });
 
   it('cooks a real shard: parts and index in the store, a server pack for the room, no second cook', async () => {
     const hash = hashOf(real), cook = worker(new Map([[hash, real]]));
