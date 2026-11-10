@@ -251,3 +251,20 @@ restore preserve public outputs. The page case borrows only the public
 system registrar and asserts a paused owner never advances. Every case
 keeps 9.5 s including cleanup; none runs in hooks or Vitest. No runtime,
 product, old test, pin, live service or image changes.
+
+## Hybrid render preparation contracts
+
+Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hybrid-render-preparation.proof.mjs`.
+Six explicit CI-only cases enter a valid data product through the actual
+HybridRuntimeSession, plan admission and strings.register feature. The
+public product reader and render promise are borrowed loader boundaries;
+prepare is never replaced. Actual installed text stays unpublished until
+entry. Private construction overlaps rendering; ordinary entry waits.
+World-read refusal, render refusal, cancellation and plan admission
+refusal drain the same started render promise before teardown, retaining
+the original error. The old external-module control becomes today's
+actual data-plan admission, which no longer imports external runtimes.
+These are non-rendering scheduling/lifetime contracts on a real App and
+scope, with no GL, pixel or shipped-scene claim. Each complete case keeps
+9.5 s including scope cleanup; none runs in hooks or Vitest. Old tests,
+runtime, pins and generated tables remain untouched.
