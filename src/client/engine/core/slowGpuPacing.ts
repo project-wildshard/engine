@@ -25,6 +25,12 @@
  *  SwiftShader (Chromium's headless default, ANGLE's Vulkan device), Mesa's llvmpipe and softpipe, Windows' WARP
  *  ("Microsoft Basic Render Driver"), and Firefox's / WebKit's plain "software" names. */
 const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|microsoft basic render|\bwarp\b|software (?:rasterizer|renderer)|^software$/iu;
+/** A WebGL context's renderer name: the unmasked one where WEBGL_debug_renderer_info is exposed, else RENDERER (which a
+ *  privacy-masking browser may report generically: then no software name matches, and nothing is paced). */
+export function webglRendererName(gl: Pick<WebGLRenderingContext, 'getExtension' | 'getParameter' | 'RENDERER'>): string {
+  const info = gl.getExtension('WEBGL_debug_renderer_info'), name: unknown = gl.getParameter(info === null ? gl.RENDERER : info.UNMASKED_RENDERER_WEBGL);
+  return typeof name === 'string' ? name : '';
+}
 /** Whether a WebGL renderer name is a software rasterizer (never a real GPU, so never a player's phone). */
 export function softwareRasterizer(renderer: string): boolean { return SOFTWARE_RENDERER.test(renderer); }
 

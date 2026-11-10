@@ -37,7 +37,7 @@ import type { BackdropLayer } from '../world/backdropLayer';
 import { GradeEffect } from './Grade';
 import { VolumetricsEffect, makeNoiseTexture } from './Volumetrics';
 import { TIER, TIER_CONFIG, frameCapFps, gfxPrefs, type Tier } from './tier';
-import { pacedSkip, slowGpuPacingFor, type SlowGpuPacing } from './slowGpuPacing';
+import { pacedSkip, slowGpuPacingFor, webglRendererName, type SlowGpuPacing } from './slowGpuPacing';
 import { worldTime } from '../../../shared/engine/core/time';
 import { installViewport, viewportHeight } from './viewport';
 import { FIXED_STEP, MAX_FIXED_STEPS } from '../../../shared/engine/core/fixedStep';
@@ -1514,9 +1514,7 @@ export class Game {
    *  A real GPU keeps its tier's scale unpaced (slowGpuPacingFor). Idempotent. */
   paceSlowGpu(): void {
     if (this.slowPacing !== null || this.dead) return;
-    const gl = this.renderer.getContext(), info = gl.getExtension('WEBGL_debug_renderer_info');
-    const name: unknown = info === null ? gl.getParameter(gl.RENDERER) : gl.getParameter(info.UNMASKED_RENDERER_WEBGL);
-    const pacing = slowGpuPacingFor(true, typeof name === 'string' ? name : '', this.renderer.getPixelRatio());
+    const pacing = slowGpuPacingFor(true, webglRendererName(this.renderer.getContext()), this.renderer.getPixelRatio());
     if (pacing === null) return;
     const channel = new MessageChannel();
     this.slowPacing = pacing; this.pacedProbe = channel;

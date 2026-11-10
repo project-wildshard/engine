@@ -33,3 +33,7 @@ Narrowed to software rasterizers: "Render scale stays 2x on the phone (no dynami
 wildshard-singleplayer AGENTS.md). A slow shaders step alone could include a real slow phone, so pacing now also needs
 the unmasked WebGL renderer to be a software rasterizer (SwiftShader, llvmpipe/softpipe, Microsoft Basic Render/WARP).
 Every real GPU, phone or desktop, keeps its tier's scale unpaced, however slow its shaders step measured.
+
+J206 review of the narrowing: no must-fix. Its two SHOULDs taken: the renderer name is read through `webglRendererName`
+(tested with the debug extension exposed and masked; a masked name matches no software rasterizer, so nothing is paced),
+and the tests now name softpipe, WARP and generic software renderers too.

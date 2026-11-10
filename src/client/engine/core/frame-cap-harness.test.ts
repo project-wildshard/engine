@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TIER, initializeTier, frameCapFps, practiceFps, frameProbe } from './tier';
 import { frameBudgetSpent, heldDrawDeferred, noteFrameDrawn, setBuildHeld } from '../../../shared/engine/core/framePacing';
-import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing, pacedSkip, slowGpuPacingFor, softwareRasterizer } from './slowGpuPacing';
+import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing, pacedSkip, slowGpuPacingFor, softwareRasterizer, webglRendererName } from './slowGpuPacing';
 
 const initialTier = TIER, initialLocation = globalThis.location;
 
@@ -111,7 +111,8 @@ test('RT3: only a software rasterizer is ever paced; a real GPU the shaders step
     expect(slowGpuPacingFor(true, name, 2)).toBeNull();
   }
   const software = ['ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)', 'Google SwiftShader',
-    'llvmpipe (LLVM 15.0.7, 256 bits)', 'ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0, D3D11)'];
+    'llvmpipe (LLVM 15.0.7, 256 bits)', 'softpipe', 'ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0, D3D11)',
+    'WARP', 'Software Rasterizer', 'software'];
   for (const name of software) {
     expect(softwareRasterizer(name)).toBe(true);
     expect(slowGpuPacingFor(false, name, 2)).toBeNull(); // a software GPU the shaders step measured fast is not paced either
@@ -121,4 +122,17 @@ test('RT3: only a software rasterizer is ever paced; a real GPU the shaders step
   // and a real GPU never gets a scale: there is no pacing object to lower one
   const slowPhone = slowGpuPacingFor(true, 'Apple GPU', 2);
   expect(slowPhone?.takeRatio() ?? null).toBeNull();
+});
+
+test('RT3: the renderer name is the unmasked one where exposed, else RENDERER; a masked real GPU is never paced', () => {
+  const UNMASKED = 0x9246, RENDERER = 0x1f01;
+  const gl = (exposed: boolean, names: Record<number, unknown>) => ({ RENDERER, getExtension: (name: string) => exposed && name === 'WEBGL_debug_renderer_info' ? { UNMASKED_RENDERER_WEBGL: UNMASKED } : null,
+    getParameter: (key: number) => names[key] }) as unknown as Parameters<typeof webglRendererName>[0];
+  const swift = 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)';
+  expect(webglRendererName(gl(true, { [UNMASKED]: swift, [RENDERER]: 'WebKit WebGL' }))).toBe(swift);
+  expect(webglRendererName(gl(false, { [UNMASKED]: swift, [RENDERER]: 'WebKit WebGL' }))).toBe('WebKit WebGL');
+  expect(webglRendererName(gl(true, { [UNMASKED]: null }))).toBe('');
+  expect(slowGpuPacingFor(true, webglRendererName(gl(true, { [UNMASKED]: 'Apple GPU' })), 2)).toBeNull();
+  expect(slowGpuPacingFor(true, webglRendererName(gl(false, { [RENDERER]: 'WebKit WebGL' })), 2)).toBeNull();
+  expect(slowGpuPacingFor(true, webglRendererName(gl(true, { [UNMASKED]: swift })), 2)).not.toBeNull();
 });
