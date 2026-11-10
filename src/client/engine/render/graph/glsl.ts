@@ -420,8 +420,17 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       return (spec?.cost ?? 0) + (n.op === 'fogSample' ? postFog?.cost.instructions ?? 0 : 0) + body + (n.in ?? []).reduce<number>((sum, x) => sum + ownCost(x, scope, seen), 0);
     };
     /** whether a reference samples a texture (implicit derivatives), through its inputs and a loop's output */
-    const samples = (r: GraphRef | undefined, scope: Scope, seen = new Set<GraphNode>()): boolean => {
+    const samplesOf = new WeakMap<Scope, Map<string, boolean>>();
+    const samples = (r: GraphRef | undefined, scope: Scope, seen?: Set<GraphNode>): boolean => {
       if (typeof r !== 'string') return false;
+      // DL21 (Nine's Props): a top-level answer depends on the scope chain alone, so each scope keeps it
+      if (seen === undefined) {
+        let memo = samplesOf.get(scope);
+        if (memo === undefined) { memo = new Map(); samplesOf.set(scope, memo); }
+        const known = memo.get(r); if (known !== undefined) return known;
+        const found = samples(r, scope, new Set());
+        memo.set(r, found); return found;
+      }
       for (let s: Scope | null = scope; s !== null; s = s.parent) {
         const node = s.nodes[r];
         if (node === undefined) continue;
@@ -446,12 +455,45 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       }
       return out;
     };
+    // DL21: Nine's ~2,100-node kit graphs carry ~90 selects; each select re-derived these per call (O(selects × nodes))
+    const armsOf = new WeakMap<Readonly<Record<string, GraphNode>>, Map<string, ReadonlySet<string>>>();
+    /** reach of a select's two arms, by its id (read-only; a pure function of its scope's nodes) */
+    const armReach = (scope: Scope, id: string, m: GraphNode): ReadonlySet<string> => {
+      let memo = armsOf.get(scope.nodes);
+      if (memo === undefined) { memo = new Map(); armsOf.set(scope.nodes, memo); }
+      let known = memo.get(id);
+      if (known === undefined) { known = reach(scope, [m.in?.[1], m.in?.[2]]); memo.set(id, known); }
+      return known;
+    };
+    const backOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, readonly string[]>>();
+    /** each node's readers in a scope, in declaration order (one entry per input slot) */
+    const backReaders = (scope: Scope): ReadonlyMap<string, readonly string[]> => {
+      const known = backOf.get(scope.nodes); if (known !== undefined) return known;
+      const back = new Map<string, string[]>();
+      for (const [id, node] of Object.entries(scope.nodes)) for (const r of node.in ?? []) if (typeof r === 'string') {
+        const list = back.get(r); if (list === undefined) back.set(r, [id]); else list.push(id);
+      }
+      backOf.set(scope.nodes, back); return back;
+    };
+    const selectsOf = new WeakMap<Readonly<Record<string, GraphNode>>, ReadonlyMap<string, readonly (readonly [string, GraphNode])[]>>();
+    /** a scope's selects by their condition node, in declaration order */
+    const selectsOn = (scope: Scope, cond: string): readonly (readonly [string, GraphNode])[] => {
+      let known = selectsOf.get(scope.nodes);
+      if (known === undefined) {
+        const byCond = new Map<string, (readonly [string, GraphNode])[]>();
+        for (const [id, m] of Object.entries(scope.nodes)) {
+          const c = m.in?.[0]; if (m.op !== 'select' || typeof c !== 'string') continue;
+          const list = byCond.get(c); if (list === undefined) byCond.set(c, [[id, m]]); else list.push([id, m]);
+        }
+        known = byCond; selectsOf.set(scope.nodes, known);
+      }
+      return known.get(cond) ?? [];
+    };
     /** the operands a branched select's arms (and its group's: `sameCondition`) share, or that something outside them
      *  reads: built before the branch. A derivative or a sample two members read stays before it, as one select's did */
     const branchShared = (members: readonly (readonly [string, GraphNode])[], scope: Scope): string[] => {
-      const back = new Map<string, string[]>();
-      for (const [id, node] of Object.entries(scope.nodes)) for (const r of node.in ?? []) if (typeof r === 'string') back.set(r, [...(back.get(r) ?? []), id]);
-      const own = members.map(([, m]) => reach(scope, [m.in?.[1], m.in?.[2]])), ids = new Set(members.map(([id]) => id));
+      const back = backReaders(scope);
+      const own = members.map(([id, m]) => armReach(scope, id, m)), ids = new Set(members.map(([id]) => id));
       const x = reach(scope, members.map(([, m]) => m.in?.[1])), y = reach(scope, members.map(([, m]) => m.in?.[2])), arms = new Set([...x, ...y]), uses = readers(scope);
       const frontier = [...arms].filter(k => {
         const node = scope.nodes[k]; if (node === undefined || node.op === 'varying' || (node.in ?? []).length === 0) return false;
@@ -482,11 +524,11 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
       // a late select (it reads the lighting calls' results) never groups: building a lighting call inside a branch writes
       // its exported globals into the root while the branch is open, so pixels outside it would read them unassigned
       if (late(scope.nodes, self)) return [];
-      const candidates = Object.entries(scope.nodes).filter(([id, m]) => id !== self && m.op === 'select' && m.in?.[0] === cond
+      const candidates = selectsOn(scope, cond).filter(([id, m]) => id !== self
         && !late(scope.nodes, id)
         && find(`${scope.path}/${id}`, b) === undefined && !(samples(m.in?.[1], scope) && samples(m.in?.[2], scope))
         && typeOfRef(m.in?.[1] ?? 0, scope) !== 'bool' && typeOfRef(m.in?.[2] ?? 0, scope) !== 'bool');
-      const reaches = new Map<string, Set<string>>([[self, reach(scope, [n.in?.[1], n.in?.[2]])], ...candidates.map(([id, m]) => [id, reach(scope, [m.in?.[1], m.in?.[2]])] as const)]);
+      const reaches = new Map<string, ReadonlySet<string>>([[self, armReach(scope, self, n)], ...candidates.map(([id, m]) => [id, armReach(scope, id, m)] as const)]);
       let members: (readonly [string, GraphNode])[] = candidates;
       for (;;) {
         const all = [self, ...members.map(([id]) => id)];
