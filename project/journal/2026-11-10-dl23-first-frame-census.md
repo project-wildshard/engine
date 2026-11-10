@@ -21,3 +21,6 @@ and Shaders steps by timing, so its before-count there varies run to run.)
 J206 review (Codex) had one MUST-FIX on a first cut that took every camera-layer drawable: two hidden instanced
 twins differing only in instance colour compile two programs, while the parked warm draws one. The census now is the
 warm's own inventory, and a test proves the census and the warm's draws are the same set, one hidden twin included.
+
+The second J206 review (Codex) found no MUST-FIX; its SHOULD, wiring coverage through `precompileLevel`, is a test that
+the census reaches scene discovery as its include, drawnFrom stays the default, and an arrival set still wins.

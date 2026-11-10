@@ -135,3 +135,32 @@ test('PL6: what the first frame\'s warm turns show is in the boot\'s first view'
     expect(camera.quaternion.equals(new THREE.Quaternion())).toBe(true); expect(camera.fov).toBe(60);
   } finally {geometry.dispose(); material.dispose();}
 });
+
+test('DL23: a boot census reaches scene discovery as its include, in place of the view and turns', async () => {
+  const source = readFileSync(new URL('precompile.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('export async function precompileLevel(');
+  const selectorStart = source.indexOf('function drawnFrom('), selectorEnd = source.indexOf('\n/**', selectorStart);
+  if (start === -1 || selectorStart === -1 || selectorEnd < selectorStart) throw new Error('Level preparation missing');
+  const scene = new THREE.Scene(), owner = {onDispose: (): void => undefined}, includes: unknown[] = [];
+  const none = (): never[] => [];
+  const method: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(selectorStart, selectorEnd)}\n${source.slice(start).replace('export async', 'async')}\nprecompileLevel`), {
+    THREE, performance, pageScope: owner, resourceScope: () => owner, bootTraceActive: () => false, earlyTarget: () => null,
+    prepareSceneResources: (): Promise<void> => Promise.resolve(), shadowDepthResolver: () => undefined,
+    entryFrameExclusions: () => new Set(), workSlice: () => ({due: () => false, yield: (): Promise<void> => Promise.resolve()}),
+    materialsOf: () => [], sceneJobs: () => ({jobs: [], materials: 0}),
+    pacedSceneJobs: (...args: unknown[]): Promise<{jobs: never[]; materials: number}> => { includes.push(args[7]); return Promise.resolve({jobs: [], materials: 0}); },
+    familyCompileJobs: none, offscreenJobs: none, shadowJobs: none, backgroundJob: () => null, postJobs: none, exteriorJobs: none,
+    exclusiveMaterials: () => new Set(), includeFutureLights: (): void => undefined, readbackPreparation: () => ({root: new THREE.Group(), target: scene}),
+    collectTextures: () => [], runPrecompile: (): Promise<{materials: number}> => Promise.resolve({materials: 0}),
+  });
+  if (typeof method !== 'function') throw new Error('Level preparation is not callable');
+  const game = {scene, rootScene: scene, camera: new THREE.PerspectiveCamera(), composer: {inputBuffer: null}, composerBuilt: true,
+    renderer: {shadowMap: {type: THREE.PCFShadowMap}}, level: {boot: {shaders: {}}}};
+  const census = (): boolean => true, arrival = (): boolean => false;
+  await Reflect.apply(method, undefined, [game, undefined, {owner, chunkCasters: false, drawnOnly: true, firstFrame: census, turns: [Math.PI]}]);
+  await Reflect.apply(method, undefined, [game, undefined, {owner, chunkCasters: false, drawnOnly: true, turns: [Math.PI]}]);
+  await Reflect.apply(method, undefined, [game, undefined, {owner, chunkCasters: false, firstFrame: census, arrival}]);
+  expect(includes[0]).toBe(census); // the census, not drawnFrom's view
+  expect(typeof includes[1]).toBe('function'); expect(includes[1]).not.toBe(census); // drawnFrom, as before
+  expect(includes[2]).toBe(arrival); // an arrival's set still wins
+});
