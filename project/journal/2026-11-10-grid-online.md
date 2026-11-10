@@ -19,3 +19,4 @@
   `build-server.mjs`), so an instance like `open-plot-nw` is checked as its
   shard; `grid` needs a bundle that places cells. Tests pin the page catalogue
   to the server's grid order and check the restored body's position.
+- Re-recorded the grid cell test clocks after the review's added cases.
