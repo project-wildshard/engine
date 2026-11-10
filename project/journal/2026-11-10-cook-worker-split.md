@@ -34,3 +34,9 @@ J206 Codex review of 455bbec: one MUST, no SHOULD. `cook-admission-proof.mjs
 runs all three files and keeps the 23-case and four-slot assertions
 (passes locally: 23 cases, four slots). All 23 cases, limits, timeouts and
 the GC expectation (stray part plus b2's index) were confirmed unchanged.
+
+## Timings
+
+The push gate recorded the two new files from its own full run (limits
+35.2 s, publish 21.7 s under full-gate load); the quarantined file keeps
+its existing weight until its own fresh clocks replace it.

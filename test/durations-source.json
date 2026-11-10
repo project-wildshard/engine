@@ -1650,6 +1650,42 @@
       "finishedAt": "2026-11-10T21:04:56.548Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "6d73a10700ec29908820745ca835d006418a6f8d",
+      "tree": "ea487e0e8140da5eafac248d13c31559072bc540",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/cook-worker-limits.test.ts",
+          "blob": "87e2f0023aa49fb216d06345fcbf6c1fad93be20",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 18,
+          "durationMs": 35176.41029099999
+        },
+        {
+          "file": "test/cook-worker-publish.test.ts",
+          "blob": "f75e1e8bab961708980a941a67339f30bc5ee952",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 21673.452791
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:21:20.435Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

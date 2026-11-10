@@ -621,6 +621,8 @@
   "test/cook-installed-runtime.test.ts": 0.37738487500000006,
   "test/cook-refusals.test.ts": 2.2991757309999996,
   "test/cook-validation.test.ts": 21.825218664,
+  "test/cook-worker-limits.test.ts": 35.176410290999996,
+  "test/cook-worker-publish.test.ts": 21.673452791,
   "test/cook-worker.test.ts": 138.97,
   "test/core-heap-diagnostic.test.ts": 0.7439951820000001,
   "test/crack-every-player.test.ts": 0.49834773000000004,
