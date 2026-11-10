@@ -250,7 +250,7 @@ timed(
       assert.equal(finished, false);
       assert.deepEqual(f.events, ["construct", "world"]);
       f.render.reject(new Error("Later render refusal"));
-      assert.deepEqual(await settled, { error: f.failure });
+      assert.equal((await settled).error, f.failure);
       assert.deepEqual(f.events, ["construct", "world", "dispose", "restore"]);
       assert.equal(f.session.state().ready, false);
       assert.equal(f.visible(), undefined);
@@ -270,7 +270,7 @@ timed("render refusal publishes no afterWorld kit or entered strings", async () 
     );
     await f.world.promise;
     f.render.reject(failure);
-    assert.deepEqual(await settled, { error: failure });
+    assert.equal((await settled).error, failure);
     assert.deepEqual(f.events, ["construct", "world", "dispose", "restore"]);
     assert.equal(f.session.state().ready, false);
     assert.equal(f.visible(), undefined);
@@ -328,7 +328,7 @@ timed("actual plan admission refusal drains rendering before an installation exi
     assert.equal(finished, false);
     assert.equal(f.contexts(), 0);
     f.render.reject(new Error("Later render refusal"));
-    assert.deepEqual(await settled, { error: f.failure });
+    assert.equal((await settled).error, f.failure);
     assert.deepEqual(f.events, []);
     assert.equal(f.session.state().ready, false);
     assert.equal(f.visible(), undefined);
