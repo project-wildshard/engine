@@ -229,3 +229,25 @@ pinned tables retain their original quest conditions and order.
 Each complete case keeps 9.5 s including native cleanup; no live server,
 walked journey or database durability is claimed. The SDK owns the
 installed binding/reader counterpart. The original duplicate stays.
+
+## Weather continuation owner contracts
+
+After the ordinary Pine and Nalati pin installs, run
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs`.
+Explicit CI-only cases map all seven original waiting-file laws. The
+legacy file runs in its own native-math process: all 19,200 historical
+Pine outputs, old v1 saves and exact recorded tails remain unchanged.
+The separate portable native realm accepts the same saves, repeats its
+complete future wind/phase continuation and preserves atomic refusal
+and publication identity. Its intentional existing portable-sine rounding
+is not silently substituted into the historical oracle.
+
+Nalati uses its actual pinned weather bundle and admitted raw return
+module on a real renderer-free Rapier host. Public storm controls retain
+the naturally seeded bolt schedule; no private register is assigned.
+The original candidate-point data port proves high-point selection and
+the 1.2-second warning, not a rendered forest. Cadence, shelter and opaque
+restore preserve public outputs. The page case borrows only the public
+system registrar and asserts a paused owner never advances. Every case
+keeps 9.5 s including cleanup; none runs in hooks or Vitest. No runtime,
+product, old test, pin, live service or image changes.

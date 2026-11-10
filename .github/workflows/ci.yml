@@ -84,6 +84,11 @@ jobs:
       - name: Prove actual quest progress and native placement floors
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/interaction-placement.proof.mjs
+      - name: Prove shipped weather continuation and native storm decisions
+        if: needs.changes.outputs.docs != 'true'
+        run: |
+          node scripts/pins.ts install pine-hollow nalati-grasslands
+          node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'
