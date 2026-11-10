@@ -54,6 +54,7 @@ import { execFileSync } from 'node:child_process';
 import { startSharedLink } from './phone-loading/link.ts';
 import { profiles } from './phone-loading/model.ts';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { readSweepTarget, requireSweepDocumentBuild } from './loading-flow/target.mjs';
 
 // the service worker's own fetches reach context 'request' events (Chromium), as scripts/bench-load.mjs does
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
@@ -85,11 +86,16 @@ const out = resolve(values.out ?? `tmp/complete-at-control/${flow}-${rev.slice(0
 if (!out.startsWith(`${resolve('tmp')}/`)) { console.error('--out must be under ./tmp'); process.exit(2); }
 if (existsSync(resolve('.git/quiet'))) { console.error('Official Simulator quiet is active'); process.exit(2); }
 
-/** Every level's slug: the grid's cells and the shard folders. */
-const ALL_SLUGS = new Set([
-  ...JSON.parse(readFileSync(resolve('src/shared/game/grid/singleplayer.json'), 'utf8')).grid.cells.map(cell => cell.slug),
-  ...readdirSync(resolve('src/shards'), { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name),
-]);
+/** Every level in this exact served product; author folders moved out of engine. */
+let sweepTarget;
+try {
+  sweepTarget = await readSweepTarget(base, rev);
+  if (flow !== 'grid' && !sweepTarget.slugs.has(flow)) throw new Error('Requested shard is absent from the served sweep catalogue');
+} catch (error) {
+  console.error(`DL17 NO READING: ${String(error)}`);
+  process.exit(2);
+}
+const ALL_SLUGS = sweepTarget.slugs;
 /** The level a URL names, or null for shared content: its shardfile files, its assets, baked files, music, sfx, horizon,
  *  an open plot's asset folder, or a Rolldown chunk named after the shard. */
 function slugOf(path) {
@@ -307,7 +313,7 @@ try {
   }
   page.on('pageerror', error => report.errors.push(error.message));
   const version = await (await fetch(new URL('/version.json', base))).json();
-  if (typeof version.build !== 'string' || !version.build.startsWith(rev.slice(0, 7))) throw new Error(`Served build ${version.build} is not ${rev}`);
+  if (version.build !== sweepTarget.build) throw new Error('Served build changed after sweep catalogue collection');
   report.build = version.build;
   // the grid's title route (frame-floor's, but with the worker on unless --sw=off) or the shard's direct chunk route
   const url = new URL('/', base);
@@ -323,6 +329,7 @@ try {
     control.at = null;
     const workerFetchesOpenAtNavigation = workerOpen(), start = Date.now();
     await page.goto(url.href, { waitUntil: 'load' });
+    await requireSweepDocumentBuild(page, sweepTarget.build);
     if (flow === 'grid') {
       await page.locator('.ws-main-grid').click();
       await page.waitForFunction(() => window.__wildshard?.shard?.grid?.state().live.live.gameplayReady === true, undefined, { timeout: 240000 });
@@ -334,6 +341,7 @@ try {
     if (control.at === null) throw new Error('No ws:control-ready within 30 s of entry');
     const at = await page.evaluate(() => Reflect.get(window, '__dl17AtControl') ?? null);
     if (at === null) throw new Error('No snapshot from the control frame');
+    await requireSweepDocumentBuild(page, sweepTarget.build);
     // control is the control frame's own clock (the snapshot's Date.now()), not the binding's later arrival in Node: a request
     // that starts between the two is after control
     const controlFrame = typeof at.when === 'number' ? Math.min(at.when, control.at) : control.at;
