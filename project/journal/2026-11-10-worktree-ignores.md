@@ -36,3 +36,5 @@ watcher checks compare paths relative to the fixture, so the guard passes
 inside a real worktree too (run there: 11 of 11). The format and named-lint
 
 checks now fail on a broken tool run, not only on a planted hit.
+
+Clocks re-recorded after the review fix changed the guard's blob.
