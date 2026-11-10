@@ -272,6 +272,9 @@
 .ws-touch-disc.at:not(.show) { display: none; }
 .ws-touch-use { bottom: calc(var(--row) + var(--disc) + 14px); }
 .ws-touch:has(.ws-touch-disc.at-up0.show) .ws-touch-use { bottom: calc(var(--row) + var(--rslot) + var(--disc) + 14px); }
+/* A14: online, the chat row sits over MOVE (src/client/host/online/chatLines.ts): the band yields MOVE's column to it and stays over
+   the right thumb, its target */
+:root:has(#ws-chat) .ws-touch-use { left: calc(var(--split) + 6px); font-size: 15px; letter-spacing: 0.16em; }
 
 /* ── E152 (the user, 2026-09-25): HOVER was a tab on the bar's top edge, right over MOVE — "too close to the movement".
    Now a small tab on the LEFT EDGE, halfway up the screen: flush with the edge, rounded on the inside, icon over a tiny

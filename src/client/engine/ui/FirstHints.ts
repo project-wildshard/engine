@@ -80,6 +80,8 @@ const ANCHOR: Record<HintControl, string> = {
 };
 /** controls the tag must not cover while it finds its spot */
 const OBSTACLES = '.ws-touch-disc, .ws-touch-attack, .ws-touch-hover, .ws-touch-swap, .ws-touch-use.show';
+/** A14: the online page's chat row over MOVE (src/client/host/online/chatLines.ts) is one too, though it lives outside the layer */
+const PAGE_OBSTACLES = '#ws-chat > form';
 /** the keys that use a control on a desktop (jump and dodge come through the player's own hooks) */
 
 const STORE = 'hints';
@@ -248,7 +250,7 @@ export class FirstHints {
     const tw = this.tag.offsetWidth, th = this.tag.offsetHeight, W = hud.width;
     const cx = x0 + w / 2;
     const obstacles: Box[] = [];
-    for (const o of document.querySelectorAll<HTMLElement>(`.ws-touch :is(${OBSTACLES})`)) {
+    for (const o of document.querySelectorAll<HTMLElement>(`.ws-touch :is(${OBSTACLES}), ${PAGE_OBSTACLES}`)) {
       if (o === el || o.contains(el) || !shown(o)) continue;
       const b = o.getBoundingClientRect();
       obstacles.push({ l: b.left - hud.left - 4, t: b.top - hud.top - 4, r: b.right - hud.left + 4, b: b.bottom - hud.top + 4 });

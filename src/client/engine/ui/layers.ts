@@ -111,9 +111,18 @@ export class UiLayers {
     entry.view.back();
     return true;
   }
+  /** A menu or panel covers the world (the bag, the map, pause, settings, a shop, the journal): any input owner above the HUD
+   *  that is not drawn as part of the world (an NPC's dialogue box is). */
+  get menuOpen(): boolean { return this.input().some((entry) => entry.layer !== 'hud' && entry.view.presentation !== 'world'); }
   refresh(): void {
     const visible = this.input(), top = visible.at(-1);
     for (const entry of visible) entry.view.root.inert = entry !== top;
+    // QA row 15 (Jake, 2026-11-10: "When the menu is open, can we just hide the chat and the audio?"): <html data-ws-menu> while
+    // one is, so a page module outside this bundle (the online chat row and its mic, src/client/host/online/chatLines.ts) can
+    // stand aside in CSS; nothing it runs stops
+    // (a node bake's stub document has no documentElement, app.ts)
+    const root = typeof document === 'undefined' ? null : document.documentElement as HTMLElement | null;
+    if (root !== null) { if (this.menuOpen) root.dataset['wsMenu'] = 'open'; else delete root.dataset['wsMenu']; }
     this.changed?.();
     for(const update of this.observers)update();
   }
