@@ -30,3 +30,8 @@ graphics", and "with low, you can just do… 1 time and 1 time".
   a page back in view counts its frames (faster than 30 Hz = Low Power
   off); phone eligibility frozen at boot; the card has its own scope;
   the proof's 30 Hz clock serves every loop and checks the shard.
+- Verify review (Codex, NO-GO on 3/5/6): the first PLAY's exemption is
+  one navigation's (cleared on its entry and when SHARD SELECT opens);
+  Settings repaints while open; fast frames outrun only the reading they
+  beat, a newer title reading holds again. Rebased on a0d8ce3 (the Low
+  Power reading on main); proof green on and off.

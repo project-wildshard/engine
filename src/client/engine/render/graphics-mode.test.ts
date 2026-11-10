@@ -52,3 +52,11 @@ test('MG3: frames faster than 30 Hz after the reading (the page back in view) un
   expect(lowPowerOn()).toBe(false);
   expect(graphicsMode()).toBe('high');
 });
+
+test('MG3: a newer title reading of Low Power supersedes frames that outran an older one', async () => {
+  reading(true); noteFastFrames();
+  expect(lowPowerOn()).toBe(false);
+  await new Promise(resolve => { setTimeout(resolve, 2); });
+  reading(true); // the title read 30 Hz again (Low Power switched back on)
+  expect(lowPowerOn()).toBe(true);
+});

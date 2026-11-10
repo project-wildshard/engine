@@ -1,4 +1,4 @@
-import { jsonSlot } from '../saves/slots';
+import { jsonSlot, saveStorage } from '../saves/slots';
 import { lowPowerReading } from '../boot/lowPower';
 import { engineString } from '../../../shared/engine/strings';
 /**
@@ -33,20 +33,22 @@ export function savedGraphicsMode(): GraphicsMode {
 /** MG3: the words a refused High says ("Low Power Mode is on. Turn it off (Settings ▸ Battery) to use High graphics.") */
 export function lowPowerRefusal(): string { return engineString('s_low_power_refusal'); }
 
-/** MG3: frames came faster than Low Power Mode allows since the reading (a page back in view measured them): it is off now */
-let fastSince = false;
+/** MG3: the title reading (boot/lowPower.ts keeps it as the session's `boot.lowPower`) that frames faster than Low Power Mode
+ *  allows have since outrun: that reading no longer holds; a newer one does */
+let outrun: string | null = null;
+const titleReading = (): string | null => { try { return saveStorage('session').getItem('boot.lowPower'); } catch { return null; } };
 /** MG3: a window of this page's own frames ran faster than 30 Hz (Game, as the page comes back into view): Low Power is off, so
  *  the title's older "likely" no longer holds High back. A busy page cannot prove the opposite: only the idle title says
  *  "likely" (boot/lowPower.ts). */
 export function noteFastFrames(): void {
-  if (fastSince) return;
-  fastSince = true;
-  if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent(PIXELS_EVENT));
+  const was = lowPowerOn();
+  outrun = titleReading();
+  if (was && !lowPowerOn() && typeof document !== 'undefined') document.dispatchEvent(new CustomEvent(PIXELS_EVENT));
 }
 /** MG3: whether Low Power Mode looks on (the idle title read rAF capped near 30 Hz this tab, and nothing faster since) */
-export function lowPowerOn(): boolean { return !fastSince && lowPowerReading()?.verdict === 'likely'; }
+export function lowPowerOn(): boolean { return lowPowerReading()?.verdict === 'likely' && (outrun === null || outrun !== titleReading()); }
 /** Tests only. */
-export function resetFastFrames(): void { fastSince = false; }
+export function resetFastFrames(): void { outrun = null; }
 
 /** Save a pick and tell the page. High under Low Power Mode is refused (false); the saved pick stays as it was. */
 export function saveGraphicsMode(mode: GraphicsMode): boolean {

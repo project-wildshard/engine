@@ -27,7 +27,10 @@ mkdirSync(out, { recursive: true });
 const LOW_POWER_RAF = `(() => {
   const raf = window.requestAnimationFrame.bind(window), queue = new Map(); let next = 1, last = 0, pumping = false;
   const pump = now => {
-    if (now - last >= 32) { last = now; const due = [...queue.values()]; queue.clear(); for (const fn of due) fn(now); }
+    if (now - last >= 32) {
+      last = now;
+      for (const id of [...queue.keys()]) { const fn = queue.get(id); if (fn === undefined) continue; queue.delete(id); try { fn(now); } catch (error) { setTimeout(() => { throw error; }); } }
+    }
     if (queue.size > 0) raf(pump); else pumping = false;
   };
   window.requestAnimationFrame = fn => { const id = next++; queue.set(id, fn); if (!pumping) { pumping = true; raf(pump); } return id; };
@@ -82,8 +85,8 @@ try {
       // MG5: the first PLAY
       await page.locator('.ws-main-select').click();
       await page.locator('.ws-firstplay').waitFor({ timeout: 240_000 });
-      const shard = await page.evaluate(() => /** @type {any} */ (window).__wildshard?.world?.chunk?.slug ?? /** @type {any} */ (window).__wildshard?.world?.chunk?.id ?? null);
-      check(shard === 'driftwood-isle', `${power}: the first PLAY enters Driftwood (${String(shard)}) with the first-play card (MG5)`);
+      const shard = await page.evaluate(() => (/** @type {{ __wildshard?: { shard?: { slug?: string } } }} */ (/** @type {unknown} */ (window))).__wildshard?.shard?.slug ?? '');
+      check(shard === 'driftwood-isle', `${power}: the first PLAY enters Driftwood (${shard}) with the first-play card (MG5)`);
       await page.waitForTimeout(1500);
       const card = page.locator('.ws-firstplay');
       await card.locator('[data-v="low"]').click(); await page.waitForTimeout(900);

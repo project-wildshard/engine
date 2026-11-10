@@ -46,8 +46,12 @@ test('MG5 / MG6: no card unless the title started a first play; Replay arms the 
   dropFirstPlay(); expect(firstPlayPending('nine')).toBe(false);
   expect(startFirstPlay('dw')).toBe(true);
   expect(root.querySelector('.ws-firstplay')).not.toBeNull();
-  // a stale intent (over ten minutes) is no first play
-  expect(firstPlayPending('dw', Date.now() + 11 * 60_000)).toBe(false);
+  // a fresh intent holds for ten minutes, no longer
+  const at = Date.now();
+  expect(startFirstPlay('nine', at)).toBe(true);
+  expect(firstPlayPending('nine', at + 9 * 60_000)).toBe(true);
+  expect(firstPlayPending('nine', at + 11 * 60_000)).toBe(false);
+  dropFirstPlay();
   resetFirstPlay(); // Settings > Replay first-time setup
   expect(firstPlayDone()).toBe(false);
 });

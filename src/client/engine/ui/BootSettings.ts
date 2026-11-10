@@ -17,7 +17,7 @@ import { engineString } from '../../../shared/engine/strings';
  * ones that skip the title, so the reload lands back on this title screen. Reuses the in-game menu's look (gmenu.css).
  */
 import { automaticTier, TIER, gfxPrefs, saveGfxPrefs } from '../core/tier';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, saveGraphicsMode } from '../render/graphicsMode';
+import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode } from '../render/graphicsMode';
 import { firstPlayDone, resetFirstPlay } from '../boot/firstPlayMark';
 
 import { isDev, onDev } from '../core/devMode';
@@ -68,7 +68,7 @@ export function openBootSettings(): void {
   // (GPU textures' "Auto · now …"), for the one behind it now. No weapons in hand on the title
   debug?.applies({ chunk: activeLevel(), weapons: new Set() });
   developerTools?.applies({ chunk: activeLevel(), weapons: new Set() });
-  if (layer?.active !== true) { openScope = scope.child('open'); layer = app.ui.push('menu', { root: r, order: 0, back: close }, openScope); openScope.interval(2000, () => { debug?.paint(); developerTools?.paint(); }); }
+  if (layer?.active !== true) { openScope = scope.child('open'); layer = app.ui.push('menu', { root: r, order: 0, back: close }, openScope); openScope.interval(2000, () => { debug?.paint(); developerTools?.paint(); refresh?.(); }); openScope.listen(document, PIXELS_EVENT, () => { refresh?.(); }); }
   refresh?.(); if (built) offline?.refresh(); // a fresh panel has just sized it
   r.classList.add('show');
   r.inert = false;

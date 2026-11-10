@@ -95,7 +95,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // leaving the title for a world resets it: pause ▸ EXIT TO MAIN opens on the main menu again
   const deck = buildTitleDeck({ ...deckOpts, cards,
     // MG5: an entry that is not the first PLAY's own drops a first play armed and never reached
-    onEnter: (card) => { if (card !== firstEntry) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
+    onEnter: (card) => { if (card !== firstEntry) dropFirstPlay(); firstEntry = null; leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
     onExplore: (card) => { dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
   const grid = gridEntryShown(mode());
   const s = GAME_STRINGS.mainMenu;
@@ -164,6 +164,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const selectCard = required(main, '.ws-main-select', HTMLButtonElement);
   const show = (next: MainMenuScreen): void => {
     screen = next;
+    if (next === 'select') firstEntry = null; // MG5: a first PLAY that never got there is not this entry's
     root.dataset['screen'] = next;
     main.classList.toggle('hide', next !== 'main');
     deck.root.classList.toggle('hide', next !== 'select');
