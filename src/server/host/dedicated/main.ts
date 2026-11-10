@@ -22,6 +22,7 @@ import { savesUrl } from './saves/pgDatabase';
 import { ServerReports } from './serverReports';
 import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
+import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
 
 declare const __BUILD_ID__: string;
@@ -55,6 +56,7 @@ const hold = process.env['HOLD_MS'], grace = process.env['GRACE_MS'], poll = pro
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
 const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
 const recordTag=setting('RECORD_TAG');
+const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;
 
 /** One row of the table is one worker thread, started once (J182). */
@@ -81,6 +83,8 @@ const world: World = await World.open({ build, cells, ...worldSettings(release.c
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); },
   ...(playtest===undefined?{}:{playtest:row=>{playtest.append(row);}}),
+  // J218: phones on 4G need TURN to reach each other's voice. Without the key, voice falls back to public STUN.
+  ...(turnKey === undefined || turnToken === undefined ? {} : { voiceIce: cloudflareTurn(turnKey, turnToken) }),
   restart: () => { stop(0); } });
 const server = createServer((request, response) => {
   if (request.url !== '/health') { response.writeHead(404).end(); return; }

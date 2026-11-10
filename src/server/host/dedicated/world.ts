@@ -26,6 +26,7 @@ import { pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
 import { workerTable } from './workerTable';
+import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
@@ -97,6 +98,8 @@ export interface WorldOptions {
   /** One worker's 10 s reading, for what leaves the box (E7.8a). */
   readonly reading?: (index: number, reading: WorkerReading) => void;
   readonly playtest?:(row:PlaytestRow)=>void;
+  /** J218: the ICE servers voice chat hands a player who joins; public STUN when absent. */
+  readonly voiceIce?: () => Promise<readonly VoiceIceServer[]>;
   /** A proof's overrides. */
   readonly helloMs?: number; readonly readyMs?: number; readonly connectsPerMinute?: number; readonly socketsPerIp?: number; readonly graceMs?: number;
   /** Monotonic connection-budget clock, overridable by local boundary tests. */
@@ -129,8 +132,11 @@ export class World {
   private asked = 0;
   private draining = false;
   private grace: { readonly endsAt: number; readonly build: string } | null = null;
+  /** J218: who is on voice in each cell, and their signalling. */
+  private readonly voice: VoiceRelay;
   private constructor(options: WorldOptions) {
     this.options = options;
+    this.voice = new VoiceRelay(options.voiceIce);
     this.now = options.now ?? diagnosticNow;
     this.server = new WebSocketServer({ noServer: true, ...SOCKET_SERVER_OPTIONS });
     this.scope.interval(MINUTE_MS, () => { this.sweepConnects(this.now()); });
@@ -289,6 +295,7 @@ export class World {
       end.onClose(off);end.control('playtest');
     }
     pumpSocket(end, port1);
+    this.voice.attach(end, slug, entry.name);
     this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
   }
   private sayCountdown(end: SocketTransport): void {
@@ -305,8 +312,8 @@ export class World {
     this.scope.timeout(ms, () => { this.options.restart(); });
   }
   /** What `/health` says: no player data. */
-  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number } {
-    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size };
+  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number; readonly voice: number } {
+    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size, voice: this.voice.talking };
   }
   /** Stop: everyone is saved and told `restart`, and the queue gets its time. */
   async drain(): Promise<boolean> {
