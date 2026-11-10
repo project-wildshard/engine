@@ -354,6 +354,9 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 
 /* panel */
 .ws-load .ws-load-meta-1 { grid-template-columns: 1fr; margin: 10px 0 8px; }
+/* LS5 (J188): time left keeps its row from the first frame, so it appears without moving the card; hidden until honest */
+.ws-load .ws-load-meta .ws-load-left:not([data-shown]) { visibility: hidden; }
+.ws-load .ws-load-meta .ws-load-left[hidden] { display: none; }
 .ws-load .ws-load-title { display: flex; align-items: baseline; }
 .ws-load .ws-load-title b { margin-left: 6px; }
 .ws-load .ws-load-clock { margin-left: auto; font-family: var(--ws-mono); font-size: 13px; letter-spacing: 0.08em; color: var(--ws-cyan); font-weight: 400; }
@@ -492,6 +495,7 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 <div class="ws-load-title"><span class="ws-load-kicker" data-el="kicker">Loading</span><b data-el="slug"></b><span class="ws-load-clock" data-el="clock">00:00.0</span></div>
 <div class="ws-load-meta ws-load-meta-1">
 <div><span>tier</span><span data-el="tier"></span></div>
+<div class="ws-load-left" data-el="leftRow"><span>time left</span><span data-el="left"></span></div>
 </div>
 <div class="ws-load-phase" data-phase="start" data-state="on" data-open>
 <button type="button" class="ws-load-track-row" data-el="stHead"><span class="ws-load-track-name">start</span><span class="ws-load-track-fact" data-el="stFact">—</span><span class="ws-load-track-pct" data-el="stPct">—</span></button>

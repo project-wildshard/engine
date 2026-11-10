@@ -24,6 +24,7 @@ const shellHtml = (tagline: string): string => `<div class="ws-load-head">
 <div class="ws-load-title"><span class="ws-load-kicker" data-el="kicker">Loading</span><b data-el="slug"></b><span class="ws-load-clock" data-el="clock">00:00.0</span></div>
 <div class="ws-load-meta ws-load-meta-1">
 <div><span>tier</span><span data-el="tier"></span></div>
+<div class="ws-load-left" data-el="leftRow"><span>time left</span><span data-el="left"></span></div>
 </div>
 <div class="ws-load-phase" data-phase="start" data-state="on" data-open>
 <button type="button" class="ws-load-track-row" data-el="stHead"><span class="ws-load-track-name">start</span><span class="ws-load-track-fact" data-el="stFact">—</span><span class="ws-load-track-pct" data-el="stPct">—</span></button>

@@ -16,6 +16,7 @@ import { beginLoadingWait, reportLoadingWait, finishLoadingWait, loadingWaitStat
 import { loadingCacheText, loadingDownloadText, loadingDownloadFraction, loadingPrefetchFraction, loadingPrefetchText, type LoadingPrefetchSnapshot, type LoadingDownloadSnapshot } from '../boot/loadingDownloadText';
 import { LoadingTimeline, installLoadingTimeline, type LoadingPath, type LoadingRow, type LoadingGap } from '../../../shared/engine/boot/timeline';
 import {loadingFraction} from '../boot/weights';
+import {TimeLeftClock,timeLeftSeconds,timeLeftText} from '../boot/timeLeft';
 import {diagnosticBuild,diagnosticStep,safeBootDiagnostics} from '../boot/diagnostics';
 import { isDev, onDev } from '../core/devMode';
 import { getSetting, onSetting } from './Settings';
@@ -39,7 +40,7 @@ const savedStorage = saveStorage('session');
  */
 type TimelineSnapshot = ReturnType<LoadingTimeline['snapshot']>;
 type ElKey = 'clock' | 'kicker' | 'stHead' | 'stFact' | 'stPct' | 'stBar' | 'stRows' | 'dlHead' | 'dlFact' | 'dlPct' | 'dlBar' | 'dlRows' | 'pfRow' | 'pfFact' | 'pfPct'
-  | 'suHead' | 'suFact' | 'suPct' | 'suBar' | 'suRows' | 'foot' | 'slug' | 'tier' | 'retry';
+  | 'suHead' | 'suFact' | 'suPct' | 'suBar' | 'suRows' | 'foot' | 'slug' | 'tier' | 'retry' | 'leftRow' | 'left';
 /** LS2 (J188, density 2): three phases that add up to the total. Start runs from the tap until this panel adopts the
  *  card (the game's own code), Download until the spawn download closes, Load until the world is ready. */
 export type LoadingPhase = 'start' | 'download' | 'load';
@@ -146,6 +147,10 @@ export class Loading {
    *  accounting; its owner drives the steps (`scopedStep`) and `done()` disposes it */
   private readonly scoped: boolean;
   private failedReason: string | null = null;
+  /** LS5: the shown time left, and whether the shaders step measured a GPU the time-left tables do not describe. */
+  private readonly timeLeft = new TimeLeftClock();
+  private slowGpu = false;
+  private timeLeftShown = false;
 
   constructor(chunk: { id: string; name: string; trace?: boolean }, mode: { readonly scoped?: boolean } = {}) {
     bootMark('app:loading-adopt', {scoped: mode.scoped === true, chunk: chunk.id});
@@ -185,7 +190,7 @@ export class Loading {
     const tagline = this.root.querySelector('.ws-load-tagline'); if (tagline === null) throw new Error('Loading: no tagline'); tagline.textContent = appIdentity().tagline;
     const el = (key: ElKey): HTMLElement => { const e = this.root.querySelector<HTMLElement>(`[data-el="${key}"]`); if (!e) throw new Error(`Loading: no [data-el="${key}"]`); return e; };
     const keys: readonly ElKey[] = ['clock', 'kicker', 'stHead', 'stFact', 'stPct', 'stBar', 'stRows', 'dlHead', 'dlFact', 'dlPct', 'dlBar', 'dlRows', 'pfRow', 'pfFact', 'pfPct',
-      'suHead', 'suFact', 'suPct', 'suBar', 'suRows', 'foot', 'slug', 'tier', 'retry'];
+      'suHead', 'suFact', 'suPct', 'suBar', 'suRows', 'foot', 'slug', 'tier', 'retry', 'leftRow', 'left'];
     this.els = Object.fromEntries(keys.map(key => [key, el(key)])) as Record<ElKey, HTMLElement>;
     set(this.els.kicker, engineString('s_loading_kicker'));
     // Density 2: only the running phase shows its rows; a tap on a phase opens (or closes) the others.
@@ -344,6 +349,7 @@ export class Loading {
     setBar(this.els.dlBar, download); setBar(this.els.suBar, v.setup);
     this.paintRows(timeline);
     this.paintPhases();
+    this.paintTimeLeft(timeline);
   }
 
   private paintAdmissionNow(timeline: TimelineSnapshot): void {
@@ -462,6 +468,37 @@ export class Loading {
       const ms = r.ms;
       set(el.children[2] as HTMLElement, ms >= 1000 ? engineString('s_51b784eb9dd6', [(ms / 1000).toFixed(1)]) : engineString('s_f3813306296c', [Math.round(ms)]));
     });
+  }
+
+  /**
+   * LS5 (J188): time left from the path's measured rows and this device's measured speed (boot/timeLeft.ts), hidden until
+   * the readings make it honest: a path measured on two profiles, a second of finished work to read the speed from, the
+   * download closed, and a GPU like the ones measured. A GPU the shaders step measured slow (a software renderer, LS8's
+   * narrow first frame) builds its pipelines on the CPU inside the first frame, 20 times the measured seconds: no table
+   * describes it, so the card shows no number for the rest of that boot.
+   */
+  private paintTimeLeft(timeline: TimelineSnapshot): void {
+    const row = this.els.leftRow;
+    if (this.finished || this.scoped || this.view?.error || this.failedReason !== null) {
+      row.hidden = true; delete row.dataset['shown']; setData(this.root, 'timeLeft', ''); return;
+    }
+    const transfer = this.downloadProgress();
+    const honest = this.configured && (this.downloadSource === undefined || transfer.complete) && !this.measuredSlowGpu(timeline);
+    const shown = this.timeLeft.read(performance.now(), honest ? timeLeftSeconds(timeline.rows) : null);
+    if (shown === null) { delete row.dataset['shown']; setData(this.root, 'timeLeft', ''); return; }
+    set(this.els.left, timeLeftText(shown.seconds));
+    row.dataset['shown'] = '';
+    setData(this.root, 'timeLeft', String(shown.ms));
+    if (!this.timeLeftShown) { this.timeLeftShown = true; bootMark('app:time-left-shown', { seconds: shown.seconds }); }
+  }
+
+  /** LS8's reading of the GPU, written once after the shaders step (finish.ts `app:first-frame-plan`). */
+  private measuredSlowGpu(timeline: TimelineSnapshot): boolean {
+    if (this.slowGpu) return true;
+    if (timeline.rows.find(row => row.key === 'shaders')?.state !== 'ok') return false;
+    const plan = bootTiming()?.entries.find(entry => entry.operation === 'app:first-frame-plan');
+    this.slowGpu = plan?.detail['narrow'] === true;
+    return this.slowGpu;
   }
 
   /** Actual collector events publish even if a worker boots between clock ticks. */

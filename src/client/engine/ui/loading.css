@@ -55,6 +55,9 @@
 
 /* panel */
 .ws-load .ws-load-meta-1 { grid-template-columns: 1fr; margin: 10px 0 8px; }
+/* LS5 (J188): time left keeps its row from the first frame, so it appears without moving the card; hidden until honest */
+.ws-load .ws-load-meta .ws-load-left:not([data-shown]) { visibility: hidden; }
+.ws-load .ws-load-meta .ws-load-left[hidden] { display: none; }
 .ws-load .ws-load-title { display: flex; align-items: baseline; }
 .ws-load .ws-load-title b { margin-left: 6px; }
 .ws-load .ws-load-clock { margin-left: auto; font-family: var(--ws-mono); font-size: 13px; letter-spacing: 0.08em; color: var(--ws-cyan); font-weight: 400; }

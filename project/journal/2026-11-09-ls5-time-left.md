@@ -14,3 +14,8 @@ rather than holding a wrong one. Rows' own reported shares are not used: they re
 
 The grid's bar now takes its shares from the phone profile's seconds, as the shardfile and native paths already did
 (LS7), instead of an equal share a row, so the bar's pace follows where the time goes on a phone-like device.
+
+Hidden: before a second of phone-profile work has finished, while the download is open, on a path measured on one
+profile or none (shardfile, native, cells), and on a GPU the shaders step measured slow. That last one is headless
+SwiftShader, which builds its pipelines on the CPU inside the first frame, 19-26 s against 1.1 s on the Mac's GPU;
+no table describes it, so it is the named exception, as in LS8 (J204).
