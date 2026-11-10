@@ -1,7 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { harnessPins, installedIdentity } from '../../../shared/engine/app/identity';
 /** Optional, error-only Sentry channel. The existing /api/errors report remains the primary local inbox. */
-import type { captureException, getClient, init, withScope } from '@sentry/browser';
+import type { captureException, ErrorEvent, getClient, init, withScope } from '@sentry/browser';
 
 declare const __BUILD_ID__: string;
 
@@ -26,6 +26,34 @@ export function browserErrorDeliveryAllowed(environment: { readonly origin: stri
   origins: readonly string[]): boolean {
   return !environment.automated && !environment.harness && origins.includes(environment.origin);
 }
+/** The Sentry environment an allowed origin reports as: its entry in the identity's map, else `production`. */
+export function browserErrorEnvironment(origin: string, environments: Readonly<Record<string, string>>): string {
+  return Object.hasOwn(environments, origin) ? environments[origin] ?? 'production' : 'production';
+}
+
+const EXTENSION_FRAME = /^(?:chrome-extension|moz-extension|safari-extension|safari-web-extension|webkit-masked-url):/u;
+const AUTOMATION_AGENT = /HeadlessChrome|Playwright|PhantomJS/u;
+
+/**
+ * Why an event is noise and must not reach Sentry, or null to keep it (SENTRY-TRIAGE S6). Pure, so each case is tested:
+ * extension-only stacks, the debug probe's harness error (a tool on a real page), QB8's deliberate error outside staging,
+ * automation user agents (a CDP-attached agent may not set navigator.webdriver), ResizeObserver loop warnings and an
+ * opaque "Script error." with no frames.
+ */
+export function browserErrorNoise(event: ErrorEvent, page: { readonly environment: string; readonly userAgent: string }): string | null {
+  if (AUTOMATION_AGENT.test(page.userAgent)) return 'automation';
+  const exceptions = event.exception?.values ?? [];
+  const messages = [event.message ?? '', ...exceptions.map((value) => value.value ?? '')].map((message) => message.trim());
+  const files = exceptions.flatMap((value) => value.stacktrace?.frames ?? []).map((frame) => frame.filename ?? '')
+    .filter((file) => file !== '' && file !== '<anonymous>');
+  if (files.length > 0 && files.every((file) => EXTENSION_FRAME.test(file))) return 'extension';
+  if (messages.some((message) => message.startsWith('Probe control requires the harness pins'))) return 'probe';
+  if (page.environment !== 'staging' && messages.some((message) => message.startsWith('QB8 capture:'))) return 'qb8';
+  if (messages.some((message) => message.startsWith('ResizeObserver loop'))) return 'resize-observer';
+  if (files.length === 0 && messages.some((message) => /^script error\.?$/iu.test(message))) return 'script-error';
+  return null;
+}
+
 function productionPage(): boolean {
   if (typeof location === 'undefined' || typeof navigator === 'undefined') return false;
   return browserErrorDeliveryAllowed({origin: location.origin, automated: navigator.webdriver, harness: harnessPins() !== undefined},
@@ -35,9 +63,11 @@ function productionPage(): boolean {
 function loadSdk(): Promise<BrowserSdk | null> {
   if (!productionPage()) return Promise.resolve(null);
   sdk ??= import('@sentry/browser').then((sentry) => {
+    const environment = browserErrorEnvironment(location.origin, installedIdentity()?.errorReportEnvironments ?? {});
     sentry.init({
       dsn,
       release: __BUILD_ID__,
+      environment,
       // ErrorModal already owns window errors and rejections. Keep the SDK out of the boot's
       // hot path and do not install click/fetch breadcrumbs, tracing, profiling or replay.
       defaultIntegrations: false,
@@ -49,6 +79,7 @@ function loadSdk(): Promise<BrowserSdk | null> {
       normalizeDepth: 6, // context -> checkpoint array -> checkpoint -> facts
       beforeSend(event) {
         if (!productionPage()) return null;
+        if (browserErrorNoise(event, { environment, userAgent: navigator.userAgent }) !== null) return null;
         if (event.request) event.request.url = `${location.origin}${location.pathname}`;
         return event;
       },

@@ -35,6 +35,8 @@ export interface AppIdentity {
   /** Exact production origins allowed to send optional browser error telemetry.
    * Unset identities and automation never send to that external channel. */
   readonly errorReportOrigins?: readonly string[];
+  /** The Sentry environment each report origin sends as (`staging`, `preview`); an origin not listed is `production`. */
+  readonly errorReportEnvironments?: Readonly<Record<string, string>>;
 }
 
 // One slot per page, not per module instance: a page loads this module once, but a test that resets its modules

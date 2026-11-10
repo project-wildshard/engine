@@ -18,5 +18,12 @@ export const WILDSHARD_IDENTITY: AppIdentity = {
   importPlayerDocument: async (document, player) => (await import('../../shared/game/saves')).rebindCreatureRewards(document, player),
   exposeProbe: (probe) => { window.__wildshard = probe; },
   harness: () => (typeof window === 'undefined' ? undefined : window.__wildshardHarness),
-  errorReportOrigins: ['https://wildshard-singleplayer.vercel.app'],
+  // SENTRY-TRIAGE S1: the live hosts report too, each under its own Sentry environment.
+  errorReportOrigins: ['https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io',
+    'https://wildshard-singleplayer.vercel.app'],
+  errorReportEnvironments: {
+    'https://play.wildshard.io': 'production',
+    'https://staging.wildshard.io': 'staging',
+    'https://preview.wildshard.io': 'preview',
+  },
 };
