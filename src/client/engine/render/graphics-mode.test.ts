@@ -2,12 +2,12 @@
 import { afterEach, expect, test } from 'vitest';
 import { saveStorage } from '../saves/slots';
 import { drawingPixelRatio } from './devPixels';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode, savedGraphicsMode } from './graphicsMode';
+import { graphicsMode, lowPowerOn, lowPowerRefusal, noteFastFrames, PIXELS_EVENT, resetFastFrames, saveGraphicsMode, savedGraphicsMode } from './graphicsMode';
 
 const session = saveStorage('session');
 /** the idle title's reading, as boot/lowPower.ts keeps it for the tab */
 const reading = (likely: boolean): void => { session.setItem('boot.lowPower', JSON.stringify({ likely, rate: likely ? 30 : 60, at: Date.now() })); };
-afterEach(() => { session.removeItem('boot.lowPower'); saveGraphicsMode('high'); });
+afterEach(() => { session.removeItem('boot.lowPower'); resetFastFrames(); saveGraphicsMode('high'); });
 
 test('MG3: Low Power Mode on runs Low and refuses High with the reason; the saved pick waits', () => {
   saveGraphicsMode('high');
@@ -38,4 +38,17 @@ test('MG3: Low Power Mode off allows both, and the saved High comes back', () =>
   expect(drawingPixelRatio(3, 2, true)).toBe(2);
   expect(saveGraphicsMode('low')).toBe(true);
   expect(saveGraphicsMode('high')).toBe(true);
+});
+
+test('MG3: frames faster than 30 Hz after the reading (the page back in view) unlock High at once', () => {
+  saveGraphicsMode('high');
+  reading(true);
+  expect(graphicsMode()).toBe('low');
+  let heard = 0;
+  const hear = (): void => { heard++; };
+  document.addEventListener(PIXELS_EVENT, hear);
+  try { noteFastFrames(); } finally { document.removeEventListener(PIXELS_EVENT, hear); }
+  expect(heard).toBe(1);
+  expect(lowPowerOn()).toBe(false);
+  expect(graphicsMode()).toBe('high');
 });

@@ -1,8 +1,8 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { listenTap } from '@wildshard/engine/input/dom';
 import { mountUi } from '@wildshard/engine/ui/ownership';
-import { finishFirstPlay, firstPlayPending } from '@wildshard/engine/boot/firstPlayMark';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, saveGraphicsMode, type GraphicsMode } from '@wildshard/engine/render/graphicsMode';
+import { FIRST_PLAY_EVENT, finishFirstPlay, firstPlayPending, takeFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
+import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode, type GraphicsMode } from '@wildshard/engine/render/graphicsMode';
 import './firstPlay.css';
 
 /**
@@ -27,14 +27,21 @@ const COPY = {
   done: 'Done',
 } as const;
 
-/** Show the card once the player has control, if the title started a first play. */
-export function installFirstPlay(scope: Scope, root: HTMLElement): void {
-  if (!firstPlayPending()) return;
-  scope.listen(document, 'ws:control-ready', () => { showFirstPlayCard(scope, root); }, { once: true });
+/** Show the card once the player has control in `slug`, when the title armed a first play for it: as control arrives, or at
+ *  once when the title arms one for a shard already in control (a resident level re-entered). The intent is spent on showing. */
+export function installFirstPlay(scope: Scope, root: HTMLElement, slug: string): void {
+  let controlled = false, card: HTMLElement | null = null;
+  const maybe = (): void => {
+    if (card !== null || !controlled || scope.disposed || !firstPlayPending(slug)) return;
+    takeFirstPlay(); card = showFirstPlayCard(scope, root, () => { card = null; });
+  };
+  scope.listen(document, 'ws:control-ready', () => { controlled = true; maybe(); });
+  scope.listen(document, FIRST_PLAY_EVENT, maybe);
 }
 
-/** The card itself (exported for its test and the worst-case HUD). */
-export function showFirstPlayCard(scope: Scope, root: HTMLElement): HTMLElement {
+/** The card itself, in a scope of its own that DONE disposes (exported for its test and the worst-case HUD). */
+export function showFirstPlayCard(parent: Scope, root: HTMLElement, closed: () => void = () => undefined): HTMLElement {
+  const scope = parent.child('first-play');
   const card = document.createElement('section');
   card.className = 'ws-firstplay'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', COPY.title);
   const line = (tag: string, cls: string, text: string): HTMLElement => { const n = document.createElement(tag); n.className = cls; n.textContent = text; return n; };
@@ -48,18 +55,22 @@ export function showFirstPlayCard(scope: Scope, root: HTMLElement): HTMLElement 
   const finish = document.createElement('button'); finish.type = 'button'; finish.className = 'ws-firstplay-done'; finish.textContent = COPY.done;
   card.append(line('i', 'ws-firstplay-kicker', COPY.kicker), line('h2', 'ws-firstplay-title', COPY.title), seg,
     line('p', 'ws-firstplay-text', COPY.low), line('p', 'ws-firstplay-text', COPY.high), note, finish);
-  const paint = (refused = false): void => {
+  // a refused High says so until the next pick that holds, or until Low Power goes (then High is the player's again)
+  let refused = false;
+  const paint = (): void => {
+    if (!lowPowerOn()) refused = false;
     const mode = graphicsMode();
     for (const [key, b] of buttons) b.setAttribute('aria-pressed', String(key === mode));
     note.textContent = refused || lowPowerOn() ? lowPowerRefusal() : COPY.power;
     note.dataset['tone'] = refused ? 'refused' : lowPowerOn() ? 'on' : 'off';
   };
-  for (const [mode, b] of buttons) listenTap(scope, b, () => { paint(!saveGraphicsMode(mode)); });
-  listenTap(scope, finish, () => {
-    finishFirstPlay(); card.remove();
-  });
+  for (const [mode, b] of buttons) listenTap(scope, b, () => { refused = !saveGraphicsMode(mode); paint(); });
+  listenTap(scope, finish, () => { finishFirstPlay(); scope.dispose(); closed(); });
   // the card takes its own touches: the look surface under it never sees them
   scope.listen(card, 'pointerdown', (event: Event) => { event.stopPropagation(); });
+  // the Low Power reading can land, lapse or flip while the card is up: it follows the mode in force
+  scope.listen(document, PIXELS_EVENT, () => { paint(); });
+  scope.interval(1000, () => { paint(); });
   paint();
   mountUi(card, scope, root);
   return card;

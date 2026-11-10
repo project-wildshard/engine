@@ -131,7 +131,8 @@ export interface TitleDeck {
   readonly index: number;
   readonly select: (i: number, smooth?: boolean) => void;
   /** ENTER WORLD on the selected card */
-  readonly activate: () => void;
+  /** ENTER WORLD on the selected card: the card it started entering, or null (a draft, a locked card, an entry in flight) */
+  readonly activate: () => TitleCard | null;
   /** centre the selected card: call once the deck is in the DOM (offsets need layout) */
   readonly start: () => void;
   readonly dispose: () => void;
@@ -287,21 +288,22 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   };
   // the card is entered through its shardfile, whose download starts first
   let entering = false;
-  const enter = (c: DeckEntry): void => {
-    if (entering) return;
-    if (c.shard === null || !canEnter(c, mode())) return;
+  const enter = (c: DeckEntry): boolean => {
+    if (entering) return false;
+    if (c.shard === null || !canEnter(c, mode())) return false;
     const shard = c.shard;
     entering = true;
     startEntryDownload(c.slug); titlePrefetchChoice(saves).remember(c.slug);
     const attempt = beginNavigationShell(c.name, scope, () => { opts.onEnter(shard); }, play);
     attempt.onDispose(() => { entering = false; });
+    return true;
   };
-  /** ENTER WORLD, or a key: the shard's one entry (its shardfile, G531 / LD5) */
-  const activate = (): void => {
+  /** ENTER WORLD, or a key: the shard's one entry (its shardfile, G531 / LD5). The card it started entering, if any (MG5) */
+  const activate = (): TitleCard | null => {
     const c = entries[index];
     // A draft opens on the drafts site (J16, J19): FOLLOW THE BUILD shows its teaser, DRAFT MODE its pages (Developer on there).
-    if (c?.draft) { window.open(c.draft.url, '_blank', 'noopener'); return; }
-    if (c?.shard) enter(c);
+    if (c?.draft) { window.open(c.draft.url, '_blank', 'noopener'); return null; }
+    return c?.shard && enter(c) ? c.shard : null;
   };
 
   // swipe → the track follows the finger (rubber-banded at the ends), release = one page in the swipe direction
@@ -329,7 +331,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // a click that only follows the title's SHARD SELECT tap lands where that tap was, not on a card or dot (QC2)
   cardEls.forEach((e, i) => { listenDom(scope, e, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && i !== index && performance.now() - swipedAt > 400) select(i); }); });
   dots.forEach((d, i) => { listenDom(scope, d, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev)) select(i); }); });
-  onTap(required(root, '.ws-menu-play'), activate);
+  onTap(required(root, '.ws-menu-play'), () => { activate(); });
   onTap(required(root, '.ws-menu-explore'), () => { const c = entries[index]; if (c?.shard && canExplore(c, mode())) opts.onExplore(c.shard); });
   onTap(required(root, '.ws-menu-settings'), opts.onSettings);
   // QA row 25: the Developer's pixel picks, under SETTINGS (a temporary home, Jake's word)

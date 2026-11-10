@@ -22,3 +22,11 @@ graphics", and "with low, you can just do… 1 time and 1 time".
 - MG6: main menu > Settings > First-time setup: Replay.
 - scripts/mobile-graphics-proof.mjs: headless WebKit 390x844, Low Power
   played as a 30 Hz rAF; MG3-MG6 pass with it on and off.
+- J206 review (Codex, NO-GO) fixed: the first-play intent is bound to
+  its shard and ten minutes, kept only when storage keeps it, dropped by
+  any other entry, spent when the card shows; the deck's own activate
+  decides the entry (activate returns the card); a shard already in
+  control shows the card at once; Game compares the mode every 2 s and
+  a page back in view counts its frames (faster than 30 Hz = Low Power
+  off); phone eligibility frozen at boot; the card has its own scope;
+  the proof's 30 Hz clock serves every loop and checks the shard.

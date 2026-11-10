@@ -53,7 +53,8 @@ import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 import { isDev, onDev } from './devMode';
 import { activeDevPixels, drawingPixelRatio } from '../render/devPixels';
-import { PIXELS_EVENT } from '../render/graphicsMode';
+import { graphicsMode, noteFastFrames, PIXELS_EVENT } from '../render/graphicsMode';
+import { classifyFrames } from '../boot/lowPower';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
 import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/memorySaver';
 import { dropShadowColour } from '../world/shadowVariants';
@@ -517,13 +518,32 @@ export class Game {
     if (tracedBoot) recordGpuCheckpoint(this.renderer, 'renderer:created');
     // QA row 25 / MG2: a Developer's screen × density pick (render/devPixels.ts), else a phone's Low graphics
     // (render/graphicsMode.ts), stands in for the tier's cap; either applies live
-    this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, TIER === 'phone' && gfxPrefs.dpr === 'auto'));
+    this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics));
     // the new ratio waits for the frame that draws (RT3: never in the task that decided it, whose cleared canvas nothing
     // would replace; under a menu or the title the world stays as it was until play draws again)
-    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, TIER === 'phone' && gfxPrefs.dpr === 'auto'); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; };
+    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; };
     this.engineScope.listen(document, PIXELS_EVENT, repixel);
-    // MG3: Low Power Mode is switched in the phone's own settings, away from the page: read it again as the page comes back
-    this.engineScope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') repixel(); });
+    // MG3: Low Power Mode is switched in the phone's own settings, away from the page. As the page comes back it counts a second
+    // of its frames: faster than 30 Hz proves Low Power off (a busy page cannot prove it on: the idle title reads that). The
+    // reading itself lands, lapses or flips on its own clock, so the mode in force is compared every two seconds, and a
+    // change tells the page (Settings, the first-play card) and lands in the next drawn frame
+    this.engineScope.listen(document, 'visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      const stamps: number[] = [];
+      const tick = (now: number): void => {
+        if (this.engineScope.disposed || document.visibilityState !== 'visible') return;
+        stamps.push(now);
+        if (now - (stamps[0] ?? now) < 1000) { this.engineScope.raf(tick); return; }
+        const frames = classifyFrames(stamps);
+        if (frames !== null && !frames.slow) noteFastFrames();
+      };
+      this.engineScope.raf(tick); repixel();
+    });
+    let mode = graphicsMode();
+    this.engineScope.interval(2000, () => {
+      const now = graphicsMode();
+      if (now !== mode) { mode = now; document.dispatchEvent(new CustomEvent(PIXELS_EVENT)); }
+    });
     this.engineScope.onDispose(onDev(repixel));
     this.renderer.setSize(window.innerWidth, viewportHeight());
     this.renderer.toneMapping = THREE.NoToneMapping; // tone mapping happens in the composer
@@ -1547,6 +1567,9 @@ export class Game {
 
   /** QA row 25: a Developer pixel pick waiting for the next drawn frame */
   private pickedRatio: number | null = null;
+  /** MG2: Low / High applies to this page: the phone tier with no explicit render scale, as it booted (a render-scale pick
+   *  waiting for its reload does not switch Low off early) */
+  private readonly phoneGraphics: boolean = TIER === 'phone' && gfxPrefs.dpr === 'auto';
   resize(): void { this.fitSize(); this.kickLoop(); }
   private fitSize(): void {
     const w = window.innerWidth, h = viewportHeight();

@@ -14,11 +14,11 @@
  */
 import { titleAssetURL } from './titleAssets';
 import { TIER } from '@wildshard/engine/core/tier';
-import { firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
+import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { lowPowerOn } from '@wildshard/engine/render/graphicsMode';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
-import { buildTitleDeck, titleCards, type TitleDeck, type TitleDeckOptions } from './titleDeck';
+import { buildTitleDeck, titleCards, type TitleCard, type TitleDeck, type TitleDeckOptions } from './titleDeck';
 import { gridEntryShown, menuMode, gridMode } from './grid/menu';
 import { dropGridIntent, enterGrid, gridRecoveryLoop } from './grid/pageEntry';
 import { pageScope } from '@wildshard/engine/app/resources';
@@ -91,10 +91,12 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const leaveTitle = (): void => { leavingTitle = true; stopReadAhead?.(); };
   const mode = opts.mode ?? menuMode;
   const { notice, onGrid, screen: first, cards = titleCards(), whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
+  let firstEntry: TitleCard | null = null; // MG5: the card the first PLAY is entering
   // leaving the title for a world resets it: pause ▸ EXIT TO MAIN opens on the main menu again
   const deck = buildTitleDeck({ ...deckOpts, cards,
-    onEnter: (card) => { leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
-    onExplore: (card) => { leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
+    // MG5: an entry that is not the first PLAY's own drops a first play armed and never reached
+    onEnter: (card) => { if (card !== firstEntry) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
+    onExplore: (card) => { dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
   const grid = gridEntryShown(mode());
   const s = GAME_STRINGS.mainMenu;
   const dev = mode().developer;
@@ -172,14 +174,19 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // MOBILE-GRAPHICS MG5: a phone's first PLAY (no `firstPlayDone` mark on the device) skips SHARD SELECT for the deck's first
   // playable card (Driftwood), where the first-play card waits (firstPlay.ts); every later PLAY, and every desktop one, opens
   // SHARD SELECT as before
+  // The deck's own entry decides (its admission rules: a draft, a locked or unavailable card enters nothing); when it enters
+  // nothing, SHARD SELECT opens as usual
   const play = (): void => {
-    const firstCard = TIER === 'phone' && !firstPlayDone() ? cards.find((card) => card.upgrade === undefined && card.unavailable === undefined) : undefined;
-    if (firstCard !== undefined) { startFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(firstCard); return; }
+    if (TIER === 'phone' && !firstPlayDone()) {
+      deck.select(0, false);
+      const entered = deck.activate();
+      if (entered !== null) { firstEntry = startFirstPlay(entered.slug) ? entered : null; return; }
+    }
     show('select'); deck.start();
   };
   deck.onTap(selectCard, play);
   const gridCard = main.querySelector('.ws-main-grid');
-  if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode())) { onGrid(); leaveTitle(); } });
+  if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode())) { dropFirstPlay(); onGrid(); leaveTitle(); } });
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).
   let started = false;

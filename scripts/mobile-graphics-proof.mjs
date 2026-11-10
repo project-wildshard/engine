@@ -22,9 +22,17 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//u.test(base)) throw new Error(
 const out = resolve(arg('out', 'tmp/mobile-graphics-proof')), powers = arg('power', 'on,off').split(',');
 mkdirSync(out, { recursive: true });
 
-/** iOS in Low Power Mode: animation frames at 30 Hz */
-const LOW_POWER_RAF = `(() => { const raf = window.requestAnimationFrame.bind(window); let last = 0;
-  window.requestAnimationFrame = fn => raf(function tick(now) { if (now - last < 32) return raf(tick); last = now; fn(now); }); })();`;
+/** iOS in Low Power Mode: animation frames at 30 Hz. One 30 Hz clock delivers every callback queued for it, as a capped display
+ *  does, so no loop starves another */
+const LOW_POWER_RAF = `(() => {
+  const raf = window.requestAnimationFrame.bind(window), queue = new Map(); let next = 1, last = 0, pumping = false;
+  const pump = now => {
+    if (now - last >= 32) { last = now; const due = [...queue.values()]; queue.clear(); for (const fn of due) fn(now); }
+    if (queue.size > 0) raf(pump); else pumping = false;
+  };
+  window.requestAnimationFrame = fn => { const id = next++; queue.set(id, fn); if (!pumping) { pumping = true; raf(pump); } return id; };
+  window.cancelAnimationFrame = id => { queue.delete(id); };
+})();`;
 
 /** @type {string[]} */ const failures = [];
 /** @param {boolean} ok @param {string} what */
@@ -74,7 +82,8 @@ try {
       // MG5: the first PLAY
       await page.locator('.ws-main-select').click();
       await page.locator('.ws-firstplay').waitFor({ timeout: 240_000 });
-      check(true, `${power}: the first PLAY enters Driftwood with the first-play card (MG5)`);
+      const shard = await page.evaluate(() => /** @type {any} */ (window).__wildshard?.world?.chunk?.slug ?? /** @type {any} */ (window).__wildshard?.world?.chunk?.id ?? null);
+      check(shard === 'driftwood-isle', `${power}: the first PLAY enters Driftwood (${String(shard)}) with the first-play card (MG5)`);
       await page.waitForTimeout(1500);
       const card = page.locator('.ws-firstplay');
       await card.locator('[data-v="low"]').click(); await page.waitForTimeout(900);
