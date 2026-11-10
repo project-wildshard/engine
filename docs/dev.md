@@ -81,14 +81,29 @@ goes in `tmp/<task>/` and is deleted when done.
 - Tests use real things (git in temp dirs, real files and processes); never
   mock git. No LLM, `claude`, herdr or network in tests.
 
+## Plan worktrees
+
+A plan works in its own worktree (J240, meta DEV-SPEED DS12):
+
+```sh
+node scripts/worktree.mjs new <slug>   # .worktrees/<slug> on plan/<slug>, from origin/main
+cd .worktrees/<slug>                   # commit here; then land:
+WS_LANE_NAME=<lane> node scripts/land.mjs
+```
+
+`new` clones the canonical checkout's matching tracked files (APFS, no new
+blocks), installs from pnpm's store offline, runs `pnpm pins` and records
+its steps in `tmp/worktree-setup.json`. Every repo tool skips `.worktrees/`
+(`scripts/worktree-ignore.mjs`, DS11).
+
 ## Git hooks
 
 | Hook | Checks | Bypass |
 | --- | --- | --- |
 | commit-msg | Conventional Commits subject ≤ 50, body ≤ 72, one `Assisted-by: AGENT:MODEL` trailer, no AI `Co-Authored-By` | `SKIP_ATTRIB=1` (human-only commit) |
-| pre-commit | `main` in the main checkout (D27), staged set echo, whitespace, 1 MB cap, credentials, sh / mjs syntax, new-plan Status line, journal (D25) | `ALLOW_BRANCH=1`, `ALLOW_BIG=1`, `ALLOW_SECRET=1`, `SKIP_JOURNAL=1` |
+| pre-commit | `main` in the main checkout, `plan/<slug>` in `.worktrees/<slug>` (D27, J240), staged set echo, whitespace, 1 MB cap, credentials, sh / mjs syntax, new-plan Status line, journal (D25) | `ALLOW_BRANCH=1`, `ALLOW_BIG=1`, `ALLOW_SECRET=1`, `SKIP_JOURNAL=1` |
 | pre-commit | lint + format:check on staged code, typecheck; 8 s budget | `SKIP_BUDGET=1` (time only), `SKIP_CHECK=1` |
-| pre-push | outgoing commits: size, credentials, syntax; then `pnpm check` | `ALLOW_BIG=1`, `ALLOW_SECRET=1`, `SKIP_CHECK=1` |
+| pre-push | outgoing commits: size, credentials, syntax; then `pnpm check` (a push that only deletes `plan/*` branches skips it) | `ALLOW_BIG=1`, `ALLOW_SECRET=1`, `SKIP_CHECK=1` |
 
 Bypasses are for the case they name, never for a red gate: fix the code,
 not the gate.
