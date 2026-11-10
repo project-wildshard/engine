@@ -4,7 +4,7 @@ import { constants } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vitest/config';
-import {PUSH_PROFILE} from './push-budget.mjs';
+import {PUSH_BUDGET,PUSH_PROFILE} from './push-budget.mjs';
 import type {startCpuBroker} from './cpu-broker.mjs';
 
 interface VitestTempEnvironment extends NodeJS.ProcessEnv {
@@ -90,7 +90,7 @@ export async function runVitest(args: readonly string[]): Promise<number> {
       const {assertHeavyLease}=await import('./heavy-lane-lease.mjs');
       assertHeavyLease('full-test');
       const {startCpuBroker}=await import('./cpu-broker.mjs');
-      broker=await startCpuBroker();
+      broker=await startCpuBroker({scopeSlots:PUSH_BUDGET.workers});
     }
     // Each real file now owns CPU admission before collection. Performance and
     // uncapped encoder files reserve the whole budget, so their original clocks

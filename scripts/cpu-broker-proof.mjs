@@ -44,5 +44,25 @@ try{
  assert.ok(killedBroker.pid!==undefined);process.kill(killedBroker.pid,'SIGKILL');
  await assert.rejects(killedBroker.lost);await held.lost;await held.release();
  const recovered=await holdCpu('all',{root,capacity:2,repo:a});leases.push(recovered);await recovered.release();
- console.log(JSON.stringify({sharedWithCommandOwners:true,exclusiveFIFO:true,capacity:2,killedClientDrained:true,invalidRequestsRefused:true,brokerLossObserved:true,killedBrokerRecovered:true,remaining:0}));
+ const scoped=await startCpuBroker({root,capacity:2,scopeSlots:1});
+ try{
+  await assert.rejects(async()=>{
+   const oversized=await holdBrokerCpu(scoped.environment,2,a);
+   leases.push(oversized);await oversized.release();
+  },/CPU broker request/);
+  const local=await holdBrokerCpu(scoped.environment,1,a);leases.push(local);
+  let secondReady=false;
+  const second=holdBrokerCpu(scoped.environment,1,b).then(lease=>{leases.push(lease);secondReady=true;return lease;});
+  // Another repo can use the spare machine slot while this broker is full.
+  const external=await holdCpu(1,{root,capacity:2,repo:b});leases.push(external);
+  assert.equal(secondReady,false);await local.release();
+  const next=await second;assert.equal(next.proof.capacity,2);await next.release();
+  let quietReady=false;
+  const quiet=holdBrokerCpu(scoped.environment,'all',a).then(lease=>{leases.push(lease);quietReady=true;return lease;});
+  await pause(40);assert.equal(quietReady,false);await external.release();
+  const exclusiveGrant=await quiet;assert.equal(exclusiveGrant.proof.slots,2);await exclusiveGrant.release();
+ }finally{await scoped.close();}
+ const scopedState=JSON.parse(readFileSync(join(root,'queue.json'),'utf8'));
+ assert.deepEqual(scopedState.cpuActive,[]);assert.deepEqual(scopedState.cpuQueue,[]);
+ console.log(JSON.stringify({sharedWithCommandOwners:true,exclusiveFIFO:true,capacity:2,scopeSlots:1,killedClientDrained:true,invalidRequestsRefused:true,brokerLossObserved:true,killedBrokerRecovered:true,remaining:0}));
 }finally{await Promise.all(leases.map(lease=>lease.release()));await broker.close();if(killedBroker!==undefined)await killedBroker.close().catch(()=>undefined);rmSync(work,{recursive:true,force:true});}

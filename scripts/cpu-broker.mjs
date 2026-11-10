@@ -6,12 +6,15 @@ import * as v from 'valibot';
 
 const endpointSchema=v.object({port:v.pipe(v.number(),v.integer(),v.minValue(1),v.maxValue(65535)),token:v.string()});
 const grantSchema=v.object({lease:v.string(),slots:v.number(),capacity:v.number(),queueSeconds:v.number()});
+const refusalSchema=v.object({error:v.string()});
 
 /** One owned child per Vitest invocation, with the same machine scheduler root.
- * @param {{root?:string,capacity?:number}} [options] */
+ * @param {{root?:string,capacity?:number,scopeSlots?:number}} [options] */
 export async function startCpuBroker(options={}){
  const root=resolvePath(options.root??process.env.WS_CPU_ROOT??process.env.WS_HEAVY_SCHEDULER_ROOT??resolvePath(homedir(),'.wildshard-heavy-lanes'));
- const child=spawn('python3',[resolvePath('scripts/cpu-broker.py'),'--root',root,...(options.capacity===undefined?[]:['--capacity',String(options.capacity)])],{stdio:['pipe','pipe','pipe']});
+ const child=spawn('python3',[resolvePath('scripts/cpu-broker.py'),'--root',root,
+  ...(options.capacity===undefined?[]:['--capacity',String(options.capacity)]),
+  ...(options.scopeSlots===undefined?[]:['--scope-slots',String(options.scopeSlots)])],{stdio:['pipe','pipe','pipe']});
  let buffer='',errors='',ready=false,closing=false;
  child.stderr.on('data',data=>{errors+=data.toString();});
  /** @type {Promise<v.InferOutput<typeof endpointSchema>>} */
@@ -44,7 +47,14 @@ export async function holdBrokerCpu(address,slots,repo){
  const admission=new Promise((resolve,reject)=>{
   socket.once('error',reject);socket.once('close',()=>{if(!granted)reject(new Error('CPU broker closed before admission'));});
   socket.on('data',data=>{buffer+=data.toString();if(!granted&&buffer.includes('\n')){
-   try{const value=v.parse(grantSchema,JSON.parse(buffer.slice(0,buffer.indexOf('\n'))));if(value.slots<1)throw new Error('Invalid CPU grant');granted=true;resolve(value);}catch(error){socket.destroy();reject(error instanceof Error?error:new Error('Invalid broker message'));}
+   try{
+    const reply=JSON.parse(buffer.slice(0,buffer.indexOf('\n')));
+    const refusal=v.safeParse(refusalSchema,reply);
+    if(refusal.success)throw new Error(refusal.output.error);
+    const value=v.parse(grantSchema,reply);
+    if(value.slots<1)throw new Error('Invalid CPU grant');
+    granted=true;resolve(value);
+   }catch(error){socket.destroy();reject(error instanceof Error?error:new Error('Invalid broker message'));}
   }});
  });
  const proof=await admission;
