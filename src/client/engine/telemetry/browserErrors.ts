@@ -44,8 +44,8 @@ export function browserErrorNoise(event: ErrorEvent, page: { readonly environmen
   if (AUTOMATION_AGENT.test(page.userAgent)) return 'automation';
   const exceptions = event.exception?.values ?? [];
   const messages = [event.message ?? '', ...exceptions.map((value) => value.value ?? '')].map((message) => message.trim());
-  const files = exceptions.flatMap((value) => value.stacktrace?.frames ?? []).map((frame) => frame.filename ?? '')
-    .filter((file) => file !== '' && file !== '<anonymous>');
+  // Every frame counts, a nameless or <anonymous> one too: only a stack that is all extension is the extension's.
+  const files = exceptions.flatMap((value) => value.stacktrace?.frames ?? []).map((frame) => frame.filename ?? '');
   if (files.length > 0 && files.every((file) => EXTENSION_FRAME.test(file))) return 'extension';
   if (messages.some((message) => message.startsWith('Probe control requires the harness pins'))) return 'probe';
   if (page.environment !== 'staging' && messages.some((message) => message.startsWith('QB8 capture:'))) return 'qb8';

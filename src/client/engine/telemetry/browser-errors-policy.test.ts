@@ -45,7 +45,6 @@ test.each([
   ['a ResizeObserver loop limit',thrown('ResizeObserver loop limit exceeded'),page,'resize-observer'],
   ['a ResizeObserver undelivered loop',thrown('ResizeObserver loop completed with undelivered notifications.'),page,'resize-observer'],
   ['a frameless Script error.',thrown('Script error.',[]),page,'script-error'],
-  ['a Script error. with only anonymous frames',thrown('Script error.',['<anonymous>']),page,'script-error'],
   ['a Script error. message event',{type:undefined,message:'Script error.'},page,'script-error'],
 ] as const)('S6 drops %s',(_name,event,where,reason)=>{
   expect(browserErrorNoise(event,where)).toBe(reason);
@@ -55,6 +54,9 @@ test.each([
   ['a first-party frame among extension frames',thrown('boom',['chrome-extension://abc/content.js','https://play.example.invalid/assets/main-abc.js']),page],
   ['a QB8 capture on staging',thrown('QB8 capture: a forced uncaught error in play'),{...page,environment:'staging'}],
   ['a Script error. with a first-party frame',thrown('Script error.'),page],
+  ['a Script error. with an anonymous frame',thrown('Script error.',['<anonymous>']),page],
+  ['an extension frame beside an anonymous frame',thrown('boom',['chrome-extension://abc/content.js','<anonymous>']),page],
+  ['an extension frame beside a nameless frame',thrown('boom',['chrome-extension://abc/content.js','']),page],
   ['a frameless real error',thrown('The game stopped loading at step "gap"',[]),page],
 ] as const)('S6 keeps %s',(_name,event,where)=>{
   expect(browserErrorNoise(event,where)).toBeNull();
