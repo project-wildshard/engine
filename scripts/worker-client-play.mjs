@@ -88,11 +88,12 @@ export async function play(browser, phone, base, only = '') {
     return steps;
   }
   if (only === 'nalati-signals') {
-    const { run } = await import('./split-repair-nalati-signals.mjs');
+    const { run, storm } = await import('./split-repair-nalati-signals.mjs');
     const { run: guardian } = await import('./split-repair-guardian.mjs');
     const { run: panic } = await import('./split-repair-horse-panic.mjs');
     await step('Nalati: real stampede signals, notice and knockdown', () => run(browser, phone, base));
-    await step('Nalati: a natural raid makes the guardian bark', () => guardian(browser, phone, base));
+    await step('Nalati: a natural raid makes the guardian bark, and the page flock bleats', () => guardian(browser, phone, base));
+    await step('Nalati: a replicated storm telegraph plays its crackle cue', () => storm(browser, phone, base));
     await step('Nalati: a real mounted bite panics the horse', () => panic(browser, phone, base));
     return steps;
   }

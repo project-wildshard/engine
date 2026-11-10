@@ -51,3 +51,44 @@ export async function run(browser,phone,base) {
     });
   } finally {await context.close();}
 }
+
+/** SR12: a replicated storm reaction reaches its cue. A storm is called up the way a page's sky word goes (`__workerClientSky`);
+ * the server's weather program places the strikes, its `weather.*` rows carry each telegraph, NetClimate.sync hands the record
+ * to the storm cue's listener, and the cue plays lightningCrackle when the strike is in range of the player.
+ * @param {import('playwright').Browser} browser @param {import('playwright').BrowserContextOptions} phone @param {string} base */
+export async function storm(browser,phone,base) {
+  const context=await browser.newContext({...phone,deviceScaleFactor:2}),page=await context.newPage(),errors=/** @type {string[]} */([]);
+  page.on('pageerror',error=>{errors.push(error.message.slice(0,300));});
+  try {
+    await context.addInitScript(()=>{Reflect.set(window,'__wildshardHarness',{seed:18970,capture:null});});
+    await saveFixture(context,{scope:'device',key:'devMode',data:true});
+    await page.goto(`${base}/?chunk=nalati-grasslands&mute=1&nolock=1&sw=0`,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>Reflect.get(window,'__wildshard')?.world!==undefined,undefined,{timeout:90000});
+    await page.evaluate(FLOOR_GRID_ENTER);
+    await page.mouse.click(5,5); // Real gesture unlocks WebAudio; the URL keeps its master muted.
+    await page.waitForFunction(()=>(Reflect.get(window,'__workerClient')?.().frames??0)>30,undefined,{timeout:90000});
+    const read=()=>page.evaluate(()=>{
+      const probe=Reflect.get(window,'__wildshard'),world=probe.requireWorld();
+      const rig=/** @type {{weather?: {state: string}, storm?: {stormActive: boolean, record: (event: string) => Readonly<Record<string, number>>}} | undefined} */(Object.entries(probe.shard).find(([key])=>key.includes('weather'))?.[1]);
+      const heard=Reflect.get(window,'__repairStorm'),played=probe.sounds().event;
+      for(const [name,count]of Object.entries(played))heard[name]=(heard[name]??0)+count;
+      const telegraph=rig?.storm?.record('telegraph'),p=world.player.position;
+      return {state:rig?.weather?.state??null,active:rig?.storm?.stormActive===true,age:telegraph?.age??null,away:telegraph===undefined?null:Math.hypot((telegraph.x??0)-p.x,(telegraph.z??0)-p.z),crackles:heard.lightningCrackle??0,titan:(Reflect.get(window,'__workerClientFights')?.()??[]).find(row=>row.id==='storm-titan')?.state??null};
+    });
+    await page.evaluate(()=>{
+      const probe=Reflect.get(window,'__wildshard'),world=probe.requireWorld();
+      probe.sounds(); Reflect.set(window,'__repairStorm',{});
+      const y=Reflect.get(window,'__hf').heightAt(-105,212);world.player.link?.place?.(-105,y+0.4,212,0);
+    });
+    const before=await read();
+    await page.evaluate(()=>{Reflect.get(window,'__workerClientSky')?.('storm');});
+    // A telegraph record starts 1e6 s old and resets to 0 each time the server's row serial moves.
+    let last=before,nearest=Infinity;
+    for(let n=0;n<60&&last.crackles===0;n++) {
+      await page.waitForTimeout(1000);
+      last=await read();
+      if(last.age!==null&&last.age<1e5&&last.away!==null)nearest=Math.min(nearest,last.away);
+    }
+    return {ok:before.crackles===0&&last.active&&nearest<160&&last.crackles>0&&last.titan!=='fight'&&errors.length===0,before,last,nearest:Math.round(nearest),errors:errors.slice(0,3)};
+  } finally {await context.close();}
+}

@@ -774,8 +774,7 @@
     }
    ],
    "proof": "flow:nalati-signals",
-   "why": "A page crowd's own FlockBrain bleats; the server's copy reaches the page as creature.sound (row creature.sound).",
-   "debt": "Proof missing: nalati-signals asserts the stampede, the guardian's bark and the bite, not a page FlockBrain bleat. Add a flow step that hears one."
+   "why": "A page crowd's own FlockBrain bleats through pageCrowds' sound port as creature.sound; flow:nalati-signals' guardian step hears sheep_bleat by the pasture, a cue no server view carries."
   },
   {
    "id": "weather.reactions",
@@ -791,9 +790,8 @@
      "emits": "for (const listener of this.listeners.get(event) ?? []) listener(record);"
     }
    ],
-   "proof": "local",
-   "why": "NetClimate.sync copies the server's replicated reaction records and calls the storm cues' listeners (audit: a working state-to-event adapter).",
-   "debt": "Proof missing: no flow asserts a replicated weather reaction reaching its cue. Add a storm step that hears one."
+   "proof": "flow:nalati-signals",
+   "why": "NetClimate.sync copies the server's replicated reaction records and calls the storm cues' listeners; flow:nalati-signals' storm step sees a replicated telegraph near the player play its lightningCrackle cue."
   },
   {
    "id": "host.actor.died.declared",

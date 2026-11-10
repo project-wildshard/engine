@@ -19,3 +19,18 @@ The guard shipped with four named debt rows; these commits clear them.
   copies the server's hp into the page's health each frame, so the
   fall leaves no number behind. flow:hurt gets a third step: enter
   the room, drop 8 m, see page damage and a flash with no wire hit.
+- The page flock bleat: pageCrowds advances a real FlockBrain on the
+  page, whose onSound emits `creature.sound` `sheep_bleat`. The
+  nalati-signals guardian step stands by the pasture anyway, so it
+  now also needs a bleat. No server view carries that cue: the
+  guardian's outputs carry the bark.
+- The replicated weather reaction: a new nalati-signals step calls up
+  a storm through `__workerClientSky`, then waits for a server
+  telegraph row within 160 m to reach forest's cue and play
+  lightningCrackle (the harness sound tap). It fails if the Titan's
+  fight is up, since the page's arena fight can also raise one.
+
+`pnpm check:page-events` now reports debt 0: 66 sites, 41 rows.
+
+Not covered, by the brief: `ctx.answer` handlers are not listeners
+this guard reads.
