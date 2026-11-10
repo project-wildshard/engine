@@ -68,3 +68,11 @@ the world with nothing over it (`InputService.playing`). Alt chords
 are taken whether their letter is bound or not. F4, F5, F11 and F12
 are never taken, even when rebound. A blur into one of the page's own
 frames doesn't pause. On Linux the Meta key is labelled Super.
+
+## RL6 names its one exception
+
+The reload lane's test said no client code can raise the leave prompt.
+Its regex read one statement at a time, so it never saw the guard's
+`if (!armed()) return;` before preventDefault. Now it lists every
+file that can cancel a leave, scanning the whole file with comments
+stripped, and requires that list to be exactly leaveGuard.ts.
