@@ -77,3 +77,6 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
 
 - Queue job 284 refused for the new test file's clocks, as designed;
   recorded from the gate's own evidence.
+
+- benchmax marks the device's first play done: since MG5 a phone's first
+  SHARD SELECT goes straight to Driftwood's first-play card.

@@ -33,6 +33,8 @@ try {
   await developerSettings(context, { tier: 'phone', volume: 0 });
   await saveFixture(context, { scope: 'global', key: 'gfx', data: { dpr: values.dpr ?? '2', aa: 'auto' } });
   for (const fixture of levelDownloadFixtures('packs')) await saveFixture(context, fixture);
+  // a phone's first PLAY goes straight to Driftwood's first-play card (MOBILE-GRAPHICS MG5): this device has done it
+  await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await context.addInitScript(hideDeveloperOverlays);
   const page = await context.newPage();
   page.setDefaultTimeout(240_000);
