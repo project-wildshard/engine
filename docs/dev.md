@@ -291,3 +291,21 @@ and remains frozen while paused. No fabricated client.latest, stateField
 spy, fake weather, live server, renderer or browser is involved. Each
 complete case keeps 9.5 s including clients, rooms and host disposal;
 none runs in hooks or Vitest, and no old SDK file or runtime changes.
+
+## Independent quest seat contracts
+
+Install the ordinary Driftwood and Pine pins, then run
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/quest-seats.proof.mjs`.
+These three explicit CI cases stay outside hooks and Vitest discovery.
+Each complete case, including native world load and cleanup, retains a
+9.5-second timeout and elapsed guard.
+
+Actual headless quest inputs seat a second player on both authored cables,
+advance and release its real motor, and earn only its own finish flag.
+Driftwood carries an actual serialized mid-ride world through native
+restore and earns the finish again. Pine opens and closes only the bot
+board and trader, and its empty purse refuses a purchase. Positions are
+controlled at authored prompts; this is not a walked journey, a database
+durability proof, or a live-server connection. No flag, ride state, reward
+or controller implementation is forced. The original SDK file remains
+until owner review approves retirement.
