@@ -47,3 +47,13 @@ test/title-layout.test.ts builds the real menu, box and pill with the app's
 CSS and fonts. It checks the hero share, the label and that nothing
 overlaps, in Chromium and WebKit. It runs by name, and CI's e2e job runs it
 in Chromium.
+
+## J206 review
+
+Codex's one MUST: a tag pushed past the hook had no CI check, since ci.yml
+runs on main only. The changelog-tag workflow now checks a pushed vX.Y.Z
+tag's section at its commit. It can't stop the tag, but it goes red. Its
+SHOULDs: the layout test now turns the phone (874 × 402) and asserts the
+open box's exact bullets on screen. Real-hook fixture cases for the
+pre-push step are still open; scripts/changelog.mjs's pushProblems is
+unit-tested instead.

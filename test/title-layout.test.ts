@@ -21,13 +21,14 @@ const FOLDER = process.env['WS_TITLE_LAYOUT'], OUT = resolve('tmp/title-layout')
 const BROWSERS = (process.env['WS_TITLE_LAYOUT_BROWSERS'] ?? 'chromium').split(',');
 const TYPES: Readonly<Record<string, string>> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
 const BUILD = 'a8144a50e79afe7e66a8ecdce9406e152518c916'; // a world build's id is the full engine commit
-/** 402 × 874: an iPhone with no browser chrome; 402 × 654: the same phone in Safari, toolbars showing (Jake's screenshot) */
-const SIZES = [[402, 874], [402, 654], [1440, 900]] as const;
+/** 402 × 874: an iPhone with no browser chrome; 402 × 654: the same phone in Safari, toolbars showing (Jake's screenshot);
+ *  874 × 402: the phone turned (the short-landscape rules); 1440 × 900: a laptop */
+const SIZES = [[402, 874], [402, 654], [874, 402], [1440, 900]] as const;
 
 interface Box { readonly x: number; readonly y: number; readonly r: number; readonly b: number; readonly h: number }
 interface Layout {
   readonly vh: number; readonly logo: Box; readonly pill: Box | null; readonly pillText: string; readonly boxBuild: string;
-  readonly hero: Box; readonly rows: readonly Box[]; readonly notes: number;
+  readonly hero: Box; readonly rows: readonly Box[]; readonly notes: readonly string[]; readonly panel: Box | null;
 }
 const overlaps = (a: Box, b: Box): boolean => a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
 
@@ -70,7 +71,8 @@ test.skipIf(FOLDER === undefined)('the title keeps a big hero, a short build lab
               pillText: document.querySelector('.ws-update [data-el="text"]')?.textContent ?? '',
               boxBuild: document.querySelector('.ws-whatsnew-build')?.textContent ?? '', hero: box(one('.ws-main-hero')),
               rows: ['.ws-main-cards', '.ws-main-settings', '.ws-main-dev', '.ws-main-doctor'].map(selector => box(one(selector))),
-              notes: document.querySelectorAll('.ws-whatsnew-list li').length };
+              notes: [...document.querySelectorAll<HTMLElement>('.ws-whatsnew-list li')].filter(li => li.offsetParent !== null).map(li => li.textContent),
+              panel: (() => { const body = document.querySelector<HTMLElement>('.ws-whatsnew-body'); return body === null || body.hidden ? null : box(body); })() };
           });
           await page.screenshot({ path: join(FOLDER, `${name}-${String(width)}x${String(height)}${open ? '-open' : ''}.png`) });
           await page.close();
@@ -87,7 +89,10 @@ test.skipIf(FOLDER === undefined)('the title keeps a big hero, a short build lab
           expect(overlaps(layout.rows[0] ?? layout.hero, layout.rows[1] ?? layout.hero), where).toBe(false);
           // the hero is at least 30% of a portrait phone, whether or not the changelog is open
           if (portrait) expect(layout.hero.h / layout.vh, `${where}: the hero is ${String(Math.round(layout.hero.h))} px`).toBeGreaterThanOrEqual(0.3);
-          if (open) expect(layout.notes, where).toBe(release.notes.length);
+          // opening the box shows this version's bullets, exactly, on screen; folded, none
+          expect(layout.notes, where).toEqual(open ? release.notes : []);
+          if (open && layout.panel !== null) expect(layout.panel.b, `${where}: the changelog runs off the screen`).toBeLessThanOrEqual(layout.vh);
+          if (open) expect(layout.panel, where).not.toBeNull();
         }
       } finally { await browser.close(); }
     }

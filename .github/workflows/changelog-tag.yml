@@ -1,0 +1,24 @@
+# Jake 2026-11-10: every engine version tag, patches included, carries a changelog. The pre-push hook refuses a vX.Y.Z tag
+# whose commit has no CHANGELOG.md section; this goes red for one pushed without the hook. Node built-ins only, no install.
+name: changelog-tag
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - name: Require the tag's changelog section at its commit
+        run: node scripts/changelog.mjs check "$GITHUB_REF_NAME" --at="$GITHUB_SHA"
