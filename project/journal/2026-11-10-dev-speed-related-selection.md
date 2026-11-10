@@ -70,3 +70,6 @@ expired-scope controls and the positive docs control. Local actual Git/Vitest
 proof still passes2.89s, with all ten harness/fallback/stamp controls retained.
 Normal typed lint and script-project types pass. No dependency installation is
 added to the hosted changes job and no CI/lease/case budget is changed.
+
+Cold-start forward one-shot review has no MUST/SHOULD. Official renderer
+regeneration for source4f9b0e1 produces 02080c587763885a652c5b94f344e94fcbe94330b4007f6d6a030089e901c15d.
