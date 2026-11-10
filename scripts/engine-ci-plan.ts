@@ -63,12 +63,18 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
     const normal=packShards(ordinary,weights,2,0);
     return {index:index+1,native,ordinary,expectedSeconds:setupSeconds+(sum(native)+Math.max(0,...normal.map(sum)))*factor};
   });
-  const curve=Array.from({length:12},(_,index)=>({count:index+1,seconds:Math.max(...shards(index+1).map(shard=>shard.expectedSeconds)),gain:0}));
+  // Full CI can use two overflow jobs without increasing its concurrent
+  // runner allotment. Ring 1 retains its existing search range.
+  const maxShards=ring==='full'?14:12;
+  const curve=Array.from({length:maxShards},(_,index)=>({count:index+1,seconds:Math.max(...shards(index+1).map(shard=>shard.expectedSeconds)),gain:0}));
   const first=curve[0]?.seconds??0,best=Math.min(...curve.map(row=>row.seconds));
   for(const row of curve)row.gain=first===best?1:(first-row.seconds)/(first-best);
   // Keep a full minute (20 percent) below the five-minute wall gate, including
   // measured setup/import/admission costs rather than only test-body seconds.
-  const selected=curve.find(row=>row.gain>=.9&&row.seconds<=240);
+  const eligible=curve.filter(row=>row.gain>=.9&&row.seconds<=240);
+  // A recently measured file split consumed five seconds of predicted reserve.
+  // Prefer ten spare seconds when full CI can buy that within its job budget.
+  const selected=(ring==='full'?eligible.find(row=>row.seconds<=230):undefined)??eligible[0];
   if(selected===undefined)throw new Error('No shard count meets 90% gain with 20% five-minute headroom; optimize the measured floor');
   return {version:1,sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),ring,files:[...files],inventoryHash:digest(files),
     unknown:files.filter(file=>baseline[file]===undefined),count:selected.count,setupSeconds,factor,curve,shards:shards(selected.count)};
