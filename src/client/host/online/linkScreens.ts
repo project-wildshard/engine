@@ -145,7 +145,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   parent.append(banner, deploy);
 
   let state: LinkState = 'live', reason: string | undefined, wasDown = false, quietUntil = 0, deployLeft = 0, deployTicking = false;
-  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop'; paint: () => void } | null = null;
+  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop'; paint: () => void; what?: string; chat?: boolean } | null = null;
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
 
@@ -203,7 +203,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     };
     paint(); own.interval(1000, paint);
     parent.append(root); freePointer();
-    open = { scope: own, root, kind: 'hold', paint };
+    open = { scope: own, root, kind: 'hold', paint, what, chat };
     root.querySelector('button')?.focus();
   };
   /** A card that stops play: the link gave up, the world is full, another tab, turned away. */
@@ -224,7 +224,14 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     state = next; reason = why;
     paintBanner();
     // down again: the notice goes, and a stop card (lost, after Try again) gives way to the banner
-    if (down()) { wasDown = true; unnotice(); if (open?.kind === 'stop') close(); open?.paint(); return; }
+    if (down()) {
+      wasDown = true; unnotice();
+      if (open?.kind === 'stop') close();
+      // a hold card follows its banner: a new cause (silent to restart) or 35 s down redraws it, else it just ticks
+      const ids = blockedIds(open?.chat === true ? 'reset' : bannerFor(state, hooks.why(), hooks.progress().dials).ids);
+      if (open?.kind === 'hold' && open.root.dataset['failmode'] !== ids && open.what !== undefined) hold(open.what, open.chat === true); else open?.paint();
+      return;
+    }
     if (state === 'live') {
       close();
       if (wasDown) notice();

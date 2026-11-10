@@ -41,6 +41,8 @@ export interface WeaponWire {
   readonly shot: (seq: number) => void;
   /** This row is now in hand here. The server hears of it, and the weapon it answers with is the one this player holds. */
   readonly equip: (row: string) => void;
+  /** FM4: may a player's swap start now? An online page says no while its link is down, so the swap isn't sent late. */
+  readonly mayEquip?: () => boolean;
   /** The player used this named interaction, which the server judges. */
   readonly interact: (id: string) => void;
 }

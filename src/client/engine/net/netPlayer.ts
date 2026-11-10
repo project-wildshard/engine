@@ -57,6 +57,7 @@ export class NetPlayer implements PlayerLink {
       if (!this.client.allows('Equip')) { this.follow(this.held); return; }
       this.wanted = slot; this.asks = 0; this.askAt = 0; this.heavy = false;
     },
+    mayEquip: () => this.client.allows('Equip'),
     interact: id => { this.client.act({ kind: 'interact', seq: this.seq, id }); },
     reload: () => { this.client.act({ kind: 'reload', seq: this.seq, slot: this.held }); },
   };

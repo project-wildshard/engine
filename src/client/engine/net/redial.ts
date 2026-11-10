@@ -90,7 +90,8 @@ export class Redial {
   check(): void {
     const now = this.now();
     if (this.phase === 'up' && this.heardAt !== null && now - this.heardAt >= STRIP_MS) { this.because('hidden'); this.lose(now); }
-    if (this.phase === 'down') this.dialAt = now;
+    // a link that went silent while the page was away was the page's absence: say welcome back
+    if (this.phase === 'down') { if (this.cause === 'silent') this.because('hidden'); this.dialAt = now; }
   }
   /** The player asked to try again, after `lost`. */
   retry(): void {

@@ -240,6 +240,9 @@ export class EquipmentService implements WeaponHooks {
   /** hold `id` (if unlocked); animated unless `instant` (start-up `?weapon=`) */
   select(id: WeaponId, instant = false): void {
     if (!this.unlocked.has(id)) return;
+    // FM4: a player's swap asked while the online link is down never starts, so a slow preparation can't send it after the link is back
+    const wire = this.serverWire;
+    if (!instant && wire !== null && 'mayEquip' in wire && wire.mayEquip !== undefined && !wire.mayEquip()) return;
     const to = this.get(id);
     const previous = this.selection;
     if (previous?.waiting === true && previous.to === to) { previous.instant ||= instant; return; }

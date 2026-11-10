@@ -212,7 +212,7 @@ const others = async () => v.parse(Others, await phone.evaluate('window.__online
 /** @param {number} serial @param {string} target */
 const countdown = async (serial, target) => {
   rig.publish(serial, target);
-  await until(phone, "document.querySelector('#ws-countdown-strip')?.textContent?.includes('World update') === true", 20_000, 'the countdown');
+  await until(phone, String.raw`document.querySelector('#ws-countdown-strip')?.hidden === false && /World update\s*in \d+ s/.test(document.querySelector('#ws-countdown-strip')?.textContent ?? '')`, 20_000, 'the countdown');
   await phone.shot(`countdown-${String(serial)}`);
   note(`deploy ${String(serial)}: the countdown shows, and play goes on`, await phone.evaluate('window.__workerClient().closed === null'));
 };

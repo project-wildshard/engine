@@ -171,3 +171,14 @@ test('a chat line after the world ended is not held', () => {
   expect(screens.holdChat('anyone?', () => undefined, () => undefined)).toBe(false);
   scope.dispose();
 });
+
+test('an open hold card follows its banner when the cause changes', () => {
+  const { scope, screens, set } = harness();
+  set({ why: 'silent' }); screens.link('reconnecting', 'silent');
+  screens.allow('Talk');
+  expect(shown('half-open-blocked')).not.toBeNull();
+  set({ why: 'restart' }); screens.link('reconnecting', 'restart');
+  expect(shown('half-open-blocked')).toBeNull();
+  expect(shown('restart-blocked')?.textContent).toContain('You tapped Talk');
+  scope.dispose();
+});

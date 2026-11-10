@@ -42,3 +42,11 @@ online shell, replacing the plain strip and the raw error text.
 - Try again on the lost card hands back to the banner; one notice at a
   time, gone when the link drops again; the stylesheet outlives a
   shell; chat after the world ended is not held.
+- Second pass (NO-GO on fcf013a): a swap to a weapon that prepares
+  slowly could still go out after recovery. `WeaponWire.mayEquip`
+  lets `EquipmentService.select` refuse a player's swap before it
+  starts. Also: a silent link that dropped while the page was away is
+  told as a return to the tab, an open hold card follows a new cause,
+  and the phone proof waits for a visible, counting deploy banner.
+  Left: cards can't be tabbed through (InputService takes Tab), and
+  the browser proof checks the page's side of chat, not the server's.

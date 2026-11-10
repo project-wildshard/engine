@@ -164,3 +164,12 @@ test('a restart close while already dialling changes the cause and says so, with
   expect(causes).toEqual(['restart']);
   redial.dispose();
 });
+
+test('a link that went silent and dropped while the page was away is told as a return to the tab', () => {
+  const { heard, run, redial } = harness();
+  heard(); run(3200);
+  expect(redial.why).toBe('silent');
+  redial.check();
+  expect(redial.why).toBe('hidden');
+  redial.dispose();
+});

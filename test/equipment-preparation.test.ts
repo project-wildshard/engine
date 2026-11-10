@@ -165,3 +165,20 @@ test('initial, duplicate and closed preparation declarations refuse', () => {
     f.scope.dispose(); expect(() => f.service.prepareOnSelect('spear', () => Promise.resolve())).toThrow('owner left');
   } finally { f.scope.dispose(); }
 });
+
+test('FM4: a swap asked while the online link is down never starts, so a slow preparation cannot send it after the link is back', async () => {
+  const f = fixture(), read = gate(), prepare = vi.fn(() => read.pending), sent: string[] = [];
+  let open = false;
+  f.service.prepareOnSelect('bow', prepare);
+  f.service.bindWire({ equip: (id: string) => { sent.push(id); }, mayEquip: () => open } as unknown as Parameters<EquipmentService['bindWire']>[0]);
+  sent.length = 0;
+  try {
+    f.service.select('bow');
+    await Promise.resolve();
+    expect(prepare).not.toHaveBeenCalled();
+    open = true; read.release(); await f.service.settleSelection();
+    expect(sent).toEqual([]); expect(f.service.current).toBe(f.first);
+    f.service.select('bow'); await f.service.settleSelection();
+    expect(sent).toEqual(['weapon.bow']);
+  } finally { read.release(); f.scope.dispose(); }
+});
