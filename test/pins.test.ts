@@ -3,11 +3,12 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { restorePacks, type PackedIndex } from '../scripts/pin-packs.ts';
+import { pinnedPublicAssets } from '../scripts/pin-assets.ts';
 
 /** The tool's stderr, once it exits. */
 const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[]): Promise<string> => new Promise(resolve => {
@@ -23,6 +24,26 @@ const servers: Server[] = [], folders: string[] = [];
 afterEach(() => {
   for (const server of servers.splice(0)) server.close();
   for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
+});
+
+test('frozen product image fallbacks retain exact producer bytes and reject a corrupted pin',()=>{
+  const root=mkdtempSync(resolvePath('tmp/pinned-images-'));folders.push(root);
+  mkdirSync(join(root,'test/pins'),{recursive:true});
+  cpSync('test/pins/assets.json',join(root,'test/pins/assets.json'));
+  cpSync('test/pins/assets',join(root,'test/pins/assets'),{recursive:true});
+  const manifest=JSON.parse(readFileSync('test/pins/assets.json','utf8')) as {assets:{file:string;slug:string;url:string}[]};
+  const owners=[...new Set(manifest.assets.map(row=>row.slug))];
+  const all=pinnedPublicAssets(root,owners);
+  expect(all.map(row=>row.url)).toEqual(manifest.assets.map(row=>row.url));
+  for(const owner of owners)expect(pinnedPublicAssets(root,[owner]).map(row=>row.url)).toEqual(manifest.assets.filter(row=>row.slug===owner).map(row=>row.url));
+  const first=manifest.assets[0];if(first===undefined)throw new Error('Expected a real fallback asset');
+  const file=join(root,first.file),body=readFileSync(file);
+  writeFileSync(file,Buffer.concat([body,Buffer.from([0])]));
+  expect(()=>pinnedPublicAssets(root,owners)).toThrow('Pinned public asset bytes differ');
+  writeFileSync(file,body);
+  manifest.assets[0]={...first,file:'../outside.jpg'};
+  writeFileSync(join(root,'test/pins/assets.json'),JSON.stringify({version:1,...manifest}));
+  expect(()=>pinnedPublicAssets(root,owners)).toThrow('Invalid pinned public asset');
 });
 
 test('every pin names a live head by its hash, and the catalogue holds the same heads', () => {

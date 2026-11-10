@@ -83,3 +83,12 @@ goes in `tmp/<task>/` and is deleted when done.
 
 Bypasses are for the case they name, never for a red gate: fix the code,
 not the gate.
+
+Frozen product image fallbacks may be listed in `test/pins/assets.json`.
+Their small files live under `test/pins/assets/`, with immutable producer
+Git provenance, SHA-256 and byte count. `pins.ts install` validates them
+before publishing through its ordinary mount ledger. Remove an old
+bridge pin when refreshing to a product that carries the same URL; a
+different body is a hard publication collision, never an override. The
+app build checks every declared baked texture mode before bundling and
+again in final output, including the native image fallback.

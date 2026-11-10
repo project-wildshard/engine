@@ -35,6 +35,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 import type { PackedIndex } from './pin-packs.ts';
+import { pinnedPublicAssets } from './pin-assets.ts';
 
 interface Pin { readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number }
 interface PinFile { readonly api: string; readonly shards: readonly Pin[] }
@@ -187,11 +188,24 @@ async function install(only: readonly string[]): Promise<void> {
   await prepareAssetDecoders();
   const { shards } = readJson(PINS) as PinFile;
   const pins = only.length === 0 ? shards : shards.filter(row => only.includes(row.slug));
+  const publicAssets = pinnedPublicAssets(process.cwd(), pins.map(row => row.slug));
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
   if (unknown.length > 0) throw new Error(`Not pinned: ${unknown.join(', ')}`);
   const revision = shardfileValidationRevision(process.cwd());
   for (const path of existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : []) rmSync(path, { force: true });
   const shared = tracked(), published = new Map<string, string>();
+  const publish = (url: string, body: Uint8Array): void => {
+    const hash = sha256(body), held = published.get(url);
+    if (held !== undefined && held !== hash) throw new Error(`Two pins publish different ${url}`);
+    if (shared.has(url)) {
+      if (sha256(readFileSync(url)) !== hash) throw new Error(`${url} differs from engine's tracked file`);
+      return;
+    }
+    if (held !== undefined) return;
+    published.set(url, hash);
+    mkdirSync(dirname(url), { recursive: true });
+    writeFileSync(url, body);
+  };
   let failed = 0;
   for await (const [pin, bytes] of inOrder(pins, 6)) {
     const started = performance.now(), files = readTar(bytes);
@@ -213,19 +227,7 @@ async function install(only: readonly string[]): Promise<void> {
     const target = resolve('out', folder);
     rmSync(target, { recursive: true, force: true });
     let mounts = 0;
-    const publish = (url: string, body: Uint8Array): void => {
-      const hash = sha256(body), held = published.get(url);
-      if (held !== undefined && held !== hash) throw new Error(`Two pins publish different ${url}`);
-      if (shared.has(url)) {
-        if (sha256(readFileSync(url)) !== hash) throw new Error(`${pin.slug}: ${url} differs from engine's tracked file`);
-        return;
-      }
-      if (held !== undefined) return;
-      published.set(url, hash);
-      mkdirSync(dirname(url), { recursive: true });
-      writeFileSync(url, body);
-      mounts++;
-    };
+    const beforeMounts = published.size;
     for (const [path, body] of files) {
       if (path.endsWith('/') || path === 'validation.json') continue;
       const out = join(target, path);
@@ -242,9 +244,11 @@ async function install(only: readonly string[]): Promise<void> {
       mkdirSync(dirname(join(target, path)), { recursive: true });
       writeFileSync(join(target, path), body);
     }
+    mounts = published.size - beforeMounts;
     writeFileSync(join(target, 'validation.json'), `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision } })}\n`);
     console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${mounts} mounts published`);
   }
+  for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   if (failed > 0) process.exitCode = 1;
   mkdirSync('out', { recursive: true });
   const paths = [...published.keys()].sort((a, b) => a.localeCompare(b));

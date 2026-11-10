@@ -4,6 +4,7 @@ import {cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, r
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the owned fixture and output directories.
 import {dirname, join, resolve} from 'node:path';
 import {copyDeferredPublic, deferredPublicCopy, copyOutputProducts, pruneLooseCopies} from '../scripts/app-build/outputProducts.mjs';
+import {checkBakedTextures} from '../scripts/app-build/bakedTextures.mjs';
 
 function write(root: string, name: string, body: string): void {
   mkdirSync(dirname(join(root,name)),{recursive:true});writeFileSync(join(root,name),body);
@@ -13,6 +14,24 @@ function files(root: string): Record<string,string> {
     const path=join(row.parentPath,row.name);return [path.slice(root.length+1),readFileSync(path).toString('hex')];
   }).sort(([left],[right])=>left.localeCompare(right)));
 }
+it('publishes every declared baked mode for both tiers and refuses a missing fallback before or after copying',()=>{
+  const root=mkdtempSync(resolve('tmp/app-baked-'));
+  const desktop='/assets/baked/dawn-isle/tex/sky.jpg',phone='/assets/baked/dawn-isle/tex/sky.phone.webp',gpu='/assets/gpu/baked/dawn-isle/tex/sky-01234567.ktx2';
+  try{
+    write(root,'out/dawn/shard.json','{}');
+    const modes={phone:{img:{baked:[phone]},ktx2:{baked:[gpu]}},desktop:{img:{baked:[desktop]},ktx2:{baked:[gpu]}}};
+    const bindings={$call:'pageModeBoot',args:[{grid:{modes}}]};
+    write(root,'out/dawn/mounts/shardfiles/dawn/discovery.json',JSON.stringify({rows:{bootBindings:bindings}}));
+    for(const url of [desktop,phone,gpu])write(root,`public${url}`,'authored texture');
+    expect(checkBakedTextures(root,join(root,'public'))).toBe(3);
+    copyDeferredPublic(root,join(root,'dist'));pruneLooseCopies(join(root,'dist'));
+    expect(checkBakedTextures(root,join(root,'dist'))).toBe(3);
+    rmSync(join(root,`public${phone}`));
+    expect(()=>checkBakedTextures(root,join(root,'public'))).toThrow(phone);
+    rmSync(join(root,`dist${desktop}`));
+    expect(()=>checkBakedTextures(root,join(root,'dist'))).toThrow(desktop);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
 describe('app public copy before final product publication',()=>{
   it('keeps emitted collisions, nested public bytes and the actual final product tree exact',()=>{
     const root=mkdtempSync(resolve('tmp/app-public-'));

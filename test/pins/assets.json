@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "slug": "driftwood-isle",
+      "url": "/assets/baked/driftwood-isle/tex/giant.jpg",
+      "file": "test/pins/assets/294455219e4cae78bc8ef095924dc7f7e03d4c4bba2708033ceffa244cf7443c.jpg",
+      "sha256": "294455219e4cae78bc8ef095924dc7f7e03d4c4bba2708033ceffa244cf7443c",
+      "bytes": 25127,
+      "source": {
+        "repo": "shard-driftwood",
+        "commit": "93d562fcbca48d4867b3d254ff30ab843694e8db",
+        "path": "public/assets/baked/driftwood-isle/tex/giant.jpg",
+        "blob": "79f1c9b3f876d1f69511b01a671274129fb8c15f"
+      }
+    },
+    {
+      "slug": "driftwood-isle",
+      "url": "/assets/baked/driftwood-isle/tex/giant.phone.webp",
+      "file": "test/pins/assets/ed924bba44834de00b929aee8bc05e94297e6559332e76c53f7838cfa6f7b9f4.webp",
+      "sha256": "ed924bba44834de00b929aee8bc05e94297e6559332e76c53f7838cfa6f7b9f4",
+      "bytes": 7488,
+      "source": {
+        "repo": "shard-driftwood",
+        "commit": "93d562fcbca48d4867b3d254ff30ab843694e8db",
+        "path": "public/assets/baked/driftwood-isle/tex/giant.phone.webp",
+        "blob": "8024b364523937cfe92d452de79727eadf3f59e7"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/baked/pine-hollow/tex/clouds.jpg",
+      "file": "test/pins/assets/1eb28a76a1aa8712faaac76c09e55b516c524e8939a646261974a0f768832bec.jpg",
+      "sha256": "1eb28a76a1aa8712faaac76c09e55b516c524e8939a646261974a0f768832bec",
+      "bytes": 63536,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "c8d104aafcdb0f55a309f1d04ce4f127738a70fc",
+        "path": "public/assets/baked/pine-hollow/tex/clouds.jpg",
+        "blob": "d0e15c340deb786b19c3ca698efdd68e0cf12fda"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/baked/pine-hollow/tex/clouds.phone.webp",
+      "file": "test/pins/assets/82e953e316a6d57e8a33a89f5e918913fc67d5fc75a376ab55558b90c0bbaa43.webp",
+      "sha256": "82e953e316a6d57e8a33a89f5e918913fc67d5fc75a376ab55558b90c0bbaa43",
+      "bytes": 16988,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "c8d104aafcdb0f55a309f1d04ce4f127738a70fc",
+        "path": "public/assets/baked/pine-hollow/tex/clouds.phone.webp",
+        "blob": "b8e2797236b7bd73938f7db268cde1e25e8b2de7"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/baked/pine-hollow/tex/planet.jpg",
+      "file": "test/pins/assets/8a784a2da31fc939183538639ec86c110cf27e43015e6b3b28fbfe90921bdf6d.jpg",
+      "sha256": "8a784a2da31fc939183538639ec86c110cf27e43015e6b3b28fbfe90921bdf6d",
+      "bytes": 59994,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "c8d104aafcdb0f55a309f1d04ce4f127738a70fc",
+        "path": "public/assets/baked/pine-hollow/tex/planet.jpg",
+        "blob": "ea2ef9366263f2bdf6c252b573d27f3dcf4e552a"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/baked/pine-hollow/tex/planet.phone.webp",
+      "file": "test/pins/assets/5f40b9b3101490a4d6cb0e53f5259516bfe13fcffb47bbf94db502659322a8a5.webp",
+      "sha256": "5f40b9b3101490a4d6cb0e53f5259516bfe13fcffb47bbf94db502659322a8a5",
+      "bytes": 8472,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "c8d104aafcdb0f55a309f1d04ce4f127738a70fc",
+        "path": "public/assets/baked/pine-hollow/tex/planet.phone.webp",
+        "blob": "41fc20817bd834f0137cbfff1da60f591e96ccb7"
+      }
+    }
+  ]
+}

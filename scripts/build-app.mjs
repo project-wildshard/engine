@@ -16,6 +16,7 @@ import { newBuildId, stampBuildDocuments } from './app-build/buildIdentity.mjs';
 import { carryPreviousDeploy } from './app-build/previousDeploy.mjs';
 import { buildValidationReceipts } from './app-build/validationReceipts.mjs';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
+import { checkBakedTextures } from './app-build/bakedTextures.mjs';
 
 const args = process.argv.slice(2);
 /** a `--name value` or `--name=value` argument's value
@@ -40,6 +41,7 @@ const step = (nodeArgs) => {
 // analytic fallback), the boot tables, then the shard list again (the tables can add static imports to a manifest's closure)
 // C3: a tree with no shard source (the lifted engine) has no list or bake to run; it builds from a catalogue and its packs.
 const shardSource = existsSync('src/shards');
+checkBakedTextures(process.cwd(), resolve('public'));
 if (shardSource) {
   step(['scripts/gen-shards.mjs']);
   for (const baker of ['bake-chunk', 'bake-sky']) {
@@ -124,6 +126,7 @@ writeFileSync(resolve(outDir, 'build-flags.json'), JSON.stringify({ devserver: m
 copyOutputProducts(process.cwd(), outDir);
 // DL20: the deploy drops the loose copies nothing reads by URL
 const dropped = pruneLooseCopies(outDir);
+checkBakedTextures(process.cwd(), outDir);
 console.log(`Loose copies dropped: ${dropped.files} files, ${(dropped.bytes / 1e6).toFixed(1)} MB`);
 
 // SHARD-SIZE row 1: refuse a shard whose phone download grew. Only the default web output holds the whole book.
