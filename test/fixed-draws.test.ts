@@ -1,7 +1,7 @@
 import { FixedDrawRowsSchema } from '@wildshard/format/fixedDraws';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
-import { driftwoodFixedModel } from './fixtures/driftwood-fixed-bank';
+import { fixedDrawModel as driftwoodFixedModel } from './fixtures/fixed-draw-models';
 import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry } from 'three';
 import { zlibSync } from 'fflate';

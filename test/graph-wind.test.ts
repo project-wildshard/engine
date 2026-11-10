@@ -1,8 +1,7 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test } from 'vitest';
-import { vec2 } from 'three/tsl';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
 import { windGustAt, windUniforms } from '../src/client/engine/world/wind';
-import { graph, windGustAt as windOp } from '../src/sharddev/materials';
 import { validateGraph, type GraphIr } from '@wildshard/format/materialGraph';
 import { evalGlsl } from './fixtures/glslEval';
 
@@ -30,6 +29,5 @@ test('graph wind samples the CPU gust front and reads the existing live clock', 
       expect(actual[2]).toBeCloseTo(windUniforms.uGust.value, 5);
     }
     expect(validateGraph({ ...ir, nodes: { ...ir.nodes, point: { op: 'const', value: [1, 2, 3] } } }).ok).toBe(false);
-    expect(validateGraph(graph({ model: 'unlit', surface: { colour: [1, 1, 1], alpha: windOp(vec2(1, 2)) } })).ok).toBe(true);
   } finally { compiled.material.dispose(); windUniforms.uWindTime.value = time; windUniforms.uGust.value = gust; }
 });

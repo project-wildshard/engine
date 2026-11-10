@@ -3,14 +3,17 @@ import * as THREE from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { clientMaterials } from '../src/client/game/shardfile/clientMaterials';
 import { emptyShardfile } from '../src/shared/host/author';
-import { graph } from '../src/sharddev/materials';
+import type { GraphIr } from '@wildshard/format/materialGraph';
+
+// The IR the SDK authors for graph({ model: 'toon', surface: { colour: [0.4, 0.5, 0.6] } }); sharddev proves it still does.
+const TOON_IR: GraphIr = { version: 1, kind: 'material', nodes: {}, stages: { surface: { colour: [0.4, 0.5, 0.6] } }, model: 'toon' };
 
 vi.stubGlobal('ImageBitmap', class ImageBitmap { readonly width = 0; });
 afterAll(() => { vi.unstubAllGlobals(); });
 
 test('the SDK toon graph and classic surfaces follow the catalogue day clock in place', async () => {
   const source = emptyShardfile({ slug: 'day-fixture', name: 'Day', author: 'Test', seed: 1, revision: 1 });
-  source.look.materials['cel'] = { family: 'graph', graph: graph({ model: 'toon', surface: { colour: [0.4, 0.5, 0.6] } }) };
+  source.look.materials['cel'] = { family: 'graph', graph: TOON_IR };
   source.look.materials['classic'] = { family: 'toon', colour: [1, 1, 1], vertexColours: true, faceted: true, doubleSided: true, roughness: 0.88, metalness: 0 };
   const scope = new Scope('day-toon'), renderer: unknown = Object.create(THREE.WebGLRenderer.prototype);
   if (!(renderer instanceof THREE.WebGLRenderer)) throw new Error('Missing renderer');

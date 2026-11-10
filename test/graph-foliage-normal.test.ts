@@ -1,8 +1,7 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
-import { vec3 } from 'three/tsl';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
-import { graph as authorGraph } from '../src/sharddev/materials';
 import { validateGraph, type GraphIr } from '@wildshard/format/materialGraph';
 
 /** the classic program's front-face undo: three's normal chunk flips a back face's normal; foliage multiplies it back */
@@ -34,8 +33,6 @@ test('foliage keeps a front-face normal basis without changing two-sided draws o
       expect(clone.normalMap).toBe(normal);
       expect(clone.side).toBe(THREE.DoubleSide);
     } finally { clone.dispose(); }
-    const authored = authorGraph({ doubleSided: true, flipBackfaceNormals: false, surface: { colour: vec3(1) } });
-    expect(authored.flipBackfaceNormals).toBe(false);
     expect(validateGraph({ ...ir, flipBackfaceNormals: 'no' }).ok).toBe(false);
     expect(validateGraph({ version: 1, kind: 'post', flipBackfaceNormals: false, nodes: {}, stages: { post: { colour: [1, 1, 1] } } }).ok).toBe(false);
   } finally { classic.material.dispose(); foliage.material.dispose(); normal.dispose(); }

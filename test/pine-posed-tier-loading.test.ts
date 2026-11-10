@@ -4,7 +4,10 @@ import { initializeTier, TIER } from '../src/client/engine/core/tier';
 import { PosedDraw } from '../src/client/game/looks/posedInstances';
 import type { PosedAssetSet } from '../src/client/game/plugin/geometry';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
-import { PINE_WILDLIFE_DRAW as rows } from './fixtures/pine-wildlife';
+import rows from './fixtures/posed-draw-rows.json' with { type: 'json' };
+
+// CI21 (J232): engine reads no shard source (J65). This is Pine's shipped `look/wildlife-draw.json` row, copied byte for
+// byte from the pinned pine-hollow product (revision 2, blob 5dba1513…569c), so the posed-tier law runs on a real row.
 
 for (const tier of ['phone', 'desktop'] as const) test(`cold ${tier} wildlife preparation awaits only its selected bird sources`, async () => {
   const previous = TIER, disposals: (() => void)[] = [];

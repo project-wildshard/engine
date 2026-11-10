@@ -1,7 +1,6 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test } from 'vitest';
-import { vec4 } from 'three/tsl';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
-import { graph as authorGraph, instanceTransform } from '../src/sharddev/materials';
 import { validateGraph, type GraphIr } from '@wildshard/format/materialGraph';
 
 test('full instance placement reads the existing matrix and ordinary meshes use identity', () => {
@@ -19,7 +18,6 @@ test('full instance placement reads the existing matrix and ordinary meshes use 
     // an instanced draw (three's USE_INSTANCING) multiplies by the existing instanceMatrix; an ordinary mesh is identity
     expect(helper).toContain('#ifdef USE_INSTANCING\n  v = instanceMatrix * v;\n#endif');
     expect(helper.replaceAll(/#ifdef USE_(INSTANCING|BATCHING)\n[\s\S]*?#endif\n/g, '').trim()).toBe('vec4 wsInstanceTransform( vec4 v ) {');
-    expect(authorGraph({ model: 'unlit', vertex: { offset: instanceTransform(vec4(0, 1, 0, 0)).xyz }, surface: { colour: [1, 1, 1] } }).nodes).toMatchObject({ n0: { op: 'instanceTransform' } });
     expect(validateGraph({ ...ir, stages: { surface: { colour: 'xyz' } } }).ok).toBe(false);
     expect(validateGraph({ ...ir, nodes: { ...ir.nodes, point: { op: 'const', value: [1, 2, 3] } } }).ok).toBe(false);
   } finally { compiled.material.dispose(); }

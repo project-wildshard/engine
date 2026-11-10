@@ -1,3 +1,4 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import * as THREE from 'three';
 import { expect, it } from 'vitest';
 import { MAX_GRAPH_BUDGET, validateGraph, type GraphIr, type GraphNode } from '@wildshard/format/materialGraph';
@@ -6,15 +7,12 @@ import * as v from 'valibot';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
 import { classicLookCompiler } from './fixtures/classicLookCompiler';
 import { clientGraphs } from '../src/client/game/shardfile/clientGraphs';
-import { GraphMaterial } from '../src/sharddev/materials';
 import { emptyShardfile } from '../src/shared/host/author';
 
 it('compiles a declared larger graph only with trusted authority and never substitutes a family', () => {
   const nodes: Record<string, GraphNode> = { colour: { op: 'const', value: [0.3, 0.6, 0.2] } };
   for (let index = 0; index < 200; index++) nodes[`row${index}`] = { op: 'add', in: [index === 0 ? 'colour' : `row${index - 1}`, 0.001] };
   const graph: GraphIr = { version: 1, kind: 'material', model: 'unlit', budget: { nodes: 256, samplers: 4, instructions: 1024 }, nodes, stages: { surface: { colour: 'row199' } } };
-  const authored = new GraphMaterial(graph);
-  expect(authored.graph.budget).toEqual(graph.budget); authored.dispose();
   expect(v.safeParse(MaterialsSchema, { meadow: { family: 'graph', graph } }).success).toBe(true);
   expect(validateGraph(graph).ok).toBe(false);
   const admitted = validateGraph(graph, { trustedBudget: true });

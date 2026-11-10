@@ -1,8 +1,7 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test, vi } from 'vitest';
 import * as THREE from 'three';
-import { vec3 } from 'three/tsl';
 import { classicShadowDepth, compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
-import { graph as authorGraph } from '../src/sharddev/materials';
 import { validateGraph, type GraphIr } from '@wildshard/format/materialGraph';
 
 test('opted-in casters share live displacement and alpha, cache by material and release with it', () => {
@@ -47,7 +46,6 @@ test('opted-in casters share live displacement and alpha, cache by material and 
     expect(plain.depth).toBe(null);
     expect(classicShadowDepth(plain.material, stock, object)).toBe(null);
     plain.material.dispose();
-    expect(authorGraph({ model: 'unlit', vertex: { offset: vec3(0, 1, 0), shadow: true }, surface: { colour: vec3(1) } }).stages['vertex.offset']?.shadow).toBe(true);
     expect(validateGraph({ ...graph, stages: { ...graph.stages, 'vertex.clip': { position: [0, 0, 0, 1] } } }).ok).toBe(false);
   } finally { clone.dispose(); compiled.material.dispose(); stock.dispose(); geometry.dispose(); map.dispose(); shadowMap.dispose(); }
 });

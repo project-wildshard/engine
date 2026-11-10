@@ -1,7 +1,6 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test } from 'vitest';
-import { attribute, varying } from 'three/tsl';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
-import { graph as authorGraph } from '../src/sharddev/materials';
 import { validateGraph, type GraphIr } from '@wildshard/format/materialGraph';
 
 /** a graph's classic program sources (a clone's, as a drawn variant's) */
@@ -26,9 +25,6 @@ test('flat varyings preserve the provoking-vertex qualifier through validation, 
   const smooth = program({ ...graph, nodes: { ...graph.nodes, facet: { op: 'varying', in: ['tint'] } } });
   expect(smooth.vertexShader).not.toContain('flat ');
   expect(smooth.fragmentShader).not.toContain('flat ');
-  const authored = authorGraph({ model: 'unlit', surface: { colour: varying(attribute('aDirection', 'vec3')).setInterpolation('flat') } });
-  expect(Object.values(authored.nodes).some(n => n.op === 'varying' && n.interpolation === 'flat')).toBe(true);
   expect(validateGraph({ ...graph, nodes: { ...graph.nodes, facet: { ...graph.nodes['facet'], interpolation: 'linear' } } }).ok).toBe(false);
   expect(validateGraph({ ...graph, nodes: { ...graph.nodes, tint: { ...graph.nodes['tint'], interpolation: 'flat' } } }).ok).toBe(false);
-  expect(() => authorGraph({ surface: { colour: varying(attribute('aDirection', 'vec3')).setInterpolation('linear') } })).toThrow('interpolation');
 });

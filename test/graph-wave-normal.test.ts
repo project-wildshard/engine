@@ -1,9 +1,8 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
-import { vec2 } from 'three/tsl';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
 import { waveDisplace } from '../src/shared/engine/world/waves';
-import { graph, gerstnerNormal } from '../src/sharddev/materials';
 import { validateGraph, type GraphIr } from '@wildshard/format/materialGraph';
 import { evalGlsl } from './fixtures/glslEval';
 
@@ -26,7 +25,6 @@ test('the analytic graph normal follows the shared CPU wave surface at rest poin
       const expected = tz.cross(tx).normalize().toArray(), actual = evalGlsl(program.fragment.body, colour, compiled.material.uniforms);
       for (const [i, v] of expected.entries()) expect(actual[i]).toBeCloseTo(v, 5);
     }
-    expect(validateGraph(graph({ model: 'unlit', surface: { colour: gerstnerNormal(vec2(0), 1, 1) } })).ok).toBe(true);
     expect(validateGraph({ ...ir, nodes: { ...ir.nodes, at: { op: 'const', value: [1, 2, 3] } } }).ok).toBe(false);
   } finally { compiled.material.dispose(); }
 });

@@ -8215,5 +8215,318 @@
     ],
     "sourceRevision": "2cafaa4490287d83655bf93eb8e1b1d4fd34c7d4",
     "sourceBlob": "16901832c3340020bb964bbe9326e0c156ba292f"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-budget.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-budget.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps every trusted-budget compile, catalogue and refusal assertion. The one SDK assertion (a GraphMaterial keeps the declared budget) moved unchanged to sharddev test/graph-author-ops.test.ts.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "compiles a declared larger graph only with trusted authority and never substitutes a family"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "f416bfee3292623742847f58746623a435100e94"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-data-texture.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-data-texture.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the numerical sampler law (data role, NoColorSpace, validateGraph refusals) on a DataTexture of the raster's own bytes. The lossless linear KTX2 bake of those channels (format 37, zstd, decoded bytes) moved unchanged to sharddev graph-author-ops.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "samples numerical library channels at computed UVs without colour conversion"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "bd54d0a077f9ffd04b7387e0d0bc108966926265"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-day-toon.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-day-toon.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine compiles the literal toon IR the SDK authors; sharddev graph-author-ops asserts graph() still emits exactly that IR. Every day-clock and in-place uniform assertion is unchanged.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "the SDK toon graph and classic surfaces follow the catalogue day clock in place"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "eaf6eb6ff1189d8e862e054ee4d4e744836829dc"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-flat-varying.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-flat-varying.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the flat qualifier, smooth contrast and validateGraph refusals; the two TSL authoring assertions (flat authored, linear refuses) moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "flat varyings preserve the provoking-vertex qualifier through validation, SDK authoring and both shaders"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "0002db691b8c8d9f4453bc794147c3080103baac"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-fog-inputs.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-fog-inputs.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the live atmosphere/ramp uniform borrowing; the graphInputs op-list authoring assertion moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "atmosphere and ramp graph inputs borrow the live day owners and define a no-ramp default"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "d4f8b17b6c303539a2f4d70792387fca9378dd79"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-foliage-normal.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-foliage-normal.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the front-face normal basis, clone and refusal assertions; the flipBackfaceNormals authoring passthrough moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "foliage keeps a front-face normal basis without changing two-sided draws or borrowed normal maps"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "5582b38ef60e1ace5b2daa6eb2152ee4e5c03a9a"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-instance-transform.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-instance-transform.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the instance-matrix GLSL law; the instanceTransform authoring assertion moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "full instance placement reads the existing matrix and ordinary meshes use identity"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "51cf53be216a712408e279ea1f6bb71eecca5d06"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-optional-attribute.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-optional-attribute.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine compiles the literal IR the SDK authors (sharddev asserts graph() emits it) and keeps every shared-program and default-value assertion; the non-finite-default authoring refusal moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "optional attributes share one shader across present/missing channels and carry their constants to every variant"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "6bfc24588c003cac1d41c299f9852054df312bb8"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-shadow-depth.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-shadow-depth.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the shared caster displacement/alpha and cache law; the shadow:true authoring passthrough moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "opted-in casters share live displacement and alpha, cache by material and release with it"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "6c4537979b8cad52a3ff0b94470d573da76702b3"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-shadow-offset.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-shadow-offset.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the receiver-offset shadow lookups and live uniform law; the shadow.offset authoring assertion moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "receiver offsets reach the shadow lookups and live uniforms without moving the caster"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "83866af520fad6e563a1087db6d72ab97a9530e8"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-toon-caustics.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-toon-caustics.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the per-material caustic omission; the toonCaustics:false authoring passthrough moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "one toon material omits the caustic term while its siblings keep the shared water and bands"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "6a822b36ed01536ccac95eac6be79b245b7bf810"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-wave-normal.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-wave-normal.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the analytic normal against the CPU wave surface; the SDK gerstnerNormal admission moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "the analytic graph normal follows the shared CPU wave surface at rest points"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "9b0f9b1ae10fe82d6c16587fb4d3b4044b88e993"
+  },
+  {
+    "repo": "engine",
+    "file": "test/graph-wind.test.ts",
+    "outcome": "restored",
+    "target": "test/graph-wind.test.ts",
+    "landed": "sharddev@3dae05c (SDK half)",
+    "decision": "Engine keeps the CPU gust front and live clock sampling; the SDK windGustAt admission moved unchanged to sharddev.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "graph wind samples the CPU gust front and reads the existing live clock"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "6a6bb782e218a0b856396c1dd52dea72b231a591"
+  },
+  {
+    "repo": "engine",
+    "file": "test/specimen-explorer.test.ts",
+    "outcome": "restored",
+    "target": "test/specimen-explorer.test.ts",
+    "decision": "Unchanged cases. The named product rows are built from engine's own hashImmutableBytes and fixtureProductFile instead of sharddev's nameBlob writer; every tier, offset, geometry, material and refusal assertion is the original.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "an unrelated shard lists and builds its cold specimen book at both tiers (offset=%s)",
+      "a specimen book refuses an unknown face side"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "cafdbba058ffd91f365e1a8b764f0ca694ba4437"
+  },
+  {
+    "repo": "engine",
+    "file": "test/shipped-graph-cost.test.ts",
+    "outcome": "restored",
+    "target": "test/shipped-graph-cost.test.ts",
+    "ring": 2,
+    "ringReason": "Censuses every pinned shipped product; Ring 1 installs three products and five slices, so it runs with the full pins in full CI and full pre-push.",
+    "decision": "Engine holds no shard source, so the census enumerates the installed pinned products (folder pin receipts matched to test/pins/shardfiles.json, the whole hash set required) instead of src/shards folders. Every per-graph assertion and the static top-ten report are unchanged; 28 products, 29 cases pass.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "6f6da33a585e75f0b58f23c35ecb9e58abef7915"
+  },
+  {
+    "repo": "engine",
+    "file": "test/physics-shards-headless.test.ts",
+    "outcome": "restored",
+    "target": "test/physics-shards-headless.test.ts",
+    "ring": 2,
+    "ringReason": "Walks native routes on complete pinned products (as physics-headless); Ring 1 slices lack named product assets.",
+    "decision": "File unchanged. Nine's 19 routes were skipped because the Nine session imported the moved test/fixtures/nine-headless; engine now owns that fixture and reads Nine's walk bounds from the pinned product's ui/level manifest section, not shard source (J65). All 55 routes pass.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "e0b8de8a12d57c8806d6b0fc26cf08ae776fd011"
+  },
+  {
+    "repo": "engine",
+    "file": "test/pine-posed-tier-loading.test.ts",
+    "outcome": "restored",
+    "target": "test/pine-posed-tier-loading.test.ts",
+    "decision": "Cases unchanged. The posed-draw row is Pine's shipped look/wildlife-draw.json copied from the pinned pine-hollow product (revision 2) into test/fixtures/posed-draw-rows.json, instead of running Pine's generators.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "b14ab302c3f5529a8906bf42e939bb1a8381fbf6"
+  },
+  {
+    "repo": "engine",
+    "file": "test/fixed-draws.test.ts",
+    "outcome": "restored",
+    "target": "test/fixed-draws.test.ts",
+    "decision": "Cases unchanged. The gull and reef-fish templates are Driftwood's shipped GLBs copied from the pinned driftwood-isle product (revision 3) into test/fixtures/fixed-draws/, instead of running Driftwood's fixedProgram. 18 cases pass.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "every slot loads together from named sources and copies its own template",
+      "an undeclared, missing or repeated slot refuses; no source reads the product",
+      "a cold card owns exactly its slots, read through the product, and releases them with its scope",
+      "closing during a read releases a slot that finished early and refuses; a closed card hands out nothing",
+      "an ancestor retiring (disposing, the card still live) during a read refuses",
+      "a partial read failure releases every slot that loaded and reports the failure",
+      "a baked row decodes its block exactly, renames its channels and expands when declared",
+      "a baked row refuses a wrong byte count, a missing channel or geometry instead of bytes",
+      "lane rows read their blocks once while independent named rows retain expansion",
+      "a lane block past its bake, two sources or a lane without its baked layout refuse",
+      "metadata-only libraries retain binary URL lanes and refuse undeclared product readers",
+      "fixed-draw data refuses accessors, cycles and extra channel operands before decoding",
+      "fixed-draw named admission keeps exact channel-pair arity",
+      "a product file of baked rows is one library per product and file; a failure stays; a changed reader refuses",
+      "product fixed draws read baked files through the same concrete product receiver",
+      "product fixed draws refuse replaced %s while binary intake is pending",
+      "product fixed draws pin the binary reader before awaiting metadata"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "75042cdf9b9218aa8631a9af5a961cd5743fcd95"
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/sky-vane-scene.test.ts",
+    "outcome": "migrated",
+    "target": "test/sky-vane-scene.test.ts",
+    "landed": "shard-sky-reach@23ba938",
+    "decision": "Sky's own scene rows; moved to their shard (J200). Only the engine import changed, to the public game/plugin/scene export.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "keeps each vane rotor independently movable at its declared interaction anchor",
+      "keeps native rotor ports available without drawing missing model parts"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "4c912e7ef48f45663beec43b877c8718d2ce8f70"
+  },
+  {
+    "repo": "shard-sky-reach",
+    "file": "test/sky-mill-scene.test.ts",
+    "outcome": "migrated",
+    "target": "test/sky-mill-scene.test.ts",
+    "landed": "shard-sky-reach@23ba938",
+    "decision": "Sky's own scene rows; moved to their shard (J200). Only the engine import changed, to the public game/plugin/scene export.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "keeps mill parts borrowed under a native spinning hub",
+      "keeps the native hub available when optional baked parts fail to load",
+      "keeps the authored fallen deck under its native pivot and copies interaction anchors"
+    ],
+    "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
+    "sourceBlob": "d98157ebbf338f69a5c9f7c5cee63c314ba82af5"
   }
 ]

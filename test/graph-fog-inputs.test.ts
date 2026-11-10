@@ -1,8 +1,8 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
 import { captureFogUniforms, ColourRampFog, fogUniforms } from '../src/client/engine/world/Atmosphere';
-import { graph as authorGraph, graphInputs } from '../src/sharddev/materials';
 import type { GraphIr } from '@wildshard/format/materialGraph';
 
 test('atmosphere and ramp graph inputs borrow the live day owners and define a no-ramp default', () => {
@@ -29,6 +29,4 @@ test('atmosphere and ramp graph inputs borrow the live day owners and define a n
     ramp.zenith.value.setRGB(0.4, 0.2, 0.1);
     expect(sets.some(set => set['fogRampZenith']?.value === ramp.zenith.value)).toBe(true);
   } finally { THREE.ShaderChunk.fog_pars_fragment = pars; THREE.ShaderChunk.fog_fragment = fragment; }
-  const authored = authorGraph({ model: 'unlit', surface: { colour: graphInputs.atmosphereSunColour.add(graphInputs.atmosphereSunDirection).add(graphInputs.fogZenithColour).add(graphInputs.fogColour) } });
-  expect(Object.values(authored.nodes).map(n => n.op)).toEqual(expect.arrayContaining(['atmosphereSunColour', 'atmosphereSunDirection', 'fogZenithColour', 'fogColour']));
 });

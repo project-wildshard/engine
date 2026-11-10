@@ -1,9 +1,8 @@
+// CI21 (J232): the SDK authoring assertion moved to sharddev test/graph-author-ops.test.ts; engine keeps its compile/runtime law.
 import { expect, test } from 'vitest';
 import type * as THREE from 'three';
-import { vec3 } from 'three/tsl';
 import { compileClassicGraph } from '../src/client/engine/render/graph/glslMaterial';
 import { ToonLook } from '../src/client/engine/render/families/toon';
-import { graph as authorGraph } from '../src/sharddev/materials';
 import { validateGraph, type GraphIr } from '@wildshard/format/materialGraph';
 
 /** a toon graph's classic program: its sources and the uniform objects it reads */
@@ -28,7 +27,6 @@ test('one toon material omits the caustic term while its siblings keep the share
     expect(has(base, look.uniforms.famToonWater.value)).toBe(true);
     expect(look.params.caustics.level).toBe(3);
   } finally { base.dispose(); surface.dispose(); }
-  expect(authorGraph({ model: 'toon', toonCaustics: false, surface: { colour: vec3(1) } }).toonCaustics).toBe(false);
   expect(validateGraph({ ...ir, model: 'standard', toonCaustics: false }).ok).toBe(false);
   expect(validateGraph({ ...ir, toonCaustics: 'off' }).ok).toBe(false);
 });
