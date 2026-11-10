@@ -60,6 +60,13 @@ export function installGltfMaterialOrder(loader: GLTFLoader): void {
   });
 }
 
+/** LS11: the material part of `gltfOpaqueSort`'s order (its file batch, then its declaration index), for a caller that
+ *  orders opaque drawables the way the renderer will. */
+export function opaqueMaterialOrder(material: Material): readonly [number, number] {
+  const order = materialOrder(material);
+  return [order.batch, order.index ?? 0];
+}
+
 /** Three's opaque sort, with private declaration identity in the material slot.
  * Unparsed materials retain native IDs. Transparent sorting remains native. */
 export function gltfOpaqueSort(a: RenderItem, b: RenderItem): number {

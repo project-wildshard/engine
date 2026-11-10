@@ -16,6 +16,7 @@ import { familyCompileJobs } from './families/registry';
 import { shaderPatchTextures } from './shaderPatches';
 import { uploadCompressedTexture } from './compressedUpload';
 import { linkStandIn } from '../app/sceneOwnership';
+import { FenceAbortError } from './fencedUnits';
 import { offscreenPreparations } from './offscreenPreparation';
 import { prepareSceneResources } from './scenePreparation';
 import { readbackPreparation } from './readbackPreparation';
@@ -863,19 +864,27 @@ const serialLoading = (renderer: Renderer, isolateImageUploads: boolean): boolea
 /**
  * LS11 (J204): `pause`, repeated until the GPU has finished what was submitted before it (a WebGL2 fence, asked once a
  * pause, never waited on). SwiftShader at 4x CPU ran the shaders step's 19 texture uploads and two post draws in 50 ms of
- * script, then held the main thread 1.1 s in the canvas read-back that waited for all of it. Ends early on a lost context,
- * a failed wait or a retired owner (the caller's own check then throws).
+ * script, then held the main thread 1.1 s in the canvas read-back that waited for all of it. A lost context or a failed
+ * wait rejects as the first frame's fences do (FenceAbortError, 'WebGL context lost' for a loss), crediting nothing; a
+ * retired owner ends the wait and the caller's own check throws.
  */
 function gpuSettled(renderer: Renderer, pause: () => Promise<void>, current: () => boolean): () => Promise<void> {
   return async () => {
     const gl = renderer.getContext();
     if (!('fenceSync' in gl)) { await pause(); return; }
+    const lost = (): FenceAbortError => new FenceAbortError('context-lost', 'WebGL context lost during a shader warm-up fence');
     const sync = gl.isContextLost() ? null : gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-    if (sync === null) { await pause(); return; }
+    if (sync === null) throw lost();
     try {
       gl.flush();
-      do await pause();
-      while (current() && !gl.isContextLost() && gl.clientWaitSync(sync, 0, 0) === gl.TIMEOUT_EXPIRED);
+      for (;;) {
+        await pause();
+        if (!current()) return;
+        if (gl.isContextLost()) throw lost();
+        const status = gl.clientWaitSync(sync, 0, 0);
+        if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) return;
+        if (status !== gl.TIMEOUT_EXPIRED) throw new FenceAbortError('wait-failed', `WebGL fence wait failed during a shader warm-up (0x${status.toString(16)})`);
+      }
     } finally { gl.deleteSync(sync); }
   };
 }

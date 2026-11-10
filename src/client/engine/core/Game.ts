@@ -3,6 +3,7 @@ import { engineString } from '../../../shared/engine/strings';
 import { Scope } from '../../../shared/engine/app/scope';
 import { FencedUnits } from '../render/fencedUnits';
 import { FrameDrawRanges, type FrameDrawRange } from '../render/frameDrawRange';
+import { opaqueMaterialOrder } from '../render/gltfMaterialOrder';
 import { installBrowserScopeEnvironment } from '../app/view/scopeEnvironment';
 import {pagePresentation} from '../app/view/presentation';
 import {PresentationLoop} from '../app/view/presentationLoop';
@@ -1376,11 +1377,15 @@ export class Game {
         && object.layers.test(cam.layers) && materials(object).length > 0) shown.push(object);
     });
     const transparent = (object: THREE.Object3D): boolean => materials(object).some(material => material.transparent);
-    const firstId = (object: THREE.Object3D): number => {
-      const id: unknown = Reflect.get(materials(object)[0] ?? {}, 'id');
-      return typeof id === 'number' ? id : 0;
+    // gltfOpaqueSort's key: render order, then the material's file batch and declaration index
+    const key = (object: THREE.Object3D): readonly [number, number] => {
+      const first = materials(object)[0];
+      return first === undefined ? [0, 0] : opaqueMaterialOrder(first);
     };
-    const opaque = shown.filter(object => !transparent(object)).sort((a, b) => a.renderOrder - b.renderOrder || firstId(a) - firstId(b));
+    const opaque = shown.filter(object => !transparent(object)).sort((a, b) => {
+      const ka = key(a), kb = key(b);
+      return a.renderOrder - b.renderOrder || ka[0] - kb[0] || ka[1] - kb[1];
+    });
     const order = [...opaque, ...shown.filter(transparent)];
     const prev = r.getRenderTarget(), face = r.getActiveCubeFace(), mip = r.getActiveMipmapLevel();
     for (let k = 1; k <= FIRST_VIEW_PARTS; k++) {

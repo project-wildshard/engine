@@ -24,3 +24,7 @@ slow (`narrow`); Metal Chromium and WebKit take none of them:
 Not fixed here: the first real world frame (`worldFrame`'s hidden frame) costs 0.3-0.6 s of read-back on most builds and
 2.0-2.4 s on some, base code included; the same frame's passes drawn just before it, fenced, took 26-223 ms each, and the
 uploads in it are under 0.5 MB, so its cost is not in our draws.
+
+Review (Codex, J206): `gpuSettled` now rejects a lost context or a failed fence wait with `FenceAbortError`, as the first
+frame's fences do, and the first-view prefixes order opaque drawables by `gltfOpaqueSort`'s key (render order, material
+file batch, declaration index; `opaqueMaterialOrder`).
