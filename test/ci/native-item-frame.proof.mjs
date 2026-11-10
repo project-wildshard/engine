@@ -169,7 +169,8 @@ timed(
     }
     const ids = ['pine.crossbow', 'pine.lever', 'pine.longbow']
     const state = host => ids.map(id => host.adapters.get(id)?.snapshot())
-    let contacts = 0
+    let contacts = 0,
+      postRestoreContacts = 0
     try {
       for (const [name, expected] of Object.entries(originalProfiles))
         assert.deepEqual(declaration(items, `weapon.${name}`).profile, expected)
@@ -235,10 +236,21 @@ timed(
           current.dispose()
           old = restoreSimHost(level, { rapier }, oldSaved, installOld)
           current = restoreSimHost(level, { rapier }, saved, install)
+          current.events.on(
+            'damage.dealt',
+            () => {
+              postRestoreContacts++
+            },
+            current.scope,
+          )
           assert.deepEqual(state(current), state(old))
         }
       }
       assert.ok(contacts > 0)
+      assert.ok(
+        postRestoreContacts > 0,
+        'Restored item owner must publish real contacts',
+      )
       const adapter = current.adapters.get('pine.lever')
       if (adapter === undefined) throw new Error('Missing cycle continuation')
       const before = adapter.snapshot()
