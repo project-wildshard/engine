@@ -530,11 +530,13 @@ function gallery(scope: Scope, go: (to: number) => void): HTMLElement {
   return root;
 }
 
-let open: Scope | null = null;
+let open: Scope | null = null, returnTo: HTMLElement | null = null;
 /** Show one failure's screen by id, or `gallery` for the list. Returns what closes it. Showing another closes this one. */
 export function showFailScreen(id: string, parent: HTMLElement = document.body): () => void {
+  // focus goes back to what had it before the first screen opened, however many the ribbon stepped through since
+  if (open === null) returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   open?.dispose();
-  const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const before = returnTo;
   const scope = new Scope('failScreens'), close = (): void => { scope.dispose(); if (open === scope) open = null; before?.focus(); };
   open = scope;
   const style = scope.ownNode(make('style')); style.id = STYLE_ID; style.textContent = CSS; document.head.append(style);
