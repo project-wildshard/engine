@@ -35,6 +35,7 @@ reattach the actual damage listener to the restored host, and separately
 require positive post-restore publication. The original positive contact
 assertion remains. All three cases pass after this strengthening; no
 second review, full gate or publication was run.
+
 ## Full-gate fixture type forward
 
 Q180 refused this unpublished row in the real solution typecheck:
@@ -45,6 +46,9 @@ preserves that exact branch, tuning and legacy item behavior. No JSON,
 controller, runtime, assertion or cap changes. The later CPU-broker loss
 was a fail-fast shutdown after this type error, not its cause.
 
-Before a fresh changed capture, run the complete kit/layer solution
-typecheck with one builder and all three real native item continuations.
+Before a fresh changed capture, the complete kit/layer solution
+typecheck with one builder passes in 9.17 seconds under a real build
+admission. All three native item cases pass in 1.140 seconds. Its input
+generation shrank three tracked boot tables in this private clone; only
+those known own generated changes are restored to their committed bytes.
 No unchanged retry, broker runtime patch or global hold is requested.
