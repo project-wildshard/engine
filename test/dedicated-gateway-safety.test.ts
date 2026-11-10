@@ -130,3 +130,20 @@ test('Cloudflare TURN answers parse, and credentials are shared while they last'
   clock = 49_000; await ice(); expect(calls).toBe(1);
   clock = 51_000; expect((await ice()).at(-1)).toEqual({ urls: 'turn:x', username: 'u', credential: '2' });
 });
+
+test('voice holds eight places in a cell even when nine join at once', async () => {
+  const { VoiceRelay } = await import('../src/server/host/dedicated/voiceRelay');
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const relay = new VoiceRelay(async () => { await gate; return []; });
+  const heard: string[][] = [], sends: ((bytes: ArrayBuffer) => void)[] = [];
+  for (let index = 0; index < 9; index++) {
+    const words: string[] = []; heard.push(words);
+    relay.attach({ control: (_control, bytes) => { words.push(new TextDecoder().decode(bytes)); },
+      onControl: listener => { sends.push(bytes => { listener('voice', bytes); }); return () => undefined; }, onClose: () => () => undefined }, 'cell', `P${String(index)}`);
+  }
+  for (const send of sends) send(new TextEncoder().encode('{"k":"join"}').buffer);
+  release(); await gate; await new Promise(resolve => { setImmediate(resolve); });
+  expect(heard.filter(words => words.some(word => word.includes('"k":"full"')))).toHaveLength(1);
+  expect(relay.talking).toBe(8);
+});

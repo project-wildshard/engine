@@ -33,7 +33,7 @@ export interface VoiceSocket {
   readonly onControl: (listener: (control: SocketControl, bytes: ArrayBuffer) => void) => () => void;
   readonly onClose: (listener: (reason: string) => void) => () => void;
 }
-interface Seat { readonly id: string; readonly cell: string; readonly name: string; readonly end: VoiceSocket; joined: boolean; joins: number }
+interface Seat { readonly id: string; readonly cell: string; readonly name: string; readonly end: VoiceSocket; joined: boolean; joining: boolean; joins: number }
 /** Public STUN only: two phones behind carrier NAT may not meet without TURN. */
 export const STUN_ONLY: readonly VoiceIceServer[] = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
 
@@ -50,7 +50,7 @@ export class VoiceRelay {
   constructor(ice: () => Promise<readonly VoiceIceServer[]> = () => Promise.resolve(STUN_ONLY)) { this.ice = ice; }
   /** A seated socket: it may join voice in `cell` until it closes. */
   attach(end: VoiceSocket, cell: string, name: string): void {
-    const seat: Seat = { id: newId(), cell, name, end, joined: false, joins: 0 };
+    const seat: Seat = { id: newId(), cell, name, end, joined: false, joining: false, joins: 0 };
     this.seats.set(seat.id, seat);
     const off = end.onControl((control, bytes) => { if (control === 'voice') this.heard(seat, bytes); });
     end.onClose(() => { off(); this.seats.delete(seat.id); if (seat.joined) { seat.joined = false; this.roster(cell); } });
@@ -60,10 +60,12 @@ export class VoiceRelay {
   /** Players on voice, in every cell. */
   get talking(): number { let count = 0; for (const seat of this.seats.values()) if (seat.joined) count++; return count; }
   private heard(seat: Seat, bytes: ArrayBuffer): void {
+    // A piece past its own count can't be put back together: it would only sit in a peer's memory.
+
     let raw: unknown;
     try { raw = JSON.parse(decoder.decode(bytes)); } catch { return; }
     const said = v.safeParse(VoiceSaySchema, raw);
-    if (!said.success || !this.seats.has(seat.id)) return;
+    if (!said.success || !this.seats.has(seat.id) || (said.output.k === 'sig' && said.output.i >= said.output.n)) return;
     const word = said.output;
     if (word.k === 'join') { void this.join(seat); return; }
     if (word.k === 'leave') { seat.joins++; if (seat.joined) { seat.joined = false; this.roster(seat.cell); } return; }
@@ -72,13 +74,15 @@ export class VoiceRelay {
     this.say(to, { k: 'sig', from: seat.id, m: word.m, i: word.i, n: word.n, d: word.d });
   }
   private async join(seat: Seat): Promise<void> {
-    if (seat.joined) return;
+    if (seat.joined || seat.joining) return;
+    // A join waiting on its ICE servers holds its place, so eight joining at once can't all count the same seven.
     let count = 0;
-    for (const other of this.seats.values()) if (other.joined && other.cell === seat.cell) count++;
+    for (const other of this.seats.values()) if ((other.joined || other.joining) && other.cell === seat.cell) count++;
     if (count >= VOICE_PER_CELL) { this.say(seat, { k: 'full' }); return; }
     const ticket = ++seat.joins;
+    seat.joining = true;
     let ice: readonly VoiceIceServer[];
-    try { ice = await this.ice(); } catch { ice = STUN_ONLY; }
+    try { ice = await this.ice(); } catch { ice = STUN_ONLY; } finally { seat.joining = false; }
     // Closed, left or joined again while the ICE servers were on their way: that later word wins.
     if (!this.seats.has(seat.id) || seat.joins !== ticket || seat.joined) return;
     const peers = [...this.seats.values()].filter(other => other.joined && other.cell === seat.cell).map(other => other.id);

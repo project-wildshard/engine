@@ -32,3 +32,11 @@ srflx), so its proof is the iOS Simulator on staging.
 The client half: one RTCPeerConnection per peer, the joiner offers, a
 chat-row mic button with off/asking/on/talking/blocked states, B on a
 keyboard, one tip under chat, and name chips that glow and mute.
+
+The J206 Codex review found three must-fixes, all fixed: offers dropped
+while TURN loaded (TURN now resolves before join), a stale hi taking
+over a new seat (the hi path is synchronous now, and every await checks
+its session and link), and unbounded half-heard pieces (per-peer and
+age limits, purged when a peer leaves). Also: the cell cap holds places
+for joins in flight, a failed TURN fetch is retried, signalling is
+paced at 6 pieces per 50 ms, and a silent offer is retried at 15 s.

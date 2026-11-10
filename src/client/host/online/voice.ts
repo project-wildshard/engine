@@ -28,8 +28,12 @@ export interface VoicePeer { readonly id: string; readonly name: string; speakin
 
 /** A remote level past this is talking; held this long after it drops, so a word's gaps don't flicker. */
 const SPEAKING_LEVEL = 0.03, SPEAKING_HOLD_MS = 450, LEVEL_POLL_MS = 150;
-/** An offerer retries a failed link this many times. */
-const RETRIES = 3;
+/** An offerer retries a failed or silent link this many times, the silent one after this long. */
+const RETRIES = 3, UNANSWERED_MS = 15_000;
+/** Signalling in pieces: a half-heard message is dropped after this long, and no peer holds more than a few at once. */
+const PIECES_MS = 10_000, PIECES_PER_PEER = 4, MAX_PIECES = 64;
+/** Pieces sent per 50 ms: signalling shares the game socket's message budget, so a burst is spread out. */
+const SEND_EVERY_MS = 50, SEND_PER_TICK = 6;
 /**
  * TURN for phones on 4G: a Cloudflare Worker mints short-lived Realtime TURN credentials, so the key's token never reaches a
  * page or the game server. Without it, the game server's STUN-only list stands and two phones behind carrier NAT may not meet.
@@ -56,7 +60,8 @@ async function fetchIce(url: string): Promise<RTCIceServer[] | null> {
 const MIC: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 
 /** `early` holds candidates heard before the remote description; `held`, our own found before our description went out. */
-interface Link { readonly pc: RTCPeerConnection; readonly offerer: boolean; readonly audio: HTMLAudioElement; readonly early: RTCIceCandidateInit[]; readonly held: RTCIceCandidateInit[]; described: boolean; heardAt: number; retries: number }
+interface Link { readonly pc: RTCPeerConnection; readonly offerer: boolean; readonly audio: HTMLAudioElement; readonly early: RTCIceCandidateInit[]; readonly held: RTCIceCandidateInit[]; readonly openedAt: number; described: boolean; heardAt: number; retries: number }
+interface Pieces { readonly from: string; readonly n: number; readonly at: number; readonly parts: (string | undefined)[]; got: number }
 type Signal = { readonly sdp: RTCSessionDescriptionInit } | { readonly cand: RTCIceCandidateInit };
 
 /** This device's voice choices: on when it last left (so a grid crossing keeps it on), and whether the first tip was seen. */
@@ -78,7 +83,10 @@ export class VoiceChat {
   speaking = false;
   private readonly link: VoiceLink;
   private readonly links = new Map<string, Link>();
-  private readonly pieces = new Map<string, string[]>();
+  private readonly pieces = new Map<string, Pieces>();
+  private readonly outbox: object[] = [];
+  /** Bumped on every new seat, stop and disposal: an await that comes back to an older one does nothing. */
+  private session = 0;
   private readonly muted = new Set<string>();
   private readonly changes = new Set<() => void>();
   private me: string | null = null;
@@ -89,13 +97,15 @@ export class VoiceChat {
   private selfAt = 0;
   private wanted = false;
   private turn: { readonly at: number; readonly servers: Promise<RTCIceServer[] | null> } | null = null;
+  private turned: RTCIceServer[] | null = null;
   private readonly iceUrl: string;
   constructor(scope: Scope, link: VoiceLink, iceUrl: string = VOICE_ICE_URL) {
     this.link = link; this.iceUrl = iceUrl;
     if (typeof RTCPeerConnection !== 'function' || typeof navigator.mediaDevices?.getUserMedia !== 'function') this.state = 'unsupported';
     scope.onDispose(link.on(word => { this.heard(word); }));
     scope.interval(LEVEL_POLL_MS, () => { void this.poll(); });
-    scope.onDispose(() => { this.close(); });
+    scope.interval(SEND_EVERY_MS, () => { for (const word of this.outbox.splice(0, SEND_PER_TICK)) this.link.send(word); });
+    scope.onDispose(() => { this.wanted = false; this.session++; this.close(); });
     // A remote stream an autoplay rule held back plays on the next touch.
     listenPage(scope, 'pointerdown', () => { for (const { audio } of this.links.values()) if (audio.paused) void audio.play().catch(() => undefined); });
     void this.checkPermission();
@@ -107,23 +117,44 @@ export class VoiceChat {
   async start(): Promise<void> {
     if (this.state === 'unsupported' || this.state === 'asking' || this.state === 'joining' || this.state === 'on') return;
     this.wanted = true; voicePrefs.write({ wanted: true });
+    const session = ++this.session;
     this.set('asking');
-    if (this.iceUrl !== '' && (this.turn === null || diagnosticNow() - this.turn.at > ICE_KEEP_MS)) this.turn = { at: diagnosticNow(), servers: fetchIce(this.iceUrl) };
+    // Made inside the tap: Safari only lets an AudioContext run if it starts in the gesture, and the mic's answer comes later.
+    const context = this.analyser === null && typeof AudioContext === 'function' ? new AudioContext() : null;
+    void context?.resume().catch(() => undefined);
+    const turn = this.ask();
+    let mic: MediaStream;
     try {
-      this.mic ??= await navigator.mediaDevices.getUserMedia({ audio: MIC, video: false });
+      mic = this.mic ?? await navigator.mediaDevices.getUserMedia({ audio: MIC, video: false });
     } catch (error) {
+      void context?.close().catch(() => undefined);
+      if (session !== this.session) return;
       this.wanted = false;
       this.set(error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError') ? 'denied' : 'failed');
       return;
     }
-    if (!this.wanted) { this.releaseMic(); return; }
-    this.listenToSelf();
+    // Stopped, or started again, while the browser asked: this answer is nobody's.
+    if (session !== this.session || !this.wanted) { void context?.close().catch(() => undefined); if (mic !== this.mic) for (const track of mic.getTracks()) track.stop(); return; }
+    this.mic = mic;
+    if (context !== null) this.listenToSelf(context);
     this.set('joining');
+    // The TURN list is in hand before joining, so nobody's offer can arrive while this page still waits for it.
+    this.turned = await turn;
+    if (session !== this.session || !this.wanted) return;
     if (this.me !== null) this.link.send({ k: 'join' });
+  }
+  /** The Worker's TURN list: a good answer is kept for an hour, a failed one is asked again next time. */
+  private ask(): Promise<RTCIceServer[] | null> {
+    if (this.iceUrl === '') return Promise.resolve(null);
+    if (this.turn !== null && diagnosticNow() - this.turn.at < ICE_KEEP_MS) return this.turn.servers;
+    const servers = fetchIce(this.iceUrl), asked = { at: diagnosticNow(), servers };
+    this.turn = asked;
+    void servers.then(found => { if (found === null && this.turn === asked) this.turn = null; return found; });
+    return servers;
   }
   /** Voice off: leave, hang up on everyone, and give the mic back so the browser's mic light goes out. */
   stop(): void {
-    this.wanted = false; voicePrefs.write({ wanted: false });
+    this.wanted = false; this.session++; voicePrefs.write({ wanted: false });
     if (this.state === 'on' || this.state === 'joining') this.link.send({ k: 'leave' });
     this.close();
     this.set(this.state === 'unsupported' ? 'unsupported' : 'off');
@@ -158,35 +189,40 @@ export class VoiceChat {
         now.add(id);
         if (!this.roster.has(id)) this.roster.set(id, { id, name, speaking: false, muted: this.muted.has(id), linked: false });
       }
-      for (const id of this.roster.keys()) if (!now.has(id)) { this.roster.delete(id); this.drop(id); }
+      for (const id of this.roster.keys()) if (!now.has(id)) { this.roster.delete(id); this.drop(id); this.forget(id); }
       this.changed();
       return;
     }
     if (word.k === 'full') { this.wanted = false; this.close(); this.set('full'); return; }
     if (word.k === 'hi') {
-      if (!this.wanted || this.mic === null) { this.link.send({ k: 'leave' }); return; }
-      void this.begin(word);
+      if (!this.wanted || this.mic === null || this.state !== 'joining') { if (!this.wanted) this.link.send({ k: 'leave' }); return; }
+      this.ice = this.turned ?? word.ice; this.set('on');
+      for (const id of word.peers) if (id !== this.me) void this.offer(id);
       return;
     }
     this.piece(word);
   }
-  /** Joined: take the Worker's TURN list over the server's STUN one, then offer to everyone already on. */
-  private async begin(word: Extract<VoiceHeard, { k: 'hi' }>): Promise<void> {
-    const turn = await this.turn?.servers ?? null;
-    if (!this.wanted || this.mic === null || this.state !== 'joining') return;
-    this.ice = turn ?? word.ice; this.set('on');
-    for (const id of word.peers) if (id !== this.me) void this.offer(id);
-  }
   private piece(word: Extract<VoiceHeard, { k: 'sig' }>): void {
-    if (this.state !== 'on') return;
-    const key = `${word.from}:${String(word.m)}`, parts = this.pieces.get(key) ?? Array.from({ length: word.n }, () => '');
-    parts[word.i] = word.d; this.pieces.set(key, parts);
-    if (parts.some((part, index) => part === '' && index !== word.i)) return;
+    if (this.state !== 'on' || !this.roster.has(word.from) || word.n > MAX_PIECES || word.i >= word.n) return;
+    const key = `${word.from}:${String(word.m)}`;
+    let held = this.pieces.get(key);
+    if (held === undefined) {
+      let mine = 0;
+      for (const other of this.pieces.values()) if (other.from === word.from) mine++;
+      if (mine >= PIECES_PER_PEER) return;
+      held = { from: word.from, n: word.n, at: diagnosticNow(), parts: Array.from<string | undefined>({ length: word.n }), got: 0 };
+      this.pieces.set(key, held);
+    }
+    if (held.n !== word.n || held.parts[word.i] !== undefined) return;
+    held.parts[word.i] = word.d; held.got++;
+    if (held.got < held.n) return;
     this.pieces.delete(key);
     let signal: Signal;
-    try { signal = JSON.parse(parts.join('')) as Signal; } catch { return; }
+    try { signal = JSON.parse(held.parts.join('')) as Signal; } catch { return; }
     void this.signal(word.from, signal);
   }
+  /** Drop every half-heard message from one peer. */
+  private forget(id: string): void { for (const [key, held] of this.pieces) if (held.from === id) this.pieces.delete(key); }
   private async signal(from: string, signal: Signal): Promise<void> {
     try {
       if ('cand' in signal) {
@@ -201,8 +237,10 @@ export class VoiceChat {
         const link = this.open(from, false);
         await link.pc.setRemoteDescription(signal.sdp);
         await this.flush(link);
-        await link.pc.setLocalDescription(await link.pc.createAnswer());
-        if (link.pc.localDescription !== null) this.describe(from, link, link.pc.localDescription.toJSON());
+        const answer = await link.pc.createAnswer();
+        if (this.links.get(from) !== link) return;
+        await link.pc.setLocalDescription(answer);
+        if (this.links.get(from) === link && link.pc.localDescription !== null) this.describe(from, link, link.pc.localDescription.toJSON());
       } else if (signal.sdp.type === 'answer') {
         const link = this.links.get(from);
         if (link === undefined || link.pc.signalingState !== 'have-local-offer') return;
@@ -217,15 +255,17 @@ export class VoiceChat {
     const link = this.open(id, true);
     link.retries = retries;
     try {
-      await link.pc.setLocalDescription(await link.pc.createOffer());
-      if (link.pc.localDescription !== null) this.describe(id, link, link.pc.localDescription.toJSON());
-    } catch { this.drop(id); }
+      const offer = await link.pc.createOffer();
+      if (this.links.get(id) !== link) return;
+      await link.pc.setLocalDescription(offer);
+      if (this.links.get(id) === link && link.pc.localDescription !== null) this.describe(id, link, link.pc.localDescription.toJSON());
+    } catch { if (this.links.get(id) === link) this.drop(id); }
   }
   private open(id: string, offerer: boolean): Link {
     const pc = new RTCPeerConnection({ iceServers: [...this.ice] }), audio = document.createElement('audio');
     audio.autoplay = true; audio.setAttribute('playsinline', ''); audio.muted = this.muted.has(id); audio.dataset['voicePeer'] = id;
     // Played from memory, never mounted: a hidden element in the page would only be one more node to keep.
-    const link: Link = { pc, offerer, audio, early: [], held: [], described: false, heardAt: 0, retries: 0 };
+    const link: Link = { pc, offerer, audio, early: [], held: [], openedAt: diagnosticNow(), described: false, heardAt: 0, retries: 0 };
     this.links.set(id, link);
     for (const track of this.mic?.getAudioTracks() ?? []) if (this.mic !== null) pc.addTrack(track, this.mic);
     pc.ontrack = event => { audio.srcObject = event.streams[0] ?? new MediaStream([event.track]); void audio.play().catch(() => undefined); };
@@ -247,7 +287,7 @@ export class VoiceChat {
   }
   private say(to: string, signal: Signal): void {
     const text = JSON.stringify(signal), m = ++this.sent, n = Math.ceil(text.length / VOICE_PIECE_CHARS);
-    for (let i = 0; i < n; i++) this.link.send({ k: 'sig', to, m, i, n, d: text.slice(i * VOICE_PIECE_CHARS, (i + 1) * VOICE_PIECE_CHARS) });
+    for (let i = 0; i < n; i++) this.outbox.push({ k: 'sig', to, m, i, n, d: text.slice(i * VOICE_PIECE_CHARS, (i + 1) * VOICE_PIECE_CHARS) });
   }
   private drop(id: string): void {
     const link = this.links.get(id);
@@ -258,7 +298,7 @@ export class VoiceChat {
     const peer = this.roster.get(id);
     if (peer !== undefined) { peer.linked = false; peer.speaking = false; }
   }
-  private hangUp(): void { for (const id of this.links.keys()) this.drop(id); this.pieces.clear(); }
+  private hangUp(): void { for (const id of this.links.keys()) this.drop(id); this.pieces.clear(); this.outbox.length = 0; }
   private close(): void {
     this.hangUp(); this.releaseMic();
     for (const peer of this.roster.values()) peer.speaking = false;
@@ -269,15 +309,14 @@ export class VoiceChat {
     void this.analyser?.context.close().catch(() => undefined);
     this.analyser = null; this.level = 0; this.speaking = false;
   }
-  private listenToSelf(): void {
-    if (this.mic === null || typeof AudioContext !== 'function') return;
+  private listenToSelf(context: AudioContext): void {
+    if (this.mic === null) return;
     try {
-      const context = new AudioContext(), node = context.createAnalyser();
+      const node = context.createAnalyser();
       node.fftSize = 512;
       context.createMediaStreamSource(this.mic).connect(node);
       this.analyser = { context, node, data: new Float32Array(node.fftSize) };
-      void context.resume().catch(() => undefined);
-    } catch { this.analyser = null; }
+    } catch { this.analyser = null; void context.close().catch(() => undefined); }
   }
   private async poll(): Promise<void> {
     const now = diagnosticNow();
@@ -292,7 +331,10 @@ export class VoiceChat {
       if (speaking !== this.speaking || Math.abs(level - this.level) > 0.05) moved = true;
       this.level = level; this.speaking = speaking;
     }
+    for (const [key, held] of this.pieces) if (now - held.at > PIECES_MS) this.pieces.delete(key);
     for (const [id, link] of this.links) {
+      // An offer nobody answered, or a link that never got going: the offerer starts again.
+      if (link.offerer && this.state === 'on' && link.pc.connectionState !== 'connected' && now - link.openedAt > UNANSWERED_MS && link.retries < RETRIES) { void this.offer(id, link.retries + 1); continue; }
       const peer = this.roster.get(id);
       if (peer === undefined) continue;
       if (await heardLevel(link.pc) > SPEAKING_LEVEL) link.heardAt = now;
