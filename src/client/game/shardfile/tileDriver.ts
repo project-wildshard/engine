@@ -415,9 +415,22 @@ export function residentTiles(resident: Scope, contents: readonly TileContent[],
     // 1.7-2.8 s on the Simulator with no count)
     const keys = tileKeys(order.tiles.filter(tile => order.rank(tile) === 0)), units = loadingUnits('Spawn tiles', keys.length);
     units(0);
-    await driver.require(keys, count => { units(count); }); live();
+    // DL21: the coarse cover starts once the arrival tile is attached, beside the rest of the spawn tiles, whose count
+    // moves the card meanwhile. Warm Nine's cover re-reads its kit's files through the service worker, and WebKit's
+    // Cache Storage held the first of them 1.0 s (a hit, its cache handle already open) after the spawn tiles' ~2 s
+    // without one: 'Spawn tiles 9 / 9 · coarse cover' sat still for that second. A failed tile still refuses the boot
+    // once the cover has settled, so no cover work outlives it; with no spawn tile the cover starts after them as before.
+    let coarse: Promise<void> | undefined;
+    const cover = (): Promise<void> => {
+      if (coarse === undefined) { coarse = driver.coarse(at.x, at.z); void Promise.allSettled([coarse]); } // awaited below
+      return coarse;
+    };
+    try {
+      await driver.require(keys, count => { units(count); if (count === 1) void cover(); });
+    } catch (error: unknown) { await Promise.allSettled(coarse === undefined ? [] : [coarse]); live(); throw error; }
+    live();
     units(keys.length, 'coarse cover');
-    await driver.coarse(at.x, at.z); live();
+    await cover(); live();
     drivers.set(resident, driver);
     noteEnteredTiles(resident, () => ({ render: driver.resident('render'), colliders: driver.resident('colliders'), bytes: tileBytes.get(resident) ?? new Map() }));
     preparation.complete = true;
