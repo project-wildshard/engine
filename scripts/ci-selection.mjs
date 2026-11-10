@@ -1,6 +1,8 @@
 // A green docs-only verdict is never evidence that the code was tested.
 import {execFileSync} from 'node:child_process';
-import {appendFileSync} from 'node:fs';
+import {appendFileSync,existsSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {readLiftPending} from './lift-pending.mjs';
 import {pathToFileURL} from 'node:url';
 import {pushSelection} from './push-selection.mjs';
 
@@ -42,6 +44,13 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
    const tests=jobs.filter(job=>record(job)&&typeof job.name==='string'&&/^tests(?: \(.+\))?$/u.test(job.name));
    if(!['changes','static','plan','e2e'].every(passed)||tests.length===0||tests.some(job=>!record(job)||job.status!=='completed'||job.conclusion!=='success'))continue;
    const selected=pushSelection(`refs/heads/main ${sha} refs/heads/main ${run.head_sha}`,cwd);
+   // Unchanged source is insufficient after a time-based discovery exclusion
+   // expires. Stay full until the inherited inventory is actually disposed;
+   // an older green run did not prove those newly required files.
+   if(selected.mode==='docs'&&existsSync(resolve(cwd,'test/lift-pending-policy.json'))){
+    const pending=readLiftPending(cwd);
+    if(pending.files.length>0&&pending.excluded.length===0)return full('Inherited migration exclusion expired; require the complete current test inventory');
+   }
    return {docs:selected.mode==='docs',base:run.head_sha,reason:`Compared with code-proving CI run ${run.id}: ${selected.reason}`};
   }
   return full('No successful code-proving ancestor in Actions history; run full');

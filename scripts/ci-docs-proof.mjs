@@ -1,5 +1,6 @@
 // Run the workflow's real classification command against Git and a local Actions API double.
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {execFileSync,spawn} from 'node:child_process';
 import {createServer} from 'node:http';
 import {copyFileSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
@@ -40,7 +41,7 @@ const classify=async(before,sha)=>{
 };
 try{
  git(['init','--quiet','--initial-branch=main']);mkdirSync(join(work,'scripts'));mkdirSync(join(work,'src'));mkdirSync(join(work,'test'));mkdirSync(join(work,'docs'));
- for(const name of ['push-selection.mjs','ci-selection.mjs'])if(existsSync(`scripts/${name}`))copyFileSync(`scripts/${name}`,join(work,'scripts',name));
+ for(const name of ['push-selection.mjs','ci-selection.mjs','lift-pending.mjs'])if(existsSync(`scripts/${name}`))copyFileSync(`scripts/${name}`,join(work,'scripts',name));
  writeFileSync(join(work,'src/value.ts'),'export const value=1;');writeFileSync(join(work,'test/value.mjs'),"import assert from 'node:assert/strict';import {value} from '../src/value.ts';assert.equal(value,1);");
  writeFileSync(join(work,'docs/note.md'),'base');git(['add','scripts','src','test','docs']);git(['commit','--quiet','-m','proved code']);const proved=git(['rev-parse','HEAD']);
  execFileSync(process.execPath,['test/value.mjs'],{cwd:work,stdio:'pipe'});
@@ -56,6 +57,22 @@ try{
  writeFileSync(join(work,'docs/note.md'),'docs after proved fix');git(['add','docs/note.md']);git(['commit','--quiet','-m','safe docs']);const safe=git(['rev-parse','HEAD']);
  runs=[{id:1,head_sha:fixed,status:'completed',conclusion:'success',event:'push'}];
  assert.equal(await classify(fixed,safe),true,'A real code-proving predecessor permits the optimization');
- badApi=true;assert.equal(await classify(fixed,safe),false,'An unavailable proof runs full');
- console.log(JSON.stringify({redCodeRefused:true,cancelledCodeRefused:true,docsSuccessInsufficient:true,provedDocsAllowed:true,apiFailureRunsFull:true}));
+ badApi=true;assert.equal(await classify(fixed,safe),false,'An unavailable proof runs full');badApi=false;
+ // The real saved Git policy expired since the API's green run. Its restored
+ // file genuinely fails now, even though the next commit changes only docs.
+ const admitted=new Date((Math.floor(Date.now()/1000)-7200)*1000),deadline=new Date(admitted.getTime()+3600000).toISOString();
+ const pending=`${JSON.stringify(['test/expired.test.mjs'],null,2)}\n`;
+ writeFileSync(join(work,'test/expired.test.mjs'),"import assert from 'node:assert/strict';assert.fail('newly required inherited test');");
+ writeFileSync(join(work,'test/lift-pending.json'),pending);
+ writeFileSync(join(work,'test/lift-pending-policy.json'),JSON.stringify({schema:1,owner:'codex-proof',registeredAt:admitted.toISOString(),deadline,inventorySha256:createHash('sha256').update(pending).digest('hex'),reason:'Actual inherited migration fixture restores its required test after the fixed original deadline.'}));
+ git(['add','test/expired.test.mjs','test/lift-pending.json','test/lift-pending-policy.json']);
+ execFileSync('git',['-c','user.name=Selection proof','-c','user.email=proof@example.test','commit','--quiet','-m','policy before its deadline'],{cwd:work,env:{...process.env,GIT_COMMITTER_DATE:admitted.toISOString()}});
+ const beforeExpiry=git(['rev-parse','HEAD']);
+ const expired=JSON.parse(execFileSync(process.execPath,['scripts/lift-pending.mjs'],{cwd:work,encoding:'utf8'}));
+ assert.equal(expired.excluded,0);assert.equal(expired.files.length,1);
+ assert.throws(()=>execFileSync(process.execPath,['test/expired.test.mjs'],{cwd:work,stdio:'pipe'}));
+ runs=[{id:1,head_sha:beforeExpiry,status:'completed',conclusion:'success',event:'push'}];
+ writeFileSync(join(work,'docs/note.md'),'docs after inherited exclusion expires');git(['add','docs/note.md']);git(['commit','--quiet','-m','docs after expiry']);const afterExpiry=git(['rev-parse','HEAD']);
+ assert.equal(await classify(beforeExpiry,afterExpiry),false,'An old green code run cannot hide newly required failing tests after expiry');
+ console.log(JSON.stringify({redCodeRefused:true,cancelledCodeRefused:true,docsSuccessInsufficient:true,provedDocsAllowed:true,apiFailureRunsFull:true,expiredInheritedTestsRunFull:true}));
 }finally{await new Promise(resolve=>{server.close(resolve);});rmSync(work,{recursive:true,force:true});}
