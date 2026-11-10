@@ -8,42 +8,78 @@
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:05:02.000Z",
       "deadline": "2026-11-10T12:04:31.000Z",
-      "reason": "CI4 60-second file budget overrun: 111595 ms, assertions passed; ci 42478017721 shard 2"
+      "reason": "CI4 60-second file budget overrun: 111595 ms, assertions passed; ci 42478017721 shard 2",
+      "extension": {
+        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 23 original cases passed, full module73.233s; streak0/10 after executed reset73.233s in CI42764703480. The bounded producer is in, but cold/validation/encoder cost still overruns. Preserve all23 cold/warm/security/terminal cases while profiling the remaining real producer cost; no successor covers that complete edge. One48h extension; no second.",
+        "grantedAt": "2026-11-10T06:02:19.000Z",
+        "decidedBy": "codex-pinefix2",
+        "deadline": "2026-11-12T12:04:31.000Z"
+      }
     },
     {
       "file": "test/nalati-headless-population.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:05:02.000Z",
       "deadline": "2026-11-10T12:04:31.000Z",
-      "reason": "CI4 60-second file budget overrun: 101959 ms, assertions passed; ci 42478017721 shard 3"
+      "reason": "CI4 60-second file budget overrun: 101959 ms, assertions passed; ci 42478017721 shard 3",
+      "extension": {
+        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 2 original cases passed, full module90.514s; streak0/10 after executed reset90.514s in CI42764703480. Preserve the complete roster, physical walk/night/raid and independent worker restore. The original file still overruns; measured array-copy cost cannot repair it. Profile native movement and the worker half without reducing ticks, actors or wire checks. One48h extension; no second.",
+        "grantedAt": "2026-11-10T06:02:19.000Z",
+        "decidedBy": "codex-pinefix2",
+        "deadline": "2026-11-12T12:04:31.000Z"
+      }
     },
     {
       "file": "test/nalati-bot-taming.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 69632 ms, assertion passed; ci 42479173262 shard 2"
+      "reason": "60-second file budget overrun: 69632 ms, assertion passed; ci 42479173262 shard 2",
+      "extension": {
+        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module38.484s; streak1/10 after executed reset77.880s in CI42763893464. Preserve18,694 real ticks and all five bot-only taming rounds, refill/save/near-player refusals. Safe layout/frame packing is still unproved; no complete successor permits deleting this edge. One48h extension; no second.",
+        "grantedAt": "2026-11-10T06:02:19.000Z",
+        "decidedBy": "codex-pinefix2",
+        "deadline": "2026-11-12T12:20:11.000Z"
+      }
     },
     {
       "file": "test/nalati-discovery-verbs.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 72816 ms, assertion passed; ci 42479173262 shard 1"
+      "reason": "60-second file budget overrun: 72816 ms, assertion passed; ci 42479173262 shard 1",
+      "extension": {
+        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module73.437s; streak0/10 after executed reset73.437s in CI42764703480. Preserve all7,618 real inputs,15 independent replay parts and17 discoveries/notices. Codec pilots gave no whole-case saving and were rejected. Fix measured replay/packing cost without replacing replay with recorder output. One48h extension; no second.",
+        "grantedAt": "2026-11-10T06:02:19.000Z",
+        "decidedBy": "codex-pinefix2",
+        "deadline": "2026-11-12T12:20:11.000Z"
+      }
     },
     {
       "file": "test/driftwood-long-session.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 75238 ms, assertion passed; ci 42479173262 shard 4"
+      "reason": "60-second file budget overrun: 75238 ms, assertion passed; ci 42479173262 shard 4",
+      "extension": {
+        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module57.969s; streak1/10 after executed reset83.782s in CI42763893464. Preserve1,200 seconds at capacity, unique-ID/slot reuse and the300-second independent restored suffix. Numeric publication remains load-sensitive; no verified replacement covers the uninterrupted lifecycle. One48h extension; no second.",
+        "grantedAt": "2026-11-10T06:02:19.000Z",
+        "decidedBy": "codex-pinefix2",
+        "deadline": "2026-11-12T12:20:11.000Z"
+      }
     },
     {
       "file": "test/nalati-taming-verbs.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:21:18.000Z",
       "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 89597 ms, assertion passed; ci 42479173262 shard 5 subsequently exceeded its job clock"
+      "reason": "60-second file budget overrun: 89597 ms, assertion passed; ci 42479173262 shard 5 subsequently exceeded its job clock",
+      "extension": {
+        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module36.960s; streak1/10 after executed reset76.601s in CI42763893464. Preserve the entry walk, all five real field rounds, earned mid-round checkpoint and complete restored/post-bond suffix. Safe frame/layout reuse is unproved; no successor covers the whole continuation. One48h extension; no second.",
+        "grantedAt": "2026-11-10T06:02:19.000Z",
+        "decidedBy": "codex-pinefix2",
+        "deadline": "2026-11-12T12:20:11.000Z"
+      }
     }
   ]
 }
