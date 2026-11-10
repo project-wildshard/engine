@@ -4,7 +4,7 @@
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { browserPool } from './pool.mjs';
+import { browserPool, parallel } from './pool.mjs';
 import { registerCaptureTrace } from './capture-trace.mjs';
 import { serve } from './serve.mjs';
 import { saveFixture } from '../debug-settings.mjs';
@@ -105,12 +105,21 @@ export function bootCatalogue() {
   });
 }
 
-/** Retire earlier GPU contexts before the grid's two-document boot.
+/** Each case runs in its own slot's browser; retire that slot's earlier GPU contexts before the grid's two-document boot.
  * @template T @param {{browser:(slot:number)=>Promise<T>,release:(slot:number)=>Promise<void>}} pool
- * @param {'standalone'|'grid'|'public-policy'} mode @returns {Promise<T>} */
-export async function bootCaseBrowser(pool, mode) {
-  if (mode === 'grid') await pool.release(0);
-  return pool.browser(0);
+ * @param {'standalone'|'grid'|'public-policy'} mode @param {number} [slot] @returns {Promise<T>} */
+export async function bootCaseBrowser(pool, mode, slot = 0) {
+  if (mode === 'grid') await pool.release(slot);
+  return pool.browser(slot);
+}
+
+/** BROWSER-TESTS-BENCH BB2 (J231): how many cases boot at once, each in its own browser against the one preview server.
+ * 1 keeps the old one-after-another order; Ring 1 passes its measured choice.
+ * @param {string|undefined} value @returns {number} */
+export function bootJobs(value) {
+  if (value === undefined) return 1;
+  if (!/^[1-8]$/u.test(value)) throw new Error('usage: --jobs=1..8');
+  return Number(value);
 }
 
 /** Every public primary enters through its real public button; experimental primaries enter with Developer on.
@@ -541,19 +550,21 @@ async function main() {
   const preview = external === undefined ? await serve(root, '', true) : null;
   const base = external ?? preview?.url;
   if (!base) throw new Error('No built preview');
-  const pool = browserPool(root, 1, option('angle') ?? (process.platform === 'darwin' ? 'metal' : 'swiftshader'), true);
+  const jobs = bootJobs(option('jobs'));
+  const pool = browserPool(root, jobs, option('angle') ?? (process.platform === 'darwin' ? 'metal' : 'swiftshader'), true);
   try {
     const browser = await pool.browser(0);
     const group = option('case-group') ?? 'all';
     if (group !== 'all' && group !== 'public' && group !== 'developer' && group !== 'grid') throw new Error('usage: --case-group=all|public|developer|grid');
     const catalogue = await discoverCatalogue(browser, base);
     const cases = bootCases(catalogue, group);
-    writeFileSync(join(out, 'cases.json'), `${JSON.stringify({ group, catalogue, cases }, null, 2)}\n`);
-    for (const [mode, shard, developer] of cases) {
-      const isolated = await bootCaseBrowser(pool, mode);
+    writeFileSync(join(out, 'cases.json'), `${JSON.stringify({ group, jobs, catalogue, cases }, null, 2)}\n`);
+    // Every started case finishes and keeps its receipt before the first failure is thrown (pool.mjs `parallel`).
+    await parallel([...cases], jobs, async ([mode, shard, developer], _index, slot) => {
+      const isolated = await bootCaseBrowser(pool, mode, slot);
       const result = await bootCase(isolated, base, mode, out, shard, developer);
       console.log(`${mode}: ${mode === 'public-policy' ? 'public-policy admission' : 'gameplay'} PASS in ${result.elapsedMs}ms, frame=${result.frame}, faults=${result.faults.length}`);
-    }
+    });
   } finally { try { await pool.close(); } finally { preview?.close(); } }
 }
 if (process.argv[1] && pathToFileURL(resolvePath(process.argv[1])).href === import.meta.url) await main();

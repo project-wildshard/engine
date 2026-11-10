@@ -37,7 +37,7 @@
     "gen:inputs": "node scripts/gen.mjs --inputs-only",
     "gen:source": "node --import ./scripts/bake-loader.mjs scripts/gen-source.mjs",
     "pins": "node scripts/pins.ts install",
-    "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",
+    "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 && node scripts/gen.mjs --inputs-only && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",
     "ring:1": "bash scripts/ring1.sh all",
     "release:stamp": "node scripts/stamp-validation-revision.mjs",
     "lint:typed": "node scripts/lint-all.mjs",

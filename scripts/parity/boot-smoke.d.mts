@@ -29,8 +29,11 @@ export function bootStoredSave(instance: string): Promise<string | null>;
 /** Both real frame commits and the matching durable Template namespace must be present. */
 export function verifyBootTemplateRoad(result: {entry:FloorGridWitness;exit:FloorGridWitness;checkpoint:ReturnType<typeof bootTemplateCheckpoint>}):void;
 
-/** Give the grid a fresh browser after prior contexts are closed, preserving every case law. */
-export function bootCaseBrowser<T>(pool: {browser:(slot:number)=>Promise<T>;release:(slot:number)=>Promise<void>}, mode:'standalone'|'grid'|'public-policy'):Promise<T>;
+/** Each case's own slot browser; the grid gets a fresh one after that slot's prior contexts are closed, preserving every case law. */
+export function bootCaseBrowser<T>(pool: {browser:(slot:number)=>Promise<T>;release:(slot:number)=>Promise<void>}, mode:'standalone'|'grid'|'public-policy', slot?:number):Promise<T>;
+
+/** BB2: how many boot cases run at once (`--jobs`, 1..8; 1 when absent). */
+export function bootJobs(value: string|undefined): number;
 
 /** Discover actual built-title rows through its normal document. */
 export function discoverCatalogue(browser: Browser, base: string): Promise<{slug:string;status:string;legacy:boolean;shardSelect:boolean}[]>;

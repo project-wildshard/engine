@@ -200,5 +200,29 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: bash scripts/ring1.sh build-boot
+      # BROWSER-TESTS-BENCH BB2 (J231): Chromium is cached by Playwright version and installed while the build runs.
+      - id: playwright
+        run: echo "version=$(node -p "require('./package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # Spawn parts' q11 Brotli bodies, kept by content (DL15); each one is checked against its body before use.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ring1-spawn-parts-br-${{ github.sha }}
+          restore-keys: ring1-spawn-parts-br-
+      - run: bash scripts/ci-browser.sh start
+      - run: bash scripts/ring1.sh build
+      - name: Keep only this build's spawn-part encodings in the cache
+        run: |
+          cache=~/.cache/wildshard/gen/spawn-parts-br/1
+          shopt -s nullglob
+          for file in "$cache"/*.br; do
+            name=$(basename "$file")
+            [ -f "dist/assets/spawn/parts/${name:0:16}.pack.br" ] || rm -f "$file"
+          done
+          du -sh "$cache" 2>/dev/null || true
+      - run: bash scripts/ci-browser.sh wait
+      - run: bash scripts/ring1.sh boot

@@ -233,7 +233,15 @@ jobs:
           git config --global url."$base".insteadOf "git@github.com:project-wildshard/"
           git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      # BROWSER-TESTS-BENCH BB2/BB5 (J231): both specs launch chromium-headless-shell, so only it is installed, from a
+      # cache keyed on the Playwright version; a warm run downloads nothing.
+      - id: playwright
+        run: echo "version=$(node -p "require('./package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-headless-shell-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
       - run: pnpm test:e2e
       # Jake 2026-11-10: the title's hero stays big and its build label short and clear of the logo
       - run: node --test test/title-layout-browser.proof.mjs

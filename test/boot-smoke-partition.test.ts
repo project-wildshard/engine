@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bootCases } from '../scripts/parity/boot-smoke.mjs';
+import { bootCaseBrowser, bootCases, bootJobs } from '../scripts/parity/boot-smoke.mjs';
 
 const catalogue = [
   { slug: 'driftwood-isle', status: 'live', legacy: false },
@@ -26,4 +26,17 @@ test('the independent grid leg keeps the actual public home and the mandatory ro
     ['standalone', 'far-reach', true], ['standalone', '_template', true],
   ]);
   expect(bootCases(catalogue, 'public')).toContainEqual(['public-policy', 'nine-dragon-stack', false]);
+});
+
+test('BB2: boot cases run on their own slots, the grid retires only its own slot, and --jobs is bounded', async () => {
+  const calls: string[] = [];
+  const pool = { browser: async (slot: number) => { calls.push(`browser ${slot}`); return slot; },
+    release: async (slot: number) => { calls.push(`release ${slot}`); } };
+  expect(await bootCaseBrowser(pool, 'standalone', 2)).toBe(2);
+  expect(await bootCaseBrowser(pool, 'grid', 1)).toBe(1);
+  expect(await bootCaseBrowser(pool, 'standalone')).toBe(0);
+  expect(calls).toEqual(['browser 2', 'release 1', 'browser 1', 'browser 0']);
+  expect(bootJobs(undefined)).toBe(1);
+  expect(bootJobs('3')).toBe(3);
+  for (const bad of ['0', '9', '2.5', '', ' 3', 'three']) expect(() => bootJobs(bad)).toThrow('--jobs=1..8');
 });
