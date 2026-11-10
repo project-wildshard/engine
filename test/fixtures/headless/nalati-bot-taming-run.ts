@@ -30,7 +30,7 @@ try{
   assert.ok(first);assert.ok(firstTaming);assert.ok(controls);
   const stallion=[...host.entities.values()].find(actor=>actor.kind==='horse'&&actor.variant==='stallion');assert.ok(stallion);
   const bot=host.addPlayer('bot.tamer',{x:stallion.position.x-3,y:stallion.position.y+.3,z:stallion.position.z});
-  let seq=0,balance=0,speed=0,sampled=0,breakingTicks=0,rounds=0;
+  let seq=0,balance=0,speed=0,sampled=0,breakingTicks=0,rounds=0,wasBreaking=false;
   for(let tick=0;tick<40_000;tick++){
     const session=controls.sessionOf(bot.id);
     if(session?.phase==='bonded')break;
@@ -41,7 +41,8 @@ try{
     if(!breaking){balance=gauge;speed=0;sampled=host.state.tick;}
     else{breakingTicks++;rounds=Math.max(rounds,session?.view.round??0);if(gauge!==balance){speed=(gauge-balance)/((host.state.tick-sampled)/60);balance=gauge;sampled=host.state.tick;}}
     controls.press(bot.id,{offer:true,lean:Math.max(-1,Math.min(1,balance*2+speed*1.1)),...((session?.interactable.radius??0)>0?{mount:true}:{})});
-    if(tick===30&&session!==undefined)session.forceBreak();
+    if(session!==undefined&&!breaking&&(tick===30||wasBreaking))session.forceBreak(); // FAST-SLOW-TESTS FS3: a throw puts the bot straight back on, as the first break did
+    wasBreaking=breaking;
     resident.lend([]);
     host.step(new Map([[bot.id,{seq:seq++&0xffff,viewTick:0,steer:{keyX:x,keyY:-z,stickX:0,stickY:0},yaw:0,pitch:0,buttons:sneak?NET_BUTTONS.crouch:0}]]));
   }
