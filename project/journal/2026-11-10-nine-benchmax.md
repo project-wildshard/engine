@@ -29,3 +29,7 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
   boot timeline in `--json`, readyFrame's named parts, the bank census,
   `--dpr`, per-minute rows for NB5's 10-minute run, and the shadow pass's
   share of draws and triangles.
+
+- Paint layers commit: the worker reply carries `texels` (a
+  Uint8ClampedArray, transferred); a layer job never marks bitmap decodes
+  unsupported.

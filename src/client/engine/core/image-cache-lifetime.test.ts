@@ -50,12 +50,47 @@ class DecodedBitmap {
 }
 class DecoderWorker extends EventTarget {
   static readonly instances: DecoderWorker[] = [];
-  readonly messages: { id: number; blob: Blob; options: ImageBitmapOptions }[] = [];
+  readonly messages: unknown[] = [];
   readonly terminate = vi.fn();
   constructor() { super(); DecoderWorker.instances.push(this); }
-  postMessage(message: { id: number; blob: Blob; options: ImageBitmapOptions }): void { this.messages.push(message); }
+  postMessage(message: unknown): void { this.messages.push(message); }
   reply(id: number, image: DecodedBitmap): void { this.dispatchEvent(new MessageEvent('message', { data: { id, image } })); }
 }
+
+test('NB2: layer texels come back from the decode worker; a worker without OffscreenCanvas keeps decoding bitmaps', async () => {
+  vi.useFakeTimers();
+  DecoderWorker.instances.length = 0;
+  vi.stubGlobal('Worker', DecoderWorker); vi.stubGlobal('ImageBitmap', DecodedBitmap);
+  const fallback = vi.fn((_blob: Blob, _options: ImageBitmapOptions) => Promise.resolve(new DecodedBitmap()));
+  vi.stubGlobal('createImageBitmap', fallback);
+  const { decodeImageBitmap, decodeLayerTexels } = await import('../boot/imageDecode');
+  const rgb = new Blob(['rgb']), alpha = new Blob(['alpha']);
+  const layer = decodeLayerTexels(rgb, alpha, 2);
+  const worker = DecoderWorker.instances[0]; if (worker === undefined) throw new Error('Decoder did not start');
+  expect(worker.messages).toEqual([{ id: 1, layer: { rgb, alpha, size: 2 } }]);
+  const texels = new Uint8ClampedArray(16).fill(7);
+  worker.dispatchEvent(new MessageEvent('message', { data: { id: 1, texels } }));
+  expect(await layer).toBe(texels);
+  // a short reply is not this layer: the caller reads it back itself
+  const short = decodeLayerTexels(rgb, null, 2);
+  worker.dispatchEvent(new MessageEvent('message', { data: { id: 2, texels: new Uint8ClampedArray(4) } }));
+  expect(await short).toBeNull();
+  // no OffscreenCanvas in the worker: layers return to the page for good, bitmap decodes stay in the worker
+  const refused = decodeLayerTexels(rgb, null, 2);
+  worker.dispatchEvent(new MessageEvent('message', { data: { id: 3, error: 'no OffscreenCanvas', unsupported: true } }));
+  expect(await refused).toBeNull();
+  expect(await decodeLayerTexels(rgb, null, 2)).toBeNull();
+  expect(worker.messages).toHaveLength(3);
+  const options: ImageBitmapOptions = { imageOrientation: 'flipY' };
+  const bitmap = decodeImageBitmap(rgb, options), image = new DecodedBitmap();
+  expect(worker.messages.at(-1)).toEqual({ id: 4, blob: rgb, options });
+  worker.reply(4, image);
+  expect(await bitmap).toBe(image);
+  expect(worker.terminate).not.toHaveBeenCalled(); expect(fallback).not.toHaveBeenCalled();
+  // idle, the worker retires without failing: the next test's decodes start a fresh one
+  await vi.advanceTimersByTimeAsync(31_000);
+  expect(worker.terminate).toHaveBeenCalledOnce();
+});
 
 test('transfers bitmap ownership, preserves options and releases pending requests on worker failure', async () => {
   vi.useFakeTimers();
@@ -67,11 +102,13 @@ test('transfers bitmap ownership, preserves options and releases pending request
   const blob = new Blob(['pixels']), options: ImageBitmapOptions = { imageOrientation: 'flipY', premultiplyAlpha: 'none', colorSpaceConversion: 'none', resizeWidth: 2, resizeHeight: 2, resizeQuality: 'medium' };
   const first = decodeImageBitmap(blob, options), second = decodeImageBitmap(blob, options);
   const worker = DecoderWorker.instances[0]; if (worker === undefined) throw new Error('Decoder did not start');
-  expect(worker.messages).toEqual([{ id: 1, blob, options }, { id: 2, blob, options }]);
+  // request ids run on across the page's decodes (an earlier test's layer jobs took the first ones)
+  const id = (worker.messages[0] as { id: number } | undefined)?.id ?? Number.NaN;
+  expect(worker.messages).toEqual([{ id, blob, options }, { id: id + 1, blob, options }]);
   await vi.advanceTimersByTimeAsync(180_000);
   expect(fallback).not.toHaveBeenCalled(); expect(worker.terminate).not.toHaveBeenCalled();
   const a = new DecodedBitmap(), b = new DecodedBitmap(), stale = new DecodedBitmap();
-  worker.reply(2, b); worker.reply(1, a); worker.reply(999, stale);
+  worker.reply(id + 1, b); worker.reply(id, a); worker.reply(999, stale);
   expect(await first).toBe(a); expect(await second).toBe(b);
   expect(stale.close).toHaveBeenCalledOnce(); expect(a.close).not.toHaveBeenCalled(); expect(fallback).not.toHaveBeenCalled();
   const interrupted = [decodeImageBitmap(blob, options), decodeImageBitmap(blob, options)];

@@ -4,6 +4,7 @@ import { BASIS_PATH, detectKtx2Support } from '@wildshard/engine/core/ktx2';
 import type { Renderer } from '@wildshard/engine/render/renderer';
 import { loadTextureRow } from '@wildshard/engine/core/assets';
 import { phoneUrl } from '@wildshard/engine/boot/bytes';
+import { decodeLayerTexels } from '@wildshard/engine/boot/imageDecode';
 import { readContent } from '@wildshard/engine/boot/contentRead';
 import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
 import { workSlice } from '@wildshard/engine/core/workSlice';
@@ -107,12 +108,16 @@ function pixels(image: ImageBitmap, size: number): Uint8ClampedArray {
   return c2.getImageData(0, 0, size, size).data;
 }
 
-/** The compressed downloads overlap; each layer decodes and reads back alone, so the peak decoded memory stays one layer. */
+/** The compressed downloads overlap; each layer decodes and reads back alone, so the peak decoded memory stays one layer.
+ *  NB2: in the page's image worker (`decodeLayerTexels`), so the main thread only copies texels; here as before when the
+ *  worker cannot. */
 async function loadLayers(row: Extract<WorldSceneLentTexture, { kind: 'layers' }>): Promise<Texture> {
   const size = row.size[TIER], data = new Uint8Array(size * size * 4 * row.layers.length), slice = workSlice();
   const files = await Promise.all(row.layers.map(layer => Promise.all([blob(`${row.base}/${layer.name}.jpg`), layer.alpha ? blob(`${row.base}/${layer.name}-a.jpg`) : null])));
   for (const [i, [rgb, alpha]] of files.entries()) {
     if (slice.due()) await slice.yield();
+    const texels = await decodeLayerTexels(rgb, alpha, size);
+    if (texels !== null) { data.set(texels, i * size * size * 4); continue; }
     const colour = await createImageBitmap(rgb), cover = alpha === null ? null : await createImageBitmap(alpha), at = i * size * size * 4;
     try {
       data.set(pixels(colour, size), at);

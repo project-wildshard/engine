@@ -309,6 +309,7 @@
     "./boot/gpuFiles": "./src/client/engine/boot/gpuFiles.ts",
     "./boot/idle": "./src/client/engine/boot/idle.ts",
     "./boot/firstPlayMark": "./src/client/engine/boot/firstPlayMark.ts",
+    "./boot/imageDecode": "./src/client/engine/boot/imageDecode.ts",
     "./boot/lowPower": "./src/client/engine/boot/lowPower.ts",
     "./core/graphicsMode": "./src/client/engine/core/graphicsMode.ts",
     "./core/sustainedFrames": "./src/client/engine/core/sustainedFrames.ts",
