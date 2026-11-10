@@ -27,7 +27,9 @@ version comes from package.json through `__ENGINE_RELEASE__`
 (vite.config.ts). On a phone the pill drops " · reload" (it never fitted;
 it was ellipsised) and ends before the 36 px logo does. The box lists the
 version's CHANGELOG.md section. The daily whatsNew.json and its unwired
-24-hour freshness script are gone.
+24-hour freshness script are gone, in a commit of their own: the commit
+lane's gen lists HEAD's files, so it can't run in the commit that deletes
+one.
 
 ## Hero
 
