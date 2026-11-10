@@ -221,3 +221,19 @@ test('the hold card\'s bar is the page\'s give-up clock: full at the start, empt
   expect(shown('resuming-blocked')?.querySelector<HTMLElement>('.ws-link-hold i')?.style.width).toBe('0%');
   scope.dispose();
 });
+
+test('a card keeps Tab inside its buttons, and hands focus back when the link returns', () => {
+  const { scope, screens } = harness(), field = document.createElement('input');
+  document.body.append(field); field.focus();
+  screens.link('reconnecting', 'closed'); screens.allow('Talk');
+  const card = shown('drop-blocked'), buttons = [...card?.querySelectorAll('button') ?? []];
+  expect(document.activeElement).toBe(buttons[0]);
+  buttons.at(-1)?.focus();
+  const tab = new KeyboardEvent('keydown', { code: 'Tab', bubbles: true, cancelable: true });
+  buttons.at(-1)?.dispatchEvent(tab);
+  expect(tab.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(buttons[0]);
+  screens.link('live');
+  expect(document.activeElement).toBe(field);
+  scope.dispose();
+});

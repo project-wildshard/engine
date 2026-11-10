@@ -73,3 +73,7 @@ online shell, replacing the plain strip and the raw error text.
   the game. Tests now pin key release, single draft delivery and the
   bar at 0 s and past 120 s; the chat card says only the latest
   message is kept.
+- After the GO: the review's remaining SHOULDs. A card keeps Tab and
+  Shift+Tab inside its buttons and hands focus back (to the chat box,
+  say) when the link returns; the browser proof now waits for the held
+  line to come back through the server's room chat, exactly once.

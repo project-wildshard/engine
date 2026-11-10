@@ -109,6 +109,15 @@ function card(scope: Scope, ids: string, tone: 'info' | 'warn' | 'bad', tag: str
   const root = scope.ownNode(make('div', 'ws-link ws-link-scrim')), box = make('div', 'ws-link-box');
   root.dataset['failmode'] = ids; root.dataset['tone'] = tone; root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', title);
   box.append(make('p', 'ws-link-tag', tag), make('h1', '', title)); root.append(box);
+  // aria-modal: Tab and Shift+Tab go round the card's own buttons (InputService leaves Tab to an alertdialog)
+  scope.listen(root, 'keydown', event => {
+    if (!(event instanceof KeyboardEvent) || event.code !== 'Tab') return;
+    const all = [...root.querySelectorAll('button')].filter(button => !button.disabled);
+    const first = all[0], last = all.at(-1);
+    if (first === undefined || last === undefined) return;
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
   return { root, box };
 }
 function buttons(scope: Scope, actions: readonly { readonly label: string; readonly primary?: true; readonly busy?: string; readonly act: () => void }[]): HTMLElement {
@@ -147,7 +156,10 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
 
-  const close = (): void => { open?.scope.dispose(); open = null; };
+  // focus goes back where it was before the first card opened (the chat box, the canvas) when the last one closes
+  let returnTo: HTMLElement | null = null;
+  const close = (): void => { open?.scope.dispose(); open = null; if (returnTo?.isConnected === true) returnTo.focus(); returnTo = null; };
+  const remember = (): void => { if (open === null && document.activeElement instanceof HTMLElement && document.activeElement !== document.body) returnTo = document.activeElement; };
   // a card takes the pointer back from the game (desktop pointer lock), so its buttons can be clicked
   const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
   const paintBanner = (): void => {
@@ -173,7 +185,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   /** The hold card: the banner opened up, on a tap it can't carry. It repaints each second from the dial's progress. */
   const hold = (what: string, chat: boolean): void => {
     if (open?.kind === 'stop') return;
-    close();
+    remember(); open?.scope.dispose(); open = null;
     const own = scope.child('online.hold'), said = bannerFor(state, hooks.why(), hooks.progress().dials);
     const title = chat ? 'Your message will send when you\'re back' : state === 'resuming' ? 'Still reconnecting' : hooks.why() === 'restart' ? 'The world is restarting' : 'Not connected yet';
     const { root, box } = card(own, blockedIds(chat ? 'reset' : said.ids), said.tone, said.title, title);
@@ -208,7 +220,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
   /** A card that stops play: the link gave up, the world is full, another tab, turned away. */
   const stop = (ids: string, tone: 'info' | 'warn' | 'bad', tag: string, title: string, body: string, actions: Parameters<typeof buttons>[1], detail?: string, live?: (node: HTMLElement) => void): void => {
-    close();
+    remember(); open?.scope.dispose(); open = null;
     const own = scope.child('online.card'), { root, box } = card(own, ids, tone, tag, title);
     box.append(make('p', 'ws-link-body', body));
     if (live !== undefined) { const status = make('p', 'ws-link-facts'); status.setAttribute('role', 'status'); live(status); own.interval(1000, () => { live(status); }); box.append(status); }
