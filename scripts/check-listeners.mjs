@@ -24,6 +24,7 @@ export const ALLOWED = [
   { proto: 'udp', process: 'rapportd', why: 'Continuity' },
   { proto: 'udp', process: 'sharingd', why: 'AirDrop and Handoff' },
   { proto: 'udp', process: 'replicatord', why: 'Widget and app sync' },
+  { proto: 'udp', process: 'syslogd', why: 'macOS system log daemon' },
   { proto: 'udp', process: 'netbiosd', ports: [137, 138], why: 'NetBIOS name lookup' },
   { proto: 'udp', ports: [5353], why: 'mDNS' }, // mDNSResponder, and any app that browses
 ];

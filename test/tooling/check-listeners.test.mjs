@@ -57,6 +57,16 @@ describe('parseNetstat', () => {
 });
 
 describe('judge', () => {
+  test('the macOS log daemon may hold an ephemeral UDP socket', () => {
+    expect(refused([udp('*.50611', 'syslogd:389'), udp('*.61000', 'syslogd:389')])).toEqual([]);
+    expect(allowedBy({proto: 'udp', address: '*', port: 50611, process: 'syslogd', pid: 389})?.why).toBe('macOS system log daemon');
+  });
+
+  test('the log daemon allowance covers neither TCP nor unknown UDP processes', () => {
+    expect(refused([tcp('*.50611', 'syslogd:389')])).toEqual(['syslogd:50611']);
+    expect(refused([udp('*.50611', 'unknown-agent:1234'), udp('*.61000', 'syslogd-helper:1235')])).toEqual(['unknown-agent:50611', 'syslogd-helper:61000']);
+  });
+
   test('the Mac listeners NI4 found pass', () => {
     expect(refused([
       tcp('*.5000', 'ControlCenter:707'),
