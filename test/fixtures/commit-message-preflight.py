@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(dir=source / 'tmp', prefix='commit-message-') a
     (root / 'scripts').mkdir()
     shutil.copy2(wrapper, root / 'scripts/commit.sh')
     (root / '.githooks').mkdir()
-    shutil.copy2(source / '.githooks/commit-msg-conventions', root / '.githooks/commit-msg-conventions')
+    shutil.copy2(source / '.githooks/check-commit-message.mjs', root / '.githooks/check-commit-message.mjs')
     hook = root / '.githooks/pre-commit'
     hook.write_text('''#!/usr/bin/env python3
 import os, pathlib, sys, time
@@ -38,7 +38,7 @@ sys.exit(23 if os.environ.get('FIXTURE_RED') else 0)
 ''')
     hook.chmod(0o755)
     hook = root / '.githooks/commit-msg'
-    hook.write_text('#!/bin/sh\nexec python3 .githooks/commit-msg-conventions "$1"\n')
+    hook.write_text('#!/bin/sh\nexec node .githooks/check-commit-message.mjs "$1"\n')
     hook.chmod(0o755)
     git('config', 'core.hooksPath', '.githooks')
     (root / 'peer.txt').write_text('peer stage\n')
@@ -50,7 +50,7 @@ sys.exit(23 if os.environ.get('FIXTURE_RED') else 0)
         result = subprocess.run(['scripts/commit.sh', message, '--', 'own.txt'],
                                 cwd=root, env={**env, **(extra or {})}, capture_output=True, text=True)
         return result, (time.monotonic() - start) * 1000
-    message = 'test(cf1): bad body\n\n' + 'x' * 73 + '\n\nAssisted-by: Codex:gpt-6.1-sol'
+    message = 'test(cf1): bad body\n\n' + 'word ' * 16 + '\n\nAssisted-by: Codex:gpt-6.1-sol'
     rejected, elapsed = run(message)
     assert rejected.returncode != 0 and 'Wrap the body' in rejected.stderr, rejected
     assert git('rev-parse', 'HEAD') == head

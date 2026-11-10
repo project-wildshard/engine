@@ -137,8 +137,21 @@ def refuse(message):
 def timeout(*_):
     refuse("commit lock timed out")
 try:
+    # Use this repository's installed message policy before generating inputs,
+    # taking the shared lease or running an expensive hook. Do not duplicate it.
+    javascript_validator = Path(".githooks/check-commit-message.mjs")
     validator = ".githooks/commit-msg-conventions"
-    if os.path.isfile(validator):
+    if javascript_validator.is_file():
+        check = subprocess.run(["node", "--input-type=module", "-e",
+            "import {readFileSync} from 'node:fs';"
+            "const {validate}=await import(process.argv[1]);"
+            "const error=validate(readFileSync(0,'utf8'),{human:process.env.SKIP_ATTRIB==='1'});"
+            "if(error){console.error(error);process.exitCode=1;}",
+            javascript_validator.resolve().as_uri()], input=message, text=True,
+            capture_output=True, timeout=5, env=base_env)
+        if check.returncode:
+            refuse(check.stderr.strip() or "message policy refused")
+    elif os.path.isfile(validator):
         error = runpy.run_path(validator)["validate"](message, human=os.getenv("SKIP_ATTRIB") == "1")
         if error:
             refuse(error)

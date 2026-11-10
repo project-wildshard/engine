@@ -40,7 +40,6 @@
   "test/client-timed-encounters.test.ts",
   "test/client-wildlife.test.ts",
   "test/closed-components.test.ts",
-  "test/commit-message-preflight.test.ts",
   "test/committed-fast-checks.test.ts",
   "test/contract-page-admission.test.ts",
   "test/contract-program-owner.test.ts",
