@@ -17,6 +17,12 @@ const savedSchema = v.strictObject({ instance: identity, slug: identity,
 export type GridSavedLocation = v.InferOutput<typeof locationSchema>;
 /** A durable place: the instance, the road beside it and where in it the player stood. */
 export interface GridSavedPlace { readonly instance: string; readonly slug: string; readonly road: { readonly x: number; readonly z: number; readonly yaw: number }; readonly location: GridSavedLocation }
+/** SR4: where the server's durable continuation stands, as its site document names it: a cell's instance, or null on the road. */
+export interface GridServerSite { readonly site: string | null }
+/** The site a page's place stands in, in the server's terms. */
+export function placeSite(place: Pick<GridSavedPlace, 'instance' | 'location'>): string | null {
+  return place.location.kind === 'cell' ? place.instance : null;
+}
 const lastDefinition = { key: 'grid.last-played', scope: 'device' as const, version: 1, schema: v.nullable(savedSchema), initial: () => null };
 const localDefinition = { ...lastDefinition, key: 'platform.grid-position', scope: 'shard' as const };
 const guardDefinition = { key: 'grid.recovery.guard', scope: 'device' as const, version: 1,
@@ -62,8 +68,10 @@ export interface GridRecoveryService {
   clearLoop: () => boolean;
   /** The last durable place, for a server opening a page's save for the first time. */
   lastPlace: (assembly: GridAssembly) => GridSavedPlace | null;
-  /** An abrupt end may resume only an already durable, catalogue-bound checkpoint. */
-  restoreLast: (assembly: GridAssembly) => boolean;
+  /** An abrupt end may resume only an already durable, catalogue-bound checkpoint. SR4: the page's place is lazily committed
+   *  storage and a killed browser can lose its newest writes, while the server's continuation is durable. A place that does
+   *  not stand where `server` does is stale, and resumes nothing: the title's GRID tap resumes the server's own (J190). */
+  restoreLast: (assembly: GridAssembly, server?: GridServerSite) => boolean;
   /** A pending reset never boots until the target namespace proves its atomic generation advance. */
   prepareReset: (assembly: GridAssembly, current: { instance: string; slug: string }, road: RoadPoint, target: LocalSaveInstance) => boolean;
   completeReset: (assembly: GridAssembly) => boolean;
@@ -103,11 +111,12 @@ export function gridRecovery(store: SaveStore, now: () => number = Date.now): Gr
     },
     clearLoop: () => guard.write(null),
     lastPlace: assembly => { const saved = last.peek(); return saved !== null && validSaved(saved, assembly) ? saved : null; },
-    restoreLast: assembly => {
+    restoreLast: (assembly, server) => {
       if ([last.status?.(), session.status?.(), device.status?.(), pendingReset.status?.()].includes('future')
         || session.peek() !== null || device.peek() !== null) return false;
       const saved = last.peek();
       if (saved === null || !validSaved(saved, assembly)) return false;
+      if (server !== undefined && placeSite(saved) !== server.site) return false;
       return service.write(assembly, saved, saved.road, 'reload');
     },
     prepareReset: (assembly: GridAssembly, current: { instance: string; slug: string }, road: RoadPoint, target: LocalSaveInstance) => {

@@ -70,6 +70,23 @@ test('a grid kill resumes its durable location after sessionStorage is replaced'
   expect(gridRecoveryLoop()).toBe(true);
 });
 
+test('SR4: a grid kill resumes its place only where the server durably stands', () => {
+  const f = fixture(), record = f.read();
+  if (record === null) throw new Error('Missing admitted road');
+  const original = gridRecovery(f.store, () => Date.now());
+  expect(original.save(assembly, home, record.road, { kind: 'road' })).toBe(true);
+  expect(original.clearLoop()).toBe(true);
+  const other = assembly.cells.find(cell => cell.instance !== home.instance);
+  if (other === undefined) throw new Error('Missing a second catalogue cell');
+  const crash = (server: readonly { site: string | null }[]) => consumeGridRecovery({ assembly, saves: new SaveStore({ local: f.local, session: new Storage() }),
+    now: () => Date.now(), unexpected: true, previous: { ...previous, kind: 'unexpected', mode: 'grid' }, server });
+  // Chromium lost the page's newer place: the server's site says a cell, the page's says the road. The title's tap resumes the server.
+  expect(crash([{ site: other.instance }, { site: null }])).toBeNull();
+  expect(gridRecoveryLoop()).toBe(false);
+  // A site this catalogue has no cell for is skipped, as the server's own boot skips it; the next one agrees.
+  expect(crash([{ site: 'gone-cell' }, { site: null }])).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
+});
+
 test('explicit RELOAD discards its pending grid recovery and stays at the title', () => {
   const f = fixture();
   expect(f.read({ ...previous, reload: true, mode: 'grid' })).toBeNull();

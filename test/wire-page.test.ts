@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { Flags } from '../src/shared/engine/world/interact/flags';
-import { forgetServerInstance, type IndexedSaves } from '../src/client/engine/saves/indexed';
+import { forgetServerInstance, readServerSites, type IndexedSaves } from '../src/client/engine/saves/indexed';
 import { QuestViewFeed } from '../src/client/engine/quest/view/replica';
 import type { QuestDef } from '../src/shared/engine/quest/core';
 import type { QuestProgress } from '../src/shared/engine/quest/progress';
@@ -75,6 +75,23 @@ test('New Game forgets every world and site of its instance, and no other', asyn
     storage: { get length() { return documents.size; }, key: index => [...documents.keys()][index] ?? null, getItem: key => documents.get(key) ?? null, setItem: () => undefined, removeItem: () => undefined } };
   expect(await forgetServerInstance(saves, 'w.', 'a')).toBe(true);
   expect([...documents.keys()].sort()).toEqual(['w.a', 'w.profile', 'w.standalone-b', 'w.standalonesitealt-grid']);
+});
+
+test('SR4: a page reads where the server durably stands from the two grid site documents alone, newest first', async () => {
+  const site = (tick: number, at: string | null): string => JSON.stringify({ keys: { continuationSite: { v: 1, data: { tick, site: at, road: 'bytes' } } } });
+  const documents = new Map([['w.standalonesite-grid', site(6, null)], ['w.standalonesitealt-grid', site(7, 'open-plot-4-1')], ['w.standalonesite-lone-a', site(9, 'a')]]);
+  const asked: string[] = [], closed = vi.fn();
+  const request = <T>(result: T): { result: T; onsuccess?: () => void } => { const made: { result: T; onsuccess?: () => void } = { result }; queueMicrotask(() => { made.onsuccess?.(); }); return made; };
+  const database = { close: closed, transaction: () => ({ objectStore: () => ({ get: (key: string) => { asked.push(key); return request(documents.get(key)); } }) }) };
+  const before = Reflect.get(globalThis, 'indexedDB');
+  Reflect.set(globalThis, 'indexedDB', { open: () => request(database) });
+  try {
+    expect(await readServerSites('w.', 'db')).toEqual([{ tick: 7, site: 'open-plot-4-1' }, { tick: 6, site: null }]);
+    expect(asked).toEqual(['w.standalonesite-grid', 'w.standalonesitealt-grid']);
+    documents.set('w.standalonesitealt-grid', '{not json'); documents.delete('w.standalonesite-grid');
+    expect(await readServerSites('w.', 'db')).toEqual([]);
+    expect(closed).toHaveBeenCalledTimes(2);
+  } finally { Reflect.set(globalThis, 'indexedDB', before); }
 });
 
 test('a seen act lands on the host that keeps places, and costs a host with none only a refusal', () => {

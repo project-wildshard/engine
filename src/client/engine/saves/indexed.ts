@@ -87,6 +87,30 @@ function siteNames(raw: string | null, instance: string): boolean {
     return isRecord(entry) && isRecord(entry['data']) && entry['data']['site'] === instance;
   } catch { return false; }
 }
+/** One site document's place and save count, or null for one that is absent or unreadable. */
+function siteRow(raw: unknown): { readonly tick: number; readonly site: string | null } | null {
+  if (typeof raw !== 'string') return null;
+  try {
+    const parsed: unknown = JSON.parse(raw), keys = isRecord(parsed) ? parsed['keys'] : null, entry = isRecord(keys) ? keys['continuationSite'] : null;
+    const data = isRecord(entry) ? entry['data'] : null, tick = isRecord(data) ? data['tick'] : null, site = isRecord(data) ? data['site'] : undefined;
+    return typeof tick === 'number' && Number.isSafeInteger(tick) && tick >= 0 && (site === null || typeof site === 'string') ? { tick, site } : null;
+  } catch { return null; }
+}
+/**
+ * SR4: where the grid session's durable continuation stands, newest first, from its two site documents (`siteDocuments('grid')` in
+ * src/server/host/standalone/continuation.ts). Two reads, not the whole store: a page asks this before it trusts its own place after
+ * an unexpected end, because Chromium can lose a killed page's newest localStorage writes while these commit strictly.
+ */
+export async function readServerSites(prefix: string = installedIdentity()?.savePrefix ?? '', name: string = serverSaveDatabase(prefix)): Promise<{ readonly tick: number; readonly site: string | null }[]> {
+  const opening = indexedDB.open(name, 1);
+  opening.onupgradeneeded = (): void => { opening.result.createObjectStore(SAVES); };
+  const database = await requested(opening);
+  try {
+    const store = database.transaction(SAVES).objectStore(SAVES);
+    const raws = await Promise.all(['standalonesite-grid', 'standalonesitealt-grid'].map(doc => requested(store.get(`${prefix}${doc}`))));
+    return raws.flatMap(raw => { const row = siteRow(raw); return row === null ? [] : [row]; }).sort((a, b) => b.tick - a.tick);
+  } finally { database.close(); }
+}
 /**
  * New Game on a server's saves: every continuation that holds this instance, and any site that stands in it. Run the same reset over the
  * instance's own document first; it keeps what New Game keeps.

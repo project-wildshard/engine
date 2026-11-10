@@ -8,7 +8,7 @@ import type { SaveStore } from '@wildshard/engine/saves/store';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
 import { pageGridIntents } from './intent';
 import { DEVSERVER, gridMode, type MenuMode } from './menu';
-import { gridRecovery, recoveryCatalogue, type GridRecoveryRecord } from '../../../shared/game/grid/recovery';
+import { gridRecovery, recoveryCatalogue, type GridRecoveryRecord, type GridServerSite } from '../../../shared/game/grid/recovery';
 import { setPageMode } from '../../../shared/game/grid/pageMode';
 import { pageGridCells as gridCells } from '../../../shared/game/grid/cellEvents';
 import type { PageMode } from '../plugin/context';
@@ -125,9 +125,10 @@ export function safeGridRecovery(assembly: GridAssembly, now: number): NonNullab
     road: { x: home.origin.x + assembly.pitch / 2 + 3.6, z: home.origin.z, yaw: 0 } };
 }
 
-/** Consume recovery metadata before routing/hydration; ordinary boot and unsupported future records select nothing. */
+/** Consume recovery metadata before routing/hydration; ordinary boot and unsupported future records select nothing.
+ * `server`: the server's durable site documents, newest first, read only after an unexpected grid end (SR4). */
 export function consumeGridRecovery(options: { assembly?: GridAssembly; saves?: SaveStore; now?: () => number; unexpected?: boolean;
-  previous?: LastEnd; search?: URLSearchParams } = {}): NonNullable<GridRecoveryRecord> | null {
+  previous?: LastEnd; search?: URLSearchParams; server?: readonly GridServerSite[] } = {}): NonNullable<GridRecoveryRecord> | null {
   const assembly = options.assembly ?? new GridAssembly(gridMode(DEVSERVER));
   const now = options.now ?? Date.now;
   const store = options.saves ?? saves, service = gridRecovery(store, now);
@@ -137,7 +138,11 @@ export function consumeGridRecovery(options: { assembly?: GridAssembly; saves?: 
     selected = null; loop = false; refused = discarded.kind === 'refused';
     return null;
   }
-  if (options.previous?.kind === 'unexpected' && options.previous.mode === 'grid') service.restoreLast(assembly);
+  if (options.previous?.kind === 'unexpected' && options.previous.mode === 'grid') {
+    // The site the server will boot in: its newest document that names the road or a cell of this catalogue (gridServer.ts).
+    const server = options.server?.find(row => row.site === null || assembly.cells.some(cell => cell.instance === row.site));
+    service.restoreLast(assembly, server);
+  }
   let result = service.consume(assembly, options.unexpected);
   const end = options.previous, search = options.search;
   // Older clients consumed their grid intent and cleared chunk before product admission.

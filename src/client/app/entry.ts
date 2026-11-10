@@ -70,6 +70,14 @@ const search = new URLSearchParams(location.search);
 inspectPreviousBoot();
 // Safari may reload the same document after WebContent dies. Keep that automatic retry on the
 // renderer-free title until the player chooses a shard again.
+/** SR4: how long a boot after an unexpected grid end waits on the server's site documents before it trusts its own place. */
+const SERVER_SITES_MS = 2000;
+/** The server's grid site documents, newest first; undefined when IndexedDB refuses or does not answer in time. */
+function serverSites(): Promise<readonly { readonly site: string | null }[] | undefined> {
+  const read = import('@wildshard/engine/saves/indexed').then(indexed => indexed.readServerSites());
+  const late = new Promise<undefined>(resolve => { entryScope.timeout(SERVER_SITES_MS, () => { resolve(undefined); }); });
+  return Promise.race([read, late]).catch(() => undefined);
+}
 async function enterPage(): Promise<unknown> {
   const requested = search.get('chunk');
   // An embedded author product has its own admission. A game URL must name a
@@ -83,7 +91,10 @@ async function enterPage(): Promise<unknown> {
   const end = lastEnd();
   const named = search.get('chunk');
   crashResume = (named === null || [end.slug].includes(named)) && !search.has('explore') ? consumeCrashResume(end, titleRows) : null;
-  const recovery = consumeGridRecovery({ unexpected: end.kind === 'unexpected', previous: end, search });
+  // SR4: after an unexpected grid end, the page's place is checked against where the server's durable continuation stands.
+  // A failed or slow read keeps the page's own place, as before.
+  const server = end.kind === 'unexpected' && end.mode === 'grid' ? await bootTask('app:grid-server-site', serverSites) : undefined;
+  const recovery = consumeGridRecovery({ unexpected: end.kind === 'unexpected', previous: end, search, ...(server === undefined ? {} : { server }) });
   if (recovery !== null || crashResume !== null) {
     search.set('chunk', recovery?.slug ?? crashResume?.slug ?? '');
     if (recovery !== null) search.set('glreload', '1');
