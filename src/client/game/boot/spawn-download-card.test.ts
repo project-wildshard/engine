@@ -32,3 +32,18 @@ test('the early card prints wire facts without changing decoded percentage or di
   expect(root.dataset['download']).toBe('50'); expect(root.dataset['readBytes']).toBe('40000000');
   stop();
 });
+
+test('the early painter stops once Loading takes the download, so the bar has one painter (LS3)', () => {
+  const root = document.createElement('div'); root.innerHTML = '<span data-el="dlFact"></span><span data-el="dlPct"></span><i data-el="dlBar"></i>';
+  let row: SpawnDownloadSnapshot = {totalBytes: 1000, completedBytes: 500, cachedBytes: 0, filesTotal: 2, filesDone: 1, complete: false, error: null};
+  let update: (value: SpawnDownloadSnapshot) => void = () => undefined;
+  const download: SpawnDownload = {ready: Promise.resolve(), snapshot: () => row, resolve: url => url, cancel: () => undefined,
+    subscribe: listener => {update = listener; listener(row); return () => undefined;}};
+  paintSpawnDownload(download, root);
+  const bar = root.querySelector<HTMLElement>('[data-el="dlBar"]');
+  expect(bar?.style.width).toBe('50%');
+  root.dataset['downloadPainter'] = 'loading'; bar?.style.setProperty('width', '95.4%'); // Loading's tenths
+  row = {...row, completedBytes: 954}; update(row);
+  expect(bar?.style.width).toBe('95.4%'); // no whole 95 painted back over it
+  expect(root.dataset['readBytes']).toBe('954'); // the card's data still follows the download
+});

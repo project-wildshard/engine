@@ -927,6 +927,9 @@ export function paintSpawnDownload(download: SpawnDownload, root: HTMLElement): 
     root.dataset['readUnknownSourceBytes'] = '0'; root.dataset['readsClosed'] = String(row.complete);
     root.dataset['spawnFilesDone'] = String(row.filesDone); root.dataset['spawnFilesTotal'] = String(row.filesTotal);
     root.dataset['streamedBytes'] = String(row.streamedBytes ?? row.completedBytes);
+    // LS3: once Loading takes this download (setDownloadSource marks the card) it paints the bar in tenths; painting here
+    // too would put a whole percent back between its paints (WebKit, saved Ember: 95 → 95.4 → 95, untraced and backwards)
+    if (root.dataset['downloadPainter'] === 'loading') return;
     const fact = root.querySelector('[data-el="dlFact"]'), pct = root.querySelector('[data-el="dlPct"]'), bar = root.querySelector<HTMLElement>('[data-el="dlBar"]');
     const text = row.wire ?? row;
     // LS2: the card's one size number, as Loading's loadingDownloadText writes it once it adopts this download

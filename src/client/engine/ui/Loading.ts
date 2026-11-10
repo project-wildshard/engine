@@ -243,6 +243,8 @@ export class Loading {
     this.root.querySelector<HTMLElement>('[data-phase="download"]')?.removeAttribute('hidden');
     this.stopDownloadSource?.();
     this.downloadSource = source;
+    // LS3: the card's one download painter from here (spawnDownload.ts paintSpawnDownload stops at this mark)
+    if (!this.scoped) this.root.dataset['downloadPainter'] = 'loading';
     const timing=bootTiming();
     if(!this.scoped&&timing!==undefined)(timing.work??={}).download=source.snapshot;
     this.scope.onDispose(()=>{if(timing?.work?.download===source.snapshot)delete timing.work.download;});
