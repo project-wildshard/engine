@@ -117,7 +117,7 @@ try{
    if(mode==='batch')assert.equal(reportFiles.length,3,'The combined failure and both singleton failures must all survive');
    /** @type {{sha:string,files:string[]}[]} */const gates=readFileSync(join(root,'observed'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
    for(const name of reportFiles){const report=JSON.parse(readFileSync(join(actualQueue,'retained',name),'utf8'));assert.equal(report.partial,false);assert.equal(readFileSync(join(actualQueue,'retained',report.job,report.requests[0].request.slice(0,-5),'writer'),'utf8'),'original failed-hook marker');assert.match(report.checkedSha,/^[a-f0-9]{40}$/u);const gate=gates.find(row=>row.sha===report.checkedSha);assert.ok(gate,'Every retained SHA must name an actual hook invocation');if(mode==='batch')assert.equal(report.job,gate.files.length===2||gate.files[0]==='lane-2'?jobs[1].id:jobs[0].id);}
-   if(mode==='batch')assert.deepEqual(gates.map(row=>row.files.length).sort(),[1,1,2]);
+   if(mode==='batch')assert.deepEqual(gates.map(row=>row.files.length).sort((a,b)=>a-b),[1,1,2]);
    assert.equal(git(remote,['rev-parse','main']),original);assert.match(readFileSync(join(actualQueue,'worker.log'),'utf8'),/exact original cleanup failure/u);
   }
   console.log(JSON.stringify({mode,failedHookUnchanged:mode!=='green',snapshotsDeleted:true,retainedAfterCleanup:mode!=='green'&&mode!=='refused'&&mode!=='publish-refused',seconds:(performance.now()-began)/1000}));
