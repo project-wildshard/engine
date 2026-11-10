@@ -66,3 +66,20 @@ test('a refusing installed hook leaves HEAD and foreign stages intact', () => {
     expect(readFileSync(join(root, 'selected'), 'utf8')).toBe('refused\n');
   });
 });
+
+test('a commit from a plan worktree uses its own index and leaves the canonical index untouched (J240, DS6)', () => {
+  fixture((root, git) => {
+    git('worktree', 'add', '-q', '-b', 'plan/p', '.worktrees/p', 'main');
+    const tree = join(root, '.worktrees/p');
+    const canonicalIndex = readFileSync(join(root, '.git/index')), canonicalHead = git('rev-parse', 'HEAD');
+    writeFileSync(join(tree, 'selected'), 'from the worktree\n');
+    const result = invoke(tree, ['selected']);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    const inTree = (...args: string[]): string => spawnSync('git', args, { cwd: tree, encoding: 'utf8' }).stdout.trim();
+    expect(inTree('show', 'plan/p:selected')).toBe('from the worktree');
+    expect(inTree('status', '--porcelain', '--', 'selected')).toBe('');
+    expect(readFileSync(join(root, '.git/index')).equals(canonicalIndex)).toBe(true);
+    expect(git('rev-parse', 'HEAD')).toBe(canonicalHead);
+    expect(git('diff', '--cached', '--name-only')).toBe('foreign');
+  });
+});

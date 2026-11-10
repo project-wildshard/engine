@@ -18,12 +18,14 @@ for path in "$@"; do
   [ ! -d "$path" ] || { echo "commit.sh: name files, not directories: $path" >&2; exit 2; }
 done
 common="$(git rev-parse --path-format=absolute --git-common-dir)"
+# This checkout's own index: a linked worktree (J240) has its own, never the common dir's (DS6).
+index="$(git rev-parse --path-format=absolute --git-path index)"
 # Advance untouched parent copies under the commit lock; stages use the index lock.
 align_shared_index() {
   python3 - "$@" <<'PYALIGN'
 import os, subprocess, sys
 from pathlib import Path
-common, parent, landed, *paths = sys.argv[1:]
+common, index, parent, landed, *paths = sys.argv[1:]
 env = dict(os.environ)
 env.pop("GIT_INDEX_FILE", None)
 def git(*args, **kwargs):
@@ -81,7 +83,7 @@ for name in paths:
             Path(temporary).unlink(missing_ok=True)
 if advanced:
     print(f"commit.sh: advanced {advanced} untouched working paths")
-index = Path(common) / "index"
+index = Path(index)
 lock = Path(str(index) + ".lock")
 try:
     handle = lock.open("xb")
@@ -117,10 +119,10 @@ PYALIGN
 export -f align_shared_index
 # Generate from immutable candidate inputs. Freshness checks, installed Git
 # hooks and index alignment hold the shared commit lease.
-exec python3 - "$common" "$message" "$patch" "$@" <<'PYCOMMIT'
+exec python3 - "$common" "$index" "$message" "$patch" "$@" <<'PYCOMMIT'
 import fcntl, hashlib, json, os, runpy, shutil, signal, subprocess, sys, tempfile, time
 from pathlib import Path
-common, message, patch, *paths = sys.argv[1:]
+common, own_index, message, patch, *paths = sys.argv[1:]
 started = time.monotonic()
 source_seconds = 0.0
 waiting = acquired = released = None
@@ -159,7 +161,7 @@ try:
         scratch = Path(temporary)
         parent = git("rev-parse", "HEAD").decode().strip()
         index = scratch / "index"
-        shutil.copy2(Path(common) / "index", index)
+        shutil.copy2(own_index, index)
         candidate_env = {**base_env, "GIT_INDEX_FILE": str(index)}
         git("read-tree", "--reset", parent, env=candidate_env)
         entries = git("ls-files", "-z", env=candidate_env)
@@ -269,7 +271,7 @@ try:
                 if result.returncode:
                     raise SystemExit(result.returncode)
                 landed = git("rev-parse", "HEAD").decode().strip()
-                subprocess.run(["bash", "-c", 'align_shared_index "$@"', "commit.sh", common, parent, landed, *paths], env=base_env, check=True)
+                subprocess.run(["bash", "-c", 'align_shared_index "$@"', "commit.sh", common, own_index, parent, landed, *paths], env=base_env, check=True)
             finally:
                 released = time.monotonic()
         raise SystemExit(0)
