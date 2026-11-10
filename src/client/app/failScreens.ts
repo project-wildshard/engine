@@ -88,7 +88,7 @@ export const FAILURES: readonly Failure[] = [
   { id: 'tls', group: 'Server', name: 'TLS failure', screen: unreachable('secure connection failed before any status',
     'If this keeps happening, check that your phone\'s date and time are set automatically.') },
   { id: 'upgrade-refused', group: 'Server', name: 'Socket upgrade refused (502 / 503)', screen: unreachable('the gateway answered 502 instead of opening the link: the server process is down') },
-  { id: 'restart', group: 'Server', name: 'Server restart mid-session', screen: { kind: 'strip', tone: 'info', title: 'The world is restarting', status: 'Back in a moment', spinner: true } },
+  { id: 'restart', group: 'Server', name: 'Server restart mid-session', screen: { kind: 'strip', tone: 'info', title: 'Restarting', status: 'the world is back in a moment', spinner: true } },
   { id: 'restart-blocked', group: 'Server', pair: 'restart', name: '↳ Pressed Play while restarting', screen: {
     kind: 'card', tone: 'info', icon: 'refresh', tag: 'Restarting', title: 'The world is restarting', blocked: 'Play',
     body: 'Play needs the world, and it\'s restarting right now. It\'s usually back within 30 seconds.',
