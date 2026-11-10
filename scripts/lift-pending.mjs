@@ -3,6 +3,7 @@ import {appendFileSync,readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
+import {resolveLiftBatches} from './lift-pending-batches.mjs';
 
 /** One finite migration owner applies explicitly to every committed path.
  * This is not the J193 flaky cohort and confers no execution qualification.
@@ -53,14 +54,22 @@ export function readLiftPending(root,now){
  }
  if(!Array.isArray(files)||files.some(file=>typeof file!=='string'||! /^(?:src|test)\/[a-zA-Z0-9_./-]+\.test\.(?:ts|mjs)$/u.test(file))||new Set(files).size!==files.length)
   throw new Error('Invalid lift-pending inventory');
+ const paths=/** @type {string[]} */(files);
+ if('batchSchedule'in policy){
+  const batch=resolveLiftBatches(policy.batchSchedule,paths,{priorDeadline:effectiveDeadline,...(now===undefined?{}:{now}),git});
+  return {owner:policy.owner,originalDeadline:policy.deadline,extended:effective!==deadline,reason:policy.reason,files:paths,...batch};
+ }
  // Git validation can itself cross the deadline. Only an explicitly supplied
  // observation time stays fixed; the ordinary loader decides after validation.
- return {owner:policy.owner,deadline:effectiveDeadline,originalDeadline:policy.deadline,extended:effective!==deadline,reason:policy.reason,files:/** @type {string[]} */(files),excluded:(now??Date.now())<effective?/** @type {string[]} */(files):[]};
+ return {owner:policy.owner,deadline:effectiveDeadline,originalDeadline:policy.deadline,extended:effective!==deadline,reason:policy.reason,files:paths,excluded:(now??Date.now())<effective?paths:[],batches:[]};
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const policy=readLiftPending();
- console.log(JSON.stringify({...policy,files:policy.files.map(file=>({file,owner:policy.owner,deadline:policy.deadline})),excluded:policy.excluded.length}));
+ console.log(JSON.stringify({...policy,files:policy.files.map(file=>{
+  const batch=policy.batches.find(item=>item.files.includes(file));
+  return {file,owner:batch?.owner??policy.owner,deadline:batch===undefined?policy.deadline:batch.deadline,...(batch===undefined?{}:{batch:batch.id,waitingFor:batch.waitingFor})};
+ }),excluded:policy.excluded.length}));
  if(process.env.GITHUB_STEP_SUMMARY)appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-  `\n### Inherited lift migration debt\n\n${policy.excluded.length} of ${policy.files.length} listed files remain excluded, owner ${policy.owner}, fixed deadline ${policy.deadline}${policy.extended?` (one J200 extension from ${policy.originalDeadline})`:''}. Registration is not execution proof. Expiry restores blocking discovery.\n`);
+  `\n### Inherited lift migration debt\n\n${policy.excluded.length} of ${policy.files.length} listed files remain excluded. Registration is not execution proof. ${policy.batches.length===0?`Owner ${policy.owner}, fixed deadline ${policy.deadline}. Expiry restores blocking discovery.`:`J237: a missed batch deadline fails the run; waiting batches activate only from their first committed enabler landing.\n\n${policy.batches.filter(batch=>batch.files.length>0).map(batch=>`- ${batch.id}: ${batch.files.length} pending, owner ${batch.owner}, ${batch.deadline??`waiting for ${batch.waitingFor.join(', ')}`}`).join('\n')}`}\n`);
 }

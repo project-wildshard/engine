@@ -13,5 +13,868 @@
     "deadline": "2026-11-12T18:00:00Z",
     "evidence": "CI21 decision page https://claude.ai/artifact/PMEQD4VL7sHRS9PS1d5QpJ (local ~/.cache/wildshard/plan-artifacts/ci21/: index.html, BRIEF.md, measured.json); meta repo docs/plans/QA-FEEDBACK-2026-11-10.md row 7",
     "reason": "The one J200 extension. 349 listed files still fail; letting them rejoin blocking discovery at the original deadline turns every engine pre-push red before codex-mock can restore or retire them. No test execution is claimed; every listed file returns to blocking discovery at the extended deadline."
+  },
+  "batchSchedule": {
+    "schema": "ci21-batches/1",
+    "rule": "J237",
+    "decidedBy": "Jake",
+    "decidedAt": "2026-11-10",
+    "evidence": "NJ4(a), J237 in meta MULTI-REPO-PLAN section 2: second dated extension per CI21 batch anchored to CI21.H landing; every file ports, missed batch makes engine red.",
+    "startsAfter": "2026-11-12T18:00:00Z",
+    "sourceMap": {
+      "repository": "Raynos/project-wildshard-meta",
+      "revision": "878b7a833c6722a5c8dfd850729b3f8cb84c9204",
+      "sha256": "4c58734cdf5d6378a9336a8bb8611c950c287521a09c732c52e541733611893a"
+    },
+    "landings": {
+      "CI21-H1": null,
+      "CI21-H2": null,
+      "CI21-H3": null,
+      "CI21-H4": null,
+      "CI21-H5": null
+    },
+    "batches": [
+      {
+        "id": "API-RUNTIME",
+        "owner": "opus-ci21port",
+        "members": [],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "API-TOOL",
+        "owner": "opus-ci21port",
+        "members": [],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "E-GAME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/arena-ground.test.ts",
+          "test/arena-portal.test.ts",
+          "test/creature-refill.test.ts",
+          "test/creature-spawner.test.ts",
+          "test/elite-native-kernels.test.ts",
+          "test/encounter-room.test.ts",
+          "test/held-slot-entered.test.ts",
+          "test/loot-continuation-ports.test.ts",
+          "test/script-v2-group-authorities.test.ts",
+          "test/script-v2-group-context.test.ts",
+          "test/script-v2-group-native.test.ts",
+          "test/script-v2-group-reference-effects.test.ts",
+          "test/script-v2-group-references.test.ts",
+          "test/spawn-script-v2-queries.test.ts",
+          "test/taming-binding-order.test.ts",
+          "test/taming-guest-legacy.test.ts",
+          "test/taming-world-actions.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H2",
+          "CI21-H3"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "E-GREEN",
+        "owner": "codex-mock",
+        "members": [],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "E-LAYOUT",
+        "owner": "codex-mock",
+        "members": [
+          "test/authored-html.test.ts",
+          "test/boot-extras.test.ts",
+          "test/closed-components.test.ts",
+          "test/control-chunks.test.ts",
+          "test/engine-sides.test.ts",
+          "test/entry-totals.test.ts",
+          "test/frame-floor-inventory.test.ts",
+          "test/generated-source-guard.test.ts",
+          "test/no-binary-json.test.ts",
+          "test/no-generated-import.test.ts",
+          "test/platform-namespace-reach.test.ts",
+          "test/platform-pending-users.test.ts",
+          "test/shard-component-crumbs.test.ts",
+          "test/sort-sides.test.ts",
+          "test/title-chunk-budget.test.ts",
+          "test/vite-boot-modules.test.ts"
+        ],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "E-PRODUCT",
+        "owner": "codex-mock",
+        "members": [
+          "test/build-validation-receipts.test.ts"
+        ],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "E-RENDER",
+        "owner": "codex-mock",
+        "members": [
+          "test/grass-profile-file-only.test.ts",
+          "test/mounted-specimen-factory.test.ts",
+          "test/nalati-actor-paint.test.ts",
+          "test/seated-figure-file-only.test.ts"
+        ],
+        "requires": [
+          "CI21-H2"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "E-RENDER-O",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/animal-model-preparation.test.ts",
+          "test/animal-retained-physics.test.ts",
+          "test/boot-settings-interaction.test.ts",
+          "test/held-arms-platform.test.ts",
+          "test/mounted-figure.test.ts",
+          "test/patrol-encounter-view.test.ts",
+          "test/pickup-catalogue.test.ts",
+          "test/scene-instances.test.ts",
+          "test/slot-encounter-view.test.ts",
+          "test/specimen-owned-glb.test.ts",
+          "test/specimen-product-atlas.test.ts",
+          "test/specimen-product-glb.test.ts",
+          "test/specimen-selection.test.ts",
+          "test/splat-family-props.test.ts",
+          "test/tile-caster-bounds.test.ts",
+          "test/world-scene-batch.test.ts",
+          "test/world-scene-slabs.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H3"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "E-RUNTIME",
+        "owner": "codex-mock",
+        "members": [
+          "test/arena-room-fight.test.ts",
+          "test/balbal-program.test.ts",
+          "test/client-stealth-entry.test.ts",
+          "test/client-timed-encounters.test.ts",
+          "test/client-wildlife.test.ts",
+          "test/contract-program-owner.test.ts",
+          "test/contracts-platform.test.ts",
+          "test/driftwood-ecology-queue.test.ts",
+          "test/driftwood-sword-profiles.test.ts",
+          "test/elite-native-roster.test.ts",
+          "test/ktx2-owned-bytes.test.ts",
+          "test/map-binding.test.ts",
+          "test/mixed-population-refill.test.ts",
+          "test/mixed-population.test.ts",
+          "test/model-library-transport-lifetime.test.ts",
+          "test/nalati-charge-raw.test.ts",
+          "test/native-ground-assembly.test.ts",
+          "test/native-roster-returns.test.ts",
+          "test/packed-specimen-files.test.ts",
+          "test/page-wildlife-view.test.ts",
+          "test/patrol-contact.test.ts",
+          "test/population-raster.test.ts",
+          "test/portable-bytes-cache.test.ts",
+          "test/portable-math.test.ts",
+          "test/return-memory-preparation.test.ts",
+          "test/return-program-shared-memory.test.ts",
+          "test/rigged-hull-transport-lifetime.test.ts",
+          "test/species-catalogue-entry.test.ts",
+          "test/specimen-cache-lifetime.test.ts",
+          "test/terrain-triplets.test.ts",
+          "test/wet-product-loans.test.ts",
+          "test/whole-library-cache.test.ts",
+          "test/world-scene-geometry-cache.test.ts",
+          "test/world-weather-stage.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H3"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "E-RUNTIME-O",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/carried-quest-host.test.ts",
+          "test/ci12-ghost-owners.test.ts",
+          "test/herd-elite-projection.test.ts",
+          "test/motion-traces.test.ts",
+          "test/native-elite-projected.test.ts",
+          "test/native-group-rows.test.ts",
+          "test/native-roster-retirement.test.ts",
+          "test/net-ride.test.ts",
+          "test/patrol-law.test.ts",
+          "test/phased-arena-continuation.test.ts",
+          "test/polearm-decision.test.ts",
+          "test/slot-continuation.test.ts",
+          "test/stealth-crouch-kernel.test.ts",
+          "test/stealth-detection.test.ts",
+          "test/timed-encounters.test.ts"
+        ],
+        "requires": [
+          "CI21-H2"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "E-SCRIPT",
+        "owner": "codex-mock",
+        "members": [
+          "test/actor-projection-v2.test.ts",
+          "test/client-return-modules.test.ts",
+          "test/client-script-bridge-values.test.ts",
+          "test/client-script-transactions-regression.test.ts",
+          "test/declared-body-ops.test.ts",
+          "test/regional-exact-restore.test.ts",
+          "test/return-program-raw-modules.test.ts",
+          "test/return-projection-template.test.ts",
+          "test/script-call-results.test.ts",
+          "test/script-checkpoint-regression.test.ts",
+          "test/script-fixed-memory.test.ts",
+          "test/script-lane-results.test.ts",
+          "test/script-state-revision.test.ts",
+          "test/script-v2-group-bank.test.ts",
+          "test/script-v2-group-members.test.ts",
+          "test/script-v2-group-rng.test.ts",
+          "test/script-v2-wildlife-queries.test.ts",
+          "test/script-v2-world-actions.test.ts",
+          "test/script-virgin-memory.test.ts",
+          "test/titan-world-commands.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H3"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "E-SCRIPT-O",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/decision-simulation.test.ts",
+          "test/quest-spawn-capability.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H3"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "E-TOOL",
+        "owner": "codex-mock",
+        "members": [
+          "test/authored-page-mode-imports.test.ts",
+          "test/authored-transition.test.ts",
+          "test/boot-audio-packs.test.ts",
+          "test/boot-dist-transfer.test.ts",
+          "test/boot-smoke-dispatch.test.ts",
+          "test/ci-fail-fast.test.ts",
+          "test/ci-products.test.ts",
+          "test/committed-fast-checks.test.ts",
+          "test/entry-styles.test.ts",
+          "test/gen-programs.test.ts",
+          "test/host-callbacks.test.ts",
+          "test/local-gate-scenarios.test.ts",
+          "test/native-fixture-bundle.test.ts",
+          "test/no-shard-runtime.test.ts",
+          "test/page-boot-discovery.test.ts",
+          "test/platform-build-tools.test.ts",
+          "test/platform-chargebacks.test.ts",
+          "test/platform-output-reach.test.ts",
+          "test/platform-output-reader.test.ts",
+          "test/prepare-release-workflow.test.ts",
+          "test/shard-words-pin.test.ts",
+          "test/shardfile-boundaries.test.ts",
+          "test/sim-lane.test.ts",
+          "test/test-domain.test.ts"
+        ],
+        "requires": [
+          "CI21-H2"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "DRIFT-GAME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/driftwood-optional-verbs.test.ts",
+          "test/driftwood-story-verbs.test.ts",
+          "test/driftwood-trade-verbs.test.ts",
+          "test/driftwood-zipline-verbs.test.ts",
+          "test/quest-step-native-parity.test.ts",
+          "test/scripts/ground-encounters.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "DRIFT-NAMED",
+        "owner": "codex-mock",
+        "members": [
+          "test/graph-scene-author-ports.test.ts"
+        ],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "DRIFT-PRODUCT",
+        "owner": "codex-mock",
+        "members": [
+          "test/approved-enemy-placement.test.ts",
+          "test/driftwood-output.test.ts",
+          "test/driftwood-program-files.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "DRIFT-RENDER",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/driftwood-scene.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "DUNES-GAME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/scripts/skitterer-pack.test.ts",
+          "test/signal-quest-verbs.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "DUNES-SCRIPT",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/scripts/sunscar-matriarch.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "DUNES-TOOL",
+        "owner": "codex-mock",
+        "members": [
+          "test/sunscar-generation-inputs.test.ts"
+        ],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "NAL-BAKE",
+        "owner": "codex-mock",
+        "members": [
+          "test/nalati-cloth-publication.test.ts",
+          "test/nalati-contact-publication.test.ts",
+          "test/nalati-decorative-native.test.ts",
+          "test/nalati-decorative-scene.test.ts",
+          "test/nalati-field-author-ports.test.ts",
+          "test/nalati-geometry-cache-ports.test.ts",
+          "test/nalati-loft-author.test.ts",
+          "test/nalati-original-place-binary.test.ts",
+          "test/nalati-original-species.test.ts",
+          "test/nalati-place-runtime-source.test.ts",
+          "test/nalati-poi-scenes.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NAL-GAME",
+        "owner": "codex-mock",
+        "members": [
+          "test/nalati-titan-handoff.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NAL-GAME-O",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/nalati-chapter-binding.test.ts",
+          "test/nalati-chapter-one.test.ts",
+          "test/nalati-flock-verbs.test.ts",
+          "test/nalati-headless-assembly.test.ts",
+          "test/nalati-javelin-contact-verbs.test.ts",
+          "test/nalati-kokpar-verbs.test.ts",
+          "test/nalati-mounted-chain-verbs.test.ts",
+          "test/nalati-mounted-lance-verbs.test.ts",
+          "test/nalati-patrol-verbs.test.ts",
+          "test/nalati-qara-verbs.test.ts",
+          "test/nalati-sabre-contact-verbs.test.ts",
+          "test/nalati-spear-contact-verbs.test.ts",
+          "test/nalati-titan-verbs.test.ts",
+          "test/nalati-weapon-verbs.test.ts",
+          "test/nalati-wolf-fight-verbs.test.ts",
+          "test/nalati-wolf-howl-verbs.test.ts",
+          "test/net-titan-saddle.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NAL-PRODUCT",
+        "owner": "codex-mock",
+        "members": [
+          "test/held-bow-product.test.ts",
+          "test/mounted-firearm-admission.test.ts",
+          "test/mounted-specimen-admission.test.ts",
+          "test/nalati-herd-binary.test.ts",
+          "test/nalati-place-binary.test.ts",
+          "test/nalati-quest-prop-binary.test.ts",
+          "test/nalati-shape-files.test.ts",
+          "test/nalati-shape-product-lanes.test.ts",
+          "test/nalati-species-product-inputs.test.ts",
+          "test/nalati-view-binary.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NAL-RENDER",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/nalati-king-pose.test.ts",
+          "test/nalati-kurgan-fabric.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NAL-SCRIPT",
+        "owner": "codex-mock",
+        "members": [
+          "test/nalati-script-sections-source.test.ts",
+          "test/nalati-weapon-observation.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NAL-SCRIPT-O",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/balbal-v2.test.ts",
+          "test/encounter-slots.test.ts",
+          "test/nalati-elite-admission.test.ts",
+          "test/nalati-night-decisions.test.ts",
+          "test/nalati-roster-decisions.test.ts",
+          "test/nalati-titan-decisions.test.ts",
+          "test/nalati-wind-projection.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NAL-TOOL",
+        "owner": "codex-mock",
+        "members": [
+          "test/nalati-author-tools.test.ts"
+        ],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "NINE-GAME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/nine-headless-assembly.test.ts",
+          "test/nine-verb-tape.test.ts",
+          "test/nine-walk-verbs.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NINE-NATIVE",
+        "owner": "codex-mock",
+        "members": [
+          "test/native-oracle.test.ts"
+        ],
+        "requires": [
+          "CI21-H1"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NINE-PRODUCT",
+        "owner": "codex-mock",
+        "members": [
+          "test/nine-authored-manifest.test.ts",
+          "test/nine-geometry-writer.test.ts",
+          "test/nine-product-inputs.test.ts",
+          "test/nine-source-rows.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NINE-RENDER",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/nine-decal-binary.test.ts",
+          "test/nine-slab-bake.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "NINE-RUNTIME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/grid-reentry.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "PLOTS-TOOL",
+        "owner": "codex-mock",
+        "members": [
+          "test/open-plots-capture.test.ts",
+          "test/open-plots-config.test.ts"
+        ],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "PINE-GAME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/pine-ammunition-verbs.test.ts",
+          "test/pine-door-verbs.test.ts",
+          "test/pine-headless-population.test.ts",
+          "test/pine-quest-verbs.test.ts",
+          "test/quest-step-pine-native-parity.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "PINE-PRODUCT",
+        "owner": "codex-mock",
+        "members": [
+          "test/contract-page-admission.test.ts",
+          "test/director-shipping-product.test.ts",
+          "test/pine-contract-admission.test.ts",
+          "test/pine-journal.test.ts",
+          "test/pine-native-story-admission.test.ts",
+          "test/pine-product-reads.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SKY-GAME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/sky-progression-verbs.test.ts",
+          "test/sky-quest-verbs.test.ts",
+          "test/sky-roost-verbs.test.ts"
+        ],
+        "requires": [
+          "CI21-H1",
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SKY-PRODUCT",
+        "owner": "codex-mock",
+        "members": [
+          "test/sky-original-rigs.test.ts",
+          "test/sky-prepared-model-product.test.ts",
+          "test/sky-signal-fixed-layouts.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SKY-RENDER",
+        "owner": "opus-ci21port",
+        "members": [],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "SKY-SCRIPT",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/scripts/far-reach-roc.test.ts"
+        ],
+        "requires": [
+          "CI21-H4"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SD-BAKE",
+        "owner": "codex-mock",
+        "members": [
+          "test/author-lut-sampling.test.ts",
+          "test/author-placement-parity.test.ts",
+          "test/bake-collider-kernels.test.ts",
+          "test/basis-glb-variant.test.ts",
+          "test/faceted-ao-scope.test.ts",
+          "test/glb-embedded-basis.test.ts",
+          "test/glb-embedded-images.test.ts",
+          "test/mover-swell-parity.test.ts",
+          "test/native-triangle-field.test.ts",
+          "test/uniform-tile-grid.test.ts",
+          "test/whole-prop-shadows.test.ts"
+        ],
+        "requires": [
+          "CI21-H5"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SD-GAME",
+        "owner": "opus-ci21port",
+        "members": [
+          "test/scripts/_template-boss.test.ts"
+        ],
+        "requires": [
+          "CI21-H5"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SD-NAMED",
+        "owner": "codex-mock",
+        "members": [
+          "test/approved-population-returns.test.ts",
+          "test/defined-sections.test.ts",
+          "test/nalati-carried-terrain-ports.test.ts",
+          "test/named-json-admission.test.ts",
+          "test/registered-creature-look-json.test.ts",
+          "test/registered-dressing-json.test.ts",
+          "test/registered-field-json.test.ts",
+          "test/registered-ground-aliases.test.ts",
+          "test/registered-json.test.ts",
+          "test/registered-native-aliases.test.ts",
+          "test/registered-placement-json.test.ts",
+          "test/registered-quest-native.test.ts",
+          "test/registered-quest-page.test.ts",
+          "test/registered-scene-facts.test.ts",
+          "test/registered-scene-json.test.ts",
+          "test/registered-scene-model-json.test.ts",
+          "test/registered-scene-sources.test.ts",
+          "test/scene-surface-intake.test.ts",
+          "test/schema-code-memory.test.ts",
+          "test/sheep-file-contract.test.ts",
+          "test/species-admission.test.ts",
+          "test/species-barrel-author-ports.test.ts",
+          "test/view-author-metadata.test.ts",
+          "test/world-assembly-schema.test.ts",
+          "test/world-scene-graph-pages.test.ts",
+          "test/world-scene-placement-pages.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H5"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SD-PRODUCT",
+        "owner": "codex-mock",
+        "members": [
+          "test/author-discovery.test.ts",
+          "test/author-errors.test.ts",
+          "test/client-runtime-declaration.test.ts",
+          "test/decision-product.test.ts",
+          "test/native-assembly.test.ts",
+          "test/new-project.test.ts",
+          "test/output-runtime.test.ts",
+          "test/product-map-publish.test.ts",
+          "test/project-sections.test.ts",
+          "test/return-projection-inventory.test.ts",
+          "test/shard-discovery.test.ts",
+          "test/template-generation.test.ts",
+          "test/template-product-reader.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H5"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SD-RENDER",
+        "owner": "opus-ci21port",
+        "members": [],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      },
+      {
+        "id": "SD-SCRIPT",
+        "owner": "codex-mock",
+        "members": [
+          "test/channel-programs-gather.test.ts",
+          "test/decision-body-ops.test.ts",
+          "test/original-script-order.test.ts",
+          "test/return-program-group-v2.test.ts",
+          "test/script-v2-radial.test.ts"
+        ],
+        "requires": [
+          "CI21-H2",
+          "CI21-H5"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SD-TOOL",
+        "owner": "codex-mock",
+        "members": [
+          "test/build-cache-report.test.ts",
+          "test/discovery-output-placement.test.mjs",
+          "test/generated-isolated-declarations.test.ts",
+          "test/golden-board-colour.test.ts",
+          "test/import-bundle.test.ts",
+          "test/json-output-guard.test.ts",
+          "test/map-source-inputs.test.ts",
+          "test/model-sources.test.ts",
+          "test/music-export-midi.test.ts",
+          "test/platform-file-families.test.ts",
+          "test/platform-runtime-closure.test.ts",
+          "test/product-build-times.test.ts",
+          "test/program-discovery-bootstrap.test.ts",
+          "test/program-discovery.test.ts",
+          "test/runtime-files.test.ts",
+          "test/shardfile-inputs.test.ts",
+          "test/template-source-layout.test.ts",
+          "test/tile-bake-report.test.ts",
+          "test/tile-bakes.test.ts"
+        ],
+        "requires": [
+          "CI21-H5"
+        ],
+        "windowHours": 48,
+        "deadline": null
+      },
+      {
+        "id": "SF-BAKE",
+        "owner": "codex-mock",
+        "members": [
+          "test/glb-normalized-positions.test.ts"
+        ],
+        "requires": [],
+        "windowHours": 48,
+        "deadline": "2026-11-14T18:00:00.000Z"
+      }
+    ]
   }
 }

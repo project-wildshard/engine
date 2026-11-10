@@ -11,7 +11,9 @@ const inventory='["test/actual.test.ts"]',policy={schema:1,owner:'codex-mock',re
 const put=()=>writeFileSync(join(root,'test/lift-pending-policy.json'),JSON.stringify(policy));
 const run=()=>spawnSync(process.execPath,['scripts/lift-pending.mjs'],{cwd:root,encoding:'utf8'});
 try{
- mkdirSync(join(root,'scripts'));mkdirSync(join(root,'test'));copyFileSync('scripts/lift-pending.mjs',join(root,'scripts/lift-pending.mjs'));writeFileSync(join(root,'test/lift-pending.json'),inventory);put();
+ mkdirSync(join(root,'scripts'));mkdirSync(join(root,'test'));
+ for(const name of ['lift-pending.mjs','lift-pending-batches.mjs'])copyFileSync(`scripts/${name}`,join(root,'scripts',name));
+ writeFileSync(join(root,'test/lift-pending.json'),inventory);put();
  for(const args of [['init','--quiet','--initial-branch=main'],['add','test'],['-c','user.name=Lift proof','-c','user.email=proof@example.test','commit','--quiet','-m','first policy']])execFileSync('git',args,{cwd:root,env:{...process.env,GIT_AUTHOR_DATE:registeredAt,GIT_COMMITTER_DATE:registeredAt}});
  assert.equal(run().status,0,run().stderr);
  policy.registeredAt=new Date(Date.parse(registeredAt)+600_000).toISOString();policy.deadline=new Date(Date.parse(policy.registeredAt)+47*3_600_000).toISOString();put();

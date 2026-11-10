@@ -1,6 +1,5 @@
 // Outside-hook public Vitest discovery proof. It never executes a test body.
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {createVitest} from 'vitest/node';
 
 const now=Date.now;
@@ -11,16 +10,18 @@ try{
  const policy=readLiftPending();
  assert.equal(policy.owner,'codex-mock');
  assert.ok(Date.parse(policy.originalDeadline)<=Date.parse('2026-11-10T18:00:00Z'));
- // CI21 option A (Jake, 2026-11-10): the one J200 extension, capped at 48 h.
- assert.ok(Date.parse(policy.deadline)<=Date.parse('2026-11-12T18:00:00Z'));
+ assert.equal(policy.batches.length,48);
+ assert.equal(policy.batches.flatMap(batch=>batch.files).length,policy.files.length);
  assert.equal(policy.excluded.length,policy.files.length,'Registration has not claimed these files executed');
  Date.now=()=>Date.parse('2026-11-13T18:00:00Z');
  const context=await createVitest({root:process.cwd(),run:true,watch:false},{logLevel:'silent'});
  try{
   const files=new Set((await context.getRelevantTestSpecifications()).map(spec=>spec.moduleId));
-  /** @type {string[]} */const pending=JSON.parse(readFileSync('test/lift-pending.json','utf8'));
+  const pending=policy.files;
   const hidden=pending.filter(file=>!files.has(`${process.cwd()}/${file}`));
   console.log(JSON.stringify({afterDeadline:'2026-11-13T18:00:00Z',pending:pending.length,stillHidden:hidden.length}));
-  assert.equal(hidden.length,0,'Every inherited pending file must return to blocking discovery after its deadline');
+  assert.equal(hidden.length,pending.length,'J237 preserves each exclusion until its own dated batch expires');
  }finally{await context.close();}
+ Date.now=()=>Date.parse('2026-11-14T18:00:00Z');
+ await assert.rejects(()=>createVitest({root:process.cwd(),run:true,watch:false},{logLevel:'silent'}),/CI21 batch deadline missed/u,'Actual Vitest startup must fail on the first missed batch');
 }finally{Date.now=now;process.argv=argv;}

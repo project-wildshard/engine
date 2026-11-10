@@ -42,7 +42,7 @@ const classify=async(before,sha)=>{
 };
 try{
  git(['init','--quiet','--initial-branch=main']);mkdirSync(join(work,'scripts'));mkdirSync(join(work,'src'));mkdirSync(join(work,'test'));mkdirSync(join(work,'docs'));
- for(const name of ['push-selection.mjs','ci-selection.mjs','lift-pending.mjs','renderer-revision.mjs','shardfile-validation-revision.mjs','source-input-proof.mjs','input-hash-memo.mjs'])if(existsSync(`scripts/${name}`))copyFileSync(`scripts/${name}`,join(work,'scripts',name));
+ for(const name of ['push-selection.mjs','ci-selection.mjs','lift-pending.mjs','lift-pending-batches.mjs','renderer-revision.mjs','shardfile-validation-revision.mjs','source-input-proof.mjs','input-hash-memo.mjs'])if(existsSync(`scripts/${name}`))copyFileSync(`scripts/${name}`,join(work,'scripts',name));
  // Refuse package resolution even if a developer's ancestor node_modules could
  // otherwise hide CI's pre-install environment. Native Node builtins stay real.
  writeFileSync(join(work,'test/cold-ci.mjs'),"import{isBuiltin,registerHooks}from'node:module';registerHooks({resolve(specifier,context,next){if(!isBuiltin(specifier)&&!specifier.startsWith('.')&&!specifier.startsWith('/')&&!specifier.startsWith('file:')&&!specifier.startsWith('internal/'))throw Error('Cold CI attempted installed package: '+specifier);return next(specifier,context);}});");
