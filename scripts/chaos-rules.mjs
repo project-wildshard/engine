@@ -1,4 +1,5 @@
 // FM2's public fault vocabulary. This module knows no game UI or scenario ids.
+import { validateHeaderValue } from 'node:http'
 /** @typedef {{route:string,kind:string,direction?:'up'|'down'|'both',ms?:number,jitterMs?:number,seed?:number,code?:number,retryAfter?:string,bytesPerSecond?:number,bytes?:number,text?:string,contentType?:string,afterMs?:number,reason?:string,fraction?:number}} ChaosRule */
 const ROUTES = new Set([
   'release',
@@ -136,6 +137,8 @@ export function chaosRules(input) {
           /[\r\n]/u.test(rule.retryAfter))
       )
         throw new Error('Invalid Retry-After')
+      if (rule.retryAfter !== undefined)
+        validateHeaderValue('Retry-After', rule.retryAfter)
     }
     if (kind === 'bandwidth')
       number(rule, 'bytesPerSecond', 1, 1024 * 1024 * 1024)
@@ -145,15 +148,17 @@ export function chaosRules(input) {
       number(rule, 'fraction', 0, 1, false)
       if (rule.seed !== undefined) number(rule, 'seed', 0, 0xffffffff)
     }
-    if (
-      kind === 'body' &&
-      (typeof rule.text !== 'string' ||
+    if (kind === 'body') {
+      if (
+        typeof rule.text !== 'string' ||
         Buffer.byteLength(rule.text) > 64 * 1024 ||
         typeof rule.contentType !== 'string' ||
         rule.contentType.length > 120 ||
-        /[\r\n]/u.test(rule.contentType))
-    )
-      throw new Error('Invalid body replacement')
+        /[\r\n]/u.test(rule.contentType)
+      )
+        throw new Error('Invalid body replacement')
+      validateHeaderValue('Content-Type', rule.contentType)
+    }
     if (kind === 'close') {
       const code = number(rule, 'code', 1000, 4999)
       if (

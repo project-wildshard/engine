@@ -14,13 +14,29 @@ import {
   symlinkSync,
   readdirSync,
 } from 'node:fs'
-import { createServer } from 'node:http'
+import { createServer, request as nativeRequest } from 'node:http'
 import { join, resolve as absolute } from 'node:path'
 import { createInterface } from 'node:readline'
 import { test } from 'node:test'
 import { setTimeout as wait } from 'node:timers/promises'
 
 import { WebSocket, WebSocketServer } from 'ws'
+
+const PROOF_STARTED = performance.now()
+/** Every owned cleanup runs even when an earlier one fails.
+ * @param {(()=>unknown)[]} actions */
+async function retire(actions) {
+  const failures = []
+  for (const action of actions) {
+    try {
+      await action()
+    } catch (error) {
+      failures.push(error)
+    }
+  }
+  if (failures.length > 0)
+    throw new AggregateError(failures, 'Owned fixture cleanup failed')
+}
 
 /** Stop only a ChildProcess this proof spawned. A forced fallback remains red.
  * @param {import('node:child_process').ChildProcess} child */
@@ -111,6 +127,7 @@ async function socket(origin) {
   const address = new URL(origin)
   address.protocol = address.protocol === 'https:' ? 'wss:' : 'ws:'
   const client = new WebSocket(address)
+  client.on('error', () => undefined)
   await once(client, 'open', { signal: AbortSignal.timeout(2000) })
   return client
 }
@@ -651,3 +668,271 @@ await test(
     }
   },
 )
+
+/** @param {string} origin @param {string} path @param {Record<string,string>} [headers] */
+function rawRequest(origin, path, headers = {}) {
+  const address = new URL(origin)
+  return new Promise((resolve, reject) => {
+    const request = nativeRequest({
+      host: '127.0.0.1',
+      port: address.port,
+      path,
+      headers,
+      signal: AbortSignal.timeout(1000),
+    })
+    request.once('response', response => {
+      response.resume()
+      resolve({ status: response.statusCode, upgraded: false })
+    })
+    request.once('upgrade', (response, peerSocket) => {
+      peerSocket.destroy()
+      resolve({ status: response.statusCode, upgraded: true })
+    })
+    request.once('error', reject)
+    request.end()
+  })
+}
+/** @param {string} origin @param {Record<string,string>} [extra] */
+function rawUpgrade(origin, extra = {}) {
+  return rawRequest(origin, '/', {
+    connection: 'Upgrade',
+    upgrade: 'websocket',
+    'sec-websocket-key': 'YWJjZGVmZ2hpamtsbW5vcA==',
+    'sec-websocket-version': '13',
+    ...extra,
+  })
+}
+async function nativeFixture() {
+  const work = mkdtempSync('tmp/fm2/regression-'),
+    server = createServer((_request, response) => {
+      response.end('owned')
+    }),
+    wss = new WebSocketServer({ server })
+  wss.on('connection', peer => {
+    peer.on('error', () => undefined)
+    peer.on('message', (data, binary) => {
+      if (peer.readyState === WebSocket.OPEN)
+        peer.send(data, { binary }, () => undefined)
+    })
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address()
+  assert.ok(address !== null && typeof address !== 'string')
+  /** @type {Awaited<ReturnType<typeof launch>>|undefined} */ let proxy
+  const close = () =>
+    retire([
+      () => proxy?.close(),
+      () => {
+        for (const peer of wss.clients) peer.terminate()
+      },
+      () =>
+        new Promise(resolve => {
+          wss.close(() => {
+            resolve(null)
+          })
+        }),
+      async () => {
+        server.closeAllConnections()
+        server.close()
+        await once(server, 'close')
+      },
+      () => {
+        rmSync(work, { recursive: true })
+      },
+    ])
+  try {
+    proxy = await launch(
+      join(work, 'proxy'),
+      `http://127.0.0.1:${address.port}`,
+    )
+    return { proxy, wss, close }
+  } catch (error) {
+    await close()
+    throw error
+  }
+}
+await test('path escape never reaches another loopback origin with caller headers', async () => {
+  const fixture = await nativeFixture()
+  let hits = 0
+  const trap = createServer((_request, response) => {
+    hits++
+    response.end('escaped')
+  })
+  trap.listen(0, '127.0.0.1')
+  await once(trap, 'listening')
+  const address = trap.address()
+  assert.ok(address !== null && typeof address !== 'string')
+  try {
+    const response = await rawRequest(
+      fixture.proxy.ready.pageOrigin,
+      `/\\127.0.0.1:${address.port}/bytes`,
+      { authorization: 'Bearer owned-canary', cookie: 'owned=canary' },
+    )
+    assert.equal(response.status, 400)
+    assert.equal(hits, 0)
+  } finally {
+    await retire([
+      fixture.close,
+      async () => {
+        trap.closeAllConnections()
+        trap.close()
+        await once(trap, 'close')
+      },
+    ])
+  }
+})
+await test('rejected key closes the real upstream opened before ws validation', async () => {
+  const fixture = await nativeFixture()
+  try {
+    assert.equal(
+      (
+        await rawUpgrade(fixture.proxy.ready.worldOrigin, {
+          'sec-websocket-key': 'invalid',
+        })
+      ).status,
+      400,
+    )
+    await wait(40)
+    assert.equal(fixture.wss.clients.size, 0)
+  } finally {
+    await fixture.close()
+  }
+})
+await test('duplicate offered protocol cannot crash the instrument', async () => {
+  const fixture = await nativeFixture()
+  try {
+    assert.equal(
+      (
+        await rawUpgrade(fixture.proxy.ready.worldOrigin, {
+          'sec-websocket-protocol': 'duplicate,duplicate',
+        })
+      ).status,
+      400,
+    )
+    assert.equal(
+      await (await fetch(fixture.proxy.ready.pageOrigin)).text(),
+      'owned',
+    )
+    assert.equal(fixture.wss.clients.size, 0)
+  } finally {
+    await fixture.close()
+  }
+})
+await test('shared pressure heals both native sending directions', async () => {
+  const fixture = await nativeFixture(),
+    client = await socket(fixture.proxy.ready.worldOrigin)
+  try {
+    await fixture.proxy.set([
+      { route: 'socket', kind: 'delay-frames', ms: 120_000 },
+    ])
+    client.send(Buffer.alloc(5 * 1024 * 1024, 1))
+    await wait(40)
+    assert.ok(
+      (await (await fixture.proxy.control()).json()).counters.matches.socket >
+        0,
+    )
+    client.send(Buffer.from([0, 71]))
+    await wait(30)
+    await fixture.proxy.set([])
+    await echoAfterQueued(client, Buffer.from([0, 72]))
+  } finally {
+    client.terminate()
+    await fixture.close()
+  }
+})
+await test('zero-length delayed messages have a count bound', async () => {
+  const fixture = await nativeFixture(),
+    client = await socket(fixture.proxy.ready.worldOrigin)
+  try {
+    await fixture.proxy.set([
+      { route: 'socket', kind: 'delay-frames', ms: 120_000 },
+    ])
+    const closed = once(client, 'close', { signal: AbortSignal.timeout(500) })
+    for (let i = 0; i < 1100; i++) client.send(Buffer.alloc(0))
+    await closed
+    assert.ok(
+      (await (await fixture.proxy.control()).json()).counters.queueOverflow > 0,
+    )
+  } finally {
+    client.terminate()
+    await fixture.close()
+  }
+})
+await test('long bandwidth deadline never wraps into immediate delivery', async () => {
+  const fixture = await nativeFixture(),
+    client = await socket(fixture.proxy.ready.worldOrigin),
+    payload = Buffer.alloc(3 * 1024 * 1024, 1)
+  let received = 0
+  client.on('message', () => {
+    received++
+  })
+  try {
+    await fixture.proxy.set([
+      { route: 'socket', kind: 'bandwidth', bytesPerSecond: 1 },
+    ])
+    client.send(payload)
+    await wait(80)
+    assert.equal(received, 0)
+    assert.equal(
+      fixture.proxy.errors().includes('TimeoutOverflowWarning'),
+      false,
+    )
+    await fixture.proxy.set([])
+    await echoAfterQueued(client, Buffer.from([0, 73]))
+    assert.ok(received >= 2)
+  } finally {
+    client.terminate()
+    await fixture.close()
+  }
+})
+await test('header controls refuse before changing active rules', async () => {
+  const fixture = await nativeFixture()
+  try {
+    const before = await (await fixture.proxy.control()).json()
+    for (const rule of [
+      { route: 'page', kind: 'status', code: 503, retryAfter: '20\u0000' },
+      {
+        route: 'page',
+        kind: 'body',
+        text: 'owned',
+        contentType: 'text/plain\u0100',
+      },
+    ]) {
+      assert.equal(
+        (
+          await fixture.proxy.control({
+            scenario: 'invalid-header',
+            rules: [rule],
+          })
+        ).status,
+        400,
+      )
+      assert.deepEqual(
+        (await (await fixture.proxy.control()).json()).rules,
+        before.rules,
+      )
+    }
+  } finally {
+    await fixture.close()
+  }
+})
+await test('upstream refusal cannot be masked by a downstream loss rule', async () => {
+  const fixture = await nativeFixture()
+  try {
+    await fixture.proxy.set([
+      { route: 'socket', kind: 'loss', direction: 'down', fraction: 1 },
+      { route: 'socket', kind: 'refuse-upgrade', direction: 'up', code: 503 },
+    ])
+    assert.equal(
+      (await rawUpgrade(fixture.proxy.ready.worldOrigin)).status,
+      503,
+    )
+    assert.equal(fixture.wss.clients.size, 0)
+  } finally {
+    await fixture.close()
+  }
+})
+await test('all native proxy controls include setup and teardown within ten seconds', () => {
+  assert.ok(performance.now() - PROOF_STARTED < 9500)
+})

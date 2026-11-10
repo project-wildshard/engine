@@ -19,7 +19,40 @@ import { chaosRules, chaosRandom, chaosDelay } from './chaos-rules.mjs'
 
 const MAX_BODY = 128 * 1024,
   MAX_QUEUE = 8 * 1024 * 1024,
-  MAX_METADATA = 2 * 1024 * 1024
+  MAX_METADATA = 2 * 1024 * 1024,
+  MAX_PENDING = 1024
+/** A cancellable absolute deadline. Node otherwise wraps delays above its
+ * signed 32-bit timer range to approximately one millisecond.
+ * @param {number} deadline */
+function deadlineWait(deadline) {
+  /** @type {ReturnType<typeof setTimeout>|undefined} */
+  let timer
+  /** @type {(elapsed:boolean)=>void} */
+  let complete = () => undefined
+  let done = false
+  /** @type {Promise<boolean>} */
+  const promise = new Promise(resolve => {
+    complete = elapsed => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      resolve(elapsed)
+    }
+    const step = () => {
+      if (done) return
+      const remaining = deadline - performance.now()
+      if (remaining <= 0) complete(true)
+      else timer = setTimeout(step, Math.min(remaining, 2_147_483_647))
+    }
+    step()
+  })
+  return {
+    promise,
+    cancel: () => {
+      complete(false)
+    },
+  }
+}
 /** @param {string} text */
 function upstream(text) {
   const url = new URL(text)
@@ -135,6 +168,10 @@ export async function openChaosProxy(options) {
   const operations = new Set()
   /** @type {Set<import('node:net').Socket>} */
   const sockets = new Set()
+  /** Every upstream remains owned until its native close, including failed
+   * client upgrades and the other half of a closing bridge.
+   * @type {Set<WebSocket>} */
+  const upstreamSockets = new Set()
   /** @type {import('node:http').Server[]} */
   const servers = []
   /** @type {WeakMap<import('node:http').IncomingMessage,string>} */
@@ -248,7 +285,12 @@ export async function openChaosProxy(options) {
   /** @param {import('node:http').IncomingMessage} request @param {import('node:http').ServerResponse} response @param {boolean} world */
   const http = async (request, response, world) => {
     const raw = request.url ?? '/'
-    if (!raw.startsWith('/') || raw.startsWith('//')) {
+    if (
+      closed ||
+      !raw.startsWith('/') ||
+      raw.startsWith('//') ||
+      raw.includes('\\')
+    ) {
       response.writeHead(400).end()
       return
     }
@@ -281,6 +323,15 @@ export async function openChaosProxy(options) {
         503,
         Buffer.from('No owned API upstream configured'),
       )
+      return
+    }
+    const forwarded = new URL(raw, target)
+    if (
+      forwarded.origin !== target.origin ||
+      forwarded.username !== '' ||
+      forwarded.password !== ''
+    ) {
+      response.writeHead(400).end()
       return
     }
     const wake = wakeups()
@@ -350,7 +401,7 @@ export async function openChaosProxy(options) {
         break
       }
       if (!alive) return
-      outgoing = httpRequest(new URL(raw, target), {
+      outgoing = httpRequest(forwarded, {
         method: request.method,
         headers: { ...request.headers, host: target.host },
         agent: false,
@@ -478,6 +529,18 @@ export async function openChaosProxy(options) {
     let alive = true,
       queued = 0
     const due = { up: 0, down: 0 }
+    const pressure = () =>
+      queued + client.bufferedAmount + remote.bufferedAmount
+    const updateFlows = () => {
+      if (!alive) return
+      if (pressure() >= MAX_QUEUE / 2) {
+        client.pause()
+        remote.pause()
+      } else {
+        client.resume()
+        remote.resume()
+      }
+    }
     /** @type {Set<(replaced?:boolean)=>void>} */ const pending = new Set()
     const activate = () => {
       for (const direction of /** @type {const} */ (['up', 'down'])) {
@@ -502,6 +565,7 @@ export async function openChaosProxy(options) {
     }
     const operation = {
       change: () => {
+        if (!alive) return
         wake.wake()
         due.up = 0
         due.down = 0
@@ -515,12 +579,12 @@ export async function openChaosProxy(options) {
         for (const send of pending) send()
         client.terminate()
         remote.terminate()
-        operations.delete(operation)
       },
     }
     operations.add(operation)
-    /** @param {'up'|'down'} direction @param {WebSocket} from @param {WebSocket} to @param {import('ws').RawData} raw @param {boolean} binary */
-    const message = (direction, from, to, raw, binary) => {
+    /** @param {'up'|'down'} direction @param {WebSocket} to @param {import('ws').RawData} raw @param {boolean} binary */
+    const message = (direction, to, raw, binary) => {
+      if (!alive) return
       const bytes = Array.isArray(raw)
           ? Buffer.concat(raw)
           : Buffer.isBuffer(raw)
@@ -537,7 +601,7 @@ export async function openChaosProxy(options) {
         matched(rule, direction)
         counters.droppedBytes += bytes.length
         counters.droppedMessages++
-        if (queued + to.bufferedAmount < MAX_QUEUE / 2) from.resume()
+        updateFlows()
         return
       }
       if (rule?.kind === 'loss' && binary && bytes[0] === 1)
@@ -556,25 +620,29 @@ export async function openChaosProxy(options) {
           (bytes.length * 1000) / (rule.bytesPerSecond ?? 1)
         delay = due[direction] - performance.now()
       }
-      queued += bytes.length
-      if (queued + to.bufferedAmount > MAX_QUEUE) {
+      if (
+        pending.size >= MAX_PENDING ||
+        pressure() + bytes.length > MAX_QUEUE
+      ) {
         counters.queueOverflow++
         operation.close()
         return
       }
-      if (queued + to.bufferedAmount > MAX_QUEUE / 2) from.pause()
-      /** @type {ReturnType<typeof setTimeout>|undefined} */ let timer
+      queued += bytes.length
+      updateFlows()
+      /** @type {()=>void} */
+      let cancel = () => undefined
       let sent = false
       /** @param {boolean} [replaced] */
       const send = (replaced = false) => {
         if (sent) return
         sent = true
-        clearTimeout(timer)
+        cancel()
         pending.delete(send)
         queued -= bytes.length
         if (!alive || to.readyState !== WebSocket.OPEN) return
         if (replaced) {
-          message(direction, from, to, bytes, binary)
+          message(direction, to, bytes, binary)
           return
         }
         counters.forwardedBytes += bytes.length
@@ -592,35 +660,48 @@ export async function openChaosProxy(options) {
                 else resolve(null)
               })
             })
-            if (queued + to.bufferedAmount < MAX_QUEUE / 2) from.resume()
+            updateFlows()
           } catch {
             operation.close()
           }
         })()
       }
       pending.add(send)
-      if (delay > 0) timer = setTimeout(send, delay)
-      else send()
+      if (delay > 0) {
+        const alarm = deadlineWait(performance.now() + delay)
+        cancel = alarm.cancel
+        void (async () => {
+          if (await alarm.promise) send()
+        })()
+      } else send()
     }
     client.on('message', (data, binary) => {
-      message('up', client, remote, data, binary)
+      message('up', remote, data, binary)
     })
     remote.on('message', (data, binary) => {
-      message('down', remote, client, data, binary)
+      message('down', client, data, binary)
     })
     client.on('close', (code, reason) => {
       closePeer(remote, code, reason)
       alive = false
       wake.wake()
       for (const send of pending) send()
-      operations.delete(operation)
+      if (
+        client.readyState === WebSocket.CLOSED &&
+        remote.readyState === WebSocket.CLOSED
+      )
+        operations.delete(operation)
     })
     remote.on('close', (code, reason) => {
       closePeer(client, code, reason)
       alive = false
       wake.wake()
       for (const send of pending) send()
-      operations.delete(operation)
+      if (
+        client.readyState === WebSocket.CLOSED &&
+        remote.readyState === WebSocket.CLOSED
+      )
+        operations.delete(operation)
     })
     client.on('error', operation.close)
     remote.on('error', operation.close)
@@ -628,13 +709,32 @@ export async function openChaosProxy(options) {
   }
   /** @param {import('node:http').IncomingMessage} request @param {import('node:stream').Duplex} socket @param {Buffer} head */
   const upgrade = (request, socket, head) => {
+    if (closed) {
+      socket.destroy()
+      return
+    }
     if (request.url !== '/') {
       socket.end(
         'HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
       )
       return
     }
-    const rule = ruleFor('socket', 'down') ?? ruleFor('socket', 'up')
+    const key = request.headers['sec-websocket-key']
+    if (
+      request.method !== 'GET' ||
+      request.headers.upgrade?.toLowerCase() !== 'websocket' ||
+      typeof key !== 'string' ||
+      !/^[0-9A-Za-z+/]{22}==$/u.test(key) ||
+      !['8', '13'].includes(request.headers['sec-websocket-version'] ?? '')
+    ) {
+      socket.end(
+        'HTTP/1.1 400 Invalid upgrade\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
+      )
+      return
+    }
+    const rule = active.rules.find(
+      value => value.route === 'socket' && value.kind === 'refuse-upgrade',
+    )
     if (rule?.kind === 'refuse-upgrade') {
       matched(rule)
       socket.end(
@@ -645,23 +745,34 @@ export async function openChaosProxy(options) {
     const address = new URL(worldTarget)
     address.protocol = 'ws:'
     const offered = request.headers['sec-websocket-protocol']
-    const remote = new WebSocket(
-      address,
-      typeof offered === 'string'
-        ? offered.split(',').map(value => value.trim())
-        : [],
-      {
-        maxPayload: MAX_QUEUE,
-        followRedirects: false,
-        ...(request.headers.origin === undefined
-          ? {}
-          : { origin: request.headers.origin }),
-      },
-    )
+    /** @type {WebSocket} */
+    let remote
+    try {
+      remote = new WebSocket(
+        address,
+        typeof offered === 'string'
+          ? offered.split(',').map(value => value.trim())
+          : [],
+        {
+          maxPayload: MAX_QUEUE,
+          followRedirects: false,
+          ...(request.headers.origin === undefined
+            ? {}
+            : { origin: request.headers.origin }),
+        },
+      )
+    } catch {
+      socket.end(
+        'HTTP/1.1 400 Invalid protocols\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
+      )
+      return
+    }
+    upstreamSockets.add(remote)
     const handshake = {
       timer: /** @type {ReturnType<typeof setTimeout>|undefined} */ (undefined),
     }
-    let settled = false
+    let settled = false,
+      bridged = false
     const operation = {
       change: () => undefined,
       close: () => {
@@ -673,6 +784,10 @@ export async function openChaosProxy(options) {
       },
     }
     operations.add(operation)
+    remote.once('close', () => {
+      upstreamSockets.delete(remote)
+      if (!bridged && !settled) operation.close()
+    })
     /** @param {number} code */
     const refuse = code => {
       if (settled) return
@@ -698,24 +813,27 @@ export async function openChaosProxy(options) {
     })
     remote.once('open', () => {
       if (settled) return
-      const current = ruleFor('socket', 'down') ?? ruleFor('socket', 'up')
+      const current = active.rules.find(
+        value => value.route === 'socket' && value.kind === 'refuse-upgrade',
+      )
       if (current?.kind === 'refuse-upgrade') {
         matched(current)
         refuse(current.code ?? 503)
         return
       }
-      settled = true
-      clearTimeout(handshake.timer)
-      operations.delete(operation)
       protocols.set(request, remote.protocol)
       try {
         wss.handleUpgrade(request, socket, head, client => {
+          bridged = true
+          settled = true
+          clearTimeout(handshake.timer)
+          operations.delete(operation)
           remote.off('error', failed)
           bridge(client, remote)
         })
+        if (!bridged) operation.close()
       } catch {
-        remote.terminate()
-        socket.destroy()
+        operation.close()
       }
     })
   }
@@ -723,7 +841,14 @@ export async function openChaosProxy(options) {
   const listen = async (server, port) => {
     servers.push(server)
     server.on('connection', socket => {
+      if (closed) {
+        socket.destroy()
+        return
+      }
       sockets.add(socket)
+      socket.on('error', () => {
+        socket.destroy()
+      })
       socket.once('close', () => {
         sockets.delete(socket)
       })
@@ -742,29 +867,43 @@ export async function openChaosProxy(options) {
       throw new Error('No owned loopback listener')
     return address.port
   }
-  const close = async () => {
-    if (closed) return
+  /** @type {Promise<void>|undefined} */
+  let closing
+  const close = () => {
+    if (closing !== undefined) return closing
     closed = true
-    for (const operation of operations) operation.close()
-    for (const socket of sockets) socket.destroy()
-    await Promise.all(
-      servers.map(
+    closing = (async () => {
+      for (const operation of operations) operation.close()
+      for (const socket of sockets) socket.destroy()
+      const peers = [...upstreamSockets].map(peer => {
+        if (peer.readyState === WebSocket.CLOSED) return Promise.resolve()
+        const retired = new Promise(resolve => {
+          peer.once('close', () => {
+            resolve(null)
+          })
+        })
+        peer.terminate()
+        return retired
+      })
+      const listeners = servers.map(
         server =>
           new Promise(resolve => {
             server.close(() => {
               resolve(null)
             })
           }),
-      ),
-    )
-    await new Promise(resolve => {
-      wss.close(() => {
-        resolve(null)
+      )
+      await Promise.all([...peers, ...listeners])
+      await new Promise(resolve => {
+        wss.close(() => {
+          resolve(null)
+        })
       })
-    })
-    const current = lstatSync(tokenFile, { throwIfNoEntry: false })
-    if (current?.ino === tokenStat.ino && current.dev === tokenStat.dev)
-      unlinkSync(tokenFile)
+      const current = lstatSync(tokenFile, { throwIfNoEntry: false })
+      if (current?.ino === tokenStat.ino && current.dev === tokenStat.dev)
+        unlinkSync(tokenFile)
+    })()
+    return closing
   }
   try {
     const page = createServer((request, response) => {
