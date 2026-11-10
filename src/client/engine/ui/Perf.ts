@@ -165,6 +165,9 @@ export class Perf {
     if (!on) this.lap?.cancel('the menu opened');
     if (on !== this.active) { this.frameWindow.reset(performance.now(), this.game.frameCount); this.lastPaint = -Infinity; }
     this.active = on; this.root.hidden = on ? this.userHidden : true;
+    // A14: the Developer sections are one host per page; the level in front holds it in its panel (a resident shard's
+    // meter may have taken it, and its disposal takes the host out of the page with its panel)
+    if (on) this.panel.querySelector('.ws-perf-head')?.after(perfDockSections());
     if (!on || this.userHidden) this.open(false);
   }
   private readonly probeOut: HTMLElement;

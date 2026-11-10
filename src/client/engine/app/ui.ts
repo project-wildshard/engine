@@ -9,7 +9,7 @@ export class AppUi extends UiLayers {
   private inputConnected = false;
   private readonly prompts = new WeakMap<Scope, () => string>();
   private readonly active: () => Scope | null;
-  constructor(active: () => Scope | null, now: () => number = () => 0) { super(now); this.active = active; this.connect(() => { /* Input attaches at boot. */ }, active); }
+  constructor(active: () => Scope | null, now: () => number = () => 0) { super(now, true); this.active = active; this.connect(() => { /* Input attaches at boot. */ }, active); }
   connectInput(input: InputService, scope: Scope): void {
     if (this.inputConnected) { this.refresh(); return; }
     this.inputConnected = true;

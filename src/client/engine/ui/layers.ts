@@ -21,7 +21,9 @@ const PRIORITY: Record<UiLayer, number> = { hud: 0, gameMenu: 1, menu: 2, modal:
 /** A single back/input owner; resident scopes retain their own overlay entries. */
 export class UiLayers {
   private readonly now: () => number;
-  constructor(now: () => number = () => 0) { this.now = now; }
+  /** QA row 15: whether this stack is the page's own (AppUi), the one that mirrors an open menu onto <html data-ws-menu> */
+  private readonly mirrorMenu: boolean;
+  constructor(now: () => number = () => 0, mirrorMenu = false) { this.now = now; this.mirrorMenu = mirrorMenu; }
   closedAt: number = Number.NEGATIVE_INFINITY;
   private entries: Entry[] = [];
   private readonly stills = new Set<Scope>();
@@ -121,7 +123,7 @@ export class UiLayers {
     // one is, so a page module outside this bundle (the online chat row and its mic, src/client/host/online/chatLines.ts) can
     // stand aside in CSS; nothing it runs stops
     // (a node bake's stub document has no documentElement, app.ts)
-    const root = typeof document === 'undefined' ? null : document.documentElement as HTMLElement | null;
+    const root = !this.mirrorMenu || typeof document === 'undefined' ? null : (document.documentElement as HTMLElement | null | undefined) ?? null;
     if (root !== null) { if (this.menuOpen) root.dataset['wsMenu'] = 'open'; else delete root.dataset['wsMenu']; }
     this.changed?.();
     for(const update of this.observers)update();

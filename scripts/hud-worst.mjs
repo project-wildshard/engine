@@ -17,7 +17,8 @@
 // overlaps the quest chip, PAUSE, the minimap, the crosshair, the chat or a touch control; the chat (its row, lines, voice tip and
 // players) overlaps none of those; and the point at the mic's centre is the mic (elementFromPoint), so a phone's only way into voice can be tapped.
 // --menu also opens the BAG on phones and checks the chat row and the mic are gone while it is up and back when it closes (QA
-// row 15). Every other overlap between HUD elements is listed, not failed: the union draws pieces no one shard draws at once.
+// row 15). A required surface missing or a page error fails too; a rotate-gated case is GATE, not PASS. Every other
+// overlap between HUD elements is listed, not failed: the union draws pieces no one shard draws at once.
 // Headless only (J148, Jake 2026-11-10); Chromium launches with the keychain flags. Our own build on localhost only.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -157,20 +158,23 @@ const hit = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top 
 /** @param {Box[]} as @param {Box[]} bs */
 const pairs = (as, bs) => as.flatMap(a => bs.filter(b => b !== a && hit(a, b)).map(b => `${a.name} × ${b.name}`));
 
-/** Into play: the grid in Developer mode (its card is Developer-only), the shard's own page without.
- * @param {import('playwright').Page} page @param {boolean} dev */
+/** A phone held sideways: the game is portrait-only there, and its rotate gate covers the page (RotateGate.ts).
+ * @param {import('playwright').Page} page */
+const rotateGate = page => page.evaluate(() => { const gate = document.querySelector('.ws-rotate'); return gate !== null && getComputedStyle(gate).display !== 'none' && gate.getBoundingClientRect().width > 0; });
+
+/** Into play: the grid in Developer mode (its card is Developer-only), the shard's own page without. False when the rotate
+ * gate is up instead: there is no HUD to lay out under it.
+ * @param {import('playwright').Page} page @param {boolean} dev @returns {Promise<boolean>} */
 async function enter(page, dev) {
+  await page.goto(new URL(dev ? '/?mute=1&nolock=1&sw=0' : '/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href, { waitUntil: 'load' });
+  await page.waitForTimeout(2000);
+  if (await rotateGate(page)) return false;
   if (dev) {
-    await page.goto(new URL('/?mute=1&nolock=1&sw=0', base).href, { waitUntil: 'load' });
-    await page.waitForSelector('.ws-main-grid', { state: 'attached', timeout: 120_000 });
-    // the title's own tap (a landscape phone's rotate gate lies over the card and would take a pointer)
-    await page.evaluate(() => { /** @type {HTMLElement} */ (document.querySelector('.ws-main-grid')).click(); });
+    await page.locator('.ws-main-grid').click({ timeout: 120_000 });
     await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state().live?.live?.gameplayReady, undefined, { timeout: 180_000 });
-  } else {
-    await page.goto(new URL('/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href, { waitUntil: 'load' });
-    await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.world?.player !== undefined, undefined, { timeout: 180_000 });
-  }
+  } else await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.world?.player !== undefined, undefined, { timeout: 180_000 });
   await page.evaluate('(window.__wildshard.world.hud.enterNow(), true)');
+  return true;
 }
 
 /** @param {import('playwright').Page} page */
@@ -190,12 +194,19 @@ for (const kind of browsers) {
       for (const mode of modes) {
         const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}`;
         const context = await browser.newContext(phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } });
+        // our own page only (J148): a request that leaves the loopback host, a redirect included, is refused
+        await context.route('**/*', route => { const { hostname } = new URL(route.request().url()); return hostname === '127.0.0.1' || hostname === 'localhost' ? route.continue() : route.abort(); });
         try {
           if (dev) { await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' }); }
           const page = await context.newPage();
           /** @type {string[]} */ const errors = [];
           page.on('pageerror', error => { errors.push(error.message.slice(0, 160)); });
-          await enter(page, dev);
+          if (!await enter(page, dev)) {
+            const file = join(out, `${name}.png`);
+            await page.screenshot({ path: file }); written.push(file);
+            console.log(`GATE  ${name}  ${file}\n  the rotate gate is up (the game is portrait-only on phones): no HUD to lay out`);
+            continue;
+          }
           await page.waitForTimeout(6000); // the quest chip, the minimap and the dock settle; the first hints run their course
           await page.addScriptTag({ content: chatCode });
           const made = await page.evaluate(union, dev);
@@ -203,13 +214,15 @@ for (const kind of browsers) {
           const file = join(out, `${name}.png`);
           await page.screenshot({ path: file }); written.push(file);
           const b = await page.evaluate(boxes);
-          // a phone held sideways: the game is portrait-only there, and its rotate gate covers the page (RotateGate.ts)
-          const gated = await page.evaluate(() => { const gate = document.querySelector('.ws-rotate'); return gate !== null && getComputedStyle(gate).display !== 'none' && gate.getBoundingClientRect().width > 0; });
-          const problems = gated ? [] : [...pairs(b.developer, [...b.guarded, ...b.chat]), ...pairs(b.chat, b.guarded)];
-          if (gated) { /* nothing to lay out under the gate */ } else if (b.mic === null) problems.push('the mic is not on screen');
+          const problems = [...pairs(b.developer, [...b.guarded, ...b.chat]), ...pairs(b.chat, b.guarded)];
+          // a check over nothing passes nothing: what it guards and what it moved must be on screen
+          const named = new Set([...b.guarded, ...b.chat, ...b.developer].map(x => x.name.replace(/#\d+$/u, '')));
+          for (const need of [...(phone ? ['PAUSE', 'touch bar'] : []), 'quest chip', 'minimap', 'chat row', ...(dev ? ['dock chip'] : [])])
+            if (!named.has(need)) problems.push(`the ${need} is not on screen: nothing to check it against`);
+          for (const error of errors) problems.push(`page error: ${error}`);
+          if (b.mic === null) problems.push('the mic is not on screen');
           else if (!b.mic.ok) problems.push(`the mic's centre is covered by ${String(b.mic.at)}`);
-          if (gated) console.log(`  ${name}: the rotate gate is up (portrait-only on phones); no layout check`);
-          if (menu && phone && !gated) {
+          if (menu && phone) {
             await openBag(page); await page.waitForTimeout(500);
             const open = await page.evaluate(boxes), shot = join(out, `${name}-bag-open.png`);
             await page.screenshot({ path: shot }); written.push(shot);
@@ -227,6 +240,9 @@ for (const kind of browsers) {
           if (others.length > 0) console.log(`  (union, not failed) ${others.slice(0, 24).join(' · ')}${others.length > 24 ? ` … +${String(others.length - 24)}` : ''}`);
           if (errors.length > 0) console.log(`  page errors: ${errors.slice(0, 3).join(' | ')}`);
           if (problems.length > 0) failures.push(name);
+        } catch (error) {
+          console.log(`FAIL  ${name}  could not run: ${String(error instanceof Error ? error.message : error).split('\n')[0]}`);
+          failures.push(name);
         } finally { await context.close(); }
       }
     }

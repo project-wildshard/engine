@@ -17,7 +17,10 @@ let row: HTMLElement | null = null;
 let panel: HTMLElement | null = null;
 /** the sections asking for attention now (a disabled script, a memory limit): the pill carries a red mark while any does */
 const alerts = new Set<HTMLElement>(), watched = new WeakSet<HTMLElement>();
-const markRow = (): void => { row?.classList.toggle('alert', alerts.size > 0); };
+const markRow = (): void => {
+  for (const el of alerts) if (el.parentElement === null) alerts.delete(el); // discarded ahead of its owner
+  row?.classList.toggle('alert', alerts.size > 0);
+};
 
 /** The dock's row, made once a page on `document.body` (the frame meter's pill is its first chip). */
 export function perfDockRow(): HTMLElement {

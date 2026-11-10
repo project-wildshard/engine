@@ -185,7 +185,8 @@ for (const file of tsFiles) {
 const ELEMENTS = new Set(['html', 'body', 'div', 'span', 'b', 'i', 'em', 'strong', 'small', 'p', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
   'pre', 'code', 'kbd', 'img', 'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'g', 'text', 'use', 'canvas', 'video', 'button', 'input',
   'select', 'option', 'textarea', 'label', 'form', 'section', 'header', 'footer', 'nav', 'main', 'article', 'aside', 'table', 'tr', 'td', 'th', 'thead',
-  'tbody', 'details', 'summary', 'dialog', 'figure', 'figcaption', 'hr', 'br', 'sup', 'sub', 'mark', 'output', 'progress', 'meter', 'fieldset', 'legend', 'u', 's', 'abbr', 'time', 'dl', 'dt', 'dd', 'iframe', 'picture', 'source', 'audio']);
+  'tbody', 'details', 'summary', 'dialog', 'figure', 'figcaption', 'hr', 'br', 'sup', 'sub', 'mark', 'output', 'progress', 'meter', 'fieldset', 'legend', 'u', 's', 'abbr', 'time', 'dl', 'dt', 'dd', 'iframe', 'picture', 'source', 'audio',
+  'defs', 'lineargradient', 'radialgradient', 'stop', 'clippath', 'mask', 'pattern', 'symbol', 'ellipse', 'tspan', 'foreignobject', 'filter', 'image', 'q', 'cite', 'caption', 'col', 'colgroup', 'tfoot', 'optgroup', 'datalist', 'slot', 'template', 'menu', 'search', 'hgroup', 'address', 'blockquote', 'del', 'ins', 'var', 'samp', 'bdi', 'bdo', 'wbr', 'ruby', 'rt', 'rp', 'data', 'object', 'embed', 'track', 'map', 'area', 'noscript']);
 {
   const sources = [];
   (function walk(dir) { for (const name of readdirSync(dir)) { const file = join(dir, name); if (statSync(file).isDirectory()) walk(file); else if (file.endsWith('.css')) sources.push(file); } })(join(ROOT, 'src'));
@@ -194,7 +195,7 @@ const ELEMENTS = new Set(['html', 'body', 'div', 'span', 'b', 'i', 'em', 'strong
       for (const sel of splitTop(selector, [','])) {
         if (/^(from|to|\d[\d.]*%)$/u.test(sel)) continue; // a keyframe step nested in an at-rule the walker reads
         for (const compound of compoundsOf(sel)) {
-          const type = /^([a-z][a-z0-9-]*)/u.exec(compound.replaceAll(/:[\w-]+\([^)]*\)/gu, ''))?.[1];
+          const type = /^([a-zA-Z][\w-]*)/u.exec(compound.replaceAll(/:[\w-]+\([^)]*\)/gu, ''))?.[1]?.toLowerCase();
           if (type !== undefined && !ELEMENTS.has(type)) report(true, file, line, `\`${sel}\` names an element \`${type}\` no page has — a comment that closed early?`);
         }
       }
