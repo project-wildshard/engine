@@ -21,7 +21,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { legacyDouble } from '../src/test/engine/FakeGame';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardPlayHost, ShardRuntime } from '../src/shared/game/shard/runtime';
-import type { AnimalManager } from '../src/server/engine/entities/AnimalManager';
+import { RowBodies } from '../src/client/engine/entities/RowBodies';
 import { canonicalSimDigest } from './fake/simState';
 import { builtProduct } from './fixtures/builtProduct';
 
@@ -107,9 +107,11 @@ test('the browser page population is the server\'s: a herdless page holds no hom
   if (feature === undefined) throw new Error('Sunscar declares its page population');
   const row = parse(ClientPopulationSchema, feature);
   const subscribed: string[] = [], systems: Parameters<ShardContext['system']>[0][] = [], spawned: string[] = [], prepared: string[] = [];
-  const rowBodies = legacyDouble<AnimalManager>({ herdless: true,
-    spawn: kind => { spawned.push(kind); throw new Error('A herdless page spawns no body'); },
-    factory: legacyDouble<AnimalManager['factory']>({ prepareSteps: function* (rows: readonly { kind: string }[]) { for (const entry of rows) { prepared.push(entry.kind); yield prepared.length; } } }) });
+  // The page's own manager, RowBodies: its draw reduced to the factory a herdless page prepares models through.
+  const rowBodies = new RowBodies(legacyDouble<ConstructorParameters<typeof RowBodies>[0]>({
+    factory: legacyDouble<RowBodies['factory']>({ prepareSteps: function* (rows: readonly { kind: string }[]) { for (const entry of rows) { prepared.push(entry.kind); yield prepared.length; } } }) }),
+    legacyDouble<ConstructorParameters<typeof RowBodies>[1]>({ levelScope: null }));
+  rowBodies.spawn = kind => { spawned.push(kind); throw new Error('A herdless page spawns no body'); };
   const scope = new Scope('sr12.page.homes');
   const ctx = legacyDouble<ShardContext>({ scope,
     game: legacyDouble<ShardContext['game']>({ runtime: legacyDouble<ShardRuntime>({ play: legacyDouble<ShardPlayHost>({ animals: rowBodies }) }) }),
@@ -126,6 +128,7 @@ test('the browser page population is the server\'s: a herdless page holds no hom
     const byId = (rows: readonly { id: string; kind: string }[]): string[][] => rows.map(entry => [entry.id, entry.kind]).sort(([a = ''], [b = '']) => a < b ? -1 : a > b ? 1 : 0);
     expect(byId(page.homes)).toEqual(byId(server.homes));
     expect(server.homes.every(entry => entry.body !== null)).toBe(true);
+    expect(rowBodies.herdless).toBe(true);
     expect(prepared.length).toBeGreaterThan(0);
     expect({ spawned, bodies: page.all().length, standing: page.homes.filter(entry => entry.animal !== null).length }).toEqual({ spawned: [], bodies: 0, standing: 0 });
     expect(subscribed).not.toContain('actor.died');
