@@ -5,8 +5,8 @@ import {existsSync,realpathSync,unlinkSync,writeFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 
 const stamps=['scripts/renderer-revision.json','scripts/validation-revision.json'];
-/** @param {string} snapshot @param {NodeJS.ProcessEnv} environment */
-export function rebaseQueuedSnapshot(snapshot,environment){
+/** @param {string} snapshot @param {NodeJS.ProcessEnv} environment @param {'origin'|'cohort'} [remote] */
+export function rebaseQueuedSnapshot(snapshot,environment,remote='origin'){
  const env={...environment,GIT_EDITOR:'true'};
  /** @param {string[]} args */
  const git=args=>execFileSync('git',args,{cwd:snapshot,env,encoding:'utf8'}).trim();
@@ -33,8 +33,8 @@ export function rebaseQueuedSnapshot(snapshot,environment){
   }finally{unlinkSync(file);}
  };
  for(let race=0;race<2;race++){
-  if(run('git',['fetch','origin','main']).status!==0)throw new Error('Queue private snapshot origin fetch failed');
-  const target=git(['rev-parse','refs/remotes/origin/main']);
+  if(run('git',['fetch',remote,'main']).status!==0)throw new Error('Queue private snapshot upstream fetch failed');
+  const target=git(['rev-parse',`refs/remotes/${remote}/main`]);
   let result=run('git',['rebase','--empty=keep',target]);
   for(let resolutions=0;result.status!==0;resolutions++){
    const conflicts=git(['diff','--name-only','--diff-filter=U']).split('\n').filter(Boolean);
@@ -59,8 +59,8 @@ export function rebaseQueuedSnapshot(snapshot,environment){
   }
   // Include dependency preparation and final generation in the pre-gate race
   // window; never spend a full gate on a known out-of-date combined tree.
-  if(run('git',['fetch','origin','main']).status!==0)throw new Error('Queue post-generation origin fetch failed');
-  if(git(['rev-parse','refs/remotes/origin/main'])!==target){
+  if(run('git',['fetch',remote,'main']).status!==0)throw new Error('Queue post-generation upstream fetch failed');
+  if(git(['rev-parse',`refs/remotes/${remote}/main`])!==target){
    if(race===0)continue;
    throw new Error('Queue origin advanced twice during rebase; retry this job');
   }

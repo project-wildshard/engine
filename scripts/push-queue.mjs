@@ -1,7 +1,7 @@
 // Commit, capture an immutable checkout, and let one per-repo worker own normal pushes.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
-import {appendFileSync,existsSync,mkdirSync,openSync,closeSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,mkdirSync,mkdtempSync,openSync,closeSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve as resolvePath} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -9,9 +9,9 @@ import * as v from 'valibot';
 import {rebaseQueuedSnapshot} from './push-queue-rebase.mjs';
 
 const self=import.meta.filename,lock=fileURLToPath(new URL('push-queue-lock.py',import.meta.url));
-const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0)))});
+const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0))),error:v.optional(v.string()),seconds:v.optional(v.number()),batch:v.optional(v.array(v.string()))});
 const terminal=new Set(['pushed','checked','already-published','failed','published-unverified','publication-unknown']);
-const pending=new Set(['capturing','queued','retrying','rebasing','installing','waiting-for-hook','checking','pushing']);
+const pending=new Set(['capturing','queued','retrying','rebasing','installing','waiting-for-hook','checking','pushing','batching']);
 const keepalive='ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes';
 class RemoteAdvanceError extends Error{name='RemoteAdvanceError';}
 class PublicationUnknownError extends Error{name='PublicationUnknownError';}
@@ -116,20 +116,90 @@ function verifySnapshot(snapshot,job,phase){
  if(changed.length>0)throw new Error(`Captured source changed ${phase}; no exact-tree publication proof: ${changed.join('; ')}`);
 }
 
+/** Batch only ready FIFO requests. Preserve original snapshots for bisection;
+ * every published subset has its own full normal hook and exact Git push.
+ * @param {string} directory @param {v.InferOutput<typeof jobSchema>[]} jobs */
+async function batch(directory,jobs){
+ const root=mkdtempSync(join(directory,'snapshots','batch-'));
+ for(const job of jobs){
+  job.requestedSha??=job.sha;job.requestedTree??=job.tree;
+  write(join(directory,`${job.id}.json`),{...job,state:'batching',batch:jobs.map(row=>row.id)});
+ }
+ /** @param {v.InferOutput<typeof jobSchema>} job @param {string} state
+  * @param {v.InferOutput<typeof jobSchema>[]} subset @param {object} extra */
+ const finish=(job,state,subset,extra)=>{
+  write(join(directory,`${job.id}.json`),{...job,state,batch:subset.map(row=>row.id),finishedAt:new Date().toISOString(),...extra});
+  notify(job,state,`combined ${subset.length} request(s): ${'error'in extra?String(extra.error):'normal full gate and exact publication verified'}`);
+  if(existsSync(job.snapshot))rmSync(job.snapshot,{recursive:true,force:true});
+ };
+ /** @param {v.InferOutput<typeof jobSchema>[]} subset */
+ async function attempt(subset){
+  const first=subset[0],last=subset.at(-1);if(first===undefined||last===undefined)return;
+  const candidateRoot=mkdtempSync(join(root,'candidate-'));
+  /** @type {v.InferOutput<typeof jobSchema>|null} */let result=null;
+  let failure='';
+  try{
+   // Origin owns the starting point. The originals are immutable payloads;
+   // each is rebased in FIFO order onto the preceding combined private main.
+   let combined=join(candidateRoot,'origin');
+   execFileSync('git',['clone','--quiet','--branch=main','--reference-if-able',first.snapshot,'--dissociate',first.remote,combined],{env:workerEnvironment(),stdio:'pipe'});
+   for(const [index,job] of subset.entries()){
+    const view=join(candidateRoot,String(index));
+    execFileSync('git',['clone','--quiet','--no-hardlinks','--branch=main',job.snapshot,view],{env:workerEnvironment(),stdio:'pipe'});
+    git(view,['remote','remove','origin']);git(view,['remote','add','origin',job.remote]);git(view,['config','core.hooksPath','.githooks']);
+    git(view,['remote','add','cohort',combined]);
+    rebaseQueuedSnapshot(view,{...workerEnvironment(),PWD:view},'cohort');
+    if(spawnSync('git',['merge-base','--is-ancestor',git(combined,['rev-parse','HEAD']),'HEAD'],{cwd:view}).status!==0)throw new Error('Queue batch lost a preceding rebased request');
+    combined=view;
+   }
+   const candidate={...last,sha:git(combined,['rev-parse','HEAD']),tree:git(combined,['rev-parse','HEAD^{tree}']),state:'queued',attempts:0};
+   result=await checkJob(directory,candidate,combined,join(candidateRoot,'result.json'));
+   failure=result?.error??'Queue candidate did not finish the normal gate';
+  }catch(error){failure=error instanceof Error?error.message:String(error);}
+  finally{rmSync(candidateRoot,{recursive:true,force:true});}
+  if(result!==null&&['pushed','already-published'].includes(result.state)){
+   for(const job of subset)finish(job,result.state,subset,{sha:result.sha,tree:result.tree,seconds:result.seconds});
+  }else if(result!==null&&['publication-unknown','published-unverified'].includes(result.state)){
+   for(const job of subset)finish(job,result.state,subset,{error:failure,sha:result.sha,tree:result.tree});
+   throw new PublicationUnknownError('Uncertain batch push needs remote verification; no bisection after publication');
+  }else if(subset.length===1){
+   finish(last,'failed',subset,{error:`Queue breaker ${last.lane??last.id}: ${failure}`});
+  }else{
+   const middle=Math.floor(subset.length/2);
+   await attempt(subset.slice(0,middle));await attempt(subset.slice(middle));
+  }
+ }
+ try{await attempt(jobs);}finally{rmSync(root,{recursive:true,force:true});}
+}
+
 /** @param {string} directory */
 async function drain(directory){
  for(;;){
   const names=readdirSync(directory).filter(name=>/^\d+-[a-f0-9]{8}\.json$/u.test(name)).sort();
   const jobs=names.map(name=>readJob(directory,name));
   const job=jobs.find(value=>value!==null&&!terminal.has(value.state));if(job===undefined||job===null)return;
-  const file=join(directory,`${job.id}.json`);
-  const snapshot=job.snapshot,started=Date.now();
+  /** @type {v.InferOutput<typeof jobSchema>[]} */const cohort=[];
+  for(const candidate of jobs){
+   if(candidate===null||terminal.has(candidate.state))continue;
+   if(candidate.checkOnly||candidate.state==='capturing'||identity(candidate.remote)!==identity(job.remote))break;
+   cohort.push(candidate);
+  }
+  await(cohort.length>1?batch(directory,cohort):checkJob(directory,job,job.snapshot));
+ }
+}
+
+/** The exact same normal hook/push pipeline serves single jobs and candidates.
+ * A batch's transient result is private; only its proven subsets update jobs.
+ * @param {string} directory @param {v.InferOutput<typeof jobSchema>} job
+ * @param {string} snapshot @param {string} [candidateRecord] */
+async function checkJob(directory,job,snapshot,candidateRecord){
+  const file=candidateRecord??join(directory,`${job.id}.json`),started=Date.now();
   let pushed=false;
   if(job.state==='capturing'){
    const held=spawnSync('python3',[lock,'--held',join(directory,'capture.lock')],{stdio:'ignore'});
-   if(held.status===0){await new Promise(resolve=>{setTimeout(resolve,100);});continue;}
+   if(held.status===0){await new Promise(resolve=>{setTimeout(resolve,100);});return null;}
    const error=held.status===1?'Capture no longer holds capture.lock; PID reuse is not liveness':'Capture lock could not be verified';
-   write(file,{...job,state:'failed',error});notify(job,'failed',error);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});continue;
+   write(file,{...job,state:'failed',error});notify(job,'failed',error);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});return null;
   }
   const environment={...workerEnvironment(),PWD:snapshot};
   /** @param {string} command @param {string[]} args @param {string} [input] */
@@ -191,9 +261,9 @@ async function drain(directory){
     }
    }
    if(!finished)throw new Error('Bounded push retry budget exhausted');
-  }catch(error){const state=pushed?'published-unverified':error instanceof PublicationUnknownError?'publication-unknown':'failed',message=error instanceof Error?error.message:String(error);save(state,{finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000,error:message});notify(job,state,message);}
+  }catch(error){const state=pushed?'published-unverified':error instanceof PublicationUnknownError?'publication-unknown':'failed',message=error instanceof Error?error.message:String(error);save(state,{finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000,error:message});if(candidateRecord===undefined)notify(job,state,message);}
   finally{if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});}
- }
+  return v.parse(jobSchema,JSON.parse(readFileSync(file,'utf8')));
 }
 
 const [mode,...args]=process.argv.slice(2);
