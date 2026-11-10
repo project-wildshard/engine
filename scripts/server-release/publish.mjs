@@ -11,12 +11,13 @@ import { bundleDescriptor, COMMIT, publication, readPublication, releasePublicKe
 
 /** @typedef {import('../../src/shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
 /** @typedef {{client: S3Client, bucket: string, candidate: ReleaseFile, privateKey: string, publicKey: string, isAncestor: (older: string, newer: string) => boolean,
- *   packsReady?: (release: ReleaseFile) => Promise<string | null>, align?: boolean}} PublishOptions */
+ *   packsReady: (release: ReleaseFile) => Promise<string | null>, align?: boolean}} PublishOptions */
 
 /** @param {unknown} error @returns {boolean} */
 const missing = error => error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound' || error.$metadata.httpStatusCode === 404);
 
-/** Staging's order (Jake, 2026-11-10: "staging needs to be healthy"): packs first, the signed file last. The server preloads the
+/** Every channel's order (J234, Jake 2026-11-10: "we never switch a build whose files aren't uploaded"): packs first, the signed
+ *  file last. The server preloads the
  *  named build's book and parts before its grace and stays on its old build while they are missing, so a file naming a build with
  *  no book strands every check behind it. Null when the book and every part the release's shards and grid need are in the bucket.
  * @param {S3Client} client @param {string} bucket @param {ReleaseFile} release @returns {Promise<string | null>} */
@@ -43,13 +44,14 @@ export async function serverPacksReady(client, bucket, release) {
   return null;
 }
 
-/** Older completed CI must never replace a newer green commit, except an explicit staging alignment. Repeated bytes are a no-op.
- *  With `packsReady`, a candidate whose packs are not published leaves the channel as it is (`held`).
+/** Fix forward only (J179, J234): no publication moves a channel to an older build. Older completed CI is `stale`; a staging
+ *  alignment that names one is refused. Repeated bytes are a no-op. A candidate whose packs are not published leaves the channel
+ *  as it is (`held`), on every channel.
  * @param {PublishOptions} options @returns {Promise<{status: string, release: ReleaseFile, signed: string, reason?: string}>} */
 export async function publishChannel(options) {
   const { client, bucket, privateKey, publicKey, isAncestor: ancestor } = options, candidate = publication(options.candidate), key = `releases/${candidate.channel}.json`;
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
-  if (options.align === true && candidate.channel !== 'staging') throw new Error('Only staging can be aligned to an older build');
+  if (options.align === true && candidate.channel !== 'staging') throw new Error('Only staging can be aligned');
   /** @type {string | null | undefined} */
   let blocked;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -66,16 +68,16 @@ export async function publishChannel(options) {
     if (previous !== null && prior !== undefined) {
       if (prior.engineBuild !== candidate.engineBuild && !ancestor(prior.engineBuild, candidate.engineBuild)) {
         if (!ancestor(candidate.engineBuild, prior.engineBuild)) throw new Error('A channel cannot move to unrelated history');
-        if (options.align !== true) return { status: 'stale', release: prior, signed: previous.signed };
+        // J234: the one rollback (staging serial 65, 2026-11-10) was allowed once; a person who names an older build is told no.
+        if (options.align === true) throw new Error(`Staging alignment is forward-only: ${candidate.engineBuild} is older than the live ${prior.engineBuild}`);
+        return { status: 'stale', release: prior, signed: previous.signed };
       }
       if (prior.engineBuild === candidate.engineBuild && prior.bundle?.sha256 !== candidate.bundle?.sha256) throw new Error('The same engine build has different bundle bytes');
       if (JSON.stringify({ ...candidate, serial: prior.serial }) === JSON.stringify(prior)) return { status: 'unchanged', release: prior, signed: previous.signed };
       if (candidate.saveEpoch < prior.saveEpoch) throw new Error('A channel cannot lower its save epoch');
     }
-    if (options.packsReady !== undefined) {
-      blocked ??= await options.packsReady(candidate);
-      if (blocked !== null) return { status: 'held', release: prior ?? candidate, signed: previous?.signed ?? '', reason: blocked };
-    }
+    blocked ??= await options.packsReady(candidate);
+    if (blocked !== null) return { status: 'held', release: prior ?? candidate, signed: previous?.signed ?? '', reason: blocked };
     const release = publication({ ...candidate, serial: (prior?.serial ?? 0) + 1 }), signed = signRelease(release, privateKey);
     try {
       await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: signed, ContentType: 'application/json', CacheControl: 'no-store',
@@ -100,8 +102,8 @@ function isAncestor(older, newer) {
 async function main() {
   const { values } = parseArgs({ options: { channel: { type: 'string' }, build: { type: 'string' }, tag: { type: 'string' }, bundle: { type: 'string' }, out: { type: 'string' }, check: { type: 'boolean', default: false },
     align: { type: 'boolean', default: false } } });
-  // `--align` (staging only): sign a named green main build, older or newer, from main's own tooling. The bundle is the one its tag
-  // already holds, and its epoch and pins are read from that commit.
+  // `--align` (staging only): sign a named green main build, never older than the live one (J234), with main's own tooling. Its epoch
+  // and pins are read from that commit; the workflow rebuilds its bundle in its own tree and checks it against the tag's asset.
   const align = values.align, head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   if (align && (values.channel !== 'staging' || values.build === undefined || !COMMIT.test(values.build) || !isAncestor(values.build, head))) throw new Error('--align needs staging and a full build on the checked-out main');
   /** @param {string} path @returns {string} */
@@ -121,12 +123,15 @@ async function main() {
   if (values.check) { console.log('Server release configuration admitted'); return; }
   const client = new S3Client({ region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials });
   try {
-    const packsReady = candidate.channel === 'staging' ? (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release) : undefined;
-    const result = await publishChannel({ client, bucket, candidate, privateKey, publicKey, isAncestor, align, ...packsReady === undefined ? {} : { packsReady } });
+    const packsReady = (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release);
+    const result = await publishChannel({ client, bucket, candidate, privateKey, publicKey, isAncestor, align, packsReady });
     writeFileSync(values.out, `${result.signed}\n`);
     console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `releases/${result.release.channel}.json`,
       ...result.reason === undefined ? {} : { held: candidate.engineBuild, reason: result.reason } }));
-    if (result.status === 'held') console.log(`::notice title=Staging held::${candidate.engineBuild.slice(0, 7)} is not signed: ${result.reason ?? ''}. Publish its packs, then run server-release with build=${candidate.engineBuild}.`);
+    if (result.status === 'held') {
+      const next = candidate.channel === 'production' ? "re-run this tag's server-release run" : `run server-release with build=${candidate.engineBuild}`;
+      console.log(`::notice title=${candidate.channel} held::${candidate.engineBuild.slice(0, 7)} is not signed: ${result.reason ?? ''}. Publish its packs, then ${next}.`);
+    }
   } finally { client.destroy(); }
 }
 

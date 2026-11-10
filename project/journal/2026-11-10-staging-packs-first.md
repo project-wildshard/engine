@@ -45,3 +45,19 @@ bundle in the named build's tree and the asset step refuses a mismatch.
 And the doctor called any book fetch failure "never published" and the
 server "stuck". Only a 404 means that now; a 503 or a timeout says try
 again.
+
+## J234: production too, and forward only
+
+Jake, after the rollback: "Fix forward. We have to fix forward. I guess
+a one-time rollback is fine, but everything else we should fix forward.
+We should make sure that staging and prods have these checks, so we
+never switch a build whose files aren't uploaded." So the packs gate now
+runs for production tags too: a tag whose server book or parts are
+missing holds, production keeps its last playable build, and the fix is
+to publish the packs and re-run the tag's server-release run.
+`packsReady` is required by `publishChannel` now, so no caller can sign
+without it. The staging `build=<sha>` run is forward-only: naming a
+build older than the live one fails the run instead of signing it.
+Today's serial 65 rollback stays the one exception. A read-only dry run
+against the public origin says both live channels (a8144a5, production
+serial 3 and staging serial 65) pass the gate: 33 parts, none missing.

@@ -7,8 +7,8 @@ on:
     types: [completed]
   push:
     tags: ['v[0-9]*']
-  # Staging alignment: sign a named green main build whose packs are already on R2, newer or older than the
-  # channel's. This is how a held build goes live once its page/pack publish lands, and how staging rolls back.
+  # Staging alignment: sign a named green main build whose packs are already on R2. Forward only (J234): the
+  # build must descend from the one staging names. This is how a held build goes live once its packs land.
   workflow_dispatch:
     inputs:
       build:
@@ -136,7 +136,7 @@ jobs:
         run: >-
           node scripts/server-release/github.mjs asset
           "$RELEASE_TAG" "$SOURCE_SHA" "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" "$RELEASE_CHANNEL"
-      # Staging signs only a build whose server book and parts are on R2 (publish.mjs `serverPacksReady`); otherwise it holds.
+      # Every channel signs only a build whose server book and parts are on R2 (publish.mjs `serverPacksReady`, J234); otherwise it holds.
       - name: Sign and advance the channel release file
         env:
           E7_RELEASE_SIGNING_KEY: ${{ secrets.E7_RELEASE_SIGNING_KEY }}

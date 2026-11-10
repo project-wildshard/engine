@@ -32,7 +32,7 @@ function candidate() {
   if (process.env.GITHUB_REPOSITORY !== REPOSITORY) return null;
   const eventName = process.env.GITHUB_EVENT_NAME;
   if (eventName === 'workflow_dispatch') {
-    // A staging alignment: a person names an exact green main build whose packs are published, to finish or roll back staging.
+    // A staging alignment: a person names an exact green main build whose packs are published, newer than staging's (J234).
     const sha = process.env.ALIGN_BUILD ?? '';
     if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('Staging alignment runs from main only');
     if (!COMMIT.test(sha)) throw new Error('Staging alignment needs a full 40-character build SHA');

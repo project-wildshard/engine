@@ -9,8 +9,8 @@ export interface PublishOptions {
   publicKey: string;
   isAncestor: (older: string, newer: string) => boolean;
   /** Null when the candidate's packs are published; otherwise why the channel is held. */
-  packsReady?: (release: ReleaseFile) => Promise<string | null>;
-  /** Staging only: a named green build may move the channel back. */
+  packsReady: (release: ReleaseFile) => Promise<string | null>;
+  /** Staging only: a person-named green build; forward-only (J234). */
   align?: boolean;
 }
 export function serverPacksReady(client: S3Client, bucket: string, release: ReleaseFile): Promise<string | null>;

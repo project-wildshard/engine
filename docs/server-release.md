@@ -12,18 +12,22 @@ wakes the producer. A pending companion workflow leaves publication to
 its completion event. PR and fork events cannot enter the signing job.
 An unrelated or older completed build cannot displace a newer channel.
 
-**Staging signs packs-first.** Jake, 2026-11-10: "staging needs to be
-healthy. we can't show these half-assed, half-open, half-closed failure
-states." The running server loads the named build's server book and parts
+**Every channel signs packs-first (J234).** Jake, 2026-11-10: "staging
+needs to be healthy. we can't show these half-assed, half-open,
+half-closed failure states," and then: "We should make sure that
+staging and prods have these checks, so we never switch a build whose
+files aren't uploaded." The running server loads the named build's server book and parts
 before its grace, and stays on its old build while they are missing. So a
 staging file that names a build with no book strands the server, the page
 and every doctor check behind it (serial 63 named `b721769` while its book
-was 404 and the server sat on `a8144a5`). Before signing a staging file,
-`publish.mjs` reads `assets/spawn/server-<build>.json` from the bucket and
+was 404 and the server sat on `a8144a5`). Before signing a staging or
+production file, `publish.mjs` reads `assets/spawn/server-<build>.json` from the bucket and
 heads every part the release's pinned shards and the grid name. If any is
 missing the run reports `held`, with a notice, and the channel keeps naming
-the last build whose packs are published. `test/server-release-ci.test.ts`
-proves held, published and the rollback below against a real S3 boundary.
+the last build whose packs are published. For a production tag, publish
+the packs and then re-run that tag's server-release run.
+`test/server-release-ci.test.ts` proves held and published on both
+channels, and the forward-only alignment, against a real S3 boundary.
 
 The order is: publish the build's server book and parts (the staging
 page/pack publish), then sign the release file (this workflow), then the
@@ -34,12 +38,15 @@ signed file stays live and the server keeps serving it.
 **Staging alignment.** Run this workflow by hand (`workflow_dispatch`) on
 main with `build` set to a full green main SHA whose packs are published:
 `gh workflow run server-release.yml --ref main -f build=<sha>`. It signs
-that build as the next staging serial, newer or older than the current
-one. It signs with main's tooling, but rebuilds the bundle in the named
-build's own tree and refuses unless it matches the asset already on its
-`server-staging-<sha>` tag, so a replaced archive is never signed. This is how a held build goes live once its
-packs land, and how staging rolls back to its last good build. The packs
-gate still applies, CI and Ring 1 must be green for that SHA, and
+that build as the next staging serial. This is how a held build goes
+live once its packs land. It is forward-only (J234, Jake: "Fix forward.
+We have to fix forward. I guess a one-time rollback is fine"): the build
+must descend from the one staging names, or the run fails. The one
+rollback was staging serial 65 to `a8144a5` on 2026-11-10. It signs
+with main's tooling, but rebuilds the bundle in the named build's own
+tree and refuses unless it matches the asset already on its
+`server-staging-<sha>` tag, so a replaced archive is never signed. The
+packs gate still applies, CI and Ring 1 must be green for that SHA, and
 production can never be aligned.
 
 A `vMAJOR.MINOR.PATCH` tag qualifies for production. Its peeled commit

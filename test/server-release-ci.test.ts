@@ -21,6 +21,7 @@ const pair = generateKeyPairSync('ed25519'), pem = pair.privateKey.export({ form
 const history = createTempRepo();
 const older = history.commit({ 'receipt.txt': 'first' }, 'First test build');
 const sha = history.commit({ 'receipt.txt': 'second' }, 'Second test build');
+const newest = history.commit({ 'receipt.txt': 'third' }, 'Third test build');
 afterAll(() => { history.cleanup(); });
 const publicKey = releasePublicKey(pem);
 const release = (build = sha): ReleaseFile => ({ channel: 'staging', serial: 1, engineBuild: build, saveEpoch: 1,
@@ -80,7 +81,8 @@ test('real S3 HTTP conditional writes advance once, retry a race, and reject an 
     try { history.git(['merge-base', '--is-ancestor', a, b]); return true; }
     catch { return false; }
   };
-  const publish = (build: string): ReturnType<typeof publishChannel> => publishChannel({ client, bucket: 'packs', candidate: release(build), privateKey: pem, publicKey, isAncestor });
+  const publish = (build: string): ReturnType<typeof publishChannel> => publishChannel({ client, bucket: 'packs', candidate: release(build), privateKey: pem, publicKey, isAncestor,
+    packsReady: () => Promise.resolve(null) });
   try {
     expect((await publish(older)).release.serial).toBe(1);
     const raced = await Promise.all([publish(sha), publish(sha)]);
@@ -95,7 +97,7 @@ test('real S3 HTTP conditional writes advance once, retry a race, and reject an 
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
 });
 
-test('staging signs a build only after its server book and parts are in the bucket, and an alignment can roll it back', async () => {
+test('J234: both channels sign a build only after its server book and parts are in the bucket, and alignment is forward-only', async () => {
   const objects = new Map<string, string>();
   let writes = 0;
   const server = createServer((request, response) => {
@@ -129,7 +131,7 @@ test('staging signs a build only after its server book and parts are in the buck
   };
   const publish = (build: string, align = false, channel: 'staging' | 'production' = 'staging'): ReturnType<typeof publishChannel> => publishChannel({ client, bucket: 'packs', candidate: { ...release(build), channel },
     privateKey: pem, publicKey, isAncestor, align, packsReady: next => serverPacksReady(client, 'packs', next) });
-  const channel = (): ReleaseFile => readReleaseFile(objects.get('releases/staging.json') ?? '', publicKey);
+  const channel = (name = 'staging'): ReleaseFile => readReleaseFile(objects.get(`releases/${name}.json`) ?? '', publicKey);
   try {
     // No book: nothing is signed, and the first file is never written.
     expect(await publish(older)).toMatchObject({ status: 'held', reason: `no server book at assets/spawn/server-${older}.json` });
@@ -143,15 +145,27 @@ test('staging signs a build only after its server book and parts are in the buck
     // A newer green build without packs holds: the channel keeps naming the build the server can play.
     expect(await publish(sha)).toMatchObject({ status: 'held', release: { engineBuild: older, serial: 1 } });
     expect(channel()).toMatchObject({ engineBuild: older, serial: 1 });
+    // Once its packs land, a person's alignment signs the held build: forward, as the next serial.
     shelve(sha, 4);
     for (const n of [4, 5, 6]) objects.set(part(n).url.slice(1), 'part');
-    expect((await publish(sha)).status).toBe('published');
+    expect((await publish(sha, true)).status).toBe('published');
     expect(channel()).toMatchObject({ engineBuild: sha, serial: 2 });
-    // Normal CI never moves back; an explicit staging alignment does, as a newer serial, and never on production.
+    // Fix forward (J234): normal CI never moves back, and an alignment naming an older build is refused, not signed.
     expect((await publish(older)).status).toBe('stale');
-    expect((await publish(older, true)).status).toBe('published');
-    expect(channel()).toMatchObject({ engineBuild: older, serial: 3 });
-    await expect(publish(older, true, 'production')).rejects.toThrow(/Only staging/u);
+    await expect(publish(older, true)).rejects.toThrow(/forward-only/u);
+    expect(channel()).toMatchObject({ engineBuild: sha, serial: 2 });
+    expect(writes).toBe(2);
+    // Production holds the same way: a tag whose packs are missing writes no production file at all.
+    expect(await publish(newest, false, 'production')).toMatchObject({ status: 'held', reason: `no server book at assets/spawn/server-${newest}.json` });
+    expect(objects.has('releases/production.json')).toBe(false);
+    shelve(newest, 7);
+    for (const n of [7, 8]) objects.set(part(n).url.slice(1), 'part');
+    expect((await publish(newest, false, 'production')).reason).toBe('no server part at assets/spawn/server/9999999999999999.pack.br');
+    expect(objects.has('releases/production.json')).toBe(false);
+    objects.set(part(9).url.slice(1), 'part');
+    expect((await publish(newest, false, 'production')).status).toBe('published');
+    expect(channel('production')).toMatchObject({ engineBuild: newest, serial: 1 });
+    await expect(publish(newest, true, 'production')).rejects.toThrow(/Only staging/u);
     expect(writes).toBe(3);
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
 });
