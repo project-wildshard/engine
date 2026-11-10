@@ -390,7 +390,7 @@ export class NativeCreaturePose {
   }
 
   readonly entityId: string;
-  readonly bones: Record<string, AnimalRigJoint> = {};
+  private readonly rig: Record<string, AnimalRigJoint> = {};
   readonly law: AnimalPoseLaw;
   private readonly joints: readonly AnimalRigJoint[];
   private readonly root = NativeCreaturePose.joint();
@@ -398,6 +398,14 @@ export class NativeCreaturePose {
   private readonly publishedFrame = new Float64Array(16);
   /** the joints the last solve covered (-1: none): a publish that changes no local and keeps the frame needs no solve */
   private solvedThrough = -1;
+  /** Joints 0..n untouched since a publish covered them (-1: any may differ). Locals change only through advance (its
+   * quadruped and `animate` writers run inside it), adopt or restore, and each marks this; until then a publish would
+   * recompose the same matrices. */
+  private cleanThrough = -1;
+  /** A caller borrowed `bones` or `context` and may keep a joint to write at any time: every publish compares again. */
+  private borrowed = false;
+  /** The root has not changed since `frame` was composed from it, so the published frame still matches it. */
+  private rootClean = false;
   private readonly frame = new Matrix4();
   private readonly quaternion = new Quaternion();
   private readonly fk: CollisionPose;
@@ -406,14 +414,17 @@ export class NativeCreaturePose {
   private readonly fore: number;
   private readonly legAbd = new Float32Array(4);
   private readonly quad: QuadrupedRigPose | null;
-  /** Borrowed numeric frame for overlays inside the existing body-step callback. */
-  readonly context: AnimalRigContext;
+  private readonly frameContext: AnimalRigContext;
   private wasAlive = true;
   private readonly identity: string;
   private readonly quadClock;
   private readonly actor: AnimalSim;
   private readonly recipe: NativeCreaturePoseRecipe;
   private readonly animate: ((context: AnimalRigContext) => void) | undefined;
+  /** The joints by name. A borrower may write a joint whenever it likes, so this pose's publishes always compare them. */
+  get bones(): Record<string, AnimalRigJoint> { this.borrowed = true; this.touch(); return this.rig; }
+  /** Borrowed numeric frame for overlays inside the existing body-step callback; borrowing it has the same effect. */
+  get context(): AnimalRigContext { this.borrowed = true; this.touch(); return this.frameContext; }
   constructor(actor: AnimalSim, recipe: NativeCreaturePoseRecipe, animate?: (context: AnimalRigContext) => void) {
     this.actor = actor; this.recipe = recipe; this.animate = animate;
     if (recipe.custom !== (animate !== undefined)) throw new Error('Incompatible native creature custom pose');
@@ -421,26 +432,28 @@ export class NativeCreaturePose {
     this.entityId = actor.entityId;
     this.fk = new CollisionPose(recipe.joints);
     this.joints = recipe.joints.map(row => {
-      if (row.name.length === 0 || this.bones[row.name] !== undefined) throw new Error('Invalid native creature pose joint');
-      const j = NativeCreaturePose.joint(); j.position.set(...row.position); j.rotation.order = row.order; j.scale.set(...row.scale); this.bones[row.name] = j; return j;
+      if (row.name.length === 0 || this.rig[row.name] !== undefined) throw new Error('Invalid native creature pose joint');
+      const j = NativeCreaturePose.joint(); j.position.set(...row.position); j.rotation.order = row.order; j.scale.set(...row.scale); this.rig[row.name] = j; return j;
     });
     this.head = recipe.joints.findIndex(row => row.name === 'head'); this.body = recipe.joints.findIndex(row => row.name === 'body');
     this.fore = actor.dims.fore === undefined ? -1 : recipe.joints.findIndex(row => row.name === actor.dims.fore?.bone);
     if (this.head < 0 || this.body < 0 || (actor.dims.fore !== undefined && this.fore < 0)) throw new Error('Missing native creature volume joint');
     this.law = new AnimalPoseLaw({ dims: actor.dims, custom: recipe.custom, ...(recipe.gait === undefined ? {} : { gait: recipe.gait }), ...(recipe.pose === undefined ? {} : { pose: recipe.pose }) });
-    this.quad = recipe.custom ? null : new QuadrupedRigPose(this.bones);
-    this.context = { bones: this.bones, dims: actor.dims, dt: 0, t: 0, seed: actor.seed, scale: actor.scale, speed: 0, strafe: 0, phase: 0, state: 'idle', alive: true,
+    this.quad = recipe.custom ? null : new QuadrupedRigPose(this.rig);
+    this.frameContext = { bones: this.rig, dims: actor.dims, dt: 0, t: 0, seed: actor.seed, scale: actor.scale, speed: 0, strafe: 0, phase: 0, state: 'idle', alive: true,
       deathT: -1, flinch: 0, brace: 0, attack: -1, lookTarget: actor.lookTarget, lookWeight: 0, position: actor.position, yaw: 0, mem: actor.mem, animal: actor };
     this.quadClock = { bodyY: actor.dims.bodyY, alive: true, deathT: -1, deathSide: 1, speed: 0, legAbd: this.legAbd };
     this.published = new Float64Array(this.joints.length * 10);
     // Factory bind matrices exist before an actor's first rendered placement; no body, clocks or RNG run here.
     this.publish(); this.root.scale.setScalar(actor.scale);
     // AnimalView.place changes root locals immediately; its bind matrices remain cached until the first scene publication.
-    this.root.position.copy(actor.position); this.root.rotation.y = actor.yaw;
+    this.root.position.copy(actor.position); this.root.rotation.y = actor.yaw; this.rootClean = false;
   }
+  /** Locals or the root may change: the next publish compares and composes them as before. */
+  private touch(): void { this.cleanThrough = -1; this.rootClean = false; }
   /** Body animation phase only; contacts keep the previous publication until publish(). */
   advance(dt: number, t: number, near: boolean): void {
-    const a = this.actor; a.advancePose(this.law, dt, t, near);
+    this.touch(); const a = this.actor; a.advancePose(this.law, dt, t, near);
     const i = this.law.input;
     if (this.recipe.deathSplay !== false && this.wasAlive && !a.alive) for (let l = 0; l < 4; l++) this.legAbd[l] = ((l % 2 === 0) === (i.deathSide < 0)) ? .35 : .25;
     this.wasAlive = a.alive;
@@ -450,7 +463,7 @@ export class NativeCreaturePose {
         this.quad.apply(this.law.pose, dt, c);
       }
       {
-        const c = this.context; c.dt = dt; c.t = t; c.speed = a.speed; c.strafe = a.strafe; c.phase = this.law.phase; c.state = a.state; c.alive = a.alive;
+        const c = this.frameContext; c.dt = dt; c.t = t; c.speed = a.speed; c.strafe = a.strafe; c.phase = this.law.phase; c.state = a.state; c.alive = a.alive;
         c.deathT = i.deathT; c.flinch = i.flinch; c.brace = i.brace * i.brace * (3 - 2 * i.brace); c.attack = a.attackPhase; c.lookWeight = this.law.lookAmt; c.yaw = a.yaw; c.mem = a.mem;
         this.animate?.(c);
       }
@@ -466,6 +479,8 @@ export class NativeCreaturePose {
   publish(through?: string): void {
     const last = through === undefined ? this.joints.length - 1 : this.recipe.joints.findIndex(row => row.name === through);
     if (last === -1) throw new Error('Missing native creature publish joint');
+    // nothing was posed since a publish that covered these joints and this frame: its worlds and publication stand
+    if (!this.borrowed && this.rootClean && last <= this.cleanThrough && last <= this.solvedThrough) return;
     let changed = false;
     for (let n = 0; n < 32; n++) {
       if (n > last) break;
@@ -479,8 +494,8 @@ export class NativeCreaturePose {
     const e = this.frame.elements, pf = this.publishedFrame;
     let same = !changed && last <= this.solvedThrough;
     for (let k = 0; same && k < 16; k++) if (!Object.is(e[k], pf[k])) same = false;
-    if (same) return;
-    pf.set(e); this.fk.solve(this.frame, last); this.solvedThrough = last;
+    if (!same) { pf.set(e); this.fk.solve(this.frame, last); this.solvedThrough = last; }
+    this.rootClean = true; if (last > this.cleanThrough) this.cleanThrough = last;
   }
   /** An extra contact point on any recipe joint (a weak point, an anchor), read from the last publication. */
   jointPoint(name: string, at: readonly [number, number, number], out: Vector3): Vector3 {
@@ -510,6 +525,7 @@ export class NativeCreaturePose {
   /** Convert a scalar-only legacy clock or its complete named joint/root envelope. Preflight is quiet;
    * complete transforms retain frozen far-LOD joints exactly, while scalar-only callers republish from the actor. */
   adopt(input: unknown): void {
+    this.touch();
     const state = poseSchema.parse(NativeCreaturePose.Legacy, typeof input === 'string' ? { pose: input } : input);
     if (state.bones !== undefined && (state.bones.length !== this.joints.length
       || state.bones.some(([name], index) => name !== this.recipe.joints[index]?.name))
@@ -529,6 +545,7 @@ export class NativeCreaturePose {
   }
   /** Strict bounded atomic restore. No posing, terrain, body, contact, RNG or publications of current locals. */
   restore(value: string): void {
+    this.touch();
     if (value.length > 65536) throw new Error('Invalid native creature pose continuation');
     const parsed: unknown = JSON.parse(value);
     if (typeof parsed === 'object' && parsed !== null && !Object.hasOwn(parsed, 'version')) { this.adopt(parsed); return; }
