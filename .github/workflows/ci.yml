@@ -78,6 +78,9 @@ jobs:
       - name: Prove earned loadout and author publication contracts
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-loadout.proof.mjs
+      - name: Prove keyed sky clock and data admission contracts
+        if: needs.changes.outputs.docs != 'true'
+        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/keyed-sky-clock.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'

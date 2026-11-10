@@ -201,3 +201,15 @@ their authored slot/clock policies and strict preflight refusals. The
 SDK predecessor remains until its owner approves retirement. A third
 actual-room case refuses both unearned slots and proves that an explicit
 choice wins when the same command also collects the rifle.
+
+## Keyed sky clock contracts
+
+After the ordinary Pine product install, run
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/keyed-sky-clock.proof.mjs`.
+Three explicit CI-only cases retain independent authored sky/weather
+numbers, the actual pinned day checkpoint suffix and strict data
+admission. Each timeout and complete-body elapsed guard stays 9.5 s.
+Clock output, preset independence and pause/resume are checked too.
+These are numerical contracts, with no rendered-pixel claim or change.
+The SDK owns installed packing, gzip and original worker bits; the old
+waiting file is retained until its owner reviews the complete mapping.
