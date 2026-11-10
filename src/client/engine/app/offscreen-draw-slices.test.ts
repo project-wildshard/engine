@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest';
-import { BoxGeometry, InstancedMesh, Mesh, MeshBasicMaterial, PerspectiveCamera, Points, Scene, WebGLRenderTarget, type Object3D } from 'three';
+import { BoxGeometry, InstancedMesh, Mesh, MeshBasicMaterial, PerspectiveCamera, PMREMGenerator, Points, Scene, WebGLRenderer, WebGLRenderTarget, type Object3D } from 'three';
 import { Scope } from '../../../shared/engine/app/scope';
 import { registerOffscreenPreparation } from '../render/offscreenPreparation';
 import { warmOffscreenPasses, type OffscreenWarmRenderer, type ParkedDrawBudget } from '../render/parkedDraws';
+import { warmOffscreenBuild } from '../render/offscreenBuild';
+import { SkyEnvironment } from '../render/skyEnvironment';
 
 /** The slicing rules at one native unit a slice (the WebKit live budget before G782 raised it to two, D152). */
 const ONE_UNIT: ParkedDrawBudget = { drawables: 8, newMaterials: 1, newBindings: 1, bufferBytes: 256 * 1024 };
@@ -50,4 +52,33 @@ test.each([false, true])('offscreen caster batches restore state before yielding
     if (cancel) { await expect(warming).rejects.toThrow('owner left'); expect(frames).toEqual([['0']]); expect(pauses).toBe(1); }
     else { expect(await warming).toBe(3); expect(frames).toEqual([['0'], ['2'], ['3']]); expect(pauses).toBe(3); }
   } finally { owner.dispose(); geometry.dispose(); material.dispose(); override.dispose(); target.dispose(); prior.dispose(); }
+});
+
+// DL23 (Pine's Sky frame): an equirect sky's first environment links its programs ahead on WebKit (`warmOffscreenBuild`)
+// and its first refresh then draws with that generator; elsewhere nothing is built ahead
+test('a sky warm-up builds nothing outside WebKit, and a primed generator draws the first refresh', async () => {
+  const renderer: unknown = Object.create(WebGLRenderer.prototype);
+  if (!(renderer instanceof WebGLRenderer)) throw new Error('Renderer missing');
+  let built = 0;
+  await warmOffscreenBuild(renderer, () => { built++; return new WebGLRenderTarget(1, 1); }, () => true, { webKitOnly: true });
+  expect(built).toBe(0);
+  for (const [key, value] of Object.entries({ getRenderTarget: (): null => null, setRenderTarget: (): void => undefined, render: (): void => undefined })) Reflect.set(renderer, key, value);
+  const scene = new Scene(), source = new WebGLRenderTarget(64, 32), cube = new WebGLRenderTarget(8, 8);
+  const drawn: unknown[] = [], freed: string[] = [];
+  const generator = (name: string): PMREMGenerator => {
+    const made: unknown = Object.create(PMREMGenerator.prototype);
+    if (!(made instanceof PMREMGenerator)) throw new Error('Generator missing');
+    return Object.assign(made, { _renderer: renderer, dispose: () => { freed.push(name); },
+      fromEquirectangular: (texture: unknown, target: unknown) => { drawn.push([name, texture, target]); return cube; } });
+  };
+  const env = new SkyEnvironment(renderer, scene, { kind: 'equirect', scene: new Scene(), camera: new PerspectiveCamera(), target: source }, { every: 60, stepped: false });
+  env.prime(generator('warmed'));
+  env.prime(generator('late'));
+  env.refresh();
+  expect(drawn).toEqual([['warmed', source.texture, null]]);
+  expect(scene.environment).toBe(cube.texture);
+  expect(freed).toEqual(['late']);
+  env.dispose();
+  expect(freed).toEqual(['late', 'warmed']);
+  source.dispose();
 });

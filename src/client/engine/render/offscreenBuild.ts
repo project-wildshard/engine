@@ -97,6 +97,40 @@ function captureCommands(renderer: Renderer): { commands: Renderer; draws: Draw[
   return { commands, draws, finish: () => { capturing = false; target = null; } };
 }
 
+/** The captured draws' actual shader variants, linked in parallel (`runPrecompile`) before any of them is drawn. */
+async function precompileDraws(renderer: Renderer, draws: readonly Draw[], current: () => boolean): Promise<void> {
+  const jobs: CompileJob[] = draws.map((draw, index) => {
+    const copy = draw.root.clone(true);
+    const link = (source: THREE.Object3D, clone: THREE.Object3D): void => {
+      linkStandIn(clone, source);
+      for (const [i, child] of source.children.entries()) { const cloned = clone.children[i]; if (cloned !== undefined) link(child, cloned); }
+    };
+    link(draw.root, copy);
+    if (isMesh(copy) && draw.material !== null) copy.material = draw.material;
+    if (isScene(copy) && draw.background !== undefined) copy.background = draw.background;
+    return { label: engineString('s_4bdf150dd0ed', [index + 1]), root: copy, camera: draw.camera, target: isScene(copy) ? copy : null, rt: draw.target, toneMapping: draw.toneMapping };
+  });
+  await runPrecompile(renderer, new THREE.PerspectiveCamera(), jobs, new Set(draws.flatMap(draw => [...draw.uniforms.keys()])).size, undefined, undefined, current);
+}
+
+const webKit = (): boolean => navigator.userAgent.includes('AppleWebKit') && !/Chrome|Chromium|Edg/.test(navigator.userAgent);
+
+/** DL23: link a synchronous offscreen factory's programs (PMREM's equirect and GGX passes, the source pass) without
+ * drawing anything, so the factory's later real run in a frame finds them linked. The factory runs once on capturing
+ * commands (no draw reaches the GPU) and its output is freed; whatever it made and keeps (a generator's materials and
+ * ping-pong target) is the caller's to reuse. `webKitOnly` does nothing elsewhere, as `prepareOffscreenBuild`. */
+export async function warmOffscreenBuild(renderer: Renderer, build: (commands: Renderer) => THREE.WebGLRenderTarget,
+  current: () => boolean, options: { webKitOnly?: boolean } = {}): Promise<void> {
+  if (!current()) throw new Error('Offscreen build owner left');
+  if (options.webKitOnly === true && !webKit()) return;
+  const capture = captureCommands(renderer), draws = capture.draws;
+  let output: THREE.WebGLRenderTarget | null = null;
+  try {
+    try { output = build(capture.commands); } finally { capture.finish(); }
+    await precompileDraws(renderer, draws, current);
+  } finally { output?.dispose(); draws.length = 0; }
+}
+
 /** Capture a synchronous, offscreen-only factory such as PMREM, prepare its actual shader variants,
  * then replay its draws in painted slices. The factory retains its meshes/materials until resolution;
  * cameras, viewports and scalar/vector uniforms are captured, while samplers stay borrowed.
@@ -106,23 +140,12 @@ export async function prepareOffscreenBuild(renderer: Renderer, build: (commands
   current: () => boolean, options: { webKitOnly?: boolean } = {}): Promise<THREE.WebGLRenderTarget> {
   const check = (): void => { if (!current()) throw new Error('Offscreen build owner left'); };
   check();
-  if (options.webKitOnly === true && (!navigator.userAgent.includes('AppleWebKit') || /Chrome|Chromium|Edg/.test(navigator.userAgent))) return build(renderer);
+  if (options.webKitOnly === true && !webKit()) return build(renderer);
   const capture = captureCommands(renderer), draws = capture.draws;
   let output: THREE.WebGLRenderTarget;
   try { output = build(capture.commands); } catch (error) { draws.length = 0; throw error; } finally { capture.finish(); }
   try {
-    const jobs: CompileJob[] = draws.map((draw, index) => {
-      const copy = draw.root.clone(true);
-      const link = (source: THREE.Object3D, clone: THREE.Object3D): void => {
-        linkStandIn(clone, source);
-        for (const [i, child] of source.children.entries()) { const cloned = clone.children[i]; if (cloned !== undefined) link(child, cloned); }
-      };
-      link(draw.root, copy);
-      if (isMesh(copy) && draw.material !== null) copy.material = draw.material;
-      if (isScene(copy) && draw.background !== undefined) copy.background = draw.background;
-      return { label: engineString('s_4bdf150dd0ed', [index + 1]), root: copy, camera: draw.camera, target: isScene(copy) ? copy : null, rt: draw.target, toneMapping: draw.toneMapping };
-    });
-    await runPrecompile(renderer, new THREE.PerspectiveCamera(), jobs, new Set(draws.flatMap(draw => [...draw.uniforms.keys()])).size, undefined, undefined, current);
+    await precompileDraws(renderer, draws, current);
     for (const draw of draws) {
       check();
       const priorTarget = renderer.getRenderTarget(), priorFace = renderer.getActiveCubeFace(), priorMip = renderer.getActiveMipmapLevel();

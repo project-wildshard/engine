@@ -176,6 +176,10 @@ export class SkyEnvironment {
   /** take over a generator and target built elsewhere (an offscreen first build) as the scene's environment */
   adopt(gen: PMREMGenerator | null, cube: WebGLRenderTarget): void { this.gen = gen; this.set(cube); }
 
+  /** a generator whose programs were linked ahead (`warmOffscreenBuild`) for the first refresh to draw with; one made
+   *  already wins and the offered one is freed */
+  prime(gen: PMREMGenerator): void { if (this.gen === null && !this.disposed) this.gen = gen; else gen.dispose(); }
+
   /** the whole refresh now, in place (a stepped one in flight is superseded) */
   refresh(): void {
     if (this.disposed) return;

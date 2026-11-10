@@ -2,7 +2,7 @@ import { loadLUT, preloadBakedTextures } from '@wildshard/engine/boot/bakedApi';
 import { resourceScope } from '@wildshard/engine/app/resources';
 import { heldFrameTurn } from '@wildshard/engine/core/framePacing';
 import type { OffscreenPass, SkyBackdrop, SkyBackdropContext, SkyBackdropFactory, SkyBackdropPost, SkyBackdropTargets } from '@wildshard/engine/render/look';
-import { prepareOffscreenBuild } from '@wildshard/engine/render/offscreenBuild';
+import { prepareOffscreenBuild, warmOffscreenBuild } from '@wildshard/engine/render/offscreenBuild';
 import { SkyEnvironment, type SkyEnvironmentRefresh, type SkyEnvironmentSource } from '@wildshard/engine/render/skyEnvironment';
 import type { DayCycle } from '@wildshard/engine/world/dayCycle';
 import { admittedChannelTable, installChannelPrograms } from '@wildshard/engine/game/plugin/channelPrograms';
@@ -171,6 +171,21 @@ export function graphDaySkyBackdrop<K>(spec: GraphDaySkySpec<K>): SkyBackdropFac
         }, () => !owner.disposed, { webKitOnly: true });
         env.adopt(prepared.generator, first);
       } catch (error) { prepared.generator?.dispose(); throw error; }
+    } else if (source.kind === 'equirect') {
+      // DL23 (Pine's Sky frame, 298-412 ms on the Simulator): the bind's first refresh linked the environment pass's and
+      // PMREM's equirect and GGX programs inside one frame. They link in parallel here, before the bind, whose refresh
+      // then draws with this generator (WebKit; elsewhere nothing changes)
+      const warmed: { generator: THREE.PMREMGenerator | null } = { generator: null };
+      try {
+        await warmOffscreenBuild(renderer, (commands) => {
+          const generator = tierPmremGenerator(commands);
+          warmed.generator = generator;
+          commands.setRenderTarget(source.target);
+          commands.render(source.scene, source.camera);
+          return generator.fromEquirectangular(source.target.texture, null);
+        }, () => !owner.disposed, { webKitOnly: true });
+      } catch (error) { warmed.generator?.dispose(); throw error; }
+      if (warmed.generator !== null) env.prime(warmed.generator);
     }
     let targets: SkyBackdropTargets | null = null, post: SkyBackdropPost | null = null;
     const group = spec.channels, params = group === undefined ? null : graphParamRoots(spec.source.clientChannels, group, spec.ids);
