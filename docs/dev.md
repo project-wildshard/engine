@@ -213,3 +213,19 @@ Clock output, preset independence and pause/resume are checked too.
 These are numerical contracts, with no rendered-pixel claim or change.
 The SDK owns installed packing, gzip and original worker bits; the old
 waiting file is retained until its owner reviews the complete mapping.
+
+## Interaction placement owner contracts
+
+After the two ordinary Driftwood and Pine pin installs, run
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/interaction-placement.proof.mjs`.
+Three explicit CI-only cases borrow actual quest progress, native floor
+queries and public model/frame ports. A real, in-reach NetRoom greeting
+unlocks both the authored lever condition and stock chest; out-of-reach
+input stays refused. No flag is assigned by the test. Actual colliders
+move from top 24 to 23 across the strict 20-metre reach, with live floor,
+height, model anchor and explicit override precedence checks. Model
+records are a caller port, not a rendered geometry claim. Both actual
+pinned tables retain their original quest conditions and order.
+Each complete case keeps 9.5 s including native cleanup; no live server,
+walked journey or database durability is claimed. The SDK owns the
+installed binding/reader counterpart. The original duplicate stays.

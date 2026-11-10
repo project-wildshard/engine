@@ -81,6 +81,9 @@ jobs:
       - name: Prove keyed sky clock and data admission contracts
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/keyed-sky-clock.proof.mjs
+      - name: Prove actual quest progress and native placement floors
+        if: needs.changes.outputs.docs != 'true'
+        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/interaction-placement.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'
