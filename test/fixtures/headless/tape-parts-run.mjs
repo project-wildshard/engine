@@ -8,13 +8,24 @@ import {hrtime} from 'node:process';
 import {resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Node imports the loader by file URL.
 import {pathToFileURL} from 'node:url';
-import {HeadlessSimulation} from '../../../src/server/host/headless.ts';
+import {compileProductWorker} from './compileProductWorker.ts';
+const cancellation=new AbortController();
+let prepared,preparing;
+// The outer20s bound cancels preparation as well as the already-running worlds.
+process.once('SIGTERM',()=>{cancellation.abort();void(async()=>{
+  await preparing?.catch(()=>undefined);prepared?.dispose();process.exit(143);
+})();});
+process.once('exit',()=>prepared?.dispose());
+preparing=compileProductWorker(undefined,cancellation.signal);
+prepared=await preparing;
+const createSimulation=prepared.create;
+console.info('tape worker preparation complete');
 import {TickWorkerHost} from '../../../src/server/host/tickWorkerHost.ts';
 import {emptyShardfile} from '../../../src/shared/host/author.ts';
 
 const source=emptyShardfile({slug:'tape-parts-fixture',name:'Tape parts',author:'Test',revision:1,seed:417});
 source.serverBudget.commandsPerTick=1;
-const open=()=>HeadlessSimulation.create(source,new Map(),undefined,{deadline:'advisory'});
+const open=()=>createSimulation(source,new Map(),undefined,{deadline:'advisory'});
 const plan=(id,frames)=>({version:1,observe:[],segments:[{id,ticks:frames.length,commands:[],frames}]});
 const actual=await open(),control=await open();
 try{
@@ -47,7 +58,7 @@ for(const prefix of ['step','walk']){
     if(prefix==='step')await first.step([{source:'prefix',commands:[{kind:'player',moveX:.2,moveZ:0,yaw:0}]}]);
     else await first.walkLeg({ticks:4,points:[{x:0,z:0},{x:40,z:0}]});
     const saved=first.checkpoint;assert.ok(saved);assert.ok(saved.tick>0);
-    restored=await HeadlessSimulation.create(source,new Map(),saved.snapshot,{deadline:'advisory'});
+    restored=await createSimulation(source,new Map(),saved.snapshot,{deadline:'advisory'});
     const continued=await first.verbTapePart(plan('after-prefix',[[]]));
     const replayed=await restored.verbTapePart(plan('after-restore',[[]]));
     assert.equal(continued.commit.tick,saved.tick+1);
@@ -56,7 +67,7 @@ for(const prefix of ['step','walk']){
     assert.equal(first.quarantined,false);assert.equal(restored.quarantined,false);
   }finally{await restored?.dispose();await first.dispose();}
 }
-const runtime=await HeadlessSimulation.create(source,new Map());
+const runtime=await createSimulation(source,new Map());
 try{const before=runtime.checkpoint;await assert.rejects(runtime.verbTapePart(plan('runtime',[[]])),/trusted offline/);assert.deepEqual(runtime.checkpoint,before);}
 finally{await runtime.dispose();}
 const idle=await open(),realClock=hrtime.bigint;

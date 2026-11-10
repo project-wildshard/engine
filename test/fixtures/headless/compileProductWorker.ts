@@ -21,17 +21,26 @@ const Host=v.object({HeadlessSimulation:v.custom<{create:ProductWorkerFactory}>(
 
 /** Fresh compilation, not a persistent result cache. Each caller still starts
  * its own production Worker and fully admits its product and physics world. */
-export async function compileProductWorker(root=resolve('.')):Promise<{
+export async function compileProductWorker(root=resolve('.'),signal?:AbortSignal):Promise<{
   create:ProductWorkerFactory;directory:string;dispose:()=>void;
 }> {
+  signal?.throwIfAborted();
   mkdirSync(resolve(root,'tmp'),{recursive:true});
   const directory=mkdtempSync(resolve(root,'tmp','compiled-product-'));
   try{
-    const {stdout}=await promisify(execFile)(process.execPath,['--experimental-transform-types',
+    const compiling=promisify(execFile)(process.execPath,['--experimental-transform-types',
       fileURLToPath(new URL('./buildProductWorker.ts',import.meta.url)),root,directory],{
-      cwd:root,maxBuffer:4*1024*1024,timeout:30_000,
+      cwd:root,maxBuffer:4*1024*1024,timeout:30_000,killSignal:'SIGKILL',
       env:{...process.env,ROLLDOWN_WORKER_THREADS:'1',TOKIO_WORKER_THREADS:'1',RAYON_NUM_THREADS:'1',UV_THREADPOOL_SIZE:'1'},
     });
+    // Abort must reap the native producer before its owned output is removed.
+    const producerClosed=new Promise<void>(done=>{compiling.child.once('close',()=>{done();});});
+    const abort=():void=>{compiling.child.kill('SIGKILL');};
+    signal?.addEventListener('abort',abort,{once:true});
+    let stdout:string;
+    try{({stdout}=await compiling);}catch(error){signal?.throwIfAborted();throw error;}
+    finally{await producerClosed;signal?.removeEventListener('abort',abort);}
+    signal?.throwIfAborted();
     const manifest=v.parse(Manifest,JSON.parse(stdout));
     const outputs=['headless.js','headlessWorker.js'].map(name=>resolve(directory,name));
     if(manifest.outputs.length!==outputs.length||manifest.outputs.some((row,index)=>row.file!==outputs[index]))throw new Error('Unexpected fixed headless output inventory');
@@ -44,12 +53,15 @@ export async function compileProductWorker(root=resolve('.')):Promise<{
     };
     verify(manifest.inputs,'Headless preparation source changed');verify(manifest.outputs,'Headless preparation output changed');
     const imported:unknown=await import(pathToFileURL(resolve(directory,'headless.js')).href);
+    signal?.throwIfAborted();
     const host=v.parse(Host,imported);
     let closed=false;
+    const dispose=():void=>{if(!closed){closed=true;signal?.removeEventListener('abort',dispose);rmSync(directory,{recursive:true,force:true});}};
+    signal?.addEventListener('abort',dispose,{once:true});
     return {directory,create:async(...args)=>{
       if(closed)throw new Error('Headless preparation is closed');
       verify(manifest.inputs,'Headless preparation source changed');verify(manifest.outputs,'Headless preparation output changed');
       return host.HeadlessSimulation.create(...args);
-    },dispose:()=>{if(!closed){closed=true;rmSync(directory,{recursive:true,force:true});}}};
+    },dispose};
   }catch(error){rmSync(directory,{recursive:true,force:true});throw error;}
 }
