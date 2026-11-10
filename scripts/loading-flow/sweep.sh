@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # J136: DOWNLOAD closes on one passing sweep on the flip build plus one sitting of phone checks. This is the sweep: every
 # reading the open rows name, against one URL, and a verdict per row. About 3 hours on a free Simulator.
-#   scripts/loading-flow/sweep.sh <url> [--out <dir under ./tmp>] [--dist <served build's dist>] [--worker-row] [--only <step,step>]
+#   scripts/loading-flow/sweep.sh <url> [--out <dir under ./tmp>] [--dist <served build's dist>] [--source-rev <engine SHA>] [--worker-row] [--only <step,step>]
+# --source-rev defaults to the served revision for direct engine builds. A promoted shell needs its pinned engine SHA
+# and the exact promoted artifact's --dist, not source maps from a rebuild.
 # Steps, in order, each skipped when <out>/.done/<step> exists, so a rerun resumes:
 #   gate      DL15, DL17, DL1, DL25: the complete-at-control gate on the six shards and the grid, packs on, cold, plus Driftwood's
 #             re-entry during the precache. The grid needs the build's source maps: without --dist the sweep serves
@@ -17,21 +19,24 @@
 # the Simulator, a flow step fails and the rerun picks it up. The upgrade visit is not here: it is one visit, right after a deploy.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-url=''; out=''; dist=''; only=''; worker=0
+url=''; out=''; dist=''; only=''; worker=0; source_rev=''
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --out) out="$2"; shift 2 ;;
     --dist) dist="$2"; shift 2 ;;
+    --source-rev) source_rev="$2"; shift 2 ;;
     --only) only=",$2,"; shift 2 ;;
     --worker-row) worker=1; shift ;;
     -*) echo "sweep.sh: unknown option $1" >&2; exit 2 ;;
     *) url="${1%/}"; shift ;;
   esac
 done
-[ -n "$url" ] || { echo 'usage: sweep.sh <url> [--out <dir>] [--dist <dir>] [--worker-row] [--only <step,step>]' >&2; exit 2; }
+[ -n "$url" ] || { echo 'usage: sweep.sh <url> [--out <dir>] [--dist <dir>] [--source-rev <engine SHA>] [--worker-row] [--only <step,step>]' >&2; exit 2; }
 build=$(curl -fsS --max-time 15 "$url/version.json" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["build"])') \
   || { echo "sweep.sh: no version.json at $url" >&2; exit 2; }
 rev=${build%%-*}
+[ -n "$source_rev" ] || source_rev=$rev
+[[ "$source_rev" =~ ^[a-f0-9]{7,40}$ ]] || { echo 'sweep.sh: invalid --source-rev' >&2; exit 2; }
 [ -n "$out" ] || out="tmp/download-sweep/$build"
 node scripts/loading-flow/sweep-input.mjs "$out" "$url" "$build" "$worker" || exit 2
 mkdir -p "$out/.done" "$out/gate"
@@ -49,7 +54,7 @@ step() { # step <name> <cmd...>: a failure leaves no mark, so the next run tries
 }
 gate() { # gate <flow> <base> [flags]: exit 1 is a red reading, still a reading; only 2 means none
   local flow=$1 base=$2; shift 2
-  scripts/browser-lane.sh --max 20 node scripts/complete-at-control.mjs --base="$base" --rev="$rev" --flow="$flow" --level-download=packs \
+  scripts/browser-lane.sh --max 20 node scripts/complete-at-control.mjs --base="$base" --rev="$rev" --source-rev="$source_rev" --flow="$flow" --level-download=packs \
     ${row[@]+"${row[@]}"} "$@" --out="$PWD/$out/gate/$flow${tag:-}.json"
   [ "$?" -lt 2 ]
 }

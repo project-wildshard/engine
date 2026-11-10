@@ -9,6 +9,7 @@
 //   --trace=on (Chromium): who asked for level content after control (each request's initiator stack, CDP) and every
 //   `wildshard.prepare:*` measure against control on the page clock, as report.trace; not part of the verdict;
 //   --dist=<the served build's dist> maps every frame through its hidden source maps
+//   --source-rev=<pinned engine SHA> separates engine Git source from a shell build's --rev
 //   --frames=<s> (G1008): every rAF interval for <s> seconds from control (fps per second, worst frame, frames over 250
 //   and 100 ms) as report.frames, before the lap; --profile=on (Chromium) adds the page's CPU profile over the same window
 //   (self time per function and inclusive time per file, through --dist's maps); --heap=on|save (Chromium) adds a heap
@@ -42,7 +43,7 @@
 //      resident data, a THREE.LOD below level 0) is listed as distance LOD, not red (its distances are Jake's look and
 //      perf call). The player's own viewmodel (under game.camera) and additive effects are not level content.
 // Exit 0 = complete at control, 1 = the gate fails (the report lists every violation), 2 = no reading.
-import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createRequire } from 'node:module';
@@ -50,18 +51,19 @@ import { chromium, webkit, devices } from 'playwright';
 import { developerSettings, saveFixture, harnessPins, hideDeveloperOverlays, levelDownloadFixtures } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { snapshot, lapLegs, lapPops, splitRequests, splitManifests, spawnRereads, neighbourSpans, splitByInitiator, NEIGHBOUR_WORK, firstSeconds, profileTop, heapTop } from './complete-at-control-snapshot.mjs';
-import { execFileSync } from 'node:child_process';
 import { startSharedLink } from './phone-loading/link.ts';
 import { profiles } from './phone-loading/model.ts';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { readSweepTarget, requireSweepDocumentBuild } from './loading-flow/target.mjs';
+import { readSweepSource, sweepMapBinding } from './loading-flow/source-maps.mjs';
 
 // the service worker's own fetches reach context 'request' events (Chromium), as scripts/bench-load.mjs does
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
-const { values } = parseArgs({ options: Object.fromEntries(['base', 'rev', 'flow', 'engine', 'lap', 'out', 'reach', 'sw', 'warm', 'link', 'level-download', 'textures', 'trace', 'dist', 'frames', 'profile', 'heap', 'probe', 'device-save'].map(key => [key, { type: 'string' }])) });
+const { values } = parseArgs({ options: Object.fromEntries(['base', 'rev', 'source-rev', 'flow', 'engine', 'lap', 'out', 'reach', 'sw', 'warm', 'link', 'level-download', 'textures', 'trace', 'dist', 'frames', 'profile', 'heap', 'probe', 'device-save'].map(key => [key, { type: 'string' }])) });
 const base = values.base, rev = values.rev, flow = values.flow;
-if (!base || !rev || !/^[0-9a-f]{7,40}$/u.test(rev) || !flow || !/^(grid|[a-z0-9]+(?:-[a-z0-9]+)*)$/u.test(flow)) {
-  console.error('usage: complete-at-control.mjs --base=URL --rev=SHA --flow=<shard slug>|grid [--engine=chromium|webkit] [--sw=on|off] [--link=none|phone] [--warm=on] [--lap=<s>] [--reach=220] [--out=tmp/<file>.json]');
+const sourceRev = values['source-rev'] ?? rev;
+if (!base || !rev || !/^[0-9a-f]{7,40}$/u.test(rev) || !sourceRev || !/^[0-9a-f]{7,40}$/u.test(sourceRev) || !flow || !/^(grid|[a-z0-9]+(?:-[a-z0-9]+)*)$/u.test(flow)) {
+  console.error('usage: complete-at-control.mjs --base=URL --rev=SHA [--source-rev=ENGINE_SHA] --flow=<shard slug>|grid [--engine=chromium|webkit] [--sw=on|off] [--link=none|phone] [--warm=on] [--lap=<s>] [--reach=220] [--out=tmp/<file>.json]');
   process.exit(2);
 }
 const engine = values.engine ?? 'chromium', reach = Number(values.reach ?? '220'), sw = values.sw ?? 'on', linkName = values.link ?? 'none';
@@ -149,33 +151,12 @@ const isLevelContent = (url) => {
 const requests = [], reads = [];
 /** The neighbour split needs the mapped trace and the served build's own session source (`git show <rev>:<file>`). */
 const byWork = (rows, trace) => (trace?.mapped !== true ? { level: rows, neighbour: [] }
-  : splitByInitiator(rows, trace, neighbourSpans(file => execFileSync('git', ['show', `${rev}:${file}`], { encoding: 'utf8' })), url => slugOf(contentPath(url) ?? '') !== null));
+  : splitByInitiator(rows, trace, neighbourSpans(file => readSweepSource(sourceRev, file)), url => slugOf(contentPath(url) ?? '') !== null));
 // --dist: the build's hidden source maps (dist/b/<build>/*.js.map) name each trace frame's source, as loading-benchmark does
 const sourceMaps = new Map();
 /** sp-x1: the maps must be the served build's own: --dist's version.json names the revision, and every map that carries a
  *  span file carries exactly that revision's source of it. Null when bound, else why not (then no frame is trusted). */
-const distBinding = () => {
-  if (values.dist === undefined) return 'no --dist';
-  const stamp = resolve(values.dist, 'version.json'), version = existsSync(stamp) ? JSON.parse(readFileSync(stamp, 'utf8')) : null;
-  if (typeof version?.build !== 'string' || !version.build.startsWith(rev.slice(0, 7))) return `--dist serves ${version?.build ?? 'no version.json'}, not ${rev}`;
-  const code = resolve(values.dist, 'b', version.build), assets = existsSync(code) ? code : resolve(values.dist, 'assets');
-  for (const file of new Set(NEIGHBOUR_WORK.map(span => span.file))) {
-    const want = execFileSync('git', ['show', `${rev}:${file}`], { encoding: 'utf8' });
-    let carried = 0;
-    for (const name of readdirSync(assets).filter(entry => entry.endsWith('.js.map'))) {
-      const text = readFileSync(resolve(assets, name), 'utf8');
-      if (!text.includes(file)) continue;
-      const map = JSON.parse(text);
-      for (const [i, source] of map.sources.entries()) {
-        if (!source.endsWith(file)) continue;
-        if (map.sourcesContent?.[i] !== want) return `${name} maps a ${file} that is not ${rev}'s`;
-        carried++;
-      }
-    }
-    if (carried === 0) return `no map in --dist carries ${file}`;
-  }
-  return null;
-};
+const distBinding = () => sweepMapBinding(values.dist, sweepTarget.build, sourceRev, NEIGHBOUR_WORK.map(span => span.file));
 /** A served frame's source (`path:line name`) through --dist's hidden maps (1-based line and column), else null. */
 const sourceOf = (frame) => {
   if (values.dist === undefined) return null;
@@ -193,7 +174,7 @@ const mapped = (rows) => (values.dist === undefined ? rows : rows.map(row => ({ 
 const link = linkName === 'phone' ? await startSharedLink(profiles.phone.down) : null;
 const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'chromium'
   ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', ...(link === null ? [] : [`--proxy-server=${link.proxy}`, '--proxy-bypass-list=<-loopback>'])] : [] });
-const report = { schema: 2, gate: 'DL17 complete-at-control', rev, base, flow, engine, reach, levelDownload: values['level-download'] ?? null, textures: values.textures ?? 'auto', link: link === null ? null : { preset: 'phone', bytesPerSecond: link.bytesPerSecond },
+const report = { schema: 2, gate: 'DL17 complete-at-control', rev, sourceRev, base, flow, engine, reach, levelDownload: values['level-download'] ?? null, textures: values.textures ?? 'auto', link: link === null ? null : { preset: 'phone', bytesPerSecond: link.bytesPerSecond },
   when: new Date().toISOString(), violations: [], errors: [], limitations: ['Cache Storage and blob: / data: reads are logged on the page only, not in its dedicated workers'] };
 try {
   // Playwright WebKit reports none of the service worker's own fetches: a worker-on WebKit run cannot see them, so it refuses
