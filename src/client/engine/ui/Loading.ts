@@ -30,6 +30,13 @@ import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import './loading.css';
 
 const savedStorage = saveStorage('session');
+/** QA 30: the fresh title page Exit leaves for: this origin's `/`, keeping an explicit service-worker opt-out (`?sw=0`) */
+export function exitTitleUrl(from: string): string {
+  const here = new URL(from), title = new URL('/', here);
+  const sw = here.searchParams.get('sw');
+  if (sw !== null) title.searchParams.set('sw', sw);
+  return title.href;
+}
 /**
  * Loading screen in the Wildshard staging identity — a painter of the boot plan's view
  * (src/client/engine/boot/plan.ts) and nothing else: two tracks (DOWNLOAD bytes read / declared, SETUP
@@ -256,7 +263,7 @@ export class Loading {
     button('settings', engineString('s_loading_settings'), () => { void import('./BootSettings').then(m => { m.openBootSettings(); return undefined; }); });
     const exit = button('exit', engineString('s_loading_exit'), () => {
       exit.disabled = true;
-      leaveSaved(() => { markUnload('exit to title from the loading card'); location.replace(new URL('/', location.href).href); });
+      leaveSaved(() => { markUnload('exit to title from the loading card'); location.replace(exitTitleUrl(location.href)); });
     });
     return row;
   }

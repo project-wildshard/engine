@@ -34,3 +34,16 @@ was, with no press anywhere since, is that tap's. A new gesture always
 starts with a press, so it still acts, and keyboard clicks (detail 0) act.
 Each tap target's scope watches presses on the document. Five seconds
 remain as a backstop.
+
+## J206 review
+
+Codex found no MUST (review
+`~/.cache/wildshard/session-keep/reviews/opus-titleversion-engine-20261110-J206-qa28-30.md`).
+Its SHOULDs are done. The menu buttons no longer re-enable pointer events
+during the card's fade-out, and Exit keeps an explicit `?sw=0` on the
+title it leaves for. The proof now taps SHARD SELECT's lower quarter and
+sends the late compat click itself. It closes Settings with its own CLOSE
+and asserts that Nine Dragon is the world that loads. On a heavily loaded
+machine the proof's waits are still timing-sensitive, so make them sturdier
+as a follow-up. The behaviour itself was seen in the runs: Exit left
+Driftwood mid-load for the title, and the late click stayed on the deck.

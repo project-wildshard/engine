@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Scope } from '../../../shared/engine/app/scope';
-import { Loading } from './Loading';
+import { exitTitleUrl, Loading } from './Loading';
 
 // QA 30 (Jake, 2026-11-10: "You can't like regret loading the wrong shard and bail out and go to the other shard"): a shard's
 // loading card carries SETTINGS and EXIT TO TITLE; Exit replaces the page with the title, ending the in-flight load with it.
@@ -39,9 +39,14 @@ it('Exit to title replaces the page with a fresh title, once', async () => {
   const exit = card().root.querySelector<HTMLButtonElement>('[data-load-menu="exit"]');
   exit?.click();
   await vi.waitFor(() => { expect(replace).toHaveBeenCalledTimes(1); });
-  expect(replace).toHaveBeenCalledWith('https://play.wildshard.io/');
+  expect(replace).toHaveBeenCalledWith('https://play.wildshard.io/?sw=0'); // an explicit worker opt-out stays
   expect(exit?.disabled).toBe(true);
   exit?.click();
   await Promise.resolve();
   expect(replace).toHaveBeenCalledTimes(1);
+});
+
+it('Exit keeps the host and drops the shard', () => {
+  expect(exitTitleUrl('https://preview.wildshard.io/?chunk=nine-dragon-stack')).toBe('https://preview.wildshard.io/');
+  expect(exitTitleUrl('http://127.0.0.1:4406/?chunk=driftwood-isle&sw=0&mute=1')).toBe('http://127.0.0.1:4406/?sw=0');
 });

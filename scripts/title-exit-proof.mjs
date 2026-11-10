@@ -62,15 +62,30 @@ try {
   must(!loading.world, 'Driftwood finished before the exit could be tested mid-load');
   await page.screenshot({ path: join(out, `${engine}-1-loading-driftwood.png`) });
   await tap('.ws-load [data-load-menu="settings"]');
-  await page.waitForSelector('.ws-gmenu.show, .ws-boot-settings.show, [class*="settings"].show', { timeout: 10000 }).catch(() => undefined);
+  const close = page.locator('.ws-gmenu.show .ws-gmenu-close').first();
+  await close.waitFor({ state: 'visible', timeout: 15000 });
+  await page.waitForTimeout(800); // the sheet's slide-in: tap CLOSE where it rests
   await page.screenshot({ path: join(out, `${engine}-2-settings-over-load.png`) });
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(500);
-  const navigated = page.waitForURL(url => url.pathname === '/' && url.search === '', { timeout: 30000 });
+  const closeBox = await close.boundingBox();
+  if (closeBox === null) throw new Error('Settings has no CLOSE on screen');
+  await page.touchscreen.tap(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2);
+  // the panel closes by dropping its .show (it fades, so the button stays in the layout)
+  await page.waitForFunction(() => [...document.querySelectorAll('.ws-gmenu-close')].every(button => button.closest('.show') === null), null, { timeout: 15000 })
+    .catch(async error => {
+      await page.screenshot({ path: join(out, `${engine}-x-settings-stuck.png`) });
+      const open = await page.evaluate(() => [...document.querySelectorAll('.ws-gmenu-close')].map(b => ({ text: b.textContent, shown: b.closest('.show')?.className ?? null, box: b.getBoundingClientRect().toJSON() })));
+      throw new Error(`Settings did not close: ${JSON.stringify({ tapped: closeBox, open })}`, { cause: error });
+    });
+  record('settings over the load', { opened: true, closed: true, stillLoading: (await state()).load });
+  await page.waitForTimeout(800); // the panel's fade
+  // a loading page's main thread is busy: give the tap and the leave their time, and hold the result until it is read
+  const navigated = page.waitForURL(url => url.pathname === '/' && url.search === '', { timeout: 120000, waitUntil: 'commit' }).then(() => null, error => /** @type {unknown} */ (error));
+  const exitAt = await page.evaluate(() => { const b = document.querySelector('.ws-load [data-load-menu="exit"]')?.getBoundingClientRect(); const e = b && document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return e ? `${e.tagName}.${String(e.getAttribute('class'))}[${String(e.getAttribute('data-load-menu'))}]` : null; });
   await tap('.ws-load [data-load-menu="exit"]');
-  await navigated;
+  const left = await navigated;
+  if (left !== null) { await page.screenshot({ path: join(out, `${engine}-x-exit-failed.png`) }); throw new Error(`EXIT TO TITLE did not leave (under the finger: ${String(exitAt)}; ${JSON.stringify(await state())})`, { cause: left }); }
   await page.waitForSelector('.ws-main:not(.hide) .ws-main-select');
-  await page.waitForFunction(() => document.querySelector('.ws-load') === null, null, { timeout: 120000 });
+  await page.waitForTimeout(1500);
   const titled = await state();
   record('exit mid-load', { from: loading.load, to: titled.path, worldLeft: titled.world, errors: [...errors] });
   must(!titled.world, 'a world is running under the title after the exit');
@@ -78,10 +93,17 @@ try {
 
   // 2. SHARD SELECT opens the deck and loads nothing
   await page.waitForTimeout(1000);
-  await tap('.ws-main-select');
+  // the card's lower quarter, where the deck puts ENTER WORLD at 402 px, and the click iOS sends for the same touch after
+  // the swap, late as on a busy page (the old 500 ms window let it through)
+  const card = await page.locator('.ws-main-select').boundingBox();
+  if (card === null) throw new Error('SHARD SELECT is not on screen');
+  const at = { x: card.x + card.width / 2, y: card.y + card.height * 0.85 };
+  await page.touchscreen.tap(at.x, at.y);
+  await page.waitForTimeout(700);
+  const under = await page.evaluate(p => { const e = document.elementFromPoint(p.x, p.y); e?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, clientX: p.x, clientY: p.y })); return e?.closest('button')?.className ?? e?.tagName ?? null; }, at);
   await page.waitForTimeout(3000);
   const deck = await state();
-  record('shard select', { screen: deck.screen, load: deck.load, world: deck.world, downs: deck.downs.slice(-3) });
+  record('shard select', { screen: deck.screen, load: deck.load, world: deck.world, lateClickOn: under });
   must(deck.screen === 'select' && deck.load === null && !deck.world && deck.path === '/', `SHARD SELECT did more than open the deck: ${JSON.stringify(deck)}`);
   await page.screenshot({ path: join(out, `${engine}-4-deck.png`) });
 
@@ -96,6 +118,7 @@ try {
   await page.waitForFunction(() => document.querySelector('.ws-load') === null && Boolean(/** @type {any} */ (window).__wildshard?.world?.game), null, { timeout: 480000, polling: 1000 });
   const played = await page.evaluate(() => ({ path: `${location.pathname}${location.search}`, level: /** @type {any} */ (window).__wildshard?.world?.level?.id ?? /** @type {any} */ (window).__wildshard?.requireWorld?.()?.chunk?.slug ?? null }));
   record('nine dragon', { ...played, errors: [...errors] });
+  must(/nine-dragon/iu.test(`${played.path} ${String(played.level)}`), `the world that loaded is not Nine Dragon: ${JSON.stringify(played)}`);
   await page.screenshot({ path: join(out, `${engine}-6-nine-dragon.png`) });
   must(errors.length === 0, `page errors: ${errors.join('; ')}`);
   await context.close();

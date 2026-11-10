@@ -39,7 +39,7 @@
 /* QA 30 (Jake 2026-11-10: "You can't like regret loading the wrong shard and bail out"): SETTINGS and EXIT TO TITLE, a row of
    their own under the card; Exit leaves for a fresh title page (src/client/engine/ui/Loading.ts menuRow) */
 .ws-load .ws-load-menu { flex: none; display: flex; gap: 10px; width: calc(100% - 32px); max-width: 560px; }
-.ws-load .ws-load-menu button { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 10px 12px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan-line); background: var(--ws-glass-deep); color: var(--ws-cyan); font: 11px var(--ws-mono); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.ws-load .ws-load-menu button { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 10px 12px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan-line); background: var(--ws-glass-deep); color: var(--ws-cyan); font: 11px var(--ws-mono); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .ws-load .ws-load-menu button:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
 .ws-load .ws-load-menu button:disabled { opacity: 0.5; cursor: default; }
 .ws-load .ws-load-retry { flex: none; min-height: 44px; padding: 8px 16px; border: 1px solid var(--ws-cyan); color: var(--ws-cyan); background: var(--ws-glass-deep); font: 12px var(--ws-mono); cursor: pointer; }
