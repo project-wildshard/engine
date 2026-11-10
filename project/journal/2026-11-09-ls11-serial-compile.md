@@ -21,9 +21,12 @@ slow (`narrow`); Metal Chromium and WebKit take none of them:
 - Image uploads and the boot's post draws each wait for a fence (asked once a paint, never waited on) before the next.
 - `Game.firstViewParts` draws the first full view as six fenced prefixes, weighed 0.33 s each.
 
-Not fixed here: the first real world frame (`worldFrame`'s hidden frame) costs 0.3-0.6 s of read-back on most builds and
-2.0-2.4 s on some, base code included; the same frame's passes drawn just before it, fenced, took 26-223 ms each, and the
-uploads in it are under 0.5 MB, so its cost is not in our draws.
+The first real world frame (`worldFrame`'s hidden frame) then held the page 2.0-2.4 s on some builds (base code too),
+in the step after it. Not our draws: the same passes drawn just before it, fenced, took 26-223 ms each. It was Chrome's
+software compositing: a frame that shows a freshly drawn WebGL canvas reads it back on the main thread (`ReadPixels` ->
+`ContextVk::finishImpl`). With every canvas hidden the run had no main-thread hold at all and no stall. So on a GPU the
+shaders step measured slow, `Loading.coverCanvas` hides the world's canvas under the card and puts it back as the card
+starts to fade (or is disposed).
 
 Review (Codex, J206): `gpuSettled` now rejects a lost context or a failed fence wait with `FenceAbortError`, as the first
 frame's fences do, and the first-view prefixes order opaque drawables by `gltfOpaqueSort`'s key (render order, material

@@ -760,7 +760,25 @@ export class Loading {
   /** Initial-session callers keep their gameplay frame gate closed during the completed-panel hold. */
   get holdRequested(): boolean { return !this.scoped && isDev() && getSetting('holdLoading'); }
 
+  private uncover: (() => void) | null = null;
+  /**
+   * LS11 (J204): keep the world's canvas out of the page's frames while this card covers it, until the card starts to
+   * fade. Where the page is composited in software (headless SwiftShader), every frame that showed a freshly drawn WebGL
+   * canvas read it back on the main thread, behind all the GPU work before it: Driftwood's first world frame held the
+   * page 2.0-2.4 s on some builds, the bar with it; hidden, no read-back ran at all. Put back before the fade, and on
+   * the card's disposal.
+   */
+  coverCanvas(canvas: HTMLElement): void {
+    if (this.uncover !== null || this.scope.disposed || this.scope.disposing) return;
+    const prior = canvas.style.visibility;
+    canvas.style.visibility = 'hidden';
+    const restore = (): void => { if (this.uncover === restore) { this.uncover = null; canvas.style.visibility = prior; } };
+    this.uncover = restore;
+    this.scope.onDispose(restore);
+  }
+
   private fade(): Promise<void> {
+    this.uncover?.();
     if (this.scope.disposed || this.scope.disposing) return Promise.reject(new DOMException('Loading was disposed before entry', 'AbortError'));
     return new Promise((resolve, reject) => {
       let complete = false;

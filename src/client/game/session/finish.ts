@@ -157,6 +157,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     const shaderMs = diagnosticNow() - shadersAt, built = (game.renderer.info.programs?.length ?? 0) - programsBefore;
     const slowGpu = built > 0 && shaderMs / built > SLOW_SHADER_MS_PER_PROGRAM;
     bootMark('app:first-frame-plan', { shaderMs: Math.round(shaderMs), programs: built, narrow: slowGpu });
+    // LS11 (J204): a GPU this slow composites the page in software; the card covers the world until it fades
+    if (slowGpu) loading.coverCanvas(game.canvas);
     await step('firstFrame', async (p) => {
       let passes = 0;
       // its units are measured seconds (J204), so the counts live in `what`, not in d / n
