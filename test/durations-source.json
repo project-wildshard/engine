@@ -730,6 +730,360 @@
       "finishedAt": "2026-11-10T20:12:36.319Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "dd6b7f63735ac912e3456b07562e661bccadad62",
+      "tree": "95232d1c011d226f577641bd68b6d8c2ff153cde",
+      "profile": "ci21-e-green-product-scope-1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/debug-authored-rows.test.ts",
+          "blob": "e452aaf681153cd8b7b108df21d155db1b57c6f1",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 319.903541
+        },
+        {
+          "file": "test/elite-god.test.ts",
+          "blob": "cc5879b2e61202a0a6423b0f7618e6813b3c15b3",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 21937.704793
+        },
+        {
+          "file": "test/elite-page-records.test.ts",
+          "blob": "ad1a2c35fb532be1924270828a3d51e0d6b97cdc",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 11810.513209000002
+        },
+        {
+          "file": "test/entry-downloads.test.ts",
+          "blob": "289c610025e90a9e8f69f699b15ceb97955eed27",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 5147.368418
+        },
+        {
+          "file": "test/headless-quest-verbs.test.ts",
+          "blob": "81cd492079f8ef99f1e420b9c1080c65a6aeeecb",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 15562.469667
+        },
+        {
+          "file": "test/input-read-trace.test.ts",
+          "blob": "99f94455b71f547b4da4fcad265585583db9dc79",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 31,
+          "durationMs": 3371.8619580000004
+        },
+        {
+          "file": "test/lint-recorded-debt.test.ts",
+          "blob": "c968fde1c05b437ecc559c15d6a49a2ab6e61e62",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 9,
+          "durationMs": 9715.679667999999
+        },
+        {
+          "file": "test/net-page-fights.test.ts",
+          "blob": "8f6c6d95a580040d80727d4ff751e7a3e0db0e4d",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 9345.086916
+        },
+        {
+          "file": "test/net-quest-spawns.test.ts",
+          "blob": "c3ed8e2ad3daf9a29a61ba9c634145b0a11c451e",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 2159.4544580000006
+        },
+        {
+          "file": "test/net-slots.test.ts",
+          "blob": "8374605003b83d8e05d6471e438dbc1a1f4393d2",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 8435.094376000003
+        },
+        {
+          "file": "test/platform-source-inputs.test.ts",
+          "blob": "7b16dba31a1fe0d7b94acc6e48b15a6ebf779dfd",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 3028.994709
+        },
+        {
+          "file": "test/ranged-cycle.test.ts",
+          "blob": "635915ba06a6eaa290cdc66c9712eaa97d4411f1",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 470.6853760000001
+        },
+        {
+          "file": "test/repo-size.test.ts",
+          "blob": "810502145f6d62439f05441fc0c59842ef988fe7",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 10,
+          "durationMs": 14452.184957999998
+        },
+        {
+          "file": "test/ruler-legacy-basis.test.ts",
+          "blob": "d32e5c2a7e1b7181b9554f15fe39c1314aabf387",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 2116.850792999999
+        },
+        {
+          "file": "test/runtime-performance-rekey.test.ts",
+          "blob": "e87ef5cd46cae0491c28c82d9ec44c133b435384",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 3535.5178760000003
+        },
+        {
+          "file": "test/schema-types.test.ts",
+          "blob": "e79aa073017fa21373d2bab34c14e5a3e951bd1e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 7,
+          "durationMs": 3226.633375
+        },
+        {
+          "file": "test/shard-component-waves.test.ts",
+          "blob": "519961502265b1ee8d67014ce46437da8ed36dc8",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 1608.5581660000003
+        },
+        {
+          "file": "test/standalone-refused-save.test.ts",
+          "blob": "168e34d633857aaf0fc015f15fee36211e7a6e5d",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 9768.373457
+        },
+        {
+          "file": "test/wind-elite-room.test.ts",
+          "blob": "532b8e0920eea4ff0ac55b57250c08da3d1d64a7",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 15877.984793
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T18:29:35.892Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "dd6b7f63735ac912e3456b07562e661bccadad62",
+      "tree": "95232d1c011d226f577641bd68b6d8c2ff153cde",
+      "profile": "ci21-e-green-product-scope-1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/debug-authored-rows.test.ts",
+          "blob": "e452aaf681153cd8b7b108df21d155db1b57c6f1",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 112.71658300000001
+        },
+        {
+          "file": "test/entry-downloads.test.ts",
+          "blob": "289c610025e90a9e8f69f699b15ceb97955eed27",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 2647.752167
+        },
+        {
+          "file": "test/input-read-trace.test.ts",
+          "blob": "99f94455b71f547b4da4fcad265585583db9dc79",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 31,
+          "durationMs": 2421.259667
+        },
+        {
+          "file": "test/lint-recorded-debt.test.ts",
+          "blob": "c968fde1c05b437ecc559c15d6a49a2ab6e61e62",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 9,
+          "durationMs": 24922.283292000004
+        },
+        {
+          "file": "test/platform-source-inputs.test.ts",
+          "blob": "7b16dba31a1fe0d7b94acc6e48b15a6ebf779dfd",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 703.0721240000001
+        },
+        {
+          "file": "test/ranged-cycle.test.ts",
+          "blob": "635915ba06a6eaa290cdc66c9712eaa97d4411f1",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 109.94050000000001
+        },
+        {
+          "file": "test/repo-size.test.ts",
+          "blob": "810502145f6d62439f05441fc0c59842ef988fe7",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 10,
+          "durationMs": 21743.686750000004
+        },
+        {
+          "file": "test/ruler-legacy-basis.test.ts",
+          "blob": "d32e5c2a7e1b7181b9554f15fe39c1314aabf387",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 579.1701670000001
+        },
+        {
+          "file": "test/runtime-performance-rekey.test.ts",
+          "blob": "e87ef5cd46cae0491c28c82d9ec44c133b435384",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 734.1218749999999
+        },
+        {
+          "file": "test/schema-types.test.ts",
+          "blob": "e79aa073017fa21373d2bab34c14e5a3e951bd1e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 7,
+          "durationMs": 3486.9495420000007
+        },
+        {
+          "file": "test/shard-component-waves.test.ts",
+          "blob": "519961502265b1ee8d67014ce46437da8ed36dc8",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 683.269001
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T18:26:53.322Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

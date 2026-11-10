@@ -85,5 +85,13 @@
  "test/spawn-parts.test.ts",
  "test/standalone-acts.test.ts",
  "test/standalone-grid.test.ts",
- "test/standalone-page-saves.test.ts"
+ "test/standalone-page-saves.test.ts",
+ "test/elite-god.test.ts",
+ "test/elite-page-records.test.ts",
+ "test/headless-quest-verbs.test.ts",
+ "test/net-page-fights.test.ts",
+ "test/net-quest-spawns.test.ts",
+ "test/net-slots.test.ts",
+ "test/standalone-refused-save.test.ts",
+ "test/wind-elite-room.test.ts"
 ]

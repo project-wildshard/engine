@@ -8594,5 +8594,361 @@
     ],
     "sourceRevision": "50f7818fa15d1513d926efc08509cc83ceceee18",
     "sourceBlob": "1219b23594bf9c79b0e6c0d64e71b278fc0f1609"
+  },
+  {
+    "repo": "engine",
+    "file": "test/debug-authored-rows.test.ts",
+    "outcome": "restored",
+    "target": "test/debug-authored-rows.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The debug-flags census counts authored debug rows registered directly, through an imported alias, a namespace or a local alias, ignores unrelated sets and adapter forwarding, refuses an unresolvable row instead of dropping it from the cap, and verified file facts can't hide a newly registered row.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "e452aaf681153cd8b7b108df21d155db1b57c6f1",
+    "originalTests": [
+      "authored direct, imported alias, namespace and local alias rows join the ordinary census",
+      "unrelated sets and adapter forwarding do not invent authored rows; existing purpose is retained",
+      "an unresolvable authored row refuses instead of disappearing from the cap",
+      "generic adapter forwarding is counted at its caller; extra literal registrations still count",
+      "verified file facts cannot hide a newly registered comparison row"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/elite-god.test.ts",
+    "outcome": "restored",
+    "target": "test/elite-god.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: A Developer's ?bossGod word, applied on the server, stops lair elites (Old Ironhide at Pine, Aqbars the Pale at Nalati) from hurting the player, while without it their blows land.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "cc5879b2e61202a0a6423b0f7618e6813b3c15b3",
+    "originalTests": [
+      "Old Ironhide stands down for a Developer's word",
+      "Aqbars the Pale stands down for a Developer's word"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "engine",
+    "file": "test/elite-page-records.test.ts",
+    "outcome": "restored",
+    "target": "test/elite-page-records.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: A world keeps the records of lairs it has no row for, and an old row save with three records and no captain still loads, with him riding on it unspawned.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "ad1a2c35fb532be1924270828a3d51e0d6b97cdc",
+    "originalTests": [
+      "a world keeps the records of lairs it has no row for",
+      "an old row save, three records and no captain, still loads, and he rides on it unspawned"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "engine",
+    "file": "test/entry-downloads.test.ts",
+    "outcome": "restored",
+    "target": "test/entry-downloads.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: Named native assembly declares the same ordered whole inputs it reads. A phone-recorded read stays in its set whatever its tier tag. A plain build publishes exact tier spawn files and rejects changed section bytes. A grid tap selects only its original mode/home page, and grid metadata can cross navigation while geometry waits for code.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "289c610025e90a9e8f69f699b15ceb97955eed27",
+    "originalTests": [
+      "named native assembly declares the same ordered whole inputs it actually reads",
+      "DL20: a read a phone recorded stays in its set, whatever tier the file is tagged",
+      "plain build publishes exact tier spawn files and rejects changed section bytes",
+      "grid tap selects only its original mode/home page, never outer or another layout",
+      "grid metadata can cross navigation while geometry waits for code and stays document-owned"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/headless-quest-verbs.test.ts",
+    "outcome": "restored",
+    "target": "test/headless-quest-verbs.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: On Driftwood Isle, Far Reach and Nalati, native quest verbs require the real walk and earned prerequisites, run in an isolated native worker.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "81cd492079f8ef99f1e420b9c1080c65a6aeeecb",
+    "originalTests": [
+      "driftwood-isle: native quest verbs require the real walk and earned prerequisites",
+      "far-reach: native quest verbs require the real walk and earned prerequisites",
+      "nalati-grasslands: native quest verbs require the real walk and earned prerequisites"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "engine",
+    "file": "test/input-read-trace.test.ts",
+    "outcome": "restored",
+    "target": "test/input-read-trace.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The generation input trace records imports, descriptor raw reads, hidden loader reads, negative probes and CommonJS/JSON loads, stays conservative for builtin-looking redirects and directory option getters, allows pure builtins and data-URL fetches, and publishes no trace when the producer fails.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "99f94455b71f547b4da4fcad265585583db9dc79",
+    "originalTests": [
+      "records imports and descriptor-based raw reads without consuming unrelated source modules",
+      "records hidden loader data and negative probes inside the load callback",
+      "uses a proven installed store root for external probes: linked=true",
+      "uses a proven installed store root for external probes: linked=false",
+      "retains an inventory fence for filesystem probes: import fs from 'node:fs';fs.existsSync('missing.ts');",
+      "retains an inventory fence for filesystem probes: import fs from 'node:fs';fs.readdirSync('.');",
+      "retains an inventory fence for filesystem probes: import fs from 'node:fs';try{fs.realpathSync.native('missing.ts');}catch{}",
+      "retains an inventory fence for filesystem probes: import fs from 'node:fs';fs.globSync('*.ts');",
+      "retains an inventory fence for filesystem probes: import fs from 'node:fs/promises';for await(const file of fs.glob('*.ts'))void file;",
+      "retains an inventory fence for filesystem probes: try{await import('./missing.mjs');}catch{}",
+      "keeps builtin fs resolution independent of staged filenames",
+      "keeps builtin node:fs resolution independent of staged filenames",
+      "records the directory scope of fs.readdirSync('listed')",
+      "records the directory scope of fs.readdirSync('listed','utf8')",
+      "records the directory scope of await fs.promises.readdir('listed')",
+      "records the directory scope of await new Promise((resolve,reject)=>fs.readdir('listed',(error,names)=>error?reject(error):resolve(names)))",
+      "records the directory scope of const dir=fs.opendirSync('listed');dir.closeSync()",
+      "records the directory scope of const dir=await fs.promises.opendir('listed');await dir.close()",
+      "records the directory scope of fs.readdirSync('listed',{})",
+      "records the directory scope of fs.readdirSync('listed',{recursive:true})",
+      "records the directory scope of await fs.promises.readdir('listed',{recursive:true})",
+      "keeps builtin-looking imports redirected to a real file conservative",
+      "does not inspect directory option getters before the filesystem does",
+      "records raw CommonJS and required JSON through synchronous load hooks",
+      "marks opaque I/O for the conservative fallback: import{spawnSync}from'node:child_process';spawnSync(process.execPath,['-e',\"require('fs').readFileSync('unread.ts')\"]);",
+      "marks opaque I/O for the conservative fallback: try{process.dlopen({exports:{}},'missing-native-addon.node');}catch{}",
+      "marks opaque I/O for the conservative fallback: import{Worker}from'node:worker_threads';const worker=new Worker('',{eval:true});await worker.terminate();",
+      "marks opaque I/O for the conservative fallback: import{createServer}from'node:http';createServer().close();",
+      "permits pure builtin imports and immutable data-URL fetches",
+      "traces freshly produced local cache files without mistaking console streams for network I/O",
+      "does not publish a successful trace when a producer fails"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/lint-recorded-debt.test.ts",
+    "outcome": "restored",
+    "target": "test/lint-recorded-debt.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: Ordinary lint enforces exact recorded per-file counts for the shard/generator/SDK import rules while the raw census still reports every site, and the real lint config applies source debt only to the primary source tree.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "c968fde1c05b437ecc559c15d6a49a2ab6e61e62",
+    "originalTests": [
+      "no-raw-random-time preserves its recorded ceiling and the original raw detection",
+      "shard-sandbox preserves its recorded ceiling and the original raw detection",
+      "shard-game-imports preserves its recorded ceiling and the original raw detection",
+      "shard-game-plugins preserves its recorded ceiling and the original raw detection",
+      "generator-imports preserves its recorded ceiling and the original raw detection",
+      "shard-engine-imports preserves its recorded ceiling and the original raw detection",
+      "sdk-no-facade preserves its recorded ceiling and the original raw detection",
+      "ordinary lint enforces exact recorded file counts while raw census still reports every site",
+      "the actual lint configuration applies source debt only to the primary source tree"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/net-page-fights.test.ts",
+    "outcome": "restored",
+    "target": "test/net-page-fights.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: A page's beaten king, counts and elites stand in a world's first boot. A world that took a page's lairs saves and restores, even one it has no row for. A page field the world can't read starts it fresh.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "8f6c6d95a580040d80727d4ff751e7a3e0db0e4d",
+    "originalTests": [
+      "a page's beaten king, counts and elites stand in a world's first boot",
+      "a world that took a page's lairs saves and restores, even one it has no row for",
+      "a page field a world can't read starts it fresh"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "engine",
+    "file": "test/net-quest-spawns.test.ts",
+    "outcome": "restored",
+    "target": "test/net-quest-spawns.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The Pine millrace runs on the server: its thralls wake, its last fall raises the flag in the book exactly once, and a done errand never races again.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "c3ed8e2ad3daf9a29a61ba9c634145b0a11c451e",
+    "originalTests": [
+      "the millrace runs on the server: its thralls wake, its last fall raises the flag in the book, once, and a done errand never races again"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "engine",
+    "file": "test/net-slots.test.ts",
+    "outcome": "restored",
+    "target": "test/net-slots.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: Night wakes Nalati's statues as bodies, their sites go empty on a row, a kill is a clue, a night out of the ground survives a save, and the awake rows carry every site past one row's worth.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "8374605003b83d8e05d6471e438dbc1a1f4393d2",
+    "originalTests": [
+      "night wakes the statues as bodies, their sites go empty on a row, and a kill is a clue",
+      "a night out of the ground survives a save",
+      "the awake rows carry every site, past one row's worth"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "engine",
+    "file": "test/platform-source-inputs.test.ts",
+    "outcome": "restored",
+    "target": "test/platform-source-inputs.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The source-progress inventory refuses an absent discovery root instead of charging its shared user, and requires every composed product discovery, not only the representative.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "7b16dba31a1fe0d7b94acc6e48b15a6ebf779dfd",
+    "originalTests": [
+      "refuses an absent discovery root instead of charging its shared user",
+      "requires every composed product discovery, not only the representative",
+      "refuses a missing registered dependency boot/rows.generated",
+      "refuses a missing registered dependency boot/rows.generated.json"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/ranged-cycle.test.ts",
+    "outcome": "restored",
+    "target": "test/ranged-cycle.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The per-round ranged (lever-action) host matches the old action's event-boundary observations, interruption and saved continuation, and data-only cycle events suspend at the old callback phase and reject invalid coefficients.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "635915ba06a6eaa290cdc66c9712eaa97d4411f1",
+    "originalTests": [
+      "per-round host matches the old action, event-boundary observations, interruption and saved continuation",
+      "data-only cycle events suspend at the old callback phase and reject invalid coefficients"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/repo-size.test.ts",
+    "outcome": "restored",
+    "target": "test/repo-size.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The repo-size guard checks the private index, caps JSON and other blobs separately, refuses generated paths, media outside public/ and disguised binaries, needs exact pins for large runtime files, counts binary bytes once per blob, and pre-push sums every outgoing commit, including payloads added then deleted. Legacy debt survives only unchanged.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "810502145f6d62439f05441fc0c59842ef988fe7",
+    "originalTests": [
+      "checks the private index, not the shared one or the working tree",
+      "JSON gets its own blob cap; other files keep the plain one",
+      "refuses generated paths, media outside public/, the removed progress guards and disguised binaries",
+      "a large runtime file needs an exact pin, and a changed blob needs its pin reviewed",
+      "counts binary bytes outside the runtime roots once per blob; text and shipped files are not counted",
+      "pre-push checks every outgoing commit, including a payload added and then deleted",
+      "pre-push sums distinct additions across commits; the rolling week only warns",
+      "legacy debt stays only unchanged; strict mode and a re-add after deletion are refused",
+      "symlinks may not leave the tree or point into generated storage",
+      "a blobless clone (CI) checks the pushed range with one batched blob fetch"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/ruler-legacy-basis.test.ts",
+    "outcome": "restored",
+    "target": "test/ruler-legacy-basis.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The decision ruler keeps all six legacy line baselines and zero verdicts with no legacy registry.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "d32e5c2a7e1b7181b9554f15fe39c1314aabf387",
+    "originalTests": [
+      "keeps all six ruler baselines and zero verdicts with no legacy registry"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/runtime-performance-rekey.test.ts",
+    "outcome": "restored",
+    "target": "test/runtime-performance-rekey.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: Historical Nalati runtime-performance debt keeps exact-source refusal; real edited or moved sites rekey without new kind or row allowance; only consumed verbatim platform sites pay newly visible debt; a -legacy folder keeps no runtime sites.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "e87ef5cd46cae0491c28c82d9ec44c133b435384",
+    "originalTests": [
+      "historical Nalati runtime debt keeps exact-source refusal intact",
+      "rekeys real edited or moved sites without new kind or row allowance",
+      "only consumed verbatim platform sites pay newly visible runtime debt",
+      "a -legacy folder name retains no runtime sites after the registry retired"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "fixtureChange": "Only move disposable policy fixture from OS temporary storage to repository tmp; all four assertions and subprocess behavior remain."
+  },
+  {
+    "repo": "engine",
+    "file": "test/schema-types.test.ts",
+    "outcome": "restored",
+    "target": "test/schema-types.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: The schema-types lint finds untyped exported valibot schemas by syntax alone (factories, aliases, wrappers, export forms), passes explicit signatures, retires paid-down identities only in scope, needs approval for identity replacements, and the real ratchet update lowers counts. The approval helper runs from the copied push-tool directory.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "e79aa073017fa21373d2bab34c14e5a3e951bd1e",
+    "originalTests": [
+      "syntax-only detection follows factories, aliases, wrappers and export forms",
+      "explicit value and factory signatures pass; actions and shadowed owners are not schemas",
+      "paid-down identities retire in scope, preserve siblings, and cannot traverse outside format",
+      "identity replacements need approval even when their file count does not rise",
+      "ordinary fast lint admits only recorded identities and count mode exposes every untyped export",
+      "the real ratchet update lowers counts and retires paid-down identity allowances",
+      "the approval helper executes from the copied push-tool directory without source neighbours"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/shard-component-waves.test.ts",
+    "outcome": "restored",
+    "target": "test/shard-component-waves.test.ts",
+    "ring": 1,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: G471 component waves keep their roster and unknown ownership refuses C9 closure, reviewed pending users apply to current members while next-wave charges stay counted, and W3 folder owners conserve the ruler total and keep unknown paths visible.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "519961502265b1ee8d67014ce46437da8ed36dc8",
+    "originalTests": [
+      "G471 waves retain their roster and unknown ownership refuses C9 closure",
+      "reviewed pending users apply to current members while next-wave charges remain counted",
+      "W3 folder owners conserve the ruler total and keep unknown paths visible"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/standalone-refused-save.test.ts",
+    "outcome": "restored",
+    "target": "test/standalone-refused-save.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: A page's continuation carrying a lane from another build and a page's items keeps its progress when the standalone server refuses the save.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "168e34d633857aaf0fc015f15fee36211e7a6e5d",
+    "originalTests": [
+      "pastel-plain: a save a later build refuses still gives back its flags, and the next save stands",
+      "nalati-grasslands: a save a later build refuses still gives back its flags, and the next save stands",
+      "a page's continuation with a lane from another build, holding a page's items, keeps its progress"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires full pastel-plain pinned product, intentionally absent from Ring 1. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "engine",
+    "file": "test/wind-elite-room.test.ts",
+    "outcome": "restored",
+    "target": "test/wind-elite-room.test.ts",
+    "ring": 2,
+    "decision": "J232 E-GREEN: restore the complete original engine intent: A wind elite rides the wind over his rock, stoops, grounds, falls and stays fallen through a save; in a room he deals with whoever is nearest, and his fight outlives their leaving.",
+    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
+    "sourceBlob": "532b8e0920eea4ff0ac55b57250c08da3d1d64a7",
+    "originalTests": [
+      "he rides the wind over his rock, stoops, grounds, falls and stays fallen through a save",
+      "in a room he deals with whoever is nearest, and his fight outlives their leaving"
+    ],
+    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
+    "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
   }
 ]
