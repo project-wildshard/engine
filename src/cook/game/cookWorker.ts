@@ -26,6 +26,7 @@ import {shardSlugOf} from '@wildshard/format/standaloneCatalogue';
 import {ShardfileHashSchema, ShardSlugSchema, RevisionNumberSchema} from '@wildshard/format/uploadWire';
 import {MAX_SHARDFILE_BYTES, type CookJobReport} from './cookJob';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
+import {installedRuntimeReads} from './installedRuntimeReads';
 
 export interface CatalogueRow {readonly slug: string; readonly revision: number; readonly hash: string}
 /** The shape `api-server` POSTs (its `ShardfileNoticeSchema`, J30). */
@@ -96,7 +97,7 @@ export interface JobOutcomeKilled {readonly kind: 'killed'; readonly reason: str
 export type JobOutcome = JobOutcomeOk | JobOutcomeRefused | JobOutcomeKilled;
 
 export interface JobLauncher {
-  /** Node flags and script of one job; the repo root is the only source a job may read. */
+  /** Node flags and script of one job; reads cover the repo and its installed runtime dependencies. */
   readonly root: string;
   readonly execPath: string;
   readonly loader: string;
@@ -124,7 +125,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   const cache = join(dirname(work), 'cache');
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
   mkdirSync(cache, {recursive: true});
-  const node = [execPath, '--permission', `--allow-fs-read=${root}`, `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, '--allow-worker',
+  const node = [execPath, '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, '--allow-worker',
     `--max-old-space-size=${limits.heapMB}`, '--stack-size=4000', '--no-warnings', '--import', loader, script, tarball, out, ...expectedSlug === undefined ? [] : [expectedSlug]];
   const [command = '', ...args] = [...wrap, ...node];
   return new Promise(resolve => {

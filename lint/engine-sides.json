@@ -1050,6 +1050,7 @@
     "src/cook/game/contentNamed.ts": "cook",
     "src/cook/game/cookJob.ts": "cook",
     "src/cook/game/cookWorker.ts": "cook",
+    "src/cook/game/installedRuntimeReads.ts": "cook",
     "src/cook/game/encodedBytes.ts": "cook",
     "src/cook/game/engineHalf.ts": "cook",
     "src/cook/game/entryDownloads.ts": "cook",
