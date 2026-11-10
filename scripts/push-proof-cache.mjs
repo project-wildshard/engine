@@ -64,7 +64,7 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   const excluded=/^(?:PWD|WS_PUSH_REFS|WS_PUSH_DESTINATION|WS_PUSH_TIMINGS|WS_HEAVY_TOKEN|WS_HEAVY_ROOT|WS_HEAVY_TICKET|GIT_.*|SHLVL|_|OLDPWD)$/u;
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
   const exclusions=exclusionScope(cwd);
-  const dependencies=pushDependencyIdentity(cwd);
+  const dependencies=pushDependencyIdentity(cwd,env);
   const runtime=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,dependencies})).digest('hex');
   return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
