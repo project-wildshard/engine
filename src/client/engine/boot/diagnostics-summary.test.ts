@@ -66,3 +66,16 @@ it('exports engine operation and wait names, paths for own files, and still hide
   expect(out.resources.map(row => row.url)).toEqual(['/shardfiles/driftwood-isle/discovery.json?v=dbeeb0ab', 'resource-3']);
   expect(JSON.stringify(out)).not.toContain('PRIVATE');
 });
+
+it('keeps every counter when two of this page\'s files share one path (LS4: the fresh grid lost 5 of 506)', () => {
+  // LD6's longest chunk names pass 96 characters, so each is elided to `/b/c/…`; a query keeps only `v`
+  const long = (tail: string) => `${location.origin}/b/c/late-session-ui-clientBossFight-clientQuestPage-clientHeldMelee-sceneMotion-chapterDirector-${tail}-xpdLsmDR.js`;
+  const files = [long('ga277qpn'), long('nqk26a5y'), long('ia6jzioh'), `${location.origin}/assets/spawn/a.json?x=1`, `${location.origin}/assets/spawn/a.json?x=2`];
+  const counters = Object.fromEntries(files.map((file, index) => [`download:${file}`, { loaded: index + 1, total: null, unit: 'decoded-body-bytes', at: index, events: 1 }]));
+  const timing = { version: 1, build: null, attempt: '1', attemptCount: 1, timeOrigin: 1, entries: [], counters, active: [],
+    resources: [{ url: files[1], realm: 'page', startTime: 1 }, { url: files[0], realm: 'page', startTime: 2 }, { url: files[1], realm: 'page', startTime: 3 }] } as unknown as BootTiming;
+  const out = safeBootDiagnostics(timing) as { counters: Record<string, { loaded: number }>; resources: { url: string }[] };
+  expect(Object.keys(out.counters)).toEqual(['download:/b/c/…#2', 'download:/b/c/…', 'download:/b/c/…#3', 'download:/assets/spawn/a.json', 'download:/assets/spawn/a.json#2']);
+  expect(Object.values(out.counters).map(row => row.loaded)).toEqual([1, 2, 3, 4, 5]);
+  expect(out.resources.map(row => row.url)).toEqual(['/b/c/…', '/b/c/…#2', '/b/c/…']); // one file keeps one name
+});

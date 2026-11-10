@@ -113,10 +113,18 @@ export function diagnosticSummary(entries:readonly SummaryEntry[],resources:read
  * arbitrary object payloads. No input is mutated and no network/storage is used. */
 export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record<string,unknown>>|null{
   if(timing===undefined)return null;
-  const source=record(timing),references=new Map<string,string>();
+  const source=record(timing),references=new Map<string,string>(),named=new Map<string,string>(),taken=new Set<string>();
+  // LS4: a path is a lossy name (a segment over 96 characters, like LD6's longest chunk names, is elided; a query keeps
+  // only `v`), and counters are keyed by it, so two of this page's files never share one: the second and later files of
+  // one path read `<path>#2`, `#3` …, and the same file keeps its one name
   const url=(value:unknown):string|null=>{
     if(typeof value!=='string'||value==='')return null;
-    const own=diagnosticPath(value);if(own!==null)return own;
+    const own=diagnosticPath(value);
+    if(own!==null){
+      const held=named.get(value);if(held!==undefined)return held;
+      let label=own;for(let index=2;taken.has(label);index++)label=`${own}#${index}`;
+      taken.add(label);named.set(value,label);return label;
+    }
     const held=references.get(value);if(held!==undefined)return held;
     const id=`resource-${references.size+1}`;references.set(value,id);return id;
   };
