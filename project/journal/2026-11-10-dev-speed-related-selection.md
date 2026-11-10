@@ -48,3 +48,8 @@ remain full harness inputs regardless of their imported unit-test edges. The
 proof fixtures now carry every revision-helper dependency and the actual linked
 Valibot package, closing the broken pre-existing CI proof. Both regression paths
 and all prior controls pass; the expanded Git/Vitest proof is3.12s locally.
+
+Official renderer regeneration after committed source ef040e65ea695b09a92bc40e0d0e9f953724dfc4 produces
+6c85f9f7c121513256b0375337db4a9846dec05de19dd850ebac48c8befe78b8.
+Validation revision and full28-product generated audio/byte/version tables
+remain unchanged. Final normal typed lint and script-project types pass.
