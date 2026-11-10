@@ -11,7 +11,7 @@ import { definePageSaveKeys } from '@wildshard/engine/game/pageSaveKeys';
 import { waitFor } from '@wildshard/engine/boot/waits';
 import { runtimePacksOn } from '@wildshard/engine/boot/loadingPacks';
 import { preloadModuleFiles, readModuleFiles } from '@wildshard/engine/boot/download';
-import {prepareBootImports} from './bootDownloads';
+import { prepareBootImports, startTitleWarmup } from './bootDownloads';
 /**
  * The page's module entry. Everything the game imports statically is evaluated in ONE task when a module graph
  * runs: three.js plus the ~150 game modules at once was a 115–157 ms long task at 4× CPU before the first boot step
@@ -187,7 +187,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
   startTitleLowPowerProbe(); // Jake (11-10): the shown title, once idle, reads Low Power Mode for the tab (boot/lowPower.ts)
-  void (async () => { const { warmShaderCompiler } = await import('@wildshard/engine/boot/earlyPrograms'); warmShaderCompiler(entryScope); })();
+  void startTitleWarmup(import('@wildshard/engine/boot/earlyPrograms'), entryScope, window);
 }
 
 export const entered: Promise<unknown> = enterPage();
