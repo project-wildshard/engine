@@ -25,7 +25,7 @@ const requested = <T>(request: IDBRequest<T>): Promise<T> => new Promise((resolv
 
 const quotaFailure = (failure: unknown): boolean => typeof failure === 'object' && failure !== null && 'name' in failure && failure.name === 'QuotaExceededError';
 /** Wait for the transaction itself to finish, including an abort, before any recovery starts. */
-function commitSave(database: IDBDatabase, key: string, value: string | null): Promise<'saved' | 'quota' | 'refused'> {
+function commitSave(database: IDBDatabase, key: string, value: string | null, expected?: { readonly value: string | null }): Promise<'saved' | 'quota' | 'refused'> {
   return new Promise(resolve => {
     let transaction: IDBTransaction;
     try { transaction = database.transaction(SAVES, 'readwrite', { durability: 'strict' }); }
@@ -34,15 +34,29 @@ function commitSave(database: IDBDatabase, key: string, value: string | null): P
     transaction.oncomplete = (): void => { resolve('saved'); };
     transaction.onerror = (): void => { /* The abort below owns the final outcome; a request error alone is not durable. */ };
     transaction.onabort = (): void => { resolve(quotaFailure(synchronousFailure) || quotaFailure(transaction.error) ? 'quota' : 'refused'); };
-    try {
-      const store = transaction.objectStore(SAVES);
-      if (value === null) store.delete(key); else store.put(value, key);
-      transaction.commit();
-    } catch (failure) {
+    const refuse = (failure: unknown): void => {
       synchronousFailure = failure;
       try { transaction.abort(); }
       catch { resolve(quotaFailure(failure) ? 'quota' : 'refused'); }
-    }
+    };
+    const write = (): void => {
+      try {
+        const store = transaction.objectStore(SAVES);
+        if (value === null) store.delete(key); else store.put(value, key);
+        transaction.commit();
+      } catch (failure) { refuse(failure); }
+    };
+    try {
+      if (expected === undefined) write();
+      else {
+        const reading = transaction.objectStore(SAVES).get(key);
+        reading.onsuccess = (): void => {
+          const current: unknown = reading.result;
+          if (expected.value === null ? current === undefined : current === expected.value) write();
+          else refuse(new Error('Save changed during quota recovery'));
+        };
+      }
+    } catch (failure) { refuse(failure); }
   });
 }
 
@@ -66,7 +80,7 @@ export async function openIndexedSaves(name: string): Promise<IndexedSaves> {
   keys.forEach((key, index) => { const value: unknown = values[index]; if (typeof key === 'string' && typeof value === 'string') documents.set(key, value); });
   const writing = new Map<string, Promise<boolean>>();
   let closing = false;
-  const persist = async (key: string, value: string | null): Promise<boolean> => {
+  const persist = async (key: string, value: string | null, expected: string | null): Promise<boolean> => {
     const first = await commitSave(database, key, value);
     if (first === 'saved') return true;
     if (first !== 'quota' || typeof caches === 'undefined') return false;
@@ -93,12 +107,16 @@ export async function openIndexedSaves(name: string): Promise<IndexedSaves> {
       }
     } catch { return false; }
     // One retry, and only its real strict transaction completion can acknowledge the save.
-    return await commitSave(database, key, value) === 'saved';
+    // The read and retry share one native readwrite transaction. Refuse a
+    // native value different from this call's captured expectation; this is
+    // value-based recovery, not global ordering of unchanged-value operations.
+    return await commitSave(database, key, value, { value: expected }) === 'saved';
   };
   const write = (key: string, value: string | null): Promise<boolean> => {
     if (closing) return Promise.resolve(false);
+    const expected = documents.get(key) ?? null;
     if (value === null) documents.delete(key); else documents.set(key, value);
-    const before = writing.get(key), pending = before === undefined ? persist(key, value) : before.then(() => persist(key, value), () => persist(key, value));
+    const before = writing.get(key), pending = before === undefined ? persist(key, value, expected) : before.then(() => persist(key, value, expected), () => persist(key, value, expected));
     writing.set(key, pending);
     const finished = (): void => { if (writing.get(key) === pending) writing.delete(key); };
     void pending.then(finished, finished);

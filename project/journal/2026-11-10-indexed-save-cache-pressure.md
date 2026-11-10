@@ -48,3 +48,27 @@ without introducing a native cache enumeration.
 
 Manual native old/new evidence and review are recorded by the shell lane;
 the full normal engine queue and exact hosted release proofs remain gates.
+
+A broader native two-handle test finds an additional regression after
+publication: while handle A reclaims cache space, handle B can delete;
+the older A retry then resurrects the document. Owning shell promotion
+is held at already-live 0649b30, not rolled back; engine publication stays
+open. Per-instance serialization alone does not close this boundary.
+
+The retry now reads and compares the previously observed raw value inside
+the same native readwrite transaction that would perform its put. If the
+value changed while recovery awaited, that stale retry aborts/refuses.
+The two-handle control now reports old false/new delete true and the key
+stays absent, while the last good document is intact. This does not claim
+global cross-tab sequencing of unchanged-value operations or explain the
+unobserved historical 501 failure. Review and normal gates remain required.
+
+The follow-up J206 review finds no MUST for that recovery-only contract.
+Its SHOULDs narrow the comment and record conservative outcomes: expectation
+comes from optimistic memory, so a completely failed queued predecessor can
+leave a successor's exceptional retry refusing even without a competitor.
+A refusal keeps its candidate in memory; it never claims native durability.
+Confirmed-state tracking would be a separate improvement; no blind rollback
+of shared queued intent is introduced here. Further competing replacement,
+initial insertion and native retry read/put failure controls remain beyond
+the supplied real deletion race. They are not claimed as passing evidence.
