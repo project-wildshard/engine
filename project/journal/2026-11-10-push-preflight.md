@@ -29,3 +29,9 @@ nothing else at file or suite level could register a test and no local
 import names the variable; an import or crash of the preflight never
 blocks enqueue; and a `<job>.preflight.json` sidecar keeps the verdict
 and override when an older live worker rewrites the job without them.
+
+Dogfooding it: `push-preflight.mjs timings` recorded this change's own
+test clock in about 25 s (full 11 s, Ring 1 14 s module clocks), and the
+56-line record then met the D25 journal rule, so both fix-it messages
+now say a timing commit needs a journal line.
+- Recorded the preflight test's own clocks with `push-preflight.mjs timings`.

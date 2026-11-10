@@ -1686,6 +1686,60 @@
       "finishedAt": "2026-11-10T21:21:20.435Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "9c8e4163001f0617c6ff6f15b9709d58301c6f96",
+      "tree": "929ec175855fda723cd5e25a1b32ee24a29e90d7",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/push-preflight.test.ts",
+          "blob": "2e95f686494324ffd211573dd6fa9f18f5e8bcda",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 8,
+          "durationMs": 11021.970584
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:45:13.744Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "9c8e4163001f0617c6ff6f15b9709d58301c6f96",
+      "tree": "929ec175855fda723cd5e25a1b32ee24a29e90d7",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/push-preflight.test.ts",
+          "blob": "2e95f686494324ffd211573dd6fa9f18f5e8bcda",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 8,
+          "durationMs": 13828.430502000001
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:45:28.146Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

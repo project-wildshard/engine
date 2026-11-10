@@ -1043,6 +1043,7 @@
   "test/prune-deployments.test.ts": 0.044120875999999996,
   "test/push-duration-sequencer.test.ts": 22.330539498,
   "test/push-input-cache.test.ts": 0.261574388,
+  "test/push-preflight.test.ts": 11.021970584,
   "test/push-queue-clone.test.ts": 22.588552126000003,
   "test/pwa-update-cache.test.ts": 0.304062049,
   "test/pwa-worker-lifecycle.test.ts": 0.573194489,
