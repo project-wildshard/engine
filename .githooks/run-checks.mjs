@@ -30,12 +30,25 @@ const scripts = existsSync(pkgPath) ? (JSON.parse(readFileSync(pkgPath, 'utf8'))
 
 if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budget.mjs'))) {
   const {pushEnvironment}=await import('./push-checks.mjs');
-  const {PUSH_PROFILE}=await import('../scripts/push-budget.mjs');
+  const {PUSH_PROFILE,SPLIT_PROFILE}=await import('../scripts/push-budget.mjs');
   const {pushSelection}=await import('../scripts/push-selection.mjs');
   const {capturePushTree,readPushProof}=await import('../scripts/push-proof-cache.mjs');
   const {missingTestTimings}=await import('../scripts/push-test-timings.mjs');
+  const {planBaseRefs,pushedRefs,splitRequested}=await import('../scripts/push-local-split.mjs');
+  const {hostedGreen}=await import('../scripts/push-hosted-green.mjs');
   const env = pushEnvironment(Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))));
-  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null||missingTestTimings(env.WS_PUSH_REFS).length>0?null:readPushProof(context,pushSelection(env.WS_PUSH_REFS));
+  // J240: a plan lands by fast-forwarding main to the exact SHA its branch CI
+  // proved. That main push reuses the hosted green; it never re-runs locally.
+  const pushed=pushedRefs(env.WS_PUSH_REFS),head=git(['rev-parse','HEAD']).trim();
+  if(!env.CI&&!env.GITHUB_ACTIONS&&pushed.length>0&&pushed.every(row=>row.remote==='refs/heads/main'&&row.local===head)&&missingTestTimings(env.WS_PUSH_REFS).length===0){
+    const runs=hostedGreen(head,env.WS_PUSH_DESTINATION??git(['remote','get-url','--push','origin']).trim());
+    if(runs!==null){
+      console.error(`  - hosted-green reuse (J240): ${head} is green in ${Object.entries(runs).map(([name,run])=>`${name} run ${run.id}`).join(', ')}; no local gate`);
+      process.exit(0);
+    }
+  }
+  const split=splitRequested(env);
+  const context=capturePushTree(split?SPLIT_PROFILE:PUSH_PROFILE,env),proof=context===null||missingTestTimings(env.WS_PUSH_REFS).length>0?null:readPushProof(context,pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS));
   // Outgoing history/secrets have already passed in pre-push. Reusing a proved
   // tree starts no heavy work, so it must not wait behind a later full suite.
   if(proof!==null){

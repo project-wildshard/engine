@@ -1,4 +1,12 @@
-import { expect, it } from 'vitest';
+import { afterAll, expect, it } from 'vitest';
+// oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
+import {execFileSync} from 'node:child_process';
+// oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
+import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
+import {join, resolve} from 'node:path';
+import {BROWSER_TESTS, LOCAL_FILE_SECONDS, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, logHostedOnly, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
+import {codeProvingJobs, githubSlug, hostedGreen, landingVerdict} from '../scripts/push-hosted-green.mjs';
 import { capRelated, productReaderTests, scriptScenarioTests, QUICK_TESTS, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
 
 const durations = new Map([['test/slow.test.ts', 40], ['test/cheap.test.ts', 1], ['test/mid.test.ts', 8], ['test/cover-grid.test.ts', 30]]);
@@ -68,4 +76,125 @@ it('preserves author-source edges for tests consuming complete disk products', (
 it('keeps all grid re-entry quick checks on an unrelated push with no budget', () => {
   expect(QUICK_TESTS).toEqual(['test/grid-reentry.test.ts']);
   expect(capRelated([], ['docs/ENGINE.md'], new Map(), 0, 1, QUICK_TESTS).run).toEqual([...QUICK_TESTS].sort());
+});
+
+// DEV-SPEED DS9 (J222/J240): the split pre-push and the landing's hosted-green reuse.
+const zero = '0'.repeat(40), a = 'a'.repeat(40), b = 'b'.repeat(40);
+mkdirSync('tmp', {recursive: true});
+const scratch = mkdtempSync(resolve('tmp/push-split-'));
+afterAll(() => rmSync(scratch, {recursive: true, force: true}));
+
+it('only plan branch pushes or a watching driver ask for the split', () => {
+  expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(true);
+  expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}\nrefs/heads/plan/bar ${b} refs/heads/plan/bar ${a}`)).toBe(true);
+  expect(splitRequested({}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(false);
+  expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}\nrefs/heads/main ${a} refs/heads/main ${b}`)).toBe(false);
+  expect(splitRequested({}, `refs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBe(false);
+  expect(splitRequested({}, `refs/heads/feature/x ${a} refs/heads/feature/x ${zero}`)).toBe(false);
+  // Deleting a plan branch pushes nothing to check.
+  expect(splitRequested({}, `(delete) ${zero} refs/heads/plan/foo ${a}`)).toBe(false);
+  expect(splitRequested({}, '')).toBe(false);
+  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(true);
+  // The watching-driver flag never splits a tag, another branch or a release check (no refs).
+  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBe(false);
+  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/main ${a} refs/heads/main ${b}\nrefs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBe(false);
+  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/feature/x ${a} refs/heads/feature/x ${zero}`)).toBe(false);
+  expect(splitRequested({WS_PUSH_POST_CI: '1'}, undefined)).toBe(false);
+  // Hosted CI never runs a split of itself.
+  expect(splitRequested({CI: 'true', WS_PUSH_POST_CI: '1'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);
+  expect(splitRequested({GITHUB_ACTIONS: 'true'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);
+});
+
+it('a first plan push selects against its merge-base with origin/main', () => {
+  const repo = join(scratch, 'repo');
+  mkdirSync(repo);
+  const git = (...args: string[]): string => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {cwd: repo, encoding: 'utf8'}).trim();
+  git('init', '--quiet', '--initial-branch=main');
+  writeFileSync(join(repo, 'one.txt'), '1\n');
+  git('add', 'one.txt');
+  git('commit', '--quiet', '--no-verify', '-m', 'one');
+  const base = git('rev-parse', 'HEAD');
+  git('update-ref', 'refs/remotes/origin/main', base);
+  git('switch', '--quiet', '-c', 'plan/foo');
+  writeFileSync(join(repo, 'two.txt'), '2\n');
+  git('add', 'two.txt');
+  git('commit', '--quiet', '--no-verify', '-m', 'two');
+  const tip = git('rev-parse', 'HEAD');
+  expect(planBaseRefs(`refs/heads/plan/foo ${tip} refs/heads/plan/foo ${zero}`, repo)).toBe(`refs/heads/plan/foo ${tip} refs/heads/plan/foo ${base}`);
+  // An existing remote tip, main and unknown history are left exactly as Git sent them.
+  for (const line of [`refs/heads/plan/foo ${tip} refs/heads/plan/foo ${base}`, `refs/heads/main ${tip} refs/heads/main ${zero}`, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`]) {
+    expect(planBaseRefs(line, repo)).toBe(line);
+  }
+});
+
+it('browser, timing and slow files go to hosted CI; new files are measured locally', () => {
+  const seconds = JSON.parse(readFileSync('test/durations.json', 'utf8')) as Record<string, number>;
+  const slow = Object.keys(seconds).find(file => (seconds[file] ?? 0) > LOCAL_FILE_SECONDS && !BROWSER_TESTS.includes(file) && !TIMING_TESTS.includes(file));
+  const quick = Object.keys(seconds).find(file => (seconds[file] ?? 0) < 1 && !BROWSER_TESTS.includes(file) && !TIMING_TESTS.includes(file));
+  if (slow === undefined || quick === undefined) throw new Error('durations.json lacks a slow and a quick file');
+  const browser = BROWSER_TESTS[0], timing = TIMING_TESTS[0];
+  if (browser === undefined || timing === undefined) throw new Error('empty hosted-only lists');
+  expect(hostedOnlyReason(browser, seconds)).toBe('browser');
+  expect(hostedOnlyReason(timing, seconds)).toBe('timing');
+  expect(hostedOnlyReason(slow, seconds)).toMatch(/^over 20 s/u);
+  expect(hostedOnlyReason(quick, seconds)).toBeNull();
+  // A planted 25 s file lands on the hosted-only list.
+  expect(hostedOnlyReason('test/planted.test.ts', {'test/planted.test.ts': 25})).toBe('over 20 s (25.0 s)');
+  const related = splitLocalTests({mode: 'related', tests: [slow, quick, browser, timing]}, []);
+  expect(related.local).toEqual([quick]);
+  expect(related.hosted.map(row => row.file).sort()).toEqual([slow, browser, timing].sort());
+  // A new file without a committed clock always runs locally, as its own admission evidence.
+  expect(splitLocalTests({mode: 'related', tests: [quick]}, [slow]).local).toEqual([quick, slow].sort());
+  // A full-mode change (harness, unknown path) keeps only the quick declared native files local.
+  const native = splitLocalTests({mode: 'full'}, []);
+  expect(native.local.length).toBeGreaterThan(0);
+  for (const file of native.local) expect(NATIVE_TESTS).toContain(file);
+  for (const file of native.local) expect(hostedOnlyReason(file, seconds)).toBeNull();
+  expect(splitLocalTests({mode: 'docs'}, []).local).toEqual([]);
+});
+
+it('every Vitest file that launches a real browser is on the browser list', () => {
+  const launches = execFileSync('git', ['grep', '-l', '-E', String.raw`\.launch\(|launchPersistentContext|connectOverCDP`, '--', '*.test.ts', '*.test.mjs'], {encoding: 'utf8'}).trim().split('\n');
+  // boot-dist-transfer only names a launch in a refusal message; this file only names the pattern.
+  for (const file of launches.filter(path => path !== 'test/boot-dist-transfer.test.ts' && path !== 'test/gate-related-tests.test.ts')) expect(BROWSER_TESTS).toContain(file);
+});
+
+it('only files over the budget are logged for VITEST-BENCH', () => {
+  const file = join(scratch, 'bench', 'hosted-only.log');
+  logHostedOnly([{file: 'test/a.test.ts', reason: 'browser'}, {file: 'test/b.test.ts', reason: 'over 20 s (25.0 s)'}], {sha: a, lane: 'opus-x'}, file);
+  const rows = readFileSync(file, 'utf8').trim().split('\n').map(line => JSON.parse(line) as {file: string, sha: string, lane: string});
+  expect(rows.map(row => [row.file, row.sha, row.lane])).toEqual([['test/b.test.ts', a, 'opus-x']]);
+});
+
+it('a landing reuses only an exact SHA whose ci and ring-1 are both green', () => {
+  const run = (id: number, name: string, conclusion: string | null, status = 'completed', sha = a, event = 'push') => ({id, name, path: `.github/workflows/${name}.yml`, event, head_sha: sha, status, conclusion});
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', 'success')]}, a).state).toBe('green');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success')]}, a).state).toBe('pending');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', null, 'in_progress')]}, a).state).toBe('pending');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure'), run(2, 'ring-1', 'success')]}, a).state).toBe('red');
+  // The newest run of each workflow decides: a re-run green replaces an older red.
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure'), run(3, 'ci', 'success'), run(2, 'ring-1', 'success')]}, a).state).toBe('green');
+  expect(landingVerdict({workflow_runs: [run(3, 'ci', 'cancelled'), run(1, 'ci', 'success'), run(2, 'ring-1', 'success')]}, a).state).toBe('red');
+  // Another SHA's runs and other workflows prove nothing.
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', b), run(2, 'ring-1', 'success'), run(4, 'deploy', 'success')]}, a).state).toBe('pending');
+  expect(landingVerdict(null, a).state).toBe('pending');
+  // A pull-request run or a Ring 1 recording dispatch of the same SHA proves nothing here.
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', a, 'pull_request'), run(2, 'ring-1', 'success')]}, a).state).toBe('pending');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', 'success', 'completed', a, 'workflow_dispatch')]}, a).state).toBe('pending');
+  const job = (name: string, conclusion = 'success') => ({name, status: 'completed', conclusion});
+  const code = {jobs: [job('changes'), job('static'), job('plan'), job('e2e'), job('tests (1)'), job('tests (2)')]};
+  expect(codeProvingJobs(code)).toBe(true);
+  // A docs-only run skips plan, tests and e2e: not a code proof.
+  expect(codeProvingJobs({jobs: [job('changes'), job('static'), job('plan', 'skipped'), job('e2e', 'skipped')]})).toBe(false);
+  expect(codeProvingJobs({jobs: [job('changes'), job('static'), job('plan'), job('e2e'), job('tests (1)'), job('tests (2)', 'failure')]})).toBe(false);
+  expect(githubSlug('git@github.com:project-wildshard/engine.git')).toBe('project-wildshard/engine');
+  expect(githubSlug('https://github.com/project-wildshard/engine')).toBe('project-wildshard/engine');
+  expect(githubSlug('/local/path/engine.git')).toBeNull();
+  const paths: string[] = [];
+  const green = (path: string) => {paths.push(path); return path.includes('/jobs') ? code : {workflow_runs: [run(7, 'ci', 'success'), run(8, 'ring-1', 'success')]};};
+  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', green)).toEqual({ci: {id: 7, status: 'completed', conclusion: 'success'}, 'ring-1': {id: 8, status: 'completed', conclusion: 'success'}});
+  expect(paths).toEqual([`repos/project-wildshard/engine/actions/runs?head_sha=${a}&event=push&per_page=100`, 'repos/project-wildshard/engine/actions/runs/7/jobs?filter=latest&per_page=100']);
+  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', path => path.includes('/jobs') ? {jobs: [job('changes'), job('static')]} : green(path))).toBeNull();
+  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', () => {throw new Error('offline');})).toBeNull();
+  expect(hostedGreen('HEAD', 'git@github.com:project-wildshard/engine.git', green)).toBeNull();
 });

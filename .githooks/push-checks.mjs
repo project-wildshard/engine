@@ -3,7 +3,8 @@ import {constants, getPriority, loadavg,homedir} from 'node:os';
 import {resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
-import {PUSH_BUDGET, PUSH_PROFILE} from '../scripts/push-budget.mjs';
+import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../scripts/push-budget.mjs';
+import {logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scripts/push-local-split.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 import {missingTestTimings,prepareTestTimings,readTestTimings,completeTestTimings} from '../scripts/push-test-timings.mjs';
@@ -96,18 +97,22 @@ async function main(){
   assertHeavyLease('full-test');
   const env=pushEnvironment();
   const began=Date.now();
-  let selection=pushSelection(env.WS_PUSH_REFS);
+  // DS9: a plan branch push or a watching driver runs the split gate; hosted CI runs the rest.
+  const split=splitRequested(env),profile=split?SPLIT_PROFILE:PUSH_PROFILE;
+  /** @type {{mode:'full'|'related'|'docs',files:string[],reason:string,tests?:string[]}} */
+  let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS);
   const missing=missingTestTimings(env.WS_PUSH_REFS);
   const timing=missing.length===0?null:prepareTestTimings(missing,PUSH_PROFILE);
-  const context=capturePushTree(PUSH_PROFILE,env),proof=context===null||timing!==null?null:readPushProof(context,selection);
-  console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths`);
+  const context=capturePushTree(profile,env),proof=context===null||timing!==null?null:readPushProof(context,selection);
+  console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths${split?'; split gate (DS9): hosted CI runs the full suite, browser and timing files':''}`);
   if(proof!==null){
     console.error(`  - exact-tree green reuse: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
     return;
   }
   const record=seconds=>{
-    const after=capturePushTree(PUSH_PROFILE,env);
-    if(context!==null){
+    const after=capturePushTree(profile,env);
+    // A split full-mode gate ran no complete suite, so it proves nothing reusable.
+    if(context!==null&&!(split&&selection.mode==='full')){
       if(after===null||after.tree!==context.tree||after.runtime!==context.runtime)throw new Error('Checked tree or runtime changed during the gate; no publication proof, rerun the exact tree');
       const recorded=writePushProof(context,selection,seconds);console.error(`  - saved exact-tree proof run ${recorded.run} (${selection.mode})`);
     }
@@ -128,6 +133,18 @@ async function main(){
     selection=await completePushSelection(selection);
     console.error(`  - verified tests: ${selection.mode}; ${selection.reason}`);
   }
+  /** @type {string[]|null} */let local=null;
+  if(split){
+    const plan=splitLocalTests(selection,missing.map(file=>file.file));
+    local=plan.local;
+    for(const row of plan.hosted)console.error(`  - hosted-only (${row.reason}): ${row.file}`);
+    logHostedOnly(plan.hosted,{sha:context?.commit??'unknown',lane:process.env.WS_LANE_NAME});
+    console.error(`  - split gate: ${local.length} local Vitest file(s), ${plan.hosted.length} sent to hosted CI`);
+  }
+  const reporters=[...(timing?.requests.full===undefined?[]:['--reporter=default',`--reporter=${resolve('scripts/push-timing-reporter.ts')}`]),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])];
+  const vitest=local===null
+    ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
+    :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
   const result=await parallelChecks([
     {name:'typecheck (kit + layers)',commands:[['pnpm','run','--silent','typecheck:kit'],['pnpm','exec','npr','tsc','-b','tsconfig.layers.json','--builders',String(PUSH_BUDGET.builders)]]},
     {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
@@ -136,7 +153,7 @@ async function main(){
     {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
     {name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},
-    {name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...(timing?.requests.full===undefined?[]:['--reporter=default',`--reporter=${resolve('scripts/push-timing-reporter.ts')}`]),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])]]},
+    ...vitest,
   ],{env:timing?.requests.full===undefined?env:{...env,WS_PUSH_TIMING_REQUEST:timing.requests.full}});
   if(result.ok&&timing!==null){
     if(timing.requests.full!==undefined)completeTestTimings(timing.requests.full,0);
@@ -153,7 +170,7 @@ async function main(){
   }
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);
-  console.error(`  - push lane ${result.ok?'green':'RED'} in ${seconds.toFixed(1)} s; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
+  console.error(`  - ${split?'split ':''}push lane ${result.ok?'green':'RED'} in ${seconds.toFixed(1)} s; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
   if(result.ok)record(seconds);
   process.exitCode=result.ok?0:1;
 }

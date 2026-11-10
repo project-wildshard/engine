@@ -1,0 +1,11 @@
+export const LOCAL_FILE_SECONDS: 20;
+export const BROWSER_TESTS: readonly string[];
+export const TIMING_TESTS: readonly string[];
+export const NATIVE_TESTS: readonly string[];
+export const PLAN_REF: RegExp;
+export function pushedRefs(refs:string|undefined):{local:string;remote:string;base:string}[];
+export function splitRequested(env:NodeJS.ProcessEnv,refs?:string):boolean;
+export function planBaseRefs(refs:string|undefined,cwd?:string):string|undefined;
+export function hostedOnlyReason(file:string,seconds:Record<string,number>):string|null;
+export function splitLocalTests(selection:{mode:'full'|'related'|'docs';tests?:string[]},timing:string[],root?:string):{local:string[];hosted:{file:string;reason:string}[]};
+export function logHostedOnly(hosted:{file:string;reason:string}[],context:{sha:string;lane?:string|undefined},file?:string):void;
