@@ -102,7 +102,6 @@
   "test/grass-profile-file-only.test.ts",
   "test/grid-reentry.test.ts",
   "test/headless-byte-capture.test.ts",
-  "test/headless-direct-worker.test.ts",
   "test/headless-quest-verbs.test.ts",
   "test/held-arms-platform.test.ts",
   "test/held-bow-product.test.ts",

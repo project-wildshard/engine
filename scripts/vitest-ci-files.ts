@@ -13,6 +13,7 @@ export const CI_NATIVE_GROUPS = {
     'test/net-fuzz.test.ts',
     'test/pine-rewards.test.ts',
   ],
+  'native-direct-worker': ['test/headless-direct-worker.test.ts'],
   'native-restores': [
     'test/pinned-restore-play.test.ts',
   ],
