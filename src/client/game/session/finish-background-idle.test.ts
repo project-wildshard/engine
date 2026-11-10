@@ -90,10 +90,11 @@ test('native control and first-use audio remain immediate while speculative down
       game: {levelScope: owner}, hud: {}, app: {}, Event,
       afterControl: (scope: Scope, _frame: unknown, _ready: unknown, run: () => void): void => {expect(scope).toBe(owner); publish = run;},
       document: {dispatchEvent: (event: Event): void => {calls.push(event.type);}},
+      sustainedFrames: {start: (): void => {calls.push('sustained');}}, diagnosticNow: (): number => 0,
       reachControl: (scope: Scope): void => {expect(scope).toBe(owner); calls.push('refinements');},
       deferredAudio: {}, decodeAfterBoot: (): Promise<void> => {calls.push('audio'); return Promise.resolve();},
       backgroundDownloads: (): Promise<void> => {calls.push('idle-downloads'); return Promise.resolve();},
     });
-    publish(); expect(calls).toEqual(['ws:control-ready', 'refinements', 'audio', 'idle-downloads']);
+    publish(); expect(calls).toEqual(['ws:control-ready', 'sustained', 'refinements', 'audio', 'idle-downloads']);
   } finally {owner.dispose();}
 });
