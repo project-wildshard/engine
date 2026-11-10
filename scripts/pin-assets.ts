@@ -2,7 +2,7 @@
  * list. Keep producer bytes and provenance without rewriting its archive,
  * source hash, preparation evidence or admission receipt. */
 import {createHash} from 'node:crypto';
-import {existsSync, readFileSync} from 'node:fs';
+import {existsSync, lstatSync, readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import * as v from 'valibot';
 
@@ -27,7 +27,9 @@ export function pinnedPublicAssets(root: string, slugs?: readonly string[]): rea
       || row.url.split('/').some(part => part === '.' || part === '..') || seen.has(row.url)) throw new Error(`Invalid pinned public asset: ${row.url}`);
     seen.add(row.url);
     if (slugs !== undefined && !slugs.includes(row.slug)) return [];
-    const body = readFileSync(resolve(root, row.file));
+    const file = resolve(root, row.file), stat = lstatSync(file);
+    if (!stat.isFile() || stat.size !== row.bytes) throw new Error(`Pinned public asset bytes differ: ${row.url}`);
+    const body = readFileSync(file);
     const hash = createHash('sha256').update(body).digest('hex');
     const blob = createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex');
     if (body.length !== row.bytes || hash !== row.sha256 || blob !== row.source.blob) throw new Error(`Pinned public asset bytes differ: ${row.url}`);
