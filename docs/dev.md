@@ -179,3 +179,23 @@ NetClients. Player placement isolates the transaction laws; it is not a
 walked-journey proof. The real server stores acknowledge an in-process
 forwarder, so this makes no database durability claim. No live server,
 browser, forced health or synthetic reward is used.
+
+## Native loadout contracts
+
+After the same two pinned products are installed, run
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-loadout.proof.mjs`.
+CI runs these two cases explicitly; hooks and Vitest do not discover
+them. Each 9.5-second bound includes loading, physics and cleanup.
+
+Actual Pine pickup, clock, shot, reload and reward inputs earn the rifle
+and King-gated bow. Normal health, death and boss checkpoints remain
+active. Controlled grounded firing positions isolate equipment laws;
+this is not a walked boss encounter or a database durability proof.
+The resulting live ownership book also drives 1,200 public author-API
+frames: an independent clock oracle checks explicit pick priority,
+ownership, swaps, live locks, reused publication sets and phase order.
+Aim fallback, clamp and sentinel are author-port contracts; NaN cannot
+cross the wire. Pending swaps round-trip through the real save adapter,
+and invalid continuations leave state intact. Both stock kits retain
+their authored slot/clock policies and strict preflight refusals. The
+SDK predecessor remains until its owner approves retirement.
