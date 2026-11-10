@@ -24,3 +24,15 @@ warm's own inventory, and a test proves the census and the warm's draws are the 
 
 The second J206 review (Codex) found no MUST-FIX; its SHOULD, wiring coverage through `precompileLevel`, is a test that
 the census reaches scene discovery as its include, drawnFrom stays the default, and an arrival set still wins.
+
+## The link bound counts from the last link
+
+The first Simulator sweep of the census showed what moving 86-107 programs into one batch costs on a loaded Mac
+(load 30-60): the GPU process links about 4 a second, so the batch passed `LINK_WAIT_MS` (10 s from its issue) while
+still landing links, and the resolve phase then forced the rest synchronously in one frame: Driftwood 5,163 ms at 47 / 86
+linked, Pine 3,260 ms at 80 / 104. The other cold runs passed outright (Nalati 18.5 s, Far Reach 17.6 s, Sunscar 8.9 s,
+Driftwood packs 17.0 s, Nine packs 15.0 s; before, every cold run failed on first-frame frames of 348-1540 ms).
+
+The boot batch's bound now counts from the last link that landed (`boundedLinkWait`'s `since`), so a batch still
+making progress keeps waiting with its count moving on the card; a link that never reports (O14) still ends the wait
+`LINK_WAIT_MS` after the last one landed. The constant is unchanged.

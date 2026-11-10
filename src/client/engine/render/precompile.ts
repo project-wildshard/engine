@@ -970,13 +970,15 @@ export const LINK_WAIT_MS = 10_000;
  * a link's COMPLETION_STATUS unreported (O14: Nine Dragon's entry warm-up then stalled past its 30 s bound on the
  * Simulator; O15: Driftwood's offscreen sky): false past the bound, and the caller links what is left synchronously
  * (three's `getUniforms()`: the link-status check, one long frame instead of no frame). Never waits forever.
+ * `since` (DL23) moves the bound's start to the caller's last progress, so a batch still landing links keeps waiting.
  */
-export async function boundedLinkWait(ready: () => boolean | Promise<boolean>, wait: () => Promise<void>, capMs: number = LINK_WAIT_MS): Promise<boolean> {
+export async function boundedLinkWait(ready: () => boolean | Promise<boolean>, wait: () => Promise<void>, capMs: number = LINK_WAIT_MS,
+  since?: () => number): Promise<boolean> {
   const start = performance.now();
   for (;;) {
     const done = ready();
     if (typeof done === 'boolean' ? done : await done) return true;
-    if (performance.now() - start >= capMs) return false;
+    if (performance.now() - Math.max(start, since?.() ?? start) >= capMs) return false;
     await wait();
   }
 }
@@ -1434,17 +1436,22 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     // Boot can observe the same unreported WebKit completion as live and
     // offscreen preparation. Keep their existing bounded wait, then resolve
     // every remaining program through the mandatory native first use below.
+    // DL23: the bound counts from the last link that landed. The boot census is the first frame's whole inventory
+    // (86-107 programs), which a loaded iPhone Simulator links at about 4 a second: still landing links, the batch
+    // passed 10 s from its issue, and the resolve below forced the rest in one frame (Driftwood 5.2 s, Pine 3.3 s).
+    // A link that never reports (O14) still ends the wait LINK_WAIT_MS after the last one landed.
+    let landedAt = performance.now();
     await waitFor(`Link ${n} shader programs`, boundedLinkWait(async () => {
       checkCurrent();
       let ready = 0, askedAt = performance.now();
       for (const p of pending) {
         if (linked.has(p)) { ready++; continue; }
-        if (nativeRetired(p) || p.isReady()) { linked.add(p); ready++; }
+        if (nativeRetired(p) || p.isReady()) { linked.add(p); ready++; landedAt = performance.now(); }
         if (spent(askedAt)) { await pause(); checkCurrent(); askedAt = performance.now(); }
       }
       onProgress?.(jobs.length + ready, jobs.length + units + textures.length, `${ready} / ${n} programs linked · parallel`);
       return ready >= n;
-    }, async () => { await pause(); checkCurrent(); }), 'shader');
+    }, async () => { await pause(); checkCurrent(); }, LINK_WAIT_MS, () => landedAt), 'shader');
   }
   // Phase B: resolve each link. COMPLETION_STATUS only says the front end is done — ANGLE Metal
   // builds the Metal library on the first LINK_STATUS / uniform query (~20 ms a program with a cold
