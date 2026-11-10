@@ -38,10 +38,11 @@ function indexMatch(view: DataView, dictionary: Int32Array, start: number, end: 
 }
 // Only matches of at least 64 bytes can emit a reference. Reject shorter
 // candidates before extending their prefix; qualifying lengths stay exact.
-function matchedBytes(left: DataView, leftAt: number, right: DataView, rightAt: number): number {
-  const limit = Math.min(left.byteLength - leftAt, right.byteLength - rightAt);
-  if (limit < matchMinimum
-    || left.getUint32(leftAt + 60, true) !== right.getUint32(rightAt + 60, true)
+// Callers prove at least64bytes: earlier native starts have the current tail
+// available; basis starts were indexed only with64bytes remaining. Pass that
+// span instead of repeating view bounds/Math.min on every rejected candidate.
+function matchedBytes(left: DataView, leftAt: number, right: DataView, rightAt: number, limit: number): number {
+  if (left.getUint32(leftAt + 60, true) !== right.getUint32(rightAt + 60, true)
     || left.getUint32(leftAt + 48, true) !== right.getUint32(rightAt + 48, true)
     || left.getUint32(leftAt + 32, true) !== right.getUint32(rightAt + 32, true)
     || left.getUint32(leftAt + 16, true) !== right.getUint32(rightAt + 16, true)) return 0;
@@ -91,9 +92,9 @@ export function encodePhysicsReferences(bytes: Uint8Array, basis?: Uint8Array): 
   };
   while (at + matchMinimum <= bytes.length) {
     const key = hash(rawView, at), previous = dictionary[key] ?? -1; dictionary[key] = at;
-    let length = previous < 0 ? 0 : matchedBytes(rawView, previous, rawView, at);
+    let length = previous < 0 ? 0 : matchedBytes(rawView, previous, rawView, at, bytes.length - at);
     const basisAt = basisDictionary?.[key] ?? -1;
-    const basisLength = basisView === undefined || basisAt < 0 ? 0 : matchedBytes(basisView, basisAt, rawView, at);
+    const basisLength = basisView === undefined || basisAt < 0 ? 0 : matchedBytes(basisView, basisAt, rawView, at, Math.min(basisView.byteLength - basisAt, bytes.length - at));
     const external = basisLength >= matchMinimum && basisLength >= length;
     if (external) length = basisLength;
     if (length < matchMinimum) { at++; continue; }
