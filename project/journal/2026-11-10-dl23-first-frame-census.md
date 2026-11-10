@@ -36,3 +36,7 @@ Driftwood packs 17.0 s, Nine packs 15.0 s; before, every cold run failed on firs
 The boot batch's bound now counts from the last link that landed (`boundedLinkWait`'s `since`), so a batch still
 making progress keeps waiting with its count moving on the card; a link that never reports (O14) still ends the wait
 `LINK_WAIT_MS` after the last one landed. The constant is unchanged.
+
+J206 review of the bound (Codex): no MUST-FIX. Its SHOULD to pin the exported `since` argument is in the declaration
+law test (a valid fourth argument passes, a number there is refused). Its other SHOULD, a runPrecompile-level
+test, is left to the Simulator sweep, the real reading.

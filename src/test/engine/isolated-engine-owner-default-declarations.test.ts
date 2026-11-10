@@ -13,7 +13,7 @@ for(const name of ["client/app/sceneOwnership","client/boot/lastEnd","client/cor
 
 test('owner defaults retain DOM, promise and unshared output laws',()=>{
  const consumer=resolve('src/test/engine/t4-engine-owner-default-consumer.ts');
- let source="import {unshuffleLanes} from '../../client/engine/core/deflate';\nimport {boundedLinkWait} from '../../client/engine/render/precompile';\nimport {uiScope,mountUi} from '../../client/engine/ui/ownership';\nimport type {Scope} from '../../shared/engine/app/scope';\ndeclare const owner:Scope;\ndeclare const lanes:Uint8Array;\nexport const restored:Uint8Array=unshuffleLanes(lanes);\nexport const explicit:Uint8Array=unshuffleLanes(lanes,new Uint8Array(16),0,4);\nexport const linked:Promise<boolean>=boundedLinkWait(()=>true,async()=>{});\nexport const timed:Promise<boolean>=boundedLinkWait(()=>true,async()=>{},100);\nexport const child:Scope=uiScope('child',owner);\nexport const implicit:Scope=uiScope('child');\nexport const element:HTMLElement=document.createElement('div');\nmountUi(element,child);\nmountUi(element,child,document.body);\n";
+ let source="import {unshuffleLanes} from '../../client/engine/core/deflate';\nimport {boundedLinkWait} from '../../client/engine/render/precompile';\nimport {uiScope,mountUi} from '../../client/engine/ui/ownership';\nimport type {Scope} from '../../shared/engine/app/scope';\ndeclare const owner:Scope;\ndeclare const lanes:Uint8Array;\nexport const restored:Uint8Array=unshuffleLanes(lanes);\nexport const explicit:Uint8Array=unshuffleLanes(lanes,new Uint8Array(16),0,4);\nexport const linked:Promise<boolean>=boundedLinkWait(()=>true,async()=>{});\nexport const timed:Promise<boolean>=boundedLinkWait(()=>true,async()=>{},100);\nexport const since:Promise<boolean>=boundedLinkWait(()=>true,async()=>{},100,()=>0);\nexport const child:Scope=uiScope('child',owner);\nexport const implicit:Scope=uiScope('child');\nexport const element:HTMLElement=document.createElement('div');\nmountUi(element,child);\nmountUi(element,child,document.body);\n";
  const options:ts.CompilerOptions={strict:true,exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,
   target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,moduleResolution:ts.ModuleResolutionKind.Bundler,
   types:[],skipLibCheck:true,noEmit:true};
@@ -26,10 +26,10 @@ test('owner defaults retain DOM, promise and unshared output laws',()=>{
   return program.getSemanticDiagnostics(file);
  };
  expect(diagnostics()).toEqual([]);
- source+="unshuffleLanes(lanes,new Uint8Array(new SharedArrayBuffer(16)));\nboundedLinkWait(()=>true,async()=>{},'time');\nuiScope('child',0);\nmountUi(element,child,'parent');\nexport const wrong:number=boundedLinkWait(()=>true,async()=>{});\nexport const missing=child.undeclared;\n";
+ source+="unshuffleLanes(lanes,new Uint8Array(new SharedArrayBuffer(16)));\nboundedLinkWait(()=>true,async()=>{},'time');\nboundedLinkWait(()=>true,async()=>{},100,0);\nuiScope('child',0);\nmountUi(element,child,'parent');\nexport const wrong:number=boundedLinkWait(()=>true,async()=>{});\nexport const missing=child.undeclared;\n";
  const refused=diagnostics().map(diagnostic=>diagnostic.code);
- expect(refused.filter(code=>code===2345)).toHaveLength(4);
+ expect(refused.filter(code=>code===2345)).toHaveLength(5);
  expect(refused.filter(code=>code===2322)).toHaveLength(1);
  expect(refused).toContain(2339);
- expect(refused).toHaveLength(6);
+ expect(refused).toHaveLength(7);
 });
