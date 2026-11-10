@@ -30,6 +30,76 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "src/client/engine/boot/no-leave-prompt.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13724997136,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794272071976,
+      "durationMs": 265.62591199999997,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/boot/stale-build-reload.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13724128689,
+      "report": "shard-2-ordinary.json",
+      "measuredAt": 1794272065566,
+      "durationMs": 776.8750659999998,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/ui/reloadCover.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13723999768,
+      "report": "shard-3-ordinary.json",
+      "measuredAt": 1794272093486,
+      "durationMs": 717.492283,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/ui/update-hang-offline.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13724114477,
+      "report": "shard-4-ordinary.json",
+      "measuredAt": 1794272084634,
+      "durationMs": 760.455571,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
+      "file": "src/client/engine/ui/update-hang-online.test.ts",
+      "sha": "dd3624f012f798d07a0fb995e60b77106d6648b6",
+      "run": "42731566380",
+      "artifact": 13725640567,
+      "report": "shard-5-ordinary.json",
+      "measuredAt": 1794272103724,
+      "durationMs": 765.7435820000001,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring 1 complete module clock includes collection, setup, environment and cases/hooks. The exact test-body blob is unchanged at this forward. These source-inspection and happy-dom reload tests use identical environments in both rings and read no pinned product; no catalogue/ring branch. Other unknown files retain sixty seconds; calibration, caps, native groups and quarantine policy stay unchanged."
+    },
+    {
       "file": "test/declared-kit-items.test.ts",
       "sha": "17b936e595f674e9c75d64a068b2a205cd98aa63",
       "run": "42718338723",
