@@ -31,7 +31,7 @@ try {
   await context.addInitScript(() => {
     const w = /** @type {any} */ (window);
     w.__proof = { downs: [] };
-    document.addEventListener('mousedown', event => { const t = /** @type {Element | null} */ (event.target); w.__proof.downs.push(t === null ? 'null' : `${t.tagName}.${String(t.getAttribute('class') ?? '')}`.slice(0, 60)); }, true);
+    document.addEventListener('mousedown', event => { const t = /** @type {Element | null} */ (event.target); w.__proof.downs.push(t === null ? 'null' : `${t.tagName}.${t.getAttribute('class') ?? ''}`.slice(0, 60)); }, true);
   });
   const page = await context.newPage();
   page.setDefaultTimeout(240000);
@@ -46,7 +46,7 @@ try {
   };
   const state = () => page.evaluate(() => ({
     path: `${location.pathname}${location.search}`,
-    screen: document.querySelector('.ws-title-stack')?.getAttribute('data-screen') ?? null,
+    screen: (() => { const stack = document.querySelector('.ws-title-stack'); return stack instanceof HTMLElement ? stack.dataset.screen ?? null : null; })(),
     load: document.querySelector('.ws-load b[data-el="slug"]')?.textContent ?? null,
     world: Boolean(/** @type {any} */ (window).__wildshard?.world?.game),
     downs: /** @type {any} */ (window).__proof?.downs ?? [],
@@ -71,7 +71,7 @@ try {
   await page.touchscreen.tap(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2);
   // the panel closes by dropping its .show (it fades, so the button stays in the layout)
   await page.waitForFunction(() => [...document.querySelectorAll('.ws-gmenu-close')].every(button => button.closest('.show') === null), null, { timeout: 15000 })
-    .catch(async error => {
+    .catch(async (/** @type {unknown} */ error) => {
       await page.screenshot({ path: join(out, `${engine}-x-settings-stuck.png`) });
       const open = await page.evaluate(() => [...document.querySelectorAll('.ws-gmenu-close')].map(b => ({ text: b.textContent, shown: b.closest('.show')?.className ?? null, box: b.getBoundingClientRect().toJSON() })));
       throw new Error(`Settings did not close: ${JSON.stringify({ tapped: closeBox, open })}`, { cause: error });
@@ -79,8 +79,11 @@ try {
   record('settings over the load', { opened: true, closed: true, stillLoading: (await state()).load });
   await page.waitForTimeout(800); // the panel's fade
   // a loading page's main thread is busy: give the tap and the leave their time, and hold the result until it is read
-  const navigated = page.waitForURL(url => url.pathname === '/' && url.search === '', { timeout: 120000, waitUntil: 'commit' }).then(() => null, error => /** @type {unknown} */ (error));
-  const exitAt = await page.evaluate(() => { const b = document.querySelector('.ws-load [data-load-menu="exit"]')?.getBoundingClientRect(); const e = b && document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return e ? `${e.tagName}.${String(e.getAttribute('class'))}[${String(e.getAttribute('data-load-menu'))}]` : null; });
+  const navigated = (async () => {
+    try { await page.waitForURL(url => url.pathname === '/' && url.search === '', { timeout: 120000, waitUntil: 'commit' }); return null; }
+    catch (error) { return error; }
+  })();
+  const exitAt = await page.evaluate(() => { const b = document.querySelector('.ws-load [data-load-menu="exit"]')?.getBoundingClientRect(); const e = b && document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return e ? `${e.tagName}.${e.getAttribute('class') ?? ''}${e.closest('[data-load-menu]') === null ? '' : ' (a loading menu button)'}` : null; });
   await tap('.ws-load [data-load-menu="exit"]');
   const left = await navigated;
   if (left !== null) { await page.screenshot({ path: join(out, `${engine}-x-exit-failed.png`) }); throw new Error(`EXIT TO TITLE did not leave (under the finger: ${String(exitAt)}; ${JSON.stringify(await state())})`, { cause: left }); }
@@ -108,14 +111,15 @@ try {
   await page.screenshot({ path: join(out, `${engine}-4-deck.png`) });
 
   // 3. pick Nine Dragon in the deck and ENTER WORLD; it loads and becomes playable
-  const index = await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].findIndex(card => /nine dragon/iu.test(card.textContent ?? '')));
+  const index = await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].findIndex(c => /nine dragon/iu.test(c.textContent ?? '')));
   must(index >= 0, 'no Nine Dragon card in the deck');
-  await page.evaluate(i => { /** @type {HTMLElement | null} */ (document.querySelector(`.ws-menu-dots i[data-i="${String(i)}"]`))?.click(); }, index);
+  await page.evaluate(i => { const dot = document.querySelector(`.ws-menu-dots i[data-i="${String(i)}"]`); if (dot instanceof HTMLElement) dot.click(); }, index);
   await page.waitForTimeout(800);
   await tap('.ws-menu-play');
   await page.waitForFunction(() => /nine dragon/iu.test(document.querySelector('.ws-load b[data-el="slug"]')?.textContent ?? '') || Boolean(/** @type {any} */ (window).__wildshard?.world?.game));
   await page.screenshot({ path: join(out, `${engine}-5-loading-nine-dragon.png`) });
-  await page.waitForFunction(() => document.querySelector('.ws-load') === null && Boolean(/** @type {any} */ (window).__wildshard?.world?.game), null, { timeout: 480000, polling: 1000 });
+  // playable: the world is up and its loading card is gone or faded (a cold page keeps its hidden shell card)
+  await page.waitForFunction(() => { const shell = document.querySelector('.ws-load'); return Boolean(/** @type {any} */ (window).__wildshard?.world?.game) && (shell === null || getComputedStyle(shell).opacity === '0' || getComputedStyle(shell).display === 'none'); }, null, { timeout: 480000, polling: 1000 });
   const played = await page.evaluate(() => ({ path: `${location.pathname}${location.search}`, level: /** @type {any} */ (window).__wildshard?.world?.level?.id ?? /** @type {any} */ (window).__wildshard?.requireWorld?.()?.chunk?.slug ?? null }));
   record('nine dragon', { ...played, errors: [...errors] });
   must(/nine-dragon/iu.test(`${played.path} ${String(played.level)}`), `the world that loaded is not Nine Dragon: ${JSON.stringify(played)}`);

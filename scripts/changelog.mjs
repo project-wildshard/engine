@@ -109,11 +109,11 @@ export function pushProblems(lines, cwd = process.cwd()) {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [mode, tag] = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
-  if (mode !== 'check' && mode !== 'refs') { console.error('usage: changelog.mjs check [vX.Y.Z] [--at=<rev>] | refs < <pre-push ref lines>'); process.exit(2); }
+  if (mode !== 'check' && mode !== 'refs') throw new Error('usage: changelog.mjs check [vX.Y.Z] [--at=<rev>] | refs < <pre-push ref lines>');
   const at = process.argv.find(arg => arg.startsWith('--at='))?.slice(5);
   const problems = mode === 'refs' ? pushProblems(readFileSync(0, 'utf8'))
     : at === undefined && tag === undefined ? releaseProblems(readFileSync(CHANGELOG_PATH, 'utf8'), engineRelease(process.cwd()).version)
     : problemsAt(at ?? 'HEAD', tag);
-  if (problems.length > 0) { console.error(`push blocked: the engine changelog\n${problems.map(p => `  - ${p}`).join('\n')}\n${HOW}`); process.exit(1); }
-  if (mode !== 'refs') console.log(`changelog: ${tag ?? `v${engineRelease(process.cwd()).version}`} ok`);
+  if (problems.length > 0) { console.error(`push blocked: the engine changelog\n${problems.map(p => `  - ${p}`).join('\n')}\n${HOW}`); process.exitCode = 1; }
+  else if (mode !== 'refs') console.log(`changelog: ${tag ?? `v${engineRelease(process.cwd()).version}`} ok`);
 }
