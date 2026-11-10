@@ -46,7 +46,7 @@ cannot qualify the whole nightly or remove its J167 tag hold. Estimate:
 about 24 hosted runner-minutes once; no additional scheduled workflow.
 
 The qualification consumer has its own one-shot operational review,
-SDK-hover-qualification-20261110T050605Z: no MUST or SHOULD; actionlint
+SDK-hover-qualification-20261110T050640Z-50737: no MUST or SHOULD; actionlint
 passes. Its independent receipt assertion also reads committed pin and
 test-list digests and requires every unique phase. No hosted run is
 claimed before publication. Official renderer and validation writers
