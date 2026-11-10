@@ -172,11 +172,57 @@ with tempfile.TemporaryDirectory(dir=engine / 'tmp', prefix='full-test-log-proof
         assert merged[0]['totals']['leases'] == 7
         assert len(merged[0]['unavailable']) == 2 and len(merged[0]['sourceErrors']) == 2
         assert len(merged[0]['invalid']) == 2 and len(merged[0]['incomplete']) == 1
-        print(json.dumps({'actualLeases': 11, 'inheritedNotDoubleCounted': True,
+        # Worker allowlisting intentionally strips the lane env: recover only
+        # the exact owned queue record, including private batch candidates.
+        scope = work / 'push-queue/scope'
+        job_id = '000000001-1234abcd'
+        snapshot = scope / 'snapshots' / job_id
+        subprocess.run(['git', 'clone', '--quiet', '--no-hardlinks', str(repo), str(snapshot)], check=True)
+        job = {'id': job_id, 'lane': 'queue-source-lane', 'source': str(trees[0]), 'snapshot': str(snapshot)}
+        (scope / (job_id + '.json')).write_text(json.dumps(job))
+        queue_env = {key: value for key, value in env.items() if not key.startswith('HERDR_') and key not in
+                     ('WS_LANE_NAME', 'SERVE_OWNER', 'CLAUDE_CODE_SESSION_ID', 'CODEX_SESSION_ID')}
+        subprocess.run([*lane, '--', sys.executable, '-c', 'pass'], cwd=snapshot, env=queue_env,
+                       check=True, capture_output=True, timeout=2)
+        observed = json.loads(log.read_text().splitlines()[-1])
+        assert observed['lane'] == 'queue-source-lane' and observed['queueJob'] == job_id
+        assert observed['ownerSource'] == str(trees[0])
+        wrong_id = '000000002-deadbeef'
+        (scope / (job_id + '.json')).write_text(json.dumps({**job, 'id': wrong_id,
+                                                'snapshot': str(scope / 'snapshots' / wrong_id)}))
+        subprocess.run([*lane, '--', sys.executable, '-c', 'pass'], cwd=snapshot, env=queue_env,
+                       check=True, capture_output=True, timeout=2)
+        observed = json.loads(log.read_text().splitlines()[-1])
+        assert observed['lane'] == 'unknown' and 'queueJob' not in observed
+        candidate = scope / 'snapshots/batch-proof/candidate-proof/0'
+        subprocess.run(['git', 'clone', '--quiet', '--no-hardlinks', str(repo), str(candidate)], check=True)
+        (candidate.parent / 'result.json').write_text(json.dumps(job))
+        subprocess.run([*lane, '--', sys.executable, '-c', 'pass'], cwd=candidate, env=queue_env,
+                       check=True, capture_output=True, timeout=2)
+        observed = json.loads(log.read_text().splitlines()[-1])
+        assert observed['lane'] == 'queue-source-lane' and observed['queueJob'] == job_id
+        assert observed['worktree'] == str(candidate) and observed['ownerSource'] == str(trees[0])
+        (candidate.parent / 'result.json').write_text(json.dumps({**job, 'snapshot': '/not-this-queue'}))
+        subprocess.run([*lane, '--', sys.executable, '-c', 'pass'], cwd=candidate, env=queue_env,
+                       check=True, capture_output=True, timeout=2)
+        observed = json.loads(log.read_text().splitlines()[-1])
+        assert observed['lane'] == 'unknown' and 'ownerSource' not in observed
+        result = subprocess.run([sys.executable, str(engine / 'scripts/full-test-report.py'), '--log', str(log)],
+                                capture_output=True, text=True, check=True, timeout=2)
+        owned_group = [row for row in json.loads(result.stdout)['groups'] if row['lane'] == 'queue-source-lane']
+        assert len(owned_group) == 1 and owned_group[0]['worktree'] == str(trees[0]) and owned_group[0]['leases'] == 2
+        invalid_source = work / 'invalid-owner-source.log'
+        invalid_source.write_text(''.join(json.dumps({**acquires[0], 'ownerSource': value, 'token': 'bad-' + str(i)})+'\n'
+                                          for i, value in enumerate([None, '', 'relative'])))
+        result = subprocess.run([sys.executable, str(engine / 'scripts/full-test-report.py'), '--log', str(invalid_source)],
+                                capture_output=True, text=True, check=True, timeout=2)
+        assert len(json.loads(result.stdout)['invalid']) == 3
+        print(json.dumps({'actualLeases': 15, 'inheritedNotDoubleCounted': True,
                           'fifoWaitMeasured': True, 'realFailureTimeoutSignalPreserved': True,
                           'twoRealLinkedWorktrees': True, 'transferredEventsDeduplicated': True,
                           'unavailableAndDamagedSourcesNamed': True, 'refusedLogDoesNotChangeVerdict': True,
                           'unsafeGitMetadataCannotBlock': True, 'conflictingEventsNeverContributeVerdicts': True,
+                          'sanitizedQueueAndBatchOwnerRecovered': True,
                           'seconds': time.monotonic() - began}))
     finally:
         for process in (holder, waiter, terminated):

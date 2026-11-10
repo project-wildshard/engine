@@ -51,3 +51,21 @@ on an operator-configured second machine. Remote reads are noninteractive and
 bounded; an unreachable mini remains explicitly unavailable. No second-machine
 availability, 24-hour coverage, occupancy saving or whole DS3 completion is
 claimed by this source change. Those require the live observations in the plan.
+
+The first actual combined gate records its real failure/260.90s held time, but
+the worker's sanitized environment leaves the lane unknown. A follow-up reads
+only its exact owned job JSON, or the batch candidate's result.json, to recover
+the carrying job/owner/source. It does not claim every original batch member
+owns a bisected subset. Raw checked cwd stays in the event; the report groups
+by the owner's source worktree. No environment fingerprint or frozen worker
+changes. Missing/invalid metadata remains unknown rather than dropping events.
+
+Review `engine-dev-speed-ds3-provenance-20261110T175108Z-21927.md` finds a MUST
+for a consistent wrong-job JSON and two SHOULDs for source validation/controls.
+The actual lease control reproduces wrong attribution before the fix; normal
+snapshots now bind the record id to their own directory. Null/empty/relative
+source rows refuse. Controls actually remove identity environment variables,
+exercise ordinary and batch Git clones, check owner aggregation and reject a
+wrong snapshot. All fifteen actual leased commands pass in5.80s. Live daily
+and second-machine qualification remain open; the first failed cohort earns
+no batching or performance success credit.

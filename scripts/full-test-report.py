@@ -62,6 +62,8 @@ def report(sources, since):
                     raise ValueError('missing observation holder/worktree')
                 if row.get('plan') is not None and not isinstance(row['plan'], str):
                     raise ValueError('invalid plan identity')
+                if 'ownerSource' in row and (not isinstance(row['ownerSource'], str) or not Path(row['ownerSource']).is_absolute()):
+                    raise ValueError('invalid owner source')
                 if row['event'] == 'release' and not isinstance(row.get('exitCode'), int):
                     raise ValueError('missing command exit code')
                 if row['epoch'] < since:
@@ -91,7 +93,7 @@ def report(sources, since):
                 invalid.append({'machine': machine, 'token': token, 'error': 'invalid completed durations/CPU'})
                 continue
             completed.append(ended)
-            groups[(machine, acquired['kind'], acquired['lane'], acquired['worktree'], acquired.get('plan'))].append(ended)
+            groups[(machine, acquired['kind'], acquired['lane'], acquired.get('ownerSource', acquired['worktree']), acquired.get('plan'))].append(ended)
         elif 'not-acquired' in rows:
             rejected.append(rows['not-acquired'])
         else:
