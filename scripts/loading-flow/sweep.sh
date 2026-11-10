@@ -33,8 +33,8 @@ build=$(curl -fsS --max-time 15 "$url/version.json" | python3 -I -c 'import json
   || { echo "sweep.sh: no version.json at $url" >&2; exit 2; }
 rev=${build%%-*}
 [ -n "$out" ] || out="tmp/download-sweep/$build"
+node scripts/loading-flow/sweep-input.mjs "$out" "$url" "$build" "$worker" || exit 2
 mkdir -p "$out/.done" "$out/gate"
-printf '{"url":"%s","build":"%s","workerRow":%s}\n' "$url" "$build" "$worker" > "$out/sweep.json"
 echo "sweep: $build at $url, into $out"
 
 SHARDS='driftwood-isle far-reach nalati-grasslands nine-dragon-stack pine-hollow sunscar-dunes'
@@ -81,7 +81,7 @@ if wanted pairs; then
 fi
 phone() { # phone <log> <args>: the phone link's run, its log kept; exit 1 is a run with an error, still read by the report
   local log=$1; shift
-  pnpm --silent phone-loading --url "$url/" "$@" 2>&1 | tee "$out/$log.log" | tail -3 | cut -c1-200
+  scripts/browser-lane.sh --max 30 node --experimental-transform-types scripts/phone-loading/main.ts --url "$url/" "$@" 2>&1 | tee "$out/$log.log" | tail -3 | cut -c1-200
   grep -q '^JSON ' "$out/$log.log"
 }
 if wanted title; then
