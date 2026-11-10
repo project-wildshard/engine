@@ -40,3 +40,13 @@ the GC expectation (stray part plus b2's index) were confirmed unchanged.
 The push gate recorded the two new files from its own full run (limits
 35.2 s, publish 21.7 s under full-gate load); the quarantined file keeps
 its existing weight until its own fresh clocks replace it.
+
+## Planner fix
+
+The split broke main's CI planner (42907130906): two new native groups,
+each costed at twice its weight, took the 12-shard maximum to 241.2 s,
+over the 240 s ceiling. The limits file runs no real cook, so it now
+runs as an ordinary file; the planner selects 12 shards at 239.2 s.
+J206 Codex review: no MUST; its SHOULD (prove a hosted run beside a
+neighbour) is the next CI run. The planner had about 3 s of headroom
+before this split, so the next added file will need CI4's attention.

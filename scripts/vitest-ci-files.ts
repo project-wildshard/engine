@@ -22,9 +22,9 @@ export const CI_NATIVE_GROUPS = {
   'native-cook': [
     'test/cook-worker.test.ts',
   ],
-  // The cook's other two files keep the original serial, no-neighbour placement in groups of their own.
+  // The publish file's cold real cook keeps the original serial, no-neighbour placement. The limits file
+  // (hostile archives, job limits, R2) runs no real cook and stays an ordinary file, so the planner fits.
   'native-cook-publish': ['test/cook-worker-publish.test.ts'],
-  'native-cook-limits': ['test/cook-worker-limits.test.ts'],
   'native-cook-cpu': ['test/cook-cpu-limit.test.ts'],
   'driftwood-population': [
     'test/driftwood-headless-population.test.ts',
