@@ -72,6 +72,8 @@ test.skipIf(FOLDER === undefined)('a browser sees the strip appear when the link
     const report = await page.evaluate(() => (window as unknown as { proof: { states: string[]; frames: number; rejoins: number; welcome: string | null; said: string[] } }).proof);
     expect(report.said).toEqual(['held line']);
     await page.waitForFunction(() => (window as unknown as { proof: { heard: string[] } }).proof.heard.includes('held line'), undefined, { timeout: 5000 });
+    // a late duplicate would land within a second or two of the first: count after that window
+    await new Promise(wait => { setTimeout(wait, 1500); });
     expect(await page.evaluate(() => (window as unknown as { proof: { heard: string[] } }).proof.heard.filter(text => text === 'held line').length)).toBe(1);
     console.info(`browser strip: shown ${shownAfter.toFixed(0)} ms after the pull, cleared at ${clearedAfter.toFixed(0)} ms, ${JSON.stringify(report)}`);
     expect(report.states).toEqual(['reconnecting', 'live']);
