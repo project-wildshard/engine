@@ -6,6 +6,7 @@ import {homedir} from 'node:os';
 import {dirname,join,resolve as resolvePath} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import * as v from 'valibot';
+import {cloneQueueOrigin} from './push-queue-clone.mjs';
 import {rebaseQueuedSnapshot} from './push-queue-rebase.mjs';
 import {workerEnvironment} from './push-environment.mjs';
 
@@ -155,7 +156,7 @@ async function batch(directory,jobs){
    // Origin owns the starting point. The originals are immutable payloads;
    // each is rebased in FIFO order onto the preceding combined private main.
    let combined=join(candidateRoot,'origin');
-   execFileSync('git',['clone','--quiet','--branch=main','--reference-if-able',first.snapshot,'--dissociate',first.remote,combined],{env:workerEnvironment(),stdio:'pipe'});
+   cloneQueueOrigin(first.snapshot,first.remote,combined,workerEnvironment());
    for(const [index,job] of subset.entries()){
     verifySnapshot(job.snapshot,job,'before combining the immutable request');
     const view=join(candidateRoot,String(index));
