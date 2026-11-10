@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
-import {expect, test} from 'vitest';
+import {expect, test, vi} from 'vitest';
 import {paintSpawnDownload, type SpawnDownload, type SpawnDownloadSnapshot} from './spawnDownload';
+import {Loading} from '@wildshard/engine/ui/Loading';
+import {loadShellTemplate} from '@wildshard/engine/boot/shell';
 
 test('the existing card paints one fixed list and reserves 100 for actual completion', () => {
   const root = document.createElement('div'); root.innerHTML = '<span data-el="dlFact"></span><span data-el="dlPct"></span><i data-el="dlBar"></i>';
@@ -33,17 +35,29 @@ test('the early card prints wire facts without changing decoded percentage or di
   stop();
 });
 
-test('the early painter stops once Loading takes the download, so the bar has one painter (LS3)', () => {
-  const root = document.createElement('div'); root.innerHTML = '<span data-el="dlFact"></span><span data-el="dlPct"></span><i data-el="dlBar"></i>';
+test('Loading takes the shell card\'s download bar from the early painter at once, in tenths (LS3: one painter)', () => {
+  vi.stubGlobal('PerformanceObserver', class {observe(): void { /* not under test */ } disconnect(): void { /* not under test */ } takeRecords(): PerformanceEntry[] {return [];}});
+  const card = document.createElement('div'); card.className = 'ws-load'; card.dataset['shell'] = ''; card.innerHTML = loadShellTemplate();
+  document.body.append(card);
   let row: SpawnDownloadSnapshot = {totalBytes: 1000, completedBytes: 500, cachedBytes: 0, filesTotal: 2, filesDone: 1, complete: false, error: null};
-  let update: (value: SpawnDownloadSnapshot) => void = () => undefined;
-  const download: SpawnDownload = {ready: Promise.resolve(), snapshot: () => row, resolve: url => url, cancel: () => undefined,
-    subscribe: listener => {update = listener; listener(row); return () => undefined;}};
-  paintSpawnDownload(download, root);
-  const bar = root.querySelector<HTMLElement>('[data-el="dlBar"]');
+  const listeners = new Set<(value: SpawnDownloadSnapshot) => void>();
+  const download: SpawnDownload = {ready: new Promise<void>(() => { /* stays open: the takeover happens mid-download */ }), snapshot: () => row, resolve: url => url, cancel: () => undefined,
+    subscribe: listener => {listeners.add(listener); listener(row); return () => {listeners.delete(listener);};}};
+  // the early painter hears each update after Loading (the order that put a whole 95 back over 95.4)
+  const update = (next: SpawnDownloadSnapshot): void => { row = next; for (const listener of [...listeners].reverse()) listener(next); };
+  paintSpawnDownload(download, card); // entry.ts, from the tap
+  const bar = card.querySelector<HTMLElement>('[data-el="dlBar"]');
   expect(bar?.style.width).toBe('50%');
-  root.dataset['downloadPainter'] = 'loading'; bar?.style.setProperty('width', '95.4%'); // Loading's tenths
-  row = {...row, completedBytes: 954}; update(row);
-  expect(bar?.style.width).toBe('95.4%'); // no whole 95 painted back over it
-  expect(root.dataset['readBytes']).toBe('954'); // the card's data still follows the download
+  const loading = new Loading({id: 'driftwood-isle', name: 'Driftwood Isle'});
+  try {
+    expect(loading.root).toBe(card);
+    void loading.setDownloadSource(download);
+    expect(card.dataset['downloadPainter']).toBe('loading');
+    expect(bar?.style.width).toBe('50.0%'); // Loading painted at once, in tenths
+    update({...row, completedBytes: 954});
+    expect(bar?.style.width).toBe('95.4%'); // never the early painter's whole 95 after it
+    update({...row, completedBytes: 977});
+    expect(bar?.style.width).toBe('97.7%');
+    expect(card.dataset['readBytes']).toBe('977'); // the card's data still follows the download
+  } finally { loading.scope.dispose(); vi.unstubAllGlobals(); card.remove(); }
 });
