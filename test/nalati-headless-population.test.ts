@@ -15,6 +15,7 @@ import { populationCensus, type PopulationCensus } from '../src/shared/game/popu
 import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { canonicalSimDigest } from './fake/simState';
 import { builtProduct } from './fixtures/builtProduct';
+import { jumpOwnerClock } from './fixtures/ownerClock';
 
 // P1-E3.1b: Nalati Grasslands' population on the shipped headless host, from its built product alone. The world's every
 // server input is a server-class file (J91); no test fixture lends a row, and the worker runs the same world as a resident.
@@ -29,6 +30,7 @@ async function shipped(): Promise<{ directory: string; product: Awaited<ReturnTy
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   return { directory, product, assets, rapier, resident: snapshot => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
 }
+const Raid = v.looseObject({ state: v.looseObject({ raidT: v.number(), spawned: v.number() }) });
 const steps = (resident: TrustedHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
 const byId = (census: PopulationCensus, id: string): PopulationCensus['bodies'][number] => {
   const body = census.bodies.find(row => row.id === id); if (body === undefined) throw new Error(`Missing census body ${id}`); return body;
@@ -89,11 +91,20 @@ test('Nalati runs its whole population headless from the product: roster, wolves
     for (let tick = 0; tick < 1200; tick++) { live.step([]); restored.step([]); }
     expect(populationCensus(restored.host)).toEqual(populationCensus(live.host));
 
-    // the admission programme's delayed raid brings its three raiders at the flock
-    steps(live, 18_000);
+    // the admission programme's delayed raid brings its three raiders at the flock. FAST-SLOW-TESTS FS1: the raid was
+    // 121.7 s (7,300 ticks) away here and the original stepped 18,000 idle ticks to reach it. Its saved countdown jumps
+    // to one second, so the programme's own raid tick still runs the countdown out, admits the raid and spawns the pack.
+    const due = jumpOwnerClock(live.host, 'nalati.raid', ['state.raidT'], state => v.parse(Raid, state), state => {
+      expect(state.state.spawned).toBe(0); expect(state.state.raidT).toBeGreaterThan(60);
+      return { ...state, state: { ...state.state, raidT: 1 } };
+    });
+    expect(due.state.raidT).toBe(1);
+    steps(live, 600);
     const raided = populationCensus(live.host);
     expect(raided.kinds['wolf']?.alive).toBe(13);
     expect(['creature:42', 'creature:43', 'creature:44'].map(id => byId(raided, id).kind)).toEqual(['wolf', 'wolf', 'wolf']);
+    // the programme spawned them, once, from the jumped countdown
+    expect(v.parse(Raid, live.host.adapters.get('nalati.raid')?.snapshot()).state.spawned).toBe(1);
   } finally { restored?.dispose(); live.dispose(); }
 }, 180_000);
 
