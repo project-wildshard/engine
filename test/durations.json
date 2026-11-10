@@ -638,7 +638,7 @@
   "test/dedicated-addresses.test.ts": 2.001324123,
   "test/dedicated-doc.test.ts": 25.902614878,
   "test/dedicated-gateway-safety.test.ts": 0.883275608,
-  "test/dedicated-grid-cells.test.ts": 5.055776540999998,
+  "test/dedicated-grid-cells.test.ts": 6.288049876,
   "test/dedicated-hold-expiry.test.ts": 6.611,
   "test/dedicated-hold.test.ts": 5.199,
   "test/dedicated-ingress.test.ts": 0.5705860579999998,

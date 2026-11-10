@@ -23,3 +23,4 @@
 - CI's Ring 1 installs no open plot, so the instance-named cell in the tests is
   `template-2` (runs `_template`, which Ring 1 does install). The pull test
   now asserts the refusal text and an untouched kept record (re-review SHOULD).
+- Re-recorded its clocks.
