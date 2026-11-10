@@ -1,7 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- All writes are confined to an owned temporary policy fixture.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
-// oxlint-disable-next-line import/no-nodejs-modules -- The guard compares actual immutable Node source trees.
-import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only the owned fixture trees.
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
@@ -25,7 +23,8 @@ test('historical Nalati runtime debt keeps exact-source refusal intact', () => {
 });
 
 test('rekeys real edited or moved sites without new kind or row allowance', () => {
-  const root = mkdtempSync(join(tmpdir(), 'runtime-rekey-'));
+  mkdirSync('tmp', { recursive: true });
+  const root = mkdtempSync(join('tmp', 'runtime-rekey-'));
   const baselineRoot = join(root, 'before'), candidateRoot = join(root, 'after');
   const oldFile = 'src/shards/example/runtime/old.ts', newFile = 'src/shards/example/runtime/new.ts';
   const oldSource = 'export function update(items) { for (const item of items) consume(item); }';
