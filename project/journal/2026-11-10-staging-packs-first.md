@@ -33,3 +33,7 @@ build. So "accepted · build b721769" really meant the server ran
 `a8144a5`. Join now names the build it sent. The server row says it's
 stuck when the release's packs are missing, and otherwise says to check
 again in a few minutes. The packs row names the build it asked for.
+
+The doctor change ships in its own commit, with a regression test where
+the release names a build with no book: packs fail with the build named,
+the server warns stuck, and join names the build the server runs.

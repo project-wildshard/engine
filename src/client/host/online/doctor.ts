@@ -66,7 +66,9 @@ const fail = (value: string, hint: string): Outcome => ({ state: 'fail', value, 
 const skip = (value: string): Outcome => ({ state: 'skip', value });
 
 /** What the earlier checks learned, for the later ones. */
-interface Learned { readonly scope: Scope; release?: ReleaseFile; socket?: string; serverOffset?: number; pageOffset?: number; serverBuild?: string; rtt: number[]; joined: boolean }
+interface Learned { readonly scope: Scope; release?: ReleaseFile; socket?: string; serverOffset?: number; pageOffset?: number; serverBuild?: string; rtt: number[]; joined: boolean;
+  /** The release's build has no server book or part on the packs origin: the server cannot move to it. */
+  packsMissing?: boolean }
 
 /** The health address beside a socket: the same host, over HTTPS for `wss:`. */
 export function healthUrl(socket: string): string {
@@ -128,18 +130,19 @@ async function checkPacks(config: DoctorConfig, learned: Learned, ms: number): P
   try {
     const shards = await limited(learned.scope, ms, async signal => {
       const response = await fetch(book, { cache: 'no-store', signal });
-      if (!response.ok) throw new Error(`server book ${String(response.status)}`);
+      if (!response.ok) throw new Error(`server book ${String(response.status)} · build ${short(release.engineBuild)}`);
       return (await response.json() as { shards?: Record<string, { url?: string }> }).shards ?? {};
     });
     const named = Object.keys(shards), product = named.find(name => name === config.cell) ?? named[0];
     const part = product === undefined ? undefined : shards[product]?.url;
-    if (product === undefined || part === undefined) return fail(`book has no shards`, 'The server book for this build is empty. The pack publish is incomplete: tell Jake.');
+    if (product === undefined || part === undefined) { learned.packsMissing = true; return fail(`book has no shards`, 'The server book for this build is empty. The pack publish is incomplete: tell Jake.'); }
     // A part's headers are enough: the body is the server's to read, so the doctor stops at the status.
     const status = await limited(learned.scope, ms, async signal => { const response = await fetch(new URL(part, origin), { signal }); void response.body?.cancel(); return response.status; });
-    if (status !== 200) return fail(`${product} part ${String(status)}`, 'A pack part is missing on the packs origin. The pack publish is incomplete: tell Jake.');
+    if (status !== 200) { learned.packsMissing = true; return fail(`${product} part ${String(status)}`, 'A pack part is missing on the packs origin. The pack publish is incomplete: tell Jake.'); }
     return pass(`server book · ${String(Object.keys(shards).length)} shards · ${product} part ok`);
   } catch (error) {
-    return fail(errorText(error), "The packs origin did not serve this build's server book. The packs for this build are not published yet: tell Jake.");
+    learned.packsMissing = true;
+    return fail(errorText(error), `The packs origin has no server book for build ${short(release.engineBuild)}, the one the release file names. Its packs were never published, so the server cannot move to it: tell Jake.`);
   }
 }
 
@@ -154,7 +157,13 @@ async function checkServer(learned: Learned, ms: number): Promise<Outcome> {
     if (typeof health.build === 'string') learned.serverBuild = health.build;
     const players = typeof health.players === 'number' ? ` · ${String(health.players)} playing` : '';
     const up = typeof health.uptime === 'number' ? ` · up ${String(Math.round(health.uptime / 60))} min` : '';
-    if (learned.release !== undefined && learned.serverBuild !== undefined && learned.serverBuild !== learned.release.engineBuild) return warn(`build ${short(learned.serverBuild)}${players}`, `The server still runs ${short(learned.serverBuild)}; the release names ${short(learned.release.engineBuild)}. It moves by itself within a few minutes.`);
+    if (learned.release !== undefined && learned.serverBuild !== undefined && learned.serverBuild !== learned.release.engineBuild) {
+      const named = short(learned.release.engineBuild), runs = short(learned.serverBuild);
+      // The server loads the named build's packs before it moves; without them it stays where it is, however long anyone waits.
+      return warn(`build ${runs}${players} · release ${named}`, learned.packsMissing === true
+        ? `Stuck: the server stays on ${runs} because build ${named}'s packs are not published, so it cannot move. Tell Jake.`
+        : `The server still runs ${runs}; the release names ${named}. It loads the new packs, then restarts after a 60-second countdown. Run the check again in a few minutes; if it stays, tell Jake.`);
+    }
     return pass(`build ${short(learned.serverBuild ?? '?')}${players}${up}`);
   } catch (error) {
     if (error instanceof TimedOutError) return fail(`${new URL(url).host}: ${error.message}`, 'Server unreachable: the VPS tunnel (Tailscale Funnel) is down or the server is stopped. Tell Jake.');
@@ -180,7 +189,8 @@ const CLOSED: Readonly<Record<string, readonly [string, string]>> = {
 function checkJoin(config: DoctorConfig, learned: Learned, ms: number): Promise<Outcome> {
   const socket = learned.socket;
   if (socket === undefined || learned.release === undefined) return Promise.resolve(skip('needs the release file'));
-  const build = learned.release.engineBuild, scope = learned.scope.child('doctor.join');
+  // The door seats only the build it runs, so an accepted hello proves the server runs the build the hello named: the page's own.
+  const build = config.build || learned.release.engineBuild, scope = learned.scope.child('doctor.join');
   return new Promise<Outcome>(resolve => {
     let ws: WebSocket, opened = false, sent = 0, deploy = '';
     const done = (outcome: Outcome): void => {
@@ -199,7 +209,7 @@ function checkJoin(config: DoctorConfig, learned: Learned, ms: number): Promise<
     scope.listen(ws, 'open', () => {
       opened = true;
       // The game's own hello (J197), as a device that exists only for this check. No `ready` follows, so no body is seated.
-      ws.send(framed(SOCKET_RELIABLE, encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build: config.build || build, player: `doctor:${crypto.randomUUID()}`, name: 'Doctor', ledger: 0 })));
+      ws.send(framed(SOCKET_RELIABLE, encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build, player: `doctor:${crypto.randomUUID()}`, name: 'Doctor', ledger: 0 })));
       ping();
     });
     scope.listen(ws, 'message', (event: MessageEvent<unknown>) => {

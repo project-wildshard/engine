@@ -93,6 +93,21 @@ test('a missing pack part and a missing book are the packs origin, not the serve
   expect(rows['join']?.state).toBe('pass');
 });
 
+test('a release ahead of its packs: the server is stuck, not moving, and join names the build the server runs', { timeout: 30_000 }, async () => {
+  bench = await roomBench(); answerHealth(bench);
+  // The release names `next`, whose server book was never published; the page and the server are both still `bench`.
+  const rows = await run(config(await serveOrigin(signed(releaseFor(bench.url, 'next')))));
+  expect(rows['page']?.state).toBe('pass');
+  expect(rows['release']?.state).toBe('warn');
+  expect(rows['packs']).toMatchObject({ state: 'fail', value: 'server book 404 · build next' });
+  expect(rows['server']).toMatchObject({ state: 'warn', value: 'build bench · 0 playing · release next' });
+  expect(rows['server']?.hint).toContain('Stuck');
+  expect(rows['server']?.hint).not.toContain('moves by itself');
+  expect(rows['join']).toMatchObject({ state: 'pass' });
+  expect(rows['join']?.value).toContain('build bench');
+  expect(rows['join']?.value).not.toContain('next');
+});
+
 test('the health address sits beside the socket', () => {
   expect(healthUrl('wss://wildshard.tailb41b20.ts.net')).toBe('https://wildshard.tailb41b20.ts.net/health');
   expect(healthUrl('wss://wildshard.tailb41b20.ts.net:8443/')).toBe('https://wildshard.tailb41b20.ts.net:8443/health');
