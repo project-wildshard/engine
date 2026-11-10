@@ -44,3 +44,11 @@ receipt checks bind exact Git SHA, committed pin hash/test-list digest,
 every unique phase and actual cap/touch result. This partial manual run
 cannot qualify the whole nightly or remove its J167 tag hold. Estimate:
 about 24 hosted runner-minutes once; no additional scheduled workflow.
+
+The qualification consumer has its own one-shot operational review,
+SDK-hover-qualification-20261110T050605Z: no MUST or SHOULD; actionlint
+passes. Its independent receipt assertion also reads committed pin and
+test-list digests and requires every unique phase. No hosted run is
+claimed before publication. Official renderer and validation writers
+produce identical values twice in the clean publication view; only the
+renderer stamp changes. Creator boot-generation outputs stay excluded.
