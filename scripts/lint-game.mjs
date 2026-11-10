@@ -11,6 +11,14 @@ const threads = process.env.WS_PUSH_LINT_THREADS;
 if (threads !== undefined && !/^[1-9]\d*$/u.test(threads)) throw new Error('Invalid push lint worker limit');
 const files = asked.filter(path => LIFTED.test(path));
 if (asked.length > 0 && files.length === 0) process.exit(0);
-const run = spawnSync('oxlint', ['-c', '.oxlintrc.json', '--deny-warnings', ...(threads === undefined ? [] : ['--threads', threads]), ...(asked.length === 0 ? TREE : files)], { stdio: 'inherit',env:lintEnvironment() });
+const options=['-c', '.oxlintrc.json', '--deny-warnings', ...(threads === undefined ? [] : ['--threads', threads])],environment=lintEnvironment();
+let run = spawnSync('oxlint', [...options,...(asked.length === 0 ? TREE : files)], { stdio: asked.length===0?'inherit':'pipe',encoding:'utf8',env:environment });
+if(asked.length>0){
+  process.stdout.write(run.stdout??'');process.stderr.write(run.stderr??'');
+  if(run.status!==0&&`${run.stdout??''}\n${run.stderr??''}`.includes('No files found to lint')){
+    console.error('lint-game: selected paths have no eligible lint inputs; running the complete declared tree');
+    run=spawnSync('oxlint',[...options,...TREE],{stdio:'inherit',encoding:'utf8',env:environment});
+  }
+}
 if (run.error !== undefined) throw run.error;
 process.exit(run.status ?? 1);
