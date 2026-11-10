@@ -98,15 +98,21 @@ function wakeups() {
     /** @param {number|null} ms */
     wait: ms =>
       new Promise(resolve => {
-        /** @type {ReturnType<typeof setTimeout>|undefined} */
-        let timer
+        /** @type {()=>void} */
+        let cancel = () => undefined
         const end = () => {
-          clearTimeout(timer)
+          cancel()
           waits.delete(end)
           resolve(null)
         }
         waits.add(end)
-        if (ms !== null) timer = setTimeout(end, ms)
+        if (ms !== null) {
+          const alarm = deadlineWait(performance.now() + ms)
+          cancel = alarm.cancel
+          void (async () => {
+            if (await alarm.promise) end()
+          })()
+        }
       }),
   }
 }

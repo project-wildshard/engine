@@ -19,6 +19,7 @@ import { join, resolve as absolute } from 'node:path'
 import { createInterface } from 'node:readline'
 import { test } from 'node:test'
 import { setTimeout as wait } from 'node:timers/promises'
+import { gzipSync } from 'node:zlib'
 
 import { WebSocket, WebSocketServer } from 'ws'
 
@@ -389,6 +390,8 @@ await test(
         { route: 'socket', kind: 'loss', fraction: 1, seed: 28 },
       ])
       await echo(live, Buffer.from([8, 7]))
+      // Auto-pong proves this hop only. Prefix 2/3 echoes above separately
+      // prove application control bytes traversed the real upstream.
       const pong = once(live, 'pong', { signal: AbortSignal.timeout(1000) })
       live.ping()
       await pong
@@ -506,18 +509,29 @@ await test(
         await noApi.close()
       }
     } finally {
-      for (const client of clients) client.terminate()
-      await proxy?.close()
-      for (const client of wss.clients) client.terminate()
-      await new Promise(resolve => {
-        wss.close(() => {
-          resolve(null)
-        })
-      })
-      upstream.closeAllConnections()
-      upstream.close()
-      await once(upstream, 'close')
-      rmSync(work, { recursive: true })
+      await retire([
+        () => {
+          for (const client of clients) client.terminate()
+        },
+        () => proxy?.close(),
+        () => {
+          for (const client of wss.clients) client.terminate()
+        },
+        () =>
+          new Promise(resolve => {
+            wss.close(() => {
+              resolve(null)
+            })
+          }),
+        async () => {
+          upstream.closeAllConnections()
+          upstream.close()
+          await once(upstream, 'close')
+        },
+        () => {
+          rmSync(work, { recursive: true })
+        },
+      ])
     }
   },
 )
@@ -581,6 +595,54 @@ await test(
       assert.notEqual(collision.status, 0)
       assert.match(collision.stderr, /EADDRINUSE/u)
       assert.equal(existsSync(join(bind, 'control.token')), false)
+      const cert = absolute(work, 'cert.pem'),
+        key = absolute(work, 'key.pem'),
+        config = absolute(work, 'openssl.cnf')
+      writeFileSync(
+        config,
+        '[req]\ndistinguished_name=dn\nx509_extensions=extensions\nprompt=no\n[dn]\nCN=127.0.0.1\n[extensions]\nsubjectAltName=IP:127.0.0.1\n',
+      )
+      execFileSync(
+        'openssl',
+        [
+          'req',
+          '-x509',
+          '-newkey',
+          'rsa:2048',
+          '-nodes',
+          '-keyout',
+          key,
+          '-out',
+          cert,
+          '-days',
+          '1',
+          '-config',
+          config,
+        ],
+        { stdio: 'ignore' },
+      )
+      chmodSync(key, 0o600)
+      for (const listener of ['world', 'tls']) {
+        const folder = join(work, listener)
+        /** @type {import('node:child_process').SpawnSyncReturns<string>} */
+        const laterCollision = spawnSync(
+          process.execPath,
+          [
+            'scripts/chaos-proxy.mjs',
+            `--work=${absolute(folder)}`,
+            '--page-port=0',
+            `--world-port=${listener === 'world' ? address.port : 0}`,
+            `--tls-port=${listener === 'tls' ? address.port : 0}`,
+            `--tls-cert=${cert}`,
+            `--tls-key=${key}`,
+          ],
+          { encoding: 'utf8', timeout: 2000 },
+        )
+        assert.notEqual(laterCollision.status, 0)
+        assert.equal(laterCollision.signal, null)
+        assert.match(laterCollision.stderr, /EADDRINUSE/u)
+        assert.equal(existsSync(join(folder, 'control.token')), false)
+      }
       assert.equal(
         await (await fetch(`http://127.0.0.1:${address.port}`)).text(),
         'still owned by the proof',
@@ -782,7 +844,7 @@ await test('path escape never reaches another loopback origin with caller header
     ])
   }
 })
-await test('rejected key closes the real upstream opened before ws validation', async () => {
+await test('invalid key leaves no native upstream behind', async () => {
   const fixture = await nativeFixture()
   try {
     assert.equal(
@@ -931,6 +993,84 @@ await test('upstream refusal cannot be masked by a downstream loss rule', async 
     assert.equal(fixture.wss.clients.size, 0)
   } finally {
     await fixture.close()
+  }
+})
+await test('closing downstream keeps a non-acknowledging upstream owned', async () => {
+  const fixture = await nativeFixture(),
+    client = await socket(fixture.proxy.ready.worldOrigin)
+  try {
+    const peer = [...fixture.wss.clients][0]
+    assert.ok(peer)
+    peer.pause()
+    const closed = once(client, 'close', { signal: AbortSignal.timeout(1000) })
+    client.close()
+    await closed
+    await fixture.proxy.close()
+    assert.equal(fixture.proxy.child.exitCode, 0)
+  } finally {
+    client.terminate()
+    await fixture.close()
+  }
+})
+await test('upstream HTTP errors and chunked binary corruption stay distinct', async () => {
+  const work = mkdtempSync('tmp/fm2/chunked-'),
+    server = createServer((request, response) => {
+      if (request.url === '/assets/spawn/packs-fixture.json') {
+        response.setHeader('content-type', 'application/json')
+        response.setHeader('content-encoding', 'gzip')
+        response.end(
+          gzipSync(
+            JSON.stringify({
+              client: { fixture: { phone: { url: '/pack/manifest.json' } } },
+            }),
+          ),
+        )
+      } else if (request.url === '/pack/manifest.json') {
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({ parts: [{ url: '../chunked.bin' }] }))
+      } else if (request.url === '/error') {
+        response
+          .writeHead(503, { 'retry-after': '12' })
+          .end('owned upstream error')
+      } else {
+        response.write(Buffer.alloc(16, 7))
+        response.end(Buffer.alloc(16, 8))
+      }
+    })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address()
+  assert.ok(address !== null && typeof address !== 'string')
+  /** @type {Awaited<ReturnType<typeof launch>>|undefined} */ let proxy
+  try {
+    proxy = await launch(
+      join(work, 'proxy'),
+      `http://127.0.0.1:${address.port}`,
+    )
+    const error = await fetch(`${proxy.ready.pageOrigin}/error`)
+    assert.equal(error.status, 503)
+    assert.equal(error.headers.get('retry-after'), '12')
+    assert.equal(await error.text(), 'owned upstream error')
+    await (
+      await fetch(`${proxy.ready.pageOrigin}/assets/spawn/packs-fixture.json`)
+    ).json()
+    await (await fetch(`${proxy.ready.pageOrigin}/pack/manifest.json`)).json()
+    await proxy.set([{ route: 'packs', kind: 'truncate', bytes: 1 }])
+    const broken = await fetch(`${proxy.ready.pageOrigin}/chunked.bin`)
+    assert.equal(broken.headers.get('content-length'), '1')
+    assert.deepEqual(Buffer.from(await broken.arrayBuffer()), Buffer.from([7]))
+  } finally {
+    await retire([
+      () => proxy?.close(),
+      async () => {
+        server.closeAllConnections()
+        server.close()
+        await once(server, 'close')
+      },
+      () => {
+        rmSync(work, { recursive: true })
+      },
+    ])
   }
 })
 await test('all native proxy controls include setup and teardown within ten seconds', () => {

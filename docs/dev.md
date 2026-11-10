@@ -376,7 +376,8 @@ truncation and body replacement, and WebSocket refused upgrade, terminate,
 half-open, coded close, seeded loss and delayed frames (plus bandwidth).
 Socket direction is down by default, with explicit up/both. Seeded loss
 can drop only binary prefix 1; reliable, ping/pong and voice prefix 8 are
-preserved. Rule activation applies to existing sockets too. Healing
+preserved through the upstream. Native ws auto-pong observes only the
+client-to-proxy hop. Rule activation applies to existing sockets too. Healing
 releases delayed traffic; half-open drops are not replayed later.
 
 Pack classification learns the real root book and declared manifest/member
@@ -387,8 +388,8 @@ still reject bad length/hash bytes. Doctor entry modules are learned from
 the actual doctor document. The direct server release bypasses faults.
 
 Control bodies are bounded at 128 KiB/32 rules, metadata at 2 MiB, pending
-socket payload at 8 MiB and event samples at 256 entries. Backpressure
-pauses the native source. Shutdown and parent EOF retire only owned
+socket payload at 8 MiB/1024 messages and event samples at 256 entries.
+Backpressure pauses both native sources and healing reevaluates both. Shutdown and parent EOF retire only owned
 listeners, sockets, timers and the exclusively created token path.
 
 Run `node --test scripts/chaos-proxy-proof.mjs` explicitly. It uses the real
