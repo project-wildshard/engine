@@ -94,7 +94,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@types/three>@dimforge/rapier3d-compat": "-"
+      "@types/three>@dimforge/rapier3d-compat": "-",
+      "assemblyscript>binaryen": "npm:@pre-bundled/binaryen@131.0.0-nightly.20260721-patch-1"
     },
     "ignoredOptionalDependencies": [
       "@esbuild/aix-ppc64",
