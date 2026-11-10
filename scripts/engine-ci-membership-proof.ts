@@ -1,11 +1,11 @@
-// J193 outer-edge CLI proof. Intentionally outside hook discovery (lift-pending).
+// J193 outer-edge CLI proof, explicitly invoked by both CI plan jobs.
 // Runs actual Vitest file discovery against every generated config phase.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {relative,resolve} from 'node:path';
 import * as v from 'valibot';
-import {createEnginePlan,discoverEngineTests,readEnginePlan} from '../scripts/engine-ci-plan.ts';
+import {createEnginePlan,discoverEngineTests,readEnginePlan} from './engine-ci-plan.ts';
 
 const ring=process.argv.includes('--ring=1')?'1':'full';
 const directory=resolve(process.argv.find(arg=>arg.startsWith('--out='))?.slice(6)??'tmp/engine-ci-proof');mkdirSync(directory,{recursive:true});

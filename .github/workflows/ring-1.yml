@@ -53,7 +53,7 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - id: plan
         run: node scripts/engine-ci-plan.ts --ring=1
-      - run: node test/vitest-sharding.test.ts --ring=1
+      - run: node scripts/engine-ci-membership-proof.ts --ring=1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ring1-test-plan

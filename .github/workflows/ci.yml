@@ -93,7 +93,7 @@ jobs:
         id: plan
         run: node scripts/engine-ci-plan.ts
       - name: Prove actual phase discovery and hostile-plan refusal
-        run: node test/vitest-sharding.test.ts
+        run: node scripts/engine-ci-membership-proof.ts
       - name: Prove actual planned dispatch and unplanned-file refusal
         run: node scripts/engine-order-proof.mjs
       - name: Prove cached public imports follow a package retag

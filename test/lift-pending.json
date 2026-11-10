@@ -372,7 +372,6 @@
   "test/uniform-tile-grid.test.ts",
   "test/view-author-metadata.test.ts",
   "test/vite-boot-modules.test.ts",
-  "test/vitest-sharding.test.ts",
   "test/wet-product-loans.test.ts",
   "test/whole-library-cache.test.ts",
   "test/whole-prop-shadows.test.ts",
