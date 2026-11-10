@@ -530,3 +530,49 @@ void test(
     })
   },
 )
+
+void test(
+  'one actual pickup command preserves explicit choice and refuses both unearned slots',
+  { timeout: limit },
+  async () => {
+    await native('pine-hollow', async f => {
+      assert.equal(f.host.flags.has('owned:lever-rifle'), false)
+      assert.equal(f.host.flags.has('paid:king'), false)
+      f.tick({ equip: 1 })
+      f.settle()
+      f.settle()
+      assert.equal(f.lead.held, 0)
+      f.tick({ equip: 2 })
+      f.settle()
+      f.settle()
+      assert.equal(f.lead.held, 0)
+      const pickup = (await f.product.json('quests/native-spots.json')).pickup
+      assert.ok(pickup)
+      f.lead.resetPose(
+        {
+          x: pickup.x,
+          y: f.host.groundHeightAt(pickup.x, pickup.z),
+          z: pickup.z,
+        },
+        0,
+      )
+      f.tick({ interact: 'quest.pickup', equip: 0 })
+      f.settle()
+      f.settle()
+      assert.equal(f.host.flags.has('owned:lever-rifle'), true)
+      assert.equal(f.lead.held, 0)
+      assert.equal(f.client.owner(f.client.latest).held, 0)
+      f.tick({ equip: 1 })
+      f.settle()
+      f.settle()
+      assert.equal(f.lead.held, 1)
+      assert.equal(f.client.owner(f.client.latest).held, 1)
+      f.tick({ equip: 2 })
+      f.settle()
+      f.settle()
+      assert.equal(f.host.flags.has('paid:king'), false)
+      assert.equal(f.lead.held, 1)
+      assert.equal(f.client.owner(f.client.latest).held, 1)
+    })
+  },
+)

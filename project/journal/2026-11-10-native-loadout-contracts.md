@@ -5,7 +5,7 @@ ownership flags. Its 1,200-frame oracle also called the same production
 controller as its subject. Preserve those public contracts with an
 independent slot/clock oracle, and obtain the flags from real inputs.
 
-Two explicit CI-only cases load the pinned Driftwood and Pine products.
+Explicit CI-only cases load the pinned Driftwood and Pine products.
 Actual pickup selects the rifle. Actual clock selection, skip, free
 shots, reloads and reward collection earn the King bow. Full normal HP,
 ammunition, damage, deaths and boss checkpoints remain. A grounded pose
@@ -33,3 +33,20 @@ Four actual source mutants fail the proof: denied ownership (1.28 s),
 stale live publication (1.26 s), clamped sentinel (1.28 s), and mutation
 before invalid restore validation (2.97 s). Each original source byte
 is restored; no runtime source change belongs to this row.
+
+## Review and priority counterexample
+
+J206 one-shot review approves 779c952 with no MUST or SHOULD items:
+`~/.cache/wildshard/session-keep/reviews/sdk-loadout-engine-20261110-SDK-native-loadout-20261110T074653Z-94765.md`.
+The safe helper selected ephemeral read-only Codex because the Opus quota
+was exhausted or unverified. The review wrote nothing to the checkout.
+
+A self-audit found the old periodic sequence only collides at slot zero
+before rifle ownership, then at slot one (the pickup fallback itself).
+Add a third actual-room case, including both unearned wire refusals and
+one command that collects the real rifle while explicitly selecting zero.
+The original production expression reversed to pickup-first now fails
+1 versus 0; its source is byte-restored. Positive subsequent equip one
+reaches both body and client, and unearned equip two leaves it unchanged.
+All three actual cases pass in 3.16 s total, including process startup;
+2.03/0.28/0.20 s individually, no skips. No second review or runtime edit.

@@ -184,7 +184,7 @@ browser, forced health or synthetic reward is used.
 
 After the same two pinned products are installed, run
 `node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-loadout.proof.mjs`.
-CI runs these two cases explicitly; hooks and Vitest do not discover
+CI runs these three cases explicitly; hooks and Vitest do not discover
 them. Each 9.5-second bound includes loading, physics and cleanup.
 
 Actual Pine pickup, clock, shot, reload and reward inputs earn the rifle
@@ -198,4 +198,6 @@ Aim fallback, clamp and sentinel are author-port contracts; NaN cannot
 cross the wire. Pending swaps round-trip through the real save adapter,
 and invalid continuations leave state intact. Both stock kits retain
 their authored slot/clock policies and strict preflight refusals. The
-SDK predecessor remains until its owner approves retirement.
+SDK predecessor remains until its owner approves retirement. A third
+actual-room case refuses both unearned slots and proves that an explicit
+choice wins when the same command also collects the rifle.
