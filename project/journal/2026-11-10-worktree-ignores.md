@@ -38,3 +38,7 @@ inside a real worktree too (run there: 11 of 11). The format and named-lint
 checks now fail on a broken tool run, not only on a planted hit.
 
 Clocks re-recorded after the review fix changed the guard's blob.
+
+Hosted ring-1 on 3a2b652 went red on the two watcher cases (Linux): chokidar
+there walks the tree after `ready`, so the guard read only the root. The guard
+now waits until `src` is watched and the folder set has held still for 0.5 s.

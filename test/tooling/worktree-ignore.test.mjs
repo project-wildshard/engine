@@ -126,15 +126,32 @@ describe('the parent checkout never sees a planted worktree', () => {
 });
 
 describe('watchers and whole-root walkers', () => {
-  /** Start Vite's real dev watcher on `root` with the shared ignore; its watched folders, relative to `root`.
-   * @param {string} root @returns {Promise<string[]>} */
+  /** Poll until `check` holds or `ms` pass. @param {() => boolean} check @param {number} ms */
+  async function until(check, ms) {
+    for (const started = Date.now(); !check() && Date.now() - started < ms;) await new Promise(done => setTimeout(done, 25));
+    return check();
+  }
+
+  /**
+   * Start Vite's real dev watcher on `root` with the shared ignore; the folders it watches, relative to `root`, once
+   * it watches `src` and its folder set has held still for half a second. Linux's watcher walks the tree after `ready`,
+   * so nothing here trusts `ready` alone.
+   * @param {string} root @returns {Promise<string[]>}
+   */
   async function watched(root) {
     const server = await createServer({configFile: false, root, logLevel: 'silent', appType: 'custom',
       server: {middlewareMode: true, ws: false, watch: {ignored: worktreeWatchIgnored(root)}}, optimizeDeps: {noDiscovery: true, include: []}});
+    const folders = () => Object.keys(server.watcher.getWatched()).map(path => relative(root, path).replaceAll('\\', '/')).sort();
     try {
       server.watcher.add(root);
-      await new Promise(done => { server.watcher.once('ready', done); setTimeout(done, 2000); });
-      return Object.keys(server.watcher.getWatched()).map(path => relative(root, path).replaceAll('\\', '/'));
+      expect(await until(() => folders().includes('src'), 10_000)).toBe(true);
+      let last = folders().join('\n'), still = Date.now();
+      await until(() => {
+        const now = folders().join('\n');
+        if (now !== last) { last = now; still = Date.now(); }
+        return Date.now() - still >= 500;
+      }, 10_000);
+      return folders();
     } finally { await server.close(); }
   }
 
