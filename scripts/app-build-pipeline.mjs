@@ -17,6 +17,7 @@ import {
   pruneLooseCopies,
 } from "./app-build/outputProducts.mjs";
 import { stampBuildDocuments } from "./app-build/buildIdentity.mjs";
+import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
 import { carryPreviousDeploy } from "./app-build/previousDeploy.mjs";
 import { buildValidationReceipts } from "./app-build/validationReceipts.mjs";
 import { shardfileValidationRevision } from "./shardfile-validation-revision.mjs";
@@ -163,19 +164,21 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   } = process.env;
   if (recordTag !== undefined && !/^[\w.-]{1,64}$/u.test(recordTag))
     throw new Error("WILDSHARD_RECORD_TAG must be a bounded sitting label");
+  const world =
+    worldFile === undefined || worldKey === undefined
+      ? undefined
+      : {
+          release: worldFile,
+          key: worldKey,
+          ...(recordTag === undefined ? {} : { recordTag }),
+        };
   stampBuildDocuments(outDir, {
     validator,
     verdicts: buildValidationReceipts(validator),
-    ...(worldFile === undefined || worldKey === undefined
-      ? {}
-      : {
-          world: {
-            release: worldFile,
-            key: worldKey,
-            ...(recordTag === undefined ? {} : { recordTag }),
-          },
-        }),
+    ...(world === undefined ? {} : { world }),
   });
+  // J236: production plain, staging the S, the solo build the P; before the worker reads the final document.
+  writeHomeIcons(outDir, homeIconChannel(world));
 
   writeTitleAssets(process.cwd(), outDir);
 

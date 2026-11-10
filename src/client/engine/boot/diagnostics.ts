@@ -62,9 +62,9 @@ const WAIT_LABELS=new Set(['GLTF decode (owned bytes)','GLTF decode pacing','Gri
   'Read Texture data','Read grid session module','Spawn download','Spawn view','Startup stylesheets']);
 const SAFE_SEGMENT=/^[A-Za-z0-9._-]{1,96}$/u, CONTENT_V=/^[a-f0-9]{8,64}$/u;
 /** LD3: the build's public routes. Same origin alone does not make a file public (Codex review of ca3c1d8). */
-const PUBLIC_DIRECTORIES=new Set(['b','assets','shardfiles','basis','fonts','programs','sw-core','calibration']);
-const PUBLIC_FILES=new Set(['/','/index.html','/sw.js','/version.json','/manifest.webmanifest','/favicon.png','/apple-touch-icon.png',
-  '/icon-192.png','/icon-512.png','/catalogue.json','/asset-index.json','/asset-manifest.json','/clear-cache.json']);
+const PUBLIC_DIRECTORIES=new Set(['b','assets','shardfiles','basis','fonts','programs','sw-core','calibration','icons']);
+const PUBLIC_FILES=new Set(['/','/index.html','/sw.js','/version.json','/manifest.webmanifest',
+  '/catalogue.json','/asset-index.json','/asset-manifest.json','/clear-cache.json']);
 /** LD3: this page's own public file as its path (opaque segments elided), or null for another origin, a route outside
  *  the build's public files, a credential or a non-http URL: those keep a per-report ID. */
 export function diagnosticPath(value:string,origin:string|undefined=typeof location==='undefined'?undefined:location.origin):string|null{
