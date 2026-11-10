@@ -363,7 +363,6 @@
     "pine-posed-tier-loading.test.ts",
     "pine-product-reads.test.ts",
     "platform-build-tools.test.ts",
-    "platform-declarative-manifest.test.ts",
     "platform-file-families.test.ts",
     "platform-namespace-reach.test.ts",
     "platform-output-reader.test.ts",

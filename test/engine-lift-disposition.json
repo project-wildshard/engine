@@ -8075,5 +8075,75 @@
     "sourceRevision": "a8144a50e79afe7e66a8ecdce9406e152518c916",
     "sourceBlob": "01c1ae217d1ca3b5f23795627d3ad96a95650726",
     "retirementProof": "Body-reviewed J186 decision, not flaky-test removal, execution qualification or successor equivalence."
+  },
+  {
+    "repo": "engine",
+    "file": "test/platform-data-contracts.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: both cases fabricate source declarations and call the private sourceProgressInventory helper, asserting exact internal source-kind lists and line-count totals. They do not build, boot or play a product. Literal shader strings are counting inputs, not a rendering proof; no shader or renderer implementation is changed.",
+    "originalTests": [
+      "generated data contracts and erased JSON stubs leave handwritten and executable TypeScript charged",
+      "generated literal tables keep their embedded shader charge"
+    ],
+    "sourceRevision": "886c620755a3383a793e6938b27c3fb32f39dc0c",
+    "sourceBlob": "f7526529b393b9c62f4085ba6aec112e2b286919",
+    "retirementProof": "Individual body-reviewed J186 disposition; no execution qualification, coverage equivalence or speed claim."
+  },
+  {
+    "repo": "engine",
+    "file": "test/platform-data-counts.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: the case fabricates an old monorepo runtime/legacy denominator and directly pins private conversion fields, fractions and undefined-source classification. It verifies an internal accounting representation, not a real product or public CLI.",
+    "originalTests": [
+      "retains the sealed denominator and omits percentages for raw P0 escapes"
+    ],
+    "sourceRevision": "886c620755a3383a793e6938b27c3fb32f39dc0c",
+    "sourceBlob": "77cca708e2c3b86930b117d0d5e47f6a7044dafe",
+    "retirementProof": "Individual body-reviewed J186 disposition; no execution qualification, coverage equivalence or speed claim."
+  },
+  {
+    "repo": "engine",
+    "file": "test/platform-declarative-manifest.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: two cases directly unit-test the private declarationOnlyManifest syntax classifier and the third pins exact private count/customSources rows from synthetic source trees. It does not exercise author CLI publication or a cooked shard; actual admission/validation implementations remain unchanged.",
+    "originalTests": [
+      "recognizes typed literal rows, imported data and const aliases without executing them",
+      "keeps any runtime logic, side effect or unknown expression custom",
+      "the output basis counts no authored runtime or manifest logic (LD10: a product ships no TypeScript)"
+    ],
+    "sourceRevision": "886c620755a3383a793e6938b27c3fb32f39dc0c",
+    "sourceBlob": "489a679bf06d1182f3cc459951d7524dc4bdc73d",
+    "retirementProof": "Individual body-reviewed J186 disposition; no execution qualification, coverage equivalence or speed claim."
+  },
+  {
+    "repo": "engine",
+    "file": "test/platform-json-code.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: cases feed fabricated JSON/TypeScript text to rawShaderLines and sourceProgressInventory, asserting exact line counts and private attribution arrays. They freeze text-accounting internals rather than product behavior. No actual shader compilation/rendering or public product refusal is removed.",
+    "originalTests": [
+      "counts decoded shader patches equally in JSON and TypeScript",
+      "counts executable strings without counting graph data, labels or comments",
+      "charges authored JSON code to its shard source inventory once"
+    ],
+    "sourceRevision": "886c620755a3383a793e6938b27c3fb32f39dc0c",
+    "sourceBlob": "093d348cb4e3c7f5a8e0e65ad81cee852e73a7b7",
+    "retirementProof": "Individual body-reviewed J186 disposition; no execution qualification, coverage equivalence or speed claim."
+  },
+  {
+    "repo": "engine",
+    "file": "test/listed-view-code.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: six cases fabricate approval/register/source snippets and pin private listedViewInventory fields, line partitioning and register labels, plus a repository ledger/docs spelling. They are internal accounting/registration units, not a product or rendering test. Production ownership/accounting gates and ledgers are unchanged.",
+    "originalTests": [
+      "named view declarations partition real source custom without changing credit or closure",
+      "whole-file and sole-export labels count only actual charged contributions",
+      "physical comment handling and shared declaration lines never double-count",
+      "retired or uncharged view declarations stay visible without inventing lines",
+      "register refuses overlapping labels, foreign-shard paths and traversal",
+      "the reviewed repository register has reasons and no whole-file overlap"
+    ],
+    "sourceRevision": "886c620755a3383a793e6938b27c3fb32f39dc0c",
+    "sourceBlob": "3df45cdf81ddfd22c192c22929d70e9a41a460e1",
+    "retirementProof": "Individual body-reviewed J186 disposition; no execution qualification, coverage equivalence or speed claim."
   }
 ]
