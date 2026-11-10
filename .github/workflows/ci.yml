@@ -1,8 +1,11 @@
 name: ci
 
 on:
+  # J240: a plan worktree pushes plan/<slug>; scripts/land.mjs waits for this
+  # exact SHA to go green here, then fast-forwards main to it. Main's run of
+  # that same SHA reuses the branch run (scripts/ci-exact-reuse.mjs).
   push:
-    branches: [main]
+    branches: [main, 'plan/**']
   pull_request:
   workflow_dispatch:
 
@@ -14,14 +17,16 @@ concurrency:
   # Qualification dispatches must execute, rather than replacing a pending
   # publication run. Ordinary push/PR ordering retains its existing group.
   group: ci-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-qualification-{0}', github.run_id) || '' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push to the same plan branch supersedes its older SHA; main never cancels.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/plan/') }}
 
 jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      docs: ${{ steps.paths.outputs.docs }}
-      code_base: ${{ steps.paths.outputs.code_base }}
+      docs: ${{ steps.reuse.outputs.reused == 'true' && 'true' || steps.paths.outputs.docs }}
+      code_base: ${{ steps.reuse.outputs.reused == 'true' && github.sha || steps.paths.outputs.code_base }}
+      reused: ${{ steps.reuse.outputs.reused }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -30,6 +35,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: package.json
+      - name: Reuse this exact SHA's green plan-branch run (J240)
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-exact-reuse.mjs ci.yml
       - name: Enforce quarantine admission dates and the 48-hour cap
         run: node scripts/test-quarantine.mjs --check-history
       - name: Report every inherited migration owner and fixed deadline
@@ -37,10 +47,15 @@ jobs:
       - name: Scan the complete incoming history
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
-        run: printf 'refs/heads/main %s refs/heads/main %s\n' "$GITHUB_SHA" "$BASE_SHA" | node .githooks/check-push.mjs
+        # A plan branch is new or rebased, so its `before` is zero or off-history: scan from main.
+        run: |
+          base="$BASE_SHA"
+          case "$GITHUB_REF" in refs/heads/plan/*) base="$(git merge-base origin/main "$GITHUB_SHA")" ;; esac
+          printf 'refs/heads/main %s refs/heads/main %s\n' "$GITHUB_SHA" "$base" | node .githooks/check-push.mjs
       - name: Require this version's changelog section (Jake, 2026-11-10)
         run: node scripts/changelog.mjs check --at="$GITHUB_SHA"
       - name: Classify from an actually green code-proving ancestor
+        if: steps.reuse.outputs.reused != 'true'
         id: paths
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
@@ -49,6 +64,7 @@ jobs:
 
   static:
     needs: changes
+    if: needs.changes.outputs.reused != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -261,7 +277,7 @@ jobs:
 
   verdict-coverage:
     needs: [changes, static, plan, tests, e2e]
-    if: always() && github.event_name == 'push'
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     steps:
       # One run stands for every commit since the last finished run.

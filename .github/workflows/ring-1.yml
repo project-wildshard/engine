@@ -5,8 +5,10 @@
 name: ring-1
 
 on:
+  # J240: plan/<slug> pushes run here before scripts/land.mjs fast-forwards main;
+  # main's run of that exact SHA then reuses the branch run (the reuse job).
   push:
-    branches: [main]
+    branches: [main, 'plan/**']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -22,10 +24,37 @@ permissions:
 # One run plus the newest pending on main (G609): cancelling there means no tip is ever sure to finish.
 concurrency:
   group: ring-1-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push to the same plan branch supersedes its older SHA; main never cancels.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/plan/') }}
 
 jobs:
+  # Runs on every event so no job downstream inherits a skip; only a main push can reuse.
+  # If it fails, every job is skipped and the run is red, never a false green.
+  reuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reused: ${{ steps.reuse.outputs.reused }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      - name: Reuse this exact SHA's green plan-branch run (J240)
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-exact-reuse.mjs ring-1.yml
+
   static:
+    needs: reuse
+    if: needs.reuse.outputs.reused != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -42,6 +71,8 @@ jobs:
       - run: pnpm test:kit
 
   plan:
+    needs: reuse
+    if: needs.reuse.outputs.reused != 'true'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -101,6 +132,8 @@ jobs:
         run: node scripts/ci-shard-wall.mjs --check
 
   quarantine:
+    needs: reuse
+    if: needs.reuse.outputs.reused != 'true'
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -128,6 +161,8 @@ jobs:
           retention-days: 7
 
   cook-step:
+    needs: reuse
+    if: needs.reuse.outputs.reused != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -155,6 +190,8 @@ jobs:
           retention-days: 7
 
   build-boot:
+    needs: reuse
+    if: needs.reuse.outputs.reused != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
