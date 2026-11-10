@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { isDev, setDev } from '@wildshard/engine/core/devMode';
 import { installLoadingTimeline, LoadingTimeline } from '@wildshard/engine/boot/timeline';
 import { clientPreparationBatch, preparationCardLabel, timeClientPreparation } from './preparationTiming';
+import { worldStep } from './client';
 
 test('ordered marks partition the complete wall interval without counting overlapping children twice', () => {
   const previous = isDev(), prefix = 'wildshard.prepare:fixture:ordered.';
@@ -159,4 +160,26 @@ test('DL21: a running span names itself on its loading step and gives the step i
   } finally { uninstall(); }
   // outside a loading step the span changes nothing
   expect(await timeClientPreparation('fixture', 'world.data', () => 5)).toBe(5);
+});
+
+test('DL21: a staged world names each world part under the world data span, and the span keeps the last part', async () => {
+  const timeline = new LoadingTimeline({ id: 'fixture', steps: [{ key: 'region', label: 'Region world', weight: 1 }] }, 0);
+  const uninstall = installLoadingTimeline(timeline);
+  const detail = (): string | undefined => timeline.snapshot().rows.find(row => row.key === 'region')?.detail;
+  // the staged world's no-op progress (session.ts): before DL21 nothing but the span's own name reached the card
+  const ctx = { progress: { set: vi.fn(), detail: () => undefined } }, seen: (string | undefined)[] = [];
+  try {
+    const region = timeline.begin('region', 'product read');
+    await timeClientPreparation('fixture', 'world.data', () => {
+      seen.push(detail());
+      for (const part of ['library', 'materials', 'looks']) { worldStep(ctx, part); seen.push(detail()); }
+    });
+    expect(seen).toEqual(['world data', 'World data 1 / 10 · library', 'World data 2 / 10 · materials', 'World data 3 / 10 · looks']);
+    expect(ctx.progress.set).toHaveBeenLastCalledWith(3, 10, 'looks');
+    expect(detail()).toBe('World data 3 / 10 · looks');
+    region.end();
+  } finally { uninstall(); }
+  // outside a loading step only the world's own progress hears it
+  worldStep(ctx, 'skins');
+  expect(ctx.progress.set).toHaveBeenLastCalledWith(4, 10, 'skins');
 });

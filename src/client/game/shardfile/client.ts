@@ -24,6 +24,7 @@ import { renderCount } from '@wildshard/engine/render/frameCounter';
 import { playerModes } from '@wildshard/engine/player/modes';
 import { enteredOwner, withOwner } from '@wildshard/engine/app/ownership';
 import { macrotask } from '@wildshard/engine/boot/plan';
+import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { Mesh, Object3D, Vector3 } from 'three';
 import { QuestState } from '@wildshard/engine/quest/core';
 import { Flags } from '@wildshard/engine/world/interact/flags';
@@ -176,10 +177,14 @@ const runtimeDays = new WeakSet();
  *  with no count). WORLD_STEPS is their number on a full standalone world; a shorter mode ends its step early. */
 const WORLD_STEPS = 10;
 const worldStepsDone = new WeakMap<object, number>();
-function worldStep(ctx: ShardContext, label: string): void {
+export function worldStep(ctx: Pick<ShardContext, 'progress'>, label: string): void {
   const done = (worldStepsDone.get(ctx) ?? 0) + 1;
   worldStepsDone.set(ctx, done);
   ctx.progress.set(Math.min(done, WORLD_STEPS), WORLD_STEPS, label);
+  // DL21: a staged world's `progress` is no step of its own (the no-op of session.ts), so under the 'world data' span
+  // the card held 'Region world · world data' for 1.0 s on a warm Pine while the library, materials, looks, item
+  // models and skins finished one by one. Each part now moves the card's current step.
+  loadingUnits('World data', WORLD_STEPS)(Math.min(done, WORLD_STEPS), label);
 }
 
 export class ShardfileClient {

@@ -48,3 +48,5 @@ Tests, in existing files: the cover starts after the arrival tile and before the
 and a failure beside a running cover refuses only after it settles (`tile-driver.test.ts`, two existing tests updated
 for the cover now being asked once on such a boot); a staged world's parts name themselves under the span
 (`client-preparation-timing.test.ts`, fails without the report).
+
+The world-part naming is its own commit after the cover (`perf(boot): name each world data part`).
