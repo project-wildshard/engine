@@ -3,6 +3,8 @@
 import type { ImportReport, SaveStorage } from '../../../shared/engine/saves/store';
 import { installedIdentity, saveEpoch } from '../../../shared/engine/app/identity';
 import { deviceIdentity } from '../../../shared/engine/net/identity';
+import { ASSET_CACHE_NAME } from '../pwa/cacheNames';
+import { bootTiming } from '../../../shared/engine/boot/timing';
 
 /** A server's saves on a page: the same documents localStorage would hold. */
 export interface IndexedSaves { readonly storage: SaveStorage; readonly write: (key: string, value: string | null) => Promise<boolean>; readonly close?: () => void }
@@ -20,6 +22,29 @@ const requested = <T>(request: IDBRequest<T>): Promise<T> => new Promise((resolv
   request.onsuccess = (): void => { resolve(request.result); };
   request.onerror = (): void => { reject(request.error ?? new Error('Save storage refused')); };
 });
+
+const quotaFailure = (failure: unknown): boolean => typeof failure === 'object' && failure !== null && 'name' in failure && failure.name === 'QuotaExceededError';
+/** Wait for the transaction itself to finish, including an abort, before any recovery starts. */
+function commitSave(database: IDBDatabase, key: string, value: string | null): Promise<'saved' | 'quota' | 'refused'> {
+  return new Promise(resolve => {
+    let transaction: IDBTransaction;
+    try { transaction = database.transaction(SAVES, 'readwrite', { durability: 'strict' }); }
+    catch (failure) { resolve(quotaFailure(failure) ? 'quota' : 'refused'); return; }
+    let synchronousFailure: unknown;
+    transaction.oncomplete = (): void => { resolve('saved'); };
+    transaction.onerror = (): void => { /* The abort below owns the final outcome; a request error alone is not durable. */ };
+    transaction.onabort = (): void => { resolve(quotaFailure(synchronousFailure) || quotaFailure(transaction.error) ? 'quota' : 'refused'); };
+    try {
+      const store = transaction.objectStore(SAVES);
+      if (value === null) store.delete(key); else store.put(value, key);
+      transaction.commit();
+    } catch (failure) {
+      synchronousFailure = failure;
+      try { transaction.abort(); }
+      catch { resolve(quotaFailure(failure) ? 'quota' : 'refused'); }
+    }
+  });
+}
 
 /** Every save document under `prefix`, to pre-fill the worker's storage (§6.3.3). */
 export function saveDocuments(storage: SaveStorage, prefix: string): Record<string, string> {
@@ -39,15 +64,46 @@ export async function openIndexedSaves(name: string): Promise<IndexedSaves> {
   const [keys, values] = await Promise.all([requested(reading.getAllKeys()), requested(reading.getAll())]);
   const documents = new Map<string, string>();
   keys.forEach((key, index) => { const value: unknown = values[index]; if (typeof key === 'string' && typeof value === 'string') documents.set(key, value); });
-  const write = (key: string, value: string | null): Promise<boolean> => new Promise(resolve => {
+  const writing = new Map<string, Promise<boolean>>();
+  let closing = false;
+  const persist = async (key: string, value: string | null): Promise<boolean> => {
+    const first = await commitSave(database, key, value);
+    if (first === 'saved') return true;
+    if (first !== 'quota' || typeof caches === 'undefined') return false;
+    // Open Cache handles can retain an unlinked cache's bytes. Remove known
+    // completed download entries instead, never databases or service-worker code.
+    // Resource timings lend already-known URLs and measured sizes: no native
+    // Cache.keys enumeration can be left pending across a title navigation.
+    try {
+      const cache = await caches.open(ASSET_CACHE_NAME), origin = globalThis.location?.origin;
+      const observed = new Map<string, number>();
+      for (const entry of bootTiming()?.resources ?? []) {
+        const url = entry['url'], bytes = entry['decodedBodySize'];
+        if (typeof url === 'string' && typeof bytes === 'number' && Number.isFinite(bytes) && bytes > 0 && new URL(url).origin === origin) observed.set(url, bytes);
+      }
+      for (const entry of performance.getEntriesByType('resource')) {
+        if ('decodedBodySize' in entry && typeof entry.decodedBodySize === 'number' && Number.isFinite(entry.decodedBodySize) && entry.decodedBodySize > 0 && new URL(entry.name).origin === origin) observed.set(entry.name, Math.max(observed.get(entry.name) ?? 0, entry.decodedBodySize));
+      }
+      const downloads = [...observed].sort((left, right) => right[1] - left[1]);
+      const wanted = Math.max(1024 * 1024, (value?.length ?? 0) * 2);
+      let released = 0;
+      for (const [url, bytes] of downloads) {
+        if (await cache.delete(url)) released += bytes;
+        if (released >= wanted) break;
+      }
+    } catch { return false; }
+    // One retry, and only its real strict transaction completion can acknowledge the save.
+    return await commitSave(database, key, value) === 'saved';
+  };
+  const write = (key: string, value: string | null): Promise<boolean> => {
+    if (closing) return Promise.resolve(false);
     if (value === null) documents.delete(key); else documents.set(key, value);
-    const transaction = database.transaction(SAVES, 'readwrite', { durability: 'strict' }), store = transaction.objectStore(SAVES);
-    if (value === null) store.delete(key); else store.put(value, key);
-    // Now, not when the put's answer comes back: once the storage process holds the commit, a killed page no longer stops it.
-    transaction.commit();
-    transaction.oncomplete = (): void => { resolve(true); };
-    transaction.onerror = transaction.onabort = (): void => { resolve(false); };
-  });
+    const before = writing.get(key), pending = before === undefined ? persist(key, value) : before.then(() => persist(key, value), () => persist(key, value));
+    writing.set(key, pending);
+    const finished = (): void => { if (writing.get(key) === pending) writing.delete(key); };
+    void pending.then(finished, finished);
+    return pending;
+  };
   const app = installedIdentity();
   if (name === serverSaveDatabase() && saveEpoch() > 0 && app?.identityPrefix !== undefined) {
     const key = `device:${app.identityPrefix}identity`;
@@ -60,7 +116,7 @@ export async function openIndexedSaves(name: string): Promise<IndexedSaves> {
       } finally { previous.close?.(); }
     }
   }
-  return { write, close: () => database.close(), storage: { get length() { return documents.size; }, key: index => [...documents.keys()][index] ?? null, getItem: key => documents.get(key) ?? null,
+  return { write, close: () => { closing = true; void Promise.allSettled(writing.values()).then(() => database.close()); }, storage: { get length() { return documents.size; }, key: index => [...documents.keys()][index] ?? null, getItem: key => documents.get(key) ?? null,
     setItem: (key, value) => { void write(key, value); }, removeItem: key => { void write(key, null); } } };
 }
 
