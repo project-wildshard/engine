@@ -55,3 +55,39 @@ test('a frame without bakes ends with its run, thrown or not', () => {
   expect(() => { withoutOffscreenBakes(() => { throw new Error('a system failed'); }); }).toThrow('a system failed');
   expect(offscreenBakesHeld()).toBe(false);
 });
+
+// DL21: a boot batch's pass asked every unlinked program, a slice apiece on the Simulator (~20 ms each behind the GPU
+// process's links), and showed its count only at the pass's end: 1-1.6 s on one count while links landed.
+test('a batch link pass shows each link as it lands, not only at the pass end', async () => {
+  const renderer: unknown = Object.create(WebGLRenderer.prototype);
+  if (!(renderer instanceof WebGLRenderer)) throw new Error('Renderer missing');
+  const geometry = new BoxGeometry(), materials = Array.from({ length: 4 }, () => new MeshBasicMaterial());
+  const jobs: CompileJob[] = materials.map((material, i) => {
+    const root = new Scene(); root.add(new Mesh(geometry, material));
+    return { label: `material-${i}`, root, target: null, rt: null };
+  });
+  const programs: ProgramLike[] = [], byMaterial = new WeakMap<MeshBasicMaterial, ProgramLike[]>(), details: string[] = [];
+  let frame = 0;
+  const fields: Record<string, unknown> = {
+    info: { programs, render: { frame: 0 } }, extensions: { has: (name: string) => name === 'KHR_parallel_shader_compile' },
+    properties: { has: () => true, get: (material: MeshBasicMaterial) => ({ programs: new Map(byMaterial.get(material)?.map(program => [`linked-${program.id}`, program])) }) },
+    getContext: linkedGl, getRenderTarget: () => null, setRenderTarget: () => undefined,
+    compile: (root: Scene): void => {
+      root.traverse(object => {
+        if (!(object instanceof Mesh) || !(object.material instanceof MeshBasicMaterial)) return;
+        const id = programs.length;
+        // each program lands one slice after the one before it, inside the first pass
+        const program: ProgramLike = { type: 'test', name: `program-${id}`, cacheKey: `program-${id}`, usedTimes: 1, id, program: {},
+          isReady: () => frame >= id, getUniforms: () => ({}) };
+        programs.push(program); byMaterial.set(object.material, [program]);
+      });
+    },
+  };
+  for (const [key, value] of Object.entries(fields)) Reflect.set(renderer, key, value);
+  try {
+    await runPrecompile(renderer, new PerspectiveCamera(), jobs, materials.length, (_done, _total, detail) => { details.push(detail); }, [], () => true,
+      false, () => { frame++; return Promise.resolve(); }, undefined, undefined, 0);
+    const counts = details.flatMap(detail => /^(\d+) \/ 4 programs linked · parallel/u.exec(detail)?.[1] ?? []);
+    expect(counts.slice(0, 4)).toEqual(['1', '2', '3', '4']);
+  } finally { geometry.dispose(); for (const material of materials) material.dispose(); }
+});

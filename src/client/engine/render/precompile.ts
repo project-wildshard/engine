@@ -1448,16 +1448,20 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     // passed 10 s from its issue, and the resolve below forced the rest in one frame (Driftwood 5.2 s, Pine 3.3 s).
     // A link that never reports (O14) still ends the wait LINK_WAIT_MS after the last one landed.
     let landedAt = performance.now();
+    const report = (): void => { onProgress?.(jobs.length + linked.size, jobs.length + units + textures.length, `${linked.size} / ${n} programs linked · parallel`); };
     await waitFor(`Link ${n} shader programs`, boundedLinkWait(async () => {
       checkCurrent();
-      let ready = 0, askedAt = performance.now();
+      let askedAt = performance.now(), shown = linked.size;
       for (const p of pending) {
-        if (linked.has(p)) { ready++; continue; }
-        if (nativeRetired(p) || p.isReady()) { linked.add(p); ready++; landedAt = performance.now(); }
-        if (spent(askedAt)) { await pause(); checkCurrent(); askedAt = performance.now(); }
+        if (linked.has(p)) continue;
+        if (nativeRetired(p) || p.isReady()) { linked.add(p); landedAt = performance.now(); }
+        // DL21: a pass asks every unlinked program, and on the Simulator each ask waits ~20 ms behind the GPU process's
+        // queued links, a slice apiece: a pass over 40 took 1-1.6 s, the card on its last count while links landed. Each
+        // slice shows the links landed so far
+        if (spent(askedAt)) { if (linked.size !== shown) { shown = linked.size; report(); } await pause(); checkCurrent(); askedAt = performance.now(); }
       }
-      onProgress?.(jobs.length + ready, jobs.length + units + textures.length, `${ready} / ${n} programs linked · parallel`);
-      return ready >= n;
+      report();
+      return linked.size >= n;
     }, async () => { await pause(); checkCurrent(); }, LINK_WAIT_MS, () => landedAt), 'shader');
   }
   // Phase B: resolve each link. COMPLETION_STATUS only says the front end is done — ANGLE Metal
