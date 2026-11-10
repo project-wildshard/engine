@@ -93,6 +93,8 @@ export class Redial {
     // a link that went silent while the page was away was the page's absence: say welcome back
     if (this.phase === 'down') { if (this.cause === 'silent') this.because('hidden'); this.dialAt = now; }
   }
+  /** The player asked to dial now rather than wait out the backoff (a hold card's Try now). Nothing else changes. */
+  dialNow(): void { if (this.phase === 'down' && this.dialled === null) this.dialAt = this.now(); }
   /** The player asked to try again, after `lost`. */
   retry(): void {
     if (this.state !== 'lost') return;

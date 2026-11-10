@@ -239,10 +239,14 @@ export class EquipmentService implements WeaponHooks {
   }
   /** hold `id` (if unlocked); animated unless `instant` (start-up `?weapon=`) */
   select(id: WeaponId, instant = false): void {
-    if (!this.unlocked.has(id)) return;
     // FM4: a player's swap asked while the online link is down never starts, so a slow preparation can't send it after the link is back
     const wire = this.serverWire;
     if (!instant && wire !== null && 'mayEquip' in wire && wire.mayEquip !== undefined && !wire.mayEquip()) return;
+    this.choose(id, instant);
+  }
+  /** `select` without the player's admission: the server's word on what is held always lands. */
+  private choose(id: WeaponId, instant: boolean): void {
+    if (!this.unlocked.has(id)) return;
     const to = this.get(id);
     const previous = this.selection;
     if (previous?.waiting === true && previous.to === to) { previous.instant ||= instant; return; }
@@ -357,7 +361,7 @@ export class EquipmentService implements WeaponHooks {
   heldByServer(row: string): void {
     const weapon = this.list.find(w => w.row.id === row);
     if (weapon === undefined) return;
-    this.unlock(weapon.id); this.select(weapon.id);
+    this.unlock(weapon.id); this.choose(weapon.id, false);
   }
   /** The server settled a blow of ours: the weapon in hand plays it. */
   serverHit(hit: OwnHit): void { this.current.serverHit(hit); }

@@ -310,6 +310,8 @@ export class InputService {
       const take = world && (this.owns(event.code) || (event.altKey && !NEVER_SWALLOWED.has(event.code)) || event.code === 'AltRight');
       if (world && (event.metaKey || event.ctrlKey) && RESERVED_LETTERS.has(event.code)) event.preventDefault();
       if (on && (event.repeat || event.metaKey || event.ctrlKey)) { if (take && !event.metaKey && !event.ctrlKey) event.preventDefault(); return; }
+      // a modal that holds focus (a failure card's buttons, FM4) keeps the browser's Tab and Shift+Tab
+      if (event.code === 'Tab' && target instanceof Element && target.closest('[role="alertdialog"]') !== null) return;
       if (on) this.gesture();
       this.executeCommand({ kind: 'physical', code: event.code, on, at: this.now() });
       if (['Space', 'AltLeft', 'Tab'].includes(event.code) || take) event.preventDefault();

@@ -173,3 +173,14 @@ test('a link that went silent and dropped while the page was away is told as a r
   expect(redial.why).toBe('hidden');
   redial.dispose();
 });
+
+test('dialNow only brings the next dial forward: the cause stays', () => {
+  const { heard, run, redial, links } = harness();
+  heard(); run(3200);
+  expect(redial.why).toBe('silent');
+  const before = links.length;
+  run(100); redial.dialNow(); run(100);
+  expect(redial.why).toBe('silent');
+  expect(links.length).toBeGreaterThanOrEqual(before);
+  redial.dispose();
+});

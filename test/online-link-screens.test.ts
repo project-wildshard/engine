@@ -182,3 +182,13 @@ test('an open hold card follows its banner when the cause changes', () => {
   expect(shown('restart-blocked')?.textContent).toContain('You tapped Talk');
   scope.dispose();
 });
+
+test('a held chat card follows a new cause too', () => {
+  const { scope, screens, set } = harness();
+  screens.link('reconnecting', 'closed');
+  screens.holdChat('hi', () => undefined, () => undefined);
+  expect(shown('reset-blocked')?.textContent).toContain('Reconnecting');
+  set({ why: 'restart' }); screens.link('reconnecting', 'restart');
+  expect(shown('reset-blocked')?.textContent).toContain('Restarting');
+  scope.dispose();
+});

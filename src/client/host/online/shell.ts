@@ -60,8 +60,9 @@ export interface OnlineShell {
   /** The page came back into view: check the link now. */
   visible: () => void;
   retry: () => void;
-  /** FM4: the dial's progress and why the link is down, for the screens that show them. */
+  /** FM4: the dial's progress and why the link is down, for the screens that show them; dial now, from a hold card. */
   progress: () => LinkProgress;
+  dialNow: () => void;
   why: () => LinkCause;
   pause: () => void; resume: () => void; hold: (on: boolean) => void; bossGod: () => void; hardHits: (by: number) => void;
   place: (x: number, y: number, z: number, yaw: number) => void; raise: (flag: string) => void;
@@ -113,7 +114,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   client.hello(config.build, config.identity);
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
   return { client, voice, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
-    visible: () => { redial.check(); }, retry: () => { redial.retry(); }, progress: () => redial.progress, why: () => redial.why,
+    visible: () => { redial.check(); }, retry: () => { redial.retry(); }, progress: () => redial.progress, why: () => redial.why, dialNow: () => { redial.dialNow(); },
     pause: idle, resume: idle, hold: idle, bossGod: idle, hardHits: idle, place: idle, raise: idle,
     // The door hears a quit on any link of this build: seated, still admitted, or handed a held body back. A link that is down (a redial's
     // wait) gets a fresh one to say it on, so a held body goes too. No redial follows: the page is going.
@@ -174,7 +175,7 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   scope.interval(SEAT_WAIT_BEAT_MS, () => { if (waitingForSeat) seatWaitBeat(); });
   // FM4: the banner, the Reconnected notice, the cards and the hold cards (meta MMO-FAILURE-MODES-PLAN)
   const screens = linkScreens(scope, {
-    retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.visible(); }, doctor,
+    retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.dialNow(); }, doctor,
     // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
     reload: () => { entering(link.loaded); void reloadByHand(); },
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',

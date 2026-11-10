@@ -8,7 +8,7 @@ import { linkScreens } from '../../src/client/host/online/linkScreens';
 const url = new URLSearchParams(location.search).get('ws') ?? '', scope = new Scope('strip.proof'), transport = new WebSocketTransport(url), client = new NetClient(transport);
 const proof: { states: LinkState[]; frames: number; rejoins: number; welcome: string | null; rtt: number; said: string[] } = { states: [], frames: 0, rejoins: 0, welcome: null, rtt: 0, said: [] };
 Object.assign(window, { proof });
-const screens = linkScreens(scope, { retry: () => { redial.retry(); }, dialNow: () => { redial.check(); }, progress: () => redial.progress, why: () => redial.why, reload: () => undefined });
+const screens = linkScreens(scope, { retry: () => { redial.retry(); }, dialNow: () => { redial.dialNow(); }, progress: () => redial.progress, why: () => redial.why, reload: () => undefined });
 const redial = new Redial({ client, transport, dial: () => new WebSocketTransport(url), onState: (state, reason) => { proof.states.push(state); screens.link(state, reason); } });
 client.gateActions(what => screens.allow(what));
 // the proof's taps: an act the world must hear, and a chat line

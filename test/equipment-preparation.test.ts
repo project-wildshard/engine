@@ -182,3 +182,19 @@ test('FM4: a swap asked while the online link is down never starts, so a slow pr
     expect(sent).toEqual(['weapon.bow']);
   } finally { read.release(); f.scope.dispose(); }
 });
+
+test('FM4: a swap that finishes preparing after the link dropped rolls back to what the server holds', async () => {
+  const f = fixture(), read = gate(), sent: string[] = [];
+  let open = true;
+  f.service.prepareOnSelect('bow', () => read.pending);
+  // as NetPlayer's wire does: a refused equip hands the hand back to the server's weapon
+  f.service.bindWire({ equip: (id: string) => { if (open) sent.push(id); else f.service.heldByServer('weapon.sword'); }, mayEquip: () => open } as unknown as Parameters<EquipmentService['bindWire']>[0]);
+  sent.length = 0;
+  try {
+    f.service.select('bow');
+    open = false; read.release(); await f.service.settleSelection();
+    for (let frame = 0; frame < 120; frame++) f.service.update(1 / 60, frame / 60);
+    expect(sent).toEqual([]);
+    expect(f.service.current).toBe(f.first);
+  } finally { read.release(); f.scope.dispose(); }
+});

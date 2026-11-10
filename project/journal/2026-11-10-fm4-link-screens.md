@@ -50,3 +50,9 @@ online shell, replacing the plain strip and the raw error text.
   and the phone proof waits for a visible, counting deploy banner.
   Left: cards can't be tabbed through (InputService takes Tab), and
   the browser proof checks the page's side of chat, not the server's.
+- Third pass (NO-GO on 32da9e0): the swap gate also blocked the
+  server's own rollback (`heldByServer`), leaving the page on the
+  wrong weapon. The server's word now goes through `choose`, which no
+  gate stops. Tab works inside an alertdialog (InputService left it to
+  the game), Try now dials without relabelling the cause
+  (`Redial.dialNow`), and a held-chat card follows a new cause.
