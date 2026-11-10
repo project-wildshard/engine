@@ -229,8 +229,12 @@ async function checkJob(directory,job,snapshot,candidateRecord){
   if(job.state==='capturing'){
    const held=spawnSync('python3',[lock,'--held',join(directory,'capture.lock')],{stdio:'ignore'});
    if(held.status===0){await new Promise(resolve=>{setTimeout(resolve,100);});return null;}
+   // Capture may publish queued and release its flock after drain read the
+   // record but before the probe. Only a fresh capturing record is abandoned.
+   const current=readJob(directory,`${job.id}.json`);
+   if(current===null||current.state!=='capturing')return null;
    const error=held.status===1?'Capture no longer holds capture.lock; PID reuse is not liveness':'Capture lock could not be verified';
-   write(file,{...job,state:'failed',error});notify(job,'failed',error);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});return null;
+   write(file,{...current,state:'failed',error});notify(current,'failed',error);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});return null;
   }
   const environment={...workerEnvironment(),PWD:snapshot};
   /** @param {string} command @param {string[]} args @param {string} [input] */
