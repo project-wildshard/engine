@@ -40,3 +40,6 @@ making progress keeps waiting with its count moving on the card; a link that nev
 J206 review of the bound (Codex): no MUST-FIX. Its SHOULD to pin the exported `since` argument is in the declaration
 law test (a valid fourth argument passes, a number there is refused). Its other SHOULD, a runPrecompile-level
 test, is left to the Simulator sweep, the real reading.
+
+Stamped with the official renderer and validation revision scripts over committed source 86fc505, after rebasing onto
+origin be8d6ea (which carries LS11 bf22be9 in the same three files, no conflict).
