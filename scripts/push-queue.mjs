@@ -100,9 +100,12 @@ function capture(source,directory,checkOnly,requested){
   // Recreate this snapshot's remote so pull's fork-point cannot treat that
   // unpushed tip as old upstream and drop it on the first real fetch.
   git(snapshot,['remote','remove','origin']);git(snapshot,['remote','add','origin',remote]);git(snapshot,['config','core.hooksPath','.githooks']);
+  // The copied snapshot is independent. Remove this queue-owned transport
+  // before a worker can consume it; tolerate bounded directory-write races.
+  rmSync(anchor,{recursive:true,force:true,maxRetries:3,retryDelay:25});
   job.state='queued';write(file,job);worker(directory);return job;
  }catch(error){job.state='failed';const message=error instanceof Error?error.message:String(error);write(file,{...job,error:message});notify(job,'failed',message);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});throw error;}
- finally{if(existsSync(anchor))rmSync(anchor,{recursive:true,force:true});}
+ finally{if(existsSync(anchor))rmSync(anchor,{recursive:true,force:true,maxRetries:3,retryDelay:25});}
 }
 
 /** Refuse changed checked bytes and retain their paths before managed cleanup.
