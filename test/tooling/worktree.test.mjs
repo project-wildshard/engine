@@ -96,7 +96,7 @@ describe('worktree new', () => {
     expect(existsSync(join(canonical, '.worktrees/two/package.json'))).toBe(true);
   });
 
-  test('refuses an existing worktree or branch, and honours a live setup lock but takes over an abandoned one', () => {
+  test('refuses an existing worktree or branch, a live setup lock and an abandoned one', () => {
     const {canonical} = repos();
     expect(worktree(canonical, ['new', 'foo', '--no-install']).status).toBe(0);
     expect(worktree(canonical, ['new', 'foo', '--no-install']).stderr).toMatch(/already exists/u);
@@ -110,11 +110,14 @@ describe('worktree new', () => {
     expect(locked.stderr).toMatch(/another worktree setup/u);
     expect(existsSync(join(canonical, '.worktrees/baz'))).toBe(false);
     expect(readFileSync(lock, 'utf8')).toMatch(/ live$/u);
-    // A dead holder's lock, and a live pid's lock older than any setup (a reused pid), are taken over and released.
+    // A dead holder's lock, or a live pid's lock older than any setup (a reused pid), is named, never taken over.
     writeFileSync(lock, `999999999 ${Date.now()} dead`);
-    expect(worktree(canonical, ['new', 'baz', '--no-install']).status).toBe(0);
+    expect(worktree(canonical, ['new', 'baz', '--no-install']).stderr).toMatch(/looks abandoned \(pid 999999999 gone[\s\S]*rm .*wildshard-worktree-setup\.lock/u);
     writeFileSync(lock, `${process.pid} ${Date.now() - 11 * 60_000} old`);
-    expect(worktree(canonical, ['new', 'qux', '--no-install']).status).toBe(0);
+    expect(worktree(canonical, ['new', 'baz', '--no-install']).stderr).toMatch(/looks abandoned \(pid \d+ reused/u);
+    expect(readFileSync(lock, 'utf8')).toMatch(/ old$/u);
+    rmSync(lock);
+    expect(worktree(canonical, ['new', 'baz', '--no-install']).status).toBe(0);
     expect(existsSync(lock)).toBe(false);
   });
 
@@ -168,6 +171,33 @@ describe('worktree new', () => {
     expect(existsSync(join(canonical, '.worktrees/foo'))).toBe(false);
     expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], {cwd: canonical, env: ENV}).status).not.toBe(0);
     git(canonical, ['config', 'core.hooksPath', '.githooks']);
+    // A tracked hook that lost its x bit in the commit would not run either.
+    git(seed, ['update-index', '--chmod=-x', '.githooks/pre-commit']);
+    git(seed, ['commit', '-q', '-m', 'hook not executable']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    expect(worktree(canonical, ['new', 'foo', '--no-install']).stderr).toMatch(/hook pre-commit is missing or not executable/u);
+    expect(existsSync(join(canonical, '.worktrees/foo'))).toBe(false);
+    git(seed, ['update-index', '--chmod=+x', '.githooks/pre-commit']);
+    git(seed, ['commit', '-q', '-m', 'hook executable']);
+    git(seed, ['push', '-q', 'origin', 'main']);
     expect(worktree(canonical, ['new', 'foo', '--no-install']).status).toBe(0);
+  });
+
+  test('a name the clone check cannot read, and autocrlf in any spelling, leave the file to git', () => {
+    const {canonical, origin, base} = repos();
+    const seed = join(base, 'seed');
+    put(seed, 'odd\nname.txt', 'odd\n');
+    put(seed, 'plain.txt', 'line\n');
+    git(seed, ['add', '.']);
+    git(seed, ['commit', '-q', '-m', 'odd names']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    git(canonical, ['pull', '-q', '--rebase', '--autostash', origin, 'main']);
+    git(canonical, ['config', 'core.autocrlf', 'YES']);
+    const made = worktree(canonical, ['new', 'foo', '--no-install']);
+    expect(made.status, made.stderr).toBe(0);
+    const tree = join(canonical, '.worktrees/foo');
+    expect(readFileSync(join(tree, 'odd\nname.txt'), 'utf8')).toBe('odd\r\n');
+    // checkout-index writes CRLF under autocrlf; a raw LF clone would have passed the hash.
+    expect(readFileSync(join(tree, 'plain.txt'), 'utf8')).toBe('line\r\n');
   });
 });

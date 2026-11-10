@@ -15,7 +15,7 @@
 // WS_LANE_NAME set, one line in ~/.cache/wildshard/lane-receipts.log. Removal is DS13's reaper, never this script.
 import {execFileSync,spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,renameSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -89,7 +89,8 @@ function stagedBlobs(cwd){
 function convertedPaths(tree,paths){
  const converted=new Set();
  if(paths.length===0)return converted;
- const crlf=tryGit(tree,['config','core.autocrlf']).stdout.trim()==='true'||tryGit(tree,['config','core.eol']).stdout.trim()==='crlf';
+ // --type=bool reads yes/1/TRUE as true; `input` is not a bool and converts nothing on checkout.
+ const crlf=tryGit(tree,['config','--type=bool','core.autocrlf']).stdout.trim()==='true'||tryGit(tree,['config','core.eol']).stdout.trim().toLowerCase()==='crlf';
  const rows=nul(git(tree,['check-attr','--cached','-z','--stdin','filter','eol','text','ident','working-tree-encoding'],`${paths.join('\0')}\0`));
  for(let index=0;index+2<rows.length;index+=3){
   const path=rows[index]??'',attribute=rows[index+1],value=rows[index+2];
@@ -113,7 +114,8 @@ function cloneTrackedFiles(canonical,tree){
  /** @type {string[]} */const cloned=[];
  /** @type {string[]} */const pairs=[];
  for(const path of candidates){
-  if(converted.has(path))continue;
+  // hash-object --stdin-paths is line-based: a name with a newline is left to git.
+  if(converted.has(path)||path.includes('\n'))continue;
   try{if(!lstatSync(join(canonical,path)).isFile())continue;}catch{continue;}
   mkdirSync(dirname(join(tree,path)),{recursive:true});
   pairs.push(join(canonical,path),join(tree,path));
@@ -123,14 +125,22 @@ function cloneTrackedFiles(canonical,tree){
  const result=spawnSync('python3',['-I','-c',CLONEFILE],{input:`${pairs.join('\0')}\0`,encoding:'utf8',maxBuffer:64<<20});
  if(result.status!==0)process.stderr.write(`worktree: clone stopped early (${result.stderr.trim()===''?result.error?.message??'failed':result.stderr.trim()}); git writes the rest\n`);
  // The raw bytes of every clone hash to its blob, and its mode is the index's; anything else is deleted for git.
- const present=cloned.filter(path=>existsSync(join(tree,path)));
- const hashes=present.length===0?[]:git(tree,['hash-object','--no-filters','--stdin-paths'],`${present.join('\n')}\n`).trim().split('\n');
+ // If the check itself fails, no clone is trusted: all of them go, and git writes every file.
  let kept=0;
- present.forEach((path,index)=>{
-  const [mode,oid]=(target.get(path)??'').split(' '),stat=statSync(join(tree,path));
-  if(hashes[index]===oid&&((stat.mode&0o100)!==0)===(mode==='100755')&&stat.isFile()&&!lstatSync(join(tree,path)).isSymbolicLink())kept++;
-  else rmSync(join(tree,path),{force:true});
- });
+ try{
+  const present=cloned.filter(path=>existsSync(join(tree,path)));
+  const hashes=present.length===0?[]:git(tree,['hash-object','--no-filters','--stdin-paths'],`${present.join('\n')}\n`).trim().split('\n');
+  if(hashes.length!==present.length)throw new Error(`hash-object returned ${String(hashes.length)} hashes for ${String(present.length)} files`);
+  present.forEach((path,index)=>{
+   const [mode,oid]=(target.get(path)??'').split(' '),stat=lstatSync(join(tree,path));
+   if(hashes[index]===oid&&stat.isFile()&&((stat.mode&0o100)!==0)===(mode==='100755'))kept++;
+   else rmSync(join(tree,path),{force:true});
+  });
+ }catch(error){
+  for(const path of cloned)rmSync(join(tree,path),{force:true});
+  process.stderr.write(`worktree: clone check failed (${error instanceof Error?error.message:String(error)}); git writes every file\n`);
+  return 0;
+ }
  return kept;
 }
 
@@ -153,33 +163,26 @@ function checkHooks(tree){
 }
 
 /** A short per-repo setup lock in the shared Git dir. It is created with its owner already in it (a hard link of a
- * written file), released only by its owner, and taken over only when its holder is gone or it is older than any
- * setup. @param {string} common @returns {() => void} */
+ * written file) and released only by its owner. An abandoned lock is never taken over automatically, because no
+ * takeover is race-free without a process-held lock: the refusal names it and the command that clears it.
+ * @param {string} common @returns {() => void} */
 function lock(common){
  const path=join(common,'wildshard-worktree-setup.lock'),token=`${process.pid} ${Date.now()} ${randomBytes(6).toString('hex')}`;
  const draft=`${path}.${randomBytes(6).toString('hex')}`;
  writeFileSync(draft,token);
  try{
-  for(let attempt=0;attempt<3;attempt++){
-   try{linkSync(draft,path);return ()=>{try{if(readFileSync(path,'utf8')===token)unlinkSync(path);}catch{/* Already gone. */}};}
-   catch(error){if(!(error instanceof Error)||!('code' in error)||error.code!=='EEXIST')throw error;}
-   let held='';
-   try{held=readFileSync(path,'utf8');}catch{continue;}
-   const [pid,since]=held.split(' ').map(Number);
-   let alive=false;
-   try{if(pid!==undefined&&Number.isInteger(pid)&&pid>0){process.kill(pid,0);alive=true;}}catch{/* The holder is gone. */}
-   if(alive&&since!==undefined&&Date.now()-since<STALE_MS)throw new StopError(`another worktree setup (pid ${String(pid)}) holds ${path}; retry when it finishes`);
-   // Take the abandoned lock aside, and keep it only if it is still the one judged abandoned.
-   const aside=`${path}.abandoned.${randomBytes(6).toString('hex')}`;
-   try{renameSync(path,aside);}catch{continue;}
-   if(readFileSync(aside,'utf8')!==held){
-    try{linkSync(aside,path);}catch{/* Its owner re-created it; theirs stands. */}
-    unlinkSync(aside);
-    throw new StopError(`${path} changed hands while it was taken over; retry`);
-   }
-   unlinkSync(aside);
-  }
-  throw new StopError(`could not take ${path}`);
+  linkSync(draft,path);
+  return ()=>{try{if(readFileSync(path,'utf8')===token)unlinkSync(path);}catch{/* Already gone. */}};
+ }catch(error){
+  if(!(error instanceof Error)||!('code' in error)||error.code!=='EEXIST')throw error;
+  let held='';
+  try{held=readFileSync(path,'utf8');}catch{/* Released meanwhile. */}
+  const [pid,since]=held.split(' ').map(Number);
+  let alive=false;
+  try{if(pid!==undefined&&Number.isInteger(pid)&&pid>0){process.kill(pid,0);alive=true;}}catch{/* The holder is gone. */}
+  const age=since===undefined||!Number.isFinite(since)?'unknown':`${String(Math.round((Date.now()-since)/1000))} s`;
+  if(alive&&since!==undefined&&Date.now()-since<STALE_MS)throw new StopError(`another worktree setup (pid ${String(pid)}, ${age}) holds ${path}; retry when it finishes`);
+  throw new StopError(`${path} looks abandoned (pid ${String(pid)} ${alive?'reused':'gone'}, age ${age}); if no worktree setup is running, rm ${path} and retry`);
  }finally{unlinkSync(draft);}
 }
 

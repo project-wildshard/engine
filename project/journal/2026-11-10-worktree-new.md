@@ -37,3 +37,10 @@ Re-measured after the fixes: 15.4 s on a quieter machine (checkout 3.0, install
 1.2, pins 10.2); tracked tree 0.4 MiB unique.
 
 Clocks for `test/tooling/worktree.test.mjs` recorded with `push-preflight.mjs timings`.
+
+Second J206 pass: three more MUSTs, fixed. A failed clone check now deletes
+every clone (a name with a newline is never cloned, since `hash-object
+--stdin-paths` is line-based); `core.autocrlf` is read as a bool (`YES`, `1`);
+and an abandoned lock is no longer taken over at all, because no takeover is
+race-free without a process-held lock: the refusal names the lock and the
+`rm` that clears it.
