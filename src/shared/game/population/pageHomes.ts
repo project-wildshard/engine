@@ -63,8 +63,9 @@ function* pageHomeWork(ctx: ShardContext, declared: RuntimeSpawns, ports: Runtim
   const rowBodies = ctx.game.runtime?.play?.animals;
   if (rowBodies?.herdless === true) for (const _model of rowBodies.factory.prepareSteps([...rows, ...declared.actors ?? [], ...declared.bosses].map(row => ({ kind: row.kind, variant: row.look })))) yield;
   for (const home of homes) { spawn(home); yield; }
+  // SR12: no death listener. A page's RowBodies is herdless, so no home holds a page body for a death to match: the
+  // server's keeper refills homes, and the page draws the rows it sends (flow:creature-returns).
   if (homes.length > 0) {
-    ctx.on('actor.died', ({ actor }) => { const home = homes.find((h) => h.animal?.combatActor() === actor); if (home) home.wait = home.respawn; });
     ctx.system({ id: ports.system, phase: 'update', run: (dt) => {
       for (const home of homes) {
         if (retained && home.animal?.alive === false && home.wait <= 0) home.wait = home.respawn;

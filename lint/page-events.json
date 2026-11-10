@@ -596,29 +596,6 @@
    "why": "C6, C7, C26: the server's NetDied re-emits on the page with the row body's own actor."
   },
   {
-   "id": "actor.died.dormant",
-   "kind": "event",
-   "name": "actor.died",
-   "bus": "page",
-   "listeners": [
-    "src/client/game/population/pageReturns.ts",
-    "src/shared/game/population/pageHomes.ts"
-   ],
-   "producers": [
-    {
-     "file": "src/client/game/shardfile/clientWorker.ts",
-     "emits": "entry.manager.presentDeath?.("
-    },
-    {
-     "file": "src/client/engine/entities/RowBodies.ts",
-     "emits": "this.host.events.emit('actor.died'"
-    }
-   ],
-   "proof": "flow:creature-returns",
-   "why": "S3: the server owns returns; flow:creature-returns proves them with zero page population.",
-   "debt": "Dormant: RowBodies is always herdless, so pageReturns returns before it subscribes and pageHomes matches no body. The producer reaches neither. Retire both listeners."
-  },
-  {
    "id": "ai.windup",
    "kind": "event",
    "name": "ai.windup",

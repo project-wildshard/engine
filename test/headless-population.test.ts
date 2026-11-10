@@ -15,14 +15,13 @@ import { ClientPopulationSchema } from '@wildshard/format/clientNative';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { pagePopulationRows } from '../src/shared/game/population/pageRows';
 import { bindPageHomes } from '../src/shared/game/population/pageHomes';
-import { censusOf, populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
+import { installPageReturns } from '../src/client/game/population/pageReturns';
+import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
 import { Scope } from '../src/shared/engine/app/scope';
 import { legacyDouble } from '../src/test/engine/FakeGame';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardPlayHost, ShardRuntime } from '../src/shared/game/shard/runtime';
 import type { AnimalManager } from '../src/server/engine/entities/AnimalManager';
-import type { Animal } from '../src/client/engine/entities/AnimalView';
-import type { Actor } from '../src/shared/engine/combat/pipeline';
 import { canonicalSimDigest } from './fake/simState';
 import { builtProduct } from './fixtures/builtProduct';
 
@@ -99,66 +98,53 @@ test('Sunscar spawns, moves, kills and refills its creatures headless, and its c
   } finally { restored?.dispose(); live.dispose(); }
 }, 120_000);
 
-test('the browser page population counts and refills Sunscar exactly as the headless keeper does, tick for tick', async () => {
+test('the browser page population is the server\'s: a herdless page holds no home body and never listens for a death', async () => {
+  // SR12: the page's RowBodies is herdless, so its homes spawn nothing and match no death. The headless keeper above
+  // refills Sunscar on its own; the page only draws the rows it sends (flow:creature-returns).
   const { product, resident } = await shipped('sunscar-dunes');
   const declared = pagePopulationRows(parseNativeRuntimePlan(product.section('sim/runtime-plan')));
   const feature = product.section('client/plan').features.find(row => row.kind === 'population.homes');
   if (feature === undefined) throw new Error('Sunscar declares its page population');
   const row = parse(ClientPopulationSchema, feature);
-  // The page's creature manager, reduced to what its homes law reads: spawn, refill, retire and the died event.
-  const animals: Animal[] = [], died: ((payload: unknown) => void)[] = [], systems: Parameters<ShardContext['system']>[0][] = [];
-  let next = 0;
-  const spawn = (kind: string, x: number, z: number, yaw: number, variant?: string | string[], placement?: { entityId?: string }): Animal => {
-    const actor = legacyDouble<Actor>({}), position = new Vector3(x, 0, z);
-    const animal = legacyDouble<Animal>({ entityId: placement?.entityId ?? `creature:${next++}`, kind, variant: typeof variant === 'string' ? variant : kind,
-      alive: true, hp: 1, state: 'idle', yaw, position, mem: {}, combatActor: () => actor });
-    animals.push(animal); return animal;
-  };
-  const manager = legacyDouble<AnimalManager>({ herdless: false, spawn, retire: animal => { const at = animals.indexOf(animal); if (at !== -1) animals.splice(at, 1); },
-    replace: (retired, x, z, yaw, variant) => spawn(retired.kind, x, z, yaw, variant, { entityId: retired.entityId }) });
-  const scope = new Scope('e3.1.page');
+  const subscribed: string[] = [], systems: Parameters<ShardContext['system']>[0][] = [], spawned: string[] = [], prepared: string[] = [];
+  const rowBodies = legacyDouble<AnimalManager>({ herdless: true,
+    spawn: kind => { spawned.push(kind); throw new Error('A herdless page spawns no body'); },
+    factory: legacyDouble<AnimalManager['factory']>({ prepareSteps: function* (rows: readonly { kind: string }[]) { for (const entry of rows) { prepared.push(entry.kind); yield prepared.length; } } }) });
+  const scope = new Scope('sr12.page.homes');
   const ctx = legacyDouble<ShardContext>({ scope,
-    game: legacyDouble<ShardContext['game']>({ runtime: legacyDouble<ShardRuntime>({ play: legacyDouble<ShardPlayHost>({ animals: manager }) }) }),
-    on: (name, fn) => { if (name === 'actor.died') died.push(fn as (payload: unknown) => void); },
+    game: legacyDouble<ShardContext['game']>({ runtime: legacyDouble<ShardRuntime>({ play: legacyDouble<ShardPlayHost>({ animals: rowBodies }) }) }),
+    on: name => { subscribed.push(name); },
     system: spec => { systems.push(spec); } });
   const page = bindPageHomes(ctx, declared, { system: row.system,
     decisionActors: parseDecisionScripts(product.section('sim/scripts')).filter(script => 'spawnGroup' in script.binding).flatMap(script => Object.values(script.actors)),
     ...(row.holds === undefined ? {} : { holds: { ...row.holds, flags: { has: () => false } } }) });
-  const pageCensus = (tick: number): PopulationCensus => censusOf(tick, animals,
-    page.homes.map(entry => ({ id: entry.id, kind: entry.kind, body: entry.animal?.entityId ?? null, wait: entry.wait })));
-  // Bodies' identities and poses are each world's own; the count, the kinds and every home's clock are the population.
-  const counted = (census: PopulationCensus) => ({ alive: census.alive, fallen: census.fallen, kinds: census.kinds,
-    homes: census.homes.map(entry => ({ id: entry.id, kind: entry.kind, standing: entry.body !== null, wait: entry.wait })) });
   const live = await resident();
   try {
-    // The page's events drain at phase boundaries like the host's: a death reaches the homes after the frame's systems.
-    const pending: unknown[] = [];
-    const frame = (): void => {
-      live.step([]); for (const system of systems) system.run(FIXED_STEP, 0);
-      for (const payload of pending.splice(0)) for (const listener of died) listener(payload);
-    };
-    expect(counted(pageCensus(live.host.state.tick))).toEqual(counted(populationCensus(live.host)));
-    for (let tick = 0; tick < 120; tick++) frame();
-    const killPage = (id: string): void => {
-      const animal = page.homes.find(entry => entry.id === id)?.animal;
-      if (animal === undefined || animal === null) throw new Error(`No page body in ${id}`);
-      animal.alive = false; pending.push({ actor: animal.combatActor() });
-    };
-    kill(live, 'sunscar.home:7'); killPage('sunscar.home:7');
-    kill(live, 'sunscar.home:11'); killPage('sunscar.home:11');
-    let compared = 0;
-    for (let tick = 0; tick < 4300; tick++) {
-      frame();
-      const server = counted(populationCensus(live.host)), client = counted(pageCensus(live.host.state.tick));
-      if (JSON.stringify(client) !== JSON.stringify(server)) expect({ tick, client }).toEqual({ tick, client: server });
-      compared++;
-    }
-    expect(compared).toBe(4300);
-    const last = counted(populationCensus(live.host));
-    expect(last.alive).toBe(13);
-    expect(last.homes.every(entry => entry.standing && entry.wait === 0)).toBe(true);
+    live.step([]);
+    // The page knows the server's homes by id and kind, and the server's keeper stands a body in each of them.
+    const server = populationCensus(live.host);
+    const byId = (rows: readonly { id: string; kind: string }[]): string[][] => rows.map(entry => [entry.id, entry.kind]).sort(([a = ''], [b = '']) => a < b ? -1 : a > b ? 1 : 0);
+    expect(byId(page.homes)).toEqual(byId(server.homes));
+    expect(server.homes.every(entry => entry.body !== null)).toBe(true);
+    expect(prepared.length).toBeGreaterThan(0);
+    expect({ spawned, bodies: page.all().length, standing: page.homes.filter(entry => entry.animal !== null).length }).toEqual({ spawned: [], bodies: 0, standing: 0 });
+    expect(subscribed).not.toContain('actor.died');
+    for (let tick = 0; tick < 600; tick++) for (const system of systems) system.run(FIXED_STEP, 0);
+    expect(page.homes.every(entry => entry.animal === null && entry.wait === 0)).toBe(true);
   } finally { live.dispose(); scope.dispose(); }
 }, 120_000);
+
+test('page actor returns refuse a page that makes its own bodies: the server returns them', () => {
+  // SR12: installPageReturns no longer listens for deaths or refills; a page population with a herd of its own would be
+  // left without returns, so it is refused before any program loads.
+  const scope = new Scope('sr12.page.returns');
+  const ctx = legacyDouble<ShardContext>({ scope, on: () => { throw new Error('No page return listens for a death'); },
+    game: legacyDouble<ShardContext['game']>({ runtime: legacyDouble<ShardRuntime>({ world: legacyDouble<NonNullable<ShardRuntime['world']>>({}),
+      play: legacyDouble<ShardPlayHost>({ animals: legacyDouble<ShardPlayHost['animals']>({ herdless: false }) }) }) }) });
+  try {
+    expect(() => installPageReturns(ctx, { step: 'sr12.page.returns', water: 0, fixed: [], program: null, outOfSight: 60, rules: {} })).toThrow('must be herdless');
+  } finally { scope.dispose(); }
+});
 
 test('Far Reach lands its held roster headless with the ids and kinds its browser page holds', async () => {
   const { product, resident } = await shipped('far-reach');
