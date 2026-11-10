@@ -19,16 +19,20 @@ export class SustainedFrames {
   private readonly gpu = new Float32Array(MAX_FRAMES);
   private readonly done: SustainedMinute[] = [];
   private count = 0;
+  private last = -1;
 
   /** Control: the window starts here; a new world's control starts it again. */
-  start(now: number): void { this.from = now; this.minuteAt = now; this.frames = 0; this.done.length = 0; this.count = 0; }
+  start(now: number): void { this.from = now; this.minuteAt = now; this.frames = 0; this.done.length = 0; this.count = 0; this.last = now; }
 
   /** Each drawn frame: its interval, update and render work and the cap's interval (0 = none), all ms. */
   frame(now: number, frameMs: number, updateMs: number, renderMs: number, capMs: number): void {
     if (this.from < 0) return;
-    // a hidden page or a paused game draws nothing (or far less): a gap of a second drops the minute under way and the
-    // next one starts here, so an idle stretch is never read as the phone slowing down
-    if (frameMs >= GAP_MS) { this.minuteAt = now; this.frames = 0; return; }
+    // a hidden page, a parked game or a paused one draws nothing (or nothing that is play): a second between drawn frames
+    // on the page's own clock (the game's frame delta is clamped, so it cannot say) or a paused frame (frameMs Infinity)
+    // drops the minute under way and the next starts here, so an idle stretch never reads as the phone slowing down
+    const since = this.last < 0 ? 0 : now - this.last;
+    this.last = now;
+    if (since >= GAP_MS || !Number.isFinite(frameMs)) { this.minuteAt = now; this.frames = 0; return; }
     if (now - this.minuteAt >= MINUTE_MS) this.close(now);
     const gpu = Math.max(0, frameMs - Math.max(updateMs + renderMs, capMs));
     if (this.frames < MAX_FRAMES) this.gpu[this.frames] = gpu;

@@ -29,3 +29,8 @@ the boot's waits open). Its SHOULDs: the boot mark says whether the page actuall
 title's Low Power count starts once the title has been built, and minute numbers count on past the kept 120. Tests
 cover an idle gap, an fps-only fall, a gpu~-only rise and the numbering. The forced hidden frame after the server step
 runs a whole frame (input, fixed steps, update), as readyFrame's hidden frames already do under the same card.
+
+A re-review found the idle fix incomplete: the game passes a frame delta clamped to 100 ms, so a hidden or parked page
+never showed a gap. The collector now reads the gap on the page clock between drawn frames (a second or more drops the
+minute under way), and a paused frame (passed as Infinity) does the same. Tests: three hidden minutes behind a clamped
+delta, two paused minutes. A single real frame of a second or more also drops its minute: a stall, not a thermal trend.

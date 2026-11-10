@@ -718,11 +718,19 @@ it('QA row 31: an idle stretch or a pause never reads as a fall; fps and gpu~ fa
   // 50 fps, then the page hidden for three minutes, then 50 fps again: no empty minutes, no fall
   const idle = new SustainedFrames(); idle.start(0);
   let at = minute(idle, 0, 20, 10, 0);
-  at += 180_000; idle.frame(at, 180_000, 5, 5, 0);
+  // the game's own delta is clamped (100 ms): only the page clock shows the three minutes hidden
+  at += 180_000; idle.frame(at, 100, 5, 5, 0);
   minute(idle, at, 20, 10, 0);
   expect(idle.minutes()).toHaveLength(2);
   expect(idle.minutes().every(row => Math.abs(row.fps - 50) < 0.5)).toBe(true);
   expect(idle.falling()).toBeNull();
+  // a paused game (frames still drawn, each passed as Infinity) for two minutes, then play: no empty minute, no fall
+  const paused = new SustainedFrames(); paused.start(0);
+  at = minute(paused, 0, 20, 10, 0);
+  for (const end = at + 120_000; at < end; at += 20) paused.frame(at, Infinity, 0, 0, 0);
+  minute(paused, at, 20, 10, 0);
+  expect(paused.minutes()).toHaveLength(2);
+  expect(paused.falling()).toBeNull();
   // fps alone: 30 -> 20 with no gpu~ (a CPU-bound slowdown, the work fills each frame)
   const slower = new SustainedFrames(); slower.start(0);
   at = minute(slower, 0, 33.4, 10); minute(slower, at, 50, 50);
