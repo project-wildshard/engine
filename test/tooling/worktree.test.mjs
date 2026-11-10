@@ -96,20 +96,78 @@ describe('worktree new', () => {
     expect(existsSync(join(canonical, '.worktrees/two/package.json'))).toBe(true);
   });
 
-  test('refuses an existing worktree, an existing branch and a live setup lock, and leaves nothing behind', () => {
+  test('refuses an existing worktree or branch, and honours a live setup lock but takes over an abandoned one', () => {
     const {canonical} = repos();
     expect(worktree(canonical, ['new', 'foo', '--no-install']).status).toBe(0);
     expect(worktree(canonical, ['new', 'foo', '--no-install']).stderr).toMatch(/already exists/u);
     git(canonical, ['branch', 'plan/bar', 'main']);
     expect(worktree(canonical, ['new', 'bar', '--no-install']).stderr).toMatch(/branch plan\/bar already exists/u);
-    mkdirSync(join(canonical, '.git/wildshard-worktree-setup.lock'));
-    writeFileSync(join(canonical, '.git/wildshard-worktree-setup.lock/pid'), String(process.pid));
+    expect(git(canonical, ['rev-parse', 'plan/bar'])).toBe(git(canonical, ['rev-parse', 'main']));
+    const lock = join(canonical, '.git/wildshard-worktree-setup.lock');
+    writeFileSync(lock, `${process.pid} ${Date.now()} live`);
     const locked = worktree(canonical, ['new', 'baz', '--no-install']);
     expect(locked.status).toBe(1);
     expect(locked.stderr).toMatch(/another worktree setup/u);
     expect(existsSync(join(canonical, '.worktrees/baz'))).toBe(false);
-    // A lock whose holder died is taken over.
-    writeFileSync(join(canonical, '.git/wildshard-worktree-setup.lock/pid'), '999999999');
+    expect(readFileSync(lock, 'utf8')).toMatch(/ live$/u);
+    // A dead holder's lock, and a live pid's lock older than any setup (a reused pid), are taken over and released.
+    writeFileSync(lock, `999999999 ${Date.now()} dead`);
     expect(worktree(canonical, ['new', 'baz', '--no-install']).status).toBe(0);
+    writeFileSync(lock, `${process.pid} ${Date.now() - 11 * 60_000} old`);
+    expect(worktree(canonical, ['new', 'qux', '--no-install']).status).toBe(0);
+    expect(existsSync(lock)).toBe(false);
+  });
+
+  test('never clones a hidden edit, a mode the index disagrees with, a converted file or a swapped-in directory', () => {
+    const {canonical} = repos();
+    // assume-unchanged hides an edit from `git ls-files -m`.
+    put(canonical, 'src/same.ts', 'export const same = "hidden";\n');
+    git(canonical, ['update-index', '--assume-unchanged', 'src/same.ts']);
+    // With core.filemode off, the index keeps 100755 while the working file lost its x bit.
+    git(canonical, ['config', 'core.filemode', 'false']);
+    spawnSync('chmod', ['-x', join(canonical, 'bin/run.sh')]);
+    // skip-worktree, and the path is now a directory holding a secret.
+    git(canonical, ['update-index', '--skip-worktree', 'package.json']);
+    rmSync(join(canonical, 'package.json'));
+    put(canonical, 'package.json/secret.env', 'TOKEN=never-copied\n');
+    const made = worktree(canonical, ['new', 'foo', '--no-install']);
+    expect(made.status, made.stderr).toBe(0);
+    const tree = join(canonical, '.worktrees/foo');
+    expect(readFileSync(join(tree, 'src/same.ts'), 'utf8')).toBe('export const same = 1;\n');
+    expect(spawnSync('test', ['-x', join(tree, 'bin/run.sh')]).status).toBe(0);
+    expect(readFileSync(join(tree, 'package.json'), 'utf8')).toContain('"name":"fixture"');
+    expect(git(tree, ['status', '--porcelain'])).toBe('');
+  });
+
+  test('writes an ident-expanded file through git, not as a raw clone', () => {
+    const {canonical, origin, base} = repos();
+    const seed = join(base, 'seed');
+    put(seed, '.gitattributes', '*.id ident\n');
+    put(seed, 'version.id', '$Id$\n');
+    git(seed, ['add', '.gitattributes', 'version.id']);
+    git(seed, ['commit', '-q', '-m', 'ident']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    git(canonical, ['pull', '-q', '--rebase', '--autostash', origin, 'main']);
+    const made = worktree(canonical, ['new', 'foo', '--no-install']);
+    expect(made.status, made.stderr).toBe(0);
+    expect(readFileSync(join(canonical, '.worktrees/foo/version.id'), 'utf8')).toMatch(/^\$Id: [0-9a-f]{40} \$\n$/u);
+  });
+
+  test('refuses a repo whose tracked hooks would not run there, and takes back its worktree and branch', () => {
+    const {canonical, origin, base} = repos();
+    const seed = join(base, 'seed');
+    put(seed, '.githooks/pre-commit', '#!/bin/sh\nexit 0\n');
+    spawnSync('chmod', ['+x', join(seed, '.githooks/pre-commit')]);
+    git(seed, ['add', '.githooks/pre-commit']);
+    git(seed, ['commit', '-q', '-m', 'hooks']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    git(canonical, ['fetch', '-q', origin]);
+    const refused = worktree(canonical, ['new', 'foo', '--no-install']);
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toMatch(/core\.hooksPath is unset/u);
+    expect(existsSync(join(canonical, '.worktrees/foo'))).toBe(false);
+    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], {cwd: canonical, env: ENV}).status).not.toBe(0);
+    git(canonical, ['config', 'core.hooksPath', '.githooks']);
+    expect(worktree(canonical, ['new', 'foo', '--no-install']).status).toBe(0);
   });
 });

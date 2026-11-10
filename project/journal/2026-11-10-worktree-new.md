@@ -21,3 +21,17 @@ Five creations on the laptop: 20.0-25.4 s, median 24.2 s; without pins
 (`out/` 1,416 MiB plus 380 MiB of mounts in `public/`), because `pins.ts
 install` re-extracts every product. Making identical pins a clone or a no-op
 is what is left of DS12's 150 MiB bound.
+
+J206 Codex review: four MUSTs, all fixed. A clean `git status` doesn't prove
+bytes or modes (filters, eol, `core.filemode=false`), so every clone is now
+hashed raw against its blob and mode-checked, and files with a checkout
+conversion are never cloned. Sources are opened without following a final
+link and must be regular files (`fclonefileat`), and assume-unchanged and
+skip-worktree paths count as dirty. The lock is a hard link of a file that
+already names its owner, released only by its owner, taken over only from a
+dead or 10-minute-old holder. Tracked hooks must resolve inside the worktree
+and be executable, or setup takes back its worktree and branch (the branch
+only while it still points at the base).
+
+Re-measured after the fixes: 15.4 s on a quieter machine (checkout 3.0, install
+1.2, pins 10.2); tracked tree 0.4 MiB unique.

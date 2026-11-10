@@ -2,8 +2,10 @@
 // <canonical>/.worktrees/<slug> on plan/<slug> from origin/main, ready to work in and land from.
 //
 //   1. a short per-repo setup lock, then `git fetch origin main` and `git worktree add --no-checkout`;
-//   2. the tracked tree: each file whose blob and mode match a clean file of the canonical checkout is an APFS clone
-//      of it (copy-on-write, no new blocks); git writes the rest; `git status` must then be clean, or setup stops;
+//   2. the tracked tree: a file whose blob and mode match a clean regular file of the canonical checkout, with no
+//      checkout conversion (filter, eol, text, ident, encoding), is an APFS clone of it (copy-on-write, no new
+//      blocks); every clone is then hashed raw against its blob and mode-checked, and a mismatch is deleted; git
+//      writes the rest; `git status` must then be clean and the hooks live, or setup takes its worktree back;
 //   3. `pnpm install --frozen-lockfile --offline`: pnpm's store, cloned, not downloaded;
 //   4. `pnpm pins` when the repo has that script (shard products from ~/.cache/wildshard/pins);
 //   5. names the herdr pane (inside herdr only) and prints the land steps.
@@ -12,7 +14,8 @@
 // only tracked files and its own install. Each step's seconds go to <worktree>/tmp/worktree-setup.json and, with
 // WS_LANE_NAME set, one line in ~/.cache/wildshard/lane-receipts.log. Removal is DS13's reaper, never this script.
 import {execFileSync,spawnSync} from 'node:child_process';
-import {appendFileSync,existsSync,mkdirSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
+import {randomBytes} from 'node:crypto';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,renameSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -20,24 +23,37 @@ import {WORKTREES} from './worktree-ignore.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REGULAR=/^100(?:644|755)$/u;
-// clonefile(2) per file, one process for the whole tree: Node's COPYFILE_FICLONE makes a full copy on macOS (measured:
-// ATTR_CMNEXT_PRIVATESIZE equals the file size) and COPYFILE_FICLONE_FORCE fails with ENOSYS. Reads source/target pairs,
-// NUL-separated, on stdin; any failure stops it, and git then writes what is missing.
-const CLONEFILE=`import ctypes, os, sys
+/** The hooks a commit and a push must run, when the repo tracks them. */
+const HOOKS=['pre-commit','commit-msg','pre-push'];
+/** A lock older than this is abandoned whatever its pid says (pids are reused); the locked part takes seconds. */
+const STALE_MS=10*60_000;
+// fclonefileat(2) per file, one process for the whole tree: Node's COPYFILE_FICLONE makes a full copy on macOS
+// (measured: ATTR_CMNEXT_PRIVATESIZE equals the file size) and COPYFILE_FICLONE_FORCE fails with ENOSYS. Each source
+// is opened without following a final symlink and must be a regular file, so a path swapped for a directory or a
+// link is never cloned; every clone is hashed afterwards anyway. Reads source/target pairs, NUL-separated, on stdin.
+const CLONEFILE=`import ctypes, os, stat, sys
 libc = ctypes.CDLL(None, use_errno=True)
-libc.clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint32]
+libc.fclonefileat.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32]
+AT_FDCWD = -2
 parts = sys.stdin.buffer.read().split(b'\\0')[:-1]
 for source, target in zip(parts[0::2], parts[1::2]):
-    if libc.clonefile(source, target, 1) != 0:
-        sys.exit(f'{target.decode()}: {os.strerror(ctypes.get_errno())}')`;
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            sys.exit(f'{source.decode()}: not a regular file')
+        if libc.fclonefileat(fd, AT_FDCWD, target, 0) != 0:
+            sys.exit(f'{target.decode()}: {os.strerror(ctypes.get_errno())}')
+    finally:
+        os.close(fd)`;
 const USAGE='usage: node scripts/worktree.mjs new <slug> [--no-install] [--no-pins] [--no-herdr] [--no-clone]';
 
 class StopError extends Error{name='StopError';}
 
-/** @param {string} cwd @param {string[]} args */
-const git=(cwd,args)=>execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
+/** @param {string} cwd @param {string[]} args @param {string} [input] */
+const git=(cwd,args,input)=>execFileSync('git',args,{cwd,encoding:'utf8',input,stdio:['pipe','pipe','pipe'],maxBuffer:256<<20});
 /** @param {string} cwd @param {string[]} args */
 const tryGit=(cwd,args)=>spawnSync('git',args,{cwd,encoding:'utf8',maxBuffer:256<<20});
+const nul=(/** @type {string} */ text)=>text.split('\0').filter(Boolean);
 
 /** @param {string[]} argv */
 export function parseArgs(argv){
@@ -60,48 +76,111 @@ export function canonicalRoot(cwd){
 /** `git ls-files -s -z` as path -> "<mode> <oid>". @param {string} cwd */
 function stagedBlobs(cwd){
  /** @type {Map<string,string>} */const blobs=new Map();
- for(const row of git(cwd,['ls-files','-s','-z']).split('\0')){
+ for(const row of nul(git(cwd,['ls-files','-s','-z']))){
   const match=/^(\d{6}) ([0-9a-f]{40,64}) 0\t(.+)$/su.exec(row);
   if(match!==null)blobs.set(match[3]??'',`${match[1]} ${match[2]}`);
  }
  return blobs;
 }
 
-/** Clone into `tree` each tracked file the canonical checkout holds clean with the same blob and mode.
- * @param {string} canonical @param {string} tree @returns {number} files cloned */
+/** Paths whose checkout would not write the raw blob, from the target's own attributes: a filter, an eol, a
+ * working-tree encoding, ident expansion, or text conversion when the config asks for CRLF.
+ * @param {string} tree @param {string[]} paths @returns {Set<string>} */
+function convertedPaths(tree,paths){
+ const converted=new Set();
+ if(paths.length===0)return converted;
+ const crlf=tryGit(tree,['config','core.autocrlf']).stdout.trim()==='true'||tryGit(tree,['config','core.eol']).stdout.trim()==='crlf';
+ const rows=nul(git(tree,['check-attr','--cached','-z','--stdin','filter','eol','text','ident','working-tree-encoding'],`${paths.join('\0')}\0`));
+ for(let index=0;index+2<rows.length;index+=3){
+  const path=rows[index]??'',attribute=rows[index+1],value=rows[index+2];
+  const plain=value==='unspecified'||value==='unset'||(attribute==='text'&&!crlf);
+  if(!plain||(attribute==='text'&&crlf&&value!=='unset'))converted.add(path);
+ }
+ return converted;
+}
+
+/** Clone into `tree` each tracked file the canonical checkout holds clean with the same blob and mode, then keep only
+ * clones whose raw bytes hash to their blob and whose mode matches. @param {string} canonical @param {string} tree
+ * @returns {number} files kept */
 function cloneTrackedFiles(canonical,tree){
- const source=stagedBlobs(canonical);
- const dirty=new Set(git(canonical,['ls-files','-z','--modified','--deleted']).split('\0').filter(Boolean));
- for(const row of git(canonical,['diff','--cached','--name-only','-z']).split('\0'))if(row!=='')dirty.add(row);
+ const source=stagedBlobs(canonical),target=stagedBlobs(tree);
+ // Hidden edits count as dirty: modified, deleted, staged, assume-unchanged (lowercase tag) or skip-worktree (S).
+ const dirty=new Set(nul(git(canonical,['ls-files','-z','--modified','--deleted'])));
+ for(const path of nul(git(canonical,['diff','--cached','--name-only','-z'])))dirty.add(path);
+ for(const row of nul(git(canonical,['ls-files','-z','-v'])))if(/^(?:[a-z]|S) /u.test(row))dirty.add(row.slice(2));
+ const candidates=[...target].filter(([path,blob])=>source.get(path)===blob&&!dirty.has(path)&&REGULAR.test(blob.slice(0,6))).map(([path])=>path);
+ const converted=convertedPaths(tree,candidates);
+ /** @type {string[]} */const cloned=[];
  /** @type {string[]} */const pairs=[];
- for(const [path,blob] of stagedBlobs(tree)){
-  if(source.get(path)!==blob||dirty.has(path)||!REGULAR.test(blob.slice(0,6)))continue;
-  const target=join(tree,path);
-  mkdirSync(dirname(target),{recursive:true});
-  pairs.push(join(canonical,path),target);
+ for(const path of candidates){
+  if(converted.has(path))continue;
+  try{if(!lstatSync(join(canonical,path)).isFile())continue;}catch{continue;}
+  mkdirSync(dirname(join(tree,path)),{recursive:true});
+  pairs.push(join(canonical,path),join(tree,path));
+  cloned.push(path);
  }
  if(pairs.length===0)return 0;
  const result=spawnSync('python3',['-I','-c',CLONEFILE],{input:`${pairs.join('\0')}\0`,encoding:'utf8',maxBuffer:64<<20});
- if(result.status!==0)throw new Error(`clonefile: ${result.stderr.trim()===''?result.error?.message??'failed':result.stderr.trim()}`);
- return pairs.length/2;
+ if(result.status!==0)process.stderr.write(`worktree: clone stopped early (${result.stderr.trim()===''?result.error?.message??'failed':result.stderr.trim()}); git writes the rest\n`);
+ // The raw bytes of every clone hash to its blob, and its mode is the index's; anything else is deleted for git.
+ const present=cloned.filter(path=>existsSync(join(tree,path)));
+ const hashes=present.length===0?[]:git(tree,['hash-object','--no-filters','--stdin-paths'],`${present.join('\n')}\n`).trim().split('\n');
+ let kept=0;
+ present.forEach((path,index)=>{
+  const [mode,oid]=(target.get(path)??'').split(' '),stat=statSync(join(tree,path));
+  if(hashes[index]===oid&&((stat.mode&0o100)!==0)===(mode==='100755')&&stat.isFile()&&!lstatSync(join(tree,path)).isSymbolicLink())kept++;
+  else rmSync(join(tree,path),{force:true});
+ });
+ return kept;
 }
 
-/** A short per-repo setup lock in the shared Git dir; a holder that died leaves a lock the next run takes over.
- * @param {string} common @returns {() => void} */
-function lock(common){
- const path=join(common,'wildshard-worktree-setup.lock'),owner=join(path,'pid');
- for(let attempt=0;attempt<2;attempt++){
-  try{mkdirSync(path);writeFileSync(owner,String(process.pid));return ()=>rmSync(path,{recursive:true,force:true});}
-  catch(error){
-   if(!(error instanceof Error)||!('code' in error)||error.code!=='EEXIST')throw error;
-   const pid=Number.parseInt(existsSync(owner)?readFileSync(owner,'utf8'):'',10);
-   let alive=false;
-   try{if(Number.isInteger(pid)&&pid>0){process.kill(pid,0);alive=true;}}catch{/* The holder is gone. */}
-   if(alive)throw new StopError(`another worktree setup (pid ${pid}) holds ${path}; retry when it finishes`);
-   rmSync(path,{recursive:true,force:true});
-  }
+/** The repo's hooks must be live in the worktree: core.hooksPath inside it, and each tracked hook executable there.
+ * @param {string} tree */
+function checkHooks(tree){
+ const configured=tryGit(tree,['config','core.hooksPath']).stdout.trim();
+ const tracked=new Set(nul(git(tree,['ls-files','-z','--','.githooks'])));
+ if(tracked.size===0&&configured==='')return;
+ if(configured==='')throw new StopError(`core.hooksPath is unset but the repo tracks .githooks/; run git config core.hooksPath .githooks in the canonical checkout`);
+ const directory=resolve(tree,configured);
+ if(!directory.startsWith(`${tree}/`))throw new StopError(`core.hooksPath ${configured} resolves outside the worktree (${directory})`);
+ for(const hook of HOOKS){
+  const path=join(directory,hook);
+  if(!tracked.has(`.githooks/${hook}`))continue;
+  let mode=0;
+  try{mode=statSync(path).mode;}catch{/* Missing: refused below. */}
+  if((mode&0o111)===0)throw new StopError(`hook ${hook} is missing or not executable at ${path}`);
  }
- throw new StopError(`could not take ${path}`);
+}
+
+/** A short per-repo setup lock in the shared Git dir. It is created with its owner already in it (a hard link of a
+ * written file), released only by its owner, and taken over only when its holder is gone or it is older than any
+ * setup. @param {string} common @returns {() => void} */
+function lock(common){
+ const path=join(common,'wildshard-worktree-setup.lock'),token=`${process.pid} ${Date.now()} ${randomBytes(6).toString('hex')}`;
+ const draft=`${path}.${randomBytes(6).toString('hex')}`;
+ writeFileSync(draft,token);
+ try{
+  for(let attempt=0;attempt<3;attempt++){
+   try{linkSync(draft,path);return ()=>{try{if(readFileSync(path,'utf8')===token)unlinkSync(path);}catch{/* Already gone. */}};}
+   catch(error){if(!(error instanceof Error)||!('code' in error)||error.code!=='EEXIST')throw error;}
+   let held='';
+   try{held=readFileSync(path,'utf8');}catch{continue;}
+   const [pid,since]=held.split(' ').map(Number);
+   let alive=false;
+   try{if(pid!==undefined&&Number.isInteger(pid)&&pid>0){process.kill(pid,0);alive=true;}}catch{/* The holder is gone. */}
+   if(alive&&since!==undefined&&Date.now()-since<STALE_MS)throw new StopError(`another worktree setup (pid ${String(pid)}) holds ${path}; retry when it finishes`);
+   // Take the abandoned lock aside, and keep it only if it is still the one judged abandoned.
+   const aside=`${path}.abandoned.${randomBytes(6).toString('hex')}`;
+   try{renameSync(path,aside);}catch{continue;}
+   if(readFileSync(aside,'utf8')!==held){
+    try{linkSync(aside,path);}catch{/* Its owner re-created it; theirs stands. */}
+    unlinkSync(aside);
+    throw new StopError(`${path} changed hands while it was taken over; retry`);
+   }
+   unlinkSync(aside);
+  }
+  throw new StopError(`could not take ${path}`);
+ }finally{unlinkSync(draft);}
 }
 
 /** @param {string} cwd @param {string} command @param {string[]} args @param {NodeJS.ProcessEnv} env */
@@ -129,26 +208,30 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
   if(existsSync(tree))throw new StopError(`${relative} already exists; work there, or pick another slug`);
   if(tryGit(canonical,['rev-parse','--verify','--quiet',`refs/heads/${branch}`]).status===0)throw new StopError(`branch ${branch} already exists; delete it or pick another slug`);
   timed('fetch',()=>{git(canonical,['fetch','--quiet','origin','main']);base=git(canonical,['rev-parse','origin/main']).trim();return `origin/main ${base.slice(0,10)}`;});
-  timed('add',()=>{git(canonical,['worktree','add','--quiet','--no-checkout','-b',branch,relative,base]);git(tree,['reset','--quiet']);});
-  try{timed('checkout',()=>{
-   let cloned=0;
-   if(options.clone&&process.platform==='darwin'){
-    try{cloned=cloneTrackedFiles(canonical,tree);}
-    catch(error){process.stderr.write(`worktree: clone reuse skipped (${error instanceof Error?error.message:String(error)}); git writes every file\n`);}
-   }
-   // Git writes every tracked file the clone did not place (and symlinks); it never overwrites a clone.
-   const missing=[...stagedBlobs(tree).keys()].filter(path=>!existsSync(join(tree,path)));
-   const written=spawnSync('git',['checkout-index','--stdin','-z'],{cwd:tree,input:missing.map(path=>`${path}\0`).join(''),encoding:'utf8',maxBuffer:64<<20});
-   if(written.status!==0)throw new StopError(`git checkout-index: ${written.stderr.trim()}`);
-   tryGit(tree,['update-index','-q','--refresh']);
-   const stray=git(tree,['status','--porcelain','--untracked-files=no']).trim();
-   if(stray!=='')throw new StopError(`${relative} is not clean after checkout:\n${stray.split('\n').slice(0,10).join('\n')}`);
-   return `${cloned} of ${stagedBlobs(tree).size} tracked files cloned from the canonical checkout`;
-  });}
-  catch(error){
-   // Nothing was made here but this setup's own empty worktree and its branch at origin/main: take both back.
+  // Git refuses `-b` for a branch that appeared since the check, before anything here owns one.
+  timed('add',()=>{git(canonical,['worktree','add','--quiet','--no-checkout','-b',branch,relative,base]);});
+  try{
+   timed('checkout',()=>{
+    git(tree,['reset','--quiet']);
+    let cloned=0;
+    if(options.clone&&process.platform==='darwin'){
+     try{cloned=cloneTrackedFiles(canonical,tree);}
+     catch(error){process.stderr.write(`worktree: clone reuse skipped (${error instanceof Error?error.message:String(error)}); git writes every file\n`);}
+    }
+    // Git writes every tracked file the clone did not place (and symlinks); it never overwrites a verified clone.
+    const missing=[...stagedBlobs(tree).keys()].filter(path=>{try{lstatSync(join(tree,path));return false;}catch{return true;}});
+    const written=spawnSync('git',['checkout-index','--stdin','-z'],{cwd:tree,input:missing.map(path=>`${path}\0`).join(''),encoding:'utf8',maxBuffer:64<<20});
+    if(written.status!==0)throw new StopError(`git checkout-index: ${written.stderr.trim()}`);
+    tryGit(tree,['update-index','-q','--refresh']);
+    const stray=git(tree,['status','--porcelain','--untracked-files=no']).trim();
+    if(stray!=='')throw new StopError(`${relative} is not clean after checkout:\n${stray.split('\n').slice(0,10).join('\n')}`);
+    checkHooks(tree);
+    return `${cloned} of ${stagedBlobs(tree).size} tracked files cloned from the canonical checkout`;
+   });
+  }catch(error){
+   // Take back only what this setup made: its worktree, and its branch while it still points at the base.
    tryGit(canonical,['worktree','remove','--force',relative]);
-   tryGit(canonical,['branch','-D',branch]);
+   tryGit(canonical,['update-ref','-d',`refs/heads/${branch}`,base]);
    throw error;
   }
  }finally{unlock();}
@@ -156,15 +239,12 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
  const childEnv=Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_')));
  if(options.install)timed('install',()=>run(tree,'pnpm',['install','--frozen-lockfile','--offline'],childEnv));
  if(options.pins&&scripts.pins!==undefined)timed('pins',()=>run(tree,'pnpm',['--silent','pins'],childEnv));
- const hooks=git(tree,['rev-parse','--path-format=absolute','--git-path','hooks']).trim();
- const hooksPath=tryGit(tree,['config','core.hooksPath']).stdout.trim();
- if(hooksPath!==''&&!resolve(tree,hooksPath).startsWith(`${tree}/`))throw new StopError(`core.hooksPath ${hooksPath} resolves outside ${relative}`);
  if(options.herdr&&env.HERDR_ENV==='1'&&env.HERDR_PANE_ID!==undefined&&env.HERDR_PANE_ID!==''){
   const named=spawnSync('herdr',['pane','rename',env.HERDR_PANE_ID,`${basename(canonical)} ${branch}`],{encoding:'utf8'});
   if(named.status!==0)process.stderr.write(`worktree: herdr pane not renamed (${named.error?.message??named.stderr.trim()})\n`);
  }
  const total=Number(((performance.now()-began)/1000).toFixed(2));
- const record={slug:options.slug,branch,base,tree,hooks:hooksPath===''?hooks:resolve(tree,hooksPath),total,steps,finished:new Date().toISOString()};
+ const record={slug:options.slug,branch,base,tree,total,steps,finished:new Date().toISOString()};
  mkdirSync(join(tree,'tmp'),{recursive:true});
  writeFileSync(join(tree,'tmp/worktree-setup.json'),`${JSON.stringify(record,null,2)}\n`);
  const lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'';
