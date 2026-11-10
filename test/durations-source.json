@@ -592,6 +592,71 @@
         "ring1"
       ],
       "basis": "Successful Linux module diagnostic includes test, collection, setup, preparation and environment. This exact pure DOM case has the same happy-dom environment in both rings and reads no pinned product. No global calibration or unmeasured-file bound changes."
+    },
+    {
+      "file": "test/nalati-awareness-verbs.test.ts",
+      "sha": "1ab74faa636d6504720d098646dbb67caa4652ff",
+      "run": "42798063183",
+      "artifact": 13754693038,
+      "zipSha256": "9eda84a6be133db586ee6e335da14d22a6e65576eba53df0863c785044f27997",
+      "report": "results-1-of-3.json.timings.json",
+      "durationMs": 54292.82291,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Largest actual complete-module clock among all11 independently audited fresh581-source qualifying CI runs, not the fastest or a local estimate. Source581 exact matched-span and c4b scoped compression replace the previous runtime generation. Exact original one-case body/state/wire checks and60s budget remain; no planner/calibration/group/cap change. Ring2 classification is unchanged, so no Ring1 weight or fabricated execution is added."
+    },
+    {
+      "file": "test/vps-phase2-check.test.ts",
+      "sha": "5a84443d3721c76a28119d42ca40f6b8e260e354",
+      "run": "42800111977",
+      "artifact": 13756635964,
+      "zipSha256": "b369f26b3bee2800026c633e209c377bf17cd38257085f93b450c927458bc6a3",
+      "report": "shard-10-ordinary.json",
+      "durationMs": 374.1161339999999,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Actual successful same-source Linux schema2 complete-module diagnostic, including collection/setup/environment and exact case outcomes, CI42800111977. Replaces only this full-plan unknown60s fallback with its measured clock. No planner/calibration/group/cap change; no Ring1 measurement or membership inferred."
+    },
+    {
+      "file": "test/spawn-cache-drain.test.ts",
+      "sha": "5a84443d3721c76a28119d42ca40f6b8e260e354",
+      "run": "42800111977",
+      "artifact": 13756146607,
+      "zipSha256": "658adee1acf838340c1424be733d25600d88f28dbb6bfcdd13ae89c9176fa553",
+      "report": "shard-8-ordinary.json",
+      "durationMs": 827.0433350000001,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Actual successful same-source Linux schema2 complete-module diagnostic, including collection/setup/environment and exact case outcomes, CI42800111977. Replaces only this full-plan unknown60s fallback with its measured clock. No planner/calibration/group/cap change; no Ring1 measurement or membership inferred."
+    },
+    {
+      "file": "test/spawn-postcontrol-quota.test.ts",
+      "sha": "5a84443d3721c76a28119d42ca40f6b8e260e354",
+      "run": "42800111977",
+      "artifact": 13755976857,
+      "zipSha256": "ba68da2033d0af843e159054cd60907fd202ae0a23c1c6bcc854a1295bc9a81a",
+      "report": "shard-9-ordinary.json",
+      "durationMs": 747.4281869999998,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Actual successful same-source Linux schema2 complete-module diagnostic, including collection/setup/environment and exact case outcomes, CI42800111977. Replaces only this full-plan unknown60s fallback with its measured clock. No planner/calibration/group/cap change; no Ring1 measurement or membership inferred."
+    },
+    {
+      "file": "test/vps-phase2-state.test.ts",
+      "sha": "5a84443d3721c76a28119d42ca40f6b8e260e354",
+      "run": "42800111977",
+      "artifact": 13755632054,
+      "zipSha256": "7a21060f1d2cef3e28f529e84a5a02995d37c1cc22abac5a7e79742b33597eb2",
+      "report": "shard-11-ordinary.json",
+      "durationMs": 1172.3316089999998,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Actual successful same-source Linux schema2 complete-module diagnostic, including collection/setup/environment and exact case outcomes, CI42800111977. Replaces only this full-plan unknown60s fallback with its measured clock. No planner/calibration/group/cap change; no Ring1 measurement or membership inferred."
     }
   ],
   "full": {
