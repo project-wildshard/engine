@@ -30,6 +30,32 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "test/physics-open-plots-headless.test.ts",
+      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
+      "run": "42738123700",
+      "artifact": 13727249179,
+      "report": "results-2-of-3.json.timings.json",
+      "measuredAt": 1794275510136,
+      "durationMs": 48139.192371,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Conservative maximum complete module clock across all15 consecutive current-generation green CI executions, each19passes/0failed/0skipped and <=60000ms under published native placement. Exact current body and rawcase/clock identities verified. Replaces the old precompiled-caller estimate; original Ring2 omission stays, no Ring1transfer or cap change."
+    },
+    {
+      "file": "test/tooling/chrome-keychain.test.mjs",
+      "sha": "b17d8b7a0df7e88719dd3a1176e3b67aec800684",
+      "run": "42743123394",
+      "artifact": 13729968712,
+      "report": "shard-10-ordinary.json",
+      "measuredAt": 1794278091633,
+      "durationMs": 2449.271175,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Passed current Linux full-CI complete module clock including collection, setup, environment and cases/hooks. Exact current test-body blob matches. Replaces only this full-CI previously unknown estimate; the separate OpenPlots estimate uses its observed current-generation maximum. No Ring1transfer, other existing weight, fallback/cap/planner/group/deadline change."
+    },
+    {
       "file": "test/tooling/check-page-events.test.mjs",
       "sha": "b34773847338c43a2d1edefa88746296f233cb33",
       "run": "local",
