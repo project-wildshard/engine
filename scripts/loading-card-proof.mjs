@@ -132,6 +132,9 @@ try {
       await context.addInitScript(recordBars);
       const page = await context.newPage();
       /** @type {string[]} */ const faults = [];
+      // each grid entry reports the faults raised from the end of the previous entry (its Exit) through its own Exit;
+      // the page, and so its error listener, spans all three
+      let faultCursor=0;
       page.on('pageerror', error => faults.push(error.message));
       if (throttle && name === 'chromium') {
         const cdp = await context.newCDPSession(page);
@@ -159,8 +162,6 @@ try {
       };
       if(grid)await page.goto(`${preview.url}/?mute=1&nolock=1&sw=0`,{waitUntil:'domcontentloaded'});
       for(const attempt of grid?['fresh-grid','saved-ember','missing-art']:['entry']){
-      // each grid entry reports its own faults (the page, and so its error listener, spans all three)
-      const firstFault=faults.length;
       const tag=`${name}${gpu&&name==='chromium'?'-gpu':''}${throttle&&name==='chromium'?'-throttled':''}-${grid?attempt:shard}`;
       /** @type {{name:string,art:string}|null} */let destination=null;
       if(grid){
@@ -240,7 +241,7 @@ try {
         && lastCount.serverSteps > 0 && lastCount.serverFiles > 0 && lastCount.serverBytes > 0;
       console.log(`${tag}: measured counts ${measured ? 'ok' : 'FAILED'} ${JSON.stringify(lastCount)}`);
       if (!measured) faults.push('Start code bytes or Server internal work counts absent');
-      report.push({tag,faults:faults.slice(firstFault),log,readyAt,counts});
+      const row={tag,faults:/** @type {string[]} */([]),log,readyAt,counts};report.push(row);
       if(grid){
         await page.locator('.ws-load-play').click();
         await page.waitForFunction(()=>document.querySelector('.ws-load')===null);
@@ -270,6 +271,7 @@ try {
           await page.locator('.ws-main-grid').waitFor({timeout:60000});
         }
       }
+      row.faults=faults.slice(faultCursor);faultCursor=faults.length;
       }
       }finally{await context.close();}
     }finally{await browser?.close();if(profile!==null)rmSync(profile,{recursive:true});}

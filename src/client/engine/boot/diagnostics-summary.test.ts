@@ -78,4 +78,8 @@ it('keeps every counter when two of this page\'s files share one path (LS4: the 
   expect(Object.keys(out.counters)).toEqual(['download:/b/c/…#2', 'download:/b/c/…', 'download:/b/c/…#3', 'download:/assets/spawn/a.json', 'download:/assets/spawn/a.json#2']);
   expect(Object.values(out.counters).map(row => row.loaded)).toEqual([1, 2, 3, 4, 5]);
   expect(out.resources.map(row => row.url)).toEqual(['/b/c/…', '/b/c/…#2', '/b/c/…']); // one file keeps one name
+  // two producer names one export name (a GLTF wait label folds case): the second counter is kept, not overwritten
+  const own = `${location.origin}/b/a.js`, waits = safeBootDiagnostics({ ...timing, resources: [], counters: {
+    [`wait:GLTF decode ${own}`]: { loaded: 1, total: null, unit: 'units', at: 1, events: 1 }, [`wait:gltf decode ${own}`]: { loaded: 2, total: null, unit: 'units', at: 2, events: 1 } } }) as { counters: Record<string, { loaded: number }> };
+  expect(Object.entries(waits.counters).map(([key, row]) => [key, row.loaded])).toEqual([['wait:GLTF decode /b/a.js', 1], ['wait:GLTF decode /b/a.js#2', 2]]);
 });

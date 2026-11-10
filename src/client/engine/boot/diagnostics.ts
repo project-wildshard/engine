@@ -164,9 +164,13 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
     id:index+1,url:url(row['url']),realm:realm(row['realm']),
     initiator:oneOf(row['initiator'],['fetch','xmlhttprequest','script','css','link','img','image','other'] as const,'other'),
   });});
-  const counters=Object.fromEntries(Object.entries(record(source['counters'])).map(([key,value],index)=>{const row=record(value);return [
-    operation(key,`counter-${index+1}`),Object.assign(numbers(row,['loaded','total','at','events']),{unit:oneOf(row['unit'],UNITS,'other')}),
-  ];}));
+  // LS4: every counter survives, whatever two names its export may share (a wait label folds case, say)
+  const counters:Record<string,unknown>={};
+  for(const [index,[key,value]] of Object.entries(record(source['counters'])).entries()){
+    const row=record(value),name=operation(key,`counter-${index+1}`);
+    let label=name;for(let next=2;Object.hasOwn(counters,label);next++)label=`${name}#${next}`;
+    counters[label]=Object.assign(numbers(row,['loaded','total','at','events']),{unit:oneOf(row['unit'],UNITS,'other')});
+  }
   const realms=Object.entries(record(source['realms'])).map(([key,value])=>{const row=record(value),messages=record(row['messages']);return {
     realm:realm(key),url:url(row['url']),timeOrigin:number(row['timeOrigin']),
     precision:oneOf(row['precision'],['browser','other'] as const,'other'),
