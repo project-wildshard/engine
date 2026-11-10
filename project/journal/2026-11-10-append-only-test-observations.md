@@ -5,7 +5,7 @@ Two independent authors each append valid facts to the final array in
 durations-source.json. Git cannot choose an array tail and the queue rightly
 reports a real conflict instead of dropping one side. NoN recovery repeatedly
 rebased and preserved both histories before publishing e7caccce, whose exact
-CI and Ring1 are now green. The six quarantine files remain nonblocking/red.
+CI and Ring 1 were green. Q299 and Q300 hit the same legacy-array conflict.
 
 The recorder now appends each complete successful observation as one JSON
 line in test/durations-observations.jsonl. Git's built-in union attribute
@@ -46,6 +46,10 @@ changes. Two independent measurements of the same existing module produce a
 real weight-key conflict, which the queue reports by path. Eight actual Vitest
 invocations produce 18 clocks in 5.506 seconds. The proof retains the requests,
 reports, completion seals and merged/legacy data under ignored tmp.
+
+Enqueue preflight now names the observation log and the changed weight tables
+in its commit advice. Its legacy merge command still handles older branches
+carrying edits to durations-source.json.
 
 The existing real timing proof, restoration refusal and annotated-tag/new-ref
 controls pass in4.31s,1.89s and2.99s respectively. These manual outer-edge
