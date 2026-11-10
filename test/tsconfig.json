@@ -561,6 +561,7 @@
     "../vite/rapier.ts",
     "../scripts/app-build/controlChunks.ts",
     "../scripts/pin-packs.ts",
+    "../scripts/pin-assets.ts",
     "../scripts/engine-ci-plan.ts"
   ]
 }

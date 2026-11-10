@@ -29,3 +29,10 @@ existing pin/publication test files pass in 1.10 seconds, including
 corrupt bytes, path escape, tier selection and missing output copies.
 Native green-on-candidate and the full normal gate follow this commit;
 no release or whole-row completion is claimed here.
+
+The first candidate build caught TS6307: the composite root-test project
+needed the new pin reader in its explicit file list. Added it and reran
+the complete layer typecheck successfully, without suppressions. The
+existing committed publication facts already contain these six source
+images. Regenerating against the repaired actual public inventory now
+keeps their byte/version rows, with the official renderer stamp.
