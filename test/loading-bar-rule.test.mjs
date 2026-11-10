@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { barStalls, untracedChanges } from '../scripts/loading-bar-rule.mjs';
+import { timeLeftScore } from '../scripts/loading-time-left-rule.mjs';
 
 /** @param {number} t @param {string} bar @param {number} pct @param {Partial<import('../scripts/loading-bar-rule.mjs').BarRow>} [rest] */
 const row = (t, bar, pct, rest = {}) => ({ t, bar, pct, step: '', atomic: 0, bytes: 0, files: 0, ...rest });
@@ -57,4 +58,46 @@ test('J188: control-ready retains exact row credit until its final completion pa
   expect(untracedChanges([row(0,'load',99.8,{source}),row(1,'load',100,{source})])).toEqual([]);
   const guessed=row(0,'load',99.9,{source});expect(untracedChanges([guessed])).toEqual([guessed]);
   const premature=row(0,'load',100,{source:{...source,complete:false}});expect(untracedChanges([premature])).toEqual([premature]);
+});
+
+
+/** LS5: a boot that ends at `ready` ms, painted every 100 ms, with the card showing `estimate(t)` (null hides). */
+const timeLeftBoot = (ready, estimate) => {
+  const frames = [];
+  for (let t = 0; t < ready + 300; t += 100) {
+    const left = estimate(t);
+    frames.push({ t, left, seconds: left === null ? null : Math.max(1, Math.round(left / 1000)) });
+  }
+  return frames;
+};
+
+test('LS5: a true time left passes; only the last half of the boot is scored', () => {
+  const score = timeLeftScore(timeLeftBoot(20000, t => (t < 4000 ? 60000 : 20000 - t)), 20000);
+  expect(score).toMatchObject({ half: 10000, frames: 100, shown: 100, within: 100, strict: 100, flickers: 0, pass: true });
+});
+
+test('LS5: 25 % off fails; under half a second off passes at the end, where 25 % is less than the card shows', () => {
+  const late = timeLeftScore(timeLeftBoot(20000, t => 1.3 * (20000 - t)), 20000);
+  expect(late.pass).toBe(false);
+  // 30 % late is under half a second only in the last 1.6 s
+  expect(late.within).toBe(16);
+  expect(late.worst).toBeCloseTo(0.3, 6);
+  const end = timeLeftScore(timeLeftBoot(20000, t => 20000 - t + 400), 20000);
+  expect(end.pass).toBe(true);
+  expect(end.strict).toBeLessThan(end.within);
+});
+
+test('LS5: hidden frames are honest and pass, but a boot that never shows a number does not', () => {
+  const late = timeLeftScore(timeLeftBoot(20000, t => (t < 15000 ? null : 20000 - t)), 20000);
+  expect(late).toMatchObject({ frames: 100, shown: 50, pass: true, firstShown: 15000 });
+  expect(timeLeftScore(timeLeftBoot(20000, () => null), 20000).pass).toBe(false);
+});
+
+test('LS5: a rise is allowed; a rise taken back within half a second is a flicker', () => {
+  const rise = timeLeftScore(timeLeftBoot(20000, t => (t < 12000 ? 0.9 * (20000 - t) : 20000 - t)), 20000);
+  expect(rise.rises).toBeGreaterThan(0);
+  expect(rise.flickers).toBe(0);
+  const flicker = timeLeftScore(timeLeftBoot(20000, t => (t === 12000 ? 20000 - t + 2000 : 20000 - t)), 20000);
+  expect(flicker.flickers).toBe(1);
+  expect(flicker.pass).toBe(false);
 });

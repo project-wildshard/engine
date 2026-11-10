@@ -19,3 +19,8 @@ Hidden: before a second of phone-profile work has finished, while the download i
 profile or none (shardfile, native, cells), and on a GPU the shaders step measured slow. That last one is headless
 SwiftShader, which builds its pipelines on the CPU inside the first frame, 19-26 s against 1.1 s on the Mac's GPU;
 no table describes it, so it is the named exception, as in LS8 (J204).
+
+The proof (`scripts/loading-time-left-proof.mjs`, rule in `scripts/loading-time-left-rule.mjs`) logs the card's
+estimate against the real time left on every painted frame and scores the last half of each boot. The tests ride in
+existing files (`weights.test.ts`, `loading-calibration.test.ts`, `loading-bar-rule.test.mjs`), so CI's shard planner
+charges no unmeasured file. Plan: meta `docs/plans/LOADING-SCREEN-PLAN.md` LS5.
