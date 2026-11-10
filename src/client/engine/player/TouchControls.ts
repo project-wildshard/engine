@@ -1,5 +1,5 @@
 import { mountUi } from '../ui/ownership';
-import { mountHoverBoost } from '../ui/hoverBoost';
+import { mountBoostLook } from '../ui/hoverBoost';
 import { app } from '../app/runtime';
 import { listenDom } from '../input/dom';
 import type { Action, TouchStack, TouchVerbSpec } from '../input/InputService';
@@ -153,17 +153,13 @@ export class TouchControls {
     this.weapons = weapons;
     this.lock = lock;
     this.active = force || IS_TOUCH;
-    if (!this.active) {
-      mountHoverBoost(document.getElementById('hud') ?? document.body, this.player, app.events, this.scope);
-      return;
-    }
+    if (!this.active) return;
     const hud = document.getElementById('hud') ?? document.body;
     hud.classList.add('touch');
     const root = document.createElement('div');
     root.className = 'ws-touch';
     root.innerHTML = engineString('s_d27c19bf3c27');
     mountUi(root, this.scope, hud);
-    mountHoverBoost(root, this.player, app.events, this.scope);
     this.scope.onDispose(() => { root.remove(); });
     // ── iOS WebKit hardening (E46 — Jake's iPhone): a long press on a button lifted a drag preview of the ATTACK disc (and
     //    fired pointercancel, so the heavy never charged), a quick double tap zoomed, a press selected text. Pointer events
@@ -403,6 +399,8 @@ export class TouchControls {
     listenDom(this.scope, hover, 'pointerup', (e) => e.stopPropagation());
     app.events.on('player.hover', (on) => { hover.classList.toggle('on', on); }, this.scope);
     hover.classList.toggle('on', this.player.hover);
+    // QA row 42: no BOOST button; a double tap of this tab latches Developer boost and turns it amber (ui/hoverBoost.ts)
+    mountBoostLook(hover, this.player, app.events, this.scope);
     btn('.jump', () => { app.input.press('jump'); });
     // a throwing weapon (touch mode 'throwing'): THROW = hold to wind a javelin up, release to throw
     btn('.throw', () => { if (this.weapons.enabled) this.weapons.adsHeld = true; }, () => { this.weapons.adsHeld = false; });

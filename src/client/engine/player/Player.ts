@@ -1,5 +1,7 @@
 import { hoverSpeed } from '../../../shared/engine/player/hoverSpeed';
 import { isDev } from '../core/devMode';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
+import { hoverTaps, pressHover } from '../ui/hoverBoost';
 import { walkingSpeed } from '../../../shared/engine/player/walk';
 import { pondBob } from '../../../shared/engine/player/swim';
 import { FIXED_STEP } from '../../../shared/engine/core/fixedStep';
@@ -194,8 +196,10 @@ export class Player {
   set moveScale(value: number) { this.motionState.moveScale = value; }
   /** Grid driver supplies a position-dependent board limit; standalone cruise retains HOVER_TOP. */
   hoverSpeedLimit: (() => number) | null = null;
-  /** Developer HUD latch; the motion law also fences it with isDev on every step. */
+  /** Developer boost latch (QA row 42: a double tap of HOVER, `ui/hoverBoost.ts`); the motion law also fences it with isDev
+   *  on every step. It outlives a dismount, as the old BOOST button's did: the next ride is boosted until it is tapped off. */
   hoverBoost = false;
+  private readonly hoverTaps = hoverTaps();
   /** Status effects have their own channels; weapons keep moveScale. */
   effectMoveScale = 1;
   effectMoveLocked = false;
@@ -340,6 +344,16 @@ export class Player {
     if (on) { this.crouching = false; this.sprinting = false; }
     if (this.replaying) return;
     this.onHoverChange?.(on); app.events.emit('player.hover', on);
+  }
+
+  /** the `hover` action (H, the HOVER tab): a tap steps on / off at once; a second within 300 ms latches Developer boost
+   *  (QA row 42, ui/hoverBoost.ts) */
+  tapHover(now: number = diagnosticNow()): void { pressHover(this, this.hoverTaps, now); }
+
+  /** latch Developer boost on / off; the HOVER tab and the board's glow follow `player.boost` */
+  setBoost(on: boolean): void {
+    if (on === this.hoverBoost) return;
+    this.hoverBoost = on; app.events.emit('player.boost', on);
   }
 
   /** water surface height at (x, z): the level's water bodies' rest surface (app.world.water, in registration order: the

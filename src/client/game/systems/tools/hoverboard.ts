@@ -5,6 +5,10 @@ import { Tool } from '@wildshard/engine/combat/Tool';
 import { isMesh } from '@wildshard/engine/combat/view/ranged';
 import type { Player } from '@wildshard/engine/player/Player';
 import { buildHoverboard } from '@wildshard/engine/render/hoverboardGeometry';
+import { isDev } from '@wildshard/engine/core/devMode';
+
+/** QA row 42: the repulsors' cyan, and the amber they burn at Developer boost (the HOVER tab's `.boost` amber) */
+const CRUISE = new THREE.Color(0x8fe3ff), BOOST = new THREE.Color(0xffb547);
 
 /** The entered hoverboard controller and its owned resources. */
 export class Hoverboard extends Tool {
@@ -18,6 +22,7 @@ export class Hoverboard extends Tool {
   private t = 0;
   private pulse: THREE.MeshStandardMaterial;
   private glow: THREE.MeshBasicMaterial;
+  private boosted = false; // the repulsors' colour as last painted
 
   private readonly camera: THREE.PerspectiveCamera;
   private readonly top: number;
@@ -46,7 +51,8 @@ export class Hoverboard extends Tool {
 
   override install(ctx: EquipContext): void {
     super.install(ctx);
-    app.input.bind('hover', () => { this.player.setHover(!this.player.hover); }, ctx.scope, () => this.enabled && app.input.allowed('hover'));
+    // one tap steps on / off at once; a second inside 300 ms is the Developer boost toggle (QA row 42, ui/hoverBoost.ts)
+    app.input.bind('hover', () => { this.player.tapHover(); }, ctx.scope, () => this.enabled && app.input.allowed('hover'));
     ctx.scope.onDispose(() => { this.model.removeFromParent(); });
   }
   update(dt: number, _t: number): void {
@@ -83,6 +89,12 @@ export class Hoverboard extends Tool {
     this.model.rotation.set(this.pitch + wobble * 0.5, 0, this.lean + wobble, 'YXZ');
     this.model.scale.setScalar(s * (1 - port * 0.1));
 
+    // boost (QA row 42) burns the repulsors amber: the one look a desktop rider has, and the phone's beside the HOVER tab
+    const boosted = isDev() && on && p.hoverBoost;
+    if (boosted !== this.boosted) {
+      this.boosted = boosted; const tint = boosted ? BOOST : CRUISE;
+      this.pulse.emissive.copy(tint); this.glow.color.copy(tint);
+    }
     // repulsors breathe; brighter with speed
     const sp = Math.hypot(p.velocity.x, p.velocity.z) / this.top;
     const flash = this.kick * this.kick * 3 + this.land * 1.5; // repulsors flare on launch and on touchdown

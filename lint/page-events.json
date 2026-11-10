@@ -156,6 +156,23 @@
    "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). Predicted movement, not a server re-emit."
   },
   {
+   "id": "player.boost",
+   "kind": "event",
+   "name": "player.boost",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/ui/hoverBoost.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/player/Player.ts",
+     "emits": "app.events.emit('player.boost'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the Developer boost latch is set by the page's own HOVER double tap (QA row 42); the server only reads the boost button bit."
+  },
+  {
    "id": "player.swim",
    "kind": "event",
    "name": "player.swim",

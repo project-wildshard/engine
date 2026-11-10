@@ -25,8 +25,6 @@ export const ENGINE_STRINGS = {
   "s_loading_gap_after": "gap after ⟦0⟧",
   "s_loading_step_label": "⟦0⟧ · ⟦1⟧",
   "s_loading_step_repeat": "⟦0⟧ · pass ⟦1⟧",
-  "s_hover_boost": "BOOST",
-  "s_hover_boost_label": "Hover boost",
   "s_interact_item_count": "⟦0⟧ ×⟦1⟧",
   "s_explore_playgrounds": "⟦0⟧ · playgrounds",
   "s_explore_compare": "Compare",

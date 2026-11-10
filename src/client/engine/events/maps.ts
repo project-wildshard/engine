@@ -31,6 +31,8 @@ export interface EventMap {
   'player.dodge': true;
   /** the hover board / swimming started (true) or ended (false) */
   'player.hover': boolean;
+  /** Developer boost latched on (true) or off (false): a double tap of HOVER / H (QA row 42) */
+  'player.boost': boolean;
   'player.swim': boolean;
   /** a lock-on press found nothing to lock */
   'lock.noTarget': true;
