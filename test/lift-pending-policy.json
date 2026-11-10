@@ -4,5 +4,14 @@
   "registeredAt": "2026-11-09T18:47:27Z",
   "deadline": "2026-11-10T18:00:00Z",
   "inventorySha256": "c18c689a24c2b971ac583b93639913ae790b0e03d4c0e647555487655ca7dcd2",
-  "reason": "Inherited pre-lift migration debt, not a flaky-test quarantine. Owner must restore public-boundary successors or document J186 disposition for every listed file before the deadline. Registration proves no test execution. All listed files return to blocking discovery at expiry."
+  "reason": "Inherited pre-lift migration debt, not a flaky-test quarantine. Owner must restore public-boundary successors or document J186 disposition for every listed file before the deadline. Registration proves no test execution. All listed files return to blocking discovery at expiry.",
+  "extension": {
+    "rule": "J200",
+    "decidedBy": "Jake",
+    "decidedAt": "2026-11-10",
+    "decision": "CI21 option A: extend the lift-pending exclusion once, to Thu 2026-11-12 13:00 Cancun, then restore 20 green files, retire 262 in batches, restore the 63 gameplay files and review the 24 old-layout ones",
+    "deadline": "2026-11-12T18:00:00Z",
+    "evidence": "CI21 decision page https://claude.ai/artifact/PMEQD4VL7sHRS9PS1d5QpJ (local ~/.cache/wildshard/plan-artifacts/ci21/: index.html, BRIEF.md, measured.json); meta repo docs/plans/QA-FEEDBACK-2026-11-10.md row 7",
+    "reason": "The one J200 extension. 349 listed files still fail; letting them rejoin blocking discovery at the original deadline turns every engine pre-push red before codex-mock can restore or retire them. No test execution is claimed; every listed file returns to blocking discovery at the extended deadline."
+  }
 }

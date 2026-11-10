@@ -18,5 +18,22 @@ try{
  assert.notEqual(run().status,0,'Two edited strings cannot renew inherited exclusions');
  policy.registeredAt=registeredAt;policy.deadline=new Date(Date.parse(registeredAt)+48*3_600_000).toISOString();put();
  assert.notEqual(run().status,0,'The original committed deadline is immutable');
- console.log(JSON.stringify({renewalRefused:true,firstDeadlineImmutable:true}));
+ // J200: one recorded extension, capped at 48 h past the original deadline, frozen once committed.
+ policy.deadline=new Date(Date.parse(registeredAt)+47*3_600_000).toISOString();
+ const extended=new Date(Date.parse(policy.deadline)+48*3_600_000).toISOString();
+ const extension={rule:'J200',decidedBy:'Jake',decidedAt:registeredAt,decision:'Proof decision: extend once',deadline:extended,evidence:'proof evidence page',reason:'Proof extension; no passed execution is claimed for the listed files.'};
+ Object.assign(policy,{extension:{...extension,deadline:new Date(Date.parse(extended)+1000).toISOString()}});put();
+ assert.notEqual(run().status,0,'An extension past the J200 48 h cap is refused');
+ Object.assign(policy,{extension:{...extension,decidedBy:'agent'}});put();
+ assert.notEqual(run().status,0,'An extension without Jake\'s recorded decision is refused');
+ Object.assign(policy,{extension});put();
+ assert.notEqual(run().status,0,'An uncommitted extension is refused');
+ execFileSync('git',['-c','user.name=Lift proof','-c','user.email=proof@example.test','commit','--quiet','-am','extend once'],{cwd:root});
+ const accepted=run();assert.equal(accepted.status,0,accepted.stderr);
+ const state=JSON.parse(accepted.stdout);
+ assert.equal(state.deadline,extended);assert.equal(state.originalDeadline,policy.deadline);assert.equal(state.extended,true);assert.equal(state.excluded,1);
+ Object.assign(policy,{extension:{...extension,deadline:new Date(Date.parse(extended)-1000).toISOString()}});put();
+ execFileSync('git',['-c','user.name=Lift proof','-c','user.email=proof@example.test','commit','--quiet','-am','second extension'],{cwd:root});
+ assert.notEqual(run().status,0,'A second extension is refused even when committed');
+ console.log(JSON.stringify({renewalRefused:true,firstDeadlineImmutable:true,oneJ200ExtensionAccepted:true,secondExtensionRefused:true,capEnforced:true}));
 }finally{rmSync(root,{recursive:true,force:true});}
