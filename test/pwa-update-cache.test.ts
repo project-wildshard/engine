@@ -31,6 +31,14 @@ test('the plain emitter stamps the real worker without a boot bank or code-pack 
   expect(next.build).not.toBe(first.build); expect(workerScripts(next.core).fileName).not.toBe(workerScripts(first.core).fileName);
 });
 
+test('the Developer-only failure screen prototypes are never precached (A13)', async () => {
+  const bundle = { 'index.html': { type: 'asset' as const, source: new TextEncoder().encode('<html><head></head></html>') },
+    'b/c/app-aaaaaaaa.js': { type: 'chunk' as const, code: 'export const value=1;' }, 'b/c/late-failScreens-Dp3J7FUV.js': { type: 'chunk' as const, code: 'export const screens=1;' } };
+  const { hashed, core } = await serviceWorkerCore(bundle, process.cwd(), 'fixture');
+  expect(hashed).toEqual(['/b/c/app-aaaaaaaa.js']);
+  expect(core).not.toContain('failScreens');
+});
+
 test('a build precaches its server book, and a new book is a new worker', async () => {
   const bundle = { 'index.html': { type: 'asset' as const, source: new TextEncoder().encode('<html><head></head></html>') } };
   const url = '/assets/spawn/server-fixture.json', bytes = new TextEncoder().encode('{"book":"server"}');

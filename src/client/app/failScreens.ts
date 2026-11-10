@@ -299,7 +299,7 @@ function render(scope: Scope, screen: FailScreen): HTMLElement {
   root.dataset['tone'] = screen.tone; root.dataset['kind'] = screen.kind;
   switch (screen.kind) {
     case 'page': {
-      root.classList.add('ws-fail-page'); root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-label', screen.title);
+      root.classList.add('ws-fail-page'); root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', screen.title);
       const word = make('div', 'ws-fail-word'), middle = make('div', 'ws-fail-mid');
       word.append('Project ', make('b', '', 'Wildshard'));
       const box = boxed(scope, screen);
@@ -308,7 +308,7 @@ function render(scope: Scope, screen: FailScreen): HTMLElement {
       break;
     }
     case 'card':
-      root.classList.add('ws-fail-scrim'); root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true');
+      root.classList.add('ws-fail-scrim'); root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', screen.title);
       root.append(boxed(scope, screen));
       break;
     case 'strip': {
@@ -389,12 +389,17 @@ let open: Scope | null = null;
 export function showFailScreen(id: string, parent: HTMLElement = document.body): () => void {
   if (document.getElementById(STYLE_ID) === null) { const style = make('style'); style.id = STYLE_ID; style.textContent = CSS; document.head.append(style); }
   open?.dispose();
-  const scope = new Scope('failScreens'), close = (): void => { scope.dispose(); if (open === scope) open = null; };
+  const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const scope = new Scope('failScreens'), close = (): void => { scope.dispose(); if (open === scope) open = null; before?.focus(); };
   open = scope;
   const go = (to: number): void => { showFailScreen(FAILURES[to]?.id ?? 'gallery', parent); };
   const index = FAILURES.findIndex(failure => failure.id === id), failure = FAILURES[index];
   const shown = failure === undefined ? gallery(scope, go) : render(scope, failure.screen);
   if (failure !== undefined) shown.dataset['failmode'] = failure.id;
   parent.append(scope.ownNode(shown), scope.ownNode(ribbon(scope, index, go, close)));
+  // Developer off (src/client/engine/core/devMode.ts's `ws-dev` event) takes the prototype away at once
+  scope.listen(window, 'ws-dev', event => { if (event instanceof CustomEvent && event.detail !== true) close(); });
+  // a modal takes focus to its first button, as the error modal does; closing hands it back
+  if (shown.getAttribute('role') === 'alertdialog' || shown.getAttribute('role') === 'dialog') shown.querySelector('button')?.focus();
   return close;
 }

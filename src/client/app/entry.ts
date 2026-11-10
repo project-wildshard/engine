@@ -67,12 +67,13 @@ persistHomeScreen();
 definePageSaveKeys(saves);
 const search = new URLSearchParams(location.search);
 // A13 (meta MMO-FAILURE-MODES-PLAN): Settings ▸ Developer ▸ Failure screens asks by event. Only a Developer page (`<html data-dev>`,
-// src/client/engine/core/devMode.ts) answers, and only then is the prototype module downloaded: no player loads or sees it.
+// src/client/engine/core/devMode.ts) answers, and only then is the prototype module downloaded: the worker never precaches it
+// (scripts/app-build/serviceWorker.ts), so no player loads or sees it. Developer off closes an open screen.
 entryScope.listen(document, 'ws:failscreen', event => {
   if (!Object.hasOwn(document.documentElement.dataset, 'dev')) return;
   const id = event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : 'gallery';
   void (async (): Promise<void> => {
-    try { (await import('./failScreens')).showFailScreen(id); } catch (error) { console.warn('[failScreens] did not load', error); }
+    try { const screens = await import('./failScreens'); if (Object.hasOwn(document.documentElement.dataset, 'dev')) screens.showFailScreen(id); } catch (error) { console.warn('[failScreens] did not load', error); }
   })();
 });
 // Do not depend on the sibling sw.ts module finishing first; both entry points share the same consumed record.

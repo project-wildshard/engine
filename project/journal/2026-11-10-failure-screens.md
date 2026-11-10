@@ -16,3 +16,12 @@ them all first (meta `docs/plans/MMO-FAILURE-MODES-PLAN.md`, FM1).
   are untouched. Wiring is the plan's FM4 to FM8.
 - Shots at 402×874 and 1440×900, Chromium and WebKit, on a local
   serve-build; the page is `~/.cache/wildshard/failmodes-ui/`.
+
+## J206 review fixes
+
+Codex one-shot review (NO-GO) on 4db7599: the worker precached the
+prototype chunk, so players downloaded it; Developer off didn't close
+a screen. Now `serviceWorker.ts` leaves `-failScreens-` chunks out of
+the precache (a test pins it), the entry checks Developer again after
+the import, `ws-dev` off closes the screen, and modals get a name and
+focus. Renderer stamp regenerated.

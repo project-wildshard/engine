@@ -44,7 +44,8 @@ export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedF
   if (document?.type !== 'asset' || document.source === undefined) throw new Error('Missing worker document');
   const html = new TextDecoder().decode(document.source);
   // Everything emitted under the build's folder is immutable by it: the standalone shell names its entries, and they precache with their chunks.
-  const hashed = Object.keys(bundle).filter(name => /^(?:assets|b\/[\w.-]+)\/[^/]+-[\w-]{8}\.\w+$|^b\/[\w.-]+\/standalone\/[^/]+\.(?:js|wasm)$/u.test(name)).map(name => `/${name}`).sort();
+  // A13: the Developer-only failure screen prototypes (src/client/app/failScreens.ts) are never precached, so no player downloads them.
+  const hashed = Object.keys(bundle).filter(name => /^(?:assets|b\/[\w.-]+)\/[^/]+-[\w-]{8}\.\w+$|^b\/[\w.-]+\/standalone\/[^/]+\.(?:js|wasm)$/u.test(name) && !/-failScreens-[\w-]{8}\.js$/u.test(name)).map(name => `/${name}`).sort();
   const sources = new Map(Object.entries(titleAssetURLs(root)).map(([source, url]) => [url, source]));
   // S2: a deck portrait waits for control with the code (DL1), so a first visit's title doesn't fetch every shard's.
   const shell = shellFiles(html, root, sources), portraits = shell.filter(url => /^\/assets\/title\/[^/]+-portrait-/u.test(url)), digest = createHash('sha256');
