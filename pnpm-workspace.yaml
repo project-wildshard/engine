@@ -2,3 +2,22 @@
 packages:
   - .
 enableGlobalVirtualStore: false
+packageExtensions:
+  postprocessing:
+    peerDependencies:
+      '@types/three': '*'
+    peerDependenciesMeta:
+      '@types/three':
+        optional: true
+  n8ao:
+    peerDependencies:
+      '@types/three': '*'
+    peerDependenciesMeta:
+      '@types/three':
+        optional: true
+  navcat:
+    peerDependencies:
+      '@types/three': '*'
+    peerDependenciesMeta:
+      '@types/three':
+        optional: true

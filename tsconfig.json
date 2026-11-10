@@ -10,9 +10,6 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "paths": {
-      "three": ["./node_modules/@types/three"]
-    },
     "types": [
       "vite/client"
     ],
