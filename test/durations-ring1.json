@@ -910,7 +910,6 @@
   "test/phone-loading.test.ts": 0.6217534,
   "test/phone-route.test.ts": 1.4082710329999997,
   "test/physics-grid-admission.test.ts": 0.06266188100000002,
-  "test/physics-headless.test.ts": 3.485756624,
   "test/physics-native-cli.test.ts": 0.18337094700000006,
   "test/physics-pose-sampler.test.ts": 0.083529379,
   "test/physics-ray-values.test.ts": 0.43109872400000004,

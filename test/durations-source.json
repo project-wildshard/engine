@@ -210,33 +210,6 @@
       "finishedAt": "2026-11-10T13:04:46.683Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
-    },
-    {
-      "schema": "push-test-timing/1",
-      "sha": "d0c57a9509c8622feb01f4138d7fb77b9ddbc352",
-      "tree": "052357a8c1a713748eb821d16eb9877151cfc9a2",
-      "profile": "manual-global-full-test-one-native-worker",
-      "platform": "darwin",
-      "arch": "arm64",
-      "ring": "1",
-      "files": [
-        {
-          "file": "test/physics-headless.test.ts",
-          "blob": "df4a01a71dc67e8b353f5377ffa253aca729e373",
-          "rings": [
-            "full",
-            "1"
-          ],
-          "state": "passed",
-          "passedTests": 8,
-          "durationMs": 3485.756624
-        }
-      ],
-      "reason": "passed",
-      "errorCount": 0,
-      "finishedAt": "2026-11-10T13:04:50.874Z",
-      "completed": true,
-      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

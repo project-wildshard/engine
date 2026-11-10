@@ -8151,7 +8151,7 @@
     "file": "test/physics-headless.test.ts",
     "outcome": "restored",
     "target": "test/physics-headless.test.ts",
-    "ring": 1,
+    "ring": 2,
     "decision": "Original eight real native Driftwood route cases restored unchanged. The fixed native worker installs the engine public portable math instead of importing removed @wildshard/commons. Every original leg, tick budget, whole-world ordering, stuck/out/completion/finite-position and non-quarantine assertion remains. Both native route files retain their existing native cohort assignment; the aggregate file remains pending its separate proof.",
     "sourceRevision": "25f69574b326d00427217b77739fa702ca76e899",
     "sourceBlob": "df4a01a71dc67e8b353f5377ffa253aca729e373",
@@ -8164,6 +8164,7 @@
       "driftwood-isle > cave: completes native physics route without a snag",
       "driftwood-isle > shrine: completes native physics route without a snag",
       "driftwood-isle > boat: completes native physics route without a snag"
-    ]
+    ],
+    "ringReason": "Needs the complete admitted Driftwood product. Real Ring1 installs a server slice without named GLB bodies; the unchanged product-session reader validates/owns every named product asset before native boot. Actual Ring1 failed ENOENT before eight cases. Preserve full product admission and every original route assertion in blocking full CI and full pre-push; do not weaken the reader or inflate the three-product Ring1 setup."
   }
 ]

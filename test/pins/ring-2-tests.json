@@ -72,6 +72,7 @@
  "test/night-market-kit-budget.test.ts",
  "test/nine-memory-floor.test.ts",
  "test/output-descriptor.test.ts",
+ "test/physics-headless.test.ts",
  "test/physics-nalati-headless.test.ts",
  "test/physics-open-plots-headless.test.ts",
  "test/pine-door-continuation.test.ts",

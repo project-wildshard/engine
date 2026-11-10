@@ -44,3 +44,27 @@ Actual complete-module local bootstrap clocks (not Linux observations):
 Both reports bind the unchanged test blob, committed tree and completed zero
 process exit; no skipped or absent cases are used as timing evidence. Existing
 60s file/300s shard budgets, factor1.35, setup70s and20% headroom are unchanged.
+
+## Correct the real Ring1 product requirement
+
+Public6df full CI42822286662 passed, but actual Ring142822286597 failed
+before all eight routes: out/.slices/driftwood-isle/blobs/glb/00a1ea...glb
+is absent. The earlier local Ring1 discovery measurement used full28 products;
+it did not prove the real three-product/thin-slice Ring1 environment. That
+local Ring1 timing row and its sole provenance report are removed, not used
+as qualification. The valid full-product/full-ring clock remains unchanged.
+
+Normal pins --ring1 reproduces the exact missing-GLB failure locally with the
+original test body, a failed suite and all eight skipped. Keep the complete
+product reader/admission intact and classify this original gameplay file as
+Ring2, alongside the other full-product native physics files. Full CI and
+full pre-push still block on all original eight routes; Ring1 omits this
+explicit full-product case. This is not quarantine, timeout relief or an
+assertion/cap change. The existing native cohort is unchanged.
+
+Forward proof: real thin Ring1 reproduction fails before all8 cases; actual
+configured full discovery retains the file once in native shard3, and Ring1
+discovery removes only this full-product file. Normal full-product readmission
+and unchanged default-config cases pass8/8 in3.86s (complete module 3780.1091670000005ms).
+J206 product-ring review has no MUST/SHOULD and finds no hidden gate weakening.
+Full/Ring1 planners remain valid at12/max227.1384s and8/max224.8164s.
