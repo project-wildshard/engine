@@ -335,6 +335,12 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 /* LS4 (J188): Copy diagnostics takes Hold's place once the game is ready, the same box with its label centred */
 .ws-load .ws-load-copy { flex: none; display: block; width: calc(100% - 32px); max-width: 560px; min-height: 52px; padding: 12px 16px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan-line); background: var(--ws-glass-deep); color: #fff; font: 12px var(--ws-mono); letter-spacing: 0.22em; text-transform: uppercase; text-align: center; cursor: pointer; touch-action: manipulation; }
 .ws-load .ws-load-copy:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
+/* QA 30 (Jake 2026-11-10: "You can't like regret loading the wrong shard and bail out"): SETTINGS and EXIT TO TITLE, a row of
+   their own under the card; Exit leaves for a fresh title page (src/client/engine/ui/Loading.ts menuRow) */
+.ws-load .ws-load-menu { flex: none; display: flex; gap: 10px; width: calc(100% - 32px); max-width: 560px; }
+.ws-load .ws-load-menu button { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 10px 12px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan-line); background: var(--ws-glass-deep); color: var(--ws-cyan); font: 11px var(--ws-mono); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.ws-load .ws-load-menu button:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
+.ws-load .ws-load-menu button:disabled { opacity: 0.5; cursor: default; }
 .ws-load .ws-load-retry { flex: none; min-height: 44px; padding: 8px 16px; border: 1px solid var(--ws-cyan); color: var(--ws-cyan); background: var(--ws-glass-deep); font: 12px var(--ws-mono); cursor: pointer; }
 .ws-load .ws-load-retry[hidden] { display: none; }
 .ws-load .ws-load-foot { align-items: center; gap: 12px; }
@@ -405,7 +411,7 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
   .ws-load .ws-load-meta { grid-template-columns: 1fr; margin: 10px 0 12px; }
   .ws-load .ws-load-meta div { font-size: 10.5px; }
   .ws-load .ws-load-foot { padding: 0 16px calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 8.5px; letter-spacing: 0.14em; }
-  .ws-load .ws-load-hold, .ws-load .ws-load-copy { width: 100%; }
+  .ws-load .ws-load-hold, .ws-load .ws-load-copy, .ws-load .ws-load-menu { width: 100%; }
 }
 
 /* G846: everyone sees the detailed progress; only the hold control is Developer-only. */
