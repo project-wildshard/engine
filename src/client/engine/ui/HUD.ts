@@ -214,9 +214,13 @@ export class HUD {
     // KP4 (Jake 2026-11-09: "Same for command T, command N"): ⌘T hides the tab (ws:background pauses), ⌘N or a click in
     // another window only takes the focus. Without a pointer lock to lose, that left the world running; the held keys were
     // already let go on blur (InputService), so the player comes back to the pause menu, standing still
+    // (focus moving into one of the page's own frames blurs the window too: that is not leaving, so it waits a turn and looks)
     this.scope.listen(window, 'blur', () => {
-      if (!this.entered || this.paused || this.holdPause || (app.ui.blocking && app.ui.top !== 'gameMenu')) return;
-      this.setPaused(true);
+      this.scope.timeout(0, () => {
+        if (document.activeElement instanceof HTMLIFrameElement && document.hasFocus()) return;
+        if (!this.entered || this.paused || this.holdPause || (app.ui.blocking && app.ui.top !== 'gameMenu')) return;
+        this.setPaused(true);
+      });
     });
     const titleScope = (app.levelScope ?? app.engineScope).child('input.title');
     const title = (): boolean => this.intro !== undefined && !this.entered && !app.ui.blocking;

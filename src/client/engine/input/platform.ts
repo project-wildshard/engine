@@ -13,7 +13,9 @@ interface PlatformNavigator { userAgentData?: { platform?: string }; platform?: 
 
 /** The platform a navigator reports: User-Agent Client Hints first (Chromium), then `navigator.platform`, then the UA. */
 export function detectKeyPlatform(nav: PlatformNavigator | undefined = typeof navigator === 'undefined' ? undefined : navigator): KeyPlatform {
-  for (const said of [nav?.userAgentData?.platform, nav?.platform, nav?.userAgent]) {
+  // an Android or ChromeOS UA names itself; its navigator.platform may still say "Linux armv8l"
+  const ua = nav?.userAgent ?? '', named = /android|cros/iu.test(ua) ? ua : undefined;
+  for (const said of [nav?.userAgentData?.platform, named, nav?.platform, ua]) {
     const platform = said === undefined || said === '' ? undefined : classify(said);
     if (platform !== undefined) return platform;
   }

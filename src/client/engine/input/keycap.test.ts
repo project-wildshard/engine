@@ -22,7 +22,9 @@ test('KP1 (Jake 2026-11-09, "Alt is not a thing" on a Mac): the platform comes f
   expect(detectKeyPlatform({ userAgentData: { platform: 'Chrome OS' } })).toBe('other');
   expect(detectKeyPlatform({})).toBe('other');
   expect(detectKeyPlatform({ userAgentData: { platform: 'Windows' }, userAgent: MAC_CHROME })).toBe('windows');
-  expect(detectKeyPlatform({ platform: 'Linux armv81', userAgent: 'Mozilla/5.0 (Linux; Android 15) Chrome/142' })).toBe('linux');
+  // an Android or ChromeOS UA wins over a navigator.platform of "Linux …"
+  expect(detectKeyPlatform({ platform: 'Linux armv81', userAgent: 'Mozilla/5.0 (Linux; Android 15) Chrome/142' })).toBe('other');
+  expect(detectKeyPlatform({ platform: 'Linux x86_64', userAgent: 'Mozilla/5.0 (X11; CrOS x86_64 16181.61.0) Chrome/142' })).toBe('other');
 });
 
 test('a Mac reads ⌥ Option, ⌘ Cmd and ⌘W; Windows and Linux read Alt, Win and Ctrl+W', () => {
@@ -32,7 +34,7 @@ test('a Mac reads ⌥ Option, ⌘ Cmd and ⌘W; Windows and Linux read Alt, Win 
   expect([shortcut('W'), shortcut('T')]).toEqual(['⌘W', '⌘T']);
   for (const platform of ['windows', 'linux', 'other'] as const) {
     setKeyPlatform(platform);
-    expect([keycap('AltLeft'), keycap('MetaLeft'), keycap('ControlLeft'), keycap('KeyV')]).toEqual(['Alt', 'Win', 'Ctrl', 'V']);
+    expect([keycap('AltLeft'), keycap('MetaLeft'), keycap('ControlLeft'), keycap('KeyV')]).toEqual(['Alt', platform === 'linux' ? 'Super' : 'Win', 'Ctrl', 'V']);
     expect(shortcut('W')).toBe('Ctrl+W');
   }
 });

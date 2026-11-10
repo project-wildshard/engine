@@ -35,8 +35,9 @@ interface Context { def: InputContextDef; scope: Scope }
 interface RefreshFrame { wanted: Set<Action>; actions: (Action | undefined)[] }
 /** KP3: the browser's tab and window letters (W close, T new tab, N new window); Chrome lets a page take them only in fullscreen */
 const RESERVED_LETTERS = new Set(['KeyW', 'KeyT', 'KeyN']);
-/** keys the game never takes from the browser even when bound: Escape stays the browser's way out of lock and fullscreen */
-const NEVER_SWALLOWED = new Set(['Escape', '*']);
+/** keys the game never takes from the browser, even bound: Escape (out of lock and fullscreen), reload, fullscreen,
+ *  devtools, and Alt+F4 / Alt+Tab, which the system owns */
+const NEVER_SWALLOWED = new Set(['Escape', '*', 'F4', 'F5', 'F11', 'F12', 'Tab']);
 const WILDCARD_EXCLUDED = new Set(['Escape', 'ArrowLeft', 'ArrowRight', 'MetaLeft', 'MetaRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight']);
 /** Additive contexts and a shared press buffer. Consuming a press removes it for every later system. */
 export class InputService {
@@ -222,6 +223,8 @@ export class InputService {
   active(id: string): boolean { return this.stack.some(({ def }) => def.id === id && def.enabled?.() !== false); }
   get contexts(): readonly string[] { return this.stack.filter(({ def }) => def.enabled?.() !== false).map(({ def }) => def.id); }
   /** KP3: whether an enabled context on the stack binds this physical code (a wildcard is not ownership) */
+  /** KP3: the player is in the world with nothing over it (installGameplayInput sets it); the game's keys are taken only then */
+  playing: () => boolean = () => false;
   owns(code: string): boolean {
     if (NEVER_SWALLOWED.has(code)) return false;
     for (const entry of this.stack) {
@@ -302,12 +305,14 @@ export class InputService {
       // KP3: a key the game owns does nothing in the browser while the world has the keys (no control focused): Alt+← is
       // not Back, Alt+F / Alt+E not Chrome's menu, Alt alone not Windows' menu focus, the arrows and Space never scroll.
       // ⌘W / ⌘T / ⌘N reach the page only in tab fullscreen (Chrome reserves them otherwise); there they are taken too.
-      const world = !(target instanceof Element) || target === document.body || target === document.documentElement || target instanceof HTMLCanvasElement;
-      if (world && (event.metaKey || event.ctrlKey) && RESERVED_LETTERS.has(event.code) && this.stack.length > 0) event.preventDefault();
-      if (on && (event.repeat || event.metaKey || event.ctrlKey)) { if (world && !event.metaKey && !event.ctrlKey && this.owns(event.code)) event.preventDefault(); return; }
+      // an Alt chord is taken whether or not its letter is bound (Alt+F with a bow out is still Chrome's menu)
+      const world = (!(target instanceof Element) || target === document.body || target === document.documentElement || target instanceof HTMLCanvasElement) && this.playing();
+      const take = world && (this.owns(event.code) || (event.altKey && !NEVER_SWALLOWED.has(event.code)) || event.code === 'AltRight');
+      if (world && (event.metaKey || event.ctrlKey) && RESERVED_LETTERS.has(event.code)) event.preventDefault();
+      if (on && (event.repeat || event.metaKey || event.ctrlKey)) { if (take && !event.metaKey && !event.ctrlKey) event.preventDefault(); return; }
       if (on) this.gesture();
       this.executeCommand({ kind: 'physical', code: event.code, on, at: this.now() });
-      if (['Space', 'AltLeft', 'AltRight', 'Tab'].includes(event.code) || (world && this.owns(event.code))) event.preventDefault();
+      if (['Space', 'AltLeft', 'Tab'].includes(event.code) || take) event.preventDefault();
     };
     scope.listen(document, 'keydown', (event) => { keyboard(event, true); }, { capture: true });
     scope.listen(document, 'keyup', (event) => { keyboard(event, false); }, { capture: true });

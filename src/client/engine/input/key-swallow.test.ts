@@ -6,12 +6,13 @@ import { Scope } from '../../../shared/engine/app/scope';
 const owners: Scope[] = [];
 afterEach(() => { for (const owner of owners.splice(0)) owner.dispose(); document.body.replaceChildren(); });
 
-function fixture(): { input: InputService; scope: Scope } {
+function fixture(playing = true): { input: InputService; scope: Scope } {
   const scope = new Scope('key-swallow'); owners.push(scope);
   const input = new InputService(() => 10);
   input.register({ id: 'onFoot', actions: ['move.left', 'dodge', 'use', 'attack', 'pause', 'help'],
     keys: { 'move.left': ['KeyA', 'ArrowLeft'], dodge: ['KeyV', 'AltLeft'], use: ['KeyE'], attack: ['KeyF'], pause: ['Escape'], help: ['F1'] } }, scope);
   input.install(scope);
+  input.playing = () => playing;
   input.push('onFoot', scope);
   return { input, scope };
 }
@@ -25,12 +26,28 @@ test('KP3 (Jake 2026-11-09, "intercept that shit and suppress the default"): the
   const { input } = fixture();
   // Alt+← is Back and Alt+F / Alt+E open Chrome's menu on Windows and Linux; the game owns all three
   for (const code of ['ArrowLeft', 'KeyF', 'KeyE', 'AltLeft', 'F1']) expect(press(document.body, code, { altKey: true }).defaultPrevented, code).toBe(true);
+  // an Alt chord is taken even when its letter isn't bound (Alt+D: the address bar; Alt+H: Chrome's help menu)
+  for (const code of ['KeyD', 'KeyH', 'Home']) expect(press(document.body, code, { altKey: true }).defaultPrevented, `Alt+${code}`).toBe(true);
+  expect(press(document.body, 'AltRight').defaultPrevented).toBe(true);
   expect(press(document.body, 'AltLeft', {}, 'keyup').defaultPrevented).toBe(true);
   // a held key's auto-repeat is taken too, though it presses nothing new
   expect(press(document.body, 'ArrowLeft', { altKey: true, repeat: true }).defaultPrevented).toBe(true);
   expect(input.held('move.left')).toBe(true);
   // keys the game doesn't own, and Escape (the browser's way out of lock and fullscreen), stay the browser's
   for (const code of ['KeyK', 'Escape', 'F5', 'F12']) expect(press(document.body, code).defaultPrevented, code).toBe(false);
+  // Alt+F4 and a rebound reload / devtools key stay the system's and the browser's
+  expect(press(document.body, 'F4', { altKey: true }).defaultPrevented).toBe(false);
+  input.bindings.assign('onFoot', 'help', ['F12']);
+  expect(press(document.body, 'F12').defaultPrevented).toBe(false);
+  input.bindings.reset();
+});
+
+test('on the title, in a menu or under an overlay, only the old three (Space, Alt, Tab) are taken', () => {
+  fixture(false);
+  for (const code of ['ArrowLeft', 'KeyF', 'KeyE', 'F1', 'AltRight']) expect(press(document.body, code).defaultPrevented, code).toBe(false);
+  expect(press(document.body, 'KeyF', { altKey: true }).defaultPrevented).toBe(false);
+  for (const code of ['KeyW', 'KeyT', 'KeyN']) expect(press(document.body, code, { metaKey: true }).defaultPrevented, code).toBe(false);
+  for (const code of ['Space', 'AltLeft', 'Tab']) expect(press(document.body, code).defaultPrevented, code).toBe(true);
 });
 
 test('⌘R and Ctrl+R still reload; ⌘W / ⌘T / ⌘N are taken (they reach a page only in Chrome fullscreen)', () => {

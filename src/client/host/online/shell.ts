@@ -11,6 +11,7 @@ import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
 import {NetRecords} from '@wildshard/engine/net/netRecord';
 import {onlineTelemetry} from '@wildshard/engine/telemetry/runtime';
 import type {NetRecord,NetCorrection} from '@wildshard/engine/net/measurements';
+import { markUnload } from '@wildshard/engine/boot/lastEnd';
 import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
@@ -157,7 +158,7 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   const shell = connectOnline({ ...link, socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; showLink(state); if (state === 'ended') void ended(reason); },
     countdown: said => { showCountdown(said); preload(); },
-    elsewhere: seat => { const url = new URL(location.href); url.searchParams.set('chunk', seat); location.replace(url); },
+    elsewhere: seat => { const url = new URL(location.href); url.searchParams.set('chunk', seat); markUnload(`online seat elsewhere (${seat})`); location.replace(url); },
   });
   retry = shell.retry;
   void settled(shell.booted);

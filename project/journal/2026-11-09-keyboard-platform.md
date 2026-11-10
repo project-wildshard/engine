@@ -52,3 +52,19 @@ on. The HUD now pauses on blur too, and the held keys were already let
 go, so the player comes back to the pause menu standing still.
 Settings ▸ Key bindings says it in the platform's words: "While
 playing, ⌘W and ⌘Q ask before leaving the game; ⌘T and ⌘N pause it."
+
+## Review (J206, Codex one-shot)
+
+Seven MUST-FIX items, all taken. A reload from the toolbar can't be
+told from a close, so the guard stands down while the pointer is
+outside the page. That covers the toolbar, the tab strip and the menu
+bar. A pointer-locked player gets there only through Esc, which
+pauses, so the guard still covers the keyboard slip. Menus and
+overlays over the world (bag, journal, feedback) disarm it, and so
+does the online seat redirect, which now calls markUnload. Only a
+trusted, physical key typed into the page arms it, so a phone's soft
+keyboard never does. The game takes keys only while the player is in
+the world with nothing over it (`InputService.playing`). Alt chords
+are taken whether their letter is bound or not. F4, F5, F11 and F12
+are never taken, even when rebound. A blur into one of the page's own
+frames doesn't pause. On Linux the Meta key is labelled Super.
