@@ -44,8 +44,10 @@ byte intact. An interrupted table update replays from the complete log with no
 duplicate line. Partial and symlinked logs fail before either weight table
 changes. Two independent measurements of the same existing module produce a
 real weight-key conflict, which the queue reports by path. Eight actual Vitest
-invocations produce 18 clocks in 5.506 seconds. The proof retains the requests,
-reports, completion seals and merged/legacy data under ignored tmp.
+invocations produce 18 clocks in 5.506 seconds, or 11.230 seconds under shared
+load. The complete command is a manual Ring 2 proof because it runs actual
+Vitest processes and Git publications from independent clones. The proof keeps
+the requests, reports, seals and merged/legacy data under ignored tmp.
 
 Enqueue preflight now names the observation log and the changed weight tables
 in its commit advice. Its legacy merge command still handles older branches
