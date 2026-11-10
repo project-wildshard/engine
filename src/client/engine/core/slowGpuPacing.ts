@@ -50,13 +50,21 @@ export class SlowGpuPacing {
   private readonly costs: number[] = [];
   private due = Number.NEGATIVE_INFINITY;
   private calm = 0;
+  private pending: number | null = null;
   constructor(maxRatio: number) { this.maxRatio = maxRatio; this.ratio = maxRatio; }
+
+  /** The pixel ratio to set right before the next frame actually draws, once. A resize clears the canvas, so it waits for
+   *  the draw that replaces it, never the task that decided it (a still frame's backdrop would stay blank). */
+  takeRatio(): number | null { const next = this.pending; this.pending = null; return next; }
+
+  /** Back to the tier's own scale (a capture): from the next drawn frame. */
+  restore(): void { if (this.ratio !== this.maxRatio) { this.ratio = this.maxRatio; this.pending = this.maxRatio; } this.calm = 0; this.costs.length = 0; }
 
   /** Whether a frame may draw at `now` (the last frame's spacing has run out). */
   ready(now: number): boolean { return now >= this.due; }
 
-  /** A drawn frame that started at `start` held the main thread `cost` ms. Returns the pixel ratio to draw at from now on,
-   *  or null for no change. */
+  /** A drawn frame that started at `start` held the main thread `cost` ms. Returns the pixel ratio the next drawn frame
+   *  takes (`takeRatio`), or null for no change. */
   measured(start: number, cost: number): number | null {
     this.due = start + cost + Math.min(MAX_GAP_MS, Math.max(0, cost - HITCH_MS));
     this.costs.push(cost);
@@ -74,7 +82,15 @@ export class SlowGpuPacing {
       next = Math.min(this.maxRatio, Math.max(this.ratio + 1 / SNAP, Math.floor(this.ratio * STEP_UP * SNAP) / SNAP));
     }
     if (next === this.ratio) return null;
-    this.ratio = next;
+    this.ratio = next; this.pending = next;
     return next;
   }
+}
+
+/** Whether the loop skips this animation frame for pacing: never a forced frame, never while the traveller is held at a
+ *  cell's wall (the held-build frame floor rules then, framePacing.ts), else until the last frame's spacing has run out
+ *  and its cost probe (in flight since `probeSince`) has answered, at most MAX_GAP_MS. */
+export function pacedSkip(pacing: SlowGpuPacing | null, now: number, probeSince: number | null, forced: boolean, held: boolean): boolean {
+  if (pacing === null || forced || held) return false;
+  return !pacing.ready(now) || probeSince !== null && now - probeSince < MAX_GAP_MS;
 }

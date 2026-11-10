@@ -24,3 +24,7 @@ Spacing every frame was tried first (frames at most 2/3 of the main thread): sna
 then delivered animation frames at 4-9 a second; spacing only hitches kept 17.5 drawn frames a second. A raise
 threshold right at the 1.25x step made the scale hunt between 0.5 and 0.875 on noisy costs; four calm windows fixed it.
 No game check, clock, command budget, prediction ring or limit changed. Captures draw unpaced at the tier's own scale.
+
+J206 review (Codex) had two must-fixes, both taken: pacing ran ahead of the held-build frame floor (now a held traveller
+is never paced: the 30 fps floor rules), and a new scale resized (and cleared) the canvas in the probe's task, so a
+still frame's backdrop could stay blank. The scale now lands at the start of the next frame that actually draws.

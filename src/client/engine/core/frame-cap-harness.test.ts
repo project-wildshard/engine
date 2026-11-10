@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TIER, initializeTier, frameCapFps, practiceFps, frameProbe } from './tier';
 import { frameBudgetSpent, heldDrawDeferred, noteFrameDrawn, setBuildHeld } from '../../../shared/engine/core/framePacing';
-import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing } from './slowGpuPacing';
+import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing, pacedSkip } from './slowGpuPacing';
 
 const initialTier = TIER, initialLocation = globalThis.location;
 
@@ -73,4 +73,30 @@ test('RT3: windows steadily under the target raise the scale back to the tier, n
   for (let i = 0; i < 4 * RAISE_WINDOWS; i++) window(5);
   expect(pacing.ratio).toBe(1.5);
   expect(window(5)).toBeNull();
+});
+
+test('RT3: a new scale waits for the next drawn frame, once; a capture restores the tier scale the same way', () => {
+  const pacing = new SlowGpuPacing(2);
+  for (let i = 0; i < PACING_WINDOW; i++) pacing.measured(i * 1000, 200);
+  expect(pacing.ratio).toBe(1);
+  expect(pacing.takeRatio()).toBe(1);
+  expect(pacing.takeRatio()).toBeNull();
+  pacing.restore();
+  expect(pacing.ratio).toBe(2);
+  expect(pacing.takeRatio()).toBe(2);
+  pacing.restore();
+  expect(pacing.takeRatio()).toBeNull(); // already at the tier's scale: no resize, so no cleared canvas
+});
+
+test('RT3: pacing never skips a forced frame or a held one (the held-build floor rules), else waits for spacing and its probe', () => {
+  const pacing = new SlowGpuPacing(2);
+  pacing.measured(1000, 400); // a hitch: due at 1000 + 400 + 300
+  expect(pacedSkip(null, 1100, null, false, false)).toBe(false);
+  expect(pacedSkip(pacing, 1500, null, false, false)).toBe(true);
+  expect(pacedSkip(pacing, 1500, null, true, false)).toBe(false);
+  expect(pacedSkip(pacing, 1500, null, false, true)).toBe(false);
+  expect(pacedSkip(pacing, 1700, null, false, false)).toBe(false);
+  expect(pacedSkip(pacing, 1700, 1650, false, false)).toBe(true); // the last frame's cost has not answered yet
+  expect(pacedSkip(pacing, 1650 + MAX_GAP_MS, 1650, false, false)).toBe(false); // nor ever holds a frame past the gap cap
+  expect(pacedSkip(pacing, 1700, 1650, false, true)).toBe(false);
 });
