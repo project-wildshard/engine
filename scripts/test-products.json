@@ -371,5 +371,7 @@
   "test/audio-authoring.test.ts": [
     "driftwood-isle",
     "pine-hollow"
-  ]
+  ],
+  "test/headless-byte-capture.test.ts": ["_template"],
+  "test/script-seats.test.ts": ["pastel-plain"]
 }

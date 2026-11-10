@@ -1,14 +1,12 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The continuation fixture uses the shipped native physics binary.
-import {mkdirSync,mkdtempSync,readFileSync,rmSync} from 'node:fs';
-// oxlint-disable-next-line import/no-nodejs-modules -- A generated author fixture and trusted entry remain inside this checkout.
-import {resolve} from 'node:path';
+import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import {createSimHost,type SimHost} from '@wildshard/engine/sim';
 import {loadRapier} from '@wildshard/engine/physics/rapier';
 import { snapshotSimHost, snapshotSimHostBytes, serializeSimSnapshot, decodeSimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 import {SIM_LEVEL,fightCommand} from './fixtures/sim-level/level';
-import {newProject,buildProject} from '../src/sharddev/project';
+import {builtProduct} from './fixtures/builtProduct';
 import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
 import {createNativeProofAdapter,createNativeProofResident} from './fixtures/headless-native';
 import {prepareHeadlessRuntime} from './fixtures/headless/trustedRuntime';
@@ -37,12 +35,11 @@ test('byte capture retains exact native fight checkpoint wire and restored suffi
 });
 
 test('trusted adapter retains legacy wire, effects and exact restored native suffix',async()=>{
- mkdirSync('tmp',{recursive:true});const root=mkdtempSync(resolve('tmp','native-byte-capture-'));
  let adapter:TickWorkerAdapter|undefined,restored:TickWorkerAdapter|undefined,resident:Awaited<ReturnType<typeof createNativeProofResident>>|undefined;
  try{
-  const project=resolve(root,'project'),output=resolve(root,'out');newProject(project,'trusted-byte-capture');
-  await buildProject(project,output,{client:null,placeholders:false});
-  const product=await loadHeadlessProduct(output),rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  // CI21 (J232): the trusted runtime fixture owns the actor and its reward; the product is only the admitted shell, so the
+  // pinned Template product stands in for a freshly built SDK template project (engine can't run the SDK, J65).
+  const product=await loadHeadlessProduct(builtProduct('_template')),rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const preparation={product,shard:product.shardfile,assets:new Map<string,Uint8Array>(),rapier};
   adapter=await createNativeProofAdapter(preparation,prepareHeadlessRuntime);resident=await createNativeProofResident(preparation,prepareHeadlessRuntime);
   let rewards=0;
@@ -62,5 +59,5 @@ test('trusted adapter retains legacy wire, effects and exact restored native suf
   }
   expect(rewards).toBe(1);
   expect(decodeSimSnapshot(adapter.commit().snapshot).entities[0]?.state.motion.hp).toBeLessThan(100);
- }finally{restored?.dispose();adapter?.dispose();resident?.dispose();rmSync(root,{recursive:true,force:true});}
+ }finally{restored?.dispose();adapter?.dispose();resident?.dispose();}
 });

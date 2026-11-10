@@ -1,15 +1,23 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- rapier's own wasm, read from the tree in plain Node.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { PASTEL_SOURCE as source, pastelAssets } from './fixtures/pastelSource';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
+import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { builtProduct } from './fixtures/builtProduct';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 
 const WHIP = 'weapon.pastel-whip', BOT = 'bot.one';
 const rapier = await loadRapier(readFileSync(new URL('../public/assets/physics/rapier.wasm', import.meta.url)));
-const assets = pastelAssets();
+// CI21 (J232): Pastel Plain's pinned product, read as a server reads it, instead of compiling its source (J65).
+const directory = builtProduct('pastel-plain'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+if (descriptor === undefined) throw new Error('Missing pastel-plain output');
+const source = product.shardfile;
+const assets: ReadonlyMap<string, Uint8Array> = new Map(descriptor.index.files
+  .filter(file => serverReadsFile(file, source.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
+  .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
 const ports = { rapier, quest: { fact: () => undefined, coins: () => undefined } };
 function tick(sim: ShardfileSimulation, count = 1): void {
   const players = new Map([...sim.host.players.values()].map(player => [player.id, { moveX: 0, moveZ: 0, yaw: player.yaw }]));

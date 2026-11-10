@@ -87,6 +87,7 @@
  "test/room-respawn.test.ts",
  "test/script-v2-observation-columns.test.ts",
  "test/script-v2-transport.test.ts",
+ "test/script-seats.test.ts",
  "test/shard-phone-memory.test.ts",
  "test/shipped-graph-cost.test.ts",
  "test/sim-in-runtime.test.ts",

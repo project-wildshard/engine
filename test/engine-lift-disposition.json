@@ -8528,5 +8528,71 @@
     ],
     "sourceRevision": "79d377a3734e896117fde7fb0f5b6b7089e51dd3",
     "sourceBlob": "d98157ebbf338f69a5c9f7c5cee63c314ba82af5"
+  },
+  {
+    "repo": "engine",
+    "file": "test/headless-byte-capture.test.ts",
+    "outcome": "restored",
+    "target": "test/headless-byte-capture.test.ts",
+    "decision": "Both cases unchanged. The trusted-adapter case built a fresh SDK template project only as an admitted shell (the actor and its reward come from engine's own trustedRuntime fixture); it now loads the pinned Template product (out/_template, in Ring 1) instead of running sharddev's newProject/buildProject.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "byte capture retains exact native fight checkpoint wire and restored suffix",
+      "trusted adapter retains legacy wire, effects and exact restored native suffix"
+    ],
+    "sourceRevision": "50f7818fa15d1513d926efc08509cc83ceceee18",
+    "sourceBlob": "5bde15df8b2fa3167007df8352b93ad65a24ca06"
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-seats.test.ts",
+    "outcome": "restored",
+    "target": "test/script-seats.test.ts",
+    "ring": 2,
+    "ringReason": "Reads the pinned pastel-plain product, which Ring 1 does not install.",
+    "decision": "All four cases unchanged. Pastel Plain comes from its pinned product read as a server reads it (shardfile plus server assets) instead of compiling src/shards/pastel-plain.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "runs an item script as themselves",
+      "answers a prompt from their own place, and reads their own view",
+      "leaves with their seat, and a room save holds it",
+      "adds nothing to a one-player save"
+    ],
+    "sourceRevision": "50f7818fa15d1513d926efc08509cc83ceceee18",
+    "sourceBlob": "06bec65c555d78dc09cce6016a39ac4122dd1004"
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/faceted-author-compiler.test.ts",
+    "outcome": "migrated",
+    "target": "test/faceted-author-compiler.test.ts",
+    "landed": "sharddev@7ec7e99",
+    "decision": "SDK compiler code; moved to sharddev with every case unchanged, driving engine through its public exports.",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "the actual author compiler runs beneath the unchanged native renderer guard",
+      "finished-part culling preserves native hidden faces and every retained attribute bit",
+      "finished-part culling lends untouched part identity without disposing it"
+    ],
+    "sourceRevision": "50f7818fa15d1513d926efc08509cc83ceceee18",
+    "sourceBlob": "690b2d51a32efca6f6477aeda16f0312d26fa63f"
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/driftwood-rock-author.test.ts",
+    "outcome": "migrated",
+    "target": "test/driftwood-rock-author.test.ts",
+    "landed": "shard-driftwood@1a35540",
+    "decision": "Driftwood's own rock author bytes; moved to its shard with the fixture and recorded original (J200).",
+    "authority": "J232 (Jake, 2026-11-10): port to the owning repo, rewritten to prove the same intent",
+    "map": "project-wildshard-meta docs/plans/test-coverage/CI21-PORT-MAP.json",
+    "originalTests": [
+      "retains every original rock channel, bound, copy, card and hull byte"
+    ],
+    "sourceRevision": "50f7818fa15d1513d926efc08509cc83ceceee18",
+    "sourceBlob": "1219b23594bf9c79b0e6c0d64e71b278fc0f1609"
   }
 ]
