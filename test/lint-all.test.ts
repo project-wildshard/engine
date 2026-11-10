@@ -102,7 +102,7 @@ const fs=require('node:fs'),args=process.argv.slice(2),kind=args[0]==='exec'?'ty
 fs.appendFileSync('trace.txt',kind+':start:'+args.join(' ')+'\\n');fs.writeFileSync(kind+'.started','');
 let complete=false;const watcher=fs.watch('.',finish);
 function finish(){if(!complete&&fs.existsSync(other+'.started')){complete=true;watcher.close();fs.appendFileSync('trace.txt',kind+':finish\\n');process.exit(Number(process.env[kind==='types'?'TYPE_STATUS':'LINT_STATUS']));}}
-finish();setTimeout(()=>{watcher.close();process.exit(70);},2000).unref();
+finish();const poll=setInterval(finish,25);setTimeout(()=>{clearInterval(poll);watcher.close();process.exit(70);},2000).unref();
 `,{mode:0o755});
   for(const [index,statuses]of [[0,0],[7,0],[0,9],[7,9]].entries()){
    const [types,lint]=statuses;if(types===undefined || lint===undefined)throw new Error('Missing status');
