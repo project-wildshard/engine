@@ -290,20 +290,6 @@ async function startSelected(): Promise<void> {
   const imports = prepareBootImports(bootAwait('app:common-service-imports', Promise.all([speciesModule, iconsModule, pickupsModule, pickupRowsModule, propsModule,
     starterModule, hoverboardModule, voicesModule, boarModule, familiesModule, sourceModule, runtimeModule,
     gridEntryModule, pathsModule, prefetchModule])));
-  // Cover the full-ALL route's five observed misses; never recycle growables.
-  const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }] = await Promise.all([
-    import('@wildshard/engine/script/moduleV2'), import('@wildshard/engine/core/workSlice'),
-    import('@wildshard/engine/core/clock'),
-  ]);
-  const memoryStartedAt = diagnosticNow();
-  let memoryTurns = 0, memoryWaitMs = 0;
-  await bootTask('app:script-memory-reservation', () => prepareScriptMemoryBank([35, 0, 1, 0], async () => {
-    // Each native reserve gets its own task, even when the CPU budget is free.
-    memoryTurns++; const at = diagnosticNow(); await yieldTask(entryScope); memoryWaitMs += diagnosticNow() - at;
-    if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
-  }, [{ initial: 1, maximum: 2, count: 5 }, { initial: 1, maximum: 64, count: 4 }]));
-  performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
-    detail: { memoryTurns, memoryWaitMs } });
   const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies },
     { configuredShardfile, installShardfileProduct, installManifestShardfile, preparePageResidency }, { browserShardfileOptions },
     { pageGridRecovery }, { loadingPath }, { gridPrefetchStatus }] = await Promise.all([
@@ -317,6 +303,24 @@ async function startSelected(): Promise<void> {
     loading.setPrefetchSource(gridPrefetchStatus);
     const source = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI))) : null;
     page = preparePageResidency(arrival, source?.identity.slug);
+    // The script memory bank, sized by route: each reserve can cost JSC a full GC (e472f34069), so a grid page reserves
+    // the full-ALL route's demand for its cell activations in play, and a standalone page, which builds its one world under
+    // the loader, a few. NINE-DRAGON-BENCHMAX NB4: Nine's standalone page took 1 of the 45 by control and after play
+    // (benchmax census) while the 45 cost Jake's Low Power iPhone 1.1 s of modules. A miss allocates in place, as before.
+    const grid = page.mode === 'grid';
+    const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }] = await Promise.all([
+      import('@wildshard/engine/script/moduleV2'), import('@wildshard/engine/core/workSlice'),
+      import('@wildshard/engine/core/clock'),
+    ]);
+    const memoryStartedAt = diagnosticNow();
+    let memoryTurns = 0, memoryWaitMs = 0;
+    await bootTask('app:script-memory-reservation', () => prepareScriptMemoryBank(grid ? [35, 0, 1, 0] : [4, 0, 1, 0], async () => {
+      // Each native reserve gets its own task, even when the CPU budget is free.
+      memoryTurns++; const at = diagnosticNow(); await yieldTask(entryScope); memoryWaitMs += diagnosticNow() - at;
+      if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
+    }, grid ? [{ initial: 1, maximum: 2, count: 5 }, { initial: 1, maximum: 64, count: 4 }] : [{ initial: 1, maximum: 2, count: 1 }, { initial: 1, maximum: 64, count: 1 }]));
+    performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
+      detail: { memoryTurns, memoryWaitMs, grid } });
     await (await import('./assetTables')).prepareAssetPacks(page.mode === 'grid' || TIER !== 'phone' ? undefined : game.shard.slug);
     await completePageCatalogue(page.mode, catalogue?.ready);
     const path = page.mode === 'grid' ? 'grid' : 'shardfile';

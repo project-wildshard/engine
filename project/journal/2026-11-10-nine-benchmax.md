@@ -33,3 +33,6 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
 - Paint layers commit: the worker reply carries `texels` (a
   Uint8ClampedArray, transferred); a layer job never marks bitmap decodes
   unsupported.
+
+- Memory bank commit: the reservation moved after `preparePageResidency`
+  (the route is known there), still before admission.
