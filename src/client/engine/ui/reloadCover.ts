@@ -39,8 +39,11 @@ let words: HTMLElement | null = null;
 let restore: (() => void)[] = [];
 let watching = false;
 
-// RL8: code that must not pull this module into its graph (boot's stale-build reload) asks by event, in its own turn
-pageScope.listen(document, 'ws:reloading', event => { showReloading(null, event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : ''); });
+// RL8: code that must not pull this module into its graph (boot's stale-build reload) asks by event, in its own turn.
+// Guarded: node-side importers (debug/probe.ts through debugOptions.ts) load this module with no document.
+if (typeof document !== 'undefined') {
+  pageScope.listen(document, 'ws:reloading', event => { showReloading(null, event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : ''); });
+}
 
 /** The tapped control as a loading button: disabled, busy, a spinner and "Reloading". */
 function loadingButton(control: HTMLElement): void {

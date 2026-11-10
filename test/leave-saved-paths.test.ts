@@ -35,27 +35,31 @@ function page(): { readonly went: string[]; readonly location: object } {
   return { went, location: { href: 'https://example.test/?chunk=fixture&v=old', origin: 'https://example.test', replace: (url: string) => { went.push(url); }, reload: () => { went.push('reload'); } } };
 }
 const marks = { markReload: (): void => undefined, markUnload: (): void => undefined };
+// RL3/RL4 (reloadCover.ts): the cover's own calls, as ports. The cover and the one-frame paint wait are not what this file
+// proves; whether the navigation waits for the save is, so the frame wait runs its leave at once.
+const cover = { showReloading: (): void => undefined, reloadingLine: (): void => undefined, leaveAfterPaint: (go: () => void): void => { go(); }, RELOAD_FALLBACK_MS: 3000 };
+const pill = { ...cover, el: null, newer: false, engineString: (key: string) => key, diagnosticNow: () => 0 };
 
 const paths: readonly (readonly [string, (at: ReturnType<typeof page>) => () => void])[] = [
   ['the update pill', at => {
-    const reload = slice('src/client/engine/ui/Update.ts', 'function reload(): void {', '\n// pointerup as well', 'reload', { ...marks, location: at.location, titleBoundary: () => false, window: {} }, 'let busy = false;\n');
+    const reload = slice('src/client/engine/ui/Update.ts', 'function reload(): void {', '\n// pointerup as well', 'reload', { ...marks, ...pill, location: at.location, titleBoundary: () => false, window: {} }, 'let busy = false;\n');
     return () => { reload(); };
   }],
   ['the update pill through a waiting worker', at => {
     const adopt = (): Promise<boolean> => { at.went.push('adopted'); return Promise.resolve(true); };
-    const reload = slice('src/client/engine/ui/Update.ts', 'function reload(): void {', '\n// pointerup as well', 'reload', { ...marks, location: at.location, titleBoundary: () => false, window: { __ws_sw: { adopt } } }, 'let busy = false;\n');
+    const reload = slice('src/client/engine/ui/Update.ts', 'function reload(): void {', '\n// pointerup as well', 'reload', { ...marks, ...pill, location: at.location, titleBoundary: () => false, window: { __ws_sw: { adopt } } }, 'let busy = false;\n');
     return () => { reload(); };
   }],
   ['the reload prompt', at => {
-    const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [] });
+    const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [] });
     return () => { reload(); };
   }],
   ['the error modal\'s reload here', at => {
-    const here = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'reloadHere', { ...marks, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault' });
+    const here = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'reloadHere', { ...marks, ...cover, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault' });
     return () => { here(true); };
   }],
   ['the error modal\'s title screen', at => {
-    const title = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'toTitle', { ...marks, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault' });
+    const title = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'toTitle', { ...marks, ...cover, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault' });
     return () => { title(); };
   }],
   ['a shard switch', at => {
@@ -76,7 +80,7 @@ test('the menu\'s apply and reload leaves only once the save lands', async () =>
   const source = readFileSync('src/client/engine/ui/BootSettings.ts', 'utf8'), start = source.indexOf('listenTap(scope, apply, () => {'), end = source.indexOf('\n  const closeBtn', start);
   if (start === -1 || end < start) throw new Error('Missing the apply tap');
   const at = page(), session = held();
-  const ports = { ...marks, leaveSaved, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [], scope: null, apply: null, debug: null, developerTools: null, listenTap: (_scope: unknown, _button: unknown, run: () => void) => { run(); } };
+  const ports = { ...marks, ...cover, leaveSaved, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [], scope: null, apply: null, debug: null, developerTools: null, listenTap: (_scope: unknown, _button: unknown, run: () => void) => { run(); } };
   runInNewContext(stripTypeScriptTypes(source.slice(start, end)), ports);
   await settle();
   expect(session.asked()).toBe(1); expect(at.went).toEqual([]);
