@@ -43,7 +43,8 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
     process.exit(0);
   }
   // A miss owns the lane before generation/static work too.
-  const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--checkout-scope', '--', process.execPath, '.githooks/push-checks.mjs'],
+  const observation=process.argv[3]==='--release-observation'?['--observation-kind','release']:[];
+  const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--checkout-scope', ...observation, '--', process.execPath, '.githooks/push-checks.mjs'],
     { cwd: pkgDir, env: { ...env, WS_PUSH_GATE_PROFILE: 'full-v1', WS_CPU_ADMISSION: '1' }, stdio: 'inherit' });
   process.on('SIGINT', () => child.kill('SIGINT'));
   process.on('SIGTERM', () => child.kill('SIGTERM'));

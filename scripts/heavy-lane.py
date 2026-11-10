@@ -8,7 +8,11 @@ import json
 import hashlib
 import math
 import os
+import re
+import socket
+import stat
 from pathlib import Path
+import resource as process_resource
 import shutil
 import signal
 import subprocess
@@ -22,6 +26,115 @@ BUILD_SLOTS = ('build', 'build-2', 'build-3')
 RESOURCES = {'full-test': ('full-test',), 'build': ('build',), 'check': ('full-test', 'build')}
 LANES = ('full-test', *BUILD_SLOTS)
 WAIT_SECONDS = 5 * 60
+
+
+def read_metadata(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 4096:
+            raise ValueError('nonregular/oversized Git metadata')
+        data = os.read(fd, 4097)
+        if len(data) > 4096:
+            raise ValueError('oversized Git metadata')
+        return data.decode('utf-8').strip()
+    finally:
+        os.close(fd)
+
+
+def identity(cwd):
+    """Read Git's local identity without launching Git or reading configuration."""
+    root = Path(cwd).resolve()
+    unavailable = {'repo': None, 'worktree': str(root), 'branch': None, 'plan': None}
+    try:
+        for candidate in (root, *root.parents):
+            marker = candidate / '.git'
+            if marker.is_dir():
+                git = marker
+            elif os.path.lexists(marker):
+                text = read_metadata(marker)
+                if not text.startswith('gitdir: '):
+                    raise ValueError('invalid Git marker')
+                git = (candidate / text[8:]).resolve()
+            else:
+                continue
+            head = read_metadata(git / 'HEAD')
+            branch = head.removeprefix('ref: refs/heads/') if head.startswith('ref: refs/heads/') else None
+            common_file = git / 'commondir'
+            common = (git / read_metadata(common_file)).resolve() if os.path.lexists(common_file) else git
+            return {'repo': str(common.parent), 'worktree': str(candidate), 'branch': branch,
+                    'plan': branch.removeprefix('plan/') if branch and branch.startswith('plan/') else None}
+    except (OSError, ValueError, RuntimeError):
+        unavailable['identityUnavailable'] = True
+    return unavailable
+
+
+def command_label(command):
+    """Keep useful argv, never inline program bodies, credentials or URL queries."""
+    values, private = [], False
+    for value in command[:32]:
+        value = str(value)
+        sensitive = re.search(r'(?i)(?:token|password|secret|authorization|credential|api[-_]?key)', value)
+        if private:
+            values.append('<redacted>')
+            private = False
+        elif re.match(r'^(?:--eval|--print)=|^-[cep].+', value):
+            values.append('<inline-program>')
+        elif value in ('-c', '-e', '-p', '--eval', '--print'):
+            values.append(value)
+            private = True
+        elif sensitive:
+            values.append('<redacted>')
+            private = bool(re.fullmatch(r'--?[A-Za-z_-]+', value))
+        elif '://' in value:
+            values.append('<url>')
+        else:
+            values.append(value[:256])
+    return values
+
+
+def owner_kind(entry):
+    if 'push-queue' in Path(entry['cwd']).parts:
+        return 'queue'
+    refs = os.environ.get('WS_PUSH_REFS', '')
+    if any(line.startswith('refs/tags/') for line in refs.splitlines()):
+        return 'tag'
+    if entry.get('observationKind') == 'release':
+        return 'release'
+    if any('release-check.mjs' in str(arg) or str(arg).endswith('/release.sh') for arg in entry['command']):
+        return 'release'
+    return 'manual'
+
+
+def record_full_test(root, entry, event, **metrics):
+    """One append per event across every worktree using this scheduler root.
+
+    A missing/unwritable log is observable but cannot turn a command red or green.
+    Files copied from another machine retain machine/token IDs for deduplication.
+    """
+    if 'full-test' not in entry['resources']:
+        return
+    try:
+        row = {'schema': 'full-test-day/1', 'event': event, 'token': entry['token'],
+               'at': datetime.now(timezone.utc).isoformat(), 'epoch': time.time(),
+               'machine': socket.gethostname(), 'pid': entry['pid'],
+               'childPid': entry.get('childPid'), 'lane': entry['lane'],
+               'kind': owner_kind(entry), 'resources': list(entry['resources']),
+               'cwd': entry['cwd'], 'command': command_label(entry['command']),
+               **identity(entry['cwd']), **metrics}
+        data = (json.dumps(row, separators=(',', ':')) + '\n').encode()
+        path = root / 'full-test-day.log'
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+                raise ValueError('unsafe full-test observation file')
+            if os.write(fd, data) != len(data):
+                raise OSError('short observation append')
+        finally:
+            os.close(fd)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print('heavy-lane: full-test observation unavailable: ' + str(error), file=sys.stderr)
 
 
 def holder(resource, entry):
@@ -360,6 +473,7 @@ def main():
     parser.add_argument('--quiet', action='store_true', help='log output; print only a verdict or failing tail')
     parser.add_argument('--background', action='store_true', help='yield unattended generation/builds with utility QoS')
     parser.add_argument('--checkout-scope', action='store_true', help='one coordinated push per checkout, with shared CPU admission')
+    parser.add_argument('--observation-kind', choices=['release'], help='report-only caller provenance; never affects admission or checks')
     parser.add_argument('--admission-wait-seconds', type=float, default=None,
                         help='FIFO resource wait (default 300), separate from command time; at most 100 minutes')
     parser.add_argument('--max', type=float, default=30, help='owned command timeout in minutes; queue time is separate')
@@ -415,13 +529,17 @@ def main():
     entry = {'token': token, 'pid': os.getpid(), 'runnerPid': os.getpid(), 'childPid': None,
              'admissionWaitSeconds': admission_wait_seconds,
              'resources': resources, 'priority': 1,
+             'observationKind': args.observation_kind,
              'cwd': os.getcwd(), 'command': command, 'queuedAt': time.time(),
-             'lane': os.environ.get('SERVE_OWNER') or os.environ.get('HERDR_PANE_ID') or os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CODEX_SESSION_ID') or 'unknown'}
+             'lane': os.environ.get('WS_LANE_NAME') or os.environ.get('SERVE_OWNER') or os.environ.get('HERDR_PANE_ID') or os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CODEX_SESSION_ID') or 'unknown'}
     if args.checkout_scope:
         if os.environ.get('WS_CPU_ADMISSION') != '1':
             parser.error('checkout-scoped pushes require CPU admission')
         entry['checkout'] = str(Path.cwd().resolve())
     held, child, started, load, code = None, None, None, None, 130
+    queued_mono, acquired_mono = time.monotonic(), None
+    cpu_before = process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
+    record_full_test(root, entry, 'request')
     deadline = time.monotonic() + admission_wait_seconds
     def interrupted(_signal, _frame):
         raise KeyboardInterrupt
@@ -440,8 +558,10 @@ def main():
             if held is None:
                 time.sleep(min(0.1, max(0, deadline - time.monotonic())))
         started = time.time()
+        acquired_mono = time.monotonic()
         entry['startedAt'] = started
         load = load_average()
+        record_full_test(root, entry, 'acquire', queueSeconds=acquired_mono - queued_mono, loadStart=load)
         print('heavy-lane: acquired ' + args.kind + ' after %.2fs queue' % (started - entry['queuedAt']), file=sys.stderr, flush=True)
         compat = write_compat(root, entry)
         env = {**os.environ, 'WS_HEAVY_TOKEN': token, 'WS_HEAVY_ROOT': str(compat),
@@ -464,11 +584,16 @@ def main():
         print('heavy-lane: finished ' + args.kind + ' in %.2fs' % (time.time() - started), file=sys.stderr, flush=True)
         return code if code >= 0 else 128 - code
     except KeyboardInterrupt:
+        code = 130
         terminate(child)
         return 130
     except TimeoutError as error:
+        code = 124
         print(str(error), file=sys.stderr, flush=True)
         return 124
+    except Exception:
+        code = 1
+        raise
     finally:
         try:
             # A failed admission never starts a second wait during cleanup.
@@ -484,6 +609,15 @@ def main():
                 clear_compat(root, entry)
             for fd in held:
                 fd.close()
+            usage = process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
+            record_full_test(root, entry, 'release', queueSeconds=acquired_mono - queued_mono,
+                heldSeconds=time.monotonic() - acquired_mono, loadEnd=load_average(),
+                exitCode=code if code >= 0 else 128 - code,
+                userSeconds=max(0, usage.ru_utime - cpu_before.ru_utime),
+                systemSeconds=max(0, usage.ru_stime - cpu_before.ru_stime))
+        else:
+            record_full_test(root, entry, 'not-acquired', queueSeconds=time.monotonic() - queued_mono,
+                exitCode=code, loadEnd=load_average())
         if args.kind == 'build' and started is not None:
             record_build(root, entry['queuedAt'], started, load, code)
 
