@@ -1894,6 +1894,60 @@
       "finishedAt": "2026-11-10T21:58:59.799Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "f165924565fc37592a91c1d996fcec9df2d4607c",
+      "tree": "f6e51f6f5c5de325bc254d4c92420b76a8d92865",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/land.test.ts",
+          "blob": "13ab32d6ed40979eff0ca0292a9202f7b987b2d1",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 17,
+          "durationMs": 28817.249458000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T22:32:43.876Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "f165924565fc37592a91c1d996fcec9df2d4607c",
+      "tree": "f6e51f6f5c5de325bc254d4c92420b76a8d92865",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/land.test.ts",
+          "blob": "13ab32d6ed40979eff0ca0292a9202f7b987b2d1",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 17,
+          "durationMs": 23891.286043
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T22:33:09.023Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

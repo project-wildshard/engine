@@ -821,7 +821,7 @@
   "test/json-declarations.test.ts": 1.8795221190000002,
   "test/ktx2-table-ownership.test.ts": 0.030570960000000015,
   "test/ladder-every-player.test.ts": 0.35304613199999996,
-  "test/land.test.ts": 38.827730374000005,
+  "test/land.test.ts": 28.817249458000003,
   "test/lane-watchdog.test.ts": 0.07010490099999998,
   "test/last-cell-retention.test.ts": 0.7879508850000001,
   "test/leave-saved-paths.test.ts": 0.30889999,

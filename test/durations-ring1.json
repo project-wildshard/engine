@@ -787,7 +787,7 @@
   "test/js-heap-ratchet.test.ts": 0.51265527,
   "test/ktx2-table-ownership.test.ts": 0.042183868999999985,
   "test/ladder-every-player.test.ts": 0.278888193,
-  "test/land.test.ts": 42.66629420700001,
+  "test/land.test.ts": 23.891286043,
   "test/lane-watchdog.test.ts": 0.08126392700000003,
   "test/last-cell-retention.test.ts": 0.9528737060000001,
   "test/leave-saved-paths.test.ts": 0.3585220970000001,
