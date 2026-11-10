@@ -318,6 +318,114 @@
       "finishedAt": "2026-11-10T18:55:48.944Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "bafe074b403bba5f72f956d52b17860ce2f9360c",
+      "tree": "b5cfe6cf8efbd1e4168d48ef6ebcfe5f31d68dde",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "src/test/engine/isolated-engine-declarations.test.ts",
+          "blob": "28e337ba52a3badbed171e2982c43f8f351e5eb0",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 202,
+          "durationMs": 7622.178334
+        },
+        {
+          "file": "src/test/game/isolated-game-declarations.test.ts",
+          "blob": "144b47912ce920381d7cb937916bfcf879f90b98",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 58,
+          "durationMs": 5618.133084
+        },
+        {
+          "file": "src/test/game/isolated-game-ring2-declarations.test.ts",
+          "blob": "46be75e702ea4827c51d8e2819d5dac7447f6db6",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 88,
+          "durationMs": 9944.104540999999
+        },
+        {
+          "file": "test/push-duration-sequencer.test.ts",
+          "blob": "e6e1b6dcfd4648047028b54f65dd8ea79b4cc599",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 22330.539498000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T19:12:08.847Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "bafe074b403bba5f72f956d52b17860ce2f9360c",
+      "tree": "b5cfe6cf8efbd1e4168d48ef6ebcfe5f31d68dde",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "src/test/engine/isolated-engine-declarations.test.ts",
+          "blob": "28e337ba52a3badbed171e2982c43f8f351e5eb0",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 202,
+          "durationMs": 5116.670542
+        },
+        {
+          "file": "src/test/game/isolated-game-declarations.test.ts",
+          "blob": "144b47912ce920381d7cb937916bfcf879f90b98",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 58,
+          "durationMs": 3926.598376
+        },
+        {
+          "file": "test/push-duration-sequencer.test.ts",
+          "blob": "e6e1b6dcfd4648047028b54f65dd8ea79b4cc599",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 125.36908200000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T19:12:15.010Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [

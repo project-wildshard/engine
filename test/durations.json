@@ -515,7 +515,10 @@
   "src/shared/game/shardfile/packReads.test.ts": 0.050924882000000025,
   "src/shared/game/shardfile/tile-order.test.ts": 0.062344235,
   "src/test/engine/engine-isolated-declarations.test.ts": 7.565946417000001,
+  "src/test/engine/isolated-engine-declarations.test.ts": 7.622178334,
   "src/test/game/game-isolated-declarations.test.ts": 7.532959035,
+  "src/test/game/isolated-game-declarations.test.ts": 5.618133084,
+  "src/test/game/isolated-game-ring2-declarations.test.ts": 9.944104540999998,
   "test/actor-projection-native.test.ts": 0.6126094879999999,
   "test/admission-steps.test.ts": 0.49001314200000007,
   "test/agent-time.test.ts": 0.16488572800000006,
@@ -998,6 +1001,7 @@
   "test/progress-recording.test.ts": 0.06724391399999999,
   "test/projectile-law.test.ts": 0.26149368900000003,
   "test/prune-deployments.test.ts": 0.044120875999999996,
+  "test/push-duration-sequencer.test.ts": 22.330539498,
   "test/push-input-cache.test.ts": 0.261574388,
   "test/push-queue-clone.test.ts": 22.588552126000003,
   "test/pwa-update-cache.test.ts": 0.304062049,
@@ -1178,8 +1182,5 @@
   "test/world-scene-weld.test.ts": 1.248411632,
   "test/world-scenes-hostless-tiles.test.ts": 4.595850789999999,
   "test/world-stage-construction.test.ts": 2.108075506,
-  "test/world-updates-encounters.test.ts": 1.2113826510000003,
-  "src/test/engine/isolated-engine-declarations.test.ts": 11.968,
-  "src/test/game/isolated-game-declarations.test.ts": 10.349,
-  "src/test/game/isolated-game-ring2-declarations.test.ts": 18.699
+  "test/world-updates-encounters.test.ts": 1.2113826510000003
 }

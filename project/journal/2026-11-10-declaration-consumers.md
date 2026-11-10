@@ -38,3 +38,7 @@ so hosted ring-1 runs skipped them. Their blocks live in
 The recorded clocks follow: `test/durations.json` and `test/durations-ring1.json` drop the
 31 folded files and record the three new ones and the two hold files from a local
 one-worker run (bootstrap data, as hosted timings replace it).
+
+The push gate then measured the three new files and the sequencer test itself
+(evidence 08026bd9); `push-test-timings.mjs record` replaced the bootstrap values
+and logged the observation in `test/durations-source.json`.
