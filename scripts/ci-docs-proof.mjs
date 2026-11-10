@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync,spawn} from 'node:child_process';
 import {createServer} from 'node:http';
-import {copyFileSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
+import {copyFileSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {join,resolve as resolvePath} from 'node:path';
 
 const directory=resolvePath(process.argv[2]??'tmp/ci-docs-proof');mkdirSync(directory,{recursive:true});
@@ -41,7 +41,8 @@ const classify=async(before,sha)=>{
 };
 try{
  git(['init','--quiet','--initial-branch=main']);mkdirSync(join(work,'scripts'));mkdirSync(join(work,'src'));mkdirSync(join(work,'test'));mkdirSync(join(work,'docs'));
- for(const name of ['push-selection.mjs','ci-selection.mjs','lift-pending.mjs'])if(existsSync(`scripts/${name}`))copyFileSync(`scripts/${name}`,join(work,'scripts',name));
+ for(const name of ['push-selection.mjs','ci-selection.mjs','lift-pending.mjs','renderer-revision.mjs','shardfile-validation-revision.mjs','source-input-proof.mjs','input-hash-memo.mjs'])if(existsSync(`scripts/${name}`))copyFileSync(`scripts/${name}`,join(work,'scripts',name));
+ symlinkSync(resolvePath('node_modules'),join(work,'node_modules'),'dir');
  writeFileSync(join(work,'src/value.ts'),'export const value=1;');writeFileSync(join(work,'test/value.mjs'),"import assert from 'node:assert/strict';import {value} from '../src/value.ts';assert.equal(value,1);");
  writeFileSync(join(work,'docs/note.md'),'base');git(['add','scripts','src','test','docs']);git(['commit','--quiet','-m','proved code']);const proved=git(['rev-parse','HEAD']);
  execFileSync(process.execPath,['test/value.mjs'],{cwd:work,stdio:'pipe'});
@@ -57,6 +58,8 @@ try{
  writeFileSync(join(work,'docs/note.md'),'docs after proved fix');git(['add','docs/note.md']);git(['commit','--quiet','-m','safe docs']);const safe=git(['rev-parse','HEAD']);
  runs=[{id:1,head_sha:fixed,status:'completed',conclusion:'success',event:'push'}];
  assert.equal(await classify(fixed,safe),true,'A real code-proving predecessor permits the optimization');
+ mkdirSync(join(work,'.github/workflows'),{recursive:true});writeFileSync(join(work,'.github/workflows/proof.yml'),'name: actual workflow input\non: push\n');git(['add','.github/workflows/proof.yml']);git(['commit','--quiet','-m','change hosted workflow']);const workflowHead=git(['rev-parse','HEAD']);
+ assert.equal(await classify(safe,workflowHead),false,'The local workflow exemption must never skip hosted code-proving CI');
  badApi=true;assert.equal(await classify(fixed,safe),false,'An unavailable proof runs full');badApi=false;
  // The real saved Git policy expired since the API's green run. Its restored
  // file genuinely fails now, even though the next commit changes only docs.

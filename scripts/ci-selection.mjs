@@ -43,7 +43,7 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
    const passed=name=>jobs.some(job=>record(job)&&job.name===name&&job.status==='completed'&&job.conclusion==='success');
    const tests=jobs.filter(job=>record(job)&&typeof job.name==='string'&&/^tests(?: \(.+\))?$/u.test(job.name));
    if(!['changes','static','plan','e2e'].every(passed)||tests.length===0||tests.some(job=>!record(job)||job.status!=='completed'||job.conclusion!=='success'))continue;
-   const selected=pushSelection(`refs/heads/main ${sha} refs/heads/main ${run.head_sha}`,cwd);
+   const selected=pushSelection(`refs/heads/main ${sha} refs/heads/main ${run.head_sha}`,cwd,{hosted:true});
    // Unchanged source is insufficient after a time-based discovery exclusion
    // expires. Stay full until the inherited inventory is actually disposed;
    // an older green run did not prove those newly required files.
