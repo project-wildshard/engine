@@ -12,7 +12,7 @@ import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
-import { mainPushArgs, parseArgs, shaVerdict } from '../scripts/land.mjs';
+import { failedJobs, mainPushArgs, parseArgs, shaVerdict } from '../scripts/land.mjs';
 
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
@@ -217,6 +217,27 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.read(f.files.receipts)).toMatch(/STOP hosted CI red .*tests \(3\)/u);
   }, 60_000);
 
+  test('non-blocking quarantine reds alone never stop a landing; with a blocking red they are named as non-blocking', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.state({ red: { 'plan/foo': { ci: 'quarantine (1)', 'ring-1': 'quarantine (2)' } } });
+    const landed = f.land(wt);
+    expect(landed.status, landed.stdout).toBe(0);
+    expect(landed.stdout).toMatch(/only non-blocking quarantine jobs are red \(quarantine \(1\) \(failure\); quarantine \(2\) \(failure\)\); green/u);
+    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature');
+    const g = fixture();
+    const other = g.worktree('bar');
+    g.commit(other, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const before = g.remoteMain();
+    g.state({ red: { 'plan/bar': { ci: 'quarantine (1)', 'ring-1': 'tests (3)' } } });
+    const stopped = g.land(other);
+    expect(stopped.status).toBe(1);
+    expect(stopped.stdout).toMatch(/ring-1 run \d+ failure: tests \(3\) \(failure\)/u);
+    expect(stopped.stdout).toMatch(/ci run \d+ failure: no failed job listed \(non-blocking: quarantine \(1\) \(failure\)\)/u);
+    expect(g.remoteMain()).toBe(before);
+  }, 90_000);
+
   test('a rebase conflict stops with the conflicting paths and leaves the worktree as it was', () => {
     const f = fixture();
     const wt = f.worktree('foo');
@@ -319,6 +340,15 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(subjects).toEqual(expect.arrayContaining(['feat: foo', 'feat: bar', 'seed']));
     expect(subjects).toHaveLength(3);
   }, 60_000);
+});
+
+describe('failedJobs', () => {
+  test('splits non-blocking quarantine jobs from blocking reds', () => {
+    const jobs = [['tests (4)', 'failure'], ['quarantine (1)', 'failure'], ['quarantine', 'timed_out'], ['static', 'success'], ['e2e', 'cancelled'], ['quarantine-check', 'failure']]
+      .map(([name, conclusion]) => ({ name, conclusion }));
+    expect(failedJobs({ jobs })).toEqual({ blocking: ['tests (4) (failure)', 'e2e (cancelled)', 'quarantine-check (failure)'], nonblocking: ['quarantine (1) (failure)', 'quarantine (timed_out)'] });
+    expect(failedJobs(null)).toEqual({ blocking: [], nonblocking: [] });
+  });
 });
 
 describe('shaVerdict', () => {

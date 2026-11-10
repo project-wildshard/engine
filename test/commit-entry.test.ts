@@ -75,7 +75,11 @@ test('a commit from a plan worktree uses its own index and leaves the canonical 
     writeFileSync(join(tree, 'selected'), 'from the worktree\n');
     const result = invoke(tree, ['selected']);
     expect(result.status, result.stdout + result.stderr).toBe(0);
-    const inTree = (...args: string[]): string => spawnSync('git', args, { cwd: tree, encoding: 'utf8' }).stdout.trim();
+    const inTree = (...args: string[]): string => {
+      const run = spawnSync('git', args, { cwd: tree, encoding: 'utf8' });
+      expect(run.status, run.stderr).toBe(0);
+      return run.stdout.trim();
+    };
     expect(inTree('show', 'plan/p:selected')).toBe('from the worktree');
     expect(inTree('status', '--porcelain', '--', 'selected')).toBe('');
     expect(readFileSync(join(root, '.git/index')).equals(canonicalIndex)).toBe(true);

@@ -104,14 +104,29 @@ function ghApi(repo,path){
  return /** @type {unknown} */(JSON.parse(result.stdout));
 }
 
-/** Failed job names of a run, for the stop line.
- * @param {string} repo @param {number} id */
-function failedJobs(repo,id){
- try{
-  const data=ghApi(repo,`actions/runs/${id}/jobs?filter=latest&per_page=100`);
-  const jobs=data!==null&&typeof data==='object'&&'jobs'in data&&Array.isArray(data.jobs)?data.jobs:[];
-  return jobs.filter(job=>job!==null&&typeof job==='object'&&['failure','timed_out','cancelled','startup_failure'].includes(job.conclusion)).map(job=>`${job.name} (${job.conclusion})`);
- }catch{return ['(job list unavailable)'];}
+/** J193/J200: `quarantine (n)` jobs run quarantined files with their ordinary exit code and are continue-on-error;
+ * they are red by design until rewritten and never block a landing. */
+const NONBLOCKING_JOB=/^quarantine(?: \(\d+\))?$/u;
+const FAILED=new Set(['failure','timed_out','cancelled','startup_failure']);
+
+/** A run's failed jobs, split into the blocking ones and the non-blocking quarantine ones.
+ * @param {unknown} data the Actions `runs/<id>/jobs` response
+ * @returns {{blocking:string[],nonblocking:string[]}} */
+export function failedJobs(data){
+ const jobs=data!==null&&typeof data==='object'&&'jobs'in data&&Array.isArray(data.jobs)?data.jobs:[];
+ /** @type {{blocking:string[],nonblocking:string[]}} */const split={blocking:[],nonblocking:[]};
+ for(const job of jobs){
+  if(job===null||typeof job!=='object'||!FAILED.has(String(job.conclusion)))continue;
+  const name=String(job.name);
+  (NONBLOCKING_JOB.test(name)?split.nonblocking:split.blocking).push(`${name} (${String(job.conclusion)})`);
+ }
+ return split;
+}
+
+/** @param {string} repo @param {number} id @returns {{blocking:string[],nonblocking:string[]}} */
+function runFailures(repo,id){
+ try{return failedJobs(ghApi(repo,`actions/runs/${id}/jobs?filter=latest&per_page=100`));}
+ catch{return {blocking:['(job list unavailable)'],nonblocking:[]};}
 }
 
 const sleep=(/** @type {number} */ ms)=>new Promise(_resolve=>{setTimeout(_resolve,ms);});
@@ -257,7 +272,15 @@ class Landing{
    if(verdict.summary!==last){this.say('ci',`${what} ${short(sha)}: ${verdict.summary}`);last=verdict.summary;}
    if(verdict.state==='green'){for(const run of Object.values(verdict.runs))this.runs.push(run.id);return verdict;}
    if(verdict.state==='red'){
-    const failed=Object.entries(verdict.runs).filter(([,run])=>run.conclusion!=='success').map(([name,run])=>`${name} run ${run.id} ${run.conclusion}: ${failedJobs(this.repo,run.id).join('; ')||'no failed job listed'}${run.url===''?'':` ${run.url}`}`);
+    // Only blocking jobs decide: a run red solely from non-blocking quarantine jobs counts as green. A red run whose
+    // failed jobs can't be listed, or that lists none, stays red (fail closed).
+    const reds=Object.entries(verdict.runs).filter(([,run])=>run.conclusion!=='success').map(([name,run])=>({name,run,jobs:runFailures(this.repo,run.id)}));
+    if(reds.every(red=>red.jobs.blocking.length===0&&red.jobs.nonblocking.length>0)){
+     this.say('ci',`${what} ${short(sha)}: only non-blocking quarantine jobs are red (${reds.flatMap(red=>red.jobs.nonblocking).join('; ')}); green`);
+     for(const run of Object.values(verdict.runs))this.runs.push(run.id);
+     return {...verdict,state:'green'};
+    }
+    const failed=reds.map(({name,run,jobs})=>`${name} run ${run.id} ${run.conclusion}: ${jobs.blocking.join('; ')||'no failed job listed'}${jobs.nonblocking.length===0?'':` (non-blocking: ${jobs.nonblocking.join('; ')})`}${run.url===''?'':` ${run.url}`}`);
     return {...verdict,failed};
    }
    if(Object.keys(verdict.runs).length===0&&Date.now()>appear)throw new StopError(`no hosted ci/ring-1 run for ${short(sha)} after ${this.options.appearMinutes} min; are ci.yml and ring-1.yml triggered on plan/** pushes?`);

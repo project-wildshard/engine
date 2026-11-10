@@ -3,5 +3,6 @@ export function githubSlug(remote: string): string | null;
 export function parseArgs(argv: string[]): { pollSeconds: number; timeoutMinutes: number; appearMinutes: number; rounds: number; watchMain: boolean };
 export function classifyRebase(cwd: string, range: { tested: string; base: string; head: string; main: string }): { rule: 'carried' | 'rerun'; reason: string; stamp?: boolean };
 export function shaVerdict(data: unknown, sha: string): { state: 'pending' | 'green' | 'red'; runs: Record<string, { id: number; status: string; conclusion: string | null; branch: string; url: string }>; summary: string };
+export function failedJobs(data: unknown): { blocking: string[]; nonblocking: string[] };
 export function mainPushArgs(sha: string): string[];
 export function land(argv: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<number>;
