@@ -64,7 +64,9 @@ try{
   executed.push('set');
  }
  if(selected===undefined||selected==='deadline'){
-  const f=fixture('deadline',60);writeFileSync(f.policyFile,JSON.stringify({...f.policy,deadline:new Date(Date.parse(f.deadline)+1000).toISOString()}));
+  const f=fixture('deadline',60);
+  assert.throws(()=>writePushProof({...f.context,exclusions:{...f.context.exclusions,deadline:null}},{mode:'full',files:[]},.01),/exclusion scope changed/u,'A J237 no-time-transition state cannot be forged for a finite legacy deadline');
+  writeFileSync(f.policyFile,JSON.stringify({...f.policy,deadline:new Date(Date.parse(f.deadline)+1000).toISOString()}));
   assert.equal(readPushProof(f.context,{mode:'full',files:[]}),null,'Changed or invalid immutable deadline must invalidate the old context');
   executed.push('deadline');
  }

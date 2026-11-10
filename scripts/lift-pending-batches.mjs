@@ -18,9 +18,9 @@ function parse(value){
  const ids=Object.keys(value.landings);
  if(ids.length===0||ids.some(id=>!/^CI21-H[1-9]\d*$/u.test(id)))throw new Error('Invalid CI21 enabler registry');
  for(const landing of Object.values(value.landings))if(landing!==null&&(!record(landing)
-  ||typeof landing.repository!=='string'||!/^project-wildshard\/[a-z0-9-]+$/u.test(landing.repository)
+  ||landing.repository!=='project-wildshard/engine'
   ||typeof landing.commit!=='string'||!/^[a-f0-9]{40}$/u.test(landing.commit)||!date(landing.landedAt)
-  ||typeof landing.evidence!=='string'||landing.evidence.length<20))throw new Error('CI21 enabler landing needs repository, commit, date and evidence');
+  ||typeof landing.evidence!=='string'||landing.evidence.length<20))throw new Error('CI21 enabler landing needs an engine integration commit, date and evidence; external receipts alone cannot activate a window');
  /** @type {string[]} */const allMembers=[];
  /** @type {string[]} */const batchIds=[];
  for(const batch of value.batches){
@@ -82,12 +82,22 @@ export function resolveLiftBatches(value,files,context){
  }
  for(const [id,landing] of Object.entries(schedule.landings)){
   const first=firstLandings.get(id);
-  if(landing===null){if(first!==undefined)throw new Error(`CI21 enabler ${id} cannot be reset after landing`);continue;}
+  // A delivered enabler closes with this exact trailer on its engine
+  // integration commit, including public dependency integration for an
+  // enabler built in another repo. An omitted policy receipt then fails closed.
+  const marker=git(['log','--reverse','--format=%H',`--grep=^CI21-Enabler: ${id} [0-9a-f]\\{40\\}$`]).split('\n')[0];
+  if(landing===null){
+   if(first!==undefined)throw new Error(`CI21 enabler ${id} cannot be reset after landing`);
+   if(marker)throw new Error(`CI21 enabler ${id} landed at ${marker}; its first receipt and derived batch dates are required`);
+   continue;
+  }
   if(first===undefined||landingIdentity(first.landing)!==landingIdentity(landing))throw new Error(`CI21 enabler ${id} must retain its first committed landing`);
+  const source=marker?git(['show','-s','--format=%B',marker]).split('\n').find(line=>new RegExp(`^CI21-Enabler: ${id} [a-f0-9]{40}$`,'u').test(line))?.split(' ')[2]:undefined;
+  if(!marker||landing.commit!==source)throw new Error(`CI21 enabler ${id} must identify its first CI21-Enabler engine integration source`);
   const instant=Date.parse(landing.landedAt),recorded=Number(git(['show','-s','--format=%ct',first.commit]))*1000;
   if(instant>checkedAt||instant>recorded+999)throw new Error(`CI21 enabler ${id} cannot postdate its introducing receipt`);
   if(landing.repository==='project-wildshard/engine'){
-   try{git(['merge-base','--is-ancestor',landing.commit,'HEAD']);}
+   try{git(['merge-base','--is-ancestor',landing.commit,marker]);git(['merge-base','--is-ancestor',landing.commit,'refs/remotes/origin/main']);}
    catch{throw new Error(`CI21 enabler ${id} needs a landed engine commit`);}
    if(Math.abs(Number(git(['show','-s','--format=%ct',landing.commit]))*1000-instant)>999)
     throw new Error(`CI21 enabler ${id} date must match its actual engine commit`);
@@ -106,8 +116,9 @@ export function resolveLiftBatches(value,files,context){
  const missed=batches.filter(batch=>batch.files.length>0&&batch.deadline!==null&&observed>=Date.parse(batch.deadline));
  if(missed.length>0)throw new Error(`CI21 batch deadline missed: ${missed.map(batch=>`${batch.id} (${batch.files.length} pending, ${batch.deadline}, owner ${batch.owner})`).join('; ')}`);
  const next=batches.flatMap(batch=>batch.files.length>0&&batch.deadline!==null?[Date.parse(batch.deadline)]:[]);
- // Prior-cutoff reuse always expires at the transition. If every remaining
- // batch waits on an enabler, the past cutoff deliberately disables reuse.
- const deadline=observed<Date.parse(schedule.startsAfter)||next.length===0?schedule.startsAfter:new Date(Math.min(...next)).toISOString();
+ // The transition invalidates older proofs. Once every pending batch waits,
+ // no clock can expire by time alone. Every read still checks Git's enabler
+ // markers: a missing receipt fails even after an empty-tree marker commit.
+ const deadline=observed<Date.parse(schedule.startsAfter)?schedule.startsAfter:next.length===0?null:new Date(Math.min(...next)).toISOString();
  return {deadline,excluded:[...files],batches};
 }

@@ -24,7 +24,10 @@ const receiptSchema=v.object({version:v.literal(2),tree:v.string(),runtime:v.str
   finished:v.string(),seconds:v.number(),mode:v.picklist(['full','related','docs']),files:v.array(v.string()),exclusions:exclusionsSchema});
 /** Expired policies with no exclusions are already the complete inventory.
  * @param {v.InferOutput<typeof exclusionsSchema>} scope */
-const scopeLive=scope=>scope.files.length===0||scope.deadline!==null&&Date.now()<Date.parse(scope.deadline);
+// Null is a policy with no time-only transition (no exclusions, or J237
+// batches still waiting on integration). exclusionScope revalidates Git's
+// landing markers on every read/write; it cannot conceal an omitted receipt.
+const scopeLive=scope=>scope.files.length===0||scope.deadline===null||Date.now()<Date.parse(scope.deadline);
 /** Local pushEnvironment removes ring/quarantine modes. The lift policy is the
  * same time-dependent exclusion reader used by the actual Vitest config.
  * @param {string} root */
@@ -48,6 +51,7 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   for(const line of refs?refs.split('\n'):[]){
     const fields=line.trim().split(/\s+/u),local=fields[1],remote=fields[3];
     if(fields.length!==4||!/^[a-f0-9]{40}$/u.test(local??'')||!/^[a-f0-9]{40}$/u.test(remote??''))throw new Error('Invalid push refs for checked-tree proof');
+    if(local===undefined)throw new Error('Invalid push refs for checked-tree proof');
     if(/^0+$/u.test(local))continue;
     publishes=true;
     if(git(['rev-parse','--verify',`${local}^{tree}`])!==tree)throw new Error('Push target tree differs from the checked HEAD tree; check the exact target in an immutable checkout');
