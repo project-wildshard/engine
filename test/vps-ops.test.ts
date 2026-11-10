@@ -118,13 +118,16 @@ test('GO3: WORLD_CELLS is checked through the cells the new bundle places; nothi
   const live = (): string => readlinkSync(join(home, 'current'));
   expect((await pull('driftwood-isle')).code).toBe(0);
   expect(live()).toBe(join(home, 'bundles', 'old'));
-  expect((await pull('grid')).code, 'a bundle from before GO3 cannot open the grid').toBe(0);
+  const kept = readFileSync(join(home, 'bundles', 'old', 'release.json'), 'utf8'), oldGrid = await pull('grid');
+  expect(oldGrid.out, 'a bundle from before GO3 cannot open the grid').toMatch(/places no cell the release names/u);
   expect(live()).toBe(join(home, 'bundles', 'old'));
+  expect(readFileSync(join(home, 'bundles', 'old', 'release.json'), 'utf8'), 'the kept record is untouched').toBe(kept);
   const named = (serial: number, shards: readonly string[]): string => signed(JSON.stringify({ channel: 'production', serial, engineBuild: 'placed', saveEpoch: 1, shards: shards.map(slug => ({ slug, revision: 1 })), bundle: { name: placed.name, sha256: placed.sha256 } }));
   text = named(2, ['driftwood-isle']);
   const refused = await pull('driftwood-isle,open-plot-nw');
   expect(refused.out, 'an instance is checked as its shard').toMatch(/release has no open-plot-night-market/u);
   expect(live()).toBe(join(home, 'bundles', 'old'));
+  expect(existsSync(join(home, 'bundles', 'placed', 'release.json')), 'no kept record for a refused release').toBe(false);
   text = named(3, ['driftwood-isle', 'open-plot-night-market']);
   expect((await pull('driftwood-isle,open-plot-nw')).code).toBe(0);
   expect(live()).toBe(join(home, 'bundles', 'placed'));
