@@ -101,6 +101,11 @@ jobs:
       - name: Prove actual native item frame continuation and reaction order
         if: needs.changes.outputs.docs != 'true'
         run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-item-frame.proof.mjs
+      - name: Prove declared input and persisted cosmetic migration
+        if: needs.changes.outputs.docs != 'true'
+        run: |
+          node scripts/pins.ts install nine-dragon-stack
+          node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'

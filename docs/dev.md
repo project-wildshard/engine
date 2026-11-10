@@ -328,3 +328,23 @@ complete authored journey, live-server or phone-rendering proof. Frozen
 legacy algorithms consume preserved profile data; current item rows and
 policies are read independently from actual immutable pinned products.
 No runtime, tuning, pin, reward or test deadline changes here.
+
+## Declared input and cosmetic migration
+
+Install the existing Pine and Nine pins, then run
+`node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs`.
+Eight explicit CI-only cases preserve all nine inherited groups. Actual
+input commands respect mode, item and flags, inherited keys, closed
+visibility and scope retirement. Admission rejects executable getters
+without running them. Real SaveStore and ForwardedStorage documents
+survive cosmetic slot migration and a fresh store/locker reload, with
+one migration write and no repeated write. An acknowledgement is local
+transport evidence, not a browser disk-durability claim.
+
+Actual pinned Pine and Nine declarations retain their scalar kind,
+phone/desktop values, temporary trim and restored tier. The control
+declaration is fictional author data. No runtime or shipped content is
+changed; this is not a rendered input, physical key, live-server or
+visible cosmetic proof. Every complete case, including cleanup, has a
+9.5-second timeout and elapsed guard outside hooks and Vitest. The
+inherited SDK file stays excluded and retained for its owner to retire.
