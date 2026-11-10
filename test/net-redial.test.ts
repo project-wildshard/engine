@@ -174,13 +174,16 @@ test('a link that went silent and dropped while the page was away is told as a r
   redial.dispose();
 });
 
-test('dialNow only brings the next dial forward: the cause stays', () => {
-  const { heard, run, redial, links } = harness();
-  heard(); run(3200);
-  expect(redial.why).toBe('silent');
+test('dialNow brings a waiting dial forward and leaves the cause alone', () => {
+  const { heard, run, redial, links, failDials } = harness();
+  heard(); failDials('lost'); run(3200);
+  const cause = redial.why;
+  // run until a dial is waiting more than half a second away
+  for (let step = 0; step < 200 && (redial.progress.nextDialMs ?? 0) < 600; step++) run(50);
+  expect(redial.progress.nextDialMs).toBeGreaterThanOrEqual(600);
   const before = links.length;
-  run(100); redial.dialNow(); run(100);
-  expect(redial.why).toBe('silent');
-  expect(links.length).toBeGreaterThanOrEqual(before);
+  redial.dialNow(); run(100);
+  expect(links.length).toBe(before + 1);
+  expect(redial.why).toBe(cause);
   redial.dispose();
 });

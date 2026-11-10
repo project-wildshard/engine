@@ -63,3 +63,7 @@ online shell, replacing the plain strip and the raw error text.
   time or "nothing is lost" without a server acknowledgement; the
   notice says "back online", the deploy banner "preparing to move".
   Chat keeps one held draft; a new line replaces it.
+- Fourth pass: GO on 98ad5b0. Two of its SHOULDs done: Space and
+  Enter reach a focused card button, and the dialNow test proves the
+  dial comes forward. Left: a focus trap in cards, and server-side
+  chat receipt in the browser proof.
