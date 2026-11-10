@@ -74,3 +74,10 @@ products, both flows and tiers finds exactly nine more raw model files
 producer blobs (2,899,421 bytes). The guard includes raw model paths,
 while keeping separate unused compressed-alias banks out of this claim.
 All selected image-mode payloads will be checked before the next proof.
+
+Carry the reviewed selection correction plus the owner's performance
+forward normally. The empty generated selection still invokes actual
+Oxlint on the same configured staged scope, full typecheck and format;
+unknown/missing/non-generated empty selections retain the full fallback.
+No ignore configuration, eight-second cap or full publication gate is
+changed. Regenerate all 26 recovered rows and official revisions.
