@@ -48,7 +48,7 @@ def read_entry(path):
 
 
 def wait_label(seconds):
-    return '5 min' if seconds == WAIT_SECONDS else '%gs' % seconds
+    return '5 min' if seconds == 5 * 60 else '%gs' % seconds
 
 
 def queue_timeout(root, entry):
