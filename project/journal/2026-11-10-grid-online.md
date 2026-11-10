@@ -13,3 +13,4 @@
   every doc that lands, read first by `where()`, falling back to `lastCell`.
 - `/health` gains `table`: each open cell and its worker.
 - Walls stay (DG1): each cell is still `lone`; road and crossings are GO6.
+- Recorded the new `test/dedicated-grid-cells.test.ts` clocks (full and Ring 1).
