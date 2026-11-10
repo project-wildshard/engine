@@ -236,7 +236,7 @@ class Landing{
   }
   if(rewrite&&tryGit(this.root,['cat-file','-e',`${tip}^{commit}`]).status!==0)tryGit(this.root,['fetch','--quiet','origin',tip]);
   const args=['push','--porcelain',...rewrite?[`--force-with-lease=refs/heads/${this.branch}:${tip}`]:[],'origin',`${sha}:refs/heads/${this.branch}`];
-  this.say('pushing',`${this.branch} ${short(sha)}${rewrite?` (rebased; replaces its own ${short(String(tip))} under a lease)`:''}; the pre-push runs`);
+  this.say('pushing',`${this.branch} ${short(sha)}${rewrite?` (rebased; replaces its own ${short(tip)} under a lease)`:''}; the pre-push runs`);
   const result=spawnSync('git',args,{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','inherit']});
   if(result.status!==0){
    this.receipt(`STOP plan push ${short(sha)} refused (pre-push red or lease lost)`);
