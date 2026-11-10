@@ -22,6 +22,7 @@ import type { GraphLiteral } from '@wildshard/format/materialGraph';
 import type { LookInstance } from './lentLooks';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { buildYield, workSlice } from '@wildshard/engine/core/workSlice';
+import { waitFor } from '@wildshard/engine/boot/waits';
 import { loadLookGraphCompiler, bindGraphMeshMap } from '@wildshard/engine/render/graphBackend';
 import { curvedParams, materialTextureRefs } from '@wildshard/format/materials';
 import { clientGraphs, graphOutlineHook, isGraphEntry, keptGraphFileTextureRefs, type GraphOutlineHook, type GraphReadout, type GraphSources } from './clientGraphs';
@@ -166,7 +167,8 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
     try {
     for (const ref of refs) {
       const bytes = assets.get(ref); if (bytes === undefined) throw new Error(`Missing admitted material texture ${ref} (${shard.identity.slug})`);
-      const texture = await new Promise<Texture>((resolve, reject) => { loader.parse(Uint8Array.from(bytes).buffer, resolve, reject); });
+      // NB6: a named wait, so the boot timeline (and the props stall ratchet) knows the page waits on the transcoder
+      const texture = await waitFor('Material texture transcode', new Promise<Texture>((resolve, reject) => { loader.parse(Uint8Array.from(bytes).buffer, resolve, reject); }), 'worker');
       if (scope.disposed) { texture.dispose(); throw new Error('Material scope unloaded during transcode'); }
       // a splat layer is copied into its array, never uploaded itself (clientSplatTerrain)
       texture.flipY = false; texture.name = `shardfile:${ref}`;

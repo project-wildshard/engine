@@ -63,3 +63,14 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
   build:ring` + `boot-smoke --case-group=developer`: a deliberate 2 s
   sleep in data.ts's props step turned it red ("props sat 1.49 s of
   1.5 s idle"); without it, all three cases green.
+
+- NB6 Codex review: two MUST-FIXes, fixed. Idle is now spans, cut to the
+  stage, the named waits and the window (a sparse idle sample no longer
+  counts past its stage, and 5 ms rounding no longer tips the limit),
+  and the profile's clock is pinned by a 30 ms busy mark named
+  `__wildshardStallClock` (its first sample against the page time it
+  started), not by a read before an unbounded Profiler.stop round trip.
+  SHOULD done: the material catalogue's KTX2 transcode is a named wait
+  (`Material texture transcode`). Re-proof: sleep red (1.47 s of 1.5 s),
+  clean green (ring products 0.22-0.31 s); Nine at x4 0.84 s, with the
+  sleep 1.46 s.

@@ -58,7 +58,7 @@ const NAMED_OPERATIONS=new Set(['download:cache-check','app:session-code-ready',
 /** LD3: the loading waits a paste may name, exactly as the engine writes them; `GLTF decode <url>` and `Image decode
  *  <url>` name their file the way every resource is named. Any other label stays private. */
 const WAIT_LABELS=new Set(['GLTF decode (owned bytes)','GLTF decode pacing','Grid road grain','Grid road signs','Horizon paintings',
-  'Minimap','Read Model data','Read Product data','Read Product data section','Read Product descriptor','Read Program data',
+  'Material texture transcode','Minimap','Read Model data','Read Product data','Read Product data section','Read Product descriptor','Read Program data',
   'Read Texture data','Read grid session module','Spawn download','Spawn view','Startup stylesheets']);
 const SAFE_SEGMENT=/^[A-Za-z0-9._-]{1,96}$/u, CONTENT_V=/^[a-f0-9]{8,64}$/u;
 /** LD3: the build's public routes. Same origin alone does not make a file public (Codex review of ca3c1d8). */

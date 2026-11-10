@@ -17,7 +17,7 @@ import { parseArgs } from 'node:util';
 import { chromium, devices } from 'playwright';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
-import { bootTimelineEntries, profileIdle, stageStalls, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
+import { bootTimelineEntries, CLOCK_MARK_EXPRESSION, profileAnchor, profileIdle, stageStalls, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
@@ -65,11 +65,11 @@ try {
   if (!await until(control, 240_000)) throw new Error('never reached control');
   if (values.profile !== undefined) {
     // the profile's end is the page's `performance.now()` read just before the stop (its clock is the profiler's own)
-    const pageEnd = await page.evaluate('performance.now()');
+    const markPageMs = Number(await page.evaluate(CLOCK_MARK_EXPRESSION)), pageEnd = await page.evaluate('performance.now()');
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(values.profile, JSON.stringify({ pageEnd, profile }));
     // NB6: the ring-1 stall ratchet's own reading of this load (stalls.mjs), every load stage
-    const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, pageEnd);
+    const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, profileAnchor(profile, markPageMs));
     for (const row of stageStalls(entries, idle, ['product', 'sky', 'props', 'level.kit', 'weapon', 'finish', 'shaders', 'firstFrame', 'readyFrame', 'server'])) {
       console.log(`stall ratchet ${row.stage.padEnd(11)} worst ${(row.idleMs / 1000).toFixed(2)} s idle of a ${(STALL_WINDOW_MS / 1000).toFixed(1)} s window (limit ${(STALL_WINDOW_MS * STALL_IDLE_SHARE / 1000).toFixed(2)})`);
     }
@@ -133,6 +133,29 @@ try {
     const auto = r.shadowMap.autoUpdate, on = await read(); r.shadowMap.autoUpdate = false; const off = await read(); r.shadowMap.autoUpdate = auto;
     return { draws: on[0] - off[0], triangles: on[1] - off[1], allDraws: on[0], allTriangles: on[1] };
   })()`);
+  // NB5: where the frame's triangles and draws go, by material (the visible meshes in the camera's frustum: an instanced
+  // mesh counts its instances; a batched mesh its whole geometry). An estimate of what the GPU is handed, not a GPU timer.
+  const where = await page.evaluate(`(() => {
+    const g = window.__wildshard.world.game, camera = g.camera, scene = g.rootScene, rows = new Map();
+    camera.updateMatrixWorld();
+    const m = camera.projectionMatrix.clone().multiply(camera.matrixWorldInverse), planes = [];
+    const e = m.elements, plane = (a, b, c, d) => { const l = Math.hypot(a, b, c); planes.push([a / l, b / l, c / l, d / l]); };
+    plane(e[3] - e[0], e[7] - e[4], e[11] - e[8], e[15] - e[12]); plane(e[3] + e[0], e[7] + e[4], e[11] + e[8], e[15] + e[12]);
+    plane(e[3] + e[1], e[7] + e[5], e[11] + e[9], e[15] + e[13]); plane(e[3] - e[1], e[7] - e[5], e[11] - e[9], e[15] - e[13]);
+    plane(e[3] - e[2], e[7] - e[6], e[11] - e[10], e[15] - e[14]); plane(e[3] + e[2], e[7] + e[6], e[11] + e[10], e[15] + e[14]);
+    const inView = o => { if (o.frustumCulled === false) return true; const geo = o.geometry; if (!geo) return false; if (!geo.boundingSphere) geo.computeBoundingSphere?.();
+      const sph = geo.boundingSphere; if (!sph) return true; const c = sph.center.clone().applyMatrix4(o.matrixWorld), r = sph.radius * o.matrixWorld.getMaxScaleOnAxis();
+      return planes.every(([a, b, cc, d]) => a * c.x + b * c.y + cc * c.z + d >= -r); };
+    scene.traverseVisible(o => {
+      if (!(o.isMesh || o.isPoints || o.isLine) || !o.geometry) return;
+      if (!o.isInstancedMesh && !o.isBatchedMesh && !inView(o)) return;
+      const geo = o.geometry, count = geo.index ? geo.index.count : (geo.attributes.position?.count ?? 0), n = o.isInstancedMesh ? o.count : 1;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const name = (mats[0]?.name || mats[0]?.type || '?').slice(0, 48);
+      const row = rows.get(name) ?? { name, draws: 0, tris: 0 }; row.draws += mats.length; row.tris += Math.round(count / 3) * n; rows.set(name, row);
+    });
+    return [...rows.values()].sort((a, b) => b.tris - a.tris).slice(0, 15);
+  })()`);
   /** @param {number} ms */
   const s = ms => `${(ms / 1000).toFixed(1)} s`;
   /** @param {number} n */
@@ -146,8 +169,9 @@ try {
   console.log(`script memory bank: at control ${bank(load.scriptMemory)} · after play ${bank(play.scriptMemory)}`);
   console.log(`readyFrame unlogged >= 200 ms: ${load.readyGaps.length === 0 ? 'none' : load.readyGaps.map((/** @type {{ ms: number, from: number }} */ g) => `${s(g.ms)} at +${s(g.from)}`).join(', ')}`);
   console.log(`play ${seconds} s: ${f(play.all.fps)} fps · frame p50 ${f(play.all.p50)} / p95 ${f(play.all.p95)} ms · gpu~ p50 ${f(play.all.gpu50)} / p95 ${f(play.all.gpu95)} ms · ${play.draws} draws · ${(play.triangles / 1e6).toFixed(2)} M tris · pixel ratio ${play.pixelRatio}`);
+  console.log('triangles by material (visible, in view):'); for (const row of where) console.log(`  ${row.name.padEnd(48)} ${(row.tris / 1e6).toFixed(3)} M · ${row.draws} draws`);
   console.log(`shadow pass: ${shadow.draws} of ${shadow.allDraws} draws · ${(shadow.triangles / 1e6).toFixed(2)} of ${(shadow.allTriangles / 1e6).toFixed(2)} M tris`);
   play.minutes.forEach((/** @type {{ fps: number, p95: number, gpu95: number, draws95: number, tris95: number }} */ m, /** @type {number} */ i) => { console.log(`  minute ${String(i + 1).padStart(2)}: ${f(m.fps)} fps · p95 ${f(m.p95)} ms · gpu~ p95 ${f(m.gpu95)} ms · draws p95 ${m.draws95} · tris p95 ${(m.tris95 / 1e6).toFixed(2)} M`); });
   if (seconds <= 120) play.tens.forEach((/** @type {{ fps: number, p95: number, gpu95: number }} */ t, /** @type {number} */ i) => { console.log(`  ${String(i * 10).padStart(3)}-${String(i * 10 + 10).padEnd(3)} s: ${f(t.fps)} fps · p95 ${f(t.p95)} ms · gpu~ p95 ${f(t.gpu95)} ms`); });
-  if (values.json !== undefined) writeFileSync(values.json, `${JSON.stringify({ shard: titles[target], base, throttle, dpr: values.dpr, load, play, shadow }, null, 1)}\n`);
+  if (values.json !== undefined) writeFileSync(values.json, `${JSON.stringify({ shard: titles[target], base, throttle, dpr: values.dpr, load, play, shadow, where }, null, 1)}\n`);
 } finally { await browser.close(); }
