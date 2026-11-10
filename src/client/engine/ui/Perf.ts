@@ -1,5 +1,6 @@
 import { appIdentity, currentProbe } from '../../../shared/engine/app/identity';
 import { uiScope, mountUi } from './ownership';
+import { perfDockChip, perfDockSections } from './perfDock';
 import { engineString } from '../../../shared/engine/strings';
 import { saveStorage } from '../saves/slots';
 /**
@@ -87,7 +88,10 @@ export class Perf {
     const liveFps = livePill?.querySelector<HTMLElement>('b'), liveMs = livePill?.querySelector<HTMLElement>('span');
     if (livePill === null || liveFps === null || liveFps === undefined || liveMs === null || liveMs === undefined) throw new Error('Perf: missing live pill');
     this.live = { box: livePill, fps: liveFps, ms: liveMs };
-    mountUi(root, this.scope, document.body); mountUi(panel, this.scope, document.body);
+    // A14: the pill is the Developer dock's first chip (the memory card sits beside it); the other readouts' sections open
+    // with the panel, right under its header
+    perfDockChip(root, this.scope, 0); mountUi(panel, this.scope, document.body);
+    panel.querySelector('.ws-perf-head')?.after(perfDockSections());
     // the pill is a button on phones: toggle on the lift; cancel its touches (iOS double-tap zoom / callout / selection)
     // and never let them reach the look layer. The panel closes on a tap on it or anywhere else (not cancelled, so a
     // look drag that starts outside still looks).

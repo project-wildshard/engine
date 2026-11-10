@@ -1,6 +1,8 @@
 /**
- * The memory strip (SHARD-PLATFORM SF38 / G30, rebuilt by G628's memory-strip rows M1 / M3 / M5 / M7): Developer mode only,
- * grid pages only. One line under the top bar: the page's memory headline against the phone's crash line, in plain words
+ * The memory card (SHARD-PLATFORM SF38 / G30, rebuilt by G628's memory-strip rows M1 / M3 / M5 / M7): Developer mode only,
+ * grid pages only. A14 (Jake, 2026-11-10: "MEM becomes a really small card at the top, labelled mem, right next to the FPS
+ * chip"): a chip on the Developer dock (`perfDock.ts`) reading "mem 1.46" (GB), toned by its band, with a red "!" while a
+ * shard is over its limit. A tap drops the panel: the headline against the phone's crash line, in plain words
  * ("MEM ≈1.46 GB / 2.05 · 3 WORLDS · +440 MB SINCE START"), its colour the danger band (amber from 1.5 GB, red from
  * 1.75 GB: D1, against the 17 Pro's ~2.05 GB WebContent jetsam line), and one red line per loaded shard over its own limit
  * (M4, `memoryWarning.ts`). The headline is the larger of the cost model (`allocator.cost().playing`) and what this page
@@ -16,7 +18,7 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { isDev, onDev } from '@wildshard/engine/core/devMode';
-import { mountUi } from '@wildshard/engine/ui/ownership';
+import { perfDockChip } from '@wildshard/engine/ui/perfDock';
 import { memoryAttribution, type MemorySnapshot } from '@wildshard/engine/core/memoryAttribution';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { budgetBreakdown, megabytes, PLATFORM_OWNER, readBudgetPoints, type BudgetPoints, type PointsTone } from './budgetPoints';
@@ -36,7 +38,6 @@ export const BUDGET_REFRESH_MS = 1000;
 
 export interface BudgetOverlayHost {
   readonly scope: Scope;
-  readonly hudRoot: HTMLElement;
   readonly allocator: Pick<ResidencyAllocator, 'entries' | 'cost'>;
   /** an owner (a cell instance) to its shard's display name; the platform is the road */
   readonly name: (owner: string) => string;
@@ -101,7 +102,7 @@ function section(title: string, ...rows: HTMLElement[]): HTMLElement {
 /** Install the strip on a grid page; everything leaves with the scope. */
 export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   const { scope } = host;
-  let root: HTMLElement | null = null, bar: HTMLElement | null = null, detail: HTMLElement | null = null;
+  let root: HTMLElement | null = null, gb: HTMLElement | null = null, alert: HTMLElement | null = null, bar: HTMLElement | null = null, detail: HTMLElement | null = null, more: HTMLElement | null = null;
   let timer: ReturnType<typeof setInterval> | 0 = 0, expanded = false, last: BudgetPoints | null = null, head: MemoryHeadline | null = null, signature = '';
   let group: MemoryGrouping = 'owner', sort: MemorySort = 'total';
   let allocationScope: Scope | null = null;
@@ -152,7 +153,7 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   };
   const paint = (points: BudgetPoints, headline: MemoryHeadline, parts: ReturnType<typeof budgetBreakdown>, memory: MemorySnapshot | null,
     over: readonly { readonly owner: string; readonly overBytes: number }[]): void => {
-    if (bar === null || detail === null) return;
+    if (root === null || gb === null || alert === null || bar === null || more === null) return;
     const worlds = parts.worlds.length, start = trend[0];
     const since = start === undefined ? '' : ` · ${headline.bytes >= start ? '+' : '−'}${Math.round(Math.abs(headline.bytes - start) / 1e6)} MB SINCE START`;
     const line = el('span', 'ws-grid-budget-x', `MEM ≈${GB(headline.bytes)} GB / ${GB(CRASH_LINE)} · ${worlds} ${worlds === 1 ? 'WORLD' : 'WORLDS'}${since}`);
@@ -162,7 +163,10 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
       data(node, 'tone', 'red'); data(node, 'owner', owner); data(node, 'over-bytes', overBytes); return node;
     });
     bar.replaceChildren(line, ...lines);
-    if (!expanded) { allocationScope?.dispose(); allocationScope = null; detail.replaceChildren(); return; }
+    gb.textContent = GB(headline.bytes); data(gb, 'tone', headline.tone);
+    alert.hidden = over.length === 0; alert.textContent = over.length > 1 ? `!${String(over.length)}` : '!';
+    root.setAttribute('aria-label', line.textContent ?? '');
+    if (!expanded) { allocationScope?.dispose(); allocationScope = null; more.replaceChildren(); return; }
     const total = section(`MEMORY ≈${GB(headline.bytes)} GB OF ~${GB(CRASH_LINE)} GB CRASH LINE`,
       row('MODEL (CLAIMS)', MB(headline.model), headline.source === 'model' ? headline.tone : null),
       row('MEASURED', headline.measured === null ? 'NOTHING OBSERVED' : MB(headline.measured), headline.source === 'model' ? null : headline.tone));
@@ -176,7 +180,7 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
       const r = row(label(shard.owner).toUpperCase(), `${limit.playingPoints}% · ${Math.round(limit.playing / 1e6)} / ${Math.round(limit.playingCap / 1e6)} MB`, limit.tone);
       data(r, 'owner', shard.owner); data(r, 'limit-playing', limit.playing); return [r];
     }));
-    detail.replaceChildren(total, owned, shared, kept, limits, ...(memory === null ? [] : [memorySection(memory)]));
+    more.replaceChildren(total, owned, shared, kept, limits, ...(memory === null ? [] : [memorySection(memory)]));
   };
 
   function refresh(): void {
@@ -210,12 +214,15 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   };
   const build = (): void => {
     root = el('div', 'ws-grid-budget'); root.setAttribute('role', 'button'); root.setAttribute('aria-expanded', 'false'); root.tabIndex = -1;
-    bar = el('div', 'ws-grid-budget-bar'); detail = el('div', 'ws-grid-budget-detail'); detail.hidden = true;
-    root.append(bar, detail);
-    // the strip takes its own taps; the touch controls under it never see them
+    gb = el('b', 'ws-grid-budget-gb', '—'); alert = el('i', 'ws-grid-budget-alert', '!'); alert.hidden = true;
+    // the panel: the headline and the over-limit lines, then (expanded) the breakdown
+    bar = el('div', 'ws-grid-budget-bar'); more = el('div', 'ws-grid-budget-more'); detail = el('div', 'ws-grid-budget-detail'); detail.hidden = true;
+    detail.append(bar, more);
+    root.append(el('i', 'ws-grid-budget-label', 'mem'), gb, alert, detail);
+    // the card takes its own taps; the touch controls under it never see them
     scope.listen(root, 'pointerdown', (event: Event) => { event.stopPropagation(); });
     scope.listen(root, 'click', (event: Event) => { event.stopPropagation(); toggle(); });
-    mountUi(root, scope, host.hudRoot);
+    perfDockChip(root, scope, 10);
   };
   const sync = (on: boolean): void => {
     if (scope.disposed) return;

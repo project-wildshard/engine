@@ -125,12 +125,13 @@
 .ws-game-prompt.show { opacity: 1; }
 .ws-game-prompt b { color: var(--ws-cyan); font-weight: 500; border: 1px solid var(--ws-cyan-line); padding: 1px 6px; margin-right: 8px; }
 
-/* ── boundary warning ── */
-.ws-game-boundary { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.6s ease; }
-.ws-game-boundary.show { opacity: 1; }
-.ws-game-boundary .ws-game-bt { font-family: var(--ws-display); font-weight: 700; font-size: 22px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ws-amber); text-shadow: 0 0 18px rgba(255, 181, 71, 0.45), 0 2px 6px rgba(0, 0, 0, 0.8); }
-.ws-game-boundary .ws-game-bs { margin-top: 5px; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(255, 181, 71, 0.75); }
-.ws-game-boundary::before, .ws-game-boundary::after { content: ''; display: block; width: 100%; height: 1px; margin: 6px 0; background: repeating-linear-gradient(90deg, var(--ws-amber) 0 14px, transparent 14px 24px); opacity: 0.6; }
+/* ── boundary warning (Developer only). A14: a block in the frame meter's panel (perfDock.ts); while it shows, the fps pill
+   carries a red "!". It was a 22 px title over the world at 22 % down, over the quest chip ── */
+.ws-game-boundary { display: none; padding: 2px 8px; text-align: left; }
+.ws-game-boundary.show { display: block; }
+.ws-game-boundary .ws-game-bt { font-family: var(--ws-display); font-weight: 700; font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ws-amber); }
+.ws-game-boundary .ws-game-bs { margin-top: 3px; font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; white-space: normal; color: rgba(255, 181, 71, 0.75); }
+.ws-game-boundary::before, .ws-game-boundary::after { content: ''; display: block; width: 100%; height: 1px; margin: 3px 0; background: repeating-linear-gradient(90deg, var(--ws-amber) 0 14px, transparent 14px 24px); opacity: 0.6; }
 
 /* ── toasts ── */
 /* A1 (E130, board art/hud/round-10-toast-placement/board.jpg): right-aligned directly under the quest chip — HUD.toast() reads
@@ -156,7 +157,7 @@
 .ws-game-hitring.show { animation: ws-ring 0.35s ease-out forwards; }
 
 /* play-mode HUD hides while the intro (menu.css) is up */
-#hud.intro .ws-game-compass, #hud.intro .ws-game-health, #hud.intro .ws-game-ammo, #hud.intro .ws-game-cross, #hud.intro .ws-game-feed, #hud.intro .ws-game-prompt, #hud.intro .ws-game-boundary, #hud.intro .ws-game-toasts { opacity: 0; transition: opacity 0.4s; }
+#hud.intro .ws-game-compass, #hud.intro .ws-game-health, #hud.intro .ws-game-ammo, #hud.intro .ws-game-cross, #hud.intro .ws-game-feed, #hud.intro .ws-game-prompt, #hud.intro .ws-game-toasts { opacity: 0; transition: opacity 0.4s; }
 #hud .ws-game-compass, #hud .ws-game-health, #hud .ws-game-ammo, #hud .ws-game-feed { transition: opacity 0.6s ease 0.2s; }
 #hud .ws-game-cross { transition: opacity 0.15s ease; } /* snappy both ways for the ADS fade (was on the 0.6 s intro reveal above) */
 
@@ -278,12 +279,12 @@
   .ws-game-getlow i { width: 16px; height: 16px; }
 }
 
-/* E373: hidden-level notice; no input surface, stays clear of the touch controls. */
-.ws-game-developer { position: absolute; left: 50%; top: calc(var(--ws-top, 16px) + 116px); transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 5px 9px; border: 1px solid var(--ws-cyan); background: rgba(13, 27, 38, 0.8); color: var(--ws-cyan); font-family: var(--ws-mono); font-size: 9px; line-height: 1.3; letter-spacing: 0.09em; white-space: nowrap; pointer-events: none; }
-.ws-game-developer[hidden], #hud.intro .ws-game-developer { display: none; }
-/* G168 (art/hud/round-22-script-error C): the Developer-only red strip naming a disabled script and its cause, full width under
-   the top bar; the DEV chip is drawn here, the line is the game's (textContent). */
-.ws-game-dev-alert { position: absolute; left: 6px; right: 6px; top: calc(var(--ws-top, 16px) + 84px); z-index: calc(var(--ws-layer-hud) + 6); display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid rgba(255, 90, 74, 0.9); background: rgba(48, 6, 8, 0.86); box-shadow: 0 0 12px rgba(255, 90, 74, 0.35); color: #ff8a7e; font-family: var(--ws-mono); font-size: 9px; line-height: 1.3; letter-spacing: 0.1em; white-space: nowrap; overflow: hidden; pointer-events: none; }
+/* E373: hidden-level notice. A14: a line in the frame meter's panel (perfDock.ts), never over the world. */
+.ws-game-developer { padding: 4px 8px; border: 1px solid var(--ws-cyan); background: rgba(13, 27, 38, 0.8); color: var(--ws-cyan); font-family: var(--ws-mono); font-size: 9px; line-height: 1.3; letter-spacing: 0.09em; white-space: normal; pointer-events: none; }
+.ws-game-developer[hidden] { display: none; }
+/* G168 (art/hud/round-22-script-error C): the Developer-only red alert naming a disabled script and its cause; the DEV chip is
+   drawn here, the line is the game's (textContent). A14: the first section of the frame meter's panel (it was a full-width strip
+   over the minimap); while it shows, the fps pill carries a red "!". The line wraps: the panel is narrow. */
+.ws-game-dev-alert { display: flex; align-items: flex-start; gap: 8px; padding: 4px 8px; border: 1px solid rgba(255, 90, 74, 0.9); background: rgba(48, 6, 8, 0.86); color: #ff8a7e; font-family: var(--ws-mono); font-size: 9px; line-height: 1.3; letter-spacing: 0.1em; white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
 .ws-game-dev-alert::before { content: 'DEV'; flex: none; padding: 1px 6px; background: var(--ws-red); color: #1a0203; font-weight: 700; letter-spacing: 0.14em; }
-.ws-game-dev-alert span { overflow: hidden; text-overflow: ellipsis; }
-.ws-game-dev-alert[hidden], #hud.intro .ws-game-dev-alert { display: none; }
+.ws-game-dev-alert[hidden] { display: none; }

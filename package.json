@@ -569,6 +569,7 @@
     "./ui/ItemCard": "./src/client/engine/ui/ItemCard.ts",
     "./ui/layers": "./src/client/engine/ui/layers.ts",
     "./ui/ownership": "./src/client/engine/ui/ownership.ts",
+    "./ui/perfDock": "./src/client/engine/ui/perfDock.ts",
     "./ui/playerDeath": "./src/client/engine/ui/playerDeath.ts",
     "./ui/playerHurt": "./src/client/engine/ui/playerHurt.ts",
     "./ui/review": "./src/client/engine/ui/review.ts",

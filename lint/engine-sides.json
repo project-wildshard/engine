@@ -448,6 +448,7 @@
     "src/client/engine/ui/ownership.ts": "client",
     "src/client/engine/ui/panel.ts": "client",
     "src/client/engine/ui/Perf.ts": "client",
+    "src/client/engine/ui/perfDock.ts": "client",
     "src/client/engine/ui/perfHud.ts": "client",
     "src/client/engine/ui/perfLap.ts": "client",
     "src/client/engine/ui/perfLapSummary.ts": "client",

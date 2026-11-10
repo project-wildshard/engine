@@ -1,6 +1,10 @@
 /* frame meter (src/client/engine/ui/Perf.ts) — one small line top-right on desktop; on phones a compact pill on PAUSE's row that opens a
    details panel over the minimap (E47) */
-.ws-perf { position: fixed; right: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); z-index: calc(var(--ws-layer-hud) + 55); display: flex; align-items: baseline; gap: 5px; margin: 0; padding: 2px 5px; border: 0; appearance: none; -webkit-appearance: none; pointer-events: none; font-family: var(--ws-mono); font-size: 8px; letter-spacing: 0.04em; line-height: 1; text-align: left; color: rgba(196, 220, 232, 0.55); background: rgba(6, 10, 18, 0.45); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* A14 (Jake, 2026-11-10: "the screen is chaotic"): the Developer dock (src/client/engine/ui/perfDock.ts), one row that holds the
+   pill and the other readouts' small cards (the memory card); it takes no touch itself, its cards do */
+.ws-perf-dock { position: fixed; right: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); z-index: calc(var(--ws-layer-hud) + 55); display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.ws-perf-dock:empty { display: none; }
+.ws-perf { position: relative; display: flex; align-items: baseline; gap: 5px; margin: 0; padding: 2px 5px; border: 0; appearance: none; -webkit-appearance: none; pointer-events: none; font-family: var(--ws-mono); font-size: 8px; letter-spacing: 0.04em; line-height: 1; text-align: left; color: rgba(196, 220, 232, 0.55); background: rgba(6, 10, 18, 0.45); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ws-perf b { font-family: var(--ws-mono); font-weight: 500; font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.85); }
 .ws-perf b::after { content: ' fps'; font-size: 8px; font-weight: 400; color: rgba(196, 220, 232, 0.55); }
 .ws-perf.slow b { color: #ffd27a; }
@@ -8,13 +12,25 @@
 .ws-perf.bad .ws-perf-ms, .ws-perf-live.bad span { color: #ff7a6b; }
 .ws-perf[hidden] { display: none; }
 /* QA11 (Jake, 2026-10-29: "don't show the FPS counter on the loading screen"): in play only, never on the title or a loading screen */
-:root:has(.ws-load, #hud.intro) .ws-perf, :root:has(.ws-load, #hud.intro) .ws-perf-panel { display: none; }
+:root:has(.ws-load, #hud.intro) .ws-perf-dock, :root:has(.ws-load, #hud.intro) .ws-perf-panel { display: none; }
 .ws-perf .ws-perf-ms { display: none; }
+/* A14: the other Developer readouts (perfDock.ts sections) open with the panel, under its header: an alert first, then the
+   worker client's net block (clientWorker.ts) */
+.ws-perf-sections { display: flex; flex-direction: column; gap: 4px; padding: 5px 0; border-bottom: 1px solid rgba(143, 227, 255, 0.12); }
+.ws-perf-sections:empty { display: none; }
+.ws-perf-section { margin: 0; }
+.ws-perf-net { font-family: var(--ws-mono); font-size: 7.5px; line-height: 1.32; white-space: pre; overflow-x: auto; color: var(--ws-text); }
+/* the pill's red mark while a section asks for attention (a disabled script, a memory limit) */
+.ws-perf-dock.alert .ws-perf { border-color: #ff7a6b; }
+.ws-perf-dock.alert .ws-perf::before { content: '!'; position: absolute; left: -5px; top: -5px; padding: 1px 3px; background: #ff7a6b; color: #1a0203; font-weight: 700; font-size: 8px; line-height: 1; } /* a corner badge: the row keeps its width */
 .ws-perf-panel { display: none; }
-@media (max-width: 700px) {
+/* A14: a touch screen in landscape is a phone too (the pill and its panel, not the desktop's click-through line) */
+@media (max-width: 700px), (pointer: coarse) {
   /* phone (E47): "59 fps 17 ms" in a glass pill the height of PAUSE, just right of it on the same row (PAUSE's 44 px hit
-     area ends 6 px past its edge, this pill starts 8 px past it). A tap opens the panel; the pill never passes a touch on. */
-  .ws-perf { left: 101px; right: auto; top: var(--ws-top); height: 24px; box-sizing: border-box; align-items: center; gap: 6px; padding: 0 10px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 8.5px; letter-spacing: 0.08em; pointer-events: auto; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-tap-highlight-color: transparent; transition: border-color 0.12s, background 0.12s; }
+     area ends 6 px past its edge, the dock starts 8 px past it). A tap opens the panel; the pill never passes a touch on.
+     A14: the memory card follows it on the row, which ends left of the minimap at 402 px */
+  .ws-perf-dock { left: 101px; right: auto; top: var(--ws-top); gap: 5px; }
+  .ws-perf { height: 24px; box-sizing: border-box; align-items: center; gap: 4px; padding: 0 6px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 8.5px; letter-spacing: 0.03em; pointer-events: auto; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-tap-highlight-color: transparent; transition: border-color 0.12s, background 0.12s; }
   .ws-perf::after { content: ''; position: absolute; inset: -10px -4px -10px 0; } /* ≥ 44 px hit target */
   .ws-perf * { pointer-events: none; }
   .ws-perf .ws-perf-long { display: none; }
@@ -54,6 +70,13 @@
   .ws-perf-panel .ws-perf-abs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
   .ws-perf-panel .ws-perf-ab { margin: 0; padding: 5px 7px; }
   .ws-perf-panel .ws-perf-ab.off { background: var(--ws-cyan); color: #06121a; }
+}
+/* A14: desktop has no panel (its line is click-through); the alerts and labels a phone keeps in the panel stand at the top left,
+   where nothing else sits on desktop, and the net block stays a phone's tap away */
+@media (min-width: 701px) and (pointer: fine) {
+  .ws-perf-panel:has(.ws-perf-section:not([hidden]):not(.ws-perf-net)) { display: block; position: fixed; left: 12px; top: calc(10px + env(safe-area-inset-top, 0px)); z-index: calc(var(--ws-layer-hud) + 55); width: min(420px, 36vw); pointer-events: none; }
+  .ws-perf-panel > :not(.ws-perf-sections), .ws-perf-panel .ws-perf-net { display: none; }
+  .ws-perf-panel .ws-perf-sections { border: 0; }
 }
 /* E350 F-J1: the PERF LAP's progress line (src/client/engine/ui/perfLap.ts) — top centre, under the safe area, over the HUD; the panel is
    closed while the lap runs, so this is all it draws (one text write a second) */

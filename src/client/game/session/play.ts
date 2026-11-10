@@ -131,7 +131,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   const leakPhysics = world.physics; // The borrowed page world outlives temporary active frames.
   // G628 M4: a shard page's Developer warning chip; a grid page's resident over-limit is a line of its memory strip instead,
   // and a neighbour's cold estimate shows nowhere (the G217 blocked cell screen reads the policy, not the chip)
-  if (session.memory !== undefined && pageMode() !== 'grid') installMemoryWarning(session.memory, game.levelScope, hud.root, manifest.slug);
+  if (session.memory !== undefined && pageMode() !== 'grid') installMemoryWarning(session.memory, game.levelScope, manifest.slug);
 
   let playground: Playground | null = null;
   const away = (): boolean => getArena()?.entered === true || playground?.entered === true;
@@ -619,7 +619,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     for (const cell of grid.assembly.cells) slugCount.set(cell.slug, (slugCount.get(cell.slug) ?? 0) + 1);
     const cellName = new Map(grid.assembly.cells.map((cell) => { const name = findShard(cell.slug)?.name ?? cell.slug; return [cell.instance, (slugCount.get(cell.slug) ?? 0) > 1 ? `${name} ${cell.cell[0]},${cell.cell[1]}` : name]; }));
     const memory = session.memory;
-    const budget = installBudgetOverlay({ scope: game.levelScope, hudRoot: hud.root, allocator: grid.allocator, name: (owner) => cellName.get(owner) ?? owner, shard: (owner) => cellName.has(owner),
+    const budget = installBudgetOverlay({ scope: game.levelScope, allocator: grid.allocator, name: (owner) => cellName.get(owner) ?? owner, shard: (owner) => cellName.has(owner),
       ...(memory === undefined ? {} : { overLimit: () => residentOverLimit(memory) }) });
     // G628 M7: the strip's trend reads the headline at each cell entry
     game.levelScope.onDispose(gridCells.onEnter(() => { budget.crossed(); }));

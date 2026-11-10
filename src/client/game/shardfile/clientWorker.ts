@@ -28,7 +28,7 @@ import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { ANIMAL_STATES } from '@wildshard/engine/entities/animalStates';
 import { creatureBodyShape } from '@wildshard/engine/sim/bands';
 import { lockOn } from '@wildshard/engine/player/AimTargets';
-import { hudSlots } from '@wildshard/engine/ui/hudSlots';
+import { perfDockSection } from '@wildshard/engine/ui/perfDock';
 import { isDev } from '@wildshard/engine/core/devMode';
 import { showError } from '@wildshard/engine/ui/ErrorModal';
 import { saveSetting, type OptionValue } from '@wildshard/engine/ui/Settings';
@@ -206,19 +206,12 @@ function showRows(client: NetClient, net: NetPlayer, ports: WorkerClientPorts, b
 }
 
 function overlay({ scope }: Pick<WorkerClientPorts, 'scope'>): (text: string) => void {
-  const line = document.createElement('pre');
-  line.style.cssText = 'position:fixed;left:8px;top:150px;margin:0;padding:4px 6px;pointer-events:none;font:11px/1.3 ui-monospace,monospace;color:#fff;background:#0009;white-space:pre';
-  hudSlots.widget('band.3', line, 90, scope);
-  // QA row 10: the grid's memory strip (.ws-grid-budget) shares this top left; the text steps down below it. Once a second.
-  // The text is measured, not the box: the status row's box is one line tall and the lines overflow it.
-  const range = document.createRange();
-  return text => {
-    line.textContent = text;
-    const strip = document.querySelector<HTMLElement>('.ws-grid-budget'), below = strip === null || strip.hidden === true ? 0 : strip.getBoundingClientRect().bottom;
-    range.selectNodeContents(line);
-    const at = Number.parseFloat(line.style.top), textTop = range.getBoundingClientRect().top - (at - 150);
-    line.style.top = `${150 + Math.max(0, Math.ceil(below + 4 - textTop))}px`;
-  };
+  // A14 (Jake, 2026-11-10: "all the net debug text moves into the FPS box"): a section of the frame meter's panel, under its
+  // header; a tap on the fps pill opens it. Nothing of it is drawn over the world.
+  const block = document.createElement('pre');
+  block.className = 'ws-perf-net';
+  perfDockSection(block, scope, 10);
+  return text => { if (block.textContent !== text) block.textContent = text; };
 }
 
 async function readWorker(shell: Shell, report: WorkerClientReport): Promise<void> { report.workerTickMs = (await shell.probe()).tickMs; }

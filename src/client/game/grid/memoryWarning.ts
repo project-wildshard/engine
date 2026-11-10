@@ -1,6 +1,6 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { isDev, onDev } from '@wildshard/engine/core/devMode';
-import { mountUi } from '@wildshard/engine/ui/ownership';
+import { perfDockAlert, perfDockSection } from '@wildshard/engine/ui/perfDock';
 import type { MemoryAdmission, MemoryAdmissionWarning } from '@wildshard/format/memoryAdmission';
 import './memoryWarning.css';
 
@@ -36,13 +36,14 @@ export function memoryWarningLines(row: MemoryAdmissionWarning): readonly string
   ];
 }
 /**
- * G216 / E332: one scope-owned warning on an entered shard's HUD. The trusted policy also feeds G217's separate blocked
+ * G216 / E332: one scope-owned warning on an entered shard's HUD. A14: a section of the frame meter's panel (`perfDock.ts`); while
+ * it shows, the fps pill carries a red "!". The trusted policy also feeds G217's separate blocked
  * cell screen. The warning starts as a tappable chip; only its chip and expanded details receive pointers. Full numeric reports stay available.
  * Cold estimates show only for the entered shard; resident violations remain visible for every loaded shard.
  * The returned setter follows existing cell transitions; reports and admission policy stay unchanged.
  * No timer, control movement, authored HTML or additional admission runs; public pages create no panel.
  */
-export function installMemoryWarning(memory: MemoryAdmission, scope: Scope, hudRoot: HTMLElement, initialOwner: string | null): (owner: string | null) => void {
+export function installMemoryWarning(memory: MemoryAdmission, scope: Scope, initialOwner: string | null): (owner: string | null) => void {
   let entered = initialOwner;
   let surface: { root: HTMLElement; chip: HTMLButtonElement; details: HTMLElement } | undefined;
   const createSurface = (): { root: HTMLElement; chip: HTMLButtonElement; details: HTMLElement } => {
@@ -50,7 +51,7 @@ export function installMemoryWarning(memory: MemoryAdmission, scope: Scope, hudR
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'ws-memory-warning-chip';
     chip.setAttribute('aria-expanded', 'false');
     const details = document.createElement('div'); details.className = 'ws-memory-warning-details'; details.hidden = true;
-    root.append(chip, details); mountUi(root, scope, hudRoot);
+    root.append(chip, details); perfDockSection(root, scope, -5);
     scope.listen(root, 'pointerdown', (event: Event) => { event.stopPropagation(); });
     scope.listen(chip, 'click', (event: Event) => {
       event.stopPropagation(); const expanded = details.hidden !== false; details.hidden = !expanded; chip.setAttribute('aria-expanded', String(expanded));
@@ -61,9 +62,9 @@ export function installMemoryWarning(memory: MemoryAdmission, scope: Scope, hudR
   const refresh = (): void => {
     if (scope.disposed || scope.disposing) return;
     const reports = memory.reports().filter(report => report.stage === 'resident' || report.owner === entered);
-    if (!isDev() || reports.length === 0) { if (surface !== undefined) surface.root.hidden = true; return; }
+    if (!isDev() || reports.length === 0) { if (surface !== undefined) { surface.root.hidden = true; perfDockAlert(surface.root, scope, false); } return; }
     surface ??= createSurface();
-    surface.root.hidden = false;
+    surface.root.hidden = false; perfDockAlert(surface.root, scope, true);
     surface.chip.textContent = memoryWarningChip(reports);
     const title = document.createElement('b'); title.textContent = 'DEVELOPER · MEMORY LIMIT EXCEEDED';
     const rows = reports.map(report => {

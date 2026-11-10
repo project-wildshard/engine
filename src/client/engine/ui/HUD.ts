@@ -9,6 +9,7 @@ import type { GameMenu } from './Menu';
 import { openBootSettings } from './BootSettings';
 import { isDev, onDev } from '../core/devMode';
 import { mountDeveloperAlert, mountDeveloperBanner } from './developerBanner';
+import { perfDockAlert, perfDockSection } from './perfDock';
 import { ToastStack, type ToastTone } from './ToastStack';
 import { ItemCardPop, type ItemCardSpec } from './ItemCard';
 import { ROW, hudSlots } from './hudSlots';
@@ -231,7 +232,7 @@ export class HUD {
 
   private build(): void {
     const r = this.root;
-    mountDeveloperBanner(r, this.scope, this.opts.developerBanner);
+    mountDeveloperBanner(this.scope, this.opts.developerBanner);
     // (the desktop chunk panel — chunk:// id, grid, pos, "local build" — is gone: E140, the user's verdict on dead item 1)
 
     // compass: a slim band; the strip sits at the band's centre and slides by the heading (see setState)
@@ -293,7 +294,8 @@ export class HUD {
     this.aim = el('div', engineString('s_d1e1eef88c48')); mountUi(this.aim, this.scope, r);
 
     this.prompt = el('div', engineString('s_98730d3255b2')); mountUi(this.prompt, this.scope, r);
-    this.boundary = el('div', engineString('s_befab9df4f5c'), engineString('s_9029b332a959')); mountUi(this.boundary, this.scope, r);
+    // A14: Developer-only, so a section of the frame meter's panel (perfDock.ts) with the pill's red mark, not a title over the world
+    this.boundary = el('div', engineString('s_befab9df4f5c'), engineString('s_9029b332a959')); this.boundary.hidden = true; perfDockSection(this.boundary, this.scope, -8);
     const toasts = el('div', engineString('s_dcccdb8a40d1')); mountUi(toasts, this.scope, r); this.toasts = new ToastStack(toasts); this.toastBox = toasts;
     this.flash = el('div', engineString('s_18547caf898d')); mountUi(this.flash, this.scope, r);
 
@@ -576,7 +578,7 @@ export class HUD {
 
   /** A red strip under the top bar, shown only with Settings ▸ Developer on (G168: the technical reason behind a player toast).
    *  The text is content-supplied and set through textContent; a new alert replaces the last. */
-  devAlert(text: string): void { (this.alert ??= mountDeveloperAlert(this.root, this.scope))(text); }
+  devAlert(text: string): void { (this.alert ??= mountDeveloperAlert(this.scope))(text); }
   private alert: ((text: string) => void) | undefined;
 
   /** the level's HUD accent for the big item cards (a hex; null: the HUD cyan) — the game sets it from the level's declared accent */
@@ -604,7 +606,12 @@ export class HUD {
   damageFlash(): void { this.flash.classList.remove('show'); void this.flash.offsetWidth; this.flash.classList.add('show'); }
   /** developer mode only (E140, the user's verdict on dead item 2): players get no edge warning. main.ts calls this every
    *  frame, so the Developer switch shows / hides it live. */
-  setBoundaryWarning(visible: boolean): void { this.boundary.classList.toggle('show', visible && isDev()); }
+  private boundaryShown = false;
+  setBoundaryWarning(visible: boolean): void {
+    const on = visible && isDev();
+    if (on === this.boundaryShown) return; // play.ts calls this every frame
+    this.boundaryShown = on; this.boundary.hidden = !on; this.boundary.classList.toggle('show', on); perfDockAlert(this.boundary, this.scope, on);
+  }
 
   set menu(m: GameMenu) { this._menu = m; m.onClose = () => { this.onResume?.(); tap.resumed?.(); }; m.onExit = () => { if (m.inPractice) this.exitToExplore(); else this.exitToMenu(); }; }
   get menu(): GameMenu { const m = this._menu; if (!m) throw new Error('HUD: no menu attached (hud.menu = …)'); return m; }

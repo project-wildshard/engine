@@ -8,6 +8,7 @@ import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { memoryAttribution, type MemorySnapshot } from '@wildshard/engine/core/memoryAttribution';
 import { installBudgetOverlay, memoryHeadline } from './budgetOverlay';
 import { installMemoryWarning } from './memoryWarning';
+import { perfDockSections } from '@wildshard/engine/ui/perfDock';
 
 const scopes: Scope[] = [];
 const owner = (): Scope => { const scope = new Scope('memory-diagnostics'); scopes.push(scope); return scope; };
@@ -18,14 +19,20 @@ const observed = (gpu: number, ram: number): MemorySnapshot => ({ version: 1, al
 
 test('G628 M1/M3: one line, the page headline in its danger band; the shard limit only when expanded', () => {
   setDev(true);
-  const scope = owner(), hud = document.createElement('div'), bytes = 321_621_621;
-  document.body.append(hud);
+  const scope = owner(), hud = document.body, bytes = 321_621_621;
   const input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: bytes, commons: 0, overlap: 80_000_000 };
-  const overlay = withOwner(scope, () => installBudgetOverlay({ scope, hudRoot: hud, name: () => 'Driftwood Isle', memory: () => observed(0, 0),
+  const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Driftwood Isle', memory: () => observed(0, 0),
     allocator: { entries: () => [sim('dw', bytes)], cost: () => ({ ...contentCost(input), input }) } }));
   const line = hud.querySelector<HTMLElement>('.ws-grid-budget-x');
   expect(line?.textContent).toBe(`MEM ≈${(contentCost(input).playing / 1e9).toFixed(2)} GB / 2.05 · 1 WORLD`);
   expect(line?.dataset['tone']).toBe('green');
+  // A14: the card on the Developer dock reads "mem 0.70", toned; the headline above waits in its panel
+  const card = document.querySelector<HTMLElement>('.ws-perf-dock .ws-grid-budget');
+  expect(card?.querySelector('.ws-grid-budget-label')?.textContent).toBe('mem');
+  expect(card?.querySelector<HTMLElement>('.ws-grid-budget-gb')?.textContent).toBe((contentCost(input).playing / 1e9).toFixed(2));
+  expect(card?.querySelector<HTMLElement>('.ws-grid-budget-gb')?.dataset['tone']).toBe('green');
+  expect(card?.querySelector<HTMLElement>('.ws-grid-budget-alert')?.hidden).toBe(true);
+  expect(card?.querySelector<HTMLElement>('.ws-grid-budget-detail')?.hidden).toBe(true);
   for (const gone of ['SHARDS OK', 'SHARED', 'OF BUDGET', 'NO OWNER']) expect(hud.textContent).not.toContain(gone);
   expect(hud.querySelector('[data-owner="dw"]')).toBeNull();
   overlay.toggle();
@@ -46,11 +53,11 @@ test('hidden Developer strip skips snapshots while entry trends keep their origi
   vi.useFakeTimers();
   try {
     setDev(true);
-    const scope = owner(), hud = document.createElement('div');
+    const scope = owner();
     const input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: 100, commons: 0, overlap: 80_000_000 };
     const cost = vi.fn(() => ({ ...contentCost(input), input })), entries = vi.fn(() => [sim('nine', input.sims)]);
     const memory = vi.fn(() => observed(0, 0));
-    const overlay = withOwner(scope, () => installBudgetOverlay({ scope, hudRoot: hud, name: () => 'Nine', memory, allocator: { cost, entries } }));
+    const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Nine', memory, allocator: { cost, entries } }));
     expect(memory).toHaveBeenCalledTimes(1);
     setDev(false);
     cost.mockClear(); entries.mockClear(); memory.mockClear();
@@ -70,10 +77,10 @@ test('collapsed strip reads current totals and expands with full allocation deta
   vi.useFakeTimers();
   try {
     setDev(true);
-    const scope = owner(), hud = document.createElement('div');
+    const scope = owner(), hud = document.body;
     const input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: 100, commons: 0, overlap: 80_000_000 };
     const summary = vi.spyOn(memoryAttribution, 'summary'), snapshot = vi.spyOn(memoryAttribution, 'snapshot');
-    const overlay = withOwner(scope, () => installBudgetOverlay({ scope, hudRoot: hud, name: () => 'Nine',
+    const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Nine',
       allocator: { entries: () => [sim('nine', input.sims)], cost: () => ({ ...contentCost(input), input }) } }));
     expect(summary).toHaveBeenCalledTimes(1); expect(snapshot).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1000);
@@ -93,13 +100,13 @@ test('collapsed strip reads current totals and expands with full allocation deta
 
 test('G628 M4/M7: a red line per shard over its limit; the trend keeps the first entry and the last six', async () => {
   setDev(true);
-  const scope = owner(), hud = document.createElement('div');
-  document.body.append(hud);
+  const scope = owner(), hud = document.body;
   let sims = 100_000_000;
   const cost = () => { const input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims, commons: 0, overlap: 80_000_000 }; return { ...contentCost(input), input }; };
-  const overlay = withOwner(scope, () => installBudgetOverlay({ scope, hudRoot: hud, name: () => 'Nine', memory: () => observed(0, 0),
+  const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Nine', memory: () => observed(0, 0),
     overLimit: () => [{ owner: 'nine', overBytes: 50_000_000 }], allocator: { entries: () => [sim('nine', sims)], cost } }));
   expect(hud.querySelector('.ws-grid-budget-over')?.textContent).toBe('NINE OVER ITS LIMIT · +50.0 MB');
+  expect(hud.querySelector<HTMLElement>('.ws-grid-budget-alert')?.hidden).toBe(false);
   const start = cost().playing;
   for (let i = 0; i < 9; i++) { overlay.crossed(); sims += 10_000_000; }
   await new Promise(resolve => { setTimeout(resolve, 0); }); // each entry's line follows it by a task
@@ -111,13 +118,15 @@ test('G628 M4/M7: a red line per shard over its limit; the trend keeps the first
 
 test('cold neighbour estimates stay in history while HUD warnings follow the entered owner', () => {
   setDev(true);
-  const scope = owner(), memory = new MemoryAdmission(() => true), hud = document.createElement('div');
-  document.body.append(hud); scope.onDispose(() => { memory.dispose(); });
+  const scope = owner(), memory = new MemoryAdmission(() => true), hud = perfDockSections();
+  scope.onDispose(() => { memory.dispose(); });
   memory.accept({ stage: 'actual', owner: 'nine', id: 'nine:estimate', claimedBytes: 1, accountedBytes: 1,
     playingBytes: 1_590_900_000, loadingBytes: 1_500_000_000, playingCap: 1_200_000_000, loadingCap: 1_800_000_000 });
-  const enter = withOwner(scope, () => installMemoryWarning(memory, scope, hud, 'dw'));
-  expect(hud.children).toHaveLength(0);
+  const enter = withOwner(scope, () => installMemoryWarning(memory, scope, 'dw'));
+  expect(hud.querySelector('.ws-memory-warning')).toBeNull();
   enter('nine');
+  // A14: a section of the frame meter's panel, and the dock's red mark while it shows
+  expect(document.querySelector('.ws-perf-dock')?.classList.contains('alert')).toBe(true);
   expect(hud.querySelector('.ws-memory-warning-chip')?.textContent).toBe('MEMORY LIMIT · nine ESTIMATE · +390.9 MB');
   enter('dw'); expect(hud.querySelector<HTMLElement>('.ws-memory-warning')?.hidden).toBe(true);
   expect(memory.reports()).toHaveLength(1);
@@ -127,5 +136,6 @@ test('cold neighbour estimates stay in history while HUD warnings follow the ent
   expect(hud.querySelectorAll('.ws-memory-warning-report')).toHaveLength(1);
   enter(null); expect(hud.querySelector<HTMLElement>('.ws-memory-warning')?.hidden).toBe(false);
   setDev(false); expect(hud.querySelector<HTMLElement>('.ws-memory-warning')?.hidden).toBe(true);
-  scope.dispose(); enter('nine'); expect(hud.children).toHaveLength(0);
+  expect(document.querySelector('.ws-perf-dock')?.classList.contains('alert')).toBe(false);
+  scope.dispose(); enter('nine'); expect(hud.querySelector('.ws-memory-warning')).toBeNull();
 });
