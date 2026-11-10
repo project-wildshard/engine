@@ -389,8 +389,9 @@ the actual doctor document. The direct server release bypasses faults.
 
 Control bodies are bounded at 128 KiB/32 rules, metadata at 2 MiB, pending
 socket payload at 8 MiB/1024 messages and event samples at 256 entries.
-Backpressure pauses both native sources and healing reevaluates both. Shutdown and parent EOF retire only owned
-listeners, sockets, timers and the exclusively created token path.
+Backpressure pauses both native sources and healing reevaluates both.
+Shutdown and parent EOF retire only owned listeners, sockets, timers and
+the exclusively created token path.
 
 Run `node --test scripts/chaos-proxy-proof.mjs` explicitly. It uses the real
 CLI, HTTP/WebSocket/TLS upstreams and native byte/close observations. All
