@@ -159,6 +159,8 @@ try {
       };
       if(grid)await page.goto(`${preview.url}/?mute=1&nolock=1&sw=0`,{waitUntil:'domcontentloaded'});
       for(const attempt of grid?['fresh-grid','saved-ember','missing-art']:['entry']){
+      // each grid entry reports its own faults (the page, and so its error listener, spans all three)
+      const firstFault=faults.length;
       const tag=`${name}${gpu&&name==='chromium'?'-gpu':''}${throttle&&name==='chromium'?'-throttled':''}-${grid?attempt:shard}`;
       /** @type {{name:string,art:string}|null} */let destination=null;
       if(grid){
@@ -238,7 +240,7 @@ try {
         && lastCount.serverSteps > 0 && lastCount.serverFiles > 0 && lastCount.serverBytes > 0;
       console.log(`${tag}: measured counts ${measured ? 'ok' : 'FAILED'} ${JSON.stringify(lastCount)}`);
       if (!measured) faults.push('Start code bytes or Server internal work counts absent');
-      report.push({tag,faults:[...faults],log,readyAt,counts});
+      report.push({tag,faults:faults.slice(firstFault),log,readyAt,counts});
       if(grid){
         await page.locator('.ws-load-play').click();
         await page.waitForFunction(()=>document.querySelector('.ws-load')===null);
