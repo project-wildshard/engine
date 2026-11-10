@@ -1,8 +1,11 @@
 import {execFileSync} from 'node:child_process';
 import {lstatSync,readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {rendererRevision} from './renderer-revision.mjs';
-import {shardfileValidationRevision} from './shardfile-validation-revision.mjs';
+import {createRequire} from 'node:module';
+
+// CI calls this selector before pnpm install. Only local stamp verification
+// loads the installed revision helpers; hosted classification stays Node-only.
+const revisionModule=createRequire(import.meta.url);
 
 /** A generated digest is represented by its changed inputs, never trusted by name.
  * @param {string} file @param {string} root */
@@ -10,7 +13,9 @@ function verifiedStamp(file,root){
  try{
   if(!lstatSync(resolve(root,file)).isFile())return false;
   const value=/** @type {unknown} */(JSON.parse(readFileSync(resolve(root,file),'utf8')));
-  const expected=file==='scripts/renderer-revision.json'?rendererRevision(root):shardfileValidationRevision(root);
+  const expected=file==='scripts/renderer-revision.json'
+   ?/** @type {typeof import('./renderer-revision.mjs')} */(revisionModule('./renderer-revision.mjs')).rendererRevision(root)
+   :/** @type {typeof import('./shardfile-validation-revision.mjs')} */(revisionModule('./shardfile-validation-revision.mjs')).shardfileValidationRevision(root);
   return value!==null&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===1&&'revision'in value&&value.revision===expected;
  }catch{return false;}
 }

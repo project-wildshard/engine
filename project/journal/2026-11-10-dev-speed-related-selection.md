@@ -53,3 +53,20 @@ Official renderer regeneration after committed source ef040e65ea695b09a92bc40e0d
 6c85f9f7c121513256b0375337db4a9846dec05de19dd850ebac48c8befe78b8.
 Validation revision and full28-product generated audio/byte/version tables
 remain unchanged. Final normal typed lint and script-project types pass.
+
+## Preserve dependency-free CI startup
+
+First publication9b54 passed the normal full hook but actual CI42832826070
+failed before install: selector imports reached Valibot through revision
+helpers. This lane owns the red, also inherited by unchanged FL10 successor
+f249. The earlier installed fixture hid that cold-start requirement.
+
+The real workflow classification proof now rejects all third-party package
+resolution, even packages available in a developer's ancestor node_modules.
+It reproduced the same Valibot attempt. Revision helpers load synchronously
+only when local stamp verification needs them; hosted scope never loads them.
+The actual cold workflow/API proof now passes all previous red/cancelled/API/
+expired-scope controls and the positive docs control. Local actual Git/Vitest
+proof still passes2.89s, with all ten harness/fallback/stamp controls retained.
+Normal typed lint and script-project types pass. No dependency installation is
+added to the hosted changes job and no CI/lease/case budget is changed.

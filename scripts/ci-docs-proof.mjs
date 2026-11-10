@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync,spawn} from 'node:child_process';
 import {createServer} from 'node:http';
-import {copyFileSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
+import {copyFileSync,existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 import {join,resolve as resolvePath} from 'node:path';
+import {pathToFileURL} from 'node:url';
 
 const directory=resolvePath(process.argv[2]??'tmp/ci-docs-proof');mkdirSync(directory,{recursive:true});
 const work=mkdtempSync(join(directory,'run-')),workflow=readFileSync('.github/workflows/ci.yml','utf8');
@@ -34,7 +35,7 @@ const git=args=>execFileSync('git',['-c','user.name=Selection proof','-c','user.
 /** @param {string} before @param {string} sha */
 const classify=async(before,sha)=>{
  const output=join(work,'outputs');writeFileSync(output,'');
- const child=spawn('bash',['-c',command],{cwd:work,env:{...process.env,BASE_SHA:before,GITHUB_SHA:sha,GITHUB_RUN_ID:'99',GITHUB_EVENT_NAME:'push',GITHUB_REF_NAME:'main',GITHUB_REPOSITORY:'proof/engine',GH_TOKEN:'fixture-capability',GITHUB_API_URL:`http://127.0.0.1:${address.port}`,GITHUB_OUTPUT:output},stdio:['ignore','pipe','pipe']});
+ const child=spawn('bash',['-c',command],{cwd:work,env:{...process.env,NODE_OPTIONS:`--import=${pathToFileURL(join(work,'test/cold-ci.mjs')).href}`,BASE_SHA:before,GITHUB_SHA:sha,GITHUB_RUN_ID:'99',GITHUB_EVENT_NAME:'push',GITHUB_REF_NAME:'main',GITHUB_REPOSITORY:'proof/engine',GH_TOKEN:'fixture-capability',GITHUB_API_URL:`http://127.0.0.1:${address.port}`,GITHUB_OUTPUT:output},stdio:['ignore','pipe','pipe']});
  let text='';child.stdout.on('data',data=>{text+=data;});child.stderr.on('data',data=>{text+=data;});
  const code=await new Promise(resolve=>{child.once('exit',resolve);});assert.equal(code,0,text);
  return readFileSync(output,'utf8').includes('docs=true');
@@ -42,7 +43,9 @@ const classify=async(before,sha)=>{
 try{
  git(['init','--quiet','--initial-branch=main']);mkdirSync(join(work,'scripts'));mkdirSync(join(work,'src'));mkdirSync(join(work,'test'));mkdirSync(join(work,'docs'));
  for(const name of ['push-selection.mjs','ci-selection.mjs','lift-pending.mjs','renderer-revision.mjs','shardfile-validation-revision.mjs','source-input-proof.mjs','input-hash-memo.mjs'])if(existsSync(`scripts/${name}`))copyFileSync(`scripts/${name}`,join(work,'scripts',name));
- symlinkSync(resolvePath('node_modules'),join(work,'node_modules'),'dir');
+ // Refuse package resolution even if a developer's ancestor node_modules could
+ // otherwise hide CI's pre-install environment. Native Node builtins stay real.
+ writeFileSync(join(work,'test/cold-ci.mjs'),"import{isBuiltin,registerHooks}from'node:module';registerHooks({resolve(specifier,context,next){if(!isBuiltin(specifier)&&!specifier.startsWith('.')&&!specifier.startsWith('/')&&!specifier.startsWith('file:')&&!specifier.startsWith('internal/'))throw Error('Cold CI attempted installed package: '+specifier);return next(specifier,context);}});");
  writeFileSync(join(work,'src/value.ts'),'export const value=1;');writeFileSync(join(work,'test/value.mjs'),"import assert from 'node:assert/strict';import {value} from '../src/value.ts';assert.equal(value,1);");
  writeFileSync(join(work,'docs/note.md'),'base');git(['add','scripts','src','test','docs']);git(['commit','--quiet','-m','proved code']);const proved=git(['rev-parse','HEAD']);
  execFileSync(process.execPath,['test/value.mjs'],{cwd:work,stdio:'pipe'});
@@ -77,5 +80,5 @@ try{
  runs=[{id:1,head_sha:beforeExpiry,status:'completed',conclusion:'success',event:'push'}];
  writeFileSync(join(work,'docs/note.md'),'docs after inherited exclusion expires');git(['add','docs/note.md']);git(['commit','--quiet','-m','docs after expiry']);const afterExpiry=git(['rev-parse','HEAD']);
  assert.equal(await classify(beforeExpiry,afterExpiry),false,'An old green code run cannot hide newly required failing tests after expiry');
- console.log(JSON.stringify({redCodeRefused:true,cancelledCodeRefused:true,docsSuccessInsufficient:true,provedDocsAllowed:true,apiFailureRunsFull:true,expiredInheritedTestsRunFull:true}));
+ console.log(JSON.stringify({coldPreinstallNoPackages:true,hostedWorkflowStillFull:true,redCodeRefused:true,cancelledCodeRefused:true,docsSuccessInsufficient:true,provedDocsAllowed:true,apiFailureRunsFull:true,expiredInheritedTestsRunFull:true}));
 }finally{await new Promise(resolve=>{server.close(resolve);});rmSync(work,{recursive:true,force:true});}
