@@ -56,3 +56,16 @@ same-size/mtime-restored writer is old-red/new-green), the partial destination
 is asserted absent, and the batch proof requires exactly three exports bound
 to their observed combined/singleton hook SHAs and job IDs. Content hashes use
 sorted relative paths. No gate, ownership or deadline cap changes.
+
+Caller integration is reproducible with
+`node scripts/push-queue-retain-proof.mjs caller`, outside hooks. It invokes
+the public actual caller's request-only control from a real Git hook's tiny
+private snapshot, without launching a browser. The original EACCES leaves the
+hook red and remote unchanged. After snapshot deletion, the exact remaining
+`locked/marker` bytes survive with native-escape manifest and checked Git SHA.
+The retained payload is 13 bytes, SHA256
+`3ec2e08612073cc5950118b6d209120bdc7ded3c661b8d1fef4da273e92baeba`.
+The actual caller module matches public b16f67b. This proves remaining-file
+retention, not restoration of files already removed by the failed cleanup,
+a complete replayable Chrome profile or a hosted verdict. The 1.87-second
+control preserves all existing generic/batch safety controls.

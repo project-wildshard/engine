@@ -82,12 +82,16 @@ try{
    const report=run();assert.equal(report.bytes,0);assert.equal(report.partial,true);assert.ok(report.requests[0].omissions.some(row=>row.reason==='profile changed during copy'));assert.equal(existsSync(join(queue,'retained',job,changingRequest,'changing')),false);
    console.log(JSON.stringify({mode,concurrentChangeRefused:true,partialPayloadDeleted:true}));
   }finally{racer.stdin.end();await ended;}
- }else if(mode==='queue'||mode==='green'||mode==='batch'||mode==='refused'||mode==='publish-refused'){
+ }else if(mode==='queue'||mode==='green'||mode==='batch'||mode==='refused'||mode==='publish-refused'||mode==='caller'){
   /** @param {string} cwd @param {string[]} args */
   const git=(cwd,args)=>execFileSync('git',['-c','user.name=Retention proof','-c','user.email=proof@example.test',...args],{cwd,encoding:'utf8'}).trim();
   const remote=join(root,'remote.git'),repo=join(root,'repo');mkdirSync(repo);git(root,['init','--quiet','--bare','--initial-branch=main',remote]);git(repo,['init','--quiet','--initial-branch=main']);git(repo,['remote','add','origin',remote]);mkdirSync(join(repo,'.githooks'));
   writeFileSync(join(repo,'.githooks/pre-push'),'#!/usr/bin/env bash\nset -euo pipefail\nnode gate.cjs\n');chmodSync(join(repo,'.githooks/pre-push'),0o755);
   writeFileSync(join(repo,'gate.cjs'),`const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');if(fs.readdirSync('.').some(p=>p.startsWith('lane-'))){fs.appendFileSync(${JSON.stringify(join(root,'observed'))},JSON.stringify({sha:cp.execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files:fs.readdirSync('.').filter(p=>p.startsWith('lane-')).sort()})+'\\n');fs.mkdirSync('tmp/native-writer-drain-ABC123',{recursive:true});fs.writeFileSync('tmp/native-writer-drain-ABC123/writer','original failed-hook marker');fs.mkdirSync('tmp/queue-retain-requests',{recursive:true});fs.writeFileSync('tmp/queue-retain-requests/'+crypto.randomUUID()+'.json',JSON.stringify({schema:'wildshard.native-retain/1',kind:'native-writer-drain',profile:'tmp/native-writer-drain-ABC123'}));${mode==='refused'?"fs.rmSync('tmp/queue-retain-requests',{recursive:true});fs.symlinkSync('native-writer-drain-ABC123','tmp/queue-retain-requests');":''}${mode==='green'||mode==='publish-refused'?'':"throw new Error('exact original cleanup failure');"}}`);
+  if(mode==='caller'){
+   const callerRoot=process.cwd(),caller=resolvePath('scripts/native-retention-proof.mjs');
+   writeFileSync(join(repo,'gate.cjs'),`const fs=require('node:fs'),cp=require('node:child_process');const files=fs.readdirSync('.').filter(p=>p.startsWith('lane-')).sort();if(files.length){fs.appendFileSync(${JSON.stringify(join(root,'observed'))},JSON.stringify({sha:cp.execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files})+'\\n');fs.mkdirSync('tmp',{recursive:true});const result=cp.spawnSync(process.execPath,[${JSON.stringify(caller)},'--request-only',${JSON.stringify(`--caller-root=${callerRoot}`)}],{stdio:'inherit'});if(result.error)throw result.error;process.exit(result.status??1);}`);
+  }
   writeFileSync(join(repo,'package.json'),'{"name":"retention-proof","version":"1.0.0","private":true}');writeFileSync(join(repo,'pnpm-workspace.yaml'),'packages: []\n');writeFileSync(join(repo,'.gitignore'),'node_modules/\ntmp/\n');execFileSync('pnpm',['install','--lockfile-only'],{cwd:repo,stdio:'pipe'});
   git(repo,['add','.githooks/pre-push','gate.cjs','package.json','pnpm-workspace.yaml','pnpm-lock.yaml','.gitignore']);git(repo,['commit','--quiet','-m','base']);git(repo,['config','core.hooksPath','.githooks']);git(repo,['push','--quiet','origin','main']);const original=git(remote,['rev-parse','main']);if(mode==='publish-refused'){writeFileSync(join(remote,'hooks/pre-receive'),'#!/bin/sh\nexit 1\n');chmodSync(join(remote,'hooks/pre-receive'),0o755);}
   /** @param {string} source @param {boolean} [checkOnly] */
@@ -98,6 +102,7 @@ try{
   /** @type {ReturnType<typeof spawn>|undefined} */let holder;
   /** @type {Promise<unknown>|undefined} */let ended;
   let actualQueue;
+  /** @type {{job:string,checkedSha:string,profile:string,kind:string,bytes:number,payloadSha256:string}|undefined} */let callerEvidence;
   if(mode==='batch'){
    const warm=enqueue(repo,true);assert.equal((await wait(warm)).state,'checked');actualQueue=dirname(dirname(warm.snapshot));
    holder=spawn('python3',[lock,join(actualQueue,'worker.lock'),process.execPath,'-e',"console.log('ready');process.stdin.resume()"],{stdio:['pipe','pipe','pipe']});ended=new Promise(resolve=>{holder?.once('exit',resolve);});await new Promise((resolve,reject)=>{holder?.stdout?.once('data',resolve);holder?.once('error',reject);});
@@ -116,10 +121,12 @@ try{
    const reportFiles=readdirSync(join(actualQueue,'retained'),{recursive:true,encoding:'utf8'}).filter(name=>/^retention-.*\.json$/u.test(name.split('/').at(-1)??''));assert.ok(reportFiles.length>=jobs.length);
    if(mode==='batch')assert.equal(reportFiles.length,3,'The combined failure and both singleton failures must all survive');
    /** @type {{sha:string,files:string[]}[]} */const gates=readFileSync(join(root,'observed'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
-   for(const name of reportFiles){const report=JSON.parse(readFileSync(join(actualQueue,'retained',name),'utf8'));assert.equal(report.partial,false);assert.equal(readFileSync(join(actualQueue,'retained',report.job,report.requests[0].request.slice(0,-5),'writer'),'utf8'),'original failed-hook marker');assert.match(report.checkedSha,/^[a-f0-9]{40}$/u);const gate=gates.find(row=>row.sha===report.checkedSha);assert.ok(gate,'Every retained SHA must name an actual hook invocation');if(mode==='batch')assert.equal(report.job,gate.files.length===2||gate.files[0]==='lane-2'?jobs[1].id:jobs[0].id);}
+   for(const name of reportFiles){const report=JSON.parse(readFileSync(join(actualQueue,'retained',name),'utf8'));assert.equal(report.partial,false);
+   /** @type {Buffer} */
+   const payload=readFileSync(join(actualQueue,'retained',report.job,report.requests[0].request.slice(0,-5),mode==='caller'?'locked/marker':'writer'));assert.equal(payload.toString('utf8'),mode==='caller'?'owned refusal':'original failed-hook marker');if(mode==='caller'){assert.equal(report.requests[0].kind,'native-escape');assert.match(report.requests[0].profile,/^tmp\/escape-control-[A-Za-z0-9]{6}$/u);callerEvidence={job:report.job,checkedSha:report.checkedSha,profile:report.requests[0].profile,kind:report.requests[0].kind,bytes:report.bytes,payloadSha256:createHash('sha256').update(payload).digest('hex')};}assert.match(report.checkedSha,/^[a-f0-9]{40}$/u);const gate=gates.find(row=>row.sha===report.checkedSha);assert.ok(gate,'Every retained SHA must name an actual hook invocation');if(mode==='batch')assert.equal(report.job,gate.files.length===2||gate.files[0]==='lane-2'?jobs[1].id:jobs[0].id);}
    if(mode==='batch')assert.deepEqual(gates.map(row=>row.files.length).sort((a,b)=>a-b),[1,1,2]);
-   assert.equal(git(remote,['rev-parse','main']),original);assert.match(readFileSync(join(actualQueue,'worker.log'),'utf8'),/exact original cleanup failure/u);
+   assert.equal(git(remote,['rev-parse','main']),original);assert.match(readFileSync(join(actualQueue,'worker.log'),'utf8'),mode==='caller'?/EACCES/u:/exact original cleanup failure/u);
   }
-  console.log(JSON.stringify({mode,failedHookUnchanged:mode!=='green',snapshotsDeleted:true,retainedAfterCleanup:mode!=='green'&&mode!=='refused'&&mode!=='publish-refused',seconds:(performance.now()-began)/1000}));
+  console.log(JSON.stringify({mode,callerEvidence,failedHookUnchanged:mode!=='green',snapshotsDeleted:true,retainedAfterCleanup:mode!=='green'&&mode!=='refused'&&mode!=='publish-refused',seconds:(performance.now()-began)/1000}));
  }else throw new Error('Unknown proof mode');
 }finally{rmSync(root,{recursive:true,force:true});}
