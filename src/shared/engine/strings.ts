@@ -250,6 +250,8 @@ export const ENGINE_STRINGS = {
   "s_loading_start_files": "⟦0⟧ · ⟦1⟧ over the network",
   "s_loading_files_of": "⟦0⟧ of ⟦1⟧",
   "s_loading_copy": "Copy diagnostics",
+  "s_loading_settings": "Settings",
+  "s_loading_exit": "Exit to title",
   "s_loading_copied": "Copied",
   "s_loading_copy_failed": "Copy failed",
   "s_loading_play": "PLAY",

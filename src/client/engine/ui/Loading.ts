@@ -25,7 +25,7 @@ import { getSetting, onSetting } from './Settings';
 import { listenTap } from '../input/dom';
 import { withOwner } from '../../../shared/engine/app/ownership';
 import { holdLoadingSwitch } from './devSwitch';
-import { markReload } from '../boot/lastEnd';
+import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import './loading.css';
 
@@ -229,6 +229,7 @@ export class Loading {
     if (!this.scoped) {
       const hold = holdLoadingSwitch(this.scope); hold.classList.add('ws-load-hold');
       this.root.querySelector('.ws-load-body')?.append(hold);
+      this.root.querySelector('.ws-load-body')?.append(this.menuRow());
     }
     set(this.els.suFact, engineString('s_loading_waiting'));
     this.paintPhases();
@@ -236,6 +237,28 @@ export class Loading {
     this.clockScope.interval(CLOCK_MS, () => { this.tickClock(); });
     const unsubscribe = bootTiming()?.subscribe?.(() => { this.readServerProgress(); });
     if (unsubscribe !== undefined) this.clockScope.onDispose(unsubscribe);
+  }
+
+  /** QA 30 (Jake, 2026-11-10: "You can't like regret loading the wrong shard and bail out and go to the other shard"): the
+   *  loading card's own SETTINGS and EXIT TO TITLE. Exit leaves the way pause ▸ Exit to main menu does: a fresh title page
+   *  (src/client/game/session/exitToTitle.ts), so the in-flight load's workers, reads and server link end with this
+   *  document and nothing of it can land on the title. */
+  private menuRow(): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'ws-load-menu';
+    const button = (name: string, text: string, run: () => void): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset['loadMenu'] = name; b.textContent = text;
+      listenTap(this.scope, b, run);
+      row.append(b);
+      return b;
+    };
+    button('settings', engineString('s_loading_settings'), () => { void import('./BootSettings').then(m => { m.openBootSettings(); return undefined; }); });
+    const exit = button('exit', engineString('s_loading_exit'), () => {
+      exit.disabled = true;
+      leaveSaved(() => { markUnload('exit to title from the loading card'); location.replace(new URL('/', location.href).href); });
+    });
+    return row;
   }
 
   /** Read application-owned disk-prefetch progress without changing this attempt's wire accounting. */

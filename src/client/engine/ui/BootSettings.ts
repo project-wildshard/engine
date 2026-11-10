@@ -21,7 +21,7 @@ import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMo
 import { firstPlayDone, resetFirstPlay } from '../boot/firstPlayMark';
 
 import { isDev, onDev } from '../core/devMode';
-import { activeLevel } from '../../../shared/engine/level/selection';
+import { selectedLevel } from '../../../shared/engine/level/selection';
 import { devSwitchRows } from './devSwitch';
 import { foldCard } from './cards';
 import { buildDebugMenu, type DebugMenu } from './DebugMenu';
@@ -66,8 +66,10 @@ export function openBootSettings(): void {
   root = r;
   // re-read which Debug rows apply to the selected level, and their choices
   // (GPU textures' "Auto · now …"), for the one behind it now. No weapons in hand on the title
-  debug?.applies({ chunk: activeLevel(), weapons: new Set() });
-  developerTools?.applies({ chunk: activeLevel(), weapons: new Set() });
+  // QA 30: the loading card opens this before its level is configured; the level rows then wait for the next open
+  const level = selectedLevel();
+  if (level !== null) debug?.applies({ chunk: level, weapons: new Set() });
+  if (level !== null) developerTools?.applies({ chunk: level, weapons: new Set() });
   if (layer?.active !== true) { openScope = scope.child('open'); layer = app.ui.push('menu', { root: r, order: 0, back: close }, openScope); openScope.interval(2000, () => { debug?.paint(); developerTools?.paint(); refresh?.(); }); openScope.listen(document, PIXELS_EVENT, () => { refresh?.(); }); }
   refresh?.(); if (built) offline?.refresh(); // a fresh panel has just sized it
   r.classList.add('show');
