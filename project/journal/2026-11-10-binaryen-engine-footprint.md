@@ -39,3 +39,60 @@ A one-shot J206 review and complete unmodified normal push gate still precede pu
 NM6 remains open until sharddev and every shard root also pin the intended two releases and pass their real proofs.
 No test, budget, hook, CI cap, quarantine record or deadline changes here.
 The J20006:00UTC wake90531 remains alive while this independent dependency work proceeds.
+
+## Current main and bounded checks
+
+The source commit is rebased onto exact green a9d2e4f.
+Frozen installation reports the candidate lock up to date.
+The current API/compiler result is recorded at2026-11-10T03:07:58Z.
+The complete original WASM still matches byte for byte.
+No Binaryen bin or wasm tool consumer appears in src or scripts.
+The named ratchet-paths file passes3of3 in4.64seconds after this rebase.
+It is invoked through the normal named-file vitest-tmp command.
+The full-test wrapper refused a manual invocation; no override was used.
+The earlier source commit wrapper logged8053ms, above its5s total target.
+That commit returned success; this journal does not call it a budget pass.
+Both official revision writers are freshly run twice and deterministic.
+Only the two generated revision JSON files accompany this evidence update.
+The official J206 one-shot review covers the entire source-plus-stamp delta.
+Normal publication alone authorizes the full WS_FULL_SUITE=1 gate.
+No manual broad test suite, bypass or inherited global hold is introduced.
+FL17 is now public a9d2e4f and exact CI/Ring1 green, separate from NM6.
+Seven other quarantine entries retain their original policy values.
+The06:00UTC J200 wake remains alive; this dependency work changes no deadline.
+
+## One-shot review receipt
+
+Official J206 review has no MUST-FIX.
+Review path: pinefix2-nm6-engine-NM6-engine-20261110T032523Z-72888.md.
+It independently confirms override, lock, installed resolution and stamp scope.
+Its SHOULD-FIX is missing original declaration hash in the baseline JSON.
+The exact original public npm tarball is now read without executing package scripts.
+Its entire index hash matches the recorded old baseline.
+Its entire declaration hash matches the replacement4070415465f0d5b83fbca3609a9b99b110f34d1daabd1b9eedd6411130490422.
+The baseline JSON explicitly labels this later original-package recheck.
+No later recheck is represented as an earlier captured measurement.
+The complete tarball integrity and byte hashes remain in own NM6 evidence.
+No second review round or source/test change is needed for this evidence correction.
+
+## Q130 install forward
+
+Q130 fails before its hook at tools:install.
+Actual npr error is package.json differs from binDependencies.
+The root override is copied into the frozen native-tool manifest.
+The same exact failure reproduces in this own clone.
+Official npr install refreshes only .bin-deps/package.json and its lock.
+It adds the identical scoped override; all three tool versions stay pinned.
+The original frozen tools:install command then succeeds without an override.
+No full-hook verdict is claimed for failedQ130 and no duplicate retry is enqueued.
+Urgent Nalati fuzz and tape-worker investigation now takes priority.
+
+## Fresh combined publication
+
+The publication view starts on exact green8d134e2 and includes tape7c00ead.
+Own NM6 source is carried as e7471c1; no peer source is replaced.
+Only own reviewed journal and official generated native-tool metadata deltas follow.
+Fresh frozen pnpm install succeeds401ms and original frozen tools install succeeds.
+Official renderer and validation writers are rerun in separate processes and stable.
+This replaces obsolete standalone Q130 stamps with current combined inputs.
+No Q130 duplicate is enqueued; the next immutable full gate owns this source candidate.
