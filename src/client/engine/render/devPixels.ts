@@ -1,5 +1,6 @@
 import { isDev } from '../core/devMode';
 import { jsonSlot } from '../saves/slots';
+import { graphicsMode, LOW_PIXEL_RATIO, PIXELS_EVENT } from './graphicsMode';
 /**
  * QA row 25 (Jake, 2026-11-10, Low Power Mode at 19-23 fps, GPU bound: "when developer mode is on, allow me to switch between 2x
  * and 1x pixel density. Allow me to switch between 3x screen, 2x screen, 1x screen. So that's 6 permutations, and I can just try
@@ -18,8 +19,6 @@ export type DevDensity = 2 | 1;
 export interface DevPixels { readonly screen: DevScreen; readonly density: DevDensity }
 /** the render scale each density stands for */
 export const DENSITY_SCALE: Readonly<Record<DevDensity, number>> = { 2: 1, 1: 0.75 };
-/** the event the page hears when the pick changes (Game applies it live) */
-export const DEV_PIXELS_EVENT = 'ws:dev-pixels';
 
 const slot = jsonSlot('devPixels', 'device');
 
@@ -35,7 +34,7 @@ export function savedDevPixels(): DevPixels | null {
 /** Save a pick (null: back to the tier's own) and tell the page. */
 export function saveDevPixels(pick: DevPixels | null): void {
   try { slot.write(pick === null ? null : { screen: pick.screen, density: pick.density }); } catch { /* storage blocked: this page only */ }
-  document.dispatchEvent(new CustomEvent(DEV_PIXELS_EVENT));
+  document.dispatchEvent(new CustomEvent(PIXELS_EVENT));
 }
 
 /** The pick in force: the saved one, in Developer mode only. */
@@ -44,10 +43,12 @@ export function activeDevPixels(): DevPixels | null { return isDev() ? savedDevP
 /** The ratio a pick draws at on a screen of `device` pixels per CSS pixel. */
 export function devPixelRatio(device: number, pick: DevPixels): number { return Math.min(device, pick.screen) * DENSITY_SCALE[pick.density]; }
 
-/** The drawing buffer's pixel ratio: the Developer pick when there is one, else the tier's cap (unchanged production rule). */
-export function drawingPixelRatio(device: number, tierCap: number): number {
+/** The drawing buffer's pixel ratio: the Developer pick when there is one; else, on a phone (`phone`: the phone tier with no
+ *  explicit render scale), its Low graphics (MG2, graphicsMode.ts); else the tier's cap, the production rule as it was. */
+export function drawingPixelRatio(device: number, tierCap: number, phone = false): number {
   const pick = activeDevPixels();
-  return pick === null ? Math.min(device, tierCap) : devPixelRatio(device, pick);
+  if (pick !== null) return devPixelRatio(device, pick);
+  return phone && graphicsMode() === 'low' ? Math.min(device, LOW_PIXEL_RATIO) : Math.min(device, tierCap);
 }
 
 /** What a ratio makes of a CSS size: the drawing buffer's size and pixel count (three.js floors each side). */

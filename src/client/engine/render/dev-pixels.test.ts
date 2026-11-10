@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test } from 'vitest';
 import { setDev } from '../core/devMode';
-import { DEV_PIXELS_EVENT, devPixelRatio, drawingBuffer, drawingPixelRatio, saveDevPixels, savedDevPixels, type DevPixels } from './devPixels';
+import { devPixelRatio, drawingBuffer, drawingPixelRatio, saveDevPixels, savedDevPixels, type DevPixels } from './devPixels';
+import { PIXELS_EVENT as DEV_PIXELS_EVENT, saveGraphicsMode, savedGraphicsMode } from './graphicsMode';
 
-afterEach(() => { saveDevPixels(null); setDev(false); });
+afterEach(() => { saveDevPixels(null); saveGraphicsMode('high'); setDev(false); });
 
 const SIX: readonly DevPixels[] = [3, 2, 1].flatMap(screen => [2, 1].map(density => ({ screen, density }) as DevPixels));
 
@@ -31,4 +32,15 @@ test('QA row 25: off by default, ignored with Developer mode off, applied live w
     saveDevPixels(null);
     expect(drawingPixelRatio(3, 2)).toBe(2);
   } finally { document.removeEventListener(DEV_PIXELS_EVENT, hear); }
+});
+
+test('MG2: a phone\'s Low graphics draws at 1x, High at the tier cap; desktop and the Developer pick are untouched', () => {
+  expect(savedGraphicsMode()).toBe('high');
+  expect(drawingPixelRatio(3, 2, true)).toBe(2);
+  saveGraphicsMode('low');
+  expect(savedGraphicsMode()).toBe('low');
+  expect(drawingPixelRatio(3, 2, true)).toBe(1);
+  expect(drawingPixelRatio(3, 2, false)).toBe(2); // desktop (or an explicit render scale) keeps the tier's cap
+  setDev(true); saveDevPixels({ screen: 3, density: 2 });
+  expect(drawingPixelRatio(3, 2, true)).toBe(3); // the Developer pick wins
 });

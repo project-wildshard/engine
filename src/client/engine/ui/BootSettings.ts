@@ -17,6 +17,7 @@ import { engineString } from '../../../shared/engine/strings';
  * ones that skip the title, so the reload lands back on this title screen. Reuses the in-game menu's look (gmenu.css).
  */
 import { automaticTier, TIER, gfxPrefs, saveGfxPrefs } from '../core/tier';
+import { graphicsMode, saveGraphicsMode } from '../render/graphicsMode';
 
 import { isDev, onDev } from '../core/devMode';
 import { activeLevel } from '../../../shared/engine/level/selection';
@@ -138,10 +139,16 @@ function build(): HTMLElement {
   const registry = el('ws-gmenu-debugslot');
   debug = buildDebugMenu(registry, { onPick: repaint });
   dbg.append(registry);
-  dbg.hidden = !isDev(); tools.hidden = !isDev(); onDev((on) => { dbg.hidden = !on; tools.hidden = !on; if (on) { debug?.paint(); developerTools?.paint(); } });
+  // MG2: a phone picks Low or High graphics (render/graphicsMode.ts), live, saved on the device; the finer render scale is a
+  // Developer's (desktop keeps it in the open, as before)
+  const phone = TIER === 'phone';
+  const scale = seg(engineString('s_2dee7435d0fe'), false, dprOpts, () => gfxPrefs.dpr, (v) => { if (v === 'auto' || v === '1' || v === '1.25' || v === '1.5' || v === '2' || v === 'native') { gfxPrefs.dpr = v; saveGfxPrefs(); } });
+  const mobile = phone ? [seg(engineString('s_gfx_mode'), false, [{ v: 'low', text: engineString('s_gfx_low') }, { v: 'high', text: engineString('s_gfx_high') }], graphicsMode, (v) => { if (v === 'low' || v === 'high') saveGraphicsMode(v); })] : [];
+  const scaleShown = (): void => { scale.hidden = phone && !isDev(); };
+  scaleShown();
+  dbg.hidden = !isDev(); tools.hidden = !isDev(); onDev((on) => { dbg.hidden = !on; tools.hidden = !on; scaleShown(); if (on) { debug?.paint(); developerTools?.paint(); } });
   p.append(running,
-    el('ws-gmenu-label', engineString('s_a874fca87cdd')), row('tier', LABELS.tier),
-    seg(engineString('s_2dee7435d0fe'), false, dprOpts, () => gfxPrefs.dpr, (v) => { if (v === 'auto' || v === '1' || v === '1.25' || v === '1.5' || v === '2' || v === 'native') { gfxPrefs.dpr = v; saveGfxPrefs(); } }),
+    el('ws-gmenu-label', engineString('s_a874fca87cdd')), ...mobile, row('tier', LABELS.tier), scale,
     seg(engineString('s_c77c3af22c64'), false, aaOpts, () => gfxPrefs.aa, (v) => { if (v === 'auto' || v === 'on' || v === 'off') { gfxPrefs.aa = v; saveGfxPrefs(); } }),
     el('ws-gmenu-label', engineString('s_799c26913574')), row('touch', LABELS.touch),
     buildMusicStyleRow(scope),

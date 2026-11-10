@@ -52,7 +52,8 @@ import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 import { isDev, onDev } from './devMode';
-import { DEV_PIXELS_EVENT, activeDevPixels, drawingPixelRatio } from '../render/devPixels';
+import { activeDevPixels, drawingPixelRatio } from '../render/devPixels';
+import { PIXELS_EVENT } from '../render/graphicsMode';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
 import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/memorySaver';
 import { dropShadowColour } from '../world/shadowVariants';
@@ -514,12 +515,13 @@ export class Game {
       throw error;
     }
     if (tracedBoot) recordGpuCheckpoint(this.renderer, 'renderer:created');
-    // QA row 25: a Developer's screen × density pick (render/devPixels.ts) stands in for the tier's cap; it applies live
-    this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr));
+    // QA row 25 / MG2: a Developer's screen × density pick (render/devPixels.ts), else a phone's Low graphics
+    // (render/graphicsMode.ts), stands in for the tier's cap; either applies live
+    this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, TIER === 'phone' && gfxPrefs.dpr === 'auto'));
     // the new ratio waits for the frame that draws (RT3: never in the task that decided it, whose cleared canvas nothing
     // would replace; under a menu or the title the world stays as it was until play draws again)
-    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; };
-    this.engineScope.listen(document, DEV_PIXELS_EVENT, repixel);
+    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, TIER === 'phone' && gfxPrefs.dpr === 'auto'); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; };
+    this.engineScope.listen(document, PIXELS_EVENT, repixel);
     this.engineScope.onDispose(onDev(repixel));
     this.renderer.setSize(window.innerWidth, viewportHeight());
     this.renderer.toneMapping = THREE.NoToneMapping; // tone mapping happens in the composer
