@@ -17,8 +17,9 @@
 #   scripts/serve-build.sh list                  the servers this script started, their age and expiry
 #   scripts/serve-build.sh stop <port|all-mine>  stop one (all-mine: every server this Claude session started)
 #
-# public/ (≈ 500 MB) is not copied: the out dir symlinks its top-level entries (--head/--rev: APFS clones, `cp -c`, no extra
-# bytes, because the mirror moves on once this script exits), so a build takes the JS build's time only.
+# Public files are copied into each preview before output validation. Copy I/O
+# and artifact storage scale with public/; stopping the preview removes its output.
+# The later link merge supplies entries an older build did not publish.
 # Registry: ~/.dev-servers/<port> ("pid expiry outdir owner name"; owner = the session id, E338). Reaped by `scripts/browser-lane.sh reap` (hooks on
 # SessionStart / Stop / SubagentStop): an expired registered preview, an unregistered `vite preview` older than 6 h, and
 # every `vite` dev server older than 2 h.
@@ -270,14 +271,15 @@ if [ $HEAD_ONLY -eq 1 ]; then
 fi
 mkdir -p "$BASE/$stamp"
 echo "serve-build: building $( [ $HEAD_ONLY -eq 1 ] && echo "$REV $(git -C "$REPO" rev-parse --short "$REV")" || echo "the working tree" ) → $OUT" >&2
-# the repo's own config, with public/ left out of the copy (it is symlinked below)
+# Publish public files before build-app validates its completed output. The
+# linking below can still supply entries older build scripts did not publish.
 CFG="$BASE/$stamp/vite.serve.mjs"
 cat > "$CFG" <<JS
 import { mergeConfig } from '$REPO/node_modules/vite/dist/node/index.js';
 import base from '$SRC/vite.config.ts';
 export default async (env) => {
   const b = typeof base === 'function' ? await base(env) : base;
-  return mergeConfig(b, { root: '$SRC', build: { outDir: '$OUT', emptyOutDir: true, copyPublicDir: false } });
+  return mergeConfig(b, { root: '$SRC', build: { outDir: '$OUT', emptyOutDir: true, copyPublicDir: true } });
 };
 JS
 # the generated files first, as CI's `pnpm build` does: without them a new asset (round 13: Sky Reach's LUT) had no
