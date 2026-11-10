@@ -5,6 +5,7 @@
 //   node scripts/pins.ts refresh            re-pin to the live heads (read only: GETs)
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
 //   node scripts/pins.ts install --ring 1   Ring 1 alone: its three products, its server slices and a catalogue of just those
+//   node scripts/pins.ts install --from-format blender-template  the frozen dependency product, without network or cook
 //   node scripts/pins.ts slice              cut Ring 1's server slices from the pinned heads into test/pins/slices.json
 //   node scripts/pins.ts keep <dir>         copy every pinned and sliced tarball to <dir>, for the release that outlives J85
 //   node scripts/pins.ts status             what the tree holds against the pins
@@ -136,14 +137,15 @@ async function tarball({ slug, hash }: Pick<Pin, 'slug' | 'hash'>, apiHolds = tr
 }
 
 /** Each pin with its tarball, in pin order, with at most `limit` fetches ahead of the reader. */
-async function* inOrder(pins: readonly Pin[], limit: number): AsyncGenerator<readonly [Pin, Uint8Array]> {
-  const started = new Map(pins.slice(0, limit).map((pin, at) => [at, tarball(pin)]));
+async function* inOrder(pins: readonly Pin[], limit: number, local?: ReadonlyMap<string, Uint8Array>): AsyncGenerator<readonly [Pin, Uint8Array]> {
+  const bytesOf = (pin: Pin): Promise<Uint8Array> => Promise.resolve(local?.get(pin.hash) ?? tarball(pin));
+  const started = new Map(pins.slice(0, limit).map((pin, at) => [at, bytesOf(pin)]));
   for (const [at, pin] of pins.entries()) {
     const bytes = await started.get(at);
     if (bytes === undefined) throw new Error(`${pin.slug}: no fetch started`);
     started.delete(at);
     const next = pins[at + limit];
-    if (next !== undefined) started.set(at + limit, tarball(next));
+    if (next !== undefined) started.set(at + limit, bytesOf(next));
     yield [pin, bytes];
   }
 }
@@ -180,16 +182,18 @@ function exclude(paths: readonly string[]): void {
   writeFileSync(file, `${kept}${MARK[0]}\n${paths.map(path => `/${path}`).join('\n')}\n${MARK[1]}\n`);
 }
 
-async function install(only: readonly string[]): Promise<void> {
+async function install(only: readonly string[], fromFormat = false): Promise<void> {
   const { prepareAssetDecoders } = await import('@wildshard/format/product');
   const { validateShardfileProduct } = await import('@wildshard/format/productValidation');
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
   await prepareAssetDecoders();
-  const { shards } = readJson(PINS) as PinFile;
+  if (fromFormat && only.length !== 1) throw new Error('--from-format needs exactly blender-template');
+  const dependency = fromFormat ? (await import('./pin-format.ts')).formatTemplate(only[0] ?? '') : undefined;
+  const { shards } = dependency === undefined ? readJson(PINS) as PinFile : {shards: [dependency.pin]};
   const pins = only.length === 0 ? shards : shards.filter(row => only.includes(row.slug));
-  await fetchPinnedPublicAssets(process.cwd(), pins.map(row => row.slug));
-  const publicAssets = pinnedPublicAssets(process.cwd(), pins.map(row => row.slug));
+  if (dependency === undefined) await fetchPinnedPublicAssets(process.cwd(), pins.map(row => row.slug));
+  const publicAssets = dependency === undefined ? pinnedPublicAssets(process.cwd(), pins.map(row => row.slug)) : [];
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
   if (unknown.length > 0) throw new Error(`Not pinned: ${unknown.join(', ')}`);
   const revision = shardfileValidationRevision(process.cwd());
@@ -208,7 +212,7 @@ async function install(only: readonly string[]): Promise<void> {
     writeFileSync(url, body);
   };
   let failed = 0;
-  for await (const [pin, bytes] of inOrder(pins, 6)) {
+  for await (const [pin, bytes] of inOrder(pins, 6, dependency === undefined ? undefined : new Map([[dependency.pin.hash, dependency.bytes]]))) {
     const started = performance.now(), files = readTar(bytes);
     const fileNamed = (path: string): Uint8Array => { const body = files.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); return body; };
     try {
@@ -246,7 +250,7 @@ async function install(only: readonly string[]): Promise<void> {
       writeFileSync(join(target, path), body);
     }
     mounts = published.size - beforeMounts;
-    writeFileSync(join(target, 'validation.json'), `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision } })}\n`);
+    writeFileSync(join(target, 'validation.json'), `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision }, ...(dependency === undefined ? {} : {source: dependency.source}) })}\n`);
     console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${mounts} mounts published`);
   }
   for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
@@ -255,7 +259,7 @@ async function install(only: readonly string[]): Promise<void> {
   const paths = [...published.keys()].sort((a, b) => a.localeCompare(b));
   writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
   exclude(paths);
-  await installSaves(pins.map(row => row.slug));
+  if (dependency === undefined) await installSaves(pins.map(row => row.slug));
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
 }
 
@@ -352,13 +356,20 @@ function status(): void {
   const ledger = existsSync(LEDGER) ? readJson(LEDGER) as Ledger : undefined;
   const here = existsSync('out') ? readdirSync('out').filter(name => existsSync(`out/${name}/validation.json`)).map(name => (readJson(`out/${name}/validation.json`) as { pin?: Pin }).pin?.hash) : [];
   const missing = shards.filter(row => !here.includes(row.hash));
-  console.log(JSON.stringify({ pins: shards.length, installed: shards.length - missing.length, missing: missing.map(row => row.slug), stale: ledger !== undefined && ledger.revision !== shardfileValidationRevision(process.cwd()) }));
+  const sources = existsSync('out') ? readdirSync('out').flatMap(name => {
+    const file = join('out', name, 'validation.json');
+    if (!existsSync(file)) return [];
+    const receipt = readJson(file) as {source?: {kind: string; path: string; indexHash: string}};
+    return receipt.source === undefined ? [] : [{slug: name, ...receipt.source}];
+  }) : [];
+  console.log(JSON.stringify({ pins: shards.length, installed: shards.length - missing.length, missing: missing.map(row => row.slug), stale: ledger !== undefined && ledger.revision !== shardfileValidationRevision(process.cwd()), sources }));
   if (missing.length > 0) process.exitCode = 1;
 }
 
 const [command = 'status', ...rest] = process.argv.slice(2);
 if (command === 'refresh') await refresh();
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1');
+else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), true);
 else if (command === 'install') await install(rest);
 else if (command === 'slice') await slice();
 else if (command === 'verify-slices') await slice(true);
