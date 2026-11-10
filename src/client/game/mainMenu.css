@@ -29,7 +29,7 @@
      1:1 box that alone gave up height, so each row added under the cards (Check connection, 3a19ab3) came out of it and the
      WHAT'S NEW line took the rest, a 131 px strip on a 402 × 654 Safari page. Now it takes all the room the rows leave
      (cover crops it), and on a short screen the gaps and the cards give up height first (cqh: .ws-main's own height),
-     keeping it at least 30% of the screen at 402 × 654 (test/title-layout.test.ts). */
+     keeping it at least 30% of the screen at 402 × 654 (test/title-layout-browser.proof.mjs). */
   .ws-main .ws-main-hero { order: 1; position: relative; inset: auto; flex: 1 1 0; align-self: stretch; width: 100%; min-height: 0; margin: clamp(8px, 1.6cqh, 18px) 0; background-image: var(--ws-hero-square); background-size: cover; background-repeat: no-repeat; }
   .ws-main .ws-main-foot { order: 2; flex: none; padding-top: 0; gap: clamp(12px, 1.9cqh, 22px); }
 }

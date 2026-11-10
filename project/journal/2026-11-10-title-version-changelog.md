@@ -43,7 +43,7 @@ page the hero was 131 px (20%). It now takes all the free room
 the hero and doesn't push the layout. Hero: 207 px (32%) at 402 × 654,
 386 px (44%) at 402 × 874.
 
-test/title-layout.test.ts builds the real menu, box and pill with the app's
+test/title-layout-browser.proof.mjs builds the real menu, box and pill with the app's
 CSS and fonts. It checks the hero share, the label and that nothing
 overlaps, in Chromium and WebKit. It runs by name, and CI's e2e job runs it
 in Chromium.

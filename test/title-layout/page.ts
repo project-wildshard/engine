@@ -1,4 +1,4 @@
-// The title screen's layout proof (test/title-layout.test.ts): the real main menu, WHAT'S NEW box and build pill, with the
+// The title screen's layout proof (test/title-layout-browser.proof.mjs): the real main menu, WHAT'S NEW box and build pill, with the
 // app's own stylesheets, over no game. ?dev=0 is a player's title, ?online=0 a build without a world (no Check connection).
 import '../../src/client/engine/ui/styles/base.css';
 import '../../src/client/engine/ui/styles/menu.css';
