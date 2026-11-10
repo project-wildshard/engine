@@ -49,3 +49,29 @@ and normal thin installs each pass7/7 for this final blob; sealed complete
 module clocks are2.803s/2.751s. The public recorder preserves the earlier
 historical observations and binds the current clocks to this new source.
 Final concurrent gate and hosted qualification remain pending.
+
+Rebasing after public batch277f2d3 preserves all27 earlier dispositions and
+our19, leaving323 pending paths. The extension stays byte-for-byte identical
+apart from the separate inventory hash field. Both original timing histories
+are retained. No source or case is retired.
+
+The published inventory itself also refuses the full planner:21 paths that
+the prior batch restored lack full clocks, so all receive the required60s
+fallback. Removing our19 from actual discovery still reproduces the refusal.
+A normal global lease then runs all21/129 cases successfully in40.34s; their
+slowest complete module is24.466s. Actual thin pins pass18/41, max2.078s.
+The public recorder binds both successful reports to the observed source
+blobs. These bootstrap clocks are local, not fabricated hosted observations.
+Combined real planners now pass: full1245/12/max239.895s, Ring11148/8/max
+230.210s. Full has no unknown weights; Ring1's eight inherited unknowns still
+receive60s. No fallback, calibration, grouping or headroom is changed.
+
+CI23 now also checks paths removed from the pushed lift-pending inventory.
+An inherited file newly entering discovery needs actual clocks even when Git
+did not add the source file. The real-Git proof reproduces the old bug: an
+unmeasured restoration publishes successfully. The fix refuses that push and
+leaves the remote unchanged (2.92s), admits a tag at published main, and does
+not misclassify a file actually removed to its owner. Existing real timing,
+stale/zero/error/kit and snapshot-lifetime controls still pass in6.20s. This
+adds a gate; no check or original oracle is bypassed. Both manual proofs stay
+outside hooks. Review and the normal publication gate still apply.

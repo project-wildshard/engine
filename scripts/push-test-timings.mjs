@@ -1,4 +1,4 @@
-// New test files need a committed clock before a push can publish them.
+// New and restored test files need a committed clock before publication.
 import {execFileSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
@@ -85,6 +85,16 @@ export function missingTestTimings(refs,root=process.cwd(),destination=process.e
   const base=/^0+$/u.test(remote)?publishedBase(root,local,destination):remote;
   const paths=base===null?git(root,['ls-tree','-r','--name-only','-z',local]):git(root,['diff','--no-renames','--diff-filter=A','--name-only','-z',base,local]);
   for(const file of paths.split('\0'))if(/^(?:src|test)\/[\s\S]+\.test\.[cm]?[jt]sx?$/u.test(file))added.add(file);
+  // Restoring an inherited path changes discovery even when Git reports no
+  // new source file. Removed/moved files are filtered by real discovery below.
+  if(base!==null){
+   const inventoryFile='test/lift-pending.json',before=blobAt(root,base,inventoryFile),after=blobAt(root,local,inventoryFile);
+   if(before!==after){
+    const previous=before===null?[]:v.parse(v.array(v.string()),JSON.parse(git(root,['show',`${base}:${inventoryFile}`])));
+    const remaining=new Set(after===null?[]:v.parse(v.array(v.string()),JSON.parse(git(root,['show',`${local}:${inventoryFile}`]))));
+    for(const file of previous)if(!remaining.has(file))added.add(file);
+   }
+  }
  }
  if(added.size===0)return [];
  const fullFiles=inventory(root,'full'),ringFiles=inventory(root,'1'),full=weights(root,'full'),ring1=weights(root,'1');

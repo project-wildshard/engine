@@ -1138,6 +1138,464 @@
       "finishedAt": "2026-11-10T19:13:02.198Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "d560f4745d951daf24734f4b307d9990d5c459ae",
+      "tree": "764acd8b17b657b9f78b70b589344f8f04515a00",
+      "profile": "ci21-public-restorations-277f2d3",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/fixed-draws.test.ts",
+          "blob": "ffbc7408e9709a05e37ecf5610343038160500c6",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 18,
+          "durationMs": 1460.744209
+        },
+        {
+          "file": "test/graph-budget.test.ts",
+          "blob": "cfbe2c29607a47bb8cda4c73f1f3527a9a38702f",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 151.67450100000002
+        },
+        {
+          "file": "test/graph-data-texture.test.ts",
+          "blob": "12b06baa2ae4c3cc4527b4f07e611e64fcdbf68b",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 63.12429199999998
+        },
+        {
+          "file": "test/graph-day-toon.test.ts",
+          "blob": "8cd2b0f757af38ca7ca263b09fd134f275b6a36e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 274.07904199999996
+        },
+        {
+          "file": "test/graph-flat-varying.test.ts",
+          "blob": "9d77e56081e886336b95dc8499d8cc729bc2c07a",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 69.94633299999997
+        },
+        {
+          "file": "test/graph-fog-inputs.test.ts",
+          "blob": "c2cc0f46047d35226fed66e058a016671de791b4",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 53.18654200000001
+        },
+        {
+          "file": "test/graph-foliage-normal.test.ts",
+          "blob": "632071792ebf5bae2fe63781452ef9d9f51422ad",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 54.46579000000003
+        },
+        {
+          "file": "test/graph-instance-transform.test.ts",
+          "blob": "0ab556736783e8687e208a6ae2e976173191f4ed",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 42.00566599999999
+        },
+        {
+          "file": "test/graph-optional-attribute.test.ts",
+          "blob": "cdd0c391d27909aeb0c1c7efad8b65698952bba7",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 54.753792000000004
+        },
+        {
+          "file": "test/graph-shadow-depth.test.ts",
+          "blob": "87f5b1b5ddfa9547bf3506195b7004e7c43ee744",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 72.80029300000004
+        },
+        {
+          "file": "test/graph-shadow-offset.test.ts",
+          "blob": "1fb49bb59ecba7c77cb558e9e6110a84032dfb22",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 58.054208999999986
+        },
+        {
+          "file": "test/graph-toon-caustics.test.ts",
+          "blob": "fca4cd959b0a5bdb7234eb3573e851a4dd42ec1e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 82.75245800000002
+        },
+        {
+          "file": "test/graph-wave-normal.test.ts",
+          "blob": "f18e3fda97d4a5a8675ee21f4a6326688de0fa7e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 54.45525000000001
+        },
+        {
+          "file": "test/graph-wind.test.ts",
+          "blob": "e0df3d7c5ee6a9bfbaec045d42316dbaf949e4ea",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 64.66966799999997
+        },
+        {
+          "file": "test/headless-byte-capture.test.ts",
+          "blob": "4e6d88c110bc5a7c23f732dd92becc20d50ea2c8",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 1652.3551650000004
+        },
+        {
+          "file": "test/physics-shards-headless.test.ts",
+          "blob": "e0b8de8a12d57c8806d6b0fc26cf08ae776fd011",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 55,
+          "durationMs": 24465.710790999994
+        },
+        {
+          "file": "test/pine-posed-tier-loading.test.ts",
+          "blob": "b46a96cd3f13343a61493b859b7437eabf6b593b",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 147.17604099999997
+        },
+        {
+          "file": "test/preview-telemetry.test.ts",
+          "blob": "2141b953ffcd0645ed54e2065333a0eb86ab0612",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 322.089083
+        },
+        {
+          "file": "test/script-seats.test.ts",
+          "blob": "1ec1c7a59f038acd7faa8b774af47c04e8c9ec95",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 3358.0177090000007
+        },
+        {
+          "file": "test/shipped-graph-cost.test.ts",
+          "blob": "c93f848295273423ab43765d8cc796e06480ce3b",
+          "rings": [
+            "full"
+          ],
+          "state": "passed",
+          "passedTests": 29,
+          "durationMs": 2975.488083
+        },
+        {
+          "file": "test/specimen-explorer.test.ts",
+          "blob": "3650e18b9b7d4970a9628119bd84a4dfb59c970c",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 2241.9684999999995
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T19:30:48.449Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "d560f4745d951daf24734f4b307d9990d5c459ae",
+      "tree": "764acd8b17b657b9f78b70b589344f8f04515a00",
+      "profile": "ci21-public-restorations-277f2d3",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/fixed-draws.test.ts",
+          "blob": "ffbc7408e9709a05e37ecf5610343038160500c6",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 18,
+          "durationMs": 606.454083
+        },
+        {
+          "file": "test/graph-budget.test.ts",
+          "blob": "cfbe2c29607a47bb8cda4c73f1f3527a9a38702f",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 233.15499999999997
+        },
+        {
+          "file": "test/graph-data-texture.test.ts",
+          "blob": "12b06baa2ae4c3cc4527b4f07e611e64fcdbf68b",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 77.49166799999996
+        },
+        {
+          "file": "test/graph-day-toon.test.ts",
+          "blob": "8cd2b0f757af38ca7ca263b09fd134f275b6a36e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 303.02395899999993
+        },
+        {
+          "file": "test/graph-flat-varying.test.ts",
+          "blob": "9d77e56081e886336b95dc8499d8cc729bc2c07a",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 57.51674899999999
+        },
+        {
+          "file": "test/graph-fog-inputs.test.ts",
+          "blob": "c2cc0f46047d35226fed66e058a016671de791b4",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 57.075248999999985
+        },
+        {
+          "file": "test/graph-foliage-normal.test.ts",
+          "blob": "632071792ebf5bae2fe63781452ef9d9f51422ad",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 56.59545700000001
+        },
+        {
+          "file": "test/graph-instance-transform.test.ts",
+          "blob": "0ab556736783e8687e208a6ae2e976173191f4ed",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 48.692916999999994
+        },
+        {
+          "file": "test/graph-optional-attribute.test.ts",
+          "blob": "cdd0c391d27909aeb0c1c7efad8b65698952bba7",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 50.532748999999995
+        },
+        {
+          "file": "test/graph-shadow-depth.test.ts",
+          "blob": "87f5b1b5ddfa9547bf3506195b7004e7c43ee744",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 53.66925000000002
+        },
+        {
+          "file": "test/graph-shadow-offset.test.ts",
+          "blob": "1fb49bb59ecba7c77cb558e9e6110a84032dfb22",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 56.672291000000016
+        },
+        {
+          "file": "test/graph-toon-caustics.test.ts",
+          "blob": "fca4cd959b0a5bdb7234eb3573e851a4dd42ec1e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 62.13170800000003
+        },
+        {
+          "file": "test/graph-wave-normal.test.ts",
+          "blob": "f18e3fda97d4a5a8675ee21f4a6326688de0fa7e",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 52.26754099999998
+        },
+        {
+          "file": "test/graph-wind.test.ts",
+          "blob": "e0df3d7c5ee6a9bfbaec045d42316dbaf949e4ea",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 1,
+          "durationMs": 52.47249900000001
+        },
+        {
+          "file": "test/headless-byte-capture.test.ts",
+          "blob": "4e6d88c110bc5a7c23f732dd92becc20d50ea2c8",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 2078.401417
+        },
+        {
+          "file": "test/pine-posed-tier-loading.test.ts",
+          "blob": "b46a96cd3f13343a61493b859b7437eabf6b593b",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 199.821625
+        },
+        {
+          "file": "test/preview-telemetry.test.ts",
+          "blob": "2141b953ffcd0645ed54e2065333a0eb86ab0612",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 286.4520829999999
+        },
+        {
+          "file": "test/specimen-explorer.test.ts",
+          "blob": "3650e18b9b7d4970a9628119bd84a4dfb59c970c",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 1511.1633760000002
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T19:31:58.548Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [
