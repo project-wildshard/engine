@@ -2,12 +2,16 @@ import { engineString } from '../strings';
 import { diagnosticNow } from '../core/clock';
 import { bootTiming, bootMark, endBootOperation } from './timing';
 /** A path supplies its vocabulary; the engine only accounts for exclusive wall time. */
-export interface LoadingStep { key: string; label: string; weight: number; aliases?: readonly string[] }
+/** `weight` is the step's share of the Load bar: on a measured path, its seconds on the phone profile (LS7). `fastWeight`
+ *  is the same row's seconds on an unthrottled desktop GPU; with both, LS5 can read time left (boot/timeLeft.ts). */
+export interface LoadingStep { key: string; label: string; weight: number; fastWeight?: number; aliases?: readonly string[] }
 export interface LoadingPath { id: string; steps: readonly LoadingStep[]; ignored?: readonly string[] }
 export interface LoadingRow {
   key: string; label: string; number: number; state: 'todo' | 'on' | 'ok'; ms: number; detail: string; fraction?: number;
   /** The step's share of the Load bar (its path weight), present when it is not 1. */
   weight?: number;
+  /** LS5: the step's desktop-profile seconds, present on a path measured on two profiles. */
+  fastWeight?: number;
   /** First accounted start on the monotonic timeline clock, not a paint timestamp. */
   startedAt?: number;
   /** Last completed wall boundary; ms remains exclusive of nested work. */
@@ -157,6 +161,7 @@ export class LoadingTimeline {
         state: running.has(key) ? 'on' : row?.started ? 'ok' : 'todo', ms: row?.ms ?? 0, detail: row?.detail ?? '' };
       if (row?.fraction !== undefined) result.fraction = row.fraction;
       if (step.weight !== 1) result.weight = step.weight;
+      if (step.fastWeight !== undefined) result.fastWeight = step.fastWeight;
       if (row?.startedAt !== undefined) result.startedAt = row.startedAt;
       if (row?.endedAt !== undefined) result.endedAt = row.endedAt;
       if (row?.setupAtStart !== undefined) result.setupAtStart = row.setupAtStart;

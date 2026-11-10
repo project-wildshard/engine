@@ -1,0 +1,13 @@
+# LS5: time left that's honest
+
+Jake wants the loading card to say how long it has left, and only with real numbers (J188, his call 3 of
+2026-11-07: "only once enough real readings make it honest"). The card now has a time-left row under the tier,
+whole seconds that count down with the clock, hidden until the readings support a number.
+
+The estimate is `src/client/engine/boot/timeLeft.ts`. A single speed ratio over the bar's weights failed: between an
+unthrottled desktop GPU and the phone stand-in (Chromium on the Mac's GPU at 4x CPU and 12.8 Mbit/s), Home region
+slows 3.6x, gameplay 12x and the program links barely at all. So the grid path is now measured on both profiles
+(`loadingPaths.ts`, three runs each of `scripts/loading-time-left-proof.mjs --dump`), and each finished row is a
+reading of where this device sits between them. A least-squares fit gives that place; every row still to run costs its
+desktop seconds plus that share of the difference. A running row past its cost raises the fit, so the number goes up
+rather than holding a wrong one. Rows' own reported shares are not used: they report cheap units first or last.

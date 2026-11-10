@@ -104,6 +104,7 @@
     "src/client/engine/boot/shardPrefetch.ts": "client",
     "src/client/engine/boot/shell.ts": "client",
     "src/client/engine/boot/stuck.ts": "client",
+    "src/client/engine/boot/timeLeft.ts": "client",
     "src/client/engine/boot/stuckStep.ts": "client",
     "src/client/engine/boot/sw.ts": "client",
     "src/client/engine/boot/texturePack.ts": "client",
