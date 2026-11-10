@@ -28,11 +28,11 @@ tests() {
 }
 
 cook_step() {
-  local update=()
-  if [ "${RING_RECORD:-}" = true ]; then update=(--update); fi
+  set --
+  if [ "${RING_RECORD:-}" = true ]; then set -- --update; fi
   stage pins node scripts/pins.ts install --ring 1
   stage cook node scripts/ring-cook.mjs
-  stage step node --experimental-transform-types --no-warnings scripts/ring-step.ts --report tmp/ring-cook/step.json "${update[@]}"
+  stage step node --experimental-transform-types --no-warnings scripts/ring-step.ts --report tmp/ring-cook/step.json "$@"
 }
 
 build_boot() {
