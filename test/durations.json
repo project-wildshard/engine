@@ -827,6 +827,7 @@
   "test/lint-generated-selection.test.ts": 0.310685344,
   "test/lint-recorded-debt.test.ts": 9.715679667999998,
   "test/lint-version-policy.test.ts": 0.9726592509999998,
+  "test/load-stalls.test.ts": 15.219048832999999,
   "test/loading-bar-rule.test.mjs": 0.04827671899999999,
   "test/loading-calibration.test.ts": 0.051199350999999976,
   "test/loading-flow.test.mjs": 0.21932484600000005,

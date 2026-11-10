@@ -74,3 +74,6 @@ meta `docs/plans/NINE-DRAGON-BENCHMAX-PLAN.md`; the loop is NB1's
   (`Material texture transcode`). Re-proof: sleep red (1.47 s of 1.5 s),
   clean green (ring products 0.22-0.31 s); Nine at x4 0.84 s, with the
   sleep 1.46 s.
+
+- Queue job 284 refused for the new test file's clocks, as designed;
+  recorded from the gate's own evidence.

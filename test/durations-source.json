@@ -1596,6 +1596,60 @@
       "finishedAt": "2026-11-10T19:31:58.548Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "04ae452b83679a81105f13d605acc01bf7330b4a",
+      "tree": "8950ad3dc456e8ed02c919c1de900acbfd852674",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/load-stalls.test.ts",
+          "blob": "73b56db13497456c3d9d520b1183702173bdc34c",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 15219.048832999999
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:04:55.278Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "04ae452b83679a81105f13d605acc01bf7330b4a",
+      "tree": "8950ad3dc456e8ed02c919c1de900acbfd852674",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/load-stalls.test.ts",
+          "blob": "73b56db13497456c3d9d520b1183702173bdc34c",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 5,
+          "durationMs": 47.167166
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:04:56.548Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [
