@@ -28,3 +28,15 @@ Real source mutations dropping restored cycle and disabling numeric
 weather scaling both fail; their source bytes are restored exactly.
 The SDK half is prepared in sdk-sky-sharddev-20261110 with all four
 original byte laws and its own independent numerical reference.
+
+## One-shot review and pause oracle
+
+J206 approves engine 822a441 and SDK 03a6538, no MUST:
+`~/.cache/wildshard/session-keep/reviews/sdk-sky-engine-20261110-SDK-keyed-sky-20261110T080412Z-62674.md`.
+Its one SHOULD is fixed: after paused update(60), assert both phases
+still equal the actual authored night phase. Two equally wrong clocks
+can no longer satisfy the added pause claim. Real ignored-pause source
+mutation passes the previous equality-only test, fails the repaired
+oracle, then the byte-restored source passes all three cases. The safe
+helper used ephemeral read-only Codex because Opus quota was exhausted
+or unverified; it modified neither reviewed tree. No second review.

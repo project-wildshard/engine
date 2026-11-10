@@ -122,6 +122,8 @@ timed(
     live.update(60)
     restored.update(60)
     assert.deepEqual(restored.snapshot(), live.snapshot())
+    assert.equal(live.phase, rows.fixed.night)
+    assert.equal(restored.phase, rows.fixed.night)
     live.pickTime('live')
     restored.pickTime('live')
     live.update(0.5)
