@@ -1,6 +1,4 @@
 [
-  "src/client/game/riding/seated-figure-host.test.ts",
-  "src/client/game/shardfile/world-site-lifetime.test.ts",
   "test/actor-projection-v2.test.ts",
   "test/animal-model-preparation.test.ts",
   "test/animal-retained-physics.test.ts",

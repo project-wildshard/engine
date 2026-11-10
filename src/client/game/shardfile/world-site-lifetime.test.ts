@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Mandatory real-GC child exercises the actual site factory.
 import { execFileSync } from 'node:child_process';
-// oxlint-disable-next-line import/no-nodejs-modules -- Read shipped catalogue rows and own only the child config.
-import { readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Read pinned catalogue rows and own only the child config.
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Check the pinned catalogue bytes against their product index.
+import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the child runner without a shell.
 import { resolve as resolvePath } from 'node:path';
 import { BufferAttribute, BufferGeometry, Mesh, MeshStandardMaterial } from 'three';
@@ -19,31 +21,24 @@ import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import * as v from 'valibot';
 
 const keys = ['hut', 'lookout', 'shrine'];
-// Keep this game-test input data-only: the source fixture's constructor/schema
-// closure belongs to the shard project. The original consumed facts are still
-// validated below and by the complete world-scene admission.
-const fixedLayouts = v.parse(v.record(v.string(), v.unknown()),
-  JSON.parse(readFileSync('test/fixtures/driftwood-layout-original.json', 'utf8')));
-const shipped = v.parse(v.looseObject({ product: v.string(), models: v.array(v.looseObject({ key: v.string(), choices: v.array(v.looseObject({ id: v.string() })) })) }),
-  JSON.parse(readFileSync('src/shards/driftwood-isle/data/siteCatalogue.json', 'utf8')));
-const layoutSchema = v.looseObject({ origin: v.unknown(), colliders: v.array(v.unknown()), floors: v.array(v.unknown()), anchors: v.unknown(), descs: v.array(v.unknown()) });
-const layouts = new Map(keys.map(key => {
-  const input: unknown = fixedLayouts[key];
-  return [key, v.parse(layoutSchema, key === 'shrine' ? v.parse(v.looseObject({ world: v.unknown() }), input).world : input)] as const;
-}));
-const models: unknown[] = [];
-for (const row of shipped.models) {
-  if (!keys.includes(row.key)) continue;
-  const layout = layouts.get(row.key); if (layout === undefined) throw new Error('Missing shipped site facts');
-  const choices: unknown[] = [];
-  for (const choice of row.choices) {
-    if (choice.id !== 'world') continue;
-    choices.push({ ...choice, params: {}, colliders: layout.descs,
-      site: { origin: layout.origin, colliders: layout.colliders, floors: layout.floors, anchors: layout.anchors } });
-  }
-  models.push({ ...row, defaults: {}, variants: [], choices });
-}
-const rows = parseWorldSceneModels({ ...shipped, models });
+// J65: the shard source this read (`siteCatalogue.json` and its layout
+// constructors) lives in the shard repo now. Read the same shipped site rows
+// from the pinned driftwood-isle shardfile's admitted scene catalogue instead:
+// its cook already merged each layout's origin, colliders, floors and anchors.
+// The product is what `node scripts/pins.ts install` writes, or Ring 1's server
+// slice of the same pin (test/fixtures/engine-lift/product.ts's order); both
+// carry the identical catalogue bytes.
+const full = 'out/driftwood-isle', slice = 'out/.slices/driftwood-isle';
+const product = (process.env['WILDSHARD_RING'] === '1' ? [slice, full] : [full, slice]).find(directory => existsSync(resolvePath(directory, 'shard.json')));
+if (product === undefined) throw new Error('Missing pinned driftwood-isle product; run: node scripts/pins.ts install driftwood-isle');
+const index = v.parse(v.looseObject({ files: v.array(v.looseObject({ name: v.optional(v.string()), path: v.string(), hash: v.string() })) }),
+  JSON.parse(readFileSync(resolvePath(product, 'shard.json'), 'utf8')));
+const entry = index.files.find(file => file.name === 'models/world-scenes.json');
+if (entry === undefined) throw new Error('The pinned product has no scene catalogue');
+const bytes = readFileSync(resolvePath(product, entry.path));
+if (createHash('sha256').update(bytes).digest('hex') !== entry.hash) throw new Error('The pinned scene catalogue differs from its index hash');
+const shipped = parseWorldSceneModels(JSON.parse(bytes.toString('utf8')));
+const rows = parseWorldSceneModels({ ...shipped, models: shipped.models.filter(row => keys.includes(row.key)) });
 
 async function retiredVisit(page: Scope, ledger: MemoryAttribution, handles: Set<object>): Promise<WeakRef<object>[]> {
   const scope = page.child('retired site construction'), sky: unknown = Object.create(SkyRig.prototype);
@@ -89,13 +84,20 @@ async function retiredVisit(page: Scope, ledger: MemoryAttribution, handles: Set
 }
 
 test('awaited shipped sites release their GPU storage and collect while the page remains live', async () => {
+  // The consumed facts: each pinned site keeps its world choice, layout and colliders.
+  expect(rows.product).toBe('driftwood-isle');
+  expect(rows.models.map(row => row.key)).toEqual(keys);
+  for (const row of rows.models) {
+    const world = row.choices.find(choice => choice.id === 'world');
+    expect([world?.site !== undefined, (world?.colliders.length ?? 0) > 0, (world?.draws.length ?? 0) > 0]).toEqual([true, true, true]);
+  }
   const gc: unknown = Reflect.get(globalThis, 'gc');
   if (typeof gc !== 'function') {
     if (process.env['WS_WORLD_SITE_GC'] === '1') throw new Error('Site lifetime proof requires --expose-gc');
     mkdirSync('tmp', { recursive: true }); const directory = mkdtempSync(resolvePath('tmp/world-site-gc-'));
     try {
       const config = resolvePath(directory, 'vitest.config.mjs');
-      writeFileSync(config, `export default {root:${JSON.stringify(resolvePath('.'))},test:{include:['src/client/game/shardfile/world-site-lifetime.test.ts'],environment:'happy-dom',setupFiles:[],pool:'forks',maxWorkers:1,execArgv:['--expose-gc']}};`);
+      writeFileSync(config, `export default {root:${JSON.stringify(resolvePath('.'))},test:{include:['src/client/game/shardfile/world-site-lifetime.test.ts'],environment:'node',setupFiles:[],pool:'forks',maxWorkers:1,execArgv:['--expose-gc']}};`);
       const output = execFileSync(process.execPath, ['--expose-gc', resolvePath('node_modules/vitest/vitest.mjs'), 'run', '--config', config], {
         env: { ...process.env, WS_WORLD_SITE_GC: '1', NO_COLOR: '1' }, encoding: 'utf8', stdio: 'pipe', timeout: 30_000,
       }); expect(output).toContain('1 passed');

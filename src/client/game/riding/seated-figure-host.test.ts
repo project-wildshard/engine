@@ -1,5 +1,5 @@
-// oxlint-disable-next-line import/no-nodejs-modules -- The no-shard-nouns check reads the host's own sources.
-import { readdirSync, readFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- The no-shard-nouns check reads the host's own sources and the shard pins.
+import { readFileSync } from 'node:fs';
 import * as v from 'valibot';
 import { expect, test, vi } from 'vitest';
 import { Bone, BufferGeometry, Material, Mesh, MeshStandardMaterial, Skeleton } from 'three';
@@ -91,7 +91,9 @@ test('seat rows refuse callbacks, unknown looks and malformed looks (test 6)', (
 });
 
 test('the rider host names no shard and no shard-only figure (test 2)', () => {
-  const nouns = [...readdirSync('src/shards', { withFileTypes: true }).filter(entry => entry.isDirectory() && !entry.name.startsWith('_')).map(entry => entry.name), 'shepherd', 'ferryman'];
+  // J65: shard source left engine; the shards it consumes are its pinned shardfiles.
+  const pins = v.parse(v.object({ api: v.string(), shards: v.array(v.looseObject({ slug: v.string() })) }), JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')));
+  const nouns = [...pins.shards.map(pin => pin.slug).filter(slug => !slug.startsWith('_')), 'shepherd', 'ferryman'];
   expect(nouns.length).toBeGreaterThan(3);
   for (const file of ['src/client/game/riding/seatedFigure.ts', 'src/client/game/models/mountedSpecimen.ts', 'node_modules/@wildshard/format/src/format/mountedSpecimenRows.ts']) {
     const source = readFileSync(file, 'utf8').toLowerCase();
