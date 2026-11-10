@@ -29,3 +29,31 @@ it once, you get on the hoverboard, you get off the hoverboard."
 - Unchanged: Developer-only (isDev on the client, allowDeveloperBoost on
   the server). The latch still outlives a dismount, as the button's did.
   With Developer mode off, a second tap is just a tap.
+
+Chat (row 43): "get rid of these icons for team members. Let's just
+have chat and the little microphone button ... messages should fade
+... after 5 seconds ... when you press the chat box ... some form of
+chat overlay that takes up way more space ... not a modal."
+
+- `chatCorner.ts` holds the two rules: a line is fresh for 5 s, fades
+  for 0.6 s and is then gone from the corner, and only focus opens the
+  chat. The corner shows only the input, the mic and the voice tip.
+  Its lines let taps through to the game.
+- Focusing the input sets `data-open`. That gives a panel (phone: full
+  width from the top, at most 52 % of the height, and above the
+  keyboard through visualViewport) with a × header, the players on
+  voice as rows with the speaking glow and a Mute / Muted pill, and the
+  history (50 lines) with Report on other players' lines. A tap outside,
+  the ×, Escape or an empty Enter closes it. Sending keeps it open, so
+  you are in chatting mode. The outside tap is a capture listener that
+  never stops the event, so the game still gets that tap. The panel is
+  z 950, under the failure-mode cards (2147482300+). `data-ws-menu`
+  still hides it all (QA 15).
+- Escape from a text field still pauses the game (InputService let it
+  through on purpose), so Escape in the chat used to open PAUSE. A field
+  marked `data-ws-own-escape` now keeps its Escape. The chat field
+  closes the open chat on it instead (key-swallow test).
+- hud-worst gains `--states` (faded, open, closed, boost off / on), and
+  its chat-rev copy tolerates a rev with no chatCorner.ts.
+- The CI hover proof now drives the double tap through the real Player
+  and the HOVER tab's amber look, instead of the removed button.

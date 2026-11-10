@@ -5,8 +5,10 @@ import type { ChatBox } from './chatLines';
 import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './voice';
 
 // J218: voice's controls live in the chat row, so the one mic button is both the phone's HUD toggle and the prompt "near the
-// chat". On a keyboard `B` toggles it (no binding uses B: `src/client/game/inputContexts.ts`). Under the row, one tip says
-// what to do next, and while voice is on, each player on it is a chip that glows as they talk and mutes on a tap.
+// chat". On a keyboard `B` toggles it (no binding uses B: `src/client/game/inputContexts.ts`). Over the row, one tip says
+// what to do next. QA row 43 (Jake, 2026-11-10: "get rid of these icons for team members … just have chat and the little
+// microphone button"): the players on voice are no longer chips in the corner. They are a list in the open chat (chatLines.ts),
+// one row each, that glows as they talk and mutes on a tap, so per-player mute is never lost.
 
 const CYAN = '#8fe3ff', NAVY = 'rgba(9,22,36,.86)', RED = '#ff7a7a', AMBER = '#ffc56b';
 /** The first-time tip, and the "you're on, alone" tip, go after this long. */
@@ -23,13 +25,17 @@ const CSS = `
 #ws-voice-tip{display:flex;gap:8px;align-items:center;align-self:flex-start;max-width:100%;padding:5px 6px 5px 9px;border-radius:8px;background:rgba(6,16,28,.9);border:1px solid rgba(143,227,255,.35);color:#dff6ff;font:600 12px/1.3 system-ui,sans-serif;pointer-events:auto}
 #ws-voice-tip[data-tone=bad]{border-color:rgba(255,122,122,.6)}
 #ws-voice-tip button{flex:none;border:0;background:none;color:#9fb3c8;font:inherit;font-size:14px;padding:0 4px;cursor:pointer}
-#ws-voice-peers{display:flex;flex-wrap:wrap;gap:4px;pointer-events:auto}
-#ws-voice-peers button{display:flex;gap:5px;align-items:center;padding:3px 8px 3px 6px;border-radius:999px;border:1px solid rgba(143,227,255,.3);background:rgba(8,14,24,.7);color:#dff6ff;font:600 12px/1.2 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:box-shadow .12s,border-color .12s}
-#ws-voice-peers button i{width:7px;height:7px;border-radius:50%;background:#4a6378}
+#ws-voice-peers{display:flex;flex-direction:column;gap:4px;pointer-events:auto}
+#ws-voice-peers>[data-title]{color:#9fb3c8;font:700 10px/1.2 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;padding:0 4px 2px}
+#ws-voice-peers button{display:flex;gap:8px;align-items:center;width:100%;min-height:36px;padding:4px 10px 4px 8px;border-radius:8px;border:1px solid rgba(143,227,255,.25);background:rgba(8,14,24,.7);color:#dff6ff;font:600 13px/1.2 system-ui,sans-serif;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:box-shadow .12s,border-color .12s}
+#ws-voice-peers button i{flex:none;width:8px;height:8px;border-radius:50%;background:#4a6378}
+#ws-voice-peers button span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ws-voice-peers button em{flex:none;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${CYAN};padding:3px 8px;border-radius:999px;border:1px solid rgba(143,227,255,.4)}
 #ws-voice-peers button[data-linked=true] i{background:#5fd3a0}
 #ws-voice-peers button[data-speaking=true]{border-color:${CYAN};box-shadow:0 0 0 2px rgba(143,227,255,.45),0 0 10px rgba(143,227,255,.5)}
 #ws-voice-peers button[data-speaking=true] i{background:${CYAN}}
-#ws-voice-peers button[data-muted=true]{color:#7d8d9c;text-decoration:line-through}
+#ws-voice-peers button[data-muted=true] span{color:#7d8d9c;text-decoration:line-through}
+#ws-voice-peers button[data-muted=true] em{color:${RED};border-color:rgba(255,122,122,.5)}
 #ws-voice-peers button[data-linked=false]{opacity:.6}
 #ws-voice-tip[hidden],#ws-voice-peers[hidden]{display:none}
 `;
@@ -54,6 +60,8 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
   const button = document.createElement('button'), tip = document.createElement('div'), peers = document.createElement('div');
   button.id = 'ws-voice'; button.type = 'button';
   tip.id = 'ws-voice-tip'; peers.id = 'ws-voice-peers';
+  const heading = document.createElement('div');
+  heading.dataset['title'] = ''; heading.textContent = 'On voice · tap to mute'; peers.append(heading);
   chat.form.append(button); chat.box.append(tip, peers);
   const touch = touchFirst(), act = touch ? 'Tap the mic' : 'Press B';
   let dismissed = '', firstUntil = voicePrefs.read().seen ? 0 : diagnosticNow() + FIRST_TIP_MS, aloneUntil = 0, was: VoiceState = voice.state;
@@ -81,19 +89,20 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
     return null;
   };
   let drawnOff: boolean | null = null, drawnTip: string | null = null;
-  const chips = new Map<string, { readonly chip: HTMLButtonElement; readonly label: HTMLSpanElement }>();
+  const chips = new Map<string, { readonly chip: HTMLButtonElement; readonly label: HTMLSpanElement; readonly action: HTMLElement }>();
   const chipFor = (peer: VoicePeer): HTMLButtonElement => {
     let held = chips.get(peer.id);
     if (held === undefined) {
-      const chip = document.createElement('button'), dot = document.createElement('i'), label = document.createElement('span');
-      chip.type = 'button'; chip.dataset['peer'] = peer.id; chip.append(dot, label);
+      const chip = document.createElement('button'), dot = document.createElement('i'), label = document.createElement('span'), action = document.createElement('em');
+      chip.type = 'button'; chip.dataset['peer'] = peer.id; chip.append(dot, label, action);
       scope.listen(chip, 'click', () => { const now = voice.roster.get(peer.id); if (now !== undefined) voice.mute(peer.id, !now.muted); });
-      held = { chip, label }; chips.set(peer.id, held);
+      held = { chip, label, action }; chips.set(peer.id, held);
     }
-    const { chip, label } = held;
+    const { chip, label, action } = held;
     chip.dataset['speaking'] = String(peer.speaking); chip.dataset['muted'] = String(peer.muted); chip.dataset['linked'] = String(peer.linked);
     chip.title = peer.muted ? `Unmute ${peer.name}` : `Mute ${peer.name}`;
-    label.textContent = peer.muted ? `${peer.name} (muted)` : peer.name;
+    label.textContent = peer.name; action.textContent = peer.muted ? 'Muted' : 'Mute';
+    chip.setAttribute('aria-pressed', String(peer.muted));
     return chip;
   };
   /** Draw what changed; a button or chip being tapped is never swapped out from under the finger. */

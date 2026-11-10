@@ -1042,6 +1042,7 @@
     "src/client/game/weather/rainPresentation.ts": "client",
     "src/client/game/whatsNew.ts": "client",
     "src/client/game/whatsNewBanner.ts": "client",
+    "src/client/host/online/chatCorner.ts": "client",
     "src/client/host/online/chatLines.ts": "client",
     "src/client/host/online/doctor.ts": "client",
     "src/client/host/online/doctorPage.ts": "client",
