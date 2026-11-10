@@ -54,91 +54,103 @@ async function room(work, options = {}) {
     { ...SIM_LEVEL, entities: [], quests: [], ground: { size: 32, height: 0 } },
     { rapier },
   );
-  const clock =
-    options.clock === false
-      ? null
-      : host.useDayClock(normalizedDayClock(DEFAULT_NORMALIZED_DAY, null));
-  const weatherCalls = { mode: [], force: [] };
-  let air = null,
-    program = null;
-  if (options.weather !== false) {
-    const product = await loadHeadlessProduct(
-      "out/" + (options.pine ? "pine-hollow" : "nalati-grasslands"),
-    );
-    const data = await product.json("world/weather.json");
-    program = parseWeatherProgram(options.pine ? data : data.weather);
-    air = new WeatherContinuation(program, { seed: 19, mode: "live" });
-    publishWeather(host, {
-      get n() {
-        return air.n;
-      },
-      get state() {
-        return air.state;
-      },
-      get phaseLeft() {
-        return air.phaseLeft;
-      },
-      get profile() {
-        return air.profile;
-      },
-      get registers() {
-        return air.registers;
-      },
-      setMode(name, at) {
-        weatherCalls.mode.push([name, at]);
-        air.setMode(name, at);
-      },
-      force(name, at) {
-        weatherCalls.force.push([name, at]);
-        air.force(name, at);
-      },
-    });
-    host.onStep("proof.weather", (dt) => air.update(dt, clock?.phase ?? 0));
-  }
-  const world = new SimNetWorld(host, options.cell ?? 1),
-    link = directLoopback(),
-    client = new NetClient(link.client);
-  const net = new NetRoom({
-    world,
-    step: (inputs) => {
-      netWorldInput(actRoutes(host), inputs);
-      host.step();
-    },
-  });
-  const command = (word) => {
-    const seq = client.command(idle);
-    client.flush();
-    if (word !== undefined) client.act({ kind: "climate", ...word, seq });
-    link.pump();
-    return seq;
-  };
-  const tick = (word) => {
-    command(word);
-    net.tick();
-    link.pump();
-    client.present();
-  };
-  const open = () => {
-    net.join(link.server, world.player);
-    client.hello("", { player: "climate-owner", name: "Climate owner" });
-    link.pump();
-    net.open();
-    link.pump();
-  };
   try {
-    await work({ host, clock, air, program, weatherCalls, client, net, link, command, tick, open });
-    assert.equal(client.dropped, 0);
-    assert.equal(net.stats.dropped, 0);
-  } finally {
-    try {
-      client.dispose();
-    } finally {
-      try {
-        net.dispose();
-      } finally {
-        host.dispose();
-      }
+    const clock =
+      options.clock === false
+        ? null
+        : host.useDayClock(normalizedDayClock(DEFAULT_NORMALIZED_DAY, null));
+    const weatherCalls = { mode: [], force: [] };
+    let air = null,
+      program = null;
+    if (options.weather !== false) {
+      const product = await loadHeadlessProduct(
+        "out/" + (options.pine ? "pine-hollow" : "nalati-grasslands"),
+      );
+      const data = await product.json("world/weather.json");
+      program = parseWeatherProgram(options.pine ? data : data.weather);
+      air = new WeatherContinuation(program, { seed: 19, mode: "live" });
+      publishWeather(host, {
+        get n() {
+          return air.n;
+        },
+        get state() {
+          return air.state;
+        },
+        get phaseLeft() {
+          return air.phaseLeft;
+        },
+        get profile() {
+          return air.profile;
+        },
+        get registers() {
+          return air.registers;
+        },
+        setMode(name, at) {
+          weatherCalls.mode.push([name, at]);
+          air.setMode(name, at);
+        },
+        force(name, at) {
+          weatherCalls.force.push([name, at]);
+          air.force(name, at);
+        },
+      });
+      host.onStep("proof.weather", (dt) => air.update(dt, clock?.phase ?? 0));
     }
+    const world = new SimNetWorld(host, options.cell ?? 1),
+      link = directLoopback(),
+      client = new NetClient(link.client);
+    try {
+      const net = new NetRoom({
+        world,
+        step: (inputs) => {
+          netWorldInput(actRoutes(host), inputs);
+          host.step();
+        },
+      });
+      const command = (word) => {
+        const seq = client.command(idle);
+        client.flush();
+        if (word !== undefined) client.act({ kind: "climate", ...word, seq });
+        link.pump();
+        return seq;
+      };
+      const tick = (word) => {
+        command(word);
+        net.tick();
+        link.pump();
+        client.present();
+      };
+      const open = () => {
+        net.join(link.server, world.player);
+        client.hello("", { player: "climate-owner", name: "Climate owner" });
+        link.pump();
+        net.open();
+        link.pump();
+      };
+      try {
+        await work({
+          host,
+          clock,
+          air,
+          program,
+          weatherCalls,
+          client,
+          net,
+          link,
+          command,
+          tick,
+          open,
+        });
+        assert.equal(client.dropped, 0);
+        assert.equal(net.stats.dropped, 0);
+      } finally {
+        net.dispose();
+      }
+    } finally {
+      client.dispose();
+    }
+  } finally {
+    host.dispose();
   }
 }
 
@@ -262,9 +274,6 @@ timed(
               feed = netClimate(page.climateRows, { weather: first.program }, (word) =>
                 page.climate(word),
               );
-            feed.setMode("rain", 0.5);
-            feed.force("clear", 0.1);
-            assert.deepEqual(sent, []);
             const bind = (f) =>
               page.bind(
                 f.client,
@@ -278,6 +287,10 @@ timed(
               );
             try {
               bind(first);
+              assert.equal(first.client.latest, null);
+              feed.setMode("rain", 0.5);
+              feed.force("clear", 0.1);
+              assert.deepEqual(sent, []);
               first.open();
               for (let i = 0; i < 8; i++) {
                 first.tick();
