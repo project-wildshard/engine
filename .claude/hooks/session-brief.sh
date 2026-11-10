@@ -23,7 +23,7 @@ echo "-- other agents in this repo (herdr) --"
 if [ "${HERDR_ENV:-}" != 1 ]; then
   echo "  (not running inside herdr)"
 else
-  peers="$(bash .claude/hooks/herdr-peers.sh "$PWD" "$session")"
+  peers="$(bash .claude/hooks/herdr-peers.sh "" "$session")"
   if [ -n "$peers" ]; then
     printf '%s\n' "$peers" | while IFS="$(printf '\t')" read -r pane status goal where; do
       [ "$goal" = "-" ] && goal="(no goal set)"
@@ -69,11 +69,13 @@ else
 fi
 
 echo
-echo "-- main only: no branches, no worktrees (D27) --"
+echo "-- main only, plus plan worktrees: .worktrees/<slug> on plan/<slug> (D27, J221, J240) --"
+plans="$(git worktree list 2>/dev/null | tail -n +2 | grep -E '/\.worktrees/[a-z0-9][a-z0-9._-]* +[0-9a-f]+ \[plan/' || true)"
+if [ -n "$plans" ]; then printf '%s\n' "$plans" | sed 's/^/  plan worktree /'; fi
 strays="$(
-  git worktree list 2>/dev/null | tail -n +2 | sed 's/^/worktree /'
-  git for-each-ref --format='branch %(refname:short)' refs/heads 2>/dev/null | grep -vx 'branch main'
-  git for-each-ref --format='remote %(refname:short)' refs/remotes 2>/dev/null | grep -vxE 'remote [^/]+(/HEAD|/main)?'
+  git worktree list 2>/dev/null | tail -n +2 | grep -vE '/\.worktrees/[a-z0-9][a-z0-9._-]* +[0-9a-f]+ \[plan/' | sed 's/^/worktree /'
+  git for-each-ref --format='branch %(refname:short)' refs/heads 2>/dev/null | grep -vx 'branch main' | grep -vE '^branch plan/[a-z0-9][a-z0-9._-]*$'
+  git for-each-ref --format='remote %(refname:short)' refs/remotes 2>/dev/null | grep -vxE 'remote [^/]+(/HEAD|/main)?' | grep -vE '^remote [^/]+/plan/[a-z0-9][a-z0-9._-]*$'
 )"
 if [ -n "$strays" ]; then
   printf '%s\n' "$strays" | sed 's/^/  !! /'

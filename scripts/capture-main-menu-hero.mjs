@@ -39,6 +39,7 @@ import { devices } from 'playwright';
 import { launchMemoryBrowser } from './chromium-memory-browser.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { gridFloorDocumentIdentity } from './frame-floor-grid.mjs';
+import { gitCommonPath } from './git-common.mjs';
 
 const root = resolvePath(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -76,7 +77,7 @@ async function farMetrics(browser, page) {
 }
 
 function requireNoQuiet() {
-  const quiet = join(root, '.git/quiet');
+  const quiet = gitCommonPath('quiet', root);
   if (!existsSync(quiet)) return;
   const reservation = JSON.parse(readFileSync(quiet, 'utf8'));
   if (reservation.owner === process.env.CAPTURE_QUIET_OWNER && String(reservation.pid) === process.env.CAPTURE_QUIET_PID) return;

@@ -21,6 +21,7 @@ import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { setTimeout } from 'node:timers/promises';
 import * as v from 'valibot';
+import { gitCommonPath } from './git-common.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const agentsSchema = v.object({ result: v.object({ agents: v.array(v.object({
@@ -136,7 +137,7 @@ async function poll() {
   const [listed, history, ledger] = await Promise.all([
     command('herdr', ['agent', 'list']),
     command('git', ['log', '--since=2 hours ago', '-512', '--format=%H%x00%ct%x00%an%x00%B%x1e']),
-    readFile(resolve(root, '.git/commit-lanes.jsonl'), 'utf8').catch((/** @type {unknown} */ error) => {
+    readFile(gitCommonPath('commit-lanes.jsonl', root), 'utf8').catch((/** @type {unknown} */ error) => {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return '';
       throw error;
     }),

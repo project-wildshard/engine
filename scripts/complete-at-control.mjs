@@ -56,6 +56,7 @@ import { profiles } from './phone-loading/model.ts';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { readSweepTarget, requireSweepDocumentBuild } from './loading-flow/target.mjs';
 import { readSweepSource, sweepMapBinding } from './loading-flow/source-maps.mjs';
+import { gitCommonPath } from './git-common.mjs';
 
 // the service worker's own fetches reach context 'request' events (Chromium), as scripts/bench-load.mjs does
 process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS ??= '1';
@@ -86,7 +87,7 @@ if (!['chromium', 'webkit'].includes(engine) || !['on', 'off'].includes(sw) || !
 if (values.warm === 'on' && (linkName !== 'phone' || engine !== 'chromium' || sw !== 'on')) { console.error('--warm=on needs --link=phone, Chromium and the worker on: a localhost link finishes the precache before any re-entry'); process.exit(2); }
 const out = resolve(values.out ?? `tmp/complete-at-control/${flow}-${rev.slice(0, 10)}-${engine}.json`);
 if (!out.startsWith(`${resolve('tmp')}/`)) { console.error('--out must be under ./tmp'); process.exit(2); }
-if (existsSync(resolve('.git/quiet'))) { console.error('Official Simulator quiet is active'); process.exit(2); }
+if (existsSync(gitCommonPath('quiet'))) { console.error('Official Simulator quiet is active'); process.exit(2); }
 
 /** Every level in this exact served product; author folders moved out of engine. */
 let sweepTarget;

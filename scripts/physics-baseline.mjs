@@ -35,6 +35,7 @@ import { runNativePhysicsWalk } from './physics-native.mjs';
 import { driveGridSeam, gridSeamRoute, gridDriveFailures } from './physics-grid.mjs';
 import { enterPhysicsGrid, physicsEntryInventory, physicsEntryPierReady, physicsEntryFailures, waitForPhysicsBoot } from './physics-grid-entry.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { gitCommonPath } from './git-common.mjs';
 
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const argv = process.argv.slice(2);
@@ -182,7 +183,7 @@ let build = 'unknown';
 try { build = (await (await fetch(`${BASE}/version.json`, { cache: 'no-store' })).json()).build ?? build; } catch { /* keep 'unknown' */ }
 console.error(`> physics-baseline ${LABEL} build=${build} modes=${MODE.join(',')} cpu=${CPU}× (walk ${WALK_CPU}×)`);
 
-while (existsSync(resolvePath(ROOT, '.git/quiet'))) await new Promise(resolve => { setTimeout(resolve, 1000); });
+while (existsSync(gitCommonPath('quiet', ROOT))) await new Promise(resolve => { setTimeout(resolve, 1000); });
 const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });
 const result = { label: LABEL, build, tier: TIER, date: new Date().toISOString(), cpu: CPU, walkCpu: WALK_CPU, frames: FRAMES, poses: [], walk: [], grid: [], gridFailures: [], physics: {}, activation: {}, deviceSaves: DEVICE_SAVES, expectedSystems: EXPECTED_SYSTEMS, nativeWalk };
 

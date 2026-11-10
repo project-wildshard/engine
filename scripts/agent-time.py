@@ -356,15 +356,22 @@ def publication_seconds(pushes, commits, order):
             any(index <= order[row['sha']] and at >= row['at'] for at, index in published)]
 
 
+def git_common(repo):
+    """The common Git dir every linked worktree shares (DEV-SPEED DS6)."""
+    text, _ = command(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], repo)
+    return Path(text.strip()) if text.strip() else Path(repo) / '.git'
+
+
 def print_reading(repo, since, observations):
     home = Path.home()
-    pushes = push_rows(Path(repo) / '.git/push.log', since)
+    common = git_common(repo)
+    pushes = push_rows(common / 'push.log', since)
     gates = [row for row in pushes if isinstance(row.get('gateSeconds'), (int, float))]
     builds = rows(home / '.wildshard-heavy-lanes/build-day.log', since)
     builds = [row for row in builds if isinstance(row.get('buildSeconds'), (int, float))]
     order_text, _ = command(['git', 'rev-list', 'main'], repo)
     order = {sha:index for index, sha in enumerate(order_text.splitlines())}
-    published = publication_seconds(pushes, rows(Path(repo) / '.git/commit-lanes.jsonl', since), order)
+    published = publication_seconds(pushes, rows(common / 'commit-lanes.jsonl', since), order)
     now = time.time()
     created = dt.datetime.fromtimestamp(since - 6 * 3600, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     runs, ci_error = json_command(['gh','run','list','--workflow','deploy','--limit','1000','--created','>='+created,
@@ -407,7 +414,7 @@ def print_reading(repo, since, observations):
     table = [
         ('Push gate', '%d timed ticks, %d red; gate seconds %s; quiet ticks %d' % (len(gates), sum(row.get('status') == 'red' for row in pushes), quantiles([row['gateSeconds'] for row in gates]), sum(row.get('status') == 'quiet' for row in pushes))),
         ('Commit to origin', 'seconds %s (reachable ledger commits)' % quantiles(published)),
-        ('Commit invocation', commit_timing_reading(Path(repo) / '.git/commit-times.jsonl', since)),
+        ('Commit invocation', commit_timing_reading(common / 'commit-times.jsonl', since)),
         ('CI / red main', ci + '; reverts %d (G674 fix-forward only)' % reverts),
         ('Build mirror', 'Opus command hours %.2f; no mirror occupancy log' % observations['opusMirrorHours']),
         ('Heavy builds', '%d completed; queue seconds %s; build seconds %s; transcript queues >60 s: %d' % (len(builds), quantiles([row['queueSeconds'] for row in builds]), quantiles([row['buildSeconds'] for row in builds]), sum(value > 60 for value in observations['queueSeconds'])) + ('; historical log expiry left a gap' if not builds else '')),

@@ -51,6 +51,23 @@ describe('herdr peers in the git hooks', () => {
     const hidden = box.commit({ 'b.txt': 'b\n' }, ok('feat: add b'), { env: { ...box.env, SKIP_HERDR_PEERS: '1' } });
     assert.doesNotMatch(hidden.stderr, /herdr:/);
   });
+  test('from a plan worktree it names peers across the repo and where they work (DS6)', () => {
+    const box = withHerdr();
+    box.commit({ 'a.txt': 'a\n' }, ok('feat: add a'), { env: box.env });
+    const root = realpathSync(box.root), wt = join(root, '.worktrees', 'foo');
+    box.git(['worktree', 'add', '-q', '-b', 'plan/foo', wt]);
+    const json = join(bin, `${box.root.split('/').pop()}.json`);
+    writeFileSync(json, JSON.stringify({ result: { agents: [
+      { pane_id: 'w1:p1', agent_status: 'working', cwd: wt, agent_session: { value: 'me' }, terminal_title_stripped: 'Me' },
+      { pane_id: 'w1:p2', agent_status: 'idle', cwd: root, agent_session: { value: 'peer' }, terminal_title_stripped: 'Coordinate' },
+      { pane_id: 'w1:p3', agent_status: 'working', cwd: join(wt, 'src'), agent_session: { value: 'peer2' }, terminal_title_stripped: 'Build foo' },
+    ] } }));
+    const result = spawnSync('bash', [PEERS], { cwd: wt, encoding: 'utf8', env: { ...ENV, ...box.env } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /w1:p2\tidle\tCoordinate\tmain/);
+    assert.match(result.stdout, /w1:p3\tworking\tBuild foo\t\.worktrees\/foo/);
+    assert.doesNotMatch(result.stdout, /w1:p1/);
+  });
   test('outside herdr the hooks print nothing about peers', () => {
     const result = withHerdr().commit({ 'a.txt': 'a\n' }, ok('feat: add a'));
     assert.equal(result.status, 0, result.stderr);

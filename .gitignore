@@ -8,7 +8,9 @@ blob-report/
 .DS_Store
 .env
 .env.*
-# No worktrees here (D27); ignored so a stray one never gets committed.
+# Plan worktrees live at .worktrees/<slug> on plan/<slug> (J221, J240, DEV-SPEED DS6);
+# never part of the canonical tree. DS11 removes the old .claude/worktrees/ entries.
+/.worktrees/
 .claude/worktrees/
 
 # Lifted from singleplayer (P3).

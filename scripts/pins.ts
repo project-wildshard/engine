@@ -19,7 +19,7 @@
 //      tarball's: a receipt is static build evidence, never authority (G491).
 //   4. Its mounts, under `mounts/` or as `cook.json` rows over a blob, are published at their URLs under `public/`, because
 //      the cook and the page read `/assets/<shard>/...`.
-//      They are excluded in `.git/info/exclude`, so a pinned tree stays clean.
+//      They are excluded in Git's `info/exclude`, so a pinned tree stays clean.
 //
 // Build with WILDSHARD_CATALOGUE=test/pins/catalogue.json: the tarball hashes a page sees are then the pins'.
 //
@@ -173,8 +173,13 @@ function tracked(): ReadonlySet<string> {
 }
 
 function exclude(paths: readonly string[]): void {
-  const file = '.git/info/exclude';
-  if (!existsSync('.git')) return;
+  // A linked worktree's `.git` is a file; Git names the real exclude path (DEV-SPEED DS6).
+  let file: string;
+  try {
+    file = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return;
+  }
   const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
   const start = text.indexOf(MARK[0]), end = text.indexOf(MARK[1]);
   const kept = start === -1 ? text : `${text.slice(0, start)}${text.slice(end + MARK[1].length + 1)}`;

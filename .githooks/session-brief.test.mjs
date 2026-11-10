@@ -10,6 +10,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BRIEF = join(ROOT, '.claude', 'hooks', 'session-brief.sh');
+// Run from a plan worktree (DEV-SPEED DS6), peers are listed from the canonical
+// checkout, so agents in this checkout show as .worktrees/<slug>.
+const PLAN = /\/\.worktrees\/([^/]+)$/u.exec(ROOT)?.[1];
+const WHERE = (inner) => (PLAN === undefined ? inner : `.worktrees/${PLAN}`).replaceAll('.', '\\.').replaceAll('/', '\\/');
 const bin = mkdtempSync(join(tmpdir(), 'repo-herdr-'));
 after(() => rmSync(bin, { recursive: true, force: true }));
 
@@ -38,9 +42,9 @@ const brief = (env, input = '') => {
 describe('session brief: herdr peers', () => {
   test('lists the other agents in this repo, not self or other repos', () => {
     const out = brief({ HERDR_ENV: '1', CLAUDE_CODE_SESSION_ID: 'me' });
-    assert.match(out, /w1:p2 {2}idle {2}Build the queue view {2}\[main\]/);
-    assert.match(out, /w1:p3 {2}working {2}scaffold {2}\[\.claude\/worktrees\/agent-x\]/);
-    assert.match(out, /w1:p4 {2}working {2}\(no goal set\) {2}\[main\]/);
+    assert.match(out, new RegExp(`w1:p2 {2}idle {2}Build the queue view {2}\\[${WHERE('main')}\\]`, 'u'));
+    assert.match(out, new RegExp(`w1:p3 {2}working {2}scaffold {2}\\[${WHERE('.claude/worktrees/agent-x')}\\]`, 'u'));
+    assert.match(out, new RegExp(`w1:p4 {2}working {2}\\(no goal set\\) {2}\\[${WHERE('main')}\\]`, 'u'));
     assert.match(out, /commit only your own paths/);
     assert.doesNotMatch(out, /Me, myself|Other repo/);
   });

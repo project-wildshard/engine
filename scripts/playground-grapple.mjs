@@ -15,6 +15,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, w
 import { dirname, join, resolve as resolvePath } from 'node:path';
 import { aimAt, bootToTitle, encodePhone, enterPlayground, flags, openHub, phonePage, sleep, startRecording, stopRecording, tap } from './playground-harness.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { gitCommonPath } from './git-common.mjs';
 
 const { chromium } = await import('playwright');
 const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
@@ -29,7 +30,7 @@ const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { retu
 async function takeSlot() {
   for (;;) {
     for (const n of [1, 2]) {
-      const p = join(ROOT, `.git/nine-dragon-browser-${n}.lock`);
+      const p = gitCommonPath(`nine-dragon-browser-${n}.lock`, ROOT);
       if (existsSync(p)) {
         const pid = Number(readFileSync(p, 'utf8').trim());
         if (pid && alive(pid)) continue;

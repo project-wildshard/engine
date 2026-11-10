@@ -10,7 +10,7 @@ set -euo pipefail
 top="$(git rev-parse --show-toplevel)"
 hooks="$top/.githooks"
 refs="$(cat)"
-printf '%s\n' "$refs" | node "$hooks/check-push.mjs"
+printf '%s\n' "$refs" | node "$hooks/check-push.mjs" "$2"
 if [ -f "$top/scripts/changelog.mjs" ]; then printf '%s\n' "$refs" | node "$top/scripts/changelog.mjs" refs; fi
 export WS_PUSH_REFS="$refs"
 export WS_PUSH_DESTINATION="$2"
