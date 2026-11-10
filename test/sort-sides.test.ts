@@ -132,6 +132,20 @@ test('rewrites AGENTS.md only below its J241 marker',()=>{
   expect(planFailures(tree,plan,root).filter(failure=>failure.includes('AGENTS.md'))).toEqual([]);
 });
 
+test('leaves an AGENTS.md at any depth alone above an exact marker line, or whole without one',()=>{
+  const root=fixture(),name='`src/engine/ui/hud.ts`';
+  const quoted=`# AGENTS.md\n\n${AGENTS_MARKER} is the line to add.\n\nJake: ${name}\n`;
+  const crlf=`# AGENTS.md\r\n\r\nJake: ${name}\r\n${AGENTS_MARKER}\r\n\r\n## Agent-written\r\n\r\n- ${name}\r\n`;
+  put(root,{'AGENTS.md':quoted,'docs/AGENTS.md':`Jake: ${name}\n`,'docs/team/AGENTS.md':crlf});
+  commit(root);
+  const tree=headTree(root),plan=planSort(tree),after=appliedTree(tree,plan).text;
+  expect(plan.writes.has('AGENTS.md')).toBe(false);
+  expect(plan.writes.has('docs/AGENTS.md')).toBe(false);
+  const team=after.get('docs/team/AGENTS.md')??'',cut=crlf.indexOf(`${AGENTS_MARKER}\r\n`)+AGENTS_MARKER.length+2;
+  expect(team.slice(0,cut)).toBe(crlf.slice(0,cut));
+  expect(team.slice(cut)).toContain(`- \`${plan.moves.get('src/engine/ui/hud.ts')}\`\r\n`);
+});
+
 test('refuses an untagged file by name',()=>{
   const {'src/engine/core/view.ts':_view,...tags}=sides,root=fixture(tags);
   expect(clean(root)).toContain('untagged: src/engine/core/view.ts has no side in lint/engine-sides.json');

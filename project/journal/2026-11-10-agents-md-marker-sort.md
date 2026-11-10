@@ -15,3 +15,7 @@ byte for byte, leaves a file without the marker untouched, and reads
 only the agent section for stale names. The new test in
 `test/sort-sides.test.ts` passes; that file's 14 older cases were
 already failing on main and sit in `test/lift-pending.json` (J200).
+
+A review found the marker matched as a prefix and only the root file was
+guarded; the marker must now be a whole line, and every AGENTS.md at any
+depth keeps its top.

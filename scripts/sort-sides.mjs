@@ -490,13 +490,17 @@ function rewriteText(tree, placement, dirMoves, path, before, notes) {
   return before.slice(0, cut) + rewriteWhole(tree, placement, dirMoves, path, before.slice(cut), notes);
 }
 
-/** How many leading characters of a file a sort keeps: AGENTS.md through its J241 marker line, all of it without one. */
+/** How many leading characters of a file a sort keeps: an AGENTS.md (at any depth) through the first line that is
+ * exactly its J241 marker (LF, CRLF or end of file), and all of it without one. */
 function frozenPrefix(path, text) {
-  if (path !== 'AGENTS.md') return 0;
-  const at = text.startsWith(AGENTS_MARKER) ? 0 : text.indexOf(`\n${AGENTS_MARKER}`);
-  if (at === -1) return text.length;
-  const end = text.indexOf('\n', at === 0 ? 0 : at + 1);
-  return end === -1 ? text.length : end + 1;
+  if (!/(?:^|\/)AGENTS\.md$/u.test(path)) return 0;
+  for (let at = 0; at < text.length;) {
+    const end = text.indexOf('\n', at), stop = end === -1 ? text.length : end;
+    if (text.slice(at, stop).replace(/\r$/u, '') === AGENTS_MARKER) return end === -1 ? text.length : end + 1;
+    if (end === -1) break;
+    at = end + 1;
+  }
+  return text.length;
 }
 
 function rewriteWhole(tree, placement, dirMoves, path, before, notes) {
