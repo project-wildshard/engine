@@ -391,7 +391,8 @@ function progress(scope: Scope, screen: FailScreen, box: HTMLElement): void {
     let left = hold.left;
     const paint = (): void => { label.textContent = hold.label.replace('{h}', String(left)); fill.style.width = `${String(Math.round(left / hold.of * 100))}%`; };
     paint();
-    scope.interval(1000, () => { left = left <= 1 ? hold.left : left - 1; paint(); });
+    // the clock drains to empty and stops there, as the real hold does
+    scope.interval(1000, () => { if (left === 0) return; left--; paint(); });
   }
   if (screen.auto !== undefined) box.append(make('p', 'ws-fail-auto', screen.auto));
 }
@@ -503,9 +504,9 @@ function ribbon(scope: Scope, index: number, go: (to: number) => void, close: ()
   };
   button('☰', 'All failure screens', () => { go(-1); });
   // a banner and its blocked-action card are a pair: ⇄ flips between them
-  const pair = failure?.pair ?? FAILURES.find(other => other.pair === failure?.id)?.id;
+  const pair = failure === undefined ? undefined : failure.pair ?? FAILURES.find(other => other.pair === failure.id)?.id;
   if (pair !== undefined) button('⇄', 'Its pair', () => { go(FAILURES.findIndex(other => other.id === pair)); });
-  button('‹', 'Previous', () => { go((index - 1 + FAILURES.length) % FAILURES.length); });
+  button('‹', 'Previous', () => { go(index < 0 ? FAILURES.length - 1 : (index - 1 + FAILURES.length) % FAILURES.length); });
   button('›', 'Next', () => { go((index + 1) % FAILURES.length); });
   button('✕', 'Close', close);
   return bar;
@@ -532,15 +533,21 @@ function gallery(scope: Scope, go: (to: number) => void): HTMLElement {
 let open: Scope | null = null;
 /** Show one failure's screen by id, or `gallery` for the list. Returns what closes it. Showing another closes this one. */
 export function showFailScreen(id: string, parent: HTMLElement = document.body): () => void {
-  if (document.getElementById(STYLE_ID) === null) { const style = make('style'); style.id = STYLE_ID; style.textContent = CSS; document.head.append(style); }
   open?.dispose();
   const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const scope = new Scope('failScreens'), close = (): void => { scope.dispose(); if (open === scope) open = null; before?.focus(); };
   open = scope;
+  const style = scope.ownNode(make('style')); style.id = STYLE_ID; style.textContent = CSS; document.head.append(style);
   const go = (to: number): void => { showFailScreen(FAILURES[to]?.id ?? 'gallery', parent); };
   const index = FAILURES.findIndex(failure => failure.id === id), failure = FAILURES[index];
   const under = failure?.pair === undefined ? undefined : FAILURES.find(other => other.id === failure.pair);
-  if (under !== undefined) { const banner = render(scope, under.screen); banner.dataset['failmode'] = under.id; parent.append(scope.ownNode(banner)); }
+  if (under !== undefined) {
+    // one clock for the pair: a banner with a countdown counts the card's, so the two never disagree
+    const countdown = under.screen.countdown === undefined ? undefined : failure?.screen.countdown ?? under.screen.countdown;
+    const banner = render(scope, countdown === undefined ? under.screen : { ...under.screen, countdown });
+    // under a card, the banner's own buttons (the voice tip's) can't take focus or taps
+    banner.dataset['failmode'] = under.id; banner.inert = true; parent.append(scope.ownNode(banner));
+  }
   const shown = failure === undefined ? gallery(scope, go) : render(scope, failure.screen);
   if (failure !== undefined) shown.dataset['failmode'] = failure.id;
   parent.append(scope.ownNode(shown), scope.ownNode(ribbon(scope, index, go, close)));

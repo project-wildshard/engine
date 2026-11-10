@@ -46,3 +46,9 @@ Driftwood Isle rather than over the title.
 - `test/fail-screens-catalogue.test.ts` pins the pairs and the ids.
 - Shots: a local serve-build with `?chunk=driftwood-isle`, headless
   Chromium on Metal (`--use-angle=metal`), world ready in 5 to 8 s.
+- J206 Codex review (NO-GO on fb5a0d5): the hold bar looped instead
+  of emptying, the gallery found a false pair, and `deploy-blocked`'s
+  banner and card counted different clocks. Fixed: the bar drains and
+  stops, the pair lookup needs a screen, a banner drawn under its card
+  counts the card's clock and goes inert, Previous from the gallery
+  opens the last screen, and the stylesheet is owned by the screen.

@@ -22,6 +22,9 @@ test('every blocked-action sibling is a hold card over a banner or notice, right
     // a hold card always says what happens by itself, and shows live progress
     expect(sibling.screen.auto).toBeTruthy();
     expect(sibling.screen.facts?.some(fact => fact.includes('{n}'))).toBe(true);
+    expect(sibling.screen.countdown).toBeGreaterThan(0);
+    // a banner that counts down shares the card's clock when drawn under it (showFailScreen), so only the card's is needed
+    if (sibling.screen.hold !== undefined) expect(sibling.screen.hold.left).toBeLessThanOrEqual(sibling.screen.hold.of);
   }
 });
 
