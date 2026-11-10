@@ -15,6 +15,7 @@ import {createServer} from 'node:net';
 import {once} from 'node:events';
 import {nativeSocketTemporary} from '../../fixtures/native-socket-temp.mjs';
 import {drainNativeBrowser} from '../../fixtures/native-browser-drain.mjs';
+import {warmNativeInventory} from '../../fixtures/native-process-inventory.mjs';
 
 // Singleplayer prepared these exact executable/resource pages before its
 // isolated Escape job. The lift kept the helper but lost that workflow step.
@@ -22,7 +23,7 @@ import {drainNativeBrowser} from '../../fixtures/native-browser-drain.mjs';
 // Reading the complete installed binary/resources can exceed Vitest's default
 // 10 s hook on a cold shared runner. Bound only that disk preparation at 60 s;
 // the actual endpoint, child-process and trusted-input clocks stay unchanged.
-beforeAll(async () => { await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
+beforeAll(async () => { warmNativeInventory(); await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
 
 /** @param {number | undefined} pid */
 function stopFixturePid(pid) {
@@ -197,7 +198,7 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
       process.on('SIGTERM',terminate);process.on('SIGINT',terminate);
       await once(child.stdout,'data');let disposed=false;
       if(process.argv[3]==='hold')await new Promise(()=>{});
-      try{await drainNativeBrowser(child,undefined,async()=>{disposed=true;});throw Error('Invalid inventory was admitted');}
+      try{await drainNativeBrowser(child,undefined,async()=>{disposed=true;},{executable:'ps',args:['-axo','pid=,ppid=,pgid=,stat=']});throw Error('Invalid inventory was admitted');}
       catch(error){console.log(JSON.stringify({message:String(error),disposed,profile:existsSync(profile+'/original')}));}
       finally{await stop();}`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', program,
@@ -227,7 +228,7 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
     expect(commandValue.message).toContain('Native process inventory command refused:');
     /** @type {unknown} */
     const commandFacts = JSON.parse(commandValue.message.slice(commandValue.message.indexOf('{')));
-    expect(commandFacts).toMatchObject({code: null, signal: 'SIGTERM', killed: true, stdout: 'o'.repeat(160), stderr: 'e'.repeat(160)});
+    expect(commandFacts).toMatchObject({code: 'ETIMEDOUT', signal: 'SIGTERM', killed: true, stdout: 'o'.repeat(160), stderr: 'e'.repeat(160)});
     expect(commandValue.message.length).toBeLessThan(1024);
     const timed = spawnSync(process.execPath, ['--input-type=module', '-e', program,
       new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, 'hold'],
@@ -242,6 +243,38 @@ test('inventory refusal retains its bounded raw row and never disposes the owned
     else console.error(`Native inventory control retained after refusal: ${JSON.stringify(root)}`);
   }
 });
+
+test('delayed JS delivery cannot discard a completed native inventory', () => {
+  const profile = mkdtempSync(resolve('tmp/native-inventory-delivery-'));
+  let verified = false;
+  try {
+    const program = `import{spawn}from'node:child_process';import{once}from'node:events';import{rmSync,existsSync}from'node:fs';
+      const{drainNativeBrowser}=await import(process.argv[1]),profile=process.argv[2];
+      const child=spawn(process.execPath,['-e',"console.log('ready');setInterval(()=>{},1000)"],{detached:true,stdio:['ignore','pipe','inherit']});
+      let stopping;const stop=()=>stopping??=(async()=>{if(child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGKILL');await exited;}})();
+      process.once('SIGTERM',()=>{void stop().then(()=>process.exit(143));});
+      let facts;
+      try{await once(child.stdout,'data');let disposed=false,failure=null;
+      const pending=drainNativeBrowser(child,()=>child.kill('SIGTERM'),async()=>{rmSync(profile,{recursive:true});disposed=true;});
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,Number(process.argv[3]));
+      try{await pending;}catch(error){failure=String(error);}
+      facts={disposed,profile:existsSync(profile),failure};
+      }finally{await stop();}
+      console.log(JSON.stringify({...facts,childStopped:child.exitCode!==null||child.signalCode!==null}));`;
+    for (const delay of [650, 5100]) {
+      mkdirSync(profile, {recursive: true});
+      const result = spawnSync(process.execPath, ['--input-type=module', '-e', program,
+        new URL('../../fixtures/native-browser-drain.mjs', import.meta.url).href, profile, String(delay)], {encoding: 'utf8', timeout: 10_000});
+      expect(result.status).toBe(0);
+      if (delay === 650) expect(JSON.parse(result.stdout)).toEqual({disposed: true, profile: false, failure: null, childStopped: true});
+      else expect(JSON.parse(result.stdout)).toEqual({disposed: false, profile: true, failure: expect.stringContaining('did not drain in 5000ms'), childStopped: true});
+    }
+    verified = true;
+  } finally {
+    if (verified) rmSync(profile, {recursive: true, force: true});
+    else console.error(`Native delivery control retained after refusal: ${JSON.stringify(profile)}`);
+  }
+}, 10_000);
 
 test('a real profile removal failure rejects cleanup instead of publishing completion', async () => {
   const profile = mkdtempSync(resolve('tmp/native-writer-refusal-'));

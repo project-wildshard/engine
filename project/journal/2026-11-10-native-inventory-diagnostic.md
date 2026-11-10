@@ -56,3 +56,39 @@ The old-helper/forward exec comparison is red/green on these facts;
 both reject and preserve the profile. The final native file passes 7/7
 in 18.41 s and eligible typed lint is green. The new one-shot read-only
 review reports no MUST/SHOULD findings (Claude quota fallback to Codex).
+
+Q144 supplied the first concrete exec refusal fields: SIGTERM/killed at
+1,029 ms with machine load 43.1. Its configured timeout is 500 ms, not
+one second; elapsed includes callback scheduling. A direct real ps plus
+a controlled 650 ms parent JS stall reproduces success with empty stdout.
+The same happens with the cheap kernel tool through async execFile.
+Node's timeout destroys unread pipes after a completed command when its
+JS callback is delayed. This establishes a real empty-inventory mechanism;
+it does not prove the exact unobserved Q135 row or every Q144 delay.
+
+Collect the table synchronously with the unchanged 500 ms native timeout,
+before returning to JS, so that delayed JS cannot discard completed pipe
+data. Clip each collection to the remaining original five-second drain
+and check elapsed time again before admitting completion. A blocked
+worker beyond five seconds still refuses, retains the profile and stops
+its owned child. Malformed output still meets the identical guard.
+
+On Darwin, use a small source-built KERN_PROC_ALL snapshot rather than
+ps's per-process decoration. Keep all positive user PIDs, parents, groups
+and zombie states, including detached descendants; this is not a group-
+only query. Linux retains ps. In 24 alternating local pairs, about 1,124
+rows: ps median 29.7 ms / max 38.7 ms; kernel snapshot median 5.3 ms /
+steady max 15.2 ms. Its first native load was 214 ms. Compilation and
+first native loader execution belong to the existing resource-preparation
+phase, before startup/drain clocks. No executable or capture enters Git.
+
+The old cleanup refuses a real detached writer when its ps executable
+actually runs past 500 ms; the forward kernel collector drains that same
+writer before disposal. The new real JS-delivery control checks both
+650 ms recovery and refusal after 5.1 s, including retained profile and
+confirmed owned-child termination. The one-shot review's MUST adds the
+module type declaration; its SHOULD adds this deadline-negative control.
+No quarantine, scan/drain/startup deadline or oracle has been relaxed.
+The final native file is 8/8 green in 23.88 s, including the real trusted
+Escape pair, detached writer, malformed/timeout controls and both JS
+stall outcomes. Eligible typed lint and native compiler warnings pass.

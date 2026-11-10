@@ -12,8 +12,10 @@ import {pressEscape} from '../../scripts/parity/browser-escape.mjs';
 import {nativeChromeExecutable} from '../../scripts/warm-native-chrome.mjs';
 import {nativeSocketTemporary} from './native-socket-temp.mjs';
 import {drainNativeBrowser} from './native-browser-drain.mjs';
+import {warmNativeInventory} from './native-process-inventory.mjs';
 import { KEYCHAIN_ARGS } from '../../scripts/chromium-keychain.mjs';
 
+warmNativeInventory();
 const executable = nativeChromeExecutable();
 const directory = await mkdtemp(resolve('tmp/escape-control-'));
 const socketTemp = await nativeSocketTemporary(directory).catch(async (error: unknown) => {
