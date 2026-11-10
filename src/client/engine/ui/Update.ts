@@ -18,7 +18,7 @@ import { engineString } from '../../../shared/engine/strings';
  */
 import { isDev, onDev } from '../core/devMode';
 import { reloadForPlayer } from './playerReload';
-import { checkLiveBuild, liveBuildOf, shortBuild, workerControlled } from './buildCheck';
+import { buildLabel, checkLiveBuild, liveBuildOf, shortBuild, workerControlled } from './buildCheck';
 
 
 // The update pill exists before content is selected; keep App and Three out of the entry graph.
@@ -26,7 +26,10 @@ const scope = new Scope('ui.Update');
 
 declare const __BUILD_ID__: string;
 
-const sha = shortBuild(__BUILD_ID__);
+/** "v0.1.5 · a8144a5" (Jake, 2026-11-10: the engine version and the short commit) */
+const runningLabel = buildLabel(__BUILD_ID__);
+/** a phone's title has room beside the logo for the label alone; " · reload" joins it on a wider screen (the 700 px phone rule of update.css) */
+const narrow = typeof matchMedia === 'function' ? matchMedia('(max-width: 700px)') : null;
 const el = document.createElement('button');
 el.className = 'ws-update';
 el.type = 'button';
@@ -55,7 +58,7 @@ let newLabel = '';
 function paint(): void {
   const text = el.querySelector('[data-el="text"]');
   if (!text || busy) return;
-  text.textContent = !newer ? engineString('s_9e4fe13a912d', [sha]) : isDev()
+  text.textContent = !newer ? (narrow?.matches === true ? runningLabel : engineString('s_9e4fe13a912d', [runningLabel])) : isDev()
     ? engineString('s_update_next_boundary_dev', [newLabel]) : engineString('s_update_next_boundary');
 }
 const lightUp = (label: string): void => {
@@ -67,6 +70,7 @@ const lightUp = (label: string): void => {
 };
 function dim(): void { newer = false; newLabel = ''; el.classList.remove('newer'); paint(); sync(); }
 paint();
+if (narrow !== null) scope.listen(narrow, 'change', paint);
 // the worker found a new build (installed, waiting) — same pill, no toast
 scope.listen(window, 'ws-sw-waiting', event => {
   if (!(event instanceof CustomEvent)) return;

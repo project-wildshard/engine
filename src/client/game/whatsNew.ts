@@ -1,24 +1,29 @@
-import today from './whatsNew.json' with { type: 'json' };
 /**
- * The day's WHAT'S NEW lines on the main menu (SHARD-PLATFORM SF60, Jake's pick G214: B, a slim banner under the logo;
- * `art/menu/round-12-whats-new/B-banner*.jpg`). The coordinator rewrites `whatsNew.json` beside this file at least once a
- * day: 3–5 short, true lines of what changed in the playable build on `main`, newest first, with `date` and `updated` set
- * to now. The pre-push gate (scripts/whats-new-fresh.mjs, E482) refuses a push to main once `updated` is more than 24 h
- * old, so a stale banner blocks every push until someone rewrites it. An empty `entries` list hides the banner.
- * The lines are data (they name shards, which game code never does, E405), typed here.
- *
- *   { "date": "17 OCT 2026", "updated": "2026-10-17T12:05:00-05:00", "entries": ["Nine Dragon: portal … again", …] }
+ * What the main menu's WHAT'S NEW box says (SHARD-PLATFORM SF60, Jake's pick G214: B, a slim banner under the logo). Jake,
+ * 2026-11-10: "The box, the changelog box, let's show the version of the engine", and every engine version tag carries a
+ * changelog. So the box names this build's engine version and lists that version's section of CHANGELOG.md: one to five
+ * plain-language bullets, which the pre-push hook and CI require before a version can ship (scripts/changelog.mjs).
+ * vite.config.ts bakes the section in as `__ENGINE_RELEASE__`; there is no other copy. An empty list hides the box.
  *
  * The banner (src/client/game/whatsNewBanner.ts) shows only with Settings ▸ Developer on, and HIDE UNTIL NEXT BUILD keeps it
  * folded away until the running build changes.
  */
 export interface WhatsNew {
-  /** the day the lines were written, as the banner's build line shows it ("7 OCT 2026"); optional */
-  readonly date?: string;
-  /** when the lines were last rewritten, ISO 8601 with a zone; the pre-push gate keeps it within 24 h (E482) */
-  readonly updated: string;
-  /** the lines, plain text, one change each */
+  /** the engine version, "0.1.5" ('' when the build has none) */
+  readonly version: string;
+  /** the version's date, ISO "2026-11-10" ('' when unknown) */
+  readonly date: string;
+  /** the version's changelog bullets, plain text, one change each */
   readonly entries: readonly string[];
 }
 
-export const WHATS_NEW: WhatsNew = today;
+/** vite.config.ts: package.json's version and its CHANGELOG.md section; absent under Node */
+declare const __ENGINE_RELEASE__: { readonly version: string; readonly date: string; readonly notes: readonly string[] };
+
+/** This build's engine version and its changelog; empty under a unit test. */
+export function engineWhatsNew(): WhatsNew {
+  if (typeof __ENGINE_RELEASE__ !== 'object') return { version: '', date: '', entries: [] };
+  return { version: __ENGINE_RELEASE__.version, date: __ENGINE_RELEASE__.date, entries: __ENGINE_RELEASE__.notes };
+}
+
+export const WHATS_NEW: WhatsNew = engineWhatsNew();

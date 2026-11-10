@@ -6,12 +6,30 @@
  */
 
 declare const __BUILD_ID__: string;
+/** vite.config.ts: package.json's version and its CHANGELOG.md section (scripts/changelog.mjs); absent under Node */
+declare const __ENGINE_RELEASE__: EngineRelease;
 
-/** `<sha>-<stamp>` → the sha, or the time token: Vercel CLI builds have no git checkout */
-export const shortBuild = (id: string): string => { const [gitSha = '', stamp = ''] = id.split('-'); return gitSha.length >= 7 ? gitSha : stamp; };
+/** `<sha>-<stamp>` → the 7-character commit, or the time token: Vercel CLI builds have no git checkout. A world build's
+ *  id is the full 40-character commit (Jake, 2026-11-10: "show the short commit, not this long ass thing"). */
+export const shortBuild = (id: string): string => {
+  const [gitSha = '', stamp = ''] = id.split('-');
+  return /^[0-9a-f]{7,40}$/iu.test(gitSha) ? gitSha.slice(0, 7) : gitSha.length >= 7 ? gitSha : stamp;
+};
 
 /** The build this page runs. */
 export const runningBuild = (): string => (typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '');
+
+/** The engine version a build carries and that version's changelog (CHANGELOG.md, one to five plain-language bullets). */
+export interface EngineRelease { readonly version: string; readonly date: string; readonly notes: readonly string[] }
+/** This build's engine release; an empty one under a unit test. */
+export const engineRelease = (): EngineRelease =>
+  (typeof __ENGINE_RELEASE__ === 'object' ? __ENGINE_RELEASE__ : { version: '', date: '', notes: [] });
+
+/** What the title's build pill and WHAT'S NEW box name a build by: "v0.1.5 · a8144a5" (either half alone when the
+ *  other is unknown). */
+export function buildLabel(id: string = runningBuild(), version: string = engineRelease().version): string {
+  return [version === '' ? '' : `v${version}`, shortBuild(id)].filter(part => part !== '').join(' · ');
+}
 
 /** The live build's id, or null: offline (the PWA plays from its cache), a failed request, or an answer with no build. */
 export async function liveBuild(): Promise<string | null> {

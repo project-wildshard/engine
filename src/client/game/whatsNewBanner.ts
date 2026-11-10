@@ -5,10 +5,11 @@ import type { WhatsNew } from './whatsNew';
 /**
  * The main menu's WHAT'S NEW banner (SHARD-PLATFORM SF60, Jake's pick G214: B, a slim banner under the logo;
  * `art/menu/round-12-whats-new/B-banner.jpg` folded, `B-banner-open.jpg` open). Folded it is one line under the
- * WILDSHARD logo, "WHAT'S NEW · N CHANGES", the build and a ▾; a tap opens it in place to the build line, the day's
- * entries (src/client/game/whatsNew.ts) and HIDE UNTIL NEXT BUILD, which stores the build it was hidden on in a device save and
- * brings the banner back when the running build changes. It shows only with Settings ▸ Developer on (E451: Developer is
- * Jake's view of the unfinished work) and with at least one entry. Menu DOM only: no per-frame work, text via textContent.
+ * WILDSHARD logo: WHAT'S NEW, the engine version and short commit ("V0.1.5 · A8144A5", Jake 2026-11-10) and a ▾; a tap drops
+ * a panel under it with the engine line, that version's changelog (src/client/game/whatsNew.ts, CHANGELOG.md) and HIDE UNTIL
+ * NEXT BUILD, which stores the build it was hidden on in a device save and brings the banner back when the running build
+ * changes. It shows only with Settings ▸ Developer on (E451: Developer is Jake's view of the unfinished work) and with at least
+ * one entry. Menu DOM only: no per-frame work, text via textContent.
  *
  *   const banner = buildWhatsNewBanner({ news: WHATS_NEW, developer: isDev(), onTap: deck.onTap });   // null when it doesn't show
  */
@@ -17,9 +18,25 @@ declare const __BUILD_ID__: string; // vite.config.ts define; absent under Node
 /** the running build's id (`<sha>-<stamp>`), '' under a unit test */
 export function runningBuild(): string { return typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : ''; }
 
-/** `<sha>-<stamp>` → the sha (the stamp when a Vercel CLI build has no git checkout), the build pill's rule
- *  (src/client/engine/ui/Update.ts). One commit rebuilt keeps one id, so a redeploy of the same build stays hidden */
-export function shortBuild(id: string): string { const [sha = '', stamp = ''] = id.split('-'); return sha.length >= 7 ? sha : stamp; }
+/** `<sha>-<stamp>` → the 7-character commit (the stamp when a Vercel CLI build has no git checkout), the build pill's rule
+ *  (src/client/engine/ui/buildCheck.ts). A world build's id is the full commit; Jake 2026-11-10: "show the short commit, not
+ *  this long ass thing". One commit rebuilt keeps one id, so a redeploy of the same build stays hidden */
+export function shortBuild(id: string): string {
+  const [sha = '', stamp = ''] = id.split('-');
+  return /^[0-9a-f]{7,40}$/iu.test(sha) ? sha.slice(0, 7) : sha.length >= 7 ? sha : stamp;
+}
+
+/** "v0.1.5 · a8144a5": the engine version and the short commit, either alone when the other is unknown */
+export function versionLabel(version: string, build: string): string {
+  return [version === '' ? '' : `v${version}`, build].filter(part => part !== '').join(' · ');
+}
+
+/** "2026-11-10" → "10 NOV 2026", as the engine line shows the version's date ('' stays '') */
+export function changelogDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(iso);
+  const month = m === null ? undefined : ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][Number(m[2]) - 1];
+  return m === null || month === undefined ? '' : `${String(Number(m[3]))} ${month} ${m[1] ?? ''}`;
+}
 
 /** where HIDE UNTIL NEXT BUILD remembers the build it was pressed on */
 export interface HiddenStore { readonly read: () => string | null; readonly write: (build: string) => void }
@@ -61,7 +78,8 @@ export interface WhatsNewBanner {
 export function buildWhatsNewBanner(opts: WhatsNewBannerOptions): WhatsNewBanner | null {
   const store = opts.store ?? deviceHiddenStore();
   const build = opts.build ?? shortBuild(runningBuild());
-  const { entries, date } = opts.news;
+  const { entries, date, version } = opts.news;
+  const label = versionLabel(version, build).toUpperCase();
   let hiddenOn: string | null = null;
   try { hiddenOn = store.read(); } catch { /* unreadable: show it */ }
   if (!whatsNewShown({ developer: opts.developer, entries: entries.length, build, hiddenOn })) return null;
@@ -79,7 +97,7 @@ export function buildWhatsNewBanner(opts: WhatsNewBannerOptions): WhatsNewBanner
   const head = el('button', 'ws-whatsnew-head');
   head.type = 'button';
   head.setAttribute('aria-expanded', 'false');
-  head.append(el('i', 'ws-whatsnew-dot'), el('span', 'ws-whatsnew-title', s.title(entries.length)), el('span', 'ws-whatsnew-build', build.toUpperCase()), el('span', 'ws-whatsnew-caret'));
+  head.append(el('i', 'ws-whatsnew-dot'), el('span', 'ws-whatsnew-title', s.title), el('span', 'ws-whatsnew-build', label), el('span', 'ws-whatsnew-caret'));
   const body = el('div', 'ws-whatsnew-body');
   body.id = 'ws-whatsnew-body';
   body.hidden = true;
@@ -88,7 +106,7 @@ export function buildWhatsNewBanner(opts: WhatsNewBannerOptions): WhatsNewBanner
   for (const entry of entries) list.append(el('li', '', entry));
   const hideBtn = el('button', 'ws-whatsnew-hide', s.hide);
   hideBtn.type = 'button';
-  body.append(el('div', 'ws-whatsnew-line', s.buildLine(build.toUpperCase(), date ?? '')), list, hideBtn);
+  body.append(el('div', 'ws-whatsnew-line', s.buildLine(label, changelogDate(date))), list, hideBtn);
   root.append(head, body);
 
   let open = false;
