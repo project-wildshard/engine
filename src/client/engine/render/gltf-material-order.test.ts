@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 import { expect, test } from 'vitest';
-import { Material, Object3D, Texture } from 'three';
+import { BoxGeometry, Layers, Material, Mesh, MeshBasicMaterial, Object3D, Points, PointsMaterial, Scene, Texture } from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { RenderItem } from 'three/src/renderers/webgl/WebGLRenderLists.js';
 import { gltfOpaqueSort, installGltfMaterialOrder } from './gltfMaterialOrder';
 import { installGltfKtx2 } from '../core/ktx2';
+import { casterOrder, firstViewCut, firstViewOrder } from './firstFrameParts';
 
 const document = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0, 1] }],
   nodes: [{ mesh: 0 }, { mesh: 1 }], meshes: [0, 1].map(material => ({ primitives: [{ attributes: { POSITION: 0 }, material }] })),
@@ -136,4 +137,28 @@ test('native point-material conversion inherits declaration order before its cop
   expect(file.scene.children.map(child => child.type)).toEqual(['Points', 'Points']);
   expect(first.type).toBe('PointsMaterial'); expect(second.type).toBe('PointsMaterial');
   expect(gltfOpaqueSort(item(first), item(second))).toBeLessThan(0);
+});
+
+test('LS11: a slow GPU\'s first view and first shadow map split along the order the renderer meets them', () => {
+  const geometry = new BoxGeometry(), early = new MeshBasicMaterial(), late = new MeshBasicMaterial();
+  const glass = new MeshBasicMaterial({ transparent: true }), spray = new PointsMaterial({ transparent: true });
+  const scene = new Scene(), group = new Object3D(), hidden = new Object3D();
+  const lateMesh = new Mesh(geometry, late), earlyMesh = new Mesh(geometry, early), overlay = new Mesh(geometry, early);
+  const water = new Mesh(geometry, glass), points = new Points(geometry, spray), offLayer = new Mesh(geometry, early), unseen = new Mesh(geometry, early);
+  overlay.renderOrder = 1; offLayer.layers.set(3); hidden.visible = false;
+  lateMesh.castShadow = true; unseen.castShadow = true; earlyMesh.castShadow = true; water.castShadow = true;
+  hidden.add(unseen); group.add(lateMesh, water); scene.add(overlay, group, points, earlyMesh, offLayer, hidden);
+  try {
+    // opaque by render order then material (gltfOpaqueSort: the earlier material first), then the transparent in scene order
+    const { order, opaque } = firstViewOrder(scene, new Layers());
+    expect(order).toEqual([earlyMesh, lateMesh, overlay, water, points]);
+    expect(opaque).toBe(3);
+    // five growing opaque parts, then three of the transparent; never a transparent draw in an opaque part, the last whole
+    const parts = { opaque: 5, transparent: 3 } as const;
+    const cuts = Array.from({ length: 8 }, (_, i) => firstViewCut(i + 1, opaque, order.length, parts));
+    expect(cuts).toEqual([1, 1, 2, 2, 3, 4, 4, 5]);
+    for (const [i, cut] of cuts.entries()) if (i > 0) expect(cut).toBeGreaterThanOrEqual(cuts[i - 1] ?? 0);
+    // the shadow pass meets casters in scene order, depth first; a hidden branch casts nothing
+    expect(casterOrder(scene)).toEqual([lateMesh, water, earlyMesh]);
+  } finally { geometry.dispose(); for (const material of [early, late, glass, spray]) material.dispose(); }
 });

@@ -31,3 +31,20 @@ starts to fade (or is disposed).
 Review (Codex, J206): `gpuSettled` now rejects a lost context or a failed fence wait with `FenceAbortError`, as the first
 frame's fences do, and the first-view prefixes order opaque drawables by `gltfOpaqueSort`'s key (render order, material
 file batch, declaration index; `opaqueMaterialOrder`).
+
+## Second pass (2026-11-10): the transparent tail and the first shadow map
+
+The prior commits never reached main (queue 68 failed on its rebase), so this pass rebuilt them on 8d134e2 and
+measured again (Driftwood strict, headless SwiftShader, 4x CPU, per-unit fence times from `--dump`):
+
+- The first view's last part was the whole transparent order (the ocean, the shrine pool, flames, particles):
+  1.5 s at load 35 and 3.3 s at load 60. The opaque order now takes five parts and the transparent three more
+  (`firstFrameParts.firstViewCut`): 0.12-0.63 s each at load 15, 0.95 s at most at load 50.
+- The first pose's first full shadow map (the near cascade) was one 1.3-1.5 s unit while the four after it took
+  0.3-0.6 s. It is now drawn first as three growing prefixes of the casters in shadow-pass order, each fenced,
+  then whole: 0.33-1.0 s a unit at load 15-50, the whole map 0.38-0.47 s after them.
+
+What is left is the floor: each world slice that builds a new pipeline is one SwiftShader JIT unit. With shadow
+stand-ins off it barely moved (1.3-1.5 s), a rasterizer-discard pre-draw built nothing measurable, and a plain
+MeshBasicMaterial costs about what a graph material does, so the cost is the per-pipeline routine JIT, not our
+draw. It scales with the shared Mac's load: 1.1-1.5 s at load 4-6, 1.2-1.9 s at 11-35, 2-9.6 s at 50-60.

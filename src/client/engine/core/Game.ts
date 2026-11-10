@@ -3,7 +3,7 @@ import { engineString } from '../../../shared/engine/strings';
 import { Scope } from '../../../shared/engine/app/scope';
 import { FencedUnits } from '../render/fencedUnits';
 import { FrameDrawRanges, type FrameDrawRange } from '../render/frameDrawRange';
-import { opaqueMaterialOrder } from '../render/gltfMaterialOrder';
+import { casterOrder, firstViewCut, firstViewOrder } from '../render/firstFrameParts';
 import { installBrowserScopeEnvironment } from '../app/view/scopeEnvironment';
 import {pagePresentation} from '../app/view/presentation';
 import {PresentationLoop} from '../app/view/presentationLoop';
@@ -88,12 +88,20 @@ const FIRST_DRAW_NARROW = { afterMs: 400, budget: { drawables: 1, newMaterials: 
  *  step's bar share follows where its time goes. Driftwood Isle, headless Chromium at 4x CPU (SwiftShader, the calibration
  *  profile of loadingPaths.ts), loading-card-proof --throttle --dump, 2026-11-09: 264 world drawables 41.8 s, 25 shadow
  *  maps 3.8 s, 5 views 0.96 s, 2 post passes 0.32 s. */
-const FIRST_FRAME_SECONDS = { drawable: 0.158, shadowMap: 0.152, view: 0.192, postPass: 0.158, viewPart: 0.33 } as const;
+const FIRST_FRAME_SECONDS = { drawable: 0.158, shadowMap: 0.152, view: 0.192, postPass: 0.158, viewPart: 0.28, mapPart: 0.58 } as const;
 /** LS11 (J204): on a GPU the shaders step measured slow, the first full view after the world's slices still cost one
  *  1.3-1.9 s GPU unit (Driftwood, SwiftShader at 4x CPU, fenced: the same programs and draws, 45 ms when drawn again), so
- *  the bar sat still through it. Drawn first as this many growing prefixes of its draw order, the units were 0.15-0.56 s
- *  each, 1.96 s in all (`viewPart`), and the full view after them 42 ms. */
-const FIRST_VIEW_PARTS = 6;
+ *  the bar sat still through it. Drawn first as growing prefixes of its draw order, the units were 0.15-0.56 s each and the full
+ *  view after them 42 ms. The opaque order takes `opaque` parts, then the transparent order `transparent` more: drawn as
+ *  one part, the transparent tail (the ocean, the shrine pool, flames, particles) was 1.5 s at load 35 and 3.3 s at load
+ *  60; in eight parts at load 15 they were 0.12-0.63 s, 2.27 s in all (`viewPart`). */
+const FIRST_VIEW_PARTS = { opaque: 5, transparent: 3 } as const;
+const FIRST_VIEW_UNITS = FIRST_VIEW_PARTS.opaque + FIRST_VIEW_PARTS.transparent;
+/** LS11 (J204): the first full shadow map of the first pose (the CSM's near cascade) was one 1.3-1.5 s unit at load 35-60
+ *  (the four after it 0.3-0.6 s). On a GPU the shaders step measured slow it is drawn first as growing prefixes of its
+ *  casters, each a fenced unit, the last being the map itself: in thirds at load 15 the two prefixes took 0.83 s and
+ *  0.33 s (`mapPart`, the mean) and the whole map 0.47 s after them. */
+const FIRST_MAP_PARTS = 4;
 /** the three slots of one fixed step, in order: `pre` readies the world, `step` advances it, `post` moves against it */
 export type FixedPhase = 'pre' | 'step' | 'post';
 
@@ -1242,8 +1250,8 @@ export class Game {
     // LS8: the world's first draws count by drawable, each credited when the fence after its slice signals, so a slice
     // narrowed after a slow one (FIRST_DRAW_NARROW) changes no total. Each unit weighs its kind's measured seconds (J204).
     const W = FIRST_FRAME_SECONDS, fullDraw = (perDraw - 1) * W.shadowMap + W.view;
-    const firstView = narrow ? FIRST_VIEW_PARTS * W.viewPart : 0;
-    const total = (): number => draws * W.drawable + firstView + fullDraw * (1 + warmTurns) + postUnits * W.postPass;
+    const firstView = narrow ? FIRST_VIEW_UNITS * W.viewPart : 0, firstMap = narrow && perDraw > 1 ? (FIRST_MAP_PARTS - 1) * W.mapPart : 0;
+    const total = (): number => draws * W.drawable + firstView + firstMap + fullDraw * (1 + warmTurns) + postUnits * W.postPass;
     const drawUnits = (base: number, label: string) => (done: number, detail: string): void => {
       onProgress?.(base + Math.min(done, perDraw - 1) * W.shadowMap + (done >= perDraw ? W.view : 0), total(), `${label} · ${detail}`);
     };
@@ -1280,16 +1288,18 @@ export class Game {
           ...(narrow ? { budget: FIRST_DRAW_NARROW.budget } : { narrow: FIRST_DRAW_NARROW }) });
       checkpoint('world-pipelines:submitted');
     }
-    const drawables = draws * W.drawable, world = drawables + firstView;
+    const drawables = draws * W.drawable, world = drawables + firstView + firstMap;
     if (narrow) {
       checkpoint('first-view:before');
       await this.firstViewParts(this.camera, target, units, (k) => {
-        onProgress?.(drawables + k * W.viewPart, total(), `world view ${String(k)} / ${String(FIRST_VIEW_PARTS)}`);
+        onProgress?.(drawables + k * W.viewPart, total(), `world view ${String(k)} / ${String(FIRST_VIEW_UNITS)}`);
       });
     }
-    units.mark(() => { onProgress?.(world, total(), 'world + shadows'); });
+    units.mark(() => { onProgress?.(drawables + firstView, total(), 'world + shadows'); });
     checkpoint('world:before');
-    await this.fencedDraw(this.camera, target, units, drawUnits(world, 'world + shadows'));
+    await this.fencedDraw(this.camera, target, units, drawUnits(world, 'world + shadows'), firstMap === 0 ? undefined : (k) => {
+      onProgress?.(drawables + firstView + k * W.mapPart, total(), `world + shadows · shadow map 1 part ${String(k)} / ${String(FIRST_MAP_PARTS)}`);
+    });
     checkpoint('world:submitted');
     // E153: the world once facing each way, so a turn finds every pipeline built (warmTurn)
     const yaws = this.warmTurnYaws();
@@ -1357,57 +1367,47 @@ export class Game {
   }
 
   /**
-   * LS11 (J204): the first full view after the world's slices, drawn as FIRST_VIEW_PARTS growing prefixes of its draw
-   * order (opaque by render order and material, as three sorts them, then the transparent), each into the 1×1 scissor
-   * with the shadow maps held and each a fenced unit. Every draw meets the same draw before it as in the full view, so the
-   * GPU's one-time work for that view lands a part at a time instead of in one unit; the parts hide the rest of the
-   * order for their own draw only, and every visibility and shadow flag is put back.
+   * LS11 (J204): `render` of the root scene from `cam` into the 1×1 scissor of `target` (the canvas when null) with
+   * `hidden` out of it, so it rasterizes nothing of the view but builds and runs what that draw order meets. Visibility,
+   * scissors and the render target are put back; the caller owns the shadow flags.
+   */
+  private parkedRender(cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, hidden: readonly THREE.Object3D[]): void {
+    const r = this.renderer;
+    const prev = r.getRenderTarget(), face = r.getActiveCubeFace(), mip = r.getActiveMipmapLevel();
+    const scissor = target?.scissor.clone(), scissorTest = target?.scissorTest ?? false;
+    const canvasScissor = r.getScissor(new THREE.Vector4()), canvasScissorTest = r.getScissorTest();
+    try {
+      for (const object of hidden) object.visible = false;
+      if (target !== null) { target.scissor.set(0, 0, 1, 1); target.scissorTest = true; }
+      else { r.setScissor(0, 0, 1, 1); r.setScissorTest(true); }
+      r.setRenderTarget(target);
+      r.render(this.rootScene, cam);
+    } finally {
+      for (const object of hidden) object.visible = true;
+      if (target !== null && scissor !== undefined) { target.scissor.copy(scissor); target.scissorTest = scissorTest; }
+      r.setScissor(canvasScissor); r.setScissorTest(canvasScissorTest);
+      r.setRenderTarget(prev, face, mip);
+    }
+  }
+
+  /**
+   * LS11 (J204): the first full view after the world's slices, drawn as FIRST_VIEW_UNITS growing prefixes of its draw
+   * order (opaque by render order and material, as three sorts them, in `FIRST_VIEW_PARTS.opaque` parts, then the
+   * transparent in `.transparent` more), each into the 1×1 scissor with the shadow maps held and each a fenced unit.
+   * Every draw meets the same draw before it as in the full view, so the GPU's one-time work for that view lands a part at
+   * a time instead of in one unit; the parts hide the rest of the order for their own draw only, and every visibility and
+   * shadow flag is put back.
    */
   private async firstViewParts(cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, units: FencedUnits,
     onUnit: (done: number) => void): Promise<void> {
-    const r = this.renderer, map = r.shadowMap;
-    const materials = (object: THREE.Object3D): THREE.Material[] => {
-      const material: unknown = Reflect.get(object, 'material');
-      const list: readonly unknown[] = Array.isArray(material) ? material : [material];
-      return list.filter((m): m is THREE.Material => m instanceof THREE.Material);
-    };
-    const shown: THREE.Object3D[] = [];
-    this.rootScene.traverseVisible(object => {
-      if ((object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points || object instanceof THREE.Sprite)
-        && object.layers.test(cam.layers) && materials(object).length > 0) shown.push(object);
-    });
-    const transparent = (object: THREE.Object3D): boolean => materials(object).some(material => material.transparent);
-    // gltfOpaqueSort's key: render order, then the material's file batch and declaration index
-    const key = (object: THREE.Object3D): readonly [number, number] => {
-      const first = materials(object)[0];
-      return first === undefined ? [0, 0] : opaqueMaterialOrder(first);
-    };
-    const opaque = shown.filter(object => !transparent(object)).sort((a, b) => {
-      const ka = key(a), kb = key(b);
-      return a.renderOrder - b.renderOrder || ka[0] - kb[0] || ka[1] - kb[1];
-    });
-    const order = [...opaque, ...shown.filter(transparent)];
-    const prev = r.getRenderTarget(), face = r.getActiveCubeFace(), mip = r.getActiveMipmapLevel();
-    for (let k = 1; k <= FIRST_VIEW_PARTS; k++) {
-      const upto = k === FIRST_VIEW_PARTS ? order.length : Math.round(opaque.length * k / (FIRST_VIEW_PARTS - 1));
-      const hidden = order.slice(upto).filter(object => object.visible);
+    const map = this.renderer.shadowMap, { order, opaque } = firstViewOrder(this.rootScene, cam.layers);
+    for (let k = 1; k <= FIRST_VIEW_UNITS; k++) {
+      const upto = firstViewCut(k, opaque, order.length, FIRST_VIEW_PARTS);
       const mapAuto = map.autoUpdate, mapNeeds = map.needsUpdate;
-      const scissor = target?.scissor.clone(), scissorTest = target?.scissorTest ?? false;
-      const canvasScissor = r.getScissor(new THREE.Vector4()), canvasScissorTest = r.getScissorTest();
       try {
-        for (const object of hidden) object.visible = false;
         map.autoUpdate = false; map.needsUpdate = false;
-        if (target !== null) { target.scissor.set(0, 0, 1, 1); target.scissorTest = true; }
-        else { r.setScissor(0, 0, 1, 1); r.setScissorTest(true); }
-        r.setRenderTarget(target);
-        r.render(this.rootScene, cam);
-      } finally {
-        for (const object of hidden) object.visible = true;
-        map.autoUpdate = mapAuto; map.needsUpdate = mapNeeds;
-        if (target !== null && scissor !== undefined) { target.scissor.copy(scissor); target.scissorTest = scissorTest; }
-        r.setScissor(canvasScissor); r.setScissorTest(canvasScissorTest);
-        r.setRenderTarget(prev, face, mip);
-      }
+        this.parkedRender(cam, target, order.slice(upto).filter(object => object.visible));
+      } finally { map.autoUpdate = mapAuto; map.needsUpdate = mapNeeds; }
       await units.submit(() => { onUnit(k); });
     }
   }
@@ -1417,29 +1417,30 @@ export class Game {
    * shadow map the draw is due to render, alone (the view goes into a 1×1 scissor of its target, so it rasterizes
    * nothing), then the view with those maps held. The same maps and the same view as one `render`; on Sunscar Dunes in
    * headless Chromium the unsplit first draw was one 1.75–2.1 s GPU flush.
+   * LS11 (J204): with `onMapPart`, the first map is drawn first as FIRST_MAP_PARTS - 1 growing prefixes of the scene's
+   * casters (in the order the shadow pass meets them), each a fenced unit reported to `onMapPart`, then whole as before.
    */
   private async fencedDraw(cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, units: FencedUnits,
-    onUnit: (done: number, detail: string) => void): Promise<void> {
+    onUnit: (done: number, detail: string) => void, onMapPart?: (done: number) => void): Promise<void> {
     const r = this.renderer, map = r.shadowMap;
     const flags = this.shadowCasters(cam).map(({ shadow }) => ({ shadow, auto: shadow.autoUpdate }));
     const prev = r.getRenderTarget(), face = r.getActiveCubeFace(), mip = r.getActiveMipmapLevel();
     const mapAuto = map.autoUpdate;
+    const casters = onMapPart !== undefined && flags.length > 0 ? casterOrder(this.rootScene) : [];
     try {
       for (const [i, { shadow }] of flags.entries()) {
-        for (const other of flags) { other.shadow.autoUpdate = false; other.shadow.needsUpdate = other.shadow === shadow; }
-        map.needsUpdate = true;
-        const scissor = target?.scissor.clone(), scissorTest = target?.scissorTest ?? false;
-        const canvasScissor = r.getScissor(new THREE.Vector4()), canvasScissorTest = r.getScissorTest();
-        try {
-          if (target !== null) { target.scissor.set(0, 0, 1, 1); target.scissorTest = true; }
-          else { r.setScissor(0, 0, 1, 1); r.setScissorTest(true); }
-          r.setRenderTarget(target);
-          r.render(this.rootScene, cam);
-        } finally {
-          if (target !== null && scissor !== undefined) { target.scissor.copy(scissor); target.scissorTest = scissorTest; }
-          r.setScissor(canvasScissor); r.setScissorTest(canvasScissorTest);
-          r.setRenderTarget(prev, face, mip);
+        const drawMap = (hidden: readonly THREE.Object3D[]): void => {
+          for (const other of flags) { other.shadow.autoUpdate = false; other.shadow.needsUpdate = other.shadow === shadow; }
+          map.needsUpdate = true;
+          this.parkedRender(cam, target, hidden);
+        };
+        if (i === 0 && onMapPart !== undefined) {
+          for (let k = 1; k < FIRST_MAP_PARTS; k++) {
+            drawMap(casters.slice(Math.round(casters.length * k / FIRST_MAP_PARTS)).filter(object => object.visible));
+            await units.submit(() => { onMapPart(k); });
+          }
         }
+        drawMap([]);
         await units.submit(() => { onUnit(i + 1, `shadow map ${String(i + 1)} / ${String(flags.length)}`); });
       }
       // every map due this pose is drawn: the view draws with them held
