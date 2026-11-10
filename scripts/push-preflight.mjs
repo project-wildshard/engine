@@ -9,7 +9,7 @@ import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 const STAMPS=['scripts/renderer-revision.json','scripts/validation-revision.json'];
-const DURATIONS=['test/durations.json','test/durations-ring1.json','test/durations-source.json'];
+const DURATIONS=new Set(['test/durations.json','test/durations-ring1.json','test/durations-source.json']);
 const SOURCE='test/durations-source.json';
 // The gate's own new-test pattern (scripts/push-test-timings.mjs missingTestTimings).
 const TEST_FILE=/^(?:src|test)\/[\s\S]+\.test\.[cm]?[jt]sx?$/u;
@@ -42,10 +42,15 @@ async function gateAbsence(){
 
 /** @typedef {{line:number,kind:'test'|'suite',skip:'certain'|'unknown'|'none'}} Registration */
 
+const HOOKS=new Set(['beforeAll','afterAll','beforeEach','afterEach','onTestFinished','onTestFailed']);
+/** Statement kinds that declare without registering anything at load time. */
+const DECLARATIONS=new Set(['ImportDeclaration','VariableDeclaration','FunctionDeclaration','ClassDeclaration','TSTypeAliasDeclaration','TSInterfaceDeclaration','TSEnumDeclaration','TSModuleDeclaration','EmptyStatement']);
+
 /** Static Vitest registrations with their effective skip state in the gate.
- * Unknown control flow (helpers, loops, conditions we cannot prove) is 'unknown'.
+ * `sound` is false when anything else could register a test at load time (a
+ * helper call at file or suite level), so "every test is skipped" is unproven.
  * @param {string} text @param {(name:string)=>boolean} absent
- * @returns {Promise<Registration[]|null>} */
+ * @returns {Promise<{found:Registration[],sound:boolean}|null>} */
 export async function registrations(text,absent){
  /** @type {{parseAst:(code:string,options:{lang:'ts'|'tsx'|'js'})=>any}} */
  let parser;
@@ -72,6 +77,27 @@ export async function registrations(text,absent){
    if(row.id?.type==='Identifier'&&name!==null)envConstants.set(row.id.name,name);
   }
  }
+ // A constant shadowed anywhere (a local, a parameter) is not provably the env read.
+ /** @type {Map<string,number>} */const declared=new Map();
+ /** @param {any} pattern */
+ const bind=pattern=>{
+  if(pattern===null||typeof pattern!=='object')return;
+  if(pattern.type==='Identifier'){declared.set(pattern.name,(declared.get(pattern.name)??0)+1);return;}
+  for(const [key,value] of Object.entries(pattern))if(key!=='typeAnnotation'&&key!=='decorators'&&value!==null&&typeof value==='object')bind(value);
+ };
+ /** @param {any} node */
+ const declarations=node=>{
+  if(node===null||typeof node!=='object')return;
+  if(Array.isArray(node)){for(const child of node)declarations(child);return;}
+  if(node.type==='VariableDeclarator')bind(node.id);
+  if(['FunctionDeclaration','FunctionExpression','ArrowFunctionExpression'].includes(node.type)){bind(node.params);if(node.id)bind(node.id);}
+  if(node.type==='CatchClause')bind(node.param);
+  if(node.type==='ImportSpecifier'||node.type==='ImportDefaultSpecifier'||node.type==='ImportNamespaceSpecifier')bind(node.local);
+  if(node.type==='ClassDeclaration'&&node.id)bind(node.id);
+  for(const [key,value] of Object.entries(node))if(key!=='parent'&&value!==null&&typeof value==='object')declarations(value);
+ };
+ declarations(ast.body);
+ for(const name of envConstants.keys())if((declared.get(name)??0)!==1)envConstants.delete(name);
  /** Absent in the gate, certainly; null when not provable.
   * @param {any} node @returns {string|null} */
  const absentVariable=node=>{
@@ -126,6 +152,19 @@ export async function registrations(text,absent){
    return null;
   }
  };
+ let sound=true;
+ /** Only declarations, registrations and hooks at file or suite level.
+  * @param {any[]} statements */
+ const level=statements=>{
+  for(const statement of statements){
+   const inner=statement.type==='ExportNamedDeclaration'?statement.declaration:statement;
+   if(inner===null||inner===undefined||DECLARATIONS.has(inner.type))continue;
+   const call=inner.type==='ExpressionStatement'?inner.expression:null;
+   if(call?.type==='CallExpression'&&(chain(call.callee)!==null||call.callee?.type==='Identifier'&&HOOKS.has(call.callee.name)))continue;
+   sound=false;
+  }
+ };
+ level(ast.body);
  /** @type {Registration[]} */const found=[];
  /** @param {any} node @param {'certain'|'unknown'|'none'} inherited */
  const walk=(node,inherited)=>{
@@ -137,23 +176,47 @@ export async function registrations(text,absent){
     const skip=inherited==='certain'||registration.skip==='certain'?'certain':inherited==='unknown'||registration.skip==='unknown'?'unknown':'none';
     const kind=registration.root==='test'||registration.root==='it'?'test':'suite';
     found.push({line:lineAt(node.start),kind,skip});
+    if(kind==='suite')for(const argument of node.arguments){
+     if(!['ArrowFunctionExpression','FunctionExpression'].includes(argument?.type))continue;
+     if(argument.body?.type==='BlockStatement')level(argument.body.body);else sound=false;
+    }
     walk(node.callee,inherited);walk(node.arguments,skip);return;
    }
   }
   for(const [key,value] of Object.entries(node))if(key!=='parent'&&value!==null&&typeof value==='object')walk(value,inherited);
  };
  walk(ast.body,'none');
- return found;
+ return {found,sound};
 }
 
-/** Replay each commit the way the queue's `git rebase` will, without a checkout.
+/** The text of a test file's relative imports, one level deep, at a commit; null
+ * when one cannot be read (then an env variable might be set there).
+ * @param {string} root @param {string} sha @param {string} file @param {string} text */
+function relativeImports(root,sha,file,text){
+ const parts=[];
+ for(const match of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)['"](\.{1,2}\/[^'"]+)['"]/gu)){
+  const target=join(dirname(file),match[1]).replaceAll('\\','/');
+  let body=null;
+  for(const candidate of [target,`${target}.ts`,`${target}.mjs`,`${target}.js`,`${target}/index.ts`]){
+   try{body=git(root,['show',`${sha}:${candidate}`]);break;}catch{ /* Try the next resolution. */ }
+  }
+  if(body===null)return null;
+  parts.push(body);
+ }
+ return parts.join('\n');
+}
+
+/** Replay each commit the way the queue's `git rebase` will, without a checkout:
+ * the sequencer's own list (--reverse --topo-order --right-only --cherry-pick,
+ * merges dropped), each picked with its parent as the merge base.
  * Returns the first commit whose non-stamp paths conflict, or null when clean.
- * @param {string} root @param {string} upstream @param {string} sha */
-function simulateRebase(root,upstream,sha){
- const commits=git(root,['rev-list','--reverse','--no-merges','--right-only','--cherry-pick',`${upstream}...${sha}`]).split('\n').filter(Boolean);
+ * @param {string} root @param {string} upstream @param {string} sha @param {()=>number} remaining */
+function simulateRebase(root,upstream,sha,remaining){
+ const commits=git(root,['rev-list','--reverse','--topo-order','--no-merges','--right-only','--cherry-pick',`${upstream}...${sha}`]).split('\n').filter(Boolean);
  let ours=upstream;
  for(const commit of commits){
-  const result=spawnSync('git',['merge-tree','--write-tree','--name-only','--no-messages','-z',`--merge-base=${commit}^`,ours,commit],{cwd:root,encoding:'utf8',maxBuffer:64*1024*1024});
+  if(remaining()<=0)throw new Error(`deadline reached after replaying part of ${commits.length} commits`);
+  const result=spawnSync('git',['merge-tree','--write-tree','--name-only','--no-messages','-z',`--merge-base=${commit}^`,ours,commit],{cwd:root,encoding:'utf8',maxBuffer:64*1024*1024,timeout:remaining()});
   if(result.status!==0&&result.status!==1)throw new Error(`git merge-tree unavailable: ${result.stderr.trim()||(result.error?.message??'no output')}`);
   const [tree,...paths]=result.stdout.split('\0');
   if(tree===undefined||!/^[a-f0-9]{40,64}$/u.test(tree))throw new Error('git merge-tree gave no tree');
@@ -179,7 +242,9 @@ function addedLines(root,base,sha,file){
 }
 
 /** Run every cheap check. Never throws: a check that cannot run is a warning.
- * @param {string} root @param {{sha?:string,fetch?:boolean}} [options] @returns {Promise<Report>} */
+ * A hard deadline (default 15 s; a normal change takes 1-4 s) turns any slow
+ * step into a warning, never a wait.
+ * @param {string} root @param {{sha?:string,fetch?:boolean,budgetMs?:number}} [options] @returns {Promise<Report>} */
 export async function preflight(root,options={}){
  const began=performance.now();
  /** @type {Report} */
@@ -194,9 +259,10 @@ export async function preflight(root,options={}){
   report.sha=git(root,['rev-parse','--verify',`${options.sha??'HEAD'}^{commit}`]);
  }catch(error){report.warnings.push({check:'target',message:`could not resolve the target commit (${reason(error)}); not refusing`});report.seconds=(performance.now()-began)/1000;return report;}
  const sha=report.sha,head=git(root,['rev-parse','HEAD']);
+ const deadline=began+(options.budgetMs??15_000),remaining=()=>Math.max(0,Math.floor(deadline-performance.now()));
  await step('fetch',()=>{
   if(options.fetch===false)return;
-  git(root,['fetch','--quiet','--no-tags','origin','main'],20_000);report.fresh=true;
+  git(root,['fetch','--quiet','--no-tags','origin','main'],Math.min(5_000,remaining()));report.fresh=true;
  });
  if(!report.fresh&&options.fetch!==false)report.warnings.push({check:'fetch',message:'origin main was not refreshed, so conflicts against it are warnings only'});
  if(options.fetch===false)report.fresh=true;
@@ -215,10 +281,10 @@ export async function preflight(root,options={}){
 
  // 6 and 2: the queue's private rebase stops on any non-stamp conflict.
  await step('conflicts',()=>{
-  const conflict=simulateRebase(root,upstream,sha);
+  const conflict=simulateRebase(root,upstream,sha,remaining);
   if(conflict===null)return;
   const short=conflict.commit.slice(0,8),subject=git(root,['log','-1','--format=%s',conflict.commit]);
-  const durations=conflict.conflicts.filter(path=>DURATIONS.includes(path));
+  const durations=conflict.conflicts.filter(path=>DURATIONS.has(path));
   const fix=durations.includes(SOURCE)
    ?`git pull --rebase origin main; on the ${SOURCE} conflict run \`node scripts/push-preflight.mjs merge-durations\` (keeps both sides' observations), \`git add ${SOURCE}\`, \`git rebase --continue\`; then enqueue again`
    :'git pull --rebase origin main, resolve these paths yourself, then enqueue again';
@@ -230,13 +296,19 @@ export async function preflight(root,options={}){
  /** @type {string[]|null} */let missing=null;
  const addedTests=[...status].filter(([file,kind])=>kind==='A'&&TEST_FILE.test(file)).map(([file])=>file);
  const liftPending=status.has('test/lift-pending.json');
- await step('timings',async()=>{
+ await step('timings',()=>{
   if(addedTests.length===0&&!liftPending){missing=[];return;}
-  if(!clean([...DURATIONS,'test/lift-pending.json',...addedTests])){
-   report.warnings.push({check:'timings',message:`new test files (${addedTests.join(', ')}) not checked: HEAD is not the target or its timing files are edited; the gate will check them`});return;
+  // Discovery and clocks are read from the working tree: it must hold the target's bytes.
+  if(!clean(['.'])){
+   report.warnings.push({check:'timings',message:`new test files (${addedTests.join(', ')}) not checked: HEAD is not the target or tracked files are edited; the gate will check them`});return;
   }
-  const {missingTestTimings}=await import('./push-test-timings.mjs');
-  const rows=missingTestTimings(`refs/heads/main ${sha} refs/heads/main ${base}`,root);
+  // The gate's own check, in a child bounded by the deadline (it lists Vitest's files twice).
+  const program=`const {missingTestTimings}=await import(${JSON.stringify(pathToFileURL(join(import.meta.dirname,'push-test-timings.mjs')).href)});process.stdout.write(JSON.stringify(missingTestTimings(process.argv[1],process.argv[2])));`;
+  const child=spawnSync(process.execPath,['--input-type=module','-e',program,`refs/heads/main ${sha} refs/heads/main ${base}`,root],{cwd:root,encoding:'utf8',timeout:remaining(),killSignal:'SIGKILL',maxBuffer:16*1024*1024});
+  if(child.status!==0){const last=child.stderr.trim().split('\n').at(-1);throw new Error(child.error?.message??(last===undefined||last===''?`exit ${child.status}`:last));}
+  /** @type {{file:string,rings:string[]}[]} */const listed=JSON.parse(child.stdout);
+  // A file origin/main already has is not new to the queue's rebased range.
+  const rows=listed.filter(row=>spawnSync('git',['cat-file','-e',`${upstream}:${row.file}`],{cwd:root}).status!==0);
   missing=rows.map(row=>row.file);
   if(rows.length>0)report.refusals.push({check:'timings',
    message:`new test files without committed timings: ${rows.map(row=>`${row.file} (${row.rings.map(ring=>ring==='1'?'Ring 1':'full').join(' + ')})`).join(', ')}; the gate's timing step refuses after the full suite ("New test files need committed timings")`,
@@ -252,10 +324,12 @@ export async function preflight(root,options={}){
   for(const file of files){
    const text=git(root,['show',`${sha}:${file}`]);
    if(!/\b(?:skip|skipIf|runIf|todo)\b/u.test(text))continue;
-   const found=await registrations(text,absent);
-   if(found===null){report.warnings.push({check:'skips',message:`${file}: could not parse its tests; not refusing`});continue;}
-   const tests=found.filter(row=>row.kind==='test');
-   const whole=tests.length>0&&tests.every(row=>row.skip==='certain');
+   // A local module this file imports could set the variable itself.
+   const imported=relativeImports(root,sha,file,text);
+   const parsed=await registrations(text,name=>imported!==null&&absent(name)&&!imported.includes(name));
+   if(parsed===null){report.warnings.push({check:'skips',message:`${file}: could not parse its tests; not refusing`});continue;}
+   const found=parsed.found,tests=found.filter(row=>row.kind==='test');
+   const whole=parsed.sound&&tests.length>0&&tests.every(row=>row.skip==='certain');
    const needsClock=missing?.includes(file)??false;
    if(whole&&needsClock){
     report.refusals.push({check:'skips',message:`${file} is new and every test in it is skipped in the queue's gate (line ${tests.map(row=>row.line).join(', ')}): its timing step crashes with ValiError "Expected \\"passed\\" but received \\"skipped\\""`,

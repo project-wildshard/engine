@@ -103,6 +103,14 @@ test('2. a durations-source.json append behind origin is refused; merge-duration
   expect(check(lane).code).toBe(0);
 }, 30_000);
 
+test('1b. a test file origin/main already has is not new to the queue', () => {
+  const { lane, upstream } = fixture('timings-upstream');
+  publish(upstream, 'test(loading): pin the stall clock', { 'test/load-stalls.test.ts': passing('a stall is clipped') });
+  // The lane cherry-picked the same file before upstream recorded its clock.
+  commit(lane, 'test(loading): pin the stall clock (lane copy)', { 'test/load-stalls.test.ts': passing('a stall is clipped'), 'src/a.ts': 'export const a = 1;\n' });
+  expect(checks(check(lane).report.refusals)).not.toContain('timings');
+}, 30_000);
+
 test('3. a new test file the gate wholly skips is refused; an unprovable condition is not', () => {
   const { lane } = fixture('skips');
   // The real Q261 shape: an env-gated browser check the queue's gate never sets.
@@ -115,10 +123,17 @@ test('3. a new test file the gate wholly skips is refused; an unprovable conditi
 
   const { lane: clean } = fixture('skips-clean');
   commit(clean, 'test(hud): check the HUD layout', { 'test/hud-layout.test.ts':
-    "import { describe, test } from 'vitest';\n\ndescribe('hud', () => {\n  test.skipIf(process.platform === 'win32')('lays out', () => {});\n  test('counts', () => {});\n});\ndescribe.skip('later', () => { test('x', () => {}); });\n" });
+    "import { describe, test } from 'vitest';\n\ndescribe('hud', () => {\n  test.skipIf(process.platform === 'win32')('lays out', () => {});\n  test('counts', () => {});\n});\ndescribe.skip('later', () => { test('x', () => {}); });\n",
+    // Not provably wholly skipped: a helper may register running tests, a local import may set the variable.
+    'test/helper-skip.test.ts': "import { test } from 'vitest';\nimport { registerCases } from './cases.ts';\n\nconst BASE = process.env['WS_HUD_BASE'];\nregisterCases();\ntest.skipIf(BASE === undefined)('x', () => {});\n",
+    'test/cases.ts': "import { test } from 'vitest';\n\nexport const registerCases = (): void => { test('runs', () => {}); };\n",
+    'test/import-env.test.ts': "import { test } from 'vitest';\nimport './set-env.ts';\n\nconst BASE = process.env['WS_IMPORT_BASE'];\ntest.skipIf(BASE === undefined)('x', () => {});\n",
+    'test/set-env.ts': "process.env['WS_IMPORT_BASE'] = '1';\n" });
   const report = check(clean).report;
   expect(checks(report.refusals)).toEqual(['timings']);
-  expect(report.warnings.find(row => row.check === 'skips')?.message).toContain('test/hud-layout.test.ts adds 3 skipped or conditional');
+  expect(report.refusals[0]?.message).toContain('test/helper-skip.test.ts');
+  expect(report.refusals[0]?.message).toContain('test/import-env.test.ts');
+  expect(report.warnings.find(row => row.check === 'skips' && row.message.startsWith('test/hud-layout.test.ts'))?.message).toContain('adds 3 skipped or conditional');
 }, 30_000);
 
 test('4. stale official stamps only warn: the queue regenerates them after its rebase', () => {
@@ -202,5 +217,7 @@ test('enqueue refuses before capture, and an override is explicit and recorded i
   expect(job.state).toBe('failed');
   expect(job.preflight?.override).toBe(reason);
   expect(job.preflight?.refused[0]).toMatch(/^conflicts: /u);
+  // The sidecar survives a worker that predates the job field.
+  expect((JSON.parse(readFileSync((file ?? '').replace(/\.json$/u, '.preflight.json'), 'utf8')) as { override?: string }).override).toBe(reason);
   expect(readFileSync(join(scratch, 'receipts.log'), 'utf8')).toContain(`override`);
 }, 40_000);

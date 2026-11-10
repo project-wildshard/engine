@@ -95,6 +95,8 @@ function capture(source,directory,checkOnly,requested){
   // The copied snapshot is independent. Remove this queue-owned transport
   // before a worker can consume it; tolerate bounded directory-write races.
   rmSync(anchor,{recursive:true,force:true,maxRetries:3,retryDelay:25});
+  // An older live worker re-parses jobs without this field; the sidecar keeps the verdict.
+  if(job.preflight!==undefined)write(join(directory,`${id}.preflight.json`),{id,...job.preflight});
   job.state='queued';write(file,job);worker(directory);return job;
  }catch(error){job.state='failed';const message=error instanceof Error?error.message:String(error);write(file,{...job,error:message});notify(job,'failed',message);if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});throw error;}
  finally{if(existsSync(anchor))rmSync(anchor,{recursive:true,force:true,maxRetries:3,retryDelay:25});}
@@ -316,8 +318,11 @@ if(mode==='enqueue'){
  const directory=join(root,createHash('sha256').update(identity(remote)).digest('hex').slice(0,20));mkdirSync(join(directory,'snapshots'),{recursive:true});
  const commit=args.find(arg=>arg.startsWith('--commit='));
  // DS16c: refuse in seconds what the full gate would bounce on bookkeeping.
- const {admitEnqueue}=await import('./push-preflight.mjs');
- const preflight=await admitEnqueue(source,{commit:commit?.slice(9),checkOnly:args.includes('--check-only'),lane:process.env.WS_LANE_NAME??'push-queue',skip:process.env.WS_PREFLIGHT_SKIP});
+ // A preflight that cannot even load never blocks an enqueue.
+ const {admitEnqueue}=await import('./push-preflight.mjs').catch((/** @type {unknown} */error)=>{console.error(`push preflight unavailable (${error instanceof Error?error.message:String(error)}); enqueueing without it`);return {admitEnqueue:()=>Promise.resolve({sha:'',seconds:0,refused:[],warnings:['preflight: unavailable']})};});
+ /** @type {Awaited<ReturnType<typeof admitEnqueue>>} */let preflight;
+ try{preflight=await admitEnqueue(source,{commit:commit?.slice(9),checkOnly:args.includes('--check-only'),lane:process.env.WS_LANE_NAME??'push-queue',skip:process.env.WS_PREFLIGHT_SKIP});}
+ catch(error){console.error(`push preflight crashed (${error instanceof Error?error.message:String(error)}); enqueueing without it`);preflight={sha:'',seconds:0,refused:[],warnings:['preflight: crashed']};}
  if(preflight===null)process.exitCode=1;
  else{
   // Capture exactly the commit the preflight checked; a moved HEAD stays an ancestor or is refused.

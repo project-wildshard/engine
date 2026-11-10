@@ -20,3 +20,12 @@ timing reporter, as the gate's Ring 1 step already does, and records them
 with the gate's recorder, so a new test no longer costs a bounced gate.
 `merge-durations` keeps both sides of a durations-source conflict until
 VB18's union file retires it.
+
+J206 Codex review (six MUSTs, all fixed before landing): the replay now
+uses the sequencer's --topo-order; the timing check needs a fully clean
+tracked tree, runs in a child under a 15 s hard deadline (fetch 5 s),
+and drops files origin/main already has; a skip is "certain" only when
+nothing else at file or suite level could register a test and no local
+import names the variable; an import or crash of the preflight never
+blocks enqueue; and a `<job>.preflight.json` sidecar keeps the verdict
+and override when an older live worker rewrites the job without them.
