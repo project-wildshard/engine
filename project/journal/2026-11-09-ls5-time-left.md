@@ -11,3 +11,6 @@ slows 3.6x, gameplay 12x and the program links barely at all. So the grid path i
 reading of where this device sits between them. A least-squares fit gives that place; every row still to run costs its
 desktop seconds plus that share of the difference. A running row past its cost raises the fit, so the number goes up
 rather than holding a wrong one. Rows' own reported shares are not used: they report cheap units first or last.
+
+The grid's bar now takes its shares from the phone profile's seconds, as the shardfile and native paths already did
+(LS7), instead of an equal share a row, so the bar's pace follows where the time goes on a phone-like device.

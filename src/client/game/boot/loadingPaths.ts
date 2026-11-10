@@ -37,14 +37,39 @@ const NATIVE_MEASURED_SECONDS: Readonly<Record<string, number>> = {
   server: 3.324, audio: 0.1524,
 };
 
+/** LS5 (J188): the Infinite Grid's path (Driftwood Isle from the title's Infinite Wildshard tap, a first visit), measured
+ *  on two real-GPU profiles so the card can read time left (src/client/engine/boot/timeLeft.ts), each the mean of three
+ *  runs of `scripts/loading-time-left-proof.mjs --profile=desktop,phone --runs=3 --dump` (build 7a23966, 2026-11-09):
+ *  each row's own timeline ms at ready, and `modules` its `game-stage:modules` span, as above. The phone stand-in is the
+ *  bar's share: Chromium on this Mac's GPU (ANGLE Metal), iPhone 16 Pro viewport, 4x CPU and 12.8 Mbit/s with 150 ms
+ *  latency. The fast profile is the same Chromium unthrottled. Unlike the tables above, the GPU is real: on a software
+ *  GPU (headless SwiftShader) the first frame alone takes 19-26 s, which no player's device does; that boot hides its
+ *  time left (LS8's slow-GPU reading) and keeps these shares. Rows that did not run (a second home pass, home program
+ *  links, selected audio) have 0. */
+const GRID_MEASURED_SECONDS: Readonly<Record<string, number>> = {
+  modules: 0.5581, runtimeModules: 0.0005, data: 0.0092, audioFiles: 0, world: 0.0532, renderer: 0.0587, loadout: 0.0575,
+  weapon: 0.0961, gameplay: 0.6442, assembly: 0.8647, menu: 0.0111,
+  finish: 0.1014, // still on at ready: its ms then
+  home: 4.8447, 'world#2': 0, 'loadout#2': 0, homePrograms: 0, road: 0.0061, spawnDetail: 0.0037, shaders: 0.4227,
+  firstFrame: 1.1067, worldFrame: 0.4434, readyFrame: 0.4656, spawnPrograms: 0.2212, worldPrograms: 0.5473, server: 1.5233,
+  audio: 0.0038,
+};
+const GRID_DESKTOP_SECONDS: Readonly<Record<string, number>> = {
+  modules: 0.3031, runtimeModules: 0.0001, data: 0.0023, audioFiles: 0, world: 0.0189, renderer: 0.0207, loadout: 0.0114,
+  weapon: 0.0409, gameplay: 0.0552, assembly: 0.2964, menu: 0.0059, finish: 0.026, home: 1.3281, 'world#2': 0,
+  'loadout#2': 0, homePrograms: 0, road: 0.0001, spawnDetail: 0.0008, shaders: 0.207, firstFrame: 0.7665,
+  worldFrame: 0.0559, readyFrame: 0.3305, spawnPrograms: 0.232, worldPrograms: 0.3062, server: 0.1839, audio: 0.0003,
+};
+
 /** Only a calibrated profile carries weights. Every other path keeps an equal share a row, which is what every path
  *  had before LS7 (the bar ignored weights), until it is measured. */
-function calibrate(path: Path, measured: Readonly<Record<string, number>> | null): Path {
+function calibrate(path: Path, measured: Readonly<Record<string, number>> | null, fast?: Readonly<Record<string, number>>): Path {
   return { ...path, steps: path.steps.map(row => {
     if (measured === null) return { ...row, weight: 1 };
-    const seconds = measured[row.key];
+    const seconds = measured[row.key], desktop = fast?.[row.key];
     if (seconds === undefined) throw new Error(`LS7: Load row ${row.key} has no measured seconds`);
-    return { ...row, weight: seconds };
+    if (fast !== undefined && desktop === undefined) throw new Error(`LS5: Load row ${row.key} has no desktop seconds`);
+    return { ...row, weight: seconds, ...(desktop === undefined ? {} : { fastWeight: desktop }) };
   }) };
 }
 
@@ -84,7 +109,8 @@ export function loadingPath(id: LoadingPathId, own?: Readonly<Record<string, { l
     // DL21: the server's boot, on J130's row and after the flip on every page; no bar share, so a page with no server is unchanged
     { ...step('server', 'Worker boot'), weight: 0.01 }, leaf('audio')],
     ignored: native ? [] : BOOT_STEPS.filter(key => !selected.has(key)) },
-    id === 'grid' ? null : native ? NATIVE_MEASURED_SECONDS : id === 'shardfile' ? SHARDFILE_MEASURED_SECONDS : null);
+    id === 'grid' ? GRID_MEASURED_SECONDS : native ? NATIVE_MEASURED_SECONDS : id === 'shardfile' ? SHARDFILE_MEASURED_SECONDS : null,
+    id === 'grid' ? GRID_DESKTOP_SECONDS : undefined);
 }
 
 /** Crossings retain their existing unobstructed play view; the live diagnostic uses this separate, exact phase table. */
