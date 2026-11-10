@@ -417,7 +417,7 @@
   "src/client/game/shardfile/world-scene-volumes.test.ts": 0.468539237,
   "src/client/game/shardfile/world-site-lifetime.test.ts": 3.0091724990000004,
   "src/client/game/systems/looks/trample-upload.test.ts": 0.257916281,
-  "src/client/host/online/chat-corner.test.ts": 0.38271258300000005,
+  "src/client/host/online/chat-corner.test.ts": 0.551002417,
   "src/server/engine/ai/actor-relocate.test.ts": 0.03473447499999999,
   "src/server/engine/ai/baked-hunt-ground.test.ts": 0.03569481499999999,
   "src/server/engine/ai/elite-script.test.ts": 0.11494975599999999,

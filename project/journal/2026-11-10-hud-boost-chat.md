@@ -71,3 +71,4 @@ chat overlay that takes up way more space ... not a modal."
   force-blurs on a QA 43 build. The HOVER tab's boost look is now solid
   amber: the outline-only amber was easy to miss on the phone shots.
 - New test files' clocks recorded with `push-preflight.mjs timings`.
+- Re-clocked chat-corner.test.ts after the review fix changed it.
