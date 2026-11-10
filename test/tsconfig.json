@@ -551,6 +551,7 @@
     "../scripts/test-build-tools.ts",
     "../scripts/vitest-shard.ts",
     "../scripts/vitest-ci-files.ts",
+    "../scripts/push-duration-sequencer.ts",
     "../scripts/test-shard-plan.ts",
     "../scripts/vitest-plan.ts",
     "../scripts/vitest-timings.ts",

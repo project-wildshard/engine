@@ -2,7 +2,7 @@ import {afterAll,expect} from 'vitest';
 import {relative} from 'node:path';
 import {holdCpu} from './cpu-admission.mjs';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
-import {CI_SERIAL_TESTS} from './vitest-ci-files.ts';
+import {CI_SERIAL_TESTS,CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
 import {PUSH_BUDGET} from './push-budget.mjs';
 
 interface CookEnvironment extends NodeJS.ProcessEnv { WS_CPU_SLOTS?:string }
@@ -15,7 +15,7 @@ if(enabled==='1'){
   // The explicit no-grant encoder proof still needs the whole machine budget.
   // Production cook jobs now consume the real admitted grant (e1946bc).
   const cook=file==='test/cook-worker.test.ts';
-  const exclusive=file==='test/net-bots.test.ts'||file==='test/cook-cpu-limit.test.ts';
+  const exclusive=new Set<string>(CPU_EXCLUSIVE_TESTS).has(file);
   const native=new Set<string>(CI_SERIAL_TESTS).has(file);
   const lease=await holdCpu(exclusive?'all':cook?PUSH_BUDGET.cookSlots:native?2:1);
   const cookEnvironment:CookEnvironment=process.env,previousCookGrant=cookEnvironment.WS_CPU_SLOTS;

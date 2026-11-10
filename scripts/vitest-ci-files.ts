@@ -63,3 +63,5 @@ export const CI_NATIVE_GROUPS = {
   ],
 } as const;
 export const CI_SERIAL_TESTS = Object.values(CI_NATIVE_GROUPS).flat();
+/** Timing and uncapped encoder proofs hold the whole CPU budget, so they run alone. */
+export const CPU_EXCLUSIVE_TESTS = ['test/net-bots.test.ts', 'test/cook-cpu-limit.test.ts'] as const;
