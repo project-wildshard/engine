@@ -25,3 +25,24 @@ a screen. Now `serviceWorker.ts` leaves `-failScreens-` chunks out of
 the precache (a test pins it), the entry checks Developer again after
 the import, `ws-dev` off closes the screen, and modals get a name and
 focus. Renderer stamp regenerated.
+
+## FM1b: Jake's review (lane opus-failmodes2)
+
+Jake asked three things of the prototypes: what happens when you
+tap Play under a banner ("every banner screen needs a sibling/sister
+screen"), the 3 to 5 new UI styles up front, and shots in the game on
+Driftwood Isle rather than over the title.
+
+- Nine hold cards, `<id>-blocked`, each drawn over its own banner or
+  notice: what was tapped, live progress (try N, next dial in N s,
+  the J114 hold draining), and what happens by itself. Chat is held
+  and sent on return; a game tap is never sent late.
+- Prototypes for the review's failures 37 to 46 (release 404, captive
+  portal, bad signature, refused, banned, storage full, staging).
+- Five styles: page, card, hold card, banner, notice. The voice tip
+  now wears the notice's glass, and the banner is a tab in the top
+  band: the old full-width line covered the pause button and the
+  minimap on Driftwood Isle.
+- `test/fail-screens-catalogue.test.ts` pins the pairs and the ids.
+- Shots: a local serve-build with `?chunk=driftwood-isle`, headless
+  Chromium on Metal (`--use-angle=metal`), world ready in 5 to 8 s.
