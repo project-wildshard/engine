@@ -16,7 +16,7 @@ import { jumpOwnerClock } from './fixtures/ownerClock';
 // A long session on Driftwood's shipped rows, solo. The roster held 34 bodies and room for 221 returns, and the 222nd
 // threw about 43 minutes into a session that kept clearing the island. FAST-SLOW-TESTS FS2: those 43 minutes were idle
 // waits between returns, so each second the island's return clock jumps to its last owed return. Every return still
-// runs the shipped placement and roster code; only the waiting is skipped (3,240 ticks for the original's 262,320).
+// runs the shipped placement and roster code; only the waiting is skipped (4,440 ticks for the original's 262,320).
 
 const SLUG = 'driftwood-isle', STEP = 'driftwood.island', FULL = 255;
 
@@ -37,6 +37,7 @@ const clearIsland = (resident: TrustedHeadlessResident): void => {
 };
 const second = (resident: TrustedHeadlessResident): void => { for (let i = 0; i < 60; i++) resident.step([]); };
 const Ecology = v.looseObject({ ecology: v.looseObject({ now: v.number(), pending: v.array(v.looseObject({ due: v.number() })) }) });
+const returnClock = (resident: TrustedHeadlessResident): number => v.parse(Ecology, resident.host.adapters.get(STEP)?.snapshot()).ecology.now;
 /** Every owed return falls due now, as if its real delay had passed; the saved clock is the only thing that moves. */
 const skipWaits = (resident: TrustedHeadlessResident): void => {
   jumpOwnerClock(resident.host, STEP, ['ecology.now'], state => v.parse(Ecology, state), state => {
@@ -44,9 +45,15 @@ const skipWaits = (resident: TrustedHeadlessResident): void => {
     return { ...state, ecology: { ...ecology, now: Math.max(ecology.now, ...ecology.pending.map(entry => entry.due)) } };
   });
 };
-const session = (resident: TrustedHeadlessResident): void => { clearIsland(resident); second(resident); skipWaits(resident); };
+/** One cleared second on the island's own clock, which must still run a full second, then the jump past the waits. */
+const session = (resident: TrustedHeadlessResident): void => {
+  const was = returnClock(resident);
+  clearIsland(resident); second(resident);
+  expect(returnClock(resident) - was).toBeCloseTo(1, 9);
+  skipWaits(resident);
+};
 // Seconds at the bound and of the two-world suffix. The original's 1,200 seconds at the bound brought 138 returns into
-// dead slots; 20 jumped seconds bring 320, and the suffix still carries returns at the bound on both worlds.
+// dead slots; 20 jumped seconds bring 320. The suffix runs 10 plain seconds on both worlds, then 10 jumped ones.
 const AT_BOUND = 20, SUFFIX = 10;
 
 test('a session that keeps clearing Driftwood passes the roster bound, reuses dead slots and saves there', async () => {
@@ -71,6 +78,9 @@ test('a session that keeps clearing Driftwood passes the roster bound, reuses de
 
     const wire = serializeSimSnapshot(snapshotSimHostBytes(live.host));
     restored = await open(wire);
+    expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
+    // first an uninterrupted suffix, real waits and no owner restore, then jumped seconds that still reuse slots
+    for (let i = 0; i < SUFFIX; i++) { clearIsland(live); clearIsland(restored); second(live); second(restored); }
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
     for (let i = 0; i < SUFFIX; i++) { session(live); session(restored); }
     expect(bodies().filter(body => !seen.has(body.id)).length).toBeGreaterThan(0);

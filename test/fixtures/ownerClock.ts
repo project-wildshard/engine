@@ -26,11 +26,11 @@ export function jumpOwnerClock<S>(host: SimHost, owner: string, clocks: readonly
   const adapter = host.adapters.get(owner);
   if (adapter === undefined) throw new Error(`No saved owner ${owner}`);
   const before = structuredClone(adapter.snapshot()), jumped = edit(parse(structuredClone(before)));
-  const stray = changedPaths(before, jumped).filter(path => !allowed(path, clocks));
-  if (stray.length > 0) throw new Error(`A clock jump on ${owner} may not touch ${stray.map(path => path.join('.')).join(', ')}`);
-  // The save wire is JSON: a value that does not survive it fails the exact read-back below.
+  // The save wire is JSON, so check what actually reaches the owner, not the edited object.
   const wire: SimValue = JSON.parse(JSON.stringify(jumped));
-  adapter.restore(wire);
-  if (!isDeepStrictEqual(adapter.snapshot(), jumped)) throw new Error(`${owner} did not restore the jumped clock exactly`);
+  const stray = changedPaths(before, wire).filter(path => !allowed(path, clocks));
+  if (stray.length > 0) throw new Error(`A clock jump on ${owner} may not touch ${stray.map(path => path.join('.')).join(', ')}`);
+  adapter.restore(structuredClone(wire));
+  if (!isDeepStrictEqual(adapter.snapshot(), wire)) throw new Error(`${owner} did not restore the jumped clock exactly`);
   return jumped;
 }
