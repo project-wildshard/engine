@@ -107,3 +107,18 @@ process created; a hostile pre-existing symlink cannot overwrite a victim.
 The same real HTTP proof now exercises the frozen-source URL and a
 Ring1-style selected owner with an uncached unselected model. All
 selected public source downloads have independently verified their bytes.
+
+Final exact a359e657abe2fd7029e45ddf15ad2456e12a6bbc build passes in
+native iPhone Simulator Safari on a fresh origin. Both Driftwood and
+Pine select IMG naturally after the compressed-format probe veto, reach
+the actual loader-complete and first-game-step events, remove the card,
+and have zero fatal UI, native console errors or unexpected HTML network
+responses. Both documents are fresh and foreground with the exact full
+build ID. The normal quiet full-test lease lasts 23.43 s and releases;
+no deadline, oracle, texture override or backend change is used.
+
+The cache hardening has an actual old/new negative control: original
+81ac overwrites an unrelated symlink target with verified model bytes;
+a359 refuses EEXIST and preserves the target. The old module copy and
+both owned fixture roots are removed. One normal immutable publication
+capture follows; exact hosted CI/Ring1, tag and staged voice remain open.
