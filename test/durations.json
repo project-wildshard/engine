@@ -640,6 +640,7 @@
   "test/cook-deploy-workflow.test.ts": 0.06452920599999996,
   "test/cook-gc-reuse.test.ts": 1.1689141749999998,
   "test/cook-hostile-pins.test.ts": 2.8895328620000003,
+  "test/cook-installed-runtime.test.ts": 0.37738487500000006,
   "test/cook-refusals.test.ts": 2.2991757309999996,
   "test/cook-validation.test.ts": 21.825218664,
   "test/cook-worker.test.ts": 138.97,

@@ -623,6 +623,7 @@
   "test/cook-cpu-limit.test.ts": 4.946377766,
   "test/cook-deploy-workflow.test.ts": 0.057898426,
   "test/cook-gc-reuse.test.ts": 1.6658336000000002,
+  "test/cook-installed-runtime.test.ts": 0.354433374,
   "test/core-heap-diagnostic.test.ts": 0.7402245089999999,
   "test/crack-every-player.test.ts": 0.897210708,
   "test/creature-residency-contract.test.ts": 1.2157549410000001,

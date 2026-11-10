@@ -33,3 +33,9 @@ The repeated byte-identical outputs are the stamp proof.
 New-test timing comes from the public actual Vitest reporter API next.
 Then the clean source receives one normal full queue publication.
 No caps, deadlines, quarantine policies or live alias modes change.
+
+The normal timing API measures the new file in full and Ring1 modes.
+Both actual four-case executions pass with zero framework errors.
+Full-module clocks include collection, setup and environment work.
+The committed weights are bootstrap observations, never hosted clocks.
+The existing four cold-export/linker cases also pass after the rebase.

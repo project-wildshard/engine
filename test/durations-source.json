@@ -210,6 +210,60 @@
       "finishedAt": "2026-11-10T13:04:46.683Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "7b9aaf32de50f03cc690fe8c03b4aace648e6685",
+      "tree": "3162fc62b13dcf8cc09ce154944db2f82da2375d",
+      "profile": "actual-local-focused-gvs-runtime",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/cook-installed-runtime.test.ts",
+          "blob": "e8e9790d820f036eca222687f733fcd6face46a0",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 377.3848750000001
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T14:57:02.447Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "7b9aaf32de50f03cc690fe8c03b4aace648e6685",
+      "tree": "3162fc62b13dcf8cc09ce154944db2f82da2375d",
+      "profile": "actual-local-focused-gvs-runtime",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/cook-installed-runtime.test.ts",
+          "blob": "e8e9790d820f036eca222687f733fcd6face46a0",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 354.433374
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T14:57:03.407Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [
