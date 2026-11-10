@@ -30,3 +30,7 @@ codes fresh and with the shared parse.
 The other five declaration files (project-wide emit, the app project,
 JSON companions, generated sources, ambient life) have different shapes and
 stay as they are.
+
+Ring 2 stays ring 2: ten of the game files were in `test/pins/ring-2-tests.json`,
+so hosted ring-1 runs skipped them. Their blocks live in
+`isolated-game-ring2-declarations.test.ts`, which takes their place in that list.
