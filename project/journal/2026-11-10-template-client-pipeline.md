@@ -42,3 +42,11 @@ This is preparation for comparing the three clients. No watcher or dev
 server is installed in hooks, no winner is selected, no 60-second smoke
 is claimed and no plan row is marked done. The current production and
 staging publication checkout use their committed source independently.
+
+The first normal full publication gate refused Q280: 6,315 cases passed,
+but the existing atlas-order test still searched the old monolithic CLI
+for writeWorldMapAtlas. Its real product checks were green. The same
+focused file reproduced one red locally before the forward. It now reads
+the shared preparation function for the atlas step and verifies the CLI
+calls preparation before spawning Vite; the cold missing-product refusal
+is unchanged. All four cases pass in 171 ms. No cap or oracle is removed.

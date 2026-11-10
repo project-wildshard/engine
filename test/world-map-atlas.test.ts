@@ -51,8 +51,12 @@ test('the app build writes one atlas and its define, verifies source hashes, and
 
 test('the atlas precedes the app build, and a cold atlas refuses an unbuilt product', async () => {
   const script = readFileSync('scripts/build-app.mjs', 'utf8');
-  expect(script.indexOf('writeWorldMapAtlas')).toBeGreaterThan(-1);
-  expect(script.indexOf('writeWorldMapAtlas')).toBeLessThan(script.indexOf("vite, 'build'"));
+  const pipeline = readFileSync('scripts/app-build-pipeline.mjs', 'utf8');
+  const preparation = pipeline.slice(pipeline.indexOf('export function prepareAppBuild()'), pipeline.indexOf('export async function finishAppBuild('));
+  expect(preparation).toContain('writeWorldMapAtlas(process.cwd())');
+  const prepareCall = script.indexOf('  prepareAppBuild();');
+  expect(prepareCall).toBeGreaterThan(-1);
+  expect(prepareCall).toBeLessThan(script.indexOf('const build = spawnSync('));
   const root = mkdtempSync(resolve('tmp', 'world-atlas-cold-'));
   try {
     mkdirSync(resolve(root, 'src/shared/game/grid'), { recursive: true });
