@@ -87,29 +87,29 @@ function siteNames(raw: string | null, instance: string): boolean {
     return isRecord(entry) && isRecord(entry['data']) && entry['data']['site'] === instance;
   } catch { return false; }
 }
-/** One site document's place and save count, or null for one that is absent or unreadable. */
-function siteRow(raw: unknown): { readonly tick: number; readonly site: string | null } | null {
-  if (typeof raw !== 'string') return null;
+/** The site a present site document names; undefined when this page can't say, which the caller counts as no agreement. */
+function siteOf(raw: string): string | null | undefined {
   try {
     const parsed: unknown = JSON.parse(raw), keys = isRecord(parsed) ? parsed['keys'] : null, entry = isRecord(keys) ? keys['continuationSite'] : null;
-    const data = isRecord(entry) ? entry['data'] : null, tick = isRecord(data) ? data['tick'] : null, site = isRecord(data) ? data['site'] : undefined;
-    return typeof tick === 'number' && Number.isSafeInteger(tick) && tick >= 0 && (site === null || typeof site === 'string') ? { tick, site } : null;
-  } catch { return null; }
+    const site = isRecord(entry) && isRecord(entry['data']) ? entry['data']['site'] : undefined;
+    return site === null || typeof site === 'string' ? site : undefined;
+  } catch { return undefined; }
 }
 /**
- * SR4: where the grid session's durable continuation stands, newest first, from its two site documents (`siteDocuments('grid')` in
- * src/server/host/standalone/continuation.ts). Two reads, not the whole store: a page asks this before it trusts its own place after
- * an unexpected end, because Chromium can lose a killed page's newest localStorage writes while these commit strictly. The server's
- * schema is its own (client ↛ server), so this read is looser: it keeps every document the server could boot from, and maybe more.
+ * SR4: where the grid session's durable continuation stands, one row for each of its two site documents that exists
+ * (`siteDocuments('grid')` in src/server/host/standalone/continuation.ts). Two reads, not the whole store: a page asks this before it
+ * trusts its own place after an unexpected end, because Chromium can lose a killed page's newest localStorage writes while these
+ * commit strictly. The server's schema is its own (client ↛ server), so nothing here judges validity: a row is every present
+ * document, the server's boot picks one of them, and one this page can't read says undefined.
  */
-export async function readServerSites(prefix: string = installedIdentity()?.savePrefix ?? '', name: string = serverSaveDatabase(prefix)): Promise<{ readonly tick: number; readonly site: string | null }[]> {
+export async function readServerSites(prefix: string = installedIdentity()?.savePrefix ?? '', name: string = serverSaveDatabase(prefix)): Promise<{ readonly site: string | null | undefined }[]> {
   const opening = indexedDB.open(name, 1);
   opening.onupgradeneeded = (): void => { opening.result.createObjectStore(SAVES); };
   const database = await requested(opening);
   try {
     const store = database.transaction(SAVES).objectStore(SAVES);
     const raws = await Promise.all(['standalonesite-grid', 'standalonesitealt-grid'].map(doc => requested(store.get(`${prefix}${doc}`))));
-    return raws.flatMap(raw => { const row = siteRow(raw); return row === null ? [] : [row]; }).sort((a, b) => b.tick - a.tick);
+    return raws.flatMap(raw => typeof raw === 'string' ? [{ site: siteOf(raw) }] : []);
   } finally { database.close(); }
 }
 /**

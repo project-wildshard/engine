@@ -76,7 +76,7 @@ test('SR4: a grid kill resumes its place only where every server site document s
   const original = gridRecovery(f.store, () => Date.now());
   const other = assembly.cells.find(cell => cell.instance !== home.instance);
   if (other === undefined) throw new Error('Missing a second catalogue cell');
-  const crash = (server?: readonly { site: string | null }[]) => {
+  const crash = (server?: readonly { site: string | null | undefined }[]) => {
     expect(original.clearLoop()).toBe(true);
     return consumeGridRecovery({ assembly, saves: new SaveStore({ local: f.local, session: new Storage() }),
       now: () => Date.now(), unexpected: true, previous: { ...previous, kind: 'unexpected', mode: 'grid' }, ...(server === undefined ? {} : { server }) });
@@ -88,8 +88,9 @@ test('SR4: a grid kill resumes its place only where every server site document s
   // A newest document the server's stricter read refuses can't let a stale place through: any disagreement refuses.
   expect(crash([{ site: null }, { site: other.instance }])).toBeNull();
   expect(crash([{ site: 'gone-cell' }])).toBeNull();
+  expect(crash([{ site: null }, { site: undefined }])).toBeNull(); // a document the page couldn't read agrees with no place
   expect(crash([{ site: null }, { site: null }])).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
-  // No document the page can read, or no read at all: the page's own place, as before.
+  // No site document, or no read at all: the page's own place, as before.
   expect(crash([])).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
   expect(crash()).toMatchObject({ instance: home.instance, saved: { location: { kind: 'road' } } });
   // A place in a cell agrees only with that cell.

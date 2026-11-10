@@ -73,7 +73,7 @@ inspectPreviousBoot();
 /** SR4: how long a boot after an unexpected grid end waits on the server's site documents before it trusts its own place. */
 const SERVER_SITES_MS = 2000;
 /** The server's grid site documents; undefined when IndexedDB refuses or does not answer in time. */
-function serverSites(): Promise<readonly { readonly site: string | null }[] | undefined> {
+function serverSites(): Promise<readonly { readonly site: string | null | undefined }[] | undefined> {
   const read = import('@wildshard/engine/saves/indexed').then(indexed => indexed.readServerSites());
   const late = new Promise<undefined>(resolve => { entryScope.timeout(SERVER_SITES_MS, () => { resolve(undefined); }); });
   return Promise.race([read, late]).catch(() => undefined);

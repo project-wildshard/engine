@@ -17,8 +17,9 @@ const savedSchema = v.strictObject({ instance: identity, slug: identity,
 export type GridSavedLocation = v.InferOutput<typeof locationSchema>;
 /** A durable place: the instance, the road beside it and where in it the player stood. */
 export interface GridSavedPlace { readonly instance: string; readonly slug: string; readonly road: { readonly x: number; readonly z: number; readonly yaw: number }; readonly location: GridSavedLocation }
-/** SR4: where the server's durable continuation stands, as its site document names it: a cell's instance, or null on the road. */
-export interface GridServerSite { readonly site: string | null }
+/** SR4: where the server's durable continuation stands, as one of its site documents names it: a cell's instance, null on the
+ *  road, or undefined for a document the page couldn't read, which agrees with no place. */
+export interface GridServerSite { readonly site: string | null | undefined }
 /** The site a page's place stands in, in the server's terms. */
 export function placeSite(place: Pick<GridSavedPlace, 'instance' | 'location'>): string | null {
   return place.location.kind === 'cell' ? place.instance : null;
@@ -70,7 +71,7 @@ export interface GridRecoveryService {
   lastPlace: (assembly: GridAssembly) => GridSavedPlace | null;
   /** An abrupt end may resume only an already durable, catalogue-bound checkpoint. SR4: the page's place is lazily committed
    *  storage and a killed browser can lose its newest writes, while the server's continuation is durable. `server` is every
-   *  site document of the server's the page could read: a place must stand where each of them does, so whichever one the
+   *  site document of the server's that exists: a place must stand where each of them does, so whichever one the
    *  server's own stricter read boots from agrees with it. Otherwise it is stale, and resumes nothing: the title's GRID tap
    *  resumes the server's own (J190). */
   restoreLast: (assembly: GridAssembly, server?: readonly GridServerSite[]) => boolean;

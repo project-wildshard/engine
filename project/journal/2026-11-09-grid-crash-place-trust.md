@@ -21,3 +21,9 @@ Review (J206, Codex) found the page's read looser than the server's: the
 could let a stale place through. So the rule is now that every site
 document the page can read must name the place's site; a disagreement
 lands on the title, and its tap resumes the server.
+
+A second review found the page's reader still dropped documents the
+server accepts (a tick past 2^53). The reader now judges nothing: every
+present site document is a row, and one it can't read agrees with no
+place. A contract test writes the documents with the server's own
+`SITE` and `SaveStore`.

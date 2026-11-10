@@ -1,6 +1,8 @@
 import { expect, test, vi } from 'vitest';
 import { Flags } from '../src/shared/engine/world/interact/flags';
 import { forgetServerInstance, readServerSites, type IndexedSaves } from '../src/client/engine/saves/indexed';
+import { SaveStore, type SaveStorage } from '../src/shared/engine/saves/store';
+import { SITE, siteDocuments } from '../src/server/host/standalone/continuation';
 import { QuestViewFeed } from '../src/client/engine/quest/view/replica';
 import type { QuestDef } from '../src/shared/engine/quest/core';
 import type { QuestProgress } from '../src/shared/engine/quest/progress';
@@ -77,24 +79,41 @@ test('New Game forgets every world and site of its instance, and no other', asyn
   expect([...documents.keys()].sort()).toEqual(['w.a', 'w.profile', 'w.standalone-b', 'w.standalonesitealt-grid']);
 });
 
-test('SR4: a page reads where the server durably stands from the two grid site documents alone, newest first', async () => {
-  const site = (tick: number, at: string | null): string => JSON.stringify({ keys: { continuationSite: { v: 1, data: { tick, site: at, road: 'bytes' } } } });
-  const documents = new Map([['w.standalonesite-grid', site(6, null)], ['w.standalonesitealt-grid', site(7, 'open-plot-4-1')], ['w.standalonesite-lone-a', site(9, 'a')]]);
+/** A page-side IndexedDB holding `documents`, for `readServerSites`; returns the keys it was asked for and how often it closed. */
+async function readFrom(documents: ReadonlyMap<string, string>, prefix: string): Promise<{ rows: readonly { site: string | null | undefined }[]; asked: string[] }> {
   const asked: string[] = [], closed = vi.fn();
   const request = <T>(result: T): { result: T; onsuccess?: () => void } => { const made: { result: T; onsuccess?: () => void } = { result }; queueMicrotask(() => { made.onsuccess?.(); }); return made; };
   const database = { close: closed, transaction: () => ({ objectStore: () => ({ get: (key: string) => { asked.push(key); return request(documents.get(key)); } }) }) };
   const before = Reflect.get(globalThis, 'indexedDB');
   Reflect.set(globalThis, 'indexedDB', { open: () => request(database) });
-  try {
-    expect(await readServerSites('w.', 'db')).toEqual([{ tick: 7, site: 'open-plot-4-1' }, { tick: 6, site: null }]);
-    expect(asked).toEqual(['w.standalonesite-grid', 'w.standalonesitealt-grid']);
-    documents.set('w.standalonesitealt-grid', '{not json');
-    documents.set('w.standalonesite-grid', JSON.stringify({ keys: { continuationSite: { v: 1, data: { tick: -1, site: 4 } } } }));
-    expect(await readServerSites('w.', 'db')).toEqual([]);
-    documents.clear();
-    expect(await readServerSites('w.', 'db')).toEqual([]);
-    expect(closed).toHaveBeenCalledTimes(3);
-  } finally { Reflect.set(globalThis, 'indexedDB', before); }
+  try { const rows = await readServerSites(prefix, 'db'); expect(closed).toHaveBeenCalledTimes(1); return { rows, asked }; }
+  finally { Reflect.set(globalThis, 'indexedDB', before); }
+}
+
+test('SR4: a page reads one row for each present grid site document, and one it cannot read says undefined', async () => {
+  const site = (tick: number, at: string | null): string => JSON.stringify({ keys: { continuationSite: { v: 1, data: { tick, site: at, road: 'bytes' } } } });
+  const documents = new Map([['w.standalonesite-grid', site(6, null)], ['w.standalonesitealt-grid', site(7, 'open-plot-4-1')], ['w.standalonesite-lone-a', site(9, 'a')]]);
+  expect(await readFrom(documents, 'w.')).toEqual({ rows: [{ site: null }, { site: 'open-plot-4-1' }], asked: ['w.standalonesite-grid', 'w.standalonesitealt-grid'] });
+  documents.set('w.standalonesitealt-grid', '{not json');
+  documents.set('w.standalonesite-grid', JSON.stringify({ keys: { continuationSite: { v: 1, data: { tick: 1, site: 4 } } } }));
+  expect((await readFrom(documents, 'w.')).rows).toEqual([{ site: undefined }, { site: undefined }]);
+  documents.clear();
+  expect((await readFrom(documents, 'w.')).rows).toEqual([]);
+});
+
+test('SR4: every site the server boot reads, the page reads too (the server\'s own SITE and SaveStore)', async () => {
+  const local = new Map<string, string>(), storage: SaveStorage = { get length() { return local.size; }, key: index => [...local.keys()][index] ?? null,
+    getItem: key => local.get(key) ?? null, setItem: (key, value) => { local.set(key, value); }, removeItem: key => { local.delete(key); } };
+  const store = new SaveStore({ local: storage }), slot = store.define(SITE), [first, second] = siteDocuments('grid');
+  // A tick past 2^53 is still the server's integer, and an optional road rides along: neither may hide a site from the page.
+  expect(slot.write({ tick: 2 ** 53, site: 'open-plot-4-1' }, first)).toBe(true);
+  expect(slot.write({ tick: 7, site: null, road: 'bytes' }, second)).toBe(true);
+  const key = [...local.keys()].find(name => name.endsWith(first));
+  if (key === undefined) throw new Error('The server store wrote no site document');
+  const prefix = key.slice(0, -first.length), served = [slot.peek(first), slot.peek(second)].map(saved => saved?.site);
+  expect(served).toEqual(['open-plot-4-1', null]);
+  const { rows } = await readFrom(local, prefix);
+  for (const at of served) expect(rows).toContainEqual({ site: at });
 });
 
 test('a seen act lands on the host that keeps places, and costs a host with none only a refusal', () => {
