@@ -67,7 +67,7 @@ jobs:
       - name: Validate committed asks even on documentation pushes
         run: node src/scripts/asks.mjs check --all
       - if: needs.changes.outputs.docs != 'true'
-        run: pnpm check:sides && pnpm check:asks && pnpm test:kit && pnpm test:hooks
+        run: pnpm check:sides && pnpm check:asks && pnpm check:page-events && pnpm test:kit && pnpm test:hooks
 
   plan:
     needs: changes

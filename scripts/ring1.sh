@@ -18,6 +18,7 @@ static() {
   stage lint pnpm lint
   stage format pnpm format:check
   stage sides pnpm check:sides
+  stage page-events pnpm check:page-events
 }
 
 tests() {

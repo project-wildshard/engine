@@ -30,6 +30,19 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "test/tooling/check-page-events.test.mjs",
+      "sha": "b34773847338c43a2d1edefa88746296f233cb33",
+      "run": "local",
+      "report": "node scripts/vitest-tmp.ts run test/tooling/check-page-events.test.mjs, three runs",
+      "measuredAt": 1794277006934,
+      "durationMs": 1000,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Not a Linux CI clock: a new file with no CI run yet. Three local macOS (Apple M5 Max, Node 24.18.1) whole-module runs took 236 to 241 ms (vitest Duration, import 60%, tests 18%); the file builds seven temp trees and imports the TypeScript parser, no browser, product or pins. Recorded at 1 s, about four times the local clock, for Linux. Replace it with the first passing CI module clock. Other unknowns keep sixty seconds; no planner, cap or policy changes."
+    },
+    {
       "file": "src/client/engine/boot/stale-build-cover-order.test.ts",
       "sha": "a6c8928f951e01ba53271a45662a874a4911d405",
       "run": "42740442778",

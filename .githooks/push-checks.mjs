@@ -130,6 +130,7 @@ async function main(){
     {name:'format:check',commands:[['pnpm','run','--silent','format:check']]},
     {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
     {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
+    {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
     {name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},
     {name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])]]},
   ],{env});

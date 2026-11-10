@@ -1065,6 +1065,7 @@
   "test/title-trace.test.ts": 0.5767214730000001,
   "test/title-worker-navigation.test.ts": 0.07492949499999994,
   "test/tooling/check-listeners.test.mjs": 0.080611289,
+  "test/tooling/check-page-events.test.mjs": 1,
   "test/tooling/frame-floor-native.test.mjs": 0.08284951999999998,
   "test/tooling/parity/browser-escape.test.mjs": 22.548,
   "test/tooling/parity/native-chrome-warm.test.mjs": 9.171567277000001,

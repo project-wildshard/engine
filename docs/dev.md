@@ -13,7 +13,12 @@ Run from the repo root.
   `.bin-deps` lock into npr's shared cache, with `--frozen`. CI runs this
   after dependencies install. Typecheck/format commands use these pins;
   the optional TypeScript6 peer in node_modules is only a library.
-- `pnpm check`: typecheck + lint + format:check + unit tests + the side rule + asks. The pre-push hook runs it.
+- `pnpm check`: typecheck + lint + format:check + unit tests + the side rule + asks + page events. The pre-push hook runs it.
+- `pnpm check:page-events`: every page `.on`, `ctx.on` and callback tap
+  (`onKill`, `onWindup`, `onDamage`, `onSound`) has a row in
+  `lint/page-events.json` naming a production producer and its proof flow
+  (SPLIT-REPAIR SR12). A new listener, a producer that left, or a producer
+  only tests reach is red: add or fix the row, never the gate.
 - `pnpm test`: `node:test` on `src/**/*.test.ts`, run as .ts by Node's type stripping.
 - `pnpm test:hooks`: the `.githooks/` suite (CI, and pre-commit when hooks change).
 - `pnpm dev`: esbuild watch + the server on http://127.0.0.1:4402.

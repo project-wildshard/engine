@@ -1,0 +1,878 @@
+{
+ "about": "SR12 (meta SPLIT-REPAIR-PLAN): every page .on, ctx.on and callback tap names a production producer and the proof that drives it for real, so a listener can't outlive its producer again (scripts/check-page-events.mjs, pnpm check:page-events). proof is flow:<worker-client-proof flow>, a repo script, or local when every producer is page code. debt names an open audit finding.",
+ "entries": {
+  "page": [
+   "index.html",
+   "src/client/host/standalone/shell.ts",
+   "src/client/host/online/shell.ts"
+  ],
+  "host": [
+   "src/server/host/standalone/serverWorker.ts",
+   "src/server/host/dedicated/main.ts",
+   "src/server/host/dedicated/cellWorker.ts"
+  ]
+ },
+ "rows": [
+  {
+   "id": "weapon.hit",
+   "kind": "event",
+   "name": "weapon.hit",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/combat/view/rangedFeel.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/combat/EquipmentService.ts",
+     "emits": "this.events?.emit('weapon.hit'"
+    }
+   ],
+   "proof": "flow:creature-hit",
+   "why": "Local shots and the confirmed own hit (NetPlayer.onCombat -> Weapon.serverHit -> onHit) both reach it."
+  },
+  {
+   "id": "weapon.impact",
+   "kind": "event",
+   "name": "weapon.impact",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/combat/view/rangedFeel.ts",
+    "src/client/game/shardfile/clientStealthEntry.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/combat/EquipmentService.ts",
+     "emits": "this.events?.emit('weapon.impact'"
+    }
+   ],
+   "proof": "flow:creature-hit"
+  },
+  {
+   "id": "weapon.fired",
+   "kind": "event",
+   "name": "weapon.fired",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts",
+    "src/client/game/shardfile/clientStealthEntry.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/combat/EquipmentService.ts",
+     "emits": "this.events?.emit('weapon.fired'"
+    }
+   ],
+   "proof": "flow:creature-hit"
+  },
+  {
+   "id": "weapon.charge",
+   "kind": "event",
+   "name": "weapon.charge",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/audio/sceneDirector.ts",
+    "src/client/game/loadout/held.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/shared/engine/combat/Weapon.ts",
+     "emits": "this.equipEvents?.emit('weapon.charge'"
+    }
+   ],
+   "proof": "flow:fights",
+   "why": "The page Weapon draws on the held input; the fights flow draws the bow by the real alt hold."
+  },
+  {
+   "id": "weapon.action",
+   "kind": "event",
+   "name": "weapon.action",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/loadout/held.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/plugin/heldFirearm.ts",
+     "emits": "this.equipEvents?.emit('weapon.action'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local)."
+  },
+  {
+   "id": "weapon.reload",
+   "kind": "event",
+   "name": "weapon.reload",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/loadout/held.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/plugin/heldFirearm.ts",
+     "emits": "this.equipEvents?.emit('weapon.reload'"
+    },
+    {
+     "file": "src/client/engine/combat/EquipmentService.ts",
+     "emits": "this.events?.emit('weapon.reload'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). The server's reload is a separate act."
+  },
+  {
+   "id": "lock.noTarget",
+   "kind": "event",
+   "name": "lock.noTarget",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/player/TouchControls.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/player/LockOnTarget.ts",
+     "emits": "app.events.emit('lock.noTarget'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local)."
+  },
+  {
+   "id": "player.hover",
+   "kind": "event",
+   "name": "player.hover",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/player/TouchControls.ts",
+    "src/client/engine/ui/hoverBoost.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/player/Player.ts",
+     "emits": "app.events.emit('player.hover'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). Predicted movement, not a server re-emit."
+  },
+  {
+   "id": "player.swim",
+   "kind": "event",
+   "name": "player.swim",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/player/TouchControls.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/player/Player.ts",
+     "emits": "app.events.emit('player.swim'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). Predicted movement, not a server re-emit."
+  },
+  {
+   "id": "player.jump",
+   "kind": "event",
+   "name": "player.jump",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/ui/FirstHints.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/player/Player.ts",
+     "emits": "app.events.emit('player.jump'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). Predicted input, not a server re-emit."
+  },
+  {
+   "id": "player.dodge",
+   "kind": "event",
+   "name": "player.dodge",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/ui/FirstHints.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/player/Player.ts",
+     "emits": "app.events.emit('player.dodge'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). Predicted input. The wind-up that offers the dodge hint is row ai.windup (C5)."
+  },
+  {
+   "id": "level.loaded",
+   "kind": "event",
+   "name": "level.loaded",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts",
+    "src/client/game/plugin/heldTool.ts",
+    "src/client/game/session/session.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/level/load.ts",
+     "emits": "this.app.events.emit('level.loaded'"
+    },
+    {
+     "file": "src/client/game/session/finish.ts",
+     "emits": "app.events.emit('level.loaded'"
+    }
+   ],
+   "proof": "flow:driftwood",
+   "why": "The page loading lifecycle; every flow boots through it."
+  },
+  {
+   "id": "level.unloaded",
+   "kind": "event",
+   "name": "level.unloaded",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/core/Game.ts",
+     "emits": "this.app.events.emit('level.unloaded'"
+    },
+    {
+     "file": "src/client/engine/level/load.ts",
+     "emits": "this.app.events.emit('level.unloaded'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local)."
+  },
+  {
+   "id": "fault",
+   "kind": "event",
+   "name": "fault",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/core/Game.ts",
+     "emits": "this.app.events.emit('fault'"
+    },
+    {
+     "file": "src/client/game/shardfile/hybrid.ts",
+     "emits": "ctx.app.events.emit('fault'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local)."
+  },
+  {
+   "id": "download.parts",
+   "kind": "event",
+   "name": "download.parts",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/session/session.ts",
+     "emits": "app.events.emit('download.parts'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local)."
+  },
+  {
+   "id": "quest.step",
+   "kind": "event",
+   "name": "quest.step",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/shared/engine/quest/core.ts",
+     "emits": "this.events?.emit('quest.step'"
+    }
+   ],
+   "proof": "flow:driftwood",
+   "why": "The page QuestState mirrors server flags and emits the step; the driftwood flow talks to Wendell and reads the server step. S5 (a batch may compress steps) is about payloads, not a missing producer."
+  },
+  {
+   "id": "boss.attempt",
+   "kind": "event",
+   "name": "boss.attempt",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/quest/chapterDirector.ts",
+     "emits": "ctx.app.events.emit('boss.attempt'"
+    },
+    {
+     "file": "src/client/game/Boss.ts",
+     "emits": "app.events.emit('boss.attempt'"
+    },
+    {
+     "file": "src/client/game/plugin/ui.ts",
+     "emits": "ctx.app.events.emit('boss.attempt'"
+    },
+    {
+     "file": "src/client/game/boss/presentation.ts",
+     "emits": "events.emit('boss.attempt'"
+    },
+    {
+     "file": "src/client/game/shardfile/client.ts",
+     "emits": "ctx.app.events.emit('boss.attempt'"
+    }
+   ],
+   "proof": "flow:pine-writes",
+   "why": "Page row-bar adapters emit the outcome; C20 (a wake death recorded as left) is proved by the real boss death."
+  },
+  {
+   "id": "player.died",
+   "kind": "event",
+   "name": "player.died",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/telemetry/runtime.ts",
+    "src/client/engine/ui/playerDeath.ts",
+    "src/client/game/loadout/effects.ts",
+    "src/client/game/shard/retainedHooks.ts",
+    "src/client/game/riding/client.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "ports.died(event"
+    },
+    {
+     "file": "src/client/game/session/play.ts",
+     "emits": "app.events.emit('player.died'"
+    }
+   ],
+   "proof": "flow:death",
+   "why": "C1, C19, S2: the server's own NetDied reaches the worker client, which re-emits the page death with its cause."
+  },
+  {
+   "id": "player.died.bolts",
+   "kind": "event",
+   "name": "player.died",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/loadout/held.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "ports.died(event"
+    },
+    {
+     "file": "src/client/game/session/play.ts",
+     "emits": "app.events.emit('player.died'"
+    }
+   ],
+   "proof": "flow:pine-writes",
+   "why": "C17: the special-bolt reset on a real Pine death."
+  },
+  {
+   "id": "player.died.boss",
+   "kind": "event",
+   "name": "player.died",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/quest/chapterDirector.ts",
+    "src/client/game/Boss.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "ports.died(event"
+    },
+    {
+     "file": "src/client/game/session/play.ts",
+     "emits": "app.events.emit('player.died'"
+    }
+   ],
+   "proof": "flow:pine-writes",
+   "why": "C20: a real death in the wake fight records boss.attempt lost through the row bar."
+  },
+  {
+   "id": "player.died.declared",
+   "kind": "event",
+   "name": "player.died",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/shardfile/client.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "ports.died(event"
+    },
+    {
+     "file": "src/client/game/session/play.ts",
+     "emits": "app.events.emit('player.died'"
+    }
+   ],
+   "proof": "flow:data-shard",
+   "why": "C10: Big Blob's declared panel retries off its row."
+  },
+  {
+   "id": "player.respawned",
+   "kind": "event",
+   "name": "player.respawned",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/riding/client.ts",
+    "src/client/game/session/play.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/ui/playerDeath.ts",
+     "emits": "events.emit('player.respawned'"
+    }
+   ],
+   "proof": "flow:pine-writes",
+   "why": "C17: the page death sequence emits it after the server's death; the server refills bolts itself and the page agrees."
+  },
+  {
+   "id": "damage.dealt",
+   "kind": "event",
+   "name": "damage.dealt",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/ui/playerHurt.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/ui/playerHurt.ts",
+     "emits": "this.combat.hit(hardFallHit("
+    },
+    {
+     "file": "src/shared/engine/combat/pipeline.ts",
+     "emits": "this.events.emit('damage.dealt'"
+    }
+   ],
+   "proof": "flow:hurt",
+   "why": "C2: the server's blows present through ports.hurt -> PlayerHurt.serverHit, not this event; the listener presents only a fall the page settles itself, off the wire."
+  },
+  {
+   "id": "audio.scene-frame",
+   "kind": "event",
+   "name": "audio.scene-frame",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/audio/sceneDirector.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/worldUpdates.ts",
+     "emits": "emit.call(events,'audio.scene-frame'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local)."
+  },
+  {
+   "id": "creature.signal",
+   "kind": "event",
+   "name": "creature.signal",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/audio/sceneDirector.ts",
+    "src/client/game/riding/client.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/population/signals.ts",
+     "emits": "ctx.app.events.emit('creature.signal'"
+    },
+    {
+     "file": "src/client/game/population/pageAir.ts",
+     "emits": "pageApp().events.emit('creature.signal'"
+    }
+   ],
+   "proof": "flow:nalati-signals",
+   "why": "C22, S6: the server's group signals arrive by onView and re-emit here; page weather scares stay local."
+  },
+  {
+   "id": "creature.sound",
+   "kind": "event",
+   "name": "creature.sound",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/audio/sceneDirector.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/population/signals.ts",
+     "emits": "ctx.app.events.emit('creature.sound'"
+    },
+    {
+     "file": "src/client/game/ambient/pageCrowds.ts",
+     "emits": "app.events.emit('creature.sound'"
+    },
+    {
+     "file": "src/client/game/population/wildlifeFeature.ts",
+     "emits": "pageApp().events.emit('creature.sound'"
+    }
+   ],
+   "proof": "flow:nalati-signals",
+   "why": "C23: the guardian's bark arrives by onView; flock and forager sounds stay local."
+  },
+  {
+   "id": "reward.granted",
+   "kind": "event",
+   "name": "reward.granted",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/compendium/keepsakes.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "entry.manager.presentReward?.("
+    },
+    {
+     "file": "src/client/engine/entities/RowBodies.ts",
+     "emits": "this.host.events.emit('reward.granted'"
+    }
+   ],
+   "proof": "flow:creature-hit",
+   "why": "C26: the server's personal trophy roll comes back as a reward row and drops the loose keepsake."
+  },
+  {
+   "id": "practice.active",
+   "kind": "event",
+   "name": "practice.active",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/grapple/tool.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/practice/TrainingArena.ts",
+     "emits": "app.events.emit('practice.active'"
+    },
+    {
+     "file": "src/client/game/practice/course.ts",
+     "emits": "app.events.emit('practice.active'"
+    }
+   ],
+   "proof": "scripts/worker-client-moments.mjs --only=practice"
+  },
+  {
+   "id": "actor.died",
+   "kind": "event",
+   "name": "actor.died",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/population/pageLife.ts",
+    "src/client/game/quest/chapter.ts",
+    "src/shared/game/loot/deaths.ts",
+    "src/shared/game/population/pageHomes.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "entry.manager.presentDeath?.("
+    },
+    {
+     "file": "src/client/engine/entities/RowBodies.ts",
+     "emits": "this.host.events.emit('actor.died'"
+    }
+   ],
+   "proof": "flow:creature-hit",
+   "why": "C6, C7, C26: the server's NetDied re-emits on the page with the row body's own actor. pageHomes' herdless homes match no body today (C12)."
+  },
+  {
+   "id": "actor.died.returns",
+   "kind": "event",
+   "name": "actor.died",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/population/pageReturns.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "entry.manager.presentDeath?.("
+    },
+    {
+     "file": "src/client/engine/entities/RowBodies.ts",
+     "emits": "this.host.events.emit('actor.died'"
+    }
+   ],
+   "proof": "flow:creature-returns",
+   "why": "S3, proved by a real kill and its return."
+  },
+  {
+   "id": "ai.windup",
+   "kind": "event",
+   "name": "ai.windup",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/quest/hints.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "manager.onWindup?.(body, duration)"
+    },
+    {
+     "file": "src/client/game/session/play.ts",
+     "emits": "app.events.emit('ai.windup'"
+    }
+   ],
+   "proof": "flow:windup",
+   "why": "C5: the row's attack edge fires the wind-up with its real duration."
+  },
+  {
+   "id": "weather.changed",
+   "kind": "event",
+   "name": "weather.changed",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/shardfile/clientPlan.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/weather/forest.ts",
+     "emits": "game.app.events.emit('weather.changed'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). Forest emits it from the replicated NetStorm and NetWeather rows."
+  },
+  {
+   "id": "look.events",
+   "kind": "dynamic",
+   "name": "events",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/looks/postGraphLook.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/practice/TrainingArena.ts",
+     "emits": "app.events.emit('practice.active'"
+    },
+    {
+     "file": "src/client/game/practice/course.ts",
+     "emits": "app.events.emit('practice.active'"
+    },
+    {
+     "file": "src/client/engine/explore/diorama.ts",
+     "emits": "this.world.game.app.events.emit('explore.studio'"
+    },
+    {
+     "file": "src/client/engine/explore/ModelExplorer.ts",
+     "emits": "this.world.game.app.events.emit('explore.studio'"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). The format allows a look to name only practice.active or explore.studio (@wildshard/format postGraphLook)."
+  },
+  {
+   "id": "tap.onKill",
+   "kind": "tap",
+   "name": "onKill",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/session/play.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "entry.manager.presentDeath?.("
+    },
+    {
+     "file": "src/client/engine/entities/RowBodies.ts",
+     "emits": "this.onKill?.(a)"
+    }
+   ],
+   "proof": "flow:creature-hit",
+   "why": "C4: an own kill on the row runs the kill feed."
+  },
+  {
+   "id": "tap.onSound",
+   "kind": "tap",
+   "name": "onSound",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/session/play.ts",
+    "src/client/game/audio/sceneDirector.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "entry.manager.presentHit?.("
+    },
+    {
+     "file": "src/client/engine/entities/RowBodies.ts",
+     "emits": "this.onSound?.("
+    }
+   ],
+   "proof": "flow:creature-hit",
+   "why": "C3: a server hit runs the creature's hurt cry; page projections call the same tap."
+  },
+  {
+   "id": "tap.onWindup",
+   "kind": "tap",
+   "name": "onWindup",
+   "bus": "page",
+   "listeners": [
+    "src/client/game/session/play.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "manager.onWindup?.(body, duration)"
+    }
+   ],
+   "proof": "flow:windup",
+   "why": "C5: the row's attack edge."
+  },
+  {
+   "id": "tap.onDamage",
+   "kind": "tap",
+   "name": "onDamage",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/ui/Combat.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/game/shardfile/clientWorker.ts",
+     "emits": "entry.manager.presentHit?.("
+    },
+    {
+     "file": "src/client/engine/entities/RowBodies.ts",
+     "emits": "this.onDamage?.(a, amount"
+    }
+   ],
+   "proof": "flow:creature-hit",
+   "why": "C3: own hits get their floats and resolve the pending MISS."
+  },
+  {
+   "id": "tap.onDamage.practice",
+   "kind": "tap",
+   "name": "onDamage",
+   "bus": "page",
+   "listeners": [
+    "src/client/engine/practice/TrainingArena.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/client/engine/practice/TrainingArena.ts",
+     "emits": "this.onDamage(dealt, point)"
+    }
+   ],
+   "proof": "local",
+   "why": "Page-local: the producer is page code the split never moved (audit inventory verdict Local). A practice target's own float."
+  },
+  {
+   "id": "tap.onSound.flock",
+   "kind": "tap",
+   "name": "onSound",
+   "bus": "page",
+   "listeners": [
+    "src/shared/game/shardfile/crowdRuntime.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/shared/engine/ai/flock.ts",
+     "emits": "this.onSound?.(this.spec.bleatCue"
+    }
+   ],
+   "proof": "flow:nalati-signals",
+   "why": "A page crowd's own FlockBrain bleats; the server's copy reaches the page as creature.sound (row creature.sound)."
+  },
+  {
+   "id": "host.actor.died.declared",
+   "kind": "event",
+   "name": "actor.died",
+   "bus": "host",
+   "listeners": [
+    "src/shared/game/quest/declared.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/shared/engine/combat/pipeline.ts",
+     "emits": "this.events.emit('actor.died'"
+    }
+   ],
+   "proof": "flow:data-shard",
+   "why": "Server code in shared: the host's own combat settles the death that a declared quest trigger counts."
+  },
+  {
+   "id": "host.actor.died.props",
+   "kind": "event",
+   "name": "actor.died",
+   "bus": "host",
+   "listeners": [
+    "src/shared/game/quest/nativeProps.ts"
+   ],
+   "producers": [
+    {
+     "file": "src/shared/engine/combat/pipeline.ts",
+     "emits": "this.events.emit('actor.died'"
+    }
+   ],
+   "proof": "flow:creature-hit",
+   "why": "Server code in shared: the host's own combat settles the death that drops a quest prop, such as the sailor's key."
+  }
+ ],
+ "ignore": [
+  {
+   "file": "src/client/engine/telemetry/browserErrors.ts",
+   "name": "afterSendEvent",
+   "why": "Sentry's client hook, not a game event."
+  },
+  {
+   "file": "src/shared/engine/world/dayCycle.ts",
+   "name": "dawn",
+   "why": "DayCycle's own phase emitter; the replicated phase setter runs checkPhase on the page."
+  },
+  {
+   "file": "src/shared/engine/world/dayCycle.ts",
+   "name": "day",
+   "why": "DayCycle's own phase emitter; the replicated phase setter runs checkPhase on the page."
+  },
+  {
+   "file": "src/shared/engine/world/dayCycle.ts",
+   "name": "golden",
+   "why": "DayCycle's own phase emitter; the replicated phase setter runs checkPhase on the page."
+  },
+  {
+   "file": "src/shared/engine/world/dayCycle.ts",
+   "name": "dusk",
+   "why": "DayCycle's own phase emitter; the replicated phase setter runs checkPhase on the page."
+  },
+  {
+   "file": "src/shared/engine/world/dayCycle.ts",
+   "name": "night",
+   "why": "DayCycle's own phase emitter; the replicated phase setter runs checkPhase on the page."
+  },
+  {
+   "file": "src/client/engine/level/installation.ts",
+   "name": "app.events",
+   "why": "Forwards each ctx.on registration to the page bus; every registration is a scanned listener with its own row."
+  },
+  {
+   "file": "src/client/game/shard/retainedHooks.ts",
+   "name": "base.app.events",
+   "why": "Forwards each retained ctx.on registration to the page bus; every registration is a scanned listener with its own row."
+  }
+ ]
+}
