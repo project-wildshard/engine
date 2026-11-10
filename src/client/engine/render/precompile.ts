@@ -368,13 +368,16 @@ function compileObjects(root: THREE.Object3D, visit: (object: THREE.Object3D) =>
  * cache-key bit — carry the reference over, or the forest's four materials and three depth
  * variants compile again at the first frame.
  */
-function standIn(mesh: MeshLike): MeshLike {
-  // NF15: a classic graph that reads instance colours gives the live mesh its white ones first (its draw hook gives them
-  // only after a frame), so the copy compiles the coloured program the draws use
+/** NF15: a classic graph that reads instance colours gives the live mesh its white ones first (its draw hook gives them
+ *  only after a frame), so a copy compiles the coloured program the draws use */
+function prepareInstances(mesh: MeshLike): void {
   for (const material of materialsOf(mesh)) {
     const prepare: unknown = Reflect.get(material, 'prepareInstances');
     if (typeof prepare === 'function') Reflect.apply(prepare, material, [mesh]);
   }
+}
+function standIn(mesh: MeshLike): MeshLike {
+  prepareInstances(mesh);
   const copy = mesh.clone(false) as BatchedLike;
   const src = mesh as BatchedLike;
   if (src.isBatchedMesh && src._colorsTexture && !copy._colorsTexture) copy._colorsTexture = src._colorsTexture;
@@ -413,6 +416,10 @@ function* sceneJobSteps(scene: THREE.Scene, rt: THREE.WebGLRenderTarget | null, 
     // view, so its view program is never used; the shadow jobs warm the depth program it does draw with
     const materials = shadowOnly(o) || channelless(o) ? [] : materialsOf(mesh), list = materials.length > 0 && include !== undefined && !include(o) ? [] : materials;
     if (list.length === 0) { yield; continue; }
+    // DL23: every included mesh takes its white instance colours before its key is read, not only the first of its
+    // (material, key) pair: a second colourless twin kept the colourless key the first had left, drew colourless at its
+    // first parked draw and linked that program there (Nine's instanced architecture, Simulator frames of 456-711 ms)
+    prepareInstances(mesh);
     const ok = programObjectKey(mesh);
     const wanted = list.filter((m) => { mats.add(m); const k = m.uuid + ok; if (seen.has(k)) return false; seen.add(k); return true; });
     const distance = from === undefined || wanted.length === 0 ? 0 : boundsDistance(o, from);

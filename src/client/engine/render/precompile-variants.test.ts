@@ -5,6 +5,7 @@ import type { ProgramLike } from '../boot/perflog';
 import { noteFrameDrawn, setBuildHeld } from '../../../shared/engine/core/framePacing';
 import { SHADOW_LAYER } from '../core/shadowLayer';
 import { linkedGl } from '../../../test/engine/linkedGl';
+import { compileClassicGraph } from './graph/glslMaterial';
 
 test('preparation retains both shadow-receiver variants of a shared material', () => {
   const scene = new Scene(), geometry = new BoxGeometry(), material = new MeshStandardMaterial();
@@ -300,4 +301,21 @@ test.each([
       else expect(events[1]?.frame).toBe(events[0]?.frame);
     }
   } finally { setBuildHeld(false); clock.mockRestore(); noteFrameDrawn(Number.NEGATIVE_INFINITY); geometry.dispose(); material.dispose(); }
+});
+
+test('every colourless instanced twin of a colour-reading graph takes its white colours before its key (DL23)', () => {
+  // Nine's instanced architecture: the first twin's stand-in made only that twin white, the second kept the colourless
+  // key the first had left, and drew colourless at its first parked draw, linking that program there
+  const scene = new Scene(), geometry = new BoxGeometry();
+  const { material } = compileClassicGraph({ version: 1, kind: 'material', model: 'unlit',
+    nodes: { t: { op: 'instanceColour' }, c: { op: 'varying', in: ['t'] } }, stages: { surface: { colour: 'c' } }, effectState: { fog: false } });
+  const twins = [new InstancedMesh(geometry, material, 2), new InstancedMesh(geometry, material, 3)];
+  for (const twin of twins) scene.add(twin);
+  try {
+    const clones = sceneJobs(scene, null).jobs.flatMap(job => job.root.children);
+    expect(twins.map(twin => twin.instanceColor?.count)).toEqual([2, 3]);
+    expect(clones).toHaveLength(1);
+    expect(clones[0]).toBeInstanceOf(InstancedMesh);
+    expect(clones.every(clone => clone instanceof InstancedMesh && clone.instanceColor !== null)).toBe(true);
+  } finally { for (const twin of twins) twin.dispose(); geometry.dispose(); material.dispose(); }
 });
