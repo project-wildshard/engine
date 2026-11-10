@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 // oxlint-disable-next-line import/no-nodejs-modules -- The product and Rapier are shipped bytes.
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';

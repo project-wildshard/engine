@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import {expect, test} from 'vitest';
 import {SaveStore} from '../src/shared/engine/saves/store';
 import {titlePrefetchChoice, titlePrefetchTarget} from '../src/client/game/grid/titlePrefetchChoice';

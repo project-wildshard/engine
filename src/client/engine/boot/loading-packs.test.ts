@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { expect, test } from 'vitest';
 import { jsonSlot } from '../saves/slots';
 import { LEVEL_DOWNLOAD_SLOT, levelDownloadPacks } from './loadingPacks';

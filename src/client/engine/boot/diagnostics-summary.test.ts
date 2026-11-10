@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { expect, it } from 'vitest';
 import { diagnosticPath, diagnosticSummary, safeBootDiagnostics, DIAGNOSTIC_PRIVACY } from './diagnostics';
 import type { BootTiming } from '../../../shared/engine/boot/timing';

@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { expect, test } from 'vitest';
 import { fixtureProductFile, fixtureJsonCheck } from './fixtures/productFile';
 import { registeredJsonSchema } from '@wildshard/engine/host/formatJsonSchema';
