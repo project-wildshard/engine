@@ -25,6 +25,7 @@ export function checkBakedTextures(root, publication) {
     while (pending.length > 0) {
       const value = pending.pop();
       if (typeof value === 'string' && (/^\/assets\/.+\.(?:png|jpe?g|webp|hdr|avif)$/u.test(value)
+        || /^\/assets\/.+\.(?:glb|gltf)$/u.test(value) && !value.startsWith('/assets/gpu/') && !value.includes('/astc6/')
         || /^\/assets\/(?:gpu\/)?baked\/[^/]+\/.+\.ktx2$/u.test(value))) declared.add(value);
       else if (Array.isArray(value)) pending.push(...value);
       else if (value !== null && typeof value === 'object') pending.push(...Object.keys(value), ...Object.values(value));

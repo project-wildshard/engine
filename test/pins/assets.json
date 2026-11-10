@@ -221,6 +221,123 @@
         "path": "public/assets/horizon/pine-hollow-night.webp",
         "blob": "41c21876099cba2879e72ac38e7c2ddf1ad17ee7"
       }
+    },
+    {
+      "slug": "driftwood-isle",
+      "url": "/assets/models/driftwood-hero/captain/captain.glb",
+      "file": "test/pins/assets/29c851bf30998e82f38c22e5b58b303ce895788d1679a119222e734270b9b53b.glb",
+      "sha256": "29c851bf30998e82f38c22e5b58b303ce895788d1679a119222e734270b9b53b",
+      "bytes": 345612,
+      "source": {
+        "repo": "shard-driftwood",
+        "commit": "babb4fa5494fb33f774407256dc7ec890890242f",
+        "path": "public/assets/models/driftwood-hero/captain/captain.glb",
+        "blob": "6261cfc567c002d35a0315dc0566672ed1b885ce"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/beaver-dam-lod1/beaver-dam-lod1.glb",
+      "file": "test/pins/assets/53471a6cf350ea3a8a48c71f684fa65955568518eaf746a6ea99c86a001da3b6.glb",
+      "sha256": "53471a6cf350ea3a8a48c71f684fa65955568518eaf746a6ea99c86a001da3b6",
+      "bytes": 77472,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/beaver-dam-lod1/beaver-dam-lod1.glb",
+        "blob": "5b43f56ff4b7c87ea8a8f1045e2c2535694a6269"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/canoe-lod1/canoe-lod1.glb",
+      "file": "test/pins/assets/6b38d5c2f41ebd7d7f29f75c20159ff7c1aae5a10ee06114d87e60157611ac5d.glb",
+      "sha256": "6b38d5c2f41ebd7d7f29f75c20159ff7c1aae5a10ee06114d87e60157611ac5d",
+      "bytes": 29240,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/canoe-lod1/canoe-lod1.glb",
+        "blob": "3496dc55f9696b94e24ee74962304d623ab551ce"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/cave-arch-lod1/cave-arch-lod1.glb",
+      "file": "test/pins/assets/58db3199ade2738c927460c520d68a090fd36ef042ffdd505f8a2cfacdfc6534.glb",
+      "sha256": "58db3199ade2738c927460c520d68a090fd36ef042ffdd505f8a2cfacdfc6534",
+      "bytes": 79532,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/cave-arch-lod1/cave-arch-lod1.glb",
+        "blob": "2bb05c87293565dfd38658c3532fb564d0e6f879"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/contract-board-lod1/contract-board-lod1.glb",
+      "file": "test/pins/assets/e01192f8c784e08bf9377683e345d9c799cc76dac8fcab145e297b7c1da99fa7.glb",
+      "sha256": "e01192f8c784e08bf9377683e345d9c799cc76dac8fcab145e297b7c1da99fa7",
+      "bytes": 42660,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/contract-board-lod1/contract-board-lod1.glb",
+        "blob": "4b95440c9cc493aa5fad6bb9cbede5d634e2d0a1"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/stone-a-lod1/stone-a-lod1.glb",
+      "file": "test/pins/assets/d9d10a1603c058a88a16d359bb6eb8fbc2eca520c8c50e622aafba860a0b690d.glb",
+      "sha256": "d9d10a1603c058a88a16d359bb6eb8fbc2eca520c8c50e622aafba860a0b690d",
+      "bytes": 34576,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/stone-a-lod1/stone-a-lod1.glb",
+        "blob": "2c2a30d0efd34670ee6ec9b0f92c2551db96bf36"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/stone-b-lod1/stone-b-lod1.glb",
+      "file": "test/pins/assets/8371f5e45af5cb5ab415b8dd51f5733b87c2dae8f7f1426760e0fea2ec992b10.glb",
+      "sha256": "8371f5e45af5cb5ab415b8dd51f5733b87c2dae8f7f1426760e0fea2ec992b10",
+      "bytes": 37160,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/stone-b-lod1/stone-b-lod1.glb",
+        "blob": "f0118788d935ae1460e92260e78a559312b2891a"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/stone-c-lod1/stone-c-lod1.glb",
+      "file": "test/pins/assets/3820e887854ef275f04d12befa117ffa1f4a1f68e15bf7e4fccd73311d8d98f1.glb",
+      "sha256": "3820e887854ef275f04d12befa117ffa1f4a1f68e15bf7e4fccd73311d8d98f1",
+      "bytes": 29076,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/stone-c-lod1/stone-c-lod1.glb",
+        "blob": "842e3dabf33d3cb3b1a52682d0b32cc4e21798f2"
+      }
+    },
+    {
+      "slug": "pine-hollow",
+      "url": "/assets/models/pine-hollow-hero/waystone-lod1/waystone-lod1.glb",
+      "file": "test/pins/assets/e45d5cf7386e4cd3476c3dc51a27516be8456bea7f04682b867b23048f82aafc.glb",
+      "sha256": "e45d5cf7386e4cd3476c3dc51a27516be8456bea7f04682b867b23048f82aafc",
+      "bytes": 31972,
+      "source": {
+        "repo": "shard-pine-hollow",
+        "commit": "9d7e908d9fbcce7bedb4aeb566d743c929da24e0",
+        "path": "public/assets/models/pine-hollow-hero/waystone-lod1/waystone-lod1.glb",
+        "blob": "2ebe0ec949221f4df66c1151ac759c6173acefa6"
+      }
     }
   ]
 }

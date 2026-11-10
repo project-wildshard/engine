@@ -58,3 +58,19 @@ not claimed as selected reads. All source mount lists are extended too.
 Pinned files are bounded and required to be regular files before their
 contents are read. Their SHA-256, length and producer Git blob remain
 verified afterward. No source/receipt/archive is rewritten.
+
+After the full image census and ordinary pin install, regenerate all
+seventeen actual byte/version rows and the official renderer revision.
+The reviewed lint selection forward is carried normally so this
+formerly generated-only commit still checks the whole declared lint.
+Producer mount completion is public at 0dd6e5d/71d4c63/d7693f9; future
+producer requests will be batched from the whole mode census.
+
+Native d267 on a fresh origin reaches Driftwood Ready in 7.0 s with
+zero native console errors. Pine then exposes an omitted original LOD1
+GLB. The complete selected image-mode payload census across all 28
+products, both flows and tiers finds exactly nine more raw model files
+(Pine eight, Driftwood one). The bridge now has 26 bounded, unchanged
+producer blobs (2,899,421 bytes). The guard includes raw model paths,
+while keeping separate unused compressed-alias banks out of this claim.
+All selected image-mode payloads will be checked before the next proof.

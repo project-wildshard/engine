@@ -9,7 +9,7 @@ import * as v from 'valibot';
 const hex = (length: number) => v.pipe(v.string(), v.regex(new RegExp(`^[a-f0-9]{${length}}$`, 'u')));
 const Asset = v.strictObject({
   slug: v.pipe(v.string(), v.regex(/^[a-z0-9_-]+$/u)),
-  url: v.pipe(v.string(), v.regex(/^\/assets\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\.(?:jpg|webp|png)$/u)),
+  url: v.pipe(v.string(), v.regex(/^\/assets\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\.(?:jpg|webp|png|glb|gltf)$/u)),
   file: v.string(), sha256: hex(64), bytes: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1_000_000)),
   source: v.strictObject({repo: v.pipe(v.string(), v.regex(/^shard-[a-z0-9-]+$/u)), commit: hex(40), path: v.string(), blob: hex(40)}),
 });
