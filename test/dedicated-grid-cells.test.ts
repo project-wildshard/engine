@@ -1,3 +1,5 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- The page build's pinned catalogue.
+import { readFileSync } from 'node:fs';
 import { afterEach, expect, test, vi } from 'vitest';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { cellFrame, cellName, cellShard, worldCells } from '../src/server/host/dedicated/gridCells';
@@ -16,6 +18,12 @@ afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await benc
 test('a name means a grid instance, and each cell runs its shard', () => {
   expect([cellName(PLOT), cellName(PLOT_SHARD), cellName(HOME), cellName('_template'), cellName('not-on-the-grid')]).toEqual([PLOT, PLOT, HOME, 'template-2', 'not-on-the-grid']);
   expect([cellShard(PLOT), cellShard(HOME), cellShard('template-2'), cellShard('not-on-the-grid')]).toEqual([PLOT_SHARD, HOME, '_template', 'not-on-the-grid']);
+});
+
+test('the catalogue a page build installs places the grid as the server\'s baked one does, so frame numbers agree', () => {
+  const baked = new GridAssembly({ developer: false, devserver: false }).cells.map(cell => [cell.instance, cell.slug]);
+  const pinned = new GridAssembly({ developer: false, devserver: false }, (JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as { grid: unknown }).grid).cells.map(cell => [cell.instance, cell.slug]);
+  expect(pinned).toEqual(baked);
 });
 
 test('a cell\'s frames carry the number a grid page gives that cell', () => {
@@ -46,12 +54,13 @@ test('a cell named by instance: /health lists it and its worker, its frames carr
   expect(await walker.arrived()).toBe(true);
   expect(JSON.parse(walker.resume ?? '{}')).toMatchObject({ shard: PLOT_SHARD, cell: PLOT });
   expect(walker.client.latest?.cell).toBe(cellFrame(PLOT));
-  const room = bench.room(PLOT);
-  await new Promise(resolve => { setTimeout(resolve, 500); });
+  const room = bench.room(PLOT), spawn = room?.spawn;
+  await new Promise(resolve => { setTimeout(resolve, 1000); });
   walker.stop();
   await new Promise(resolve => { setTimeout(resolve, 200); });
   const body = room?.bodyOf('device:walker'), left = body === undefined ? null : { x: body.position.x, z: body.position.z };
   expect(left).not.toBeNull();
+  expect(Math.hypot((left?.x ?? 0) - (spawn?.x ?? 0), (left?.z ?? 0) - (spawn?.z ?? 0)), 'it walked away from the spawn').toBeGreaterThan(1);
   walker.transport.control('ready', new Uint8Array([1]).buffer);
   await vi.waitFor(() => { expect(room?.holds('device:walker')).toBe(false); });
   expect(await saves.where('device:walker')).toBe(PLOT);
@@ -61,6 +70,9 @@ test('a cell named by instance: /health lists it and its worker, its frames carr
   expect(resume).toMatchObject({ shard: PLOT_SHARD, cell: PLOT });
   expect(Math.hypot(resume.at.x - (left?.x ?? 0), resume.at.z - (left?.z ?? 0)), 'where it left, not the spawn').toBeLessThan(0.5);
   expect(back.client.latest?.cell).toBe(cellFrame(PLOT));
+  await vi.waitFor(() => { expect(room?.holds('device:walker')).toBe(true); });
+  const restored = room?.bodyOf('device:walker');
+  expect(Math.hypot((restored?.position.x ?? 0) - (left?.x ?? 0), (restored?.position.z ?? 0) - (left?.z ?? 0)), 'the server put its body back there too').toBeLessThan(0.5);
   const fresh = bot(bench.url, 'bench', 'device:new');
   expect(await fresh.arrived()).toBe(true);
   expect(JSON.parse(fresh.resume ?? '{}'), 'a player with no save lands in the first cell').toMatchObject({ shard: HOME, cell: HOME });

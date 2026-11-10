@@ -32,6 +32,9 @@ for (const [name,input] of Object.entries({main:join(DEDICATED,'main.ts'),cellWo
 }
 mkdirSync(OUT, { recursive: true });
 writeFileSync(join(OUT, 'bundle.json'), JSON.stringify({ engineBuild: values.build }));
+// GO3: the grid cells this bundle's catalogue places, so `scripts/vps/pull.mjs` checks WORLD_CELLS against what this server will open.
+const grid = /** @type {{ grid: { cells: { instance: string; slug: string }[] } }} */ (JSON.parse(readFileSync(join(ROOT, 'src/shared/game/grid/singleplayer.json'), 'utf8'))).grid;
+writeFileSync(join(OUT, 'cells.json'), JSON.stringify(grid.cells.map(({ instance, slug }) => ({ instance, slug }))));
 cpSync(require.resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm'), join(OUT, 'rapier.wasm'));
 cpSync(join(DEDICATED, 'saves/migrations'), join(OUT, 'migrations'), { recursive: true });
 console.log(`server target: ${OUT}`);

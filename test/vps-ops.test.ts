@@ -38,11 +38,12 @@ async function run(file: string, args: readonly string[], env: Record<string, st
   return { code, out };
 }
 
-/** A real bundle: a tar.gz holding a `main.mjs` that says which build it is. */
-function bundle(root: string, build: string): { readonly name: string; readonly sha256: string; readonly bytes: Buffer } {
+/** A real bundle: a tar.gz holding a `main.mjs` that says which build it is, and the grid cells it places if it says. */
+function bundle(root: string, build: string, cells?: readonly { readonly instance: string; readonly slug: string }[]): { readonly name: string; readonly sha256: string; readonly bytes: Buffer } {
   const source = join(root, `source-${build}`), name = `${build}.tar.gz`, archive = join(root, name);
   mkdirSync(source);
   writeFileSync(join(source, 'bundle.json'), JSON.stringify({ engineBuild: build }));
+  if (cells !== undefined) writeFileSync(join(source, 'cells.json'), JSON.stringify(cells));
   writeFileSync(join(source, 'main.mjs'), `console.log(${JSON.stringify(build)});\n`);
   execFileSync('tar', ['-czf', archive, '-C', source, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
   const bytes = readFileSync(archive);
@@ -106,6 +107,28 @@ test('the pull moves to a good bundle; a bad hash, a bad signature or an old rel
   files.set('/release.json', release(4, 'b1', one));
   expect((await pull()).code, 'we only fix forward: the old file is refused, and the server stays up').toBe(0);
   expect(live()).toBe(join(home, 'bundles', 'b2'));
+});
+
+test('GO3: WORLD_CELLS is checked through the cells the new bundle places; nothing moves on a refusal', async () => {
+  const root = folder(), home = join(root, 'home'), cells = [{ instance: 'driftwood-isle', slug: 'driftwood-isle' }, { instance: 'open-plot-nw', slug: 'open-plot-night-market' }];
+  const old = bundle(root, 'old'), placed = bundle(root, 'placed', cells);
+  let text = release(1, 'old', old);
+  const origin = await serve((request, response) => { response.end(request.url === '/release.json' ? text : request.url === '/old.tar.gz' ? old.bytes : placed.bytes); });
+  const pull = (cellsEnv: string): Promise<Run> => run(process.execPath, [PULL], { RELEASE_URL: `${origin}/release.json`, RELEASE_PUBLIC_KEY: KEY, BUNDLE_ORIGIN: origin, WILDSHARD_HOME: home, WORLD_CELLS: cellsEnv });
+  const live = (): string => readlinkSync(join(home, 'current'));
+  expect((await pull('driftwood-isle')).code).toBe(0);
+  expect(live()).toBe(join(home, 'bundles', 'old'));
+  expect((await pull('grid')).code, 'a bundle from before GO3 cannot open the grid').toBe(0);
+  expect(live()).toBe(join(home, 'bundles', 'old'));
+  const named = (serial: number, shards: readonly string[]): string => signed(JSON.stringify({ channel: 'production', serial, engineBuild: 'placed', saveEpoch: 1, shards: shards.map(slug => ({ slug, revision: 1 })), bundle: { name: placed.name, sha256: placed.sha256 } }));
+  text = named(2, ['driftwood-isle']);
+  const refused = await pull('driftwood-isle,open-plot-nw');
+  expect(refused.out, 'an instance is checked as its shard').toMatch(/release has no open-plot-night-market/u);
+  expect(live()).toBe(join(home, 'bundles', 'old'));
+  text = named(3, ['driftwood-isle', 'open-plot-night-market']);
+  expect((await pull('driftwood-isle,open-plot-nw')).code).toBe(0);
+  expect(live()).toBe(join(home, 'bundles', 'placed'));
+  expect((await pull('grid')).code).toBe(0);
 });
 
 test('a stopped server tells the phone once, and once more when it is back', async () => {

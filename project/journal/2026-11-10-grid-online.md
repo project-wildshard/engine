@@ -14,3 +14,8 @@
 - `/health` gains `table`: each open cell and its worker.
 - Walls stay (DG1): each cell is still `lone`; road and crossings are GO6.
 - Recorded the new `test/dedicated-grid-cells.test.ts` clocks (full and Ring 1).
+- J206 Codex review (MUST fixed): `pull.mjs` now checks WORLD_CELLS after the
+  bundle lands, through the `cells.json` the new bundle carries (written by
+  `build-server.mjs`), so an instance like `open-plot-nw` is checked as its
+  shard; `grid` needs a bundle that places cells. Tests pin the page catalogue
+  to the server's grid order and check the restored body's position.

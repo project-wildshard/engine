@@ -62,6 +62,26 @@ function checkBundle(folder, release) {
   const identity = JSON.parse(readFileSync(join(folder, 'bundle.json'), 'utf8'));
   if (identity.engineBuild !== release.engineBuild || !existsSync(join(folder, 'main.mjs'))) throw new Error('Bundle build does not match the release');
 }
+/**
+ * GO3: the cells WORLD_CELLS opens must each run a shard the release names, read through the grid cells the new bundle places
+ * (`cells.json`), so a grid instance (`open-plot-nw`) is checked as its shard. `grid` opens every placed cell the release names,
+ * so it needs a bundle that places cells and at least one of them. Nothing moves on a refusal.
+ * @param {string} folder
+ * @param {Set<string>} named
+ */
+function checkCells(folder, named) {
+  const listed = (process.env.WORLD_CELLS ?? 'driftwood-isle').trim(), file = join(folder, 'cells.json');
+  /** @type {{ instance: string; slug: string }[]} */
+  const placed = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [], shards = new Map(placed.map(row => [row.instance, row.slug]));
+  if (listed === 'grid') {
+    if (!placed.some(row => named.has(row.slug))) throw new Error('WORLD_CELLS=grid, and this bundle places no cell the release names');
+    return;
+  }
+  for (const name of listed.split(',').map(cell => cell.trim())) {
+    const slug = shards.get(name) ?? name;
+    if (!named.has(slug)) throw new Error(`The release has no ${slug}`);
+  }
+}
 /** Publish a whole, flushed record without truncating the last usable one.
  * @param {string} path
  * @param {string} text
@@ -115,10 +135,6 @@ const fetchOnly = process.argv.includes('--fetch');
 try {
   const text = (await get(need('RELEASE_URL'))).toString('utf8'), release = readRelease(text), held = heldRelease(current);
   const named = new Set(release.shards.map(row => row.slug));
-  // GO3: `grid` opens whatever grid cells the release names, and the server checks those against the catalogue it carries.
-  // A plain slug list is still checked here, before anything moves.
-  const listed = process.env.WORLD_CELLS ?? 'driftwood-isle';
-  if (listed.trim() !== 'grid') for (const cell of listed.split(',')) if (!named.has(cell.trim())) throw new Error(`The release has no ${cell}`);
   forwardOnly(release, held);
   const folder = join(bundles, release.engineBuild);
   forwardOnly(release, heldRelease(folder, true));
@@ -130,6 +146,7 @@ try {
     log({ build: release.engineBuild, serial: release.serial, already: true });
   }
   else { await unpack(release, folder); log({ build: release.engineBuild, serial: release.serial, unpacked: true }); }
+  checkCells(folder, named);
   atomicWrite(join(folder, 'release.json'), text);
   if (!fetchOnly) flip(folder);
 } catch (error) {
