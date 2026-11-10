@@ -1,7 +1,7 @@
 // Commit, capture an immutable checkout, and let one per-repo worker own normal pushes.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
-import {appendFileSync,existsSync,mkdirSync,mkdtempSync,openSync,closeSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,lstatSync,mkdirSync,mkdtempSync,openSync,closeSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve as resolvePath} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -9,12 +9,13 @@ import * as v from 'valibot';
 import {rebaseQueuedSnapshot} from './push-queue-rebase.mjs';
 
 const self=import.meta.filename,lock=fileURLToPath(new URL('push-queue-lock.py',import.meta.url));
-const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0))),error:v.optional(v.string()),seconds:v.optional(v.number()),batch:v.optional(v.array(v.string()))});
+const jobSchema=v.object({id:v.string(),source:v.string(),snapshot:v.string(),remote:v.string(),sha:v.string(),tree:v.string(),requestedSha:v.optional(v.string()),requestedTree:v.optional(v.string()),owner:v.number(),checkOnly:v.boolean(),state:v.string(),createdAt:v.string(),lane:v.optional(v.string()),attempts:v.optional(v.pipe(v.number(),v.integer(),v.minValue(0))),error:v.optional(v.string()),seconds:v.optional(v.number()),batch:v.optional(v.array(v.string())),failurePhase:v.optional(v.string())});
 const terminal=new Set(['pushed','checked','already-published','failed','published-unverified','publication-unknown']);
-const pending=new Set(['capturing','queued','retrying','rebasing','installing','waiting-for-hook','checking','pushing','batching']);
+const pending=new Set(['capturing','queued','retrying','rebasing','installing','waiting-for-hook','checking','publishing-ready','pushing','batching']);
 const keepalive='ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes';
 class RemoteAdvanceError extends Error{name='RemoteAdvanceError';}
 class PublicationUnknownError extends Error{name='PublicationUnknownError';}
+const batchOwnerSchema=v.object({schema:v.literal('queue-batch/1'),queue:v.string(),root:v.string(),owner:v.pipe(v.number(),v.integer(),v.minValue(1)),jobs:v.array(v.pipe(v.string(),v.regex(/^\d{9,}-[a-f0-9]{8}$/u)))});
 
 /** @param {string} cwd @param {string[]} args */
 const git=(cwd,args)=>execFileSync('git',args,{cwd,encoding:'utf8'}).trim();
@@ -116,11 +117,32 @@ function verifySnapshot(snapshot,job,phase){
  if(changed.length>0)throw new Error(`Captured source changed ${phase}; no exact-tree publication proof: ${changed.join('; ')}`);
 }
 
+/** The worker lock excludes another active owner. Keep unknown directories,
+ * live process groups and unfinished requests; reclaim only marked own clones.
+ * @param {string} directory */
+function reclaimBatches(directory){
+ const snapshots=join(directory,'snapshots');
+ for(const name of readdirSync(snapshots).filter(value=>value.startsWith('batch-'))){
+  const root=join(snapshots,name);
+  try{
+   if(!lstatSync(root).isDirectory()||lstatSync(root).isSymbolicLink())continue;
+   const owner=v.parse(batchOwnerSchema,JSON.parse(readFileSync(join(root,'queue-owner.json'),'utf8')));
+   if(owner.queue!==directory||owner.root!==root||owner.jobs.length===0)continue;
+   try{process.kill(-owner.owner,0);continue;}catch(error){if(!(error instanceof Error)||!('code'in error)||error.code!=='ESRCH')continue;}
+   if(!owner.jobs.every(id=>{
+    try{const job=v.parse(jobSchema,JSON.parse(readFileSync(join(directory,`${id}.json`),'utf8')));return job.id===id&&terminal.has(job.state);}catch{return false;}
+   }))continue;
+   rmSync(root,{recursive:true,force:true});console.log(`push-queue: reclaimed completed abandoned batch ${name}`);
+  }catch{ /* Unknown ownership or unfinished evidence is retained, never guessed. */ }
+ }
+}
+
 /** Batch only ready FIFO requests. Preserve original snapshots for bisection;
  * every published subset has its own full normal hook and exact Git push.
  * @param {string} directory @param {v.InferOutput<typeof jobSchema>[]} jobs */
 async function batch(directory,jobs){
  const root=mkdtempSync(join(directory,'snapshots','batch-'));
+ write(join(root,'queue-owner.json'),{schema:'queue-batch/1',queue:directory,root,owner:process.pid,jobs:jobs.map(job=>job.id)});
  for(const job of jobs){
   job.requestedSha??=job.sha;job.requestedTree??=job.tree;
   write(join(directory,`${job.id}.json`),{...job,state:'batching',batch:jobs.map(row=>row.id)});
@@ -165,6 +187,8 @@ async function batch(directory,jobs){
   }else if(result!==null&&['publication-unknown','published-unverified'].includes(result.state)){
    for(const job of subset)finish(job,result.state,subset,{error:failure,sha:result.sha,tree:result.tree});
    throw new PublicationUnknownError('Uncertain batch push needs remote verification; no bisection after publication');
+  }else if(result?.failurePhase!=='checking'&&!failure.startsWith('Queue snapshot rebase conflict:')&&!failure.startsWith('Captured source changed ')){
+   for(const job of subset)finish(job,'failed',subset,{error:`Queue infrastructure: ${failure}`});
   }else if(subset.length===1){
    finish(last,'failed',subset,{error:`Queue breaker ${last.lane??last.id}: ${failure}`});
   }else{
@@ -178,6 +202,7 @@ async function batch(directory,jobs){
 /** @param {string} directory */
 async function drain(directory){
  for(;;){
+  reclaimBatches(directory);
   const names=readdirSync(directory).filter(name=>/^\d+-[a-f0-9]{8}\.json$/u.test(name)).sort();
   const jobs=names.map(name=>readJob(directory,name));
   const job=jobs.find(value=>value!==null&&!terminal.has(value.state));if(job===undefined||job===null)return;
@@ -238,6 +263,7 @@ async function checkJob(directory,job,snapshot,candidateRecord){
      }
      save('checking');run('bash',['.githooks/pre-push','origin',job.remote],`refs/heads/main ${job.sha} refs/heads/main ${base}\n`);
      verifySnapshot(snapshot,job,'after the normal hook, before publication');
+     save('publishing-ready');
      if(!job.checkOnly){
       run('git',['fetch','origin','main']);const latest=git(snapshot,['rev-parse','refs/remotes/origin/main']);
       if(latest!==remote)throw new RemoteAdvanceError(`Remote advanced after checking to ${latest}; rebase and check again`);
@@ -264,7 +290,7 @@ async function checkJob(directory,job,snapshot,candidateRecord){
     }
    }
    if(!finished)throw new Error('Bounded push retry budget exhausted');
-  }catch(error){const state=pushed?'published-unverified':error instanceof PublicationUnknownError?'publication-unknown':'failed',message=error instanceof Error?error.message:String(error);save(state,{finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000,error:message});if(candidateRecord===undefined)notify(job,state,message);}
+  }catch(error){const state=pushed?'published-unverified':error instanceof PublicationUnknownError?'publication-unknown':'failed',message=error instanceof Error?error.message:String(error);save(state,{failurePhase:job.state,finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000,error:message});if(candidateRecord===undefined)notify(job,state,message);}
   finally{if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});}
   return v.parse(jobSchema,JSON.parse(readFileSync(file,'utf8')));
 }

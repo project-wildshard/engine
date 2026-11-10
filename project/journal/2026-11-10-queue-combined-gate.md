@@ -36,3 +36,25 @@ three intact requests through two fresh complete gates. No unrequested
 file reaches the remote. Original FIFO proof now checks each published
 tree's actual normal hook entries while allowing red bisection attempts
 and shared green cohorts, retaining all other original assertions.
+
+The published J206 wrapper one-shot found no MUST-FIX in080248a/3d473d2.
+All three SHOULDs now have concrete treatment. Each published subset's
+actual Git tree must match a successful complete gate observation. An
+unavailable origin really reproduced false breaker attribution; it now
+fails as infrastructure with zero gates/zero blamed lanes (3.81s).
+
+Batch clones carry a queue/root/job/owner manifest. Under the worker
+lock, reclamation requires that manifest to match the exact directory,
+a dead owner process group and terminal original requests. Unknown
+directories, live groups and pending requests are preserved. An actual
+fixture-owned worker group dies before its gate; four requests resume
+through normal gates. Old code leaves the batch clone, new code reclaims
+it only after all four settle (6.35s). No coordinator/user scratch is
+scanned or deleted. No second review round.
+
+The red four-lane bisection protocol is Ring2: it necessarily starts five
+real clone/preparation/gate/push candidates. It was8.25s in the first
+probe but exceeds the quick observation bound under concurrent host
+load. The case now records this explicit reason and every real outcome;
+no product deadline/assertion/file/shard cap changes. The green four-job
+one-gate proof remains quick, along with dirty/copy/crash protocols.
