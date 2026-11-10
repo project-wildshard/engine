@@ -19,6 +19,9 @@ export class PushDurationSequencer extends BaseSequencer{
       if(exclusive.has(name))return -1;
       return weights[name]??60;
     };
-    return Promise.resolve([...files].sort((a,b)=>cost(b)-cost(a)||path(a).localeCompare(path(b))));
+    // VB14: a reused worker takes the next file only when that file also shares workers, so the light shared
+    // files run as one block after the isolated ones and before the all-slot proofs.
+    const rank=(file:TestSpecification):number=>exclusive.has(path(file))?2:file.project.config.isolate?0:1;
+    return Promise.resolve([...files].sort((a,b)=>rank(a)-rank(b)||cost(b)-cost(a)||path(a).localeCompare(path(b))));
   }
 }

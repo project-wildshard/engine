@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { dirname, resolve } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import * as v from 'valibot';
-import { shardfileBoundaryViolations } from '../lint/shardfile-boundaries.mjs';
+import { createRequire } from 'node:module';
 import { mapStampPath, mapSettingsPath, mapTilesHash } from './map-hash.mjs';
 import { borrowShardfileEntry, readBuildKey, shardfileCacheRoot } from './shardfile-cache.mjs';
 import { InputHashMemo } from './bake-input-hashes.mjs';
@@ -11,6 +11,11 @@ import { productInputKey, productToolchainKey, matchingProductInputKey } from '.
 import { productFolder } from './shard-outputs.mjs';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 
+// VITEST-BENCH VB14: the boundary lint pulls in Vite, Rolldown, sharp and semver. Only a source shard's runtime
+// check needs it, so a pinned product read (every test that reads a product) never loads that graph.
+const require = createRequire(import.meta.url);
+/** @returns {typeof import('../lint/shardfile-boundaries.mjs').shardfileBoundaryViolations} */
+const shardfileBoundaryViolations = () => /** @type {typeof import('../lint/shardfile-boundaries.mjs')} */ (require('../lint/shardfile-boundaries.mjs')).shardfileBoundaryViolations;
 /** Exact closed-runtime copy admission shared by the builder and read-only product consumers.
  * @param {string} root @param {string} project */
 export function runtimeCopyIssues(root, project) {
@@ -26,7 +31,7 @@ export function runtimeCopyIssues(root, project) {
       if (file.isDirectory()) walk(path);
       else if (file.name.endsWith('.ts')) {
         if (!file.name.endsWith('.d.ts')) executable.add(path);
-        for (const issue of shardfileBoundaryViolations(root, path.slice(root.length + 1), readFileSync(path, 'utf8')).filter(row => row.rule === 'runtime-standalone')) issues.push({ file: path.slice(project.length + 1), message: issue.message });
+        for (const issue of shardfileBoundaryViolations()(root, path.slice(root.length + 1), readFileSync(path, 'utf8')).filter(row => row.rule === 'runtime-standalone')) issues.push({ file: path.slice(project.length + 1), message: issue.message });
       }
     }
   };
