@@ -2,7 +2,7 @@
  * list. Keep producer bytes and provenance without rewriting its archive,
  * source hash, preparation evidence or admission receipt. */
 import {createHash} from 'node:crypto';
-import {existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {resolve} from 'node:path';
 import * as v from 'valibot';
@@ -74,7 +74,11 @@ export async function fetchPinnedPublicAssets(root: string, slugs?: readonly str
     const body = Buffer.concat(chunks);verify(row, body);
     mkdirSync(cache, {recursive: true});
     const temporary = `${file}.${process.pid}`;
-    writeFileSync(temporary, body);renameSync(temporary, file);
+    const descriptor = openSync(temporary, 'wx');
+    try {
+      try { writeFileSync(descriptor, body); } finally { closeSync(descriptor); }
+      renameSync(temporary, file);
+    } finally { rmSync(temporary, {force: true}); }
   }
 }
 /** Verify installed fallback bytes before the ordinary mount ledger sees them. */

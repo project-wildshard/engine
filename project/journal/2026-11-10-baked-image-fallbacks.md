@@ -100,3 +100,10 @@ build guard now covers native model source keys as well as boot images.
 Unused non-model GPU aliases are outside that model claim. The real
 HTTP corruption/cache proof and native-key absence proof bring focused
 checks to 16 cases under one second. Native final closure remains pending.
+
+J206 native-model review finds no MUST-FIX. Close both SHOULD items:
+create the temporary cache file exclusively and remove only the file this
+process created; a hostile pre-existing symlink cannot overwrite a victim.
+The same real HTTP proof now exercises the frozen-source URL and a
+Ring1-style selected owner with an uncached unselected model. All
+selected public source downloads have independently verified their bytes.
