@@ -426,6 +426,104 @@
       "finishedAt": "2026-11-10T19:12:15.010Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "acd37432ebc2fe3ca1c647b6d0acbed4a94df10f",
+      "tree": "57a79dc4adb1b4bb283f26fd3f264d0cb4136a1b",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "src/client/engine/core/dev-pixels.test.ts",
+          "blob": "e6ee02769ddcc0b8e3f55e1666707fbfbca6cb37",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 35269.076999
+        },
+        {
+          "file": "src/client/engine/core/graphics-mode.test.ts",
+          "blob": "618fcdad723e1ecbb79fe0644ab44f07002252f6",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 35309.915584
+        },
+        {
+          "file": "src/client/game/first-play.test.ts",
+          "blob": "4eaf87576ca1466fc8e2b5ef5d9016839ff20b7f",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 35628.638999
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T20:02:41.312Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "acd37432ebc2fe3ca1c647b6d0acbed4a94df10f",
+      "tree": "57a79dc4adb1b4bb283f26fd3f264d0cb4136a1b",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "src/client/engine/core/dev-pixels.test.ts",
+          "blob": "e6ee02769ddcc0b8e3f55e1666707fbfbca6cb37",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 3,
+          "durationMs": 171.12308199999998
+        },
+        {
+          "file": "src/client/engine/core/graphics-mode.test.ts",
+          "blob": "618fcdad723e1ecbb79fe0644ab44f07002252f6",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 4,
+          "durationMs": 171.98029200000002
+        },
+        {
+          "file": "src/client/game/first-play.test.ts",
+          "blob": "4eaf87576ca1466fc8e2b5ef5d9016839ff20b7f",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 2,
+          "durationMs": 236.90645800000004
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T20:02:42.544Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [
