@@ -77,16 +77,17 @@ jobs:
       RELEASE_TAG: ${{ needs.source.outputs.tag }}
       RELEASE_CHANNEL: ${{ needs.source.outputs.channel }}
       ALIGN_FLAG: ${{ needs.source.outputs.align == 'true' && '--align' || '' }}
-      # An alignment signs with main's own tooling, but rebuilds and verifies the bundle in the named build's own tree.
-      SOURCE_DIR: ${{ needs.source.outputs.align == 'true' && 'source' || '.' }}
+    # J234: every run signs with main's current publisher, so the packs gate and fix-forward rules hold even for an
+    # older source (a late CI event); the bundle is built and checked in the source's own tree under ./source.
+    # A tag push runs the workflow file at its tag, so a tag on a commit from before this file would run its old
+    # publisher: never tag one.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.source.outputs.align == 'true' && github.sha || needs.source.outputs.sha }}
+          ref: main
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: needs.source.outputs.align == 'true'
         with:
           ref: ${{ needs.source.outputs.sha }}
           path: source
@@ -101,14 +102,13 @@ jobs:
           cache: pnpm
       - uses: ./.github/actions/org-deps
       - run: pnpm install --frozen-lockfile
-      - name: Install the named build's own tree
-        if: needs.source.outputs.align == 'true'
+      - name: Install the source's own tree
         working-directory: source
         run: pnpm install --frozen-lockfile
-      # The same bytes CI built for this SHA: the asset step refuses a tag asset that differs, so an alignment
-      # can never sign a replaced archive.
+      # The same bytes CI built for this SHA: the asset step refuses a tag asset that differs, so no run can
+      # sign a replaced archive.
       - name: Build deterministic dedicated bundle
-        working-directory: ${{ env.SOURCE_DIR }}
+        working-directory: source
         shell: bash
         run: |
           set -euo pipefail
@@ -130,7 +130,7 @@ jobs:
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
           --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" $ALIGN_FLAG
       - name: Upload immutable bundle to its tag release
-        working-directory: ${{ env.SOURCE_DIR }}
+        working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-

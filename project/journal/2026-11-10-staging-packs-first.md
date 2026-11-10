@@ -61,3 +61,12 @@ build older than the live one fails the run instead of signing it.
 Today's serial 65 rollback stays the one exception. A read-only dry run
 against the public origin says both live channels (a8144a5, production
 serial 3 and staging serial 65) pass the gate: 33 parts, none missing.
+
+The codex review (J206) caught that a run for an older commit, such as
+a late CI event or a tag on a commit from before the gate, ran that
+commit's own publisher, which has no gate. The publish job now checks
+out main at the root and signs with main's publisher for every source,
+and builds and checks the bundle in the source's tree under ./source. A
+tag push still runs its tag's workflow file, so never tag a commit from
+before this one. The tests now cover a held production with a live file
+(same signed bytes), an unrelated build, and the workflow's shape.

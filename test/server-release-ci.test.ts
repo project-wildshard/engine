@@ -2,8 +2,8 @@
 import { createHash, generateKeyPairSync } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real local publication boundary.
 import { createServer } from 'node:http';
-// oxlint-disable-next-line import/no-nodejs-modules -- Test-owned bundle bytes.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Test-owned bundle bytes and the workflow file.
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Vitest owns this temporary root.
 import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths belong to this test run.
@@ -22,6 +22,8 @@ const history = createTempRepo();
 const older = history.commit({ 'receipt.txt': 'first' }, 'First test build');
 const sha = history.commit({ 'receipt.txt': 'second' }, 'Second test build');
 const newest = history.commit({ 'receipt.txt': 'third' }, 'Third test build');
+/** A commit on no branch of the channel's history. */
+const unrelated = history.git(['commit-tree', `${sha}^{tree}`, '-m', 'Unrelated test build']);
 afterAll(() => { history.cleanup(); });
 const publicKey = releasePublicKey(pem);
 const release = (build = sha): ReleaseFile => ({ channel: 'staging', serial: 1, engineBuild: build, saveEpoch: 1,
@@ -153,19 +155,35 @@ test('J234: both channels sign a build only after its server book and parts are 
     // Fix forward (J234): normal CI never moves back, and an alignment naming an older build is refused, not signed.
     expect((await publish(older)).status).toBe('stale');
     await expect(publish(older, true)).rejects.toThrow(/forward-only/u);
+    shelve(unrelated, 1);
+    await expect(publish(unrelated, true)).rejects.toThrow(/unrelated history/u);
     expect(channel()).toMatchObject({ engineBuild: sha, serial: 2 });
     expect(writes).toBe(2);
-    // Production holds the same way: a tag whose packs are missing writes no production file at all.
+    // Production holds the same way: a tag whose packs are missing writes no production file at all,
     expect(await publish(newest, false, 'production')).toMatchObject({ status: 'held', reason: `no server book at assets/spawn/server-${newest}.json` });
     expect(objects.has('releases/production.json')).toBe(false);
+    expect((await publish(sha, false, 'production')).status).toBe('published');
+    // and a live production file keeps its exact signed bytes while the next tag's packs are incomplete.
+    const live = objects.get('releases/production.json');
     shelve(newest, 7);
     for (const n of [7, 8]) objects.set(part(n).url.slice(1), 'part');
-    expect((await publish(newest, false, 'production')).reason).toBe('no server part at assets/spawn/server/9999999999999999.pack.br');
-    expect(objects.has('releases/production.json')).toBe(false);
+    expect(await publish(newest, false, 'production')).toMatchObject({ status: 'held', release: { engineBuild: sha, serial: 1 }, reason: 'no server part at assets/spawn/server/9999999999999999.pack.br' });
+    expect(objects.get('releases/production.json')).toBe(live);
     objects.set(part(9).url.slice(1), 'part');
     expect((await publish(newest, false, 'production')).status).toBe('published');
-    expect(channel('production')).toMatchObject({ engineBuild: newest, serial: 1 });
+    expect(channel('production')).toMatchObject({ engineBuild: newest, serial: 2 });
     await expect(publish(newest, true, 'production')).rejects.toThrow(/Only staging/u);
-    expect(writes).toBe(3);
+    expect(writes).toBe(4);
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
+});
+
+test('J234: every run signs with main\'s publisher and builds in the source\'s own tree', () => {
+  const workflow = readFileSync('.github/workflows/server-release.yml', 'utf8'), publish = workflow.slice(workflow.indexOf('\n  publish:'));
+  const checkouts = [...publish.matchAll(/- uses: actions\/checkout@[^\n]+\n\s+with:\n((?:\s{10}[^\n]+\n)+)/gu)].map(match => match[1] ?? '');
+  expect(checkouts[0]).toMatch(/ref: main\n/u);
+  expect(checkouts[1]).toMatch(/ref: \$\{\{ needs\.source\.outputs\.sha \}\}\n\s+path: source\n/u);
+  for (const step of ['Build deterministic dedicated bundle', 'Upload immutable bundle to its tag release']) expect(publish.slice(publish.indexOf(step)).split('\n')[1]).toBe('        working-directory: source');
+  const sign = publish.slice(publish.indexOf('Sign and advance the channel release file'));
+  expect(sign).not.toMatch(/working-directory/u);
+  expect(sign).toContain('node scripts/server-release/publish.mjs');
 });

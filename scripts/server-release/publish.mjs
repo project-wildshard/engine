@@ -1,6 +1,6 @@
 // One CAS-protected signed object per channel in wildshard-packs. No VPS access.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -52,6 +52,7 @@ export async function publishChannel(options) {
   const { client, bucket, privateKey, publicKey, isAncestor: ancestor } = options, candidate = publication(options.candidate), key = `releases/${candidate.channel}.json`;
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
   if (options.align === true && candidate.channel !== 'staging') throw new Error('Only staging can be aligned');
+  if (typeof options.packsReady !== 'function') throw new Error('Every channel needs the packs gate (J234)');
   /** @type {string | null | undefined} */
   let blocked;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -102,12 +103,14 @@ function isAncestor(older, newer) {
 async function main() {
   const { values } = parseArgs({ options: { channel: { type: 'string' }, build: { type: 'string' }, tag: { type: 'string' }, bundle: { type: 'string' }, out: { type: 'string' }, check: { type: 'boolean', default: false },
     align: { type: 'boolean', default: false } } });
-  // `--align` (staging only): sign a named green main build, never older than the live one (J234), with main's own tooling. Its epoch
-  // and pins are read from that commit; the workflow rebuilds its bundle in its own tree and checks it against the tag's asset.
+  // J234: this publisher runs from main's checkout for every source, so its gate and fix-forward rules apply even to an older build.
+  // The build's epoch and pins are read from that commit; the workflow builds its bundle in its own tree and checks the tag's asset.
+  // `--align` (staging only) is a person naming a build, never older than the live one.
   const align = values.align, head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  if (align && (values.channel !== 'staging' || values.build === undefined || !COMMIT.test(values.build) || !isAncestor(values.build, head))) throw new Error('--align needs staging and a full build on the checked-out main');
+  if (values.build === undefined || !COMMIT.test(values.build) || !isAncestor(values.build, head)) throw new Error('The build must be a full commit on the checked-out main');
+  if (align && values.channel !== 'staging') throw new Error('--align is staging only');
   /** @param {string} path @returns {string} */
-  const sourceFile = path => align ? execFileSync('git', ['show', `${values.build ?? ''}:${path}`], { encoding: 'utf8' }) : readFileSync(path, 'utf8');
+  const sourceFile = path => execFileSync('git', ['show', `${values.build ?? ''}:${path}`], { encoding: 'utf8' });
   if (values.bundle === undefined || values.tag === undefined || values.out === undefined) throw new Error('Expected --bundle, --tag and --out');
   const privateKey = need('E7_RELEASE_SIGNING_KEY'), publicKey = need('E7_RELEASE_PUBLIC_KEY'), account = need('R2_ACCOUNT_ID'), bucket = need('R2_BUCKET_PACKS');
   const credentials = { accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY') };
@@ -118,7 +121,6 @@ async function main() {
   const candidate = publication({ channel: values.channel, serial: 1, engineBuild: values.build, saveEpoch: epoch,
     shards: releaseShards(JSON.parse(sourceFile('test/pins/shardfiles.json')), shardNames === undefined || shardNames === '' ? 'driftwood-isle,nalati-grasslands' : shardNames),
     bundle: bundleDescriptor(values.bundle, values.tag), socket: need('E7_RELEASE_SOCKET') });
-  if (!align && head !== candidate.engineBuild) throw new Error('Publication is not the checked-out build');
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
   if (values.check) { console.log('Server release configuration admitted'); return; }
   const client = new S3Client({ region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials });

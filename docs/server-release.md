@@ -49,6 +49,13 @@ tree and refuses unless it matches the asset already on its
 packs gate still applies, CI and Ring 1 must be green for that SHA, and
 production can never be aligned.
 
+Every run signs with main's current publisher, checked out at the root,
+and builds the bundle in the source's own tree under `./source`. So a
+late CI event for an older commit still meets the packs gate and the
+fix-forward rules. A tag push runs the workflow file at its tag, so a
+tag on a commit from before this rule would run that commit's old
+publisher, which has no production gate. Never tag one.
+
 A `vMAJOR.MINOR.PATCH` tag qualifies for production. Its peeled commit
 must belong to main and have the same two green main-push workflows. A
 tag arriving while they run waits up to 40 minutes. A red result fails;
