@@ -123,6 +123,8 @@ jobs:
         run: node scripts/engine-order-proof.mjs
       - name: Prove cached public imports follow a package retag
         run: node scripts/module-cache-proof.mjs
+      - name: Calibrate real CPU observations and report surviving writers
+        run: python3 scripts/cpu-census-proof.py
       - name: Prove an actual over-budget file refuses
         run: node scripts/engine-ci-proof.mjs && node scripts/engine-ci-proof.mjs tmp/engine-ci-budget-proof --import
       - name: Prove a named shard deadline drains descendants
