@@ -1,7 +1,9 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Every write is confined to an owned fixture under ./tmp.
-import { existsSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
+// oxlint-disable-next-line import/no-nodejs-modules -- Exercise real Node resolution from the frozen export.
+import { createRequire } from 'node:module';
 import { afterEach, describe, expect, it } from 'vitest';
 import { linkNodeModules } from '../scripts/link-node-modules.mjs';
 
@@ -83,5 +85,100 @@ describe('linkNodeModules', () => {
     linkNodeModules(repo, tree);
 
     expect(realpathSync(join(tree, 'node_modules', '@wildshard', 'format'))).toBe(current);
+  });
+
+  it('imports a registered shared-store dependency from a cold frozen export', () => {
+    const root = scratch(), repo = join(root, 'repo'), tree = join(root, 'exports', 'tree'), store = join(root, 'store');
+    const installed = join(store, 'format-content'), outside = join(root, 'live-format'), provider = join(store, 'provider');
+    mkdirSync(provider, { recursive: true });
+    writeFileSync(join(provider, 'package.json'), '{"name":"shared-provider","type":"module","exports":"./index.mjs"}');
+    writeFileSync(join(provider, 'index.mjs'), 'export default {};');
+    for (const directory of [installed, outside]) {
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@wildshard/format', type: 'module', exports: './index.mjs' }));
+      writeFileSync(join(directory, 'index.mjs'), `export default ${JSON.stringify(directory === installed ? 'installed-format' : 'unregistered-source')};`);
+    }
+    mkdirSync(join(installed, 'node_modules'));
+    symlinkSync(provider, join(installed, 'node_modules', 'shared-provider'));
+    writeFileSync(join(installed, 'index.mjs'), "export default 'installed-format'; export {default as shared} from 'shared-provider';");
+    for (const directory of [repo, tree]) {
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@wildshard/engine', type: 'module', exports: './index.mjs' }));
+      writeFileSync(join(directory, 'index.mjs'), `export default ${JSON.stringify(directory === tree ? 'frozen-export' : 'dirty-checkout')}; export {shared} from '@wildshard/format';`);
+    }
+    mkdirSync(join(repo, 'node_modules', '@wildshard'), { recursive: true });
+    // Preserve actual pinned-pnpm metadata fields; substitute only this fixture's store location.
+    const installedMetadata: Record<string, unknown> = JSON.parse(readFileSync(resolve('node_modules/.modules.yaml'), 'utf8'));
+    installedMetadata['virtualStoreDir'] = relative(join(repo, 'node_modules'), store);
+    writeFileSync(join(repo, 'node_modules', '.modules.yaml'), JSON.stringify(installedMetadata));
+    symlinkSync('../..', join(repo, 'node_modules', '@wildshard', 'engine'));
+    const link = join(repo, 'node_modules', '@wildshard', 'format');
+    symlinkSync(installed, link);
+    mkdirSync(join(tree, 'consumer'));
+    writeFileSync(join(tree, 'consumer', 'package.json'), '{"name":"proof-consumer","type":"commonjs"}');
+
+    linkNodeModules(repo, tree);
+
+    const load = createRequire(join(tree, 'consumer', 'entry.cjs'));
+    // Node's own loader consumes both modules: frozen source plus the installed dependency.
+    const engine: Record<string, unknown> = load('@wildshard/engine'), format: Record<string, unknown> = load('@wildshard/format');
+    expect(engine).toMatchObject({ default: 'frozen-export' });
+    expect(format).toMatchObject({ default: 'installed-format' });
+    expect(engine['shared']).toBe(format['shared']);
+    linkNodeModules(repo, tree);
+    expect(realpathSync(join(tree, 'node_modules', '@wildshard', 'engine'))).toBe(tree);
+    const nested = join(root, 'nested', 'deeper', 'export');
+    mkdirSync(join(nested, 'consumer'), { recursive: true });
+    writeFileSync(join(nested, 'package.json'), JSON.stringify({ name: '@wildshard/engine', type: 'module', exports: './index.mjs' }));
+    writeFileSync(join(nested, 'index.mjs'), "export default 'nested-export'; export {shared} from '@wildshard/format';");
+    writeFileSync(join(nested, 'consumer', 'package.json'), '{"name":"nested-consumer","type":"commonjs"}');
+    linkNodeModules(tree, nested);
+    const nestedLoad = createRequire(join(nested, 'consumer', 'entry.cjs'));
+    const nestedEngine: Record<string, unknown> = nestedLoad('@wildshard/engine');
+    expect(nestedEngine).toMatchObject({ default: 'nested-export' });
+    expect(nestedLoad('@wildshard/format')).toBe(format);
+    expect(nestedEngine['shared']).toBe(format['shared']);
+    for (const scalar of [String(installedMetadata['virtualStoreDir']), JSON.stringify(installedMetadata['virtualStoreDir']), `'${String(installedMetadata['virtualStoreDir'])}'`]) {
+      writeFileSync(join(repo, 'node_modules', '.modules.yaml'), `virtualStoreDir: ${scalar}\nlayoutVersion: 5\n`);
+      const yamlTree = join(root, `yaml-${scalar.length}`); mkdirSync(yamlTree, {recursive: true});
+      linkNodeModules(repo, yamlTree);
+      expect(realpathSync(join(yamlTree, 'node_modules', '@wildshard', 'format'))).toBe(installed);
+    }
+    writeFileSync(join(repo, 'node_modules', '.modules.yaml'), JSON.stringify(installedMetadata));
+
+    unlinkSync(link); symlinkSync(outside, link);
+    const unregistered = join(root, 'unregistered'); mkdirSync(unregistered);
+    expect(() => linkNodeModules(repo, unregistered)).toThrow();
+    expect(() => linkNodeModules(repo, unregistered)).toThrow();
+    unlinkSync(link);
+    mkdirSync(join(repo, 'node_modules', '.pnpm'));
+    symlinkSync(outside, join(repo, 'node_modules', '.pnpm', 'lexical-alias'));
+    symlinkSync(join(repo, 'node_modules', '.pnpm', 'lexical-alias'), link);
+    const lexical = join(root, 'lexical'); mkdirSync(lexical);
+    expect(() => linkNodeModules(repo, lexical)).toThrow();
+    expect(() => linkNodeModules(repo, lexical)).toThrow();
+    unlinkSync(link); symlinkSync(outside, join(store, 'escape')); symlinkSync(join(store, 'escape'), link);
+    const escaped = join(root, 'escaped'); mkdirSync(escaped);
+    expect(() => linkNodeModules(repo, escaped)).toThrow();
+    expect(() => linkNodeModules(repo, escaped)).toThrow();
+    unlinkSync(link); symlinkSync(installed, link);
+    writeFileSync(join(repo, 'node_modules', '.modules.yaml'), '{');
+    const corrupt = join(root, 'corrupt'); mkdirSync(corrupt);
+    expect(() => linkNodeModules(repo, corrupt)).toThrow();
+    expect(() => linkNodeModules(repo, corrupt)).toThrow();
+    writeFileSync(join(repo, 'node_modules', '.modules.yaml'), JSON.stringify({ virtualStoreDir: relative(join(repo, 'node_modules'), store) }));
+    writeFileSync(join(installed, 'package.json'), '{"name":"unrelated-package"}');
+    const crossed = join(root, 'crossed'); mkdirSync(crossed);
+    expect(() => linkNodeModules(repo, crossed)).toThrow();
+    expect(() => linkNodeModules(repo, crossed)).toThrow();
+    writeFileSync(join(installed, 'package.json'), '{"name":"@wildshard/format"}');
+    for (const directory of [repo, tree]) {
+      mkdirSync(join(directory, 'src', 'sdk'), {recursive: true});
+      writeFileSync(join(directory, 'src', 'sdk', 'package.json'), '{"name":"@wildshard/sdk"}');
+    }
+    mkdirSync(join(repo, 'src', 'sdk', 'node_modules', '@wildshard'), {recursive: true});
+    symlinkSync(outside, join(repo, 'src', 'sdk', 'node_modules', '@wildshard', 'format'));
+    expect(() => linkNodeModules(repo, tree)).toThrow();
+    expect(() => linkNodeModules(repo, tree)).toThrow();
   });
 });

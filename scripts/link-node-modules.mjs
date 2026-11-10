@@ -8,7 +8,7 @@
 //   node scripts/link-node-modules.mjs <repo> <tree>          (the shell scripts)
 //   import { linkNodeModules } from './link-node-modules.mjs'  (the node ones)
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, symlinkSync, unlinkSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -20,6 +20,63 @@ function present(path) {
   if (existsSync(path)) return true;
   try { if (lstatSync(path).isSymbolicLink()) unlinkSync(path); } catch { /* nothing there */ }
   return false;
+}
+
+/** Read pnpm's top-level store scalar: current pinned pnpm emits JSON;
+ * older installs use a plain or quoted YAML path. Reject ambiguous/tagged values.
+ * This reads only pnpm's path field, not arbitrary YAML documents.
+ * @param {string} contents @returns {string | undefined} */
+function virtualStoreDirectory(contents) {
+  try {
+    /** @type {unknown} */ const metadata = JSON.parse(contents);
+    if (typeof metadata === 'object' && metadata !== null && Object.hasOwn(metadata, 'virtualStoreDir')
+      && 'virtualStoreDir' in metadata && typeof metadata.virtualStoreDir === 'string' && metadata.virtualStoreDir.length > 0) return metadata.virtualStoreDir;
+    return undefined;
+  } catch { /* Earlier pnpm writes an unindented YAML scalar. */ }
+  const rows = contents.split(/\r?\n/u).filter(line => line.startsWith('virtualStoreDir:'));
+  if (rows.length !== 1) return undefined;
+  const value = rows[0].slice('virtualStoreDir:'.length).trim();
+  if (value.startsWith('"')) {
+    try { const decoded = JSON.parse(value); return typeof decoded === 'string' && decoded.length > 0 ? decoded : undefined; } catch { return undefined; }
+  }
+  if (/^'(?:[^']|'')*'$/u.test(value)) return value.slice(1, -1).replaceAll("''", "'") || undefined;
+  return /^[a-zA-Z0-9_./\\ :~-]+$/u.test(value) ? value : undefined;
+}
+
+/** A pinned pnpm install may keep immutable packages in its registered external
+ * virtual store. Resolve both sides so a store symlink cannot lend live source.
+ * No other outside checkout is accepted as an installed dependency.
+ * @param {string} from @param {string} target @param {string} name
+ * @returns {string | undefined}
+ */
+function installedVirtualStoreTarget(from, target, name) {
+  try {
+    // Exported installs may link this metadata; its relative store belongs to the original file.
+    const metadataFile = realpathSync(join(from, '.modules.yaml'));
+    const directory = virtualStoreDirectory(readFileSync(metadataFile, 'utf8'));
+    if (directory === undefined) return undefined;
+    const store = realpathSync(resolve(dirname(metadataFile), directory)), installed = realpathSync(target), within = relative(store, installed);
+    if (within.length === 0 || isAbsolute(within) || within === '..' || within.startsWith(`..${sep}`)) return undefined;
+    /** @type {unknown} */
+    const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
+    if (typeof manifest !== 'object' || manifest === null || !Object.hasOwn(manifest, 'name')
+      || !('name' in manifest) || manifest.name !== name) return undefined;
+    return installed;
+  } catch { return undefined; } // Missing/corrupt metadata is not authority to lend outside source.
+}
+
+/** Classify canonical destinations on every path, including retried exports.
+ * Source belongs to the frozen tree; only registered installed stores may live outside.
+ * @param {string} repo @param {string} tree @param {string} target @param {string} name */
+function scopedTarget(repo, tree, target, name) {
+  const canonical = realpathSync(target), inRepo = relative(realpathSync(repo), canonical);
+  if (inRepo === '') return resolve(tree);
+  if (!isAbsolute(inRepo) && inRepo !== '..' && !inRepo.startsWith(`..${sep}`)) {
+    return inRepo.startsWith(`src${sep}`) ? resolve(tree, inRepo) : canonical;
+  }
+  const installed = installedVirtualStoreTarget(resolve(repo, 'node_modules'), canonical, name);
+  if (installed === undefined) throw new Error(`link-node-modules: ${name} points outside the repo (${canonical})`);
+  return installed;
 }
 
 /** the scopes whose packages live in the repo itself (pnpm-workspace.yaml) */
@@ -55,11 +112,8 @@ export function linkNodeModules(repo, tree) {
       const link = join(from, name, pkg);
       // the checkout's link points into the checkout (../../src/engine); the export's points at the same path in the tree
       const target = resolve(dirname(link), readlinkSync(link));
-      const inRepo = relative(resolve(repo), target);
-      if (inRepo.startsWith('..')) throw new Error(`link-node-modules: ${link} points outside the repo (${target})`);
-      // relative, as pnpm writes it (../../src/engine): it stays inside whatever tree holds it, even one nested in this
-      // export (a test's throwaway repo)
-      symlinkSync(relative(join(to, name), join(resolve(tree), inRepo)), join(to, name, pkg));
+      const destination = scopedTarget(repo, tree, target, `${name}/${pkg}`);
+      symlinkSync(destination, join(to, name, pkg));
     }
   }
   linkWorkspaceSources(tree, to);
@@ -87,14 +141,15 @@ function linkInstalledScope(repo, tree, from, to) {
     if (!existsSync(join(from, name))) continue;
     for (const pkg of readdirSync(join(from, name))) {
       const link = join(to, name, pkg), target = resolve(join(from, name), readlinkSync(join(from, name, pkg)));
-      if (relative(resolve(repo), target).startsWith('src/')) continue;
+      if (existsSync(resolve(tree, 'src', pkg, 'package.json'))) continue;
+      const destination = scopedTarget(repo, tree, target, `${name}/${pkg}`);
       if (present(link)) {
         // A reused slot follows the install: a format release must reach it. A tree holding its own src/<pkg> keeps its link.
-        if (existsSync(resolve(tree, 'src', pkg, 'package.json')) || !lstatSync(link).isSymbolicLink() || realpathSync(link) === realpathSync(target)) continue;
+        if (existsSync(resolve(tree, 'src', pkg, 'package.json')) || !lstatSync(link).isSymbolicLink() || realpathSync(link) === realpathSync(destination)) continue;
         unlinkSync(link);
       }
       mkdirSync(dirname(link), { recursive: true });
-      symlinkSync(target, link);
+      symlinkSync(destination, link);
     }
   }
 }
@@ -140,7 +195,10 @@ function linkPackageNodeModules(repo, tree) {
         if (lstatSync(entry).isSymbolicLink()) {
           const target = realpathSync(entry), inSrc = relative(src, target);
           // a workspace package resolves to the tree's copy of the same source; anything else is the installed package
-          symlinkSync(inSrc.startsWith('..') ? target : resolve(tree, 'src', inSrc), join(toDir, name));
+          const specifier = relative(from, entry).split(sep).join('/');
+          const destination = specifier.startsWith('@wildshard/') ? scopedTarget(repo, tree, target, specifier)
+            : inSrc.startsWith('..') ? target : resolve(tree, 'src', inSrc);
+          symlinkSync(destination, join(toDir, name));
         } else if (lstatSync(entry).isDirectory()) { mkdirSync(join(toDir, name)); mirror(entry, join(toDir, name)); }
       }
     };
