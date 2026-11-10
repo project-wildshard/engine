@@ -6,6 +6,7 @@ import { isDev, setDev } from '../core/devMode';
 import { createSettings, getSetting, setSetting } from './Settings';
 import { devSwitchRows } from './devSwitch';
 import { Loading } from './Loading';
+import { progressOfCard, STUCK_STEP_MS, watchStuckStep } from '../boot/stuckStep';
 
 const owners: Scope[] = [];
 let now = 100;
@@ -114,10 +115,31 @@ it('holds complete bars and frozen timings until PLAY, then enters once after th
   expect(enter).toHaveBeenCalledTimes(1); expect(loading.scope.disposed).toBe(true);
 });
 
+it('a card held at PLAY past the stuck bound never trips the stuck-step watch', async () => {
+  // Jake, 2026-11-10: Hold at loading screen showed "stopped loading at step "gap" (no progress for 60 s)" and sent a
+  // report. The real card's hold must read as a wait on the player to the watch the composition root runs (entry.ts).
+  setDev(true); setSetting('holdLoading', true);
+  const loading = ready(), finished = loading.done(), stalls: string[] = [];
+  watchStuckStep(finished, { progress: () => progressOfCard(loading.root), now: () => now,
+    stalled: (step) => { stalls.push(step); },
+    every: (ms, run) => { const id = setInterval(run, ms); return () => { clearInterval(id); }; } });
+  for (let s = 0; s < 3 * STUCK_STEP_MS / 1000; s++) { now += 1000; await vi.advanceTimersByTimeAsync(1000); }
+  expect(stalls).toEqual([]);
+  expect(loading.root.querySelector('.ws-load-play')).not.toBeNull();
+  expect(progressOfCard(loading.root).player).toBe(true);
+  loading.root.querySelector<HTMLButtonElement>('.ws-load-play')?.click();
+  expect(progressOfCard(loading.root).player).toBe(false);
+  await vi.advanceTimersByTimeAsync(320); await finished;
+  expect(stalls).toEqual([]);
+});
+
 it.each(['setting', 'developer'] as const)('releases a held completion when %s turns off', async (change) => {
   setDev(true); setSetting('holdLoading', true);
   const loading = ready(), finished = loading.done();
+  expect(progressOfCard(loading.root).player).toBe(true);
   if (change === 'setting') setSetting('holdLoading', false); else setDev(false);
+  // the wait on the player ends with the release, so the stuck-step watch counts again
+  expect(progressOfCard(loading.root).player).toBe(false);
   await vi.advanceTimersByTimeAsync(320); await finished;
   expect(loading.playRequested).toBe(false);
   expect(loading.scope.disposed).toBe(true);

@@ -49,7 +49,31 @@ test('a start that settles, resolved or thrown, ends the watch without a stall',
 test('the card gives the step and a signature of its progress; no card is still the modules', () => {
   expect(progressOfCard(null)).toEqual({ step: 'modules', signature: 'modules' });
   const card = { dataset: { step: 'world.props', setup: '40', readBytes: '1000', spawnFilesDone: '3', streamedBytes: '4096' } };
-  expect(progressOfCard(card)).toEqual({ step: 'world.props', signature: 'world.props|40|1000|3|4096|' });
+  expect(progressOfCard(card)).toEqual({ step: 'world.props', signature: 'world.props|40|1000|3|4096|', player: false });
+  expect(progressOfCard({ dataset: { step: 'gap', ready: 'true' } }).player).toBe(true);
+});
+
+test('a boot whose PLAY is up waits on the player: held for minutes it is never stuck, and nothing is reported', () => {
+  // Jake, 2026-11-10 (iPhone, Developer ▸ Hold at loading screen): the card held at 100% with PLAY up, and a minute later
+  // the fatal modal named step "gap" and sent a report. The hold is the player's; only a real hang may trip the bound.
+  const dataset: Record<string, string | undefined> = { step: 'gap', setup: '100', readBytes: '5000', ready: 'true' };
+  const h = harness(() => progressOfCard({ dataset }));
+  watchStuckStep(never, h.ports, 60_000);
+  h.tick(300_000);
+  expect(h.stalls).toEqual([]);
+  expect(h.running()).toBe(true);
+  // loading goes on (PLAY tapped) and then hangs: the bound starts from the end of the hold, not its start
+  delete dataset['ready'];
+  h.tick(59_000); expect(h.stalls).toEqual([]);
+  h.tick(1000); expect(h.stalls).toEqual([['gap', 60_000]]);
+});
+
+test('the same card without PLAY up, unmoved for the bound, is still a stall', () => {
+  const dataset: Record<string, string> = { step: 'gap', setup: '100', readBytes: '5000' };
+  const h = harness(() => progressOfCard({ dataset }));
+  watchStuckStep(never, h.ports, 60_000);
+  h.tick(59_000); expect(h.stalls).toEqual([]);
+  h.tick(1000); expect(h.stalls).toEqual([['gap', 60_000]]);
 });
 
 test('a wait for a seat in a full world is no hang, and the watch stands once it ends', () => {
