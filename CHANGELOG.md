@@ -8,6 +8,14 @@ To release: add the next version's section at the top, commit and push it, then 
 and `--finish` as before. `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose
 `package.json` version has no valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.6 (2026-11-10)
+
+- Phones get Low and High graphics. Low Power Mode switches to Low on its own, and the first time you play you can try both in Driftwood.
+- The loading screen has Settings and Exit to title, so you can back out of the wrong shard.
+- You now arrive where you left off, without a jump after loading, and you no longer appear in the world before you press Play.
+- The title shows a short version with its changes.
+- Clearer screens when the connection drops or the server restarts.
+
 ## v0.1.5 (2026-11-10)
 
 - Phones and slow graphics chips start worlds more smoothly: the first frames are drawn in small steps, not one long freeze
