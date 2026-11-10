@@ -44,3 +44,4 @@ every clone (a name with a newline is never cloned, since `hash-object
 and an abandoned lock is no longer taken over at all, because no takeover is
 race-free without a process-held lock: the refusal names the lock and the
 `rm` that clears it.
+Clocks re-recorded after the second review changed the test.

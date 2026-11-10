@@ -1104,7 +1104,7 @@
   "test/tooling/soak/boundary.test.mjs": 0.08834931200000003,
   "test/tooling/soak/inspector.test.mjs": 0.07907460399999997,
   "test/tooling/worktree-ignore.test.mjs": 3.0824463319999995,
-  "test/tooling/worktree.test.mjs": 9.628007749999998,
+  "test/tooling/worktree.test.mjs": 16.304452042999998,
   "test/trade-handoff.test.ts": 0.457957731,
   "test/typecheck-root.test.ts": 0.35763027399999997,
   "test/vercel-cache-headers.test.ts": 0.701063965,
