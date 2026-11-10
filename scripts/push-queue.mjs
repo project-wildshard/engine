@@ -219,13 +219,26 @@ async function drain(directory){
  }
 }
 
+/** The explicit manifest is the only authority. Export errors remain diagnostic;
+ * they never replace the original hook failure or permit publication.
+ * @param {string} directory @param {v.InferOutput<typeof jobSchema>} job
+ * @param {string} snapshot */
+function retainFailedDiagnostics(directory,job,snapshot){
+ try{
+  const result=spawnSync('python3',[fileURLToPath(new URL('push-queue-retain.py',import.meta.url)),snapshot,directory,job.id,job.sha],{env:workerEnvironment(),encoding:'utf8',timeout:6000,maxBuffer:128*1024});
+  if(result.status!==0)throw new Error(`status=${result.status} signal=${result.signal} ${result.error?.message??result.stderr.slice(0,1000)}`);
+  const summary=result.stdout.trim();
+  if(summary!=='null')console.error(`Push queue retained requested diagnostics (not case attribution): ${summary}`);
+ }catch(error){console.error(`Push queue diagnostic retention refused; original failure unchanged: ${error instanceof Error?error.message:String(error)}`);}
+}
+
 /** The exact same normal hook/push pipeline serves single jobs and candidates.
  * A batch's transient result is private; only its proven subsets update jobs.
  * @param {string} directory @param {v.InferOutput<typeof jobSchema>} job
  * @param {string} snapshot @param {string} [candidateRecord] */
 async function checkJob(directory,job,snapshot,candidateRecord){
   const file=candidateRecord??join(directory,`${job.id}.json`),started=Date.now();
-  let pushed=false;
+  let pushed=false,hookFailed=false;
   if(job.state==='capturing'){
    const held=spawnSync('python3',[lock,'--held',join(directory,'capture.lock')],{stdio:'ignore'});
    if(held.status===0){await new Promise(resolve=>{setTimeout(resolve,100);});return null;}
@@ -268,7 +281,7 @@ async function checkJob(directory,job,snapshot,candidateRecord){
      if(existsSync(join(snapshot,'scripts/heavy-lane.py'))){
       save('waiting-for-hook');run('python3',[fileURLToPath(new URL('push-queue-admission.py',import.meta.url)),'--checkout',snapshot]);
      }
-     save('checking');run('bash',['.githooks/pre-push','origin',job.remote],`refs/heads/main ${job.sha} refs/heads/main ${base}\n`);
+     save('checking');try{run('bash',['.githooks/pre-push','origin',job.remote],`refs/heads/main ${job.sha} refs/heads/main ${base}\n`);}catch(error){hookFailed=true;throw error;}
      verifySnapshot(snapshot,job,'after the normal hook, before publication');
      save('publishing-ready');
      if(!job.checkOnly){
@@ -298,7 +311,7 @@ async function checkJob(directory,job,snapshot,candidateRecord){
    }
    if(!finished)throw new Error('Bounded push retry budget exhausted');
   }catch(error){const state=pushed?'published-unverified':error instanceof PublicationUnknownError?'publication-unknown':'failed',message=error instanceof Error?error.message:String(error);save(state,{failurePhase:job.state,finishedAt:new Date().toISOString(),seconds:(Date.now()-started)/1000,error:message});if(candidateRecord===undefined)notify(job,state,message);}
-  finally{if(existsSync(snapshot))rmSync(snapshot,{recursive:true,force:true});}
+  finally{if(existsSync(snapshot)){if(hookFailed&&job.state==='failed')retainFailedDiagnostics(directory,job,snapshot);rmSync(snapshot,{recursive:true,force:true});}}
   return v.parse(jobSchema,JSON.parse(readFileSync(file,'utf8')));
 }
 

@@ -18,7 +18,7 @@ if(handoff){
  const driver=join(work,'driver');mkdirSync(driver);
  // The copied driver keeps the invoking installation even outside this repo.
  symlinkSync(resolvePath('node_modules'),join(driver,'node_modules'),'dir');
- for(const name of ['push-queue.mjs','push-queue-rebase.mjs','push-queue-lock.py'])copyFileSync(resolvePath('scripts',name),join(driver,name));
+ for(const name of ['push-queue.mjs','push-queue-rebase.mjs','push-queue-lock.py','push-queue-retain.py'])copyFileSync(resolvePath('scripts',name),join(driver,name));
  const helper=join(driver,'push-queue-lock.py');
  // Only the fixture's process scheduling changes. The real helper still probes
  // the real flock after capture has published its queued record and exited.
