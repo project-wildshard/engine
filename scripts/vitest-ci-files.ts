@@ -14,6 +14,7 @@ export const CI_NATIVE_GROUPS = {
     'test/pine-rewards.test.ts',
   ],
   'native-direct-worker': ['test/headless-direct-worker.test.ts'],
+  'native-host-transport': ['test/sim-transport.test.ts'],
   'native-restores': [
     'test/pinned-restore-play.test.ts',
   ],
