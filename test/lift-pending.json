@@ -214,7 +214,6 @@
   "test/patrol-encounter-view.test.ts",
   "test/patrol-law.test.ts",
   "test/phased-arena-continuation.test.ts",
-  "test/physics-headless.test.ts",
   "test/physics-shards-headless.test.ts",
   "test/pickup-catalogue.test.ts",
   "test/pine-ammunition-verbs.test.ts",

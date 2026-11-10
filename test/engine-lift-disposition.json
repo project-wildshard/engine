@@ -8145,5 +8145,25 @@
     "sourceRevision": "886c620755a3383a793e6938b27c3fb32f39dc0c",
     "sourceBlob": "3df45cdf81ddfd22c192c22929d70e9a41a460e1",
     "retirementProof": "Individual body-reviewed J186 disposition; no execution qualification, coverage equivalence or speed claim."
+  },
+  {
+    "repo": "engine",
+    "file": "test/physics-headless.test.ts",
+    "outcome": "restored",
+    "target": "test/physics-headless.test.ts",
+    "ring": 1,
+    "decision": "Original eight real native Driftwood route cases restored unchanged. The fixed native worker installs the engine public portable math instead of importing removed @wildshard/commons. Every original leg, tick budget, whole-world ordering, stuck/out/completion/finite-position and non-quarantine assertion remains. Both native route files retain their existing native cohort assignment; the aggregate file remains pending its separate proof.",
+    "sourceRevision": "25f69574b326d00427217b77739fa702ca76e899",
+    "sourceBlob": "df4a01a71dc67e8b353f5377ffa253aca729e373",
+    "originalTests": [
+      "driftwood-isle > pier: completes native physics route without a snag",
+      "driftwood-isle > hut: completes native physics route without a snag",
+      "driftwood-isle > bridge: completes native physics route without a snag",
+      "driftwood-isle > lookout: completes native physics route without a snag",
+      "driftwood-isle > wreck: completes native physics route without a snag",
+      "driftwood-isle > cave: completes native physics route without a snag",
+      "driftwood-isle > shrine: completes native physics route without a snag",
+      "driftwood-isle > boat: completes native physics route without a snag"
+    ]
   }
 ]
