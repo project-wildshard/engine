@@ -182,7 +182,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     box.prepend(want);
     const body = make('p', 'ws-link-body'), facts = make('ul', 'ws-link-facts'), tries = make('li'), next = make('li'), holdBox = make('div', 'ws-link-hold'), holdLine = make('p'), track = make('div'), fill = make('i');
     facts.setAttribute('role', 'status'); track.append(fill); holdBox.append(holdLine, track); facts.append(tries, next);
-    body.textContent = chat ? 'The link to the world dropped. Your message is kept, marked unsent, and nothing you typed is lost.'
+    body.textContent = chat ? 'The link to the world dropped. Your latest message is kept, marked unsent; a new one replaces it.'
       : `${what} needs the world, and the link is down. We're dialling again by ourselves.`;
     const auto = make('p', 'ws-link-auto', chat ? 'It sends itself as soon as the link is back. Game taps are never sent late.'
       : 'This closes by itself when the link is back. Tap again then: we never send a tap late.');

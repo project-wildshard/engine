@@ -196,3 +196,28 @@ test('a held chat card follows a new cause too', () => {
   expect(shown('reset-blocked')?.textContent).toContain('Restarting');
   scope.dispose();
 });
+
+test('a held draft goes out once, to its own send, and an ended world drops it', () => {
+  const { scope, screens } = harness(), first: string[] = [], second: string[] = [], dropped: string[] = [];
+  screens.link('reconnecting', 'closed');
+  screens.holdChat('one', line => { first.push(line); }, () => { dropped.push('one'); });
+  screens.holdChat('two', line => { second.push(line); }, () => { dropped.push('two'); });
+  screens.link('live'); screens.link('live');
+  expect(first).toEqual([]); expect(second).toEqual(['two']); expect(dropped).toEqual(['one']);
+  screens.link('reconnecting', 'closed');
+  screens.holdChat('three', line => { first.push(line); }, () => { dropped.push('three'); });
+  screens.link('ended', 'refused'); screens.link('live');
+  expect(first).toEqual([]); expect(dropped).toEqual(['one', 'three']);
+  scope.dispose();
+});
+
+test('the hold card\'s bar is the page\'s give-up clock: full at the start, empty past 2 minutes', () => {
+  const { scope, screens, set } = harness();
+  set({ downMs: 0 }); screens.link('reconnecting', 'closed'); screens.allow('Talk');
+  const bar = (): string => shown('drop-blocked')?.querySelector<HTMLElement>('.ws-link-hold i')?.style.width ?? '';
+  expect(bar()).toBe('100%');
+  screens.allow('Talk');
+  set({ downMs: 130_000 }); screens.link('resuming', 'closed'); screens.allow('Talk');
+  expect(shown('resuming-blocked')?.querySelector<HTMLElement>('.ws-link-hold i')?.style.width).toBe('0%');
+  scope.dispose();
+});

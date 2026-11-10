@@ -73,3 +73,18 @@ test('chat, the Name box and a focused button keep their keys', () => {
   expect(press(button, 'KeyE').defaultPrevented).toBe(false);
   expect(press(button, 'ArrowLeft').defaultPrevented).toBe(false);
 });
+
+test('FM4: a failure card keeps Tab, Space and Enter for its buttons, and a key held before it opened still lets go', () => {
+  const { input } = fixture();
+  input.register({ id: 'jumper', actions: ['jump'], keys: { jump: ['Space'] } }, owners[0] ?? new Scope('x'));
+  input.push('jumper', owners[0] ?? new Scope('x'));
+  press(document.body, 'Space');
+  expect(input.held('jump')).toBe(true);
+  const card = document.createElement('div'), button = document.createElement('button');
+  card.setAttribute('role', 'alertdialog'); card.append(button); document.body.append(card);
+  for (const code of ['Tab', 'Space', 'Enter']) expect(press(button, code).defaultPrevented, code).toBe(false);
+  // the release lands on the card's button, and still reaches the game
+  expect(press(button, 'Space', {}, 'keyup').defaultPrevented).toBe(false);
+  expect(input.held('jump')).toBe(false);
+  card.remove();
+});

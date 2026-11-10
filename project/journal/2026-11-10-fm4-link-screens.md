@@ -67,3 +67,9 @@ online shell, replacing the plain strip and the raw error text.
   Enter reach a focused card button, and the dialNow test proves the
   dial comes forward. Left: a focus trap in cards, and server-side
   chat receipt in the browser proof.
+- Fifth pass (NO-GO on 1403d89): the card's key exemption also
+  swallowed the release, so a Space held before a card opened stayed
+  down. A press inside a card is the card's; a release always reaches
+  the game. Tests now pin key release, single draft delivery and the
+  bar at 0 s and past 120 s; the chat card says only the latest
+  message is kept.
