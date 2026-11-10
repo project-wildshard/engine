@@ -1840,6 +1840,60 @@
       "finishedAt": "2026-11-10T21:34:32.070Z",
       "completed": true,
       "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "c50b44aef709355f3911b928803a3caaaf094f89",
+      "tree": "e6694dd8e9318b4b52a7293637ff7ef722ad3607",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "full",
+      "files": [
+        {
+          "file": "test/land.test.ts",
+          "blob": "efb9f7aa7dca2acb8c9565ddeb2bc9f221dbc6e2",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 17,
+          "durationMs": 38827.730374000006
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:58:16.022Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
+    },
+    {
+      "schema": "push-test-timing/1",
+      "sha": "c50b44aef709355f3911b928803a3caaaf094f89",
+      "tree": "e6694dd8e9318b4b52a7293637ff7ef722ad3607",
+      "profile": "full-v1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "ring": "1",
+      "files": [
+        {
+          "file": "test/land.test.ts",
+          "blob": "efb9f7aa7dca2acb8c9565ddeb2bc9f221dbc6e2",
+          "rings": [
+            "full",
+            "1"
+          ],
+          "state": "passed",
+          "passedTests": 17,
+          "durationMs": 42666.294207000006
+        }
+      ],
+      "reason": "passed",
+      "errorCount": 0,
+      "finishedAt": "2026-11-10T21:58:59.799Z",
+      "completed": true,
+      "basis": "Actual local complete-module diagnostics, including collection/setup/environment. Bootstrap data; not a hosted Linux observation or green code proof."
     }
   ],
   "additionalFileObservations": [
