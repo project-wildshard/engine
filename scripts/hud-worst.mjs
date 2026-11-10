@@ -197,9 +197,10 @@ for (const kind of browsers) {
         const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}`;
         const context = await browser.newContext(phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } });
         // our own pages only (J148): the local build and the asset hosts it names (our Vercel blob store, *.wildshard.io); any
-        // other request, a redirect included, is refused and fails the case
+        // other request, a redirect included, fails the case. Watched, not intercepted: WebKit's request interception stalls
+        // the build's pack downloads (the Driftwood page never reached play under it, before and after A14 alike)
         /** @type {string[]} */ const refused = [];
-        await context.route('**/*', route => { const url = new URL(route.request().url()); if (OURS.test(url.hostname)) return route.continue(); refused.push(url.origin); return route.abort(); });
+        context.on('request', request => { const url = new URL(request.url()); if (/^https?:$/u.test(url.protocol) && !OURS.test(url.hostname)) refused.push(url.origin); });
         try {
           if (dev) { await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' }); }
           const page = await context.newPage();
