@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TIER, initializeTier, frameCapFps, practiceFps, frameProbe } from './tier';
 import { frameBudgetSpent, heldDrawDeferred, noteFrameDrawn, setBuildHeld } from '../../../shared/engine/core/framePacing';
-import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing, pacedSkip } from './slowGpuPacing';
+import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing, pacedSkip, slowGpuPacingFor, softwareRasterizer } from './slowGpuPacing';
 
 const initialTier = TIER, initialLocation = globalThis.location;
 
@@ -99,4 +99,26 @@ test('RT3: pacing never skips a forced frame or a held one (the held-build floor
   expect(pacedSkip(pacing, 1700, 1650, false, false)).toBe(true); // the last frame's cost has not answered yet
   expect(pacedSkip(pacing, 1650 + MAX_GAP_MS, 1650, false, false)).toBe(false); // nor ever holds a frame past the gap cap
   expect(pacedSkip(pacing, 1700, 1650, false, true)).toBe(false);
+});
+
+test('RT3: only a software rasterizer is ever paced; a real GPU the shaders step measured slow stays at its 2x scale', () => {
+  // "Render scale stays 2x on the phone (no dynamic resolution)" (Jake, 2026-10-20)
+  const real = ['Apple GPU', 'ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)',
+    'ANGLE (Apple, ANGLE Metal Renderer: Apple Paravirtual device, Unspecified Version)', 'Adreno (TM) 740', 'Mali-G78 MC24',
+    'ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 Direct3D11 vs_5_0 ps_5_0, D3D11)', 'Mesa Intel(R) UHD Graphics 620 (KBL GT2)', ''];
+  for (const name of real) {
+    expect(softwareRasterizer(name)).toBe(false);
+    expect(slowGpuPacingFor(true, name, 2)).toBeNull();
+  }
+  const software = ['ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)', 'Google SwiftShader',
+    'llvmpipe (LLVM 15.0.7, 256 bits)', 'ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0, D3D11)'];
+  for (const name of software) {
+    expect(softwareRasterizer(name)).toBe(true);
+    expect(slowGpuPacingFor(false, name, 2)).toBeNull(); // a software GPU the shaders step measured fast is not paced either
+    const pacing = slowGpuPacingFor(true, name, 2);
+    expect(pacing?.ratio).toBe(2);
+  }
+  // and a real GPU never gets a scale: there is no pacing object to lower one
+  const slowPhone = slowGpuPacingFor(true, 'Apple GPU', 2);
+  expect(slowPhone?.takeRatio() ?? null).toBeNull();
 });

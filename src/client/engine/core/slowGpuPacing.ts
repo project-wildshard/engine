@@ -15,8 +15,18 @@
  *    frame back by its excess (at most MAX_GAP_MS), so the worker messages and input it held up drain before the next.
  *    A steady frame holds nothing back: a skipped animation frame costs more than its own wait (same rig: 18 drawn frames
  *    a second unspaced, 4 when every frame left a third of the main thread free), and its read-back is short by then.
- * Nothing changes on a GPU the shaders step did not measure slow: the loop never makes one of these.
+ * Only a software rasterizer is ever paced (`softwareRasterizer`, by the unmasked renderer name): "Render scale stays 2x
+ * on the phone (no dynamic resolution)" (Jake, 2026-10-20, wildshard-singleplayer AGENTS.md), so no real GPU, phone or
+ * desktop, leaves its tier's scale, however slow its shaders step measured. A software rasterizer is no player's phone:
+ * headless CI and machines with no GPU at all.
  */
+
+/** Software rasterizers by their WebGL renderer name (WEBGL_debug_renderer_info's unmasked one where it is exposed):
+ *  SwiftShader (Chromium's headless default, ANGLE's Vulkan device), Mesa's llvmpipe and softpipe, Windows' WARP
+ *  ("Microsoft Basic Render Driver"), and Firefox's / WebKit's plain "software" names. */
+const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|microsoft basic render|\bwarp\b|software (?:rasterizer|renderer)|^software$/iu;
+/** Whether a WebGL renderer name is a software rasterizer (never a real GPU, so never a player's phone). */
+export function softwareRasterizer(renderer: string): boolean { return SOFTWARE_RENDERER.test(renderer); }
 
 /** A slow GPU's drawn frame should cost the main thread at most this long (ms). */
 export const FRAME_COST_TARGET_MS = 50;
@@ -85,6 +95,12 @@ export class SlowGpuPacing {
     this.ratio = next; this.pending = next;
     return next;
   }
+}
+
+/** The pacing for a page: only where the shaders step measured the GPU slow and the GPU is a software rasterizer; null
+ *  (the tier's scale, unpaced) on every real GPU. */
+export function slowGpuPacingFor(slowGpu: boolean, renderer: string, ratio: number): SlowGpuPacing | null {
+  return slowGpu && softwareRasterizer(renderer) ? new SlowGpuPacing(ratio) : null;
 }
 
 /** Whether the loop skips this animation frame for pacing: never a forced frame, never while the traveller is held at a

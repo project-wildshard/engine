@@ -28,3 +28,8 @@ No game check, clock, command budget, prediction ring or limit changed. Captures
 J206 review (Codex) had two must-fixes, both taken: pacing ran ahead of the held-build frame floor (now a held traveller
 is never paced: the 30 fps floor rules), and a new scale resized (and cleared) the canvas in the probe's task, so a
 still frame's backdrop could stay blank. The scale now lands at the start of the next frame that actually draws.
+
+Narrowed to software rasterizers: "Render scale stays 2x on the phone (no dynamic resolution)" (Jake, 2026-10-20,
+wildshard-singleplayer AGENTS.md). A slow shaders step alone could include a real slow phone, so pacing now also needs
+the unmasked WebGL renderer to be a software rasterizer (SwiftShader, llvmpipe/softpipe, Microsoft Basic Render/WARP).
+Every real GPU, phone or desktop, keeps its tier's scale unpaced, however slow its shaders step measured.

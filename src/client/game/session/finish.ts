@@ -161,7 +161,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     bootMark('app:first-frame-plan', { shaderMs: Math.round(shaderMs), programs: built, narrow: slowGpu });
     // LS11 (J204): a GPU this slow composites the page in software; the card covers the world until it fades
     if (slowGpu) loading.coverCanvas(game.canvas);
-    // RT3: and its frames in play are paced so its read-backs leave the main thread to worker messages and input
+    // RT3: and, on a software rasterizer only (never a real GPU: the phone stays at 2x), its frames in play are paced so
+    // its read-backs leave the main thread to worker messages and input
     if (slowGpu) game.paceSlowGpu();
     await step('firstFrame', async (p) => {
       let passes = 0;

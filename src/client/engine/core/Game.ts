@@ -37,7 +37,7 @@ import type { BackdropLayer } from '../world/backdropLayer';
 import { GradeEffect } from './Grade';
 import { VolumetricsEffect, makeNoiseTexture } from './Volumetrics';
 import { TIER, TIER_CONFIG, frameCapFps, gfxPrefs, type Tier } from './tier';
-import { SlowGpuPacing, pacedSkip } from './slowGpuPacing';
+import { pacedSkip, slowGpuPacingFor, type SlowGpuPacing } from './slowGpuPacing';
 import { worldTime } from '../../../shared/engine/core/time';
 import { installViewport, viewportHeight } from './viewport';
 import { FIXED_STEP, MAX_FIXED_STEPS } from '../../../shared/engine/core/fixedStep';
@@ -1503,17 +1503,22 @@ export class Game {
     }
   }
 
-  /** RT3: frame pacing on a GPU the shaders step measured slow (slowGpuPacing.ts); null everywhere else. */
+  /** RT3: frame pacing on a slow software rasterizer (slowGpuPacing.ts); null everywhere else. */
   private slowPacing: SlowGpuPacing | null = null;
   /** The pending cost probe of the last drawn frame: its start, or null when none is in flight. */
   private pacedStart: number | null = null;
   private pacedProbe: MessageChannel | null = null;
-  /** The pacing state on a slow GPU, for proofs; null on any other. */
+  /** The pacing state on a slow software rasterizer, for proofs; null on any other GPU. */
   get pacing(): Readonly<SlowGpuPacing> | null { return this.slowPacing; }
-  /** RT3: pace this page's frames to a slow GPU (finish.ts, after its shaders step measured one). Idempotent. */
+  /** RT3: pace this page's frames to a slow software rasterizer (finish.ts, after its shaders step measured the GPU slow).
+   *  A real GPU keeps its tier's scale unpaced (slowGpuPacingFor). Idempotent. */
   paceSlowGpu(): void {
     if (this.slowPacing !== null || this.dead) return;
-    const pacing = new SlowGpuPacing(this.renderer.getPixelRatio()), channel = new MessageChannel();
+    const gl = this.renderer.getContext(), info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name: unknown = info === null ? gl.getParameter(gl.RENDERER) : gl.getParameter(info.UNMASKED_RENDERER_WEBGL);
+    const pacing = slowGpuPacingFor(true, typeof name === 'string' ? name : '', this.renderer.getPixelRatio());
+    if (pacing === null) return;
+    const channel = new MessageChannel();
     this.slowPacing = pacing; this.pacedProbe = channel;
     // the first task after the frame: the frame's rAF work, its read-back and whatever input it held up have all run
     channel.port1.onmessage = () => {
