@@ -30,6 +30,34 @@
   "unmeasuredFileBoundSeconds": 60,
   "additionalFileObservations": [
     {
+      "file": "src/client/engine/boot/diagnostics-summary.test.ts",
+      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
+      "run": "42738124187",
+      "artifact": 13728480838,
+      "report": "shard-1-ordinary.json",
+      "measuredAt": 1794275531888,
+      "durationMs": 594.787261,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks; exact source body matches this forward. Both are pure happy-dom diagnostics/cache fixtures, with identical ring environments and no pinned product or catalogue branch. Other unknowns retain sixty seconds; no planner, scheduler, cap, policy or deadline changes."
+    },
+    {
+      "file": "test/spawn-check-lanes.test.ts",
+      "sha": "7a23966d66b493c1576b257a51a96b6d1563b2dd",
+      "run": "42738124187",
+      "artifact": 13728292220,
+      "report": "shard-5-ordinary.json",
+      "measuredAt": 1794275571372,
+      "durationMs": 804.7169220000001,
+      "appliedTo": [
+        "full",
+        "ring1"
+      ],
+      "basis": "Passed Linux Ring1 complete module clock includes collection, setup, environment and cases/hooks; exact source body matches this forward. Both are pure happy-dom diagnostics/cache fixtures, with identical ring environments and no pinned product or catalogue branch. Other unknowns retain sixty seconds; no planner, scheduler, cap, policy or deadline changes."
+    },
+    {
       "file": "test/package-input-boundary.test.ts",
       "sha": "7c1e029abbfc6859fc2ccb7130e2d75e66885993",
       "run": "42730613947",
