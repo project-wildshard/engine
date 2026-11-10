@@ -42,6 +42,8 @@ const label = arg('label', 'shot'), out = resolve(arg('out', join(homedir(), '.c
 const browsers = arg('browsers', 'chromium,webkit').split(','), sizes = arg('sizes', '402x874,402x654,874x402,1440x900').split(',');
 const modes = arg('dev', 'off,on').split(','), check = process.argv.includes('--check'), menu = process.argv.includes('--menu'), states = process.argv.includes('--states');
 const chatRev = arg('chat-rev', '');
+/** QA row 43's calm corner is in the chat modules drawn: this tree's, or a --chat-rev that has chatCorner.ts */
+let calmChat = chatRev === '';
 /** the hosts a local build loads from: itself, our Vercel blob store and our own domain (J148) */
 const OURS = /^(?:127\.0\.0\.1|localhost|[a-z0-9]+\.public\.blob\.vercel-storage\.com|(?:[a-z0-9-]+\.)*wildshard\.io)$/u;
 mkdirSync(out, { recursive: true });
@@ -58,7 +60,10 @@ async function chatBundle(rev) {
     mkdirSync(join(dir, 'src'), { recursive: true });
     for (const file of ['chatLines.ts', 'voiceUi.ts', 'voice.ts', 'chatCorner.ts']) {
       // chatCorner.ts is QA row 43's: a rev from before it has none, and its chatLines.ts doesn't import it
-      try { writeFileSync(join(dir, 'src', file), execFileSync('git', ['show', `${rev}:src/client/host/online/${file}`], { stdio: ['ignore', 'pipe', 'ignore'] })); } catch (error) { if (file !== 'chatCorner.ts') throw error; }
+      try {
+        writeFileSync(join(dir, 'src', file), execFileSync('git', ['show', `${rev}:src/client/host/online/${file}`], { stdio: ['ignore', 'pipe', 'ignore'] }));
+        if (file === 'chatCorner.ts') calmChat = true;
+      } catch (error) { if (file !== 'chatCorner.ts') throw error; }
     }
     const text = readFileSync(entry, 'utf8').replaceAll('../../src/client/host/online/', './src/').replace('../../src/shared/engine/app/scope.ts', resolve('src/shared/engine/app/scope.ts'));
     entry = join(dir, 'chat.ts'); writeFileSync(entry, text);
@@ -210,7 +215,8 @@ async function stateShots(page, name, phone, dev, written, problems) {
   console.log(`  chat open: ${opened.open ? 'expanded' : 'not expanded'}, ${String(opened.shownLines)} lines, players list ${opened.peers ? 'shown' : 'hidden'}`);
   // a tap outside the chat (not on a control: the page itself). A build from before QA row 43 has no open chat to close and
   // never lets the field go on its own: it is let go here, as a phone's keyboard would, so its boost shots can run
-  const calm = opened.open;
+  const calm = calmChat;
+  if (calm && !opened.open) problems.push('focusing the input did not open the chat');
   await page.evaluate(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); });
   if (!calm) await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
   await page.waitForTimeout(400);

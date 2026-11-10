@@ -72,3 +72,4 @@ chat overlay that takes up way more space ... not a modal."
   amber: the outline-only amber was easy to miss on the phone shots.
 - New test files' clocks recorded with `push-preflight.mjs timings`.
 - Re-clocked chat-corner.test.ts after the review fix changed it.
+- Re-review (17f99d8..2a7ae41): its timing MUST was already fixed by the re-clock; its SHOULD done: hud-worst now expects the chat to open whenever the drawn modules have chatCorner.ts.
