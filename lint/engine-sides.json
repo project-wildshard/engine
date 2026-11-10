@@ -158,6 +158,7 @@
     "src/client/engine/core/scopedCpu.ts": "client",
     "src/client/engine/core/scopedWorkerPool.ts": "client",
     "src/client/engine/core/shadowLayer.ts": "client",
+    "src/client/engine/core/slowGpuPacing.ts": "client",
     "src/client/engine/core/tier.ts": "client",
     "src/client/engine/core/Tour.ts": "client",
     "src/client/engine/core/viewport.ts": "client",

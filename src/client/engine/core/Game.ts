@@ -37,6 +37,7 @@ import type { BackdropLayer } from '../world/backdropLayer';
 import { GradeEffect } from './Grade';
 import { VolumetricsEffect, makeNoiseTexture } from './Volumetrics';
 import { TIER, TIER_CONFIG, frameCapFps, gfxPrefs, type Tier } from './tier';
+import { MAX_GAP_MS, SlowGpuPacing } from './slowGpuPacing';
 import { worldTime } from '../../../shared/engine/core/time';
 import { installViewport, viewportHeight } from './viewport';
 import { FIXED_STEP, MAX_FIXED_STEPS } from '../../../shared/engine/core/fixedStep';
@@ -1502,6 +1503,40 @@ export class Game {
     }
   }
 
+  /** RT3: frame pacing on a GPU the shaders step measured slow (slowGpuPacing.ts); null everywhere else. */
+  private slowPacing: SlowGpuPacing | null = null;
+  /** The pending cost probe of the last drawn frame: its start, or null when none is in flight. */
+  private pacedStart: number | null = null;
+  private pacedProbe: MessageChannel | null = null;
+  /** The pacing state on a slow GPU, for proofs; null on any other. */
+  get pacing(): Readonly<SlowGpuPacing> | null { return this.slowPacing; }
+  /** RT3: pace this page's frames to a slow GPU (finish.ts, after its shaders step measured one). Idempotent. */
+  paceSlowGpu(): void {
+    if (this.slowPacing !== null || this.dead) return;
+    const pacing = new SlowGpuPacing(this.renderer.getPixelRatio()), channel = new MessageChannel();
+    this.slowPacing = pacing; this.pacedProbe = channel;
+    // the first task after the frame: the frame's rAF work, its read-back and whatever input it held up have all run
+    channel.port1.onmessage = () => {
+      const start = this.pacedStart;
+      this.pacedStart = null;
+      if (start === null || this.dead || this.app.clock.mode === 'capture') return;
+      const ratio = pacing.measured(start, diagnosticNow() - start);
+      if (ratio !== null) { this.renderer.setPixelRatio(ratio); this.resize(); }
+    };
+    this.engineScope.onDispose(() => { channel.port1.onmessage = null; channel.port1.close(); channel.port2.close(); this.pacedProbe = null; });
+  }
+  /** Draw unpaced at the tier's own scale (a capture). */
+  private unpaced(): null {
+    const pacing = this.slowPacing;
+    if (pacing !== null && pacing.ratio !== pacing.maxRatio) { pacing.ratio = pacing.maxRatio; this.renderer.setPixelRatio(pacing.maxRatio); this.resize(); }
+    return null;
+  }
+  private measurePacedFrame(start: number): void {
+    if (this.pacedStart !== null || this.pacedProbe === null) return;
+    this.pacedStart = start;
+    this.pacedProbe.port2.postMessage(0);
+  }
+
   resize(): void {
     const w = window.innerWidth, h = viewportHeight();
     this.camera.aspect = w / h;
@@ -1537,6 +1572,11 @@ export class Game {
       if (now !== undefined) { if (now === lastNow) return; lastNow = now; }
       if (this.dead) return; // a core system died (faults.ts): the fatal modal is up, nothing more to draw
       lastRun = diagnosticNow();
+      // RT3: on a GPU the shaders step measured slow, the last frame's spacing (slowGpuPacing.ts) leaves the main thread to
+      // worker messages and input; like a capped vsync, a skipped one does nothing
+      // A capture draws at the tier's own scale on its own clock: no spacing, and any lowered scale restored
+      const pacing = this.app.clock.mode === 'capture' ? this.unpaced() : this.slowPacing;
+      if (pacing !== null && !forceFrame && (!pacing.ready(lastRun) || this.pacedStart !== null && lastRun - this.pacedStart < MAX_GAP_MS)) return;
       // G782: held at a cell's wall with build slices running, skip vsyncs up to the 30 fps held floor (framePacing.ts);
       // like a capped vsync, a skipped one does nothing, so the drawn frame's dt is the whole interval
       if (!forceFrame && heldDrawDeferred()) return;
@@ -1607,6 +1647,7 @@ export class Game {
       const done = diagnosticNow(), work = done - lastRun;
       noteFrameDrawn(done, now, cap, cap > 0 && Number.isFinite(lastDrawn) ? lastDrawn : undefined); // Builds share the cap recovery deadline; actual rAF still measures display cadence.
       this.app.cpu.end();
+      if (pacing !== null) this.measurePacedFrame(lastRun);
       this.workMs[this.frameI] = work;
       this.frameRafTime = now ?? null;
       this.frameCount++;
