@@ -62,6 +62,7 @@ try{
   console.log(JSON.stringify({infrastructureFailure:true,lanesBlamed:0,gates:0,seconds:(performance.now()-began)/1000}));
  }else{
  assert.deepEqual(results.map(row=>row.state),rejected?['pushed','failed','pushed','pushed']:['pushed','pushed','pushed','pushed'],JSON.stringify(results.map(row=>({id:row.id,state:row.state,error:row.error}))));
+ /** @type {{tree:string,files:string[],values:number[]}[]} */
  const rows=readFileSync(observed,'utf8').trim().split('\n').map(line=>JSON.parse(line));
  for(const result of results.filter(row=>row.state==='pushed')){
   assert.equal(git(repo,['--git-dir',remote,'rev-parse',`${result.sha}^{tree}`]),result.tree);
