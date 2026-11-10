@@ -453,7 +453,8 @@ jobs:
           # An explicit recovery can name a tree from before the worker: it ships what it built.
           if [ ! -f scripts/cook-worker.mjs ]; then echo "no cook worker at the pin"; exit 0; fi
           pnpm install --frozen-lockfile
-          export WILDSHARD_BUILD="$(node -p "JSON.parse(require('node:fs').readFileSync('../.vercel/output/static/version.json','utf8')).build")"
+          WILDSHARD_BUILD="$(node -p "JSON.parse(require('node:fs').readFileSync('../.vercel/output/static/version.json','utf8')).build")"
+          export WILDSHARD_BUILD
           node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs recook
           node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs bake ../.vercel/output/static "$WILDSHARD_PACKS_ORIGIN"
           # The build's gate ran before the bake rewrote the book: this one reads the rows phones get.
@@ -880,9 +881,9 @@ jobs:
           mkdir -p tmp/ci-native-escape
           node scripts/warm-native-chrome.mjs > tmp/ci-native-escape/warm-read.json
           cat tmp/ci-native-escape/warm-read.json
-      - name: Run the original native Escape controls alone
+      - name: Run original Escape and host transport controls without siblings
         if: matrix.group == 'escape-titan'
-        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/tooling/parity/browser-escape.test.mjs --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/results.json
+        run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/tooling/parity/browser-escape.test.mjs test/sim-transport.test.ts --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/results.json
       - name: Run the complete Titan file without sibling workers
         if: ${{ !cancelled() && steps.native-inputs.outcome == 'success' && matrix.group == 'escape-titan' }}
         run: python3 scripts/ci-fail-fast.py -- python3 scripts/heavy-lane.py check -- pnpm exec vitest run test/nalati-titan-verbs.test.ts --passWithNoTests --config scripts/vitest-native-escape.config.ts --maxWorkers=1 --bail=0 --reporter=default --reporter=json --outputFile=tmp/ci-native-escape/sim-results.json

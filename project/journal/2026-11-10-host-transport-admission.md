@@ -27,3 +27,18 @@ retains1201full files/12shards/max233.978383s and1117Ring1files/8shards/
 max224.816376s, including setup and the unchanged factor/headroom rules.
 Actual phase discovery, normal full push and hosted successor follow;
 no Linux repair or complete-row claim is made before those receipts.
+
+The one-shot review has no MUST and one actionable SHOULD: the legacy
+nightly deploy config also excludes every native group but dispatches a
+fixed list. Without a follow-up this new member would disappear there.
+Actual legacy ordinary discovery omits it, old native commands name none,
+and the amended existing Escape command discovers exactly Escape plus
+transport. No job is added; both original controls run with one worker.
+The legacy source had an existing actionlint SC2155 export-assignment
+warning. Separate assignment/export preserves the command failure status
+instead of masking it; actionlint passes without an ignore or bypass.
+
+The first phase-membership probes correctly refused after I advanced
+HEAD during their run. On the stable committed tree, both actual phase
+proofs pass1201/12 and1117/8, including duplicate/incomplete refusal.
+That verification race was mine, not a transport or planner regression.
