@@ -118,6 +118,18 @@ function parkedDrawables(root: THREE.Object3D, camera: THREE.Camera, reveal: Set
   });
 }
 
+/**
+ * DL23 (J198, "warm shaders before control"): what `Game.firstFrame`'s parked warm will draw over `root` from `camera`,
+ * the same inventory `warmParkedDraws` takes: every shown drawable in or out of the view, and one hidden drawable per
+ * pipeline none of them covers. The boot's shaders step links exactly their programs; a census of the view and its warm
+ * turns left 25 of Nalati's to link synchronously inside the parked draws (desktop WebKit), and the iPhone Simulator's
+ * first-frame step drew frames of 348-866 ms against the 250 ms bar.
+ */
+export function firstFrameDrawables(root: THREE.Object3D, camera: THREE.Camera): (object: THREE.Object3D) => boolean {
+  const drawn = new Set<THREE.Object3D>(parkedDrawables(root, camera, new Set()));
+  return object => drawn.has(object);
+}
+
 /** Slice size: at most this many drawables, at most this many materials not drawn by an earlier slice, and (optional)
  * at most this many bytes of vertex/index/instance buffers no earlier slice uploaded; a larger single drawable goes alone. */
 export interface ParkedDrawBudget { readonly drawables: number; readonly newMaterials: number; readonly bufferBytes?: number;

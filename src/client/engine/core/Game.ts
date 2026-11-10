@@ -1220,6 +1220,13 @@ export class Game {
     } finally { thaw?.(); }
   }
 
+  /** DL23 (J198): the boot shaders step's census, exactly what `firstFrame`'s parked warm will draw (`firstFrameDrawables`
+   *  over the same root and camera), so no program of it links synchronously inside a parked draw. */
+  async firstFrameCensus(): Promise<(object: THREE.Object3D) => boolean> {
+    const { firstFrameDrawables } = await import('../render/parkedDraws');
+    return firstFrameDrawables(this.rootScene, this.camera);
+  }
+
   /**
    * The first frames, as a step: every visible drawable's first draw (its pipelines, buffers and shadow-depth variants)
    * a slice at a time into a 1×1 scissor, then the world draw, the warm turns, and the full composer one pass at a time

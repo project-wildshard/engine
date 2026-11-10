@@ -144,14 +144,16 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       bootMark('app:first-game-step-end');
       // A six-material job exceeded the loading text's one-second update
       // budget at phone CPU speed. Use the existing one-material sliced path.
-      // PL6: and what the first frame's warm turns show, so none of it builds and links inside that frame
+      // PL6, DL23: and everything the first frame's parked warm draws (out of view, hidden alternates), so none of it
+      // builds and links inside that frame
       // DL10: not paced on WebKit, even with Debug 'Early shader compile' on. Its baked list leaves these links compiled in
       // the GPU process, and one program a painted frame then only stretched the step (Nine Sim cold, 266f9ea939: issue
       // 1.2 s of a 3.0 s step) without shortening its longest frame (824 ms paced vs 908 ms unpaced, both in texture uploads)
+      const firstFrame = await game.firstFrameCensus();
       await precompileLevel(game, (d, n, what) => {
         bootMark('app:shader-work-count', { done: d, total: n, detail: what });
         p.set(d, n, `${what} · ${programs()}`);
-      }, { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, turns: game.warmTurnYaws() });
+      }, { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, firstFrame });
     });
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during shader compile');
     const shaderMs = diagnosticNow() - shadersAt, built = (game.renderer.info.programs?.length ?? 0) - programsBefore;

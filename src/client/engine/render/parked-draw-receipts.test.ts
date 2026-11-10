@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import { Bone, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, InstancedMesh, Mesh, MeshBasicMaterial, PCFShadowMap, PerspectiveCamera, Scene, Skeleton,
+import { Bone, BoxGeometry, BufferGeometry, Color, Float32BufferAttribute, Group, InstancedMesh, Mesh, MeshBasicMaterial, PCFShadowMap, PerspectiveCamera, Scene, Skeleton,
   SkinnedMesh, Uint16BufferAttribute, Vector4, WebGLRenderTarget, type Camera, type Material, type Object3D } from 'three';
-import { warmParkedDraws, type ParkedDrawBudget, type ParkedDrawRenderer } from './parkedDraws';
+import { firstFrameDrawables, warmParkedDraws, type ParkedDrawBudget, type ParkedDrawRenderer } from './parkedDraws';
 import { drawNeutral } from './drawNeutral';
 
 /** The slicing rules at one native unit a slice (the WebKit live budget before G782 raised it to two, D152). */
@@ -47,7 +47,7 @@ function fixture(materials: readonly Material[]) {
   };
   /** precompile's link: the material holds the program its entry draw will use before any parked draw */
   const compile = (material: Material, id: number): void => { renderer.properties.get(material).currentProgram = { id }; };
-  return { root, draws, plans, warm, compile, dispose: () => { target.dispose(); } };
+  return { root, camera, draws, plans, warm, compile, dispose: () => { target.dispose(); } };
 }
 
 function uploadGeometry(bytes: number): BufferGeometry {
@@ -247,4 +247,25 @@ test('a known program under different blending is a new pipeline; the same state
     // the opaque pair shares one slice (same program and state); the blended material builds its own pipeline
     expect(await f.warm(ONE_UNIT)).toEqual({ drawn: 3, pauses: 2 });
   } finally { f.dispose(); for (const geometry of geometries) geometry.dispose(); for (const material of [opaque, copy, blended]) material.dispose(); }
+});
+
+test('DL23: the boot census is exactly what the parked warm draws: out of view, one hidden twin, no other layer', async () => {
+  const shown = new MeshBasicMaterial(), far = new MeshBasicMaterial(), twin = new MeshBasicMaterial(), other = new MeshBasicMaterial();
+  const f = fixture([shown, far, twin, other]), geometry = new BoxGeometry(), alternates = new Group();
+  const front = new Mesh(geometry, shown), behind = new Mesh(geometry, far), plain = new InstancedMesh(geometry, twin, 2), coloured = new InstancedMesh(geometry, twin, 2), layered = new Mesh(geometry, other);
+  front.position.set(0, 0, -5); behind.position.set(0, 0, 50); layered.position.set(0, 0, -5); layered.layers.set(3);
+  coloured.setColorAt(0, new Color(1, 0, 0)); plain.count = 0;
+  alternates.visible = false; alternates.add(plain, coloured);
+  const objects = [front, behind, plain, coloured, layered];
+  try {
+    f.root.add(front, behind, layered, alternates); f.root.visible = true; f.root.updateMatrixWorld(true);
+    const census = firstFrameDrawables(f.root, f.camera);
+    const selected = objects.filter(census);
+    await f.warm({ drawables: 8, newMaterials: 8 });
+    // every census pick draws, and nothing draws that the census left out (G743's one hidden twin per pipeline)
+    expect(new Set(f.draws.flat())).toEqual(new Set(selected));
+    expect(selected).toContain(front); expect(selected).toContain(behind); expect(selected).not.toContain(layered);
+    expect(selected.filter(object => object === plain || object === coloured)).toHaveLength(1);
+    expect(alternates.visible).toBe(false); expect(plain.count).toBe(0);
+  } finally { f.dispose(); geometry.dispose(); for (const material of [shown, far, twin, other]) material.dispose(); plain.dispose(); coloured.dispose(); }
 });

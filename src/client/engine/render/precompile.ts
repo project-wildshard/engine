@@ -1702,6 +1702,10 @@ export async function precompileLevel(game: Pick<Game, 'renderer' | 'camera' | '
     arrival?: (object: THREE.Object3D) => boolean;
     /** PL6: with `drawnOnly`, the yaws the first frame's warm turns draw (`Game.warmTurnYaws`): what they show counts as drawn. */
     turns?: readonly number[];
+    /** DL23 (J198): with `drawnOnly`, scene programs for exactly what the boot's first frame draws (`parkedDraws`
+     *  `firstFrameDrawables`) instead of the camera's view and turns: left out, they linked synchronously inside its
+     *  parked draws. */
+    firstFrame?: (object: THREE.Object3D) => boolean;
     /** Scene and exterior programs ordered by the camera's distance to what draws them, nearest first (the after-control
      *  warm-up: what the player reaches soonest links soonest). */ nearest?: boolean } = {}): Promise<number> {
 
@@ -1762,7 +1766,8 @@ export async function precompileLevel(game: Pick<Game, 'renderer' | 'camera' | '
     const roots = options.sceneOnly === true && options.futureLighting !== undefined ? [options.futureLighting, game.camera] : [scene];
     const { jobs, materials } = policy?.scene === false ? { jobs: [], materials: 0 }
       : live || drawnOnly
-        ? await pacedSceneJobs(scene, rt, per, roots, excludedRoots, options.current ?? (() => true), pageScope, options.arrival ?? (drawnOnly ? drawnFrom(game.camera, options.futureLighting, options.turns) : undefined), from)
+        ? await pacedSceneJobs(scene, rt, per, roots, excludedRoots, options.current ?? (() => true), pageScope, options.arrival
+          ?? (drawnOnly ? options.firstFrame ?? drawnFrom(game.camera, options.futureLighting, options.turns) : undefined), from)
         : sceneJobs(scene, rt, per, roots, excludedRoots);
     // Diagnostic split: the entered root's own materials, else the rest of the page compiled under its lights.
     const entered = new Set<THREE.Material>();
