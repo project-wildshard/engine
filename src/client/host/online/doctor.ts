@@ -138,8 +138,9 @@ async function checkPacks(config: DoctorConfig, learned: Learned, ms: number): P
     const named = Object.keys(shards), product = named.find(name => name === config.cell) ?? named[0];
     const part = product === undefined ? undefined : shards[product]?.url;
     if (product === undefined || part === undefined) { learned.packsMissing = true; return fail(`book has no shards`, 'The server book for this build is empty. The pack publish is incomplete: tell Jake.'); }
-    // A part's headers are enough: the body is the server's to read, so the doctor stops at the status.
-    const status = await limited(learned.scope, ms, async signal => { const response = await fetch(new URL(part, origin), { signal }); void response.body?.cancel(); return response.status; });
+    // A part's headers are enough. HEAD avoids starting and then cancelling the
+    // server's large body, which browsers report as a failed network request.
+    const status = await limited(learned.scope, ms, async signal => { const response = await fetch(new URL(part, origin), { method: 'HEAD', signal }); return response.status; });
     if (status !== 200) { learned.packsMissing = status === 404; return fail(`${product} part ${String(status)}`, 'A pack part is missing on the packs origin. The pack publish is incomplete: tell Jake.'); }
     return pass(`server book · ${String(Object.keys(shards).length)} shards · ${product} part ok`);
   } catch (error) {

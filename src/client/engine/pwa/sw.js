@@ -100,15 +100,20 @@ workerScope.listen(self, 'install', event => {
 // would hold the precache to the limit on every visit (DL1): a worker's fetch neither pauses it nor counts as a loader.
 const PRECACHE_LANES = 6, PAUSE_LIMIT_MS = 60_000;
 let precaching, paused = false, resume = () => undefined, pauses = 0;
-const inflight = new Set(), controlled = new Set(), loading = new Set(), workers = new Map();
-function isWorker(id) {
+const inflight = new Set(), controlled = new Set(), loading = new Set(), nonLoadingClients = new Map();
+/** @param {URL} url */
+const isDoctorDocument = url => url.origin === self.location.origin
+  && (url.pathname === '/doctor' || url.pathname === '/doctor/' || url.pathname === '/doctor/index.html'
+    || (url.pathname === '/' || url.pathname === '/index.html') && url.searchParams.has('doctor'));
+function isNonLoadingClient(id) {
   if (typeof self.clients?.get !== 'function') return Promise.resolve(false);
-  let known = workers.get(id);
-  if (known === undefined) { known = self.clients.get(id).then(client => client?.type === 'worker', () => false); workers.set(id, known); }
+  let known = nonLoadingClients.get(id);
+  if (known === undefined) { known = self.clients.get(id).then(client => client?.type === 'worker'
+    || client?.type === 'window' && isDoctorDocument(new URL(client.url)), () => false); nonLoadingClients.set(id, known); }
   return known;
 }
 async function pauseForClient(id) {
-  if (typeof id === 'string' && id !== '' && await isWorker(id)) return;
+  if (typeof id === 'string' && id !== '' && await isNonLoadingClient(id)) return;
   pausePrecache(id);
 }
 function pausePrecache(client) {
@@ -265,6 +270,10 @@ async function cached(request, name, event) {
 
 workerScope.listen(self, 'fetch', event => {
   const request = event.request, url = new URL(request.url);
+  // A diagnostic document must reach its own host route, not the cached game
+  // shell. It owns no game loader and must not pause the game's precache.
+  const doctor = request.mode === 'navigate' && isDoctorDocument(url);
+  if (doctor) return;
   // A loading page (a navigation, or a client that has not reported control) gets the link: the precache waits.
   if (request.mode === 'navigate') pausePrecache(event.resultingClientId);
   else if (!controlled.has(event.clientId)) event.waitUntil(pauseForClient(event.clientId));

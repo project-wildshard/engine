@@ -11,8 +11,12 @@ const channel=human?'production':'staging',releaseURL=`https://wildshard-packs.w
 /** @param {string|URL} url */
 async function read(url){const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,String(url));return response;}
 const version=await(await read(new URL('/version.json',base))).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,1);
-const root=await(await read(new URL('/?doctor',base))).text(),document=await(await read(new URL('/doctor/',base))).text();
+const root=await(await read(new URL('/',base))).text(),document=await(await read(new URL('/doctor/',base))).text();
 assert.ok(root.includes('data-doctor-door'));
+const door=await fetch(new URL('/?doctor&chunk=driftwood-isle&from=link',base),{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(15000)});
+assert.equal(door.status,307,'Doctor entry must redirect before any game HTML');
+const redirectLocation=door.headers.get('location');assert.ok(redirectLocation!==null);const destination=new URL(redirectLocation,base);
+assert.equal(destination.origin,origin);assert.equal(destination.pathname,'/doctor/');assert.equal(destination.searchParams.get('sw'),'0');assert.equal(destination.searchParams.get('chunk'),'driftwood-isle');assert.equal(destination.searchParams.get('from'),'link');
 const worldText=/globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(document)?.[1];assert.ok(worldText,'Doctor needs a release stamp');const world=JSON.parse(worldText);assert.equal(world.release,releaseURL);assert.equal(world.key,key);
 const scripts=[...document.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map(match=>match[1]);assert.ok(scripts.length>0,'Doctor entry must be build scoped');assert.ok(scripts.every(path=>path!==undefined&&path.startsWith(`/b/${build}/doctor/`)),'Every external Doctor script must be build scoped');for(const path of scripts){assert.ok(path!==undefined);await read(new URL(path,base));}
 const signed=await(await read(releaseURL)).json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));

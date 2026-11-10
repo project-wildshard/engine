@@ -1,6 +1,20 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "pnpm build",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "query", "key": "doctor" }],
+      "destination": "/doctor/?sw=0",
+      "permanent": false
+    },
+    {
+      "source": "/index.html",
+      "has": [{ "type": "query", "key": "doctor" }],
+      "destination": "/doctor/?sw=0",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
