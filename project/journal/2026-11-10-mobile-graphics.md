@@ -39,3 +39,5 @@ graphics", and "with low, you can just do… 1 time and 1 time".
   reaching engine/render: devPixels and graphicsMode moved to core/, and
   the title tells a phone by mobileDevice (boot/titleArrival.ts) instead
   of core/tier (which loads the render tables).
+- The gate's new-test timing step: recorded the real clocks job 266 saved
+  for dev-pixels, graphics-mode and first-play tests.
