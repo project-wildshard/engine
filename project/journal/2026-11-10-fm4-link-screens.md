@@ -77,3 +77,6 @@ online shell, replacing the plain strip and the raw error text.
   Shift+Tab inside its buttons and hands focus back (to the chat box,
   say) when the link returns; the browser proof now waits for the held
   line to come back through the server's room chat, exactly once.
+- Review of 16c993b (NO-GO): the Tab ring skipped the Details summary.
+  It now covers every enabled button and the summary, wraps both ways,
+  and pulls focus back in from outside the card.

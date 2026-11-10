@@ -112,11 +112,13 @@ function card(scope: Scope, ids: string, tone: 'info' | 'warn' | 'bad', tag: str
   // aria-modal: Tab and Shift+Tab go round the card's own buttons (InputService leaves Tab to an alertdialog)
   scope.listen(root, 'keydown', event => {
     if (!(event instanceof KeyboardEvent) || event.code !== 'Tab') return;
-    const all = [...root.querySelectorAll('button')].filter(button => !button.disabled);
-    const first = all[0], last = all.at(-1);
-    if (first === undefined || last === undefined) return;
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    // everything Tab can reach in the card: its enabled buttons and the Details summary
+    const all = [...root.querySelectorAll<HTMLElement>('button, summary')].filter(node => !(node instanceof HTMLButtonElement && node.disabled));
+    const first = all[0], last = all.at(-1), at = document.activeElement;
+    if (first === undefined || last === undefined) { event.preventDefault(); return; }
+    const inside = at instanceof HTMLElement && all.includes(at);
+    if (event.shiftKey && (at === first || !inside)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (at === last || !inside)) { event.preventDefault(); first.focus(); }
   });
   return { root, box };
 }

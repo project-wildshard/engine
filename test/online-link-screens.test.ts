@@ -237,3 +237,21 @@ test('a card keeps Tab inside its buttons, and hands focus back when the link re
   expect(document.activeElement).toBe(field);
   scope.dispose();
 });
+
+test('the card\'s Tab ring includes Details and wraps both ways; focus falls back to nothing when its old home is gone', () => {
+  const { scope, screens } = harness(), field = document.createElement('input');
+  document.body.append(field); field.focus();
+  screens.link('lost');
+  const card = shown('lost'), ring = [...card?.querySelectorAll<HTMLElement>('button, summary') ?? []];
+  expect(ring.at(-1)?.tagName).toBe('SUMMARY');
+  const key = (target: HTMLElement | undefined, shiftKey: boolean): KeyboardEvent => { const event = new KeyboardEvent('keydown', { code: 'Tab', shiftKey, bubbles: true, cancelable: true }); target?.dispatchEvent(event); return event; };
+  ring.at(-1)?.focus(); expect(key(ring.at(-1), false).defaultPrevented).toBe(true); expect(document.activeElement).toBe(ring[0]);
+  expect(key(ring[0], true).defaultPrevented).toBe(true); expect(document.activeElement).toBe(ring.at(-1));
+  // a stop card replaced by the banner on Try again, then the link back: focus returns to the field it came from
+  screens.link('reconnecting', 'closed'); screens.link('live');
+  expect(document.activeElement).toBe(field);
+  // the field is gone by the next card's end: nothing to return to, and nothing throws
+  screens.link('lost'); field.remove(); screens.link('reconnecting', 'closed'); screens.link('live');
+  expect(document.activeElement === field).toBe(false);
+  scope.dispose();
+});
