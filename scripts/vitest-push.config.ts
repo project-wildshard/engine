@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 /** Finish the cheapest related files before the shared push deadline. */
 export class PushSequencer extends BaseSequencer {
   override sort(files: TestSpecification[]): Promise<TestSpecification[]> {
-    const root = this.ctx.config.root, durations = readDurations(root);
+    const root = this.ctx.config.root, durations = readDurations();
     const name = (spec: TestSpecification): string => relative(root, spec.moduleId);
     return Promise.resolve([...files].sort((a, b) =>
       (durations?.get(name(a)) ?? 1) - (durations?.get(name(b)) ?? 1) || name(a).localeCompare(name(b))));

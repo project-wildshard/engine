@@ -5,6 +5,7 @@ import {dirname,relative,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import * as v from 'valibot';
 import {packShards} from './test-shard-plan.ts';
+import {DEFAULT_SECONDS,readWeights} from './test-timings.mjs';
 import {CI_NATIVE_GROUPS} from './vitest-ci-files.ts';
 
 const number=v.pipe(v.number(),v.finite(),v.minValue(0));
@@ -13,12 +14,12 @@ const paths=v.array(v.string());
 const schema=v.object({version:v.literal(1),sha:v.string(),ring:v.picklist(['full','1']),inventoryHash:v.string(),
   files:paths,unknown:paths,count:positive,setupSeconds:number,factor:number,
   curve:v.array(v.object({count:positive,seconds:number,gain:number})),
-  shards:v.array(v.object({index:positive,native:paths,ordinary:paths,expectedSeconds:number}))});
+  shards:v.array(v.object({index:positive,native:paths,ordinary:paths,expectedSeconds:number})),
+  timings:v.optional(v.picklist(['measured','default']))});
 export type EnginePlan=v.InferOutput<typeof schema>;
 interface PlanEnvironment extends NodeJS.ProcessEnv {WILDSHARD_RING?:string}
-const weightsSchema=v.record(v.string(),number);
-const timingSource=v.object({run:v.string(),wallSeconds:number,fileSeconds:number,calibration:v.optional(v.object({factor:number,setupSeconds:number}))});
-const metadata=v.object({full:timingSource,ring1:timingSource});
+/** Linux CI wall per measured file-second and per-shard setup, calibrated on run 42501721151 (full and Ring 1). */
+const CALIBRATION=Object.freeze({factor:1.35,setupSeconds:70});
 const digest=(files:readonly string[]):string=>createHash('sha256').update(JSON.stringify([...files].sort())).digest('hex');
 
 /** Discover configured paths, without collecting or executing a test. */
@@ -44,11 +45,13 @@ export function readEnginePlan(file:string,expected?:readonly string[]):EnginePl
 }
 
 export function createEnginePlan(ring:'full'|'1',files:readonly string[]):EnginePlan{
-  const baseline=v.parse(weightsSchema,JSON.parse(readFileSync(ring==='1'?'test/durations-ring1.json':'test/durations.json','utf8')) as unknown);
-  const source=v.parse(metadata,JSON.parse(readFileSync('test/durations-source.json','utf8')) as unknown)[ring==='1'?'ring1':'full'];
+  // LS2 (J250): the weights are main's last measured run (scripts/test-timings.mjs), not a committed file.
+  const baseline=readWeights(ring),measured=Object.keys(baseline).length>0;
   // An unmeasured file must satisfy the existing sixty-second CI file gate.
   // A median made the new real 20/40-second socket proofs nearly free.
-  const fallback=60;
+  // With no table at all every file is the measured median, and the run takes every shard it may.
+  const fallback=measured?60:DEFAULT_SECONDS;
+  if(!measured)console.log('::warning title=No test timings::No Actions cache or main artifact; planning with default weights and the most shards');
   const weights=new Map(files.map(file=>[file,baseline[file]??fallback]));
   const active=new Set(files),nativeGroups=Object.entries(CI_NATIVE_GROUPS).map(([name,members])=>({name:`@native:${name}`,files:members.filter(file=>active.has(file))})).filter(group=>group.files.length>0);
   const grouped=new Set<string>(nativeGroups.flatMap(group=>group.files));
@@ -56,7 +59,7 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
   const cost=new Map(units.map(file=>[file,weights.get(file)??fallback]));
   const sum=(members:readonly string[]):number=>members.reduce((total,file)=>total+(weights.get(file)??fallback),0);
   for(const group of nativeGroups){units.push(group.name);cost.set(group.name,2*sum(group.files));}
-  const factor=source.calibration?.factor??2*source.wallSeconds/source.fileSeconds,setupSeconds=source.calibration?.setupSeconds??40;
+  const {factor,setupSeconds}=CALIBRATION;
   const shards=(count:number):EnginePlan['shards']=>packShards(units,cost,count,0).map((members,index)=>{
     const native=members.flatMap(name=>nativeGroups.find(group=>group.name===name)?.files??[]);
     const ordinary=members.filter(name=>!name.startsWith('@native:'));
@@ -79,16 +82,16 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
   const eligible=curve.filter(row=>row.gain>=.9&&row.seconds<=240);
   // A recently measured file split consumed five seconds of predicted reserve.
   // Prefer ten spare seconds when full CI can buy that within its job budget.
-  const selected=(ring==='full'?eligible.find(row=>row.seconds<=230):undefined)??eligible[0];
+  const selected=measured?(ring==='full'?eligible.find(row=>row.seconds<=230):undefined)??eligible[0]:curve.at(-1);
   if(selected===undefined)throw new Error('No shard count meets 90% gain with 20% five-minute headroom; optimize the measured floor');
   return {version:1,sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),ring,files:[...files],inventoryHash:digest(files),
-    unknown:files.filter(file=>baseline[file]===undefined),count:selected.count,setupSeconds,factor,curve,shards:shards(selected.count)};
+    unknown:files.filter(file=>baseline[file]===undefined),count:selected.count,setupSeconds,factor,curve,shards:shards(selected.count),timings:measured?'measured':'default'};
 }
 
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const ring=process.argv.includes('--ring=1')?'1':'full',out=process.argv.find(arg=>arg.startsWith('--out='))?.slice(6)??'tmp/engine-ci/plan.json';
   const plan=createEnginePlan(ring,discoverEngineTests(ring));mkdirSync(dirname(out),{recursive:true});writeFileSync(out,`${JSON.stringify(plan,null,2)}\n`);
   readEnginePlan(out,plan.files);
-  console.log(JSON.stringify({ring:plan.ring,files:plan.files.length,unmeasured:plan.unknown.length,selected:plan.count,curve:plan.curve}));
+  console.log(JSON.stringify({ring:plan.ring,timings:plan.timings,files:plan.files.length,unmeasured:plan.unknown.length,selected:plan.count,curve:plan.curve}));
   const {GITHUB_OUTPUT:output}=process.env;if(output!==undefined){const {appendFileSync}=await import('node:fs');appendFileSync(output,`matrix=${JSON.stringify({shard:plan.shards.map(shard=>shard.index)})}\n`);}
 }

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,8 +13,6 @@ const resultsSchema = v.object({ testResults: v.array(v.object({ name: v.string(
 const discovered = v.array(v.object({ file: v.string() }));
 const runId = v.pipe(v.number(), v.integer(), v.minValue(1), v.safeInteger());
 const commit = v.pipe(v.string(), v.regex(/^[a-f0-9]{40}$/u));
-const moduleBaseline = v.object({ version: v.literal(1), sha: commit, run: v.string(), measuredAt: finite,
-  files: v.record(v.string(), finite) });
 const historyRuns = v.pipe(v.array(v.object({ databaseId: runId, headSha: commit,
   event: v.string(), headBranch: v.string(), status: v.string() })), v.maxLength(20));
 const historyArtifacts = v.pipe(v.array(v.object({ name: v.string(), expired: v.boolean(),
@@ -36,22 +34,13 @@ export function selectTimingHistory(runs: unknown, artifacts: unknown): string |
 
 /** Latest successful observations replace the old body-only registry per file. */
 export function measuredWeights(root: string, paths: readonly string[], results: readonly unknown[], timings: readonly unknown[]): { weights: Map<string, number>; fallbackSeconds: number; measuredFiles: number } {
-  const baseline = readDurations(root) ?? new Map<string, number>(), updates = new Map<string, { at: number; seconds: number; complete: boolean }>();
+  const baseline = readDurations() ?? new Map<string, number>(), updates = new Map<string, { at: number; seconds: number; complete: boolean }>();
   const overheads: number[] = [];
   const update = (file: string, value: { at: number; seconds: number; complete: boolean }): void => {
     const previous = updates.get(file);
     if (previous === undefined || previous.at < value.at || (previous.at === value.at && value.complete)) updates.set(file, value);
   };
-  // Keep the full-snapshot cohort when history is absent or only partially
-  // reported. Newer successful observations still replace each measured file.
-  const baselineFile = resolve(root, 'test/ci-module-durations.json'), completeBaseline: number[] = [];
-  if (existsSync(baselineFile)) {
-    const saved = v.parse(moduleBaseline, JSON.parse(readFileSync(baselineFile, 'utf8')));
-    for (const [file, seconds] of Object.entries(saved.files)) {
-      update(file, { at: saved.measuredAt, seconds, complete: true });
-      if (paths.includes(file)) completeBaseline.push(seconds);
-    }
-  }
+  const completeBaseline: number[] = [];
   for (const input of results) for (const row of v.parse(resultsSchema, input).testResults) if (row.status === 'passed' && row.endTime >= row.startTime) {
     update(relative(root, resolve(root, row.name)).replaceAll('\\', '/'), { at: row.endTime, seconds: (row.endTime - row.startTime) / 1000, complete: false });
   }

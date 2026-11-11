@@ -42,8 +42,10 @@ test('stale, duplicate, missing and foreign-source plans refuse before selecting
 test('recent successful complete-module observations include import/setup and override older body-only results', () => {
   const root = mkdtempSync(resolve('tmp/vitest-plan-'));
   try {
-    mkdirSync(resolve(root, 'test'));
-    writeFileSync(resolve(root, 'test/durations.json'), JSON.stringify({ 'test/a.test.ts': 3, 'test/b.test.ts': 4 }));
+    mkdirSync(resolve(root, 'timings'));
+    writeFileSync(resolve(root, 'timings/timings.json'), JSON.stringify({ version: 1, run: '1', sha: 'a'.repeat(40), measuredAt: 0,
+      full: { 'test/a.test.ts': 3, 'test/b.test.ts': 4 }, ring1: {} }));
+    process.env['WS_TIMINGS_DIR'] = resolve(root, 'timings');
     const results = [{ testResults: [
       { name: resolve(root, 'test/a.test.ts'), status: 'passed', startTime: 1000, endTime: 2000 },
       { name: resolve(root, 'test/b.test.ts'), status: 'failed', startTime: 1000, endTime: 1001 },
@@ -56,29 +58,7 @@ test('recent successful complete-module observations include import/setup and ov
     expect(result.weights.get('test/new.test.ts')).toBe(5.5);
     expect(result.measuredFiles).toBe(1);
     expect(() => measuredWeights(root, [], [], [{ files: [{ ...timings[0]?.files[0], collectMs: -1 }] }])).toThrow();
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('full-snapshot weights survive missing or older history and accept newer successful measurements', () => {
-  const root = mkdtempSync(resolve('tmp/vitest-plan-'));
-  try {
-    mkdirSync(resolve(root, 'test'));
-    const file = resolve(root, 'test/ci-module-durations.json');
-    const saved = { version: 1, ...source, measuredAt: 3000, files: { 'test/a.test.ts': 12, 'test/b.test.ts': 8 } };
-    writeFileSync(file, JSON.stringify(saved));
-    const paths = ['test/a.test.ts', 'test/b.test.ts', 'test/new.test.ts'];
-    const old = { file: paths[0], state: 'passed', measuredAt: 2000,
-      durationMs: 1000, collectMs: 100, setupMs: 200, prepareMs: 0, environmentMs: 0 };
-    const result = measuredWeights(root, paths, [], [{ files: [old] }]);
-    expect([...result.weights]).toEqual([[paths[0], 12], [paths[1], 8], [paths[2], 12]]);
-    expect(result.measuredFiles).toBe(2);
-    expect(measuredWeights(root, paths, [], []).weights).toEqual(result.weights);
-    const latest = measuredWeights(root, paths, [], [{ files: [{ ...old, measuredAt: 4000 }] }]);
-    expect(latest.weights.get('test/a.test.ts')).toBe(1.3);
-    expect(measuredWeights(root, paths, [], [{ files: [{ ...old, state: 'failed', measuredAt: 5000 }] }]).weights).toEqual(result.weights);
-    writeFileSync(file, JSON.stringify({ ...saved, files: { 'test/a.test.ts': -1 } }));
-    expect(() => measuredWeights(root, paths, [], [])).toThrow();
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { Reflect.deleteProperty(process.env, 'WS_TIMINGS_DIR'); rmSync(root, { recursive: true, force: true }); }
 });
 
 const historyRun = (id: number) => ({ databaseId: id, headSha: id.toString(16).padStart(40, '0'), event: 'push', headBranch: 'main', status: 'completed' });

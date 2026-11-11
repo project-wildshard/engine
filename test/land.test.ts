@@ -75,7 +75,6 @@ while read old new ref; do echo "$ref $new" >> "$PUSHED_LOG"; done
 const PRE_PUSH = `#!/bin/sh
 refs=$(cat)
 echo "post_ci=\${WS_PUSH_POST_CI:-0} $refs" >> "$PREPUSH_LOG"
-echo "timing=\${WS_PUSH_TIMING_RECORDS:-0} \${WS_PUSH_POST_CI:-0}" >> "$PREPUSH_LOG.timing"
 printf '%s\\n' "$refs" | node "$RECORD_PLAN_PUSH"
 [ -f "$PREPUSH_FAIL" ] && { echo "pre-push: planted red check"; exit 1; }
 case "$refs" in *refs/heads/main*) if [ -f "$PREPUSH_RACE" ]; then rm "$PREPUSH_RACE"; sh "$RACE_SCRIPT"; fi ;; esac
@@ -112,8 +111,7 @@ function fixture() {
   const lines = Array.from({ length: 12 }, (_, index) => `export const line${index} = ${index};`).join('\n');
   write(join(repo, 'src/shared.ts'), `${lines}\n`);
   write(join(repo, 'src/a.ts'), 'export const a = 1;\n');
-  write(join(repo, 'test/durations.json'), `{\n${Array.from({ length: 12 }, (_, index) => `  "test/t${index}.test.ts": ${index}`).join(',\n')}\n}\n`);
-  git(repo, ['add', 'src', 'test']);
+  git(repo, ['add', 'src']);
   git(repo, ['commit', '--quiet', '-m', 'seed']);
   git(repo, ['push', '--quiet', 'origin', 'main']);
   git(repo, ['config', 'core.hooksPath', hooks]);
@@ -541,22 +539,6 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
   }, 60_000);
 
-  test('main and the plan both recorded test clocks: still carried, the clocks are not a harness change', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.edit(wt, 'test/durations.json', '"test/t10.test.ts": 10', '"test/t10.test.ts": 100', 'test: record clocks');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('test/durations.json', ': 1,', ': 11,')] } });
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
-    // The carried pre-push selects as land did: timing records as data, so the plan's related tests run.
-    expect(f.read(`${f.files.prepush}.timing`).trim().split('\n').at(-1)).toBe('timing=1 1');
-    expect(f.git(f.remote, ['show', 'main:test/durations.json'])).toMatch(/"test\/t1\.test\.ts": 11,[\s\S]*"test\/t10\.test\.ts": 100/u);
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
-  }, 60_000);
-
-
   test('J206 review: a commit that slips in during the rebase or the stamp regeneration never rides to main', () => {
     const f = fixture();
     const wt = f.worktree('foo');
@@ -574,12 +556,11 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.read(f.files.receipts)).toMatch(/STOP rebased [0-9a-f]{10} is not main/u);
   }, 60_000);
 
-  test('a harness change beside clocks carries too: J249 has no harness rule, main\'s own run checks it', () => {
+  test('a harness change carries too: J249 has no harness rule, main\'s own run checks it', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, 'vitest.config.ts', 'export default {};', 'test: add a vitest config');
-    f.edit(wt, 'test/durations.json', '"test/t10.test.ts": 10', '"test/t10.test.ts": 100', 'test: record clocks');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('test/durations.json', ': 1,', ': 11,')] } });
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
@@ -705,7 +686,14 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(existsSync('.github/workflows/ring-1.yml')).toBe(false);
     expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {2}push:/mu);
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    expect([...jobs.keys()]).toEqual(['tests', 'quarantine']);
+    expect([...jobs.keys()]).toEqual(['tests', 'timings', 'quarantine']);
+    // LS2: the one bookkeeping job saves main's measured timings after the tests; it never decides the run's verdict.
+    const timings = jobs.get('timings') ?? '';
+    jobs.delete('timings');
+    expect(timings).toMatch(/^ {4}needs: tests$/mu);
+    expect(timings).toMatch(/^ {4}continue-on-error: true$/mu);
+    expect(timings).toContain("github.ref == 'refs/heads/main'");
+    expect(timings).not.toMatch(/ci-pack|vitest|test-quarantine/u);
     for (const [name, body] of jobs) {
       // No job waits on another, and none is skipped wholesale: a failed reuse check is a red job, never a false green.
       expect(body, name).not.toMatch(/^ {4}(?:if|needs):/mu);

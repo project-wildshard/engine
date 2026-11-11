@@ -15,7 +15,7 @@
 // only tracked files and its own install. Each step's seconds go to <worktree>/tmp/worktree-setup.json and, with
 // WS_LANE_NAME set, one line in ~/.cache/wildshard/lane-receipts.log. Removal is DS13's reaper: `reap`
 // (scripts/worktree-reap.mjs) removes landed, clean, idle worktrees with their branches, local and on origin.
-import {execFileSync,spawnSync} from 'node:child_process';
+import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
@@ -277,6 +277,12 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
  if(options.herdr&&env.HERDR_ENV==='1'&&env.HERDR_PANE_ID!==undefined&&env.HERDR_PANE_ID!==''){
   const named=spawnSync('herdr',['pane','rename',env.HERDR_PANE_ID,`${basename(canonical)} ${branch}`],{encoding:'utf8'});
   if(named.status!==0)process.stderr.write(`worktree: herdr pane not renamed (${named.error?.message??named.stderr.trim()})\n`);
+ }
+ // LAND-SIMPLIFY LS2: local readers use main's last measured test seconds; refresh a missing or day-old table in the
+ // background (scripts/test-timings.mjs fetch). It never holds up the worktree, and a failure only leaves the defaults.
+ if(!env.CI&&env.WS_TIMINGS_FETCH!=='0'&&existsSync(join(tree,'scripts/test-timings.mjs'))){
+  try{spawn(process.execPath,['scripts/test-timings.mjs','fetch','--if-stale'],{cwd:tree,env:childEnv,detached:true,stdio:'ignore'}).unref();}
+  catch(error){process.stderr.write(`worktree: timings refresh not started (${error instanceof Error?error.message:String(error)})\n`);}
  }
  const total=Number(((performance.now()-began)/1000).toFixed(2));
  const record={slug:options.slug,branch,base,tree,total,steps,finished:new Date().toISOString()};

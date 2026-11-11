@@ -32,10 +32,10 @@ try{
   const packed=run(true);assert.equal(packed.status,0,packed.stderr);assert.equal(readFileSync(order,'utf8'),'ba');
   const hostile=run(true,true);assert.notEqual(hostile.status,0);assert.match(hostile.stderr,/Unplanned execution/u);
   // The push profile keeps the full inventory, including unmeasured files.
-  mkdirSync(join(work,'test'));writeFileSync(join(work,'test/durations.json'),JSON.stringify({'a.test.mjs':1,'b.test.mjs':5}));
+  mkdirSync(join(work,'timings'));writeFileSync(join(work,'timings/timings.json'),JSON.stringify({version:1,run:'1',sha:'a'.repeat(40),measuredAt:0,full:{'a.test.mjs':1,'b.test.mjs':5},ring1:{}}));
   const pushSequencer=pathToFileURL(resolve('scripts/push-duration-sequencer.ts')).href;
   writeFileSync(order,'');writeFileSync(config,`import{PushDurationSequencer}from'${pushSequencer}';export default{test:{cache:false,maxWorkers:1,include:['*.test.mjs'],sequence:{sequencer:PushDurationSequencer}}};`);
-  const push=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','--root',work,'--config',config],{cwd:work,encoding:'utf8',timeout:10000,env:{...process.env,TMPDIR:work,NODE_COMPILE_CACHE:join(work,'compile')}});
+  const push=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','--root',work,'--config',config],{cwd:work,encoding:'utf8',timeout:10000,env:{...process.env,TMPDIR:work,NODE_COMPILE_CACHE:join(work,'compile'),WS_TIMINGS_DIR:join(work,'timings')}});
   assert.equal(push.status,0,push.stdout+push.stderr);assert.equal(readFileSync(order,'utf8'),'cba');
   console.log(JSON.stringify({baseline:before,planned:'ba',actual:'ba',unplannedRefused:true,pushInventory:3,pushUnmeasuredThenLongest:'cba'}));
 }finally{rmSync(work,{recursive:true,force:true});}

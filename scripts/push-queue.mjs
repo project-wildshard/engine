@@ -317,12 +317,9 @@ if(mode==='enqueue'){
  const root=resolvePath(args.find(arg=>arg.startsWith('--root='))?.slice(7)??join(homedir(),'.cache/wildshard/push-queue'));
  const directory=join(root,createHash('sha256').update(identity(remote)).digest('hex').slice(0,20));mkdirSync(join(directory,'snapshots'),{recursive:true});
  const commit=args.find(arg=>arg.startsWith('--commit='));
- // DS16c: refuse in seconds what the full gate would bounce on bookkeeping.
- // A preflight that cannot even load never blocks an enqueue.
- const {admitEnqueue}=await import('./push-preflight.mjs').catch((/** @type {unknown} */error)=>{console.error(`push preflight unavailable (${error instanceof Error?error.message:String(error)}); enqueueing without it`);return {admitEnqueue:()=>Promise.resolve({sha:'',seconds:0,refused:[],warnings:['preflight: unavailable']})};});
- /** @type {Awaited<ReturnType<typeof admitEnqueue>>} */let preflight;
- try{preflight=await admitEnqueue(source,{commit:commit?.slice(9),checkOnly:args.includes('--check-only'),lane:process.env.WS_LANE_NAME??'push-queue',skip:process.env.WS_PREFLIGHT_SKIP});}
- catch(error){console.error(`push preflight crashed (${error instanceof Error?error.message:String(error)}); enqueueing without it`);preflight={sha:'',seconds:0,refused:[],warnings:['preflight: crashed']};}
+ // LAND-SIMPLIFY LS2: the enqueue preflight is deleted (its checks were timing and stamp bookkeeping); LS7 retires
+ // the queue itself. The job keeps an empty verdict so its record shape is unchanged.
+ /** @type {{sha:string,seconds:number,refused:string[],warnings:string[]}|null} */const preflight={sha:'',seconds:0,refused:[],warnings:[]};
  if(preflight===null)process.exitCode=1;
  else{
   // Capture exactly the commit the preflight checked; a moved HEAD stays an ancestor or is refused.

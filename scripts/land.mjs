@@ -381,7 +381,7 @@ class Landing{
   if(main===head)return 'landed';
   const args=mainPushArgs(head);
   this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${carried?'; split pre-push on the rebased tree (WS_PUSH_POST_CI=1)':'; hosted-green SHA'}`);
-  const env=carried?{...this.env,WS_PUSH_POST_CI:'1',WS_PUSH_TIMING_RECORDS:'1'}:this.env;
+  const env=carried?{...this.env,WS_PUSH_POST_CI:'1'}:this.env;
   const result=spawnSync('git',args,{cwd:this.root,env,encoding:'utf8',stdio:['ignore','pipe','inherit']});
   if(result.status===0)return 'landed';
   // A lost race is main having moved; anything else (a red pre-push) stops.

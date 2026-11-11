@@ -1,8 +1,7 @@
-import {readFileSync} from 'node:fs';
 import {relative} from 'node:path';
 import {BaseSequencer,type TestSpecification} from 'vitest/node';
-import * as v from 'valibot';
 import {CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
+import {readWeights} from './test-timings.mjs';
 
 /** Longest first, so no long file starts late and finishes alone (VITEST-BENCH VB8).
  * The bounded cook worker (a 4-slot grant) is ordered by its own weight. Files that
@@ -11,7 +10,7 @@ import {CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
  * while at the end it waits only for the short files still in flight. */
 export class PushDurationSequencer extends BaseSequencer{
   override sort(files:TestSpecification[]):Promise<TestSpecification[]>{
-    const weights=v.parse(v.record(v.string(),v.pipe(v.number(),v.finite(),v.minValue(0))),JSON.parse(readFileSync('test/durations.json','utf8')) as unknown);
+    const weights=readWeights('full');
     const exclusive=new Set<string>(CPU_EXCLUSIVE_TESTS);
     const path=(file:TestSpecification):string=>relative(process.cwd(),file.moduleId).replaceAll('\\','/');
     const cost=(file:TestSpecification):number=>{

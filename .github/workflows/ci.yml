@@ -42,6 +42,9 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # The plan-branch run a main push reused (J240): its reports are this SHA's measurements (LS2's timings job).
+    outputs:
+      reused-run: ${{ steps.reuse.outputs.run }}
     strategy:
       fail-fast: false
       matrix:
@@ -127,6 +130,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: echo "WS_CI_EXCLUSION_AT=$(node -e "console.log(Date.parse(process.argv[1]))" "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .created_at)")" >> "$GITHUB_ENV"
+      # LAND-SIMPLIFY LS2 (J250, J258): the planner's weights are main's last measured run, never a committed file.
+      # Every share must plan from the same table, or shares pack different shards and skip files while green: the
+      # newest main `timings-*` entry made before this run started, restored by its exact key. With none, the newest
+      # earlier green run's artifacts; else defaults. An API failure fails the share, never a split plan.
+      - name: Pick main's last measured test timings made before this run
+        id: timings
+        if: steps.code.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/test-timings.mjs pick --before="$WS_CI_EXCLUSION_AT"
+      - if: steps.code.outputs.run == 'true' && steps.timings.outputs.key != ''
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: tmp/timings
+          key: ${{ steps.timings.outputs.key }}
+          fail-on-cache-miss: true
+      - name: With no cache, rebuild the timings from the newest earlier green run
+        if: steps.code.outputs.run == 'true' && steps.timings.outputs.key == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/test-timings.mjs fetch --strict --before="$WS_CI_EXCLUSION_AT"
       - name: Plan the smallest useful shards from actual discovery
         if: steps.code.outputs.run == 'true'
         run: node scripts/engine-ci-plan.ts
@@ -205,6 +229,48 @@ jobs:
           if test "$RESULT" = failure; then
             echo "::error title=Red run covers $range::$(printf '%s\n' "$commits" | sed '/^$/d' | wc -l | tr -d ' ') commits after the last finished run; see this job's summary"
           fi
+
+  timings:
+    # LAND-SIMPLIFY LS2 (J250, J258): main's run measures every planned file; merge its shard reports into the
+    # table and save it as the newest `timings-<run id>`, which every later run's planner restores. It never fails
+    # the run: a missed save only leaves the previous table in place. Node built-ins only, no install.
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: tests
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: tmp/timings
+          key: timings-${{ github.run_id }}
+          restore-keys: timings-
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          pattern: engine-ci-*
+          path: tmp/timings-run
+      - name: A main push that reused its plan-branch run takes that run's reports
+        if: needs.tests.outputs.reused-run != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ needs.tests.outputs.reused-run }}
+        run: gh run download "$RUN" -R "$GITHUB_REPOSITORY" -p 'engine-ci-*' -D tmp/timings-run
+      - name: Merge this run's measured files into the table
+        id: collect
+        run: node scripts/test-timings.mjs collect tmp/timings-run
+      - if: steps.collect.outputs.measured == 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: tmp/timings
+          key: timings-${{ github.run_id }}
 
   quarantine:
     # J193: run every active quarantined proof with its ordinary exit code,

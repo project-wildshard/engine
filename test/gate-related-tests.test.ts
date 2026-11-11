@@ -127,11 +127,9 @@ it('a first plan push selects against its merge-base with origin/main', () => {
   }
 });
 
-it('browser, timing and slow files go to hosted CI; new files are measured locally', () => {
-  const seconds = JSON.parse(readFileSync('test/durations.json', 'utf8')) as Record<string, number>;
-  const slow = Object.keys(seconds).find(file => (seconds[file] ?? 0) > LOCAL_FILE_SECONDS && !BROWSER_TESTS.includes(file) && !TIMING_TESTS.includes(file));
-  const quick = Object.keys(seconds).find(file => (seconds[file] ?? 0) < 1 && !BROWSER_TESTS.includes(file) && !TIMING_TESTS.includes(file));
-  if (slow === undefined || quick === undefined) throw new Error('durations.json lacks a slow and a quick file');
+it('browser, timing and slow files go to hosted CI; an unmeasured file stays local', () => {
+  const slow = 'test/slow-fixture.test.ts', quick = 'test/quick-fixture.test.ts';
+  const seconds: Record<string, number> = {[slow]: LOCAL_FILE_SECONDS + 5, [quick]: 0.5};
   const browser = BROWSER_TESTS[0], timing = TIMING_TESTS[0];
   if (browser === undefined || timing === undefined) throw new Error('empty hosted-only lists');
   expect(hostedOnlyReason(browser, seconds)).toBe('browser');
@@ -140,17 +138,17 @@ it('browser, timing and slow files go to hosted CI; new files are measured local
   expect(hostedOnlyReason(quick, seconds)).toBeNull();
   // A planted 25 s file lands on the hosted-only list.
   expect(hostedOnlyReason('test/planted.test.ts', {'test/planted.test.ts': 25})).toBe('over 20 s (25.0 s)');
-  const related = splitLocalTests({mode: 'related', tests: [slow, quick, browser, timing]}, []);
+  const related = splitLocalTests({mode: 'related', tests: [slow, quick, browser, timing]}, seconds);
   expect(related.local).toEqual([quick]);
   expect(related.hosted.map(row => row.file).sort()).toEqual([slow, browser, timing].sort());
-  // A new file without a committed clock always runs locally, as its own admission evidence.
-  expect(splitLocalTests({mode: 'related', tests: [quick]}, [slow]).local).toEqual([quick, slow].sort());
+  // LS2: a file main's last run never measured (a new one) has no clock and stays local.
+  expect(splitLocalTests({mode: 'related', tests: [quick, 'test/new-fixture.test.ts']}, seconds).local).toEqual([quick, 'test/new-fixture.test.ts'].sort());
   // A full-mode change (harness, unknown path) keeps only the quick declared native files local.
-  const native = splitLocalTests({mode: 'full'}, []);
+  const native = splitLocalTests({mode: 'full'}, seconds);
   expect(native.local.length).toBeGreaterThan(0);
   for (const file of native.local) expect(NATIVE_TESTS).toContain(file);
   for (const file of native.local) expect(hostedOnlyReason(file, seconds)).toBeNull();
-  expect(splitLocalTests({mode: 'docs'}, []).local).toEqual([]);
+  expect(splitLocalTests({mode: 'docs'}, seconds).local).toEqual([]);
 });
 
 it('every Vitest file that launches a real browser is on the browser list', () => {

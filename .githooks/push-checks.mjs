@@ -7,7 +7,6 @@ import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../scripts/push-budget.m
 import {logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scripts/push-local-split.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
-import {missingTestTimings,prepareTestTimings,readTestTimings,completeTestTimings} from '../scripts/push-test-timings.mjs';
 import {gateEnvironment} from '../scripts/push-environment.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
@@ -100,12 +99,8 @@ async function main(){
   // DS9: a plan branch push or a watching driver runs the split gate; hosted CI runs the rest.
   const split=splitRequested(env),profile=split?SPLIT_PROFILE:PUSH_PROFILE;
   /** @type {{mode:'full'|'related'|'docs',files:string[],reason:string,tests?:string[]}} */
-  // land's carried rule counts timing records as data (WS_PUSH_TIMING_RECORDS=1, split gate only), so this gate selects
-  // what land's classifier selected: the plan's related tests, never the quick-suite-only split full mode.
-  let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd(),{timingRecords:split&&env.WS_PUSH_TIMING_RECORDS==='1'});
-  const missing=missingTestTimings(env.WS_PUSH_REFS);
-  const timing=missing.length===0?null:prepareTestTimings(missing,PUSH_PROFILE);
-  const context=capturePushTree(profile,env),proof=context===null||timing!==null?null:readPushProof(context,selection);
+  let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd());
+  const context=capturePushTree(profile,env),proof=context===null?null:readPushProof(context,selection);
   console.error(`  - tests: ${selection.mode}; ${selection.reason}; ${selection.files.length} changed paths${split?'; split gate (DS9): hosted CI runs the full suite, browser and timing files':''}`);
   if(proof!==null){
     console.error(`  - exact-tree green reuse: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
@@ -137,13 +132,13 @@ async function main(){
   }
   /** @type {string[]|null} */let local=null;
   if(split){
-    const plan=splitLocalTests(selection,missing.map(file=>file.file));
+    const plan=splitLocalTests(selection);
     local=plan.local;
     for(const row of plan.hosted)console.error(`  - hosted-only (${row.reason}): ${row.file}`);
     logHostedOnly(plan.hosted,{sha:context?.commit??'unknown',lane:process.env.WS_LANE_NAME});
     console.error(`  - split gate: ${local.length} local Vitest file(s), ${plan.hosted.length} sent to hosted CI`);
   }
-  const reporters=[...(timing?.requests.full===undefined?[]:['--reporter=default',`--reporter=${resolve('scripts/push-timing-reporter.ts')}`]),...(env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`])];
+  const reporters=env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`];
   const vitest=local===null
     ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
     :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
@@ -156,20 +151,7 @@ async function main(){
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
     {name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},
     ...vitest,
-  ],{env:timing?.requests.full===undefined?env:{...env,WS_PUSH_TIMING_REQUEST:timing.requests.full}});
-  if(result.ok&&timing!==null){
-    if(timing.requests.full!==undefined)completeTestTimings(timing.requests.full,0);
-    if(timing.requests['1']!==undefined){
-      const ring=await parallelChecks([{name:'vitest (new Ring 1 timing)',commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...missing.filter(file=>file.rings.includes('1')).map(file=>file.file),'--reporter=default',`--reporter=${resolve('scripts/push-timing-reporter.ts')}`]]}],
-        {env:{...env,WILDSHARD_RING:'1',WS_PUSH_TIMING_REQUEST:timing.requests['1']}});
-      if(!ring.ok){process.exitCode=1;return;}
-      completeTestTimings(timing.requests['1'],0);
-    }
-    readTestTimings(timing.directory);
-    console.error(`timing-evidence: ${JSON.stringify({directory:timing.directory,files:missing.map(file=>file.file)})}`);
-    console.error(`  X New test files need committed timings: ${missing.map(file=>file.file).join(', ')}. Real local full/Ring 1 clocks saved; no checked tree was changed. Run: node scripts/push-test-timings.mjs record ${timing.directory}; commit the timing data and push normally.`);
-    process.exitCode=1;return;
-  }
+  ],{env});
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);
   console.error(`  - ${split?'split ':''}push lane ${result.ok?'green':'RED'} in ${seconds.toFixed(1)} s; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);

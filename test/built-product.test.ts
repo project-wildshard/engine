@@ -200,12 +200,13 @@ test.each([
   const f=await fixture();
   write(f.root,'scripts/test-products.json',JSON.stringify({'test/product.test.ts':[f.name]}));
   if(cohort==='product-free')write(f.root,f.source,'missing-current-product');
-  if(measured)write(f.root,'test/durations.json',JSON.stringify({'test/product.test.ts':50,'test/pure.test.ts':1}));
+  const timings=resolve(f.root,'timings');mkdirSync(timings,{recursive:true});
+  if(measured)write(f.root,'timings/timings.json',JSON.stringify({version:1,run:'1',sha:'a'.repeat(40),measuredAt:0,full:{'test/product.test.ts':50,'test/pure.test.ts':1},ring1:{}}));
   for(const name of ['pure','product'])write(f.root,`test/${name}.test.ts`,
     `import {test} from 'vitest';import {writeFileSync} from 'node:fs';test('${name}',()=>writeFileSync('${name}-ran','yes'));`);
   write(f.root,'vitest.config.mts',`import {DurationSequencer} from ${JSON.stringify(resolve('scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/*.test.ts'],sequence:{sequencer:DurationSequencer}}};`);
   const result=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','--shard=1/1','--config',resolve(f.root,'vitest.config.mts')],{
-    cwd:f.root,env:{...fixtureEnvironment(),CI:'1',WS_TEST_COHORT:cohort,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',VERCEL_GIT_COMMIT_SHA:'',NO_COLOR:'1'},
+    cwd:f.root,env:{...fixtureEnvironment(),CI:'1',WS_TIMINGS_DIR:timings,WS_TEST_COHORT:cohort,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',VERCEL_GIT_COMMIT_SHA:'',NO_COLOR:'1'},
     encoding:'utf8',timeout:15_000,maxBuffer:1_048_576,
   });
   expect(result.error).toBeUndefined();

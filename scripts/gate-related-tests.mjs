@@ -14,6 +14,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, relative, resolve } from 'node:path';
 import { createVitest } from 'vitest/node';
 import { liveTestSelection } from './push-inputs.mjs';
+import { readWeights } from './test-timings.mjs';
 
 // The tree under test is the working directory (the gate runs the checkout's copy of this script in the build mirror).
 const ROOT = process.cwd();
@@ -51,12 +52,8 @@ export function forceRerunTriggers(root) {
 function knownDurations() {
   /** @type {Map<string, number>} */
   const durations = new Map();
-  const measured = resolve(ROOT, 'test/durations.json');
-  if (existsSync(measured)) {
-    /** @type {Record<string, number>} */
-    const saved = JSON.parse(readFileSync(measured, 'utf8'));
-    for (const [file, seconds] of Object.entries(saved)) if (Number.isFinite(seconds) && seconds >= 0) durations.set(file, seconds);
-  }
+  // Main's last measured run (scripts/test-timings.mjs, LAND-SIMPLIFY LS2), then this checkout's own results.
+  for (const [file, seconds] of Object.entries(readWeights('full'))) durations.set(file, seconds);
   if (!existsSync(RESULTS)) return durations;
   try {
     /** @type {{ results?: [string, { duration?: number }][] }} */

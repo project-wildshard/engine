@@ -2,9 +2,10 @@
 // Vitest files and the declared native files; hosted Linux CI runs the full
 // suite, browser files, timing files and every file over the local budget.
 import {execFileSync} from 'node:child_process';
-import {appendFileSync,mkdirSync,readFileSync} from 'node:fs';
+import {appendFileSync,mkdirSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,resolve} from 'node:path';
+import {readWeights} from './test-timings.mjs';
 import {CI_SERIAL_TESTS,CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
 
 /** Q54: a related file over this many seconds alone runs on hosted CI only. */
@@ -58,13 +59,6 @@ export function planBaseRefs(refs,cwd=process.cwd()){
  }).join('\n');
 }
 
-/** @param {string} root @returns {Record<string,number>} */
-function durations(root){
- const value=/** @type {unknown} */(JSON.parse(readFileSync(resolve(root,'test/durations.json'),'utf8')));
- if(value===null||typeof value!=='object'||Array.isArray(value))throw new Error('Invalid test/durations.json');
- return /** @type {Record<string,number>} */(value);
-}
-
 /** Why a file runs on hosted CI only, or null when it stays local.
  * @param {string} file @param {Record<string,number>} seconds */
 export function hostedOnlyReason(file,seconds){
@@ -75,20 +69,17 @@ export function hostedOnlyReason(file,seconds){
  return null;
 }
 
-/** The local Vitest files for a split gate. A new file that needs a committed clock
- * always runs locally: its measurement is the admission evidence.
+/** The local Vitest files for a split gate. Seconds come from main's last measured
+ * run (scripts/test-timings.mjs, LS2); an unmeasured file stays local.
  * @param {{mode:'full'|'related'|'docs',tests?:string[]}} selection
- * @param {string[]} timing new files missing committed timings
- * @param {string} [root] */
-export function splitLocalTests(selection,timing,root=process.cwd()){
- const seconds=durations(root);
+ * @param {Record<string,number>} [seconds] */
+export function splitLocalTests(selection,seconds=readWeights('full')){
  const candidates=selection.mode==='related'?selection.tests??[]:selection.mode==='full'?[...NATIVE_TESTS]:[];
  /** @type {string[]} */const local=[];/** @type {{file:string,reason:string}[]} */const hosted=[];
  for(const file of [...new Set(candidates)].sort()){
-  const reason=timing.includes(file)?null:hostedOnlyReason(file,seconds);
+  const reason=hostedOnlyReason(file,seconds);
   if(reason===null)local.push(file);else hosted.push({file,reason});
  }
- for(const file of timing)if(!local.includes(file))local.push(file);
  return {local:local.sort(),hosted};
 }
 

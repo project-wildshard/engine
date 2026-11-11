@@ -1,21 +1,15 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { resolve } from 'node:path';
 import * as v from 'valibot';
+import { readWeights } from './test-timings.mjs';
 
-export const DURATIONS_FILE = 'test/durations.json';
 /** G989 prefers twelve longer two-worker jobs to a larger runner burst. */
 export const CI_SHARD_COUNT = 12;
 /** Fallback only: old isolated runs measured six seconds of setup/imports. */
 export const LEGACY_FILE_OVERHEAD = 6;
 
-export function readDurations(root: string): Map<string, number> | null {
-  const file = resolve(root, DURATIONS_FILE);
-  if (!existsSync(file)) return null;
-  const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-  if (parsed === null || typeof parsed !== 'object') return null;
-  const out = new Map<string, number>();
-  for (const [path, seconds] of Object.entries(parsed)) if (typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0) out.set(path, seconds);
+/** Seconds per file from main's last measured run (scripts/test-timings.mjs, LS2), or null with no table. */
+export function readDurations(env: NodeJS.ProcessEnv = process.env): Map<string, number> | null {
+  const out = new Map(Object.entries(readWeights('full', env)));
   return out.size > 0 ? out : null;
 }
 

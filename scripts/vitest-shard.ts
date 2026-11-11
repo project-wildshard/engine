@@ -1,6 +1,6 @@
 // SF74 W23 (speed audit #8): `vitest run --shard=i/n` splits by path hash, so push CI's 8 shards took 141-354 s and the
 // slowest one was the run's critical path. This sequencer packs the files by their recorded durations
-// (test/durations.json, written by scripts/vitest-durations.mjs from a run's results): heaviest file first onto the
+// (main's last measured run, scripts/test-timings.mjs): heaviest file first onto the
 // lightest shard. Every shard computes the same packing from the same file list, so each file runs exactly once. A file
 // with no recorded duration counts as the median; with no durations file at all, vitest's hash split is used.
 import { existsSync, readFileSync } from 'node:fs';
@@ -100,7 +100,7 @@ export class DurationSequencer extends BaseSequencer {
       this.plannedRanks = new Map(order.map((file, index) => [file, index]));
       return Promise.resolve(files.filter(spec => mine.has(key(spec))));
     }
-    const durations = shard === undefined ? null : readDurations(root);
+    const durations = shard === undefined ? null : readDurations();
     if (shard === undefined || durations === null) return super.shard(files);
     const key = (spec: TestSpecification): string => relative(root, spec.moduleId).replaceAll('\\', '/');
     const mine = new Set(packShards([...new Set(files.map(key))], durations, shard.count)[shard.index - 1]);

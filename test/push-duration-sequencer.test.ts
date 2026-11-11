@@ -1,5 +1,5 @@
-// oxlint-disable-next-line import/no-nodejs-modules -- Read the same recorded weights the sequencer reads.
-import { readFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Own the timings table the sequencer reads (LAND-SIMPLIFY LS2).
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Specs carry absolute module ids, as Vitest gives them.
 import { resolve } from 'node:path';
 import type { TestSpecification } from 'vitest/node';
@@ -7,7 +7,12 @@ import { expect, test } from 'vitest';
 import { PushDurationSequencer } from '../scripts/push-duration-sequencer';
 import { CPU_EXCLUSIVE_TESTS } from '../scripts/vitest-ci-files';
 
-const weights = JSON.parse(readFileSync('test/durations.json', 'utf8')) as Record<string, number>;
+const weights: Record<string, number> = { 'test/light.test.ts': 0.1, 'test/cook-worker.test.ts': 30, 'test/nalati-headless-population.test.ts': 20,
+  'test/dedicated-hold-expiry.test.ts': 10, 'test/mid.test.ts': 5, ...Object.fromEntries(CPU_EXCLUSIVE_TESTS.map((file, index) => [file, 40 + index])) };
+mkdirSync(resolve('tmp'), { recursive: true });
+const table = mkdtempSync(resolve('tmp/push-sequencer-'));
+writeFileSync(resolve(table, 'timings.json'), JSON.stringify({ version: 1, run: '1', sha: 'a'.repeat(40), measuredAt: 0, full: weights, ring1: {} }));
+process.env['WS_TIMINGS_DIR'] = table;
 const spec = (file: string, isolate = true): TestSpecification => ({ moduleId: resolve(file), project: { config: { isolate } } }) as unknown as TestSpecification;
 const sorted = async (files: readonly string[], shared: ReadonlySet<string> = new Set()): Promise<string[]> =>
   (await new PushDurationSequencer({} as never).sort(files.map(file => spec(file, !shared.has(file))))).map(file => file.moduleId.slice(resolve('.').length + 1));
