@@ -1122,6 +1122,7 @@
   "test/selected-manifests.test.ts": 0.225746809,
   "test/server-release-ci.test.ts": 0.374863342,
   "test/server-road-height.test.ts": 0.5876851319999999,
+  "test/server-route.test.ts": 0.08240433299999998,
   "test/service-worker-bundle.test.ts": 0.039737960999999995,
   "test/session-chunk-budget.test.ts": 0.071573736,
   "test/session-title-exit.test.ts": 0.08127267800000001,

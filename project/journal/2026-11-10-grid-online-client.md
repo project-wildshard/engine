@@ -28,3 +28,4 @@
 - Proof (headless Chromium, local world listing Nalati first): a fresh
   device boots Driftwood, re-enters Nalati, stands where the server says;
   Play again boots Nalati straight away.
+- Recorded `test/server-route.test.ts` clocks.
