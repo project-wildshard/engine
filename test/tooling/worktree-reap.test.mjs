@@ -129,6 +129,38 @@ describe('worktree reap', () => {
     expect(f.remoteBranches()).toEqual(['plan/shared']);
   });
 
+  test('J206 review: a merge whose parents are on main is not landed, and a linked .worktrees/ is never followed', () => {
+    const f = repos(['merged']);
+    // Main gains B; the plan merges B into its older base and adds its own change in the merge commit.
+    put(f.canonical, 'src/b.ts', 'export const b = 1;\n');
+    git(f.canonical, ['add', 'src/b.ts']);
+    git(f.canonical, ['commit', '-q', '-m', 'feat: b']);
+    git(f.canonical, ['push', '-q', 'origin', 'main']);
+    git(f.tree('merged'), ['fetch', '-q', 'origin']);
+    git(f.tree('merged'), ['merge', '-q', '--no-ff', '--no-commit', 'origin/main']);
+    put(f.tree('merged'), 'src/resolution.ts', 'export const resolved = 1;\n');
+    git(f.tree('merged'), ['add', 'src/resolution.ts']);
+    git(f.tree('merged'), ['commit', '-q', '-m', 'merge main with a resolution']);
+    // git cherry lists nothing for it: the change only lives in the merge.
+    expect(git(f.canonical, ['cherry', 'origin/main', 'plan/merged'])).toBe('');
+    const result = f.reap();
+    expect(result.stdout).toMatch(/kept {5}merged: 1 commit\(s\) not on main/u);
+    expect(existsSync(f.tree('merged'))).toBe(true);
+
+    // A second checkout whose .worktrees/ is a link into the first: its reaper must not touch the first's worktrees.
+    const g = repos(['x']);
+    g.work('x', true);
+    // Git still records <canonical>/.worktrees/x, which now reaches the folder through a link.
+    const elsewhere = join(dirname(g.canonical), 'elsewhere');
+    spawnSync('mv', [join(g.canonical, '.worktrees'), elsewhere]);
+    spawnSync('ln', ['-s', elsewhere, join(g.canonical, '.worktrees')]);
+    const linked = g.reap();
+    expect(linked.status, linked.stderr).toBe(0);
+    expect(linked.stdout).toMatch(/skipped .*x: resolves to .*elsewhere\/x, outside /u);
+    expect(linked.stdout).not.toMatch(/reaped/u);
+    expect(existsSync(join(elsewhere, 'x', 'src', 'x.ts'))).toBe(true);
+  });
+
   test('a branch that moved after the check is never deleted, and a running setup stops the run', () => {
     const f = repos(['a']);
     writeFileSync(join(f.canonical, '.git', 'wildshard-worktree-setup.lock'), '1 0 x');

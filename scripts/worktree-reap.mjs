@@ -2,11 +2,13 @@
 // worktrees whose work is on main, and nothing else. Safe to run any time, from any checkout of the repo.
 //
 // A worktree at <canonical>/.worktrees/<slug> on plan/<slug> is reaped only when all of these hold:
-//   - landed: `git cherry origin/main plan/<slug>` lists nothing (every commit's change is on main), after a fetch;
+//   - landed: the branch tip is on origin/main itself (`merge-base --is-ancestor`; land fast-forwards), after a fetch;
 //   - clean: `git status --porcelain` is empty (tracked edits and untracked files; ignored build output doesn't count);
 //   - idle: no process has its working directory inside it, no `land` holds its lock, no `worktree new` is running,
 //     and nothing in it (index, HEAD, reflog, tip commit) changed for --grace hours (default 24: a lane between
-//     landings keeps its worktree).
+//     landings keeps its worktree). The reaper then holds the worktree's land lock and checks HEAD, the tree, the
+//     processes and setup again before it removes anything; a worktree whose folder resolves outside
+//     <canonical>/.worktrees/ is skipped.
 // Then: `git worktree remove` (never --force), the local branch deleted only while it still points at the checked
 // commit, and `origin plan/<slug>` deleted (`git push --delete`, which the pre-push lets through without a gate)
 // only if the remote branch is landed too, under a lease on the SHA it had. A worktree that fails any check is kept
@@ -15,6 +17,7 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {appendFileSync,existsSync,mkdirSync,readdirSync,readlinkSync,realpathSync,statSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve,sep} from 'node:path';
+import {pidLock} from './pid-lock.mjs';
 import {WORKTREES} from './worktree-ignore.mjs';
 
 const REAP_USAGE='usage: node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--no-remote]';
@@ -66,6 +69,11 @@ function lastActivity(tree,gitDir){
  return newest;
 }
 
+/** Is `sha` on origin/main itself? @param {string} canonical @param {string} sha */
+const onMain=(canonical,sha)=>sha!==''&&tryGit(canonical,['merge-base','--is-ancestor',sha,'origin/main']).status===0;
+/** Commits of `sha` that origin/main lacks. @param {string} canonical @param {string} sha */
+const aheadOfMain=(canonical,sha)=>Number(tryGit(canonical,['rev-list','--count',`origin/main..${sha}`]).stdout.trim()||'0');
+
 /** @typedef {{path:string,head:string,branch:string}} Worktree */
 
 /** Linked worktrees of the repo from `git worktree list --porcelain -z`. @param {string} canonical @returns {Worktree[]} */
@@ -101,22 +109,39 @@ export function reap(canonical,options,env,say){
   const slug=basename(tree.path),branch=`refs/heads/plan/${slug}`;
   const keep=(/** @type {string} */ why)=>{kept.push(`${slug} (${why})`);say(`kept     ${slug}: ${why}`);};
   if(resolve(tree.path)!==join(canonical,WORKTREES,slug)&&resolve(tree.path)!==join(realRoot,WORKTREES,slug)){say(`skipped  ${tree.path}: not a plan worktree of this checkout`);continue;}
+  // Physically too: a linked .worktrees/ or worktree folder may point anywhere.
+  let physical='';
+  try{physical=realpathSync(tree.path);}catch{/* Gone: kept below. */}
+  if(physical!==''&&(physical!==join(realRoot,WORKTREES,slug)||realpathSync(join(canonical,WORKTREES))!==join(realRoot,WORKTREES))){say(`skipped  ${tree.path}: resolves to ${physical}, outside ${join(realRoot,WORKTREES)}`);continue;}
   if(tree.branch!==branch){keep(`on ${tree.branch===''?'a detached HEAD':tree.branch}, not plan/${slug}`);continue;}
   if(!existsSync(tree.path)){keep('its folder is gone; `git worktree prune` clears it');continue;}
-  const unlanded=git(canonical,['cherry','origin/main',branch]).split('\n').filter(line=>line.startsWith('+')).length;
-  if(unlanded>0){keep(`${String(unlanded)} commit(s) not on main`);continue;}
+  // Landed means the tip is on main itself (land fast-forwards): \`git cherry\` would miss a merge's own changes.
+  if(!onMain(canonical,tree.head)){keep(`${String(aheadOfMain(canonical,tree.head))} commit(s) not on main`);continue;}
   const dirty=git(tree.path,['status','--porcelain','--untracked-files=all']).split('\n').filter(Boolean);
   if(dirty.length>0){keep(`${String(dirty.length)} uncommitted path(s), first ${dirty[0]?.slice(3)}`);continue;}
   const gitDir=git(tree.path,['rev-parse','--absolute-git-dir']).trim();
-  if(existsSync(join(gitDir,'wildshard-land.lock'))){keep('land is running there');continue;}
-  if(directories===undefined){keep('cannot list process working directories');continue;}
-  const real=realpathSync(tree.path),inside=[...directories].filter(([,path])=>path===real||path.startsWith(`${real}${sep}`)||path===tree.path||path.startsWith(`${tree.path}${sep}`));
-  if(inside.length>0){keep(`in use by pid ${inside.map(([pid])=>String(pid)).join(', ')}`);continue;}
+  const busy=(/** @type {Map<number,string>|undefined} */ seen)=>seen===undefined?'cannot list process working directories'
+   :[...seen].filter(([,path])=>path===physical||path.startsWith(`${physical}${sep}`)).map(([pid])=>String(pid)).join(', ');
+  const using=busy(directories);
+  if(using!==''){keep(directories===undefined?using:`in use by pid ${using}`);continue;}
   const idleHours=Math.max(0,(now-lastActivity(tree.path,gitDir))/3_600_000);
   if(options.graceHours>0&&idleHours<options.graceHours){keep(`active ${idleHours.toFixed(1)} h ago, under the ${String(options.graceHours)} h grace`);continue;}
-  if(options.dryRun){say(`would reap ${slug}: landed, clean, idle ${idleHours.toFixed(1)} h`);reaped.push(slug);continue;}
-  const removed=tryGit(canonical,['worktree','remove',tree.path]);
-  if(removed.status!==0){keep(`git worktree remove refused: ${removed.stderr.trim()}`);continue;}
+  // Hold the worktree's land lock (land can't start under it; a running land holds it already), then check again
+  // what could have changed since: HEAD, a commit, an edit, a new process inside, a worktree setup.
+  /** @type {(() => void)|undefined} */let release;
+  try{release=pidLock(join(gitDir,'wildshard-land.lock'));}catch(error){keep(error instanceof Error?error.message:String(error));continue;}
+  if(release===undefined){keep('land is running there');continue;}
+  try{
+   const head=tryGit(tree.path,['rev-parse','HEAD']).stdout.trim();
+   const now2=git(tree.path,['status','--porcelain','--untracked-files=all']).trim();
+   const using2=busy(processDirectories());
+   const why=head!==tree.head?`HEAD moved to ${head.slice(0,10)} during the check`:now2!==''?'edited during the check':using2!==''?`in use during the check (${using2})`
+    :existsSync(join(common,'wildshard-worktree-setup.lock'))?'a worktree setup started during the check':!onMain(canonical,head)?'not on main during the check':'';
+   if(why!==''){keep(why);continue;}
+   if(options.dryRun){say(`would reap ${slug}: landed, clean, idle ${idleHours.toFixed(1)} h`);reaped.push(slug);continue;}
+   const removed=tryGit(canonical,['worktree','remove',tree.path]);
+   if(removed.status!==0){keep(`git worktree remove refused: ${removed.stderr.trim()}`);continue;}
+  }finally{release();}
   // Only while the branch is still the commit checked above; anything newer is somebody's work.
   const deleted=tryGit(canonical,['update-ref','-d',branch,tree.head]);
   say(`reaped   ${slug}: worktree removed${deleted.status===0?', branch deleted':`, branch kept (${deleted.stderr.trim()})`}`);
@@ -127,7 +152,7 @@ export function reap(canonical,options,env,say){
   if(sha===''){if(listed.status!==0)say(`         ${slug}: origin not reachable; its remote branch is left`);continue;}
   // The remote branch goes only if it is landed too: its commit must be here and add nothing main lacks.
   if(tryGit(canonical,['cat-file','-e',`${sha}^{commit}`]).status!==0){remotes.push(`${slug} kept (origin has ${sha.slice(0,10)}, unknown here)`);say(`         ${slug}: origin plan/${slug} is ${sha.slice(0,10)}, not fetched here; left`);continue;}
-  if(git(canonical,['cherry','origin/main',sha]).split('\n').some(line=>line.startsWith('+'))){remotes.push(`${slug} kept (origin has unlanded commits)`);say(`         ${slug}: origin plan/${slug} holds commits not on main; left`);continue;}
+  if(!onMain(canonical,sha)){remotes.push(`${slug} kept (origin has unlanded commits)`);say(`         ${slug}: origin plan/${slug} holds commits not on main; left`);continue;}
   const pushed=tryGit(canonical,['push','--quiet',`--force-with-lease=${branch}:${sha}`,'origin','--delete',branch]);
   if(pushed.status===0){remotes.push(`${slug} deleted`);say(`         ${slug}: origin plan/${slug} deleted`);}
   else{remotes.push(`${slug} delete failed`);say(`         ${slug}: origin plan/${slug} not deleted: ${pushed.stderr.trim()}`);}

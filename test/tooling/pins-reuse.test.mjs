@@ -3,7 +3,7 @@
 // canonical checkout and a linked plan worktree, as `worktree new` makes them.
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
@@ -154,6 +154,19 @@ describe('pins reuse', () => {
     }
   });
 
+  test('a linked public/ in the target is refused before anything is made behind it', async () => {
+    const {tree} = repos();
+    const outside = mkdtempSync(join(tmpdir(), 'pins-public-'));
+    roots.push(outside);
+    rmSync(join(tree, 'public'), {recursive: true, force: true});
+    symlinkSync(outside, join(tree, 'public'));
+    /** @type {string[]} */
+    const lines = [];
+    expect(await reusePins(tree, KEY, {log: line => { lines.push(line); }})).toBeUndefined();
+    expect(lines.at(-1)).toMatch(/public resolves outside the tree/u);
+    expect(readdirSync(outside)).toEqual([]);
+  });
+
   test('a tree installs one at a time, a busy source is skipped, and a dead holder\'s lock is taken over', async () => {
     const {root, tree} = repos();
     const release = lockPins(root);
@@ -167,10 +180,18 @@ describe('pins reuse', () => {
     expect(again).toBeTypeOf('function');
     again?.();
     // pid 2^22+1 is past macOS's and Linux's default pid range: a gone holder.
-    writeFileSync(join(root, 'out/.pins.lock'), `${String(2 ** 22 + 1)} 0 x`);
+    writeFileSync(join(root, 'out/.pins.lock'), String(2 ** 22 + 1));
     const taken = lockPins(root, {wait: false});
     expect(taken).toBeTypeOf('function');
+    expect(readFileSync(join(root, 'out/.pins.lock'), 'utf8')).toBe(String(process.pid));
     taken?.();
+    expect(existsSync(join(root, 'out/.pins.lock'))).toBe(false);
+    // A lock that is not a pid file is never taken over and never loops: it names itself.
+    mkdirSync(join(root, 'out/.pins.lock'));
+    expect(() => lockPins(root, {wait: false})).toThrow(/not a readable lock file/u);
+    rmSync(join(root, 'out/.pins.lock'), {recursive: true});
+    writeFileSync(join(root, 'out/.pins.lock'), 'garbage');
+    expect(() => lockPins(root)).toThrow(/does not hold a pid/u);
   });
 
   test('the key changes with the pins, the installer and the validation revision', () => {

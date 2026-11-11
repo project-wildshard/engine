@@ -20,8 +20,9 @@ function verifiedStamp(file,root){
  }catch{return false;}
 }
 
-/** Recorded test clocks: they decide how files are packed into shards, never what a test proves. */
-export const TIMING_RECORDS=/^test\/durations[^/]*\.jsonl?$/u;
+/** Recorded test clocks: they decide how files are packed into shards, never what a test proves. An explicit list: a
+ * new durations-shaped file is harness until it is named here. */
+export const TIMING_RECORDS=Object.freeze(['test/durations.json','test/durations-ring1.json','test/durations-source.json','test/durations-observations.jsonl']);
 
 /** Complete pushed ranges, never an arbitrary recent commit or a time-budgeted subset. `timingRecords` (land's
  * rebase rule only) counts the timing records as data, not harness: a rebase that only merged clocks stays carried.
@@ -44,7 +45,7 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
       if(!verifiedStamp(file,cwd))return {mode:'full',files:changed,reason:`Generated stamp does not match its actual inputs: ${file}`};
       continue;
     }
-    if(options.timingRecords&&TIMING_RECORDS.test(file))continue;
+    if(options.timingRecords&&TIMING_RECORDS.includes(file))continue;
     // These files run on hosted CI. Their independent static checks stay local.
     if(!options.hosted&&file.startsWith('.github/'))continue;
     if(file.endsWith('.md')&&(/^(?:docs|plans|project\/journal)\//u.test(file)||!file.includes('/'))){

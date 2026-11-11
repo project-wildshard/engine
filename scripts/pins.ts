@@ -36,7 +36,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 import { excludePublished } from './pins-exclude.mjs';
-import { dropManifest, lockPins, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
+import { dropManifest, folderName, insideTree, lockPins, mountPath, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 
@@ -214,9 +214,15 @@ async function installLocked(only: readonly string[], fromFormat: boolean): Prom
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
   if (unknown.length > 0) throw new Error(`Not pinned: ${unknown.join(', ')}`);
   const revision = shardfileValidationRevision(process.cwd());
-  for (const path of existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : []) rmSync(path, { force: true });
+  // Only plain public/ paths, under folders that are this tree's own: a ledger or a linked folder never reaches outside.
+  for (const path of existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : []) {
+    if (!mountPath(path)) continue;
+    insideTree(root, dirname(path));
+    rmSync(path, { force: true });
+  }
   const shared = tracked(), published = new Map<string, string>();
   const publish = (url: string, body: Uint8Array): void => {
+    if (!mountPath(url)) throw new Error(`A pin publishes ${url}, outside public/`);
     const hash = digest(body), held = published.get(url);
     mountHashes[url] = hash;
     if (held !== undefined && held !== hash) throw new Error(`Two pins publish different ${url}`);
@@ -226,7 +232,7 @@ async function installLocked(only: readonly string[], fromFormat: boolean): Prom
     }
     if (held !== undefined) return;
     published.set(url, hash);
-    mkdirSync(dirname(url), { recursive: true });
+    insideTree(root, dirname(url), true);
     writeFileSync(url, body);
   };
   let failed = 0;
@@ -247,6 +253,8 @@ async function installLocked(only: readonly string[], fromFormat: boolean): Prom
     if (receipt.indexHash !== sha256(fileNamed('shard.json'))) throw new Error(`${pin.slug}: its receipt names another index`);
     const folder = folderOf(files);
     if (folder === undefined) { failed++; console.error(`refused ${pin.slug}: no discovery document`); continue; }
+    if (!folderName(folder)) { failed++; console.error(`refused ${pin.slug}: product folder ${folder}`); continue; }
+    insideTree(root, 'out', true);
     const target = resolve('out', folder);
     rmSync(target, { recursive: true, force: true });
     const written: Record<string, string> = productHashes[folder] = {};

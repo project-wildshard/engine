@@ -22,3 +22,18 @@ and a per-worktree queue directory (neither exists yet).
 
 Engine's `AGENTS.md` agent section now points at `worktree.mjs new` and
 `reap` instead of the hand-made worktree (J241: below the marker only).
+
+J206 Codex review (with the pins fixes and land's clocks rule): eight
+MUSTs, all fixed. Landed now means the tip is on origin/main itself
+(`merge-base --is-ancestor`): `git cherry` skips merge commits, so a merge
+holding its own changes looked landed. A worktree whose folder resolves
+outside `<canonical>/.worktrees/` is skipped. Before removing, the reaper
+holds the worktree's land lock (`scripts/pid-lock.mjs`, land's format) and
+checks HEAD, the tree, the processes and setup again. The same lock module
+now backs `out/.pins.lock`: a whole-file link, takeover by rename only from
+a dead pid, and a folder or garbage lock fails loudly instead of looping.
+Containment is checked on the deepest existing folder before anything is
+made, and the full install's ledger and publish paths go through it too.
+land's carried pre-push gets `WS_PUSH_TIMING_RECORDS=1`, so it selects the
+plan's related tests as land's classifier did; the timing records are an
+explicit list of four files. The markdown hook resolves with `realpath`.

@@ -100,7 +100,9 @@ async function main(){
   // DS9: a plan branch push or a watching driver runs the split gate; hosted CI runs the rest.
   const split=splitRequested(env),profile=split?SPLIT_PROFILE:PUSH_PROFILE;
   /** @type {{mode:'full'|'related'|'docs',files:string[],reason:string,tests?:string[]}} */
-  let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS);
+  // land's carried rule counts timing records as data (WS_PUSH_TIMING_RECORDS=1, split gate only), so this gate selects
+  // what land's classifier selected: the plan's related tests, never the quick-suite-only split full mode.
+  let selection=pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd(),{timingRecords:split&&env.WS_PUSH_TIMING_RECORDS==='1'});
   const missing=missingTestTimings(env.WS_PUSH_REFS);
   const timing=missing.length===0?null:prepareTestTimings(missing,PUSH_PROFILE);
   const context=capturePushTree(profile,env),proof=context===null||timing!==null?null:readPushProof(context,selection);

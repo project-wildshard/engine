@@ -64,6 +64,7 @@ while read old new ref; do echo "$ref $new" >> "$PUSHED_LOG"; done
 const PRE_PUSH = `#!/bin/sh
 refs=$(cat)
 echo "post_ci=\${WS_PUSH_POST_CI:-0} $refs" >> "$PREPUSH_LOG"
+echo "timing=\${WS_PUSH_TIMING_RECORDS:-0} \${WS_PUSH_POST_CI:-0}" >> "$PREPUSH_LOG.timing"
 printf '%s\\n' "$refs" | node "$RECORD_PLAN_PUSH"
 [ -f "$PREPUSH_FAIL" ] && { echo "pre-push: planted red check"; exit 1; }
 case "$refs" in *refs/heads/main*) if [ -f "$PREPUSH_RACE" ]; then rm "$PREPUSH_RACE"; sh "$RACE_SCRIPT"; fi ;; esac
@@ -478,6 +479,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/carried\s+disjoint/u);
+    // The carried pre-push selects as land did: timing records as data, so the plan's related tests run.
+    expect(f.read(`${f.files.prepush}.timing`).trim().split('\n').at(-1)).toBe('timing=1 1');
     expect(f.git(f.remote, ['show', 'main:test/durations.json'])).toMatch(/"test\/t1\.test\.ts": 11,[\s\S]*"test\/t10\.test\.ts": 100/u);
     expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
   }, 60_000);

@@ -21,3 +21,6 @@ export function writeManifest(root: string, key: string, products: Manifest['pro
 export function lockPins(root: string, options?: { wait?: boolean }): (() => void) | undefined;
 export function hashFiles(files: readonly { path: string; bytes: number }[]): Promise<string[]>;
 export function reusePins(root: string, key: string, options?: { sources?: readonly string[]; log?: (line: string) => void }): Promise<Reused | undefined>;
+export function folderName(name: string): boolean;
+export function mountPath(path: string): boolean;
+export function insideTree(root: string, rel: string, make?: boolean): void;

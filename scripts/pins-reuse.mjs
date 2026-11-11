@@ -24,11 +24,12 @@
 // tree's lock (`out/.pins.lock`) from start to finish. WILDSHARD_PINS_REUSE=0 turns reuse off.
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {existsSync,lstatSync,mkdirSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,unlinkSync,writeFileSync} from 'node:fs';
+import {existsSync,lstatSync,mkdirSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {availableParallelism} from 'node:os';
 import {dirname,join,relative,resolve,sep} from 'node:path';
 import {Worker} from 'node:worker_threads';
 import {clonePaths} from './apfs-clone.mjs';
+import {pidLock} from './pid-lock.mjs';
 
 export const MANIFEST='out/.pins-manifest.json';
 const VERSION=2,KEY_VERSION='pins-reuse/2',LEDGER='out/.pins.json',LOCK='out/.pins.lock',PINS='test/pins/shardfiles.json';
@@ -58,11 +59,11 @@ export function pinsKey(root,revision){
 }
 
 /** A product folder name a full install could have made. @param {string} name */
-const folderName=name=>/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/u.test(name);
+export const folderName=name=>/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/u.test(name);
 /** A relative path with no way out of where it is joined. @param {string} path */
 const plainPath=path=>path!==''&&!path.startsWith('/')&&!path.includes('\\')&&!path.includes('\0')&&path.split('/').every(part=>part!==''&&part!=='.'&&part!=='..');
 /** A mount path: under public/, plain. @param {string} path */
-const mountPath=path=>path.startsWith('public/')&&plainPath(path);
+export const mountPath=path=>path.startsWith('public/')&&plainPath(path);
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
 const record=value=>typeof value==='object'&&value!==null&&!Array.isArray(value);
 
@@ -99,37 +100,30 @@ export function writeManifest(root,key,products,mounts){
  * send a delete or a write elsewhere. With `make`, the directory is created first.
  * @param {string} root @param {string} rel @param {boolean} [make]
  */
-function insideTree(root,rel,make=false){
- if(make)mkdirSync(join(root,rel),{recursive:true});
- const real=realpathSync(root),want=rel===''?real:join(real,rel);
- let got='';
- try{got=realpathSync(join(root,rel));}catch{if(!make)return;}
- if(got!==want)throw new Error(`${rel} resolves outside the tree (${got})`);
+export function insideTree(root,rel,make=false){
+ const real=realpathSync(root),at=(/** @type {string} */ path)=>path===''||path==='.'?real:join(real,path);
+ // The deepest folder that exists is checked before anything is made under it, and the result after.
+ let probe=rel;
+ while(probe!==''&&probe!=='.'&&!existsSync(join(root,probe)))probe=dirname(probe);
+ const found=realpathSync(join(root,probe));
+ if(found!==at(probe))throw new Error(`${probe===''?'.':probe} resolves outside the tree (${found})`);
+ if(probe===rel||probe===''&&rel==='.')return;
+ if(!make)return;
+ mkdirSync(join(root,rel),{recursive:true});
+ const made=realpathSync(join(root,rel));
+ if(made!==at(rel))throw new Error(`${rel} resolves outside the tree (${made})`);
 }
 
-const sleeper=new Int32Array(new SharedArrayBuffer(4));
 /**
- * Take `root`'s install lock: a file created exclusively with the holder's pid. A lock whose holder is gone is taken
- * over. With `wait`, a live holder is waited for (up to 15 minutes); without, undefined is returned at once.
+ * Take `root`'s install lock (out/.pins.lock, scripts/pid-lock.mjs). With `wait`, a live holder is waited for up to
+ * 15 minutes, then this throws; without, undefined is returned at once.
  * @param {string} root @param {{wait?:boolean}} [options] @returns {(() => void)|undefined} the release
  */
 export function lockPins(root,{wait=true}={}){
  insideTree(root,'out',true);
- const path=join(root,LOCK),token=`${String(process.pid)} ${String(Date.now())} ${Math.random().toString(36).slice(2)}`;
- for(const started=Date.now();;){
-  try{
-   writeFileSync(path,token,{flag:'wx'});
-   return ()=>{try{if(readFileSync(path,'utf8')===token)unlinkSync(path);}catch{/* Already gone. */}};
-  }catch(error){if(!(error instanceof Error)||!('code' in error)||error.code!=='EEXIST')throw error;}
-  let pid=0;
-  try{pid=Number(readFileSync(path,'utf8').split(' ')[0]);}catch{continue;}
-  let alive=false;
-  try{if(Number.isInteger(pid)&&pid>0){process.kill(pid,0);alive=true;}}catch(error){alive=error instanceof Error&&'code' in error&&error.code==='EPERM';}
-  if(!alive){try{unlinkSync(path);}catch{/* Someone else took it over. */}continue;}
-  if(!wait)return undefined;
-  if(Date.now()-started>15*60_000)throw new Error(`${path}: pid ${String(pid)} has held the pins lock for 15 minutes`);
-  Atomics.wait(sleeper,0,0,250);
- }
+ const release=pidLock(join(root,LOCK),{waitMs:wait?15*60_000:0});
+ if(release===undefined&&wait)throw new Error(`${join(root,LOCK)}: another install has held it for 15 minutes`);
+ return release;
 }
 
 const HASHER=`const {parentPort,workerData}=require('node:worker_threads');const {createHash}=require('node:crypto');const {readFileSync}=require('node:fs');
