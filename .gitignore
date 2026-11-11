@@ -150,6 +150,88 @@ public/assets/driftwood-isle/map/top.webp
 # the pre-push refused it (2026-11-11). Pure build output, never committed.
 /public/programs/
 
+# Pin outputs under public/assets/ (opus-pinignore, 2026-11-11). `pins.ts install` publishes each pinned shardfile's
+# asset mounts here, and only the canonical checkout's info/exclude lists them. A worktree made after a re-pin held the
+# new files untracked (Nalati's content-hashed astc6/ variants), so `worktree.mjs reap` kept it: `git worktree remove`
+# refuses untracked files. Directories only, each holding pin output and no tracked file, so a re-pin's new hashes stay
+# covered. A pin file beside tracked files (hdri/, models/hatchet/, music/folk/ ...) is left to info/exclude.
+# test/tooling/pins-ignore.test.mjs guards both halves: these paths ignored, no tracked public/ file matched.
+/public/assets/*/astc6/
+/public/assets/far-reach/
+/public/assets/nalati/
+/public/assets/pine-hollow/
+/public/assets/horizon/
+/public/assets/lut/
+/public/assets/nine-dragon/paint/
+/public/assets/nine-dragon/viewmodel/
+/public/assets/baked/driftwood-isle/tex/
+/public/assets/baked/pine-hollow/tex/
+/public/assets/gpu/baked/
+/public/assets/gpu/far-reach/
+/public/assets/gpu/horizon/
+/public/assets/gpu/nine-dragon/
+/public/assets/gpu/pine-hollow/
+/public/assets/gpu/tex/
+/public/assets/gpu/models/Lantern_01/
+/public/assets/gpu/models/dead_tree_trunk/
+/public/assets/gpu/models/hatchet/
+/public/assets/gpu/models/pine-hollow-hero/
+/public/assets/gpu/models/pine-hollow-trees/
+/public/assets/gpu/models/rock_moss_set_01/
+/public/assets/gpu/models/stone_fire_pit/
+/public/assets/gpu/models/tree_stump_01/
+/public/assets/gpu/models/wine_barrel_01/
+/public/assets/gpu/models/wooden_bucket_01/
+/public/assets/gpu/models/wooden_crate_02/
+/public/assets/models/driftwood-fp/
+/public/assets/models/driftwood-hero/
+/public/assets/models/pine-hollow-hero/
+/public/assets/music/alien-plain/
+/public/assets/music/clockwork-canyon/
+/public/assets/music/coral-drift/
+/public/assets/music/desert-ruin/
+/public/assets/music/ember-forge/
+/public/assets/music/fossil-badlands/
+/public/assets/music/frostline-peaks/
+/public/assets/music/jungle-ziggurat/
+/public/assets/music/lantern-bayou/
+/public/assets/music/mosslight-ruins/
+/public/assets/music/nalati/
+/public/assets/music/night-market/
+/public/assets/music/nine-dragon-stack/
+/public/assets/music/patchwork-fairground/
+/public/assets/music/pine-hollow-folk/
+/public/assets/music/pine-hollow-orchestral/
+/public/assets/music/pine-hollow-piano/
+/public/assets/music/saltwind-lighthouse/
+/public/assets/music/showcase-template/
+/public/assets/music/sky-harbor/
+/public/assets/music/sky-race/
+/public/assets/music/starfall-observatory/
+/public/assets/music/thin-ice/
+/public/assets/sfx/alien-plain/
+/public/assets/sfx/clockwork-canyon/
+/public/assets/sfx/coral-drift/
+/public/assets/sfx/desert-ruin/
+/public/assets/sfx/driftwood-isle/
+/public/assets/sfx/ember-forge/
+/public/assets/sfx/fossil-badlands/
+/public/assets/sfx/frostline-peaks/
+/public/assets/sfx/jungle-ziggurat/
+/public/assets/sfx/lantern-bayou/
+/public/assets/sfx/mosslight-ruins/
+/public/assets/sfx/nalati-grasslands/
+/public/assets/sfx/night-market/
+/public/assets/sfx/nine-dragon-stack/
+/public/assets/sfx/patchwork-fairground/
+/public/assets/sfx/pine-hollow/
+/public/assets/sfx/saltwind-lighthouse/
+/public/assets/sfx/showcase-template/
+/public/assets/sfx/sky-harbor/
+/public/assets/sfx/sky-race/
+/public/assets/sfx/starfall-observatory/
+/public/assets/sfx/thin-ice/
+
 # LS1 (J250): the renderer and validation revisions are computed live, never stamped; an old checkout's copies stay out.
 /scripts/renderer-revision.json
 /scripts/validation-revision.json
