@@ -483,20 +483,8 @@ export class NetRoom {
     for (const call of calls) if (!said.has(callLine(call))) events.push({ kind: 'view', tick, name: call.name, args: call.args });
     if (owed.length === 0) said.clear();
   }
-  private send(client: RoomClient, frame: WorldFrame, retired: readonly number[], combat: readonly RoomCombat[], lines: readonly ChatLine[], riders: ReadonlyMap<number, number>): void {
-    const { handles, world } = this, own = handles.refs(client.player.id), view = this.view(client, frame, own), events: NetEvent[] = [];
-    // A body whose Name changed (the next player in a room's lead body) comes back under a fresh handle: the old one goes first.
-    for (const handle of retired) if (handles.renewed.has(handle) && client.known.delete(handle)) events.push({ kind: 'despawn', handle });
-    for (const handle of view.visible) {
-      if (client.known.has(handle)) continue;
-      const row = handles.row(handle);
-      if (row === undefined) continue;
-      client.known.add(handle); client.owed.push(handle);
-      events.push({ kind: 'spawn', handle, cls: row.cls.id, id: row.id, initial: row.initial, text: row.text });
-    }
-    this.recalled(client, frame.tick, combat, events);
-    this.rideEvents(client, own, riders, frame.tick, events);
-    // Spawns, then what happened, then who left: a body's last hit and its death arrive before its despawn.
+  /** What this client hears of the tick's combat: what it can see, and what it landed or took. */
+  private fight(client: RoomClient, own: number, combat: readonly RoomCombat[], events: NetEvent[]): void {
     for (const row of combat) {
       if (row.kind === 'view') { events.push(row); continue; }
       if (row.kind === 'reward') { if (row.owner === client.player.id) { const { owner: _owner, ...reward } = row; events.push(reward); } continue; }
@@ -507,6 +495,30 @@ export class NetRoom {
       // the shooter's spark goes where it saw the body, everyone else's where the body is (J47, J50)
       events.push({ ...hit, at: owned ? seen ?? hit.at : hit.at, confirmFor: owned ? hit.confirmFor : 0 });
     }
+  }
+  private send(client: RoomClient, frame: WorldFrame, retired: readonly number[], combat: readonly RoomCombat[], lines: readonly ChatLine[], riders: ReadonlyMap<number, number>): void {
+    const { handles, world } = this, own = handles.refs(client.player.id), view = this.view(client, frame, own), events: NetEvent[] = [];
+    // A body whose Name changed (the next player in a room's lead body) comes back under a fresh handle. A client drops a body's
+    // id on its despawn, so the old handle's last hits and death, then its despawn, go before its successor's spawn.
+    let rows = combat;
+    const renewed = handles.renewed.size === 0 ? [] : retired.filter(handle => handles.renewed.has(handle) && client.known.has(handle));
+    if (renewed.length > 0) {
+      const old = (row: RoomCombat): boolean => (row.kind === 'died' && renewed.includes(row.id)) || (row.kind === 'hit' && renewed.includes(row.target));
+      this.fight(client, own, combat.filter(old), events);
+      for (const handle of renewed) { client.known.delete(handle); events.push({ kind: 'despawn', handle }); }
+      rows = combat.filter(row => !old(row));
+    }
+    for (const handle of view.visible) {
+      if (client.known.has(handle)) continue;
+      const row = handles.row(handle);
+      if (row === undefined) continue;
+      client.known.add(handle); client.owed.push(handle);
+      events.push({ kind: 'spawn', handle, cls: row.cls.id, id: row.id, initial: row.initial, text: row.text });
+    }
+    this.recalled(client, frame.tick, combat, events);
+    this.rideEvents(client, own, riders, frame.tick, events);
+    // Spawns, then what happened, then who left: a body's last hit and its death arrive before its despawn.
+    this.fight(client, own, rows, events);
     const quests = world.quests?.(client.player.id, client.questVersion) ?? null;
     if (quests !== null) {
       client.questVersion = quests.version;

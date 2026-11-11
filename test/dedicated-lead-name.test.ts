@@ -6,6 +6,10 @@ import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
+import { NetRoom, type NetPlayer, type NetWorld } from '../src/server/engine/net/room';
+import type { CombatEvent } from '../src/server/engine/net/combatWire';
+import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
+import type { NetClass } from '../src/shared/engine/net/schema';
 import { LEAD_SEAT } from '../src/server/host/standalone/cellWorld';
 import { LEFT } from '../src/server/host/dedicated/socketPump';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
@@ -81,4 +85,36 @@ test('a room left empty takes no ticks: the next lead still reads as themself to
   expect(room.bodyOf('c')?.id).toBe(LEAD_SEAT);
   expect(namesOf(d, LEAD_SEAT), 'a fresh page').toEqual(['Cy#3333']);
   expect(namesOf(c, 'p.d')).toEqual(['Di#4444']);
+});
+
+test('a hit the old lead took between frames reaches a page before the body goes, and the new one after', () => {
+  // A bare room: two bodies whose rows read nothing but a Name, and one hit settled on an odd tick.
+  let tick = 0, leadName = 'Ann#1111';
+  const pending: CombatEvent[] = [];
+  const cls = { ...PLAYER_CLASS, row: PLAYER_CLASS.row.map(column => ({ ...column, sample: () => 0 })), initial: PLAYER_CLASS.initial.map(column => ({ ...column, sample: () => 0 })),
+    text: [{ name: 'name', read: (view: { name: string }) => view.name }] } as unknown as NetClass<never>;
+  const body = (id: string): NetPlayer => ({ id, cls, sample: out => { out.fill(0); } });
+  const lead = body(LEAD_SEAT), other = body('p.b');
+  const world: NetWorld = { player: lead, tick: () => tick, cell: () => 0, combat: () => pending.splice(0),
+    visit: visitor => { visitor.entity(LEAD_SEAT, cls, { name: leadName } as never); visitor.entity('p.b', cls, { name: 'Bo#2222' } as never); } };
+  const room = new NetRoom({ world, step: () => { tick++; } });
+  const enter = (player: NetPlayer): { link: DirectLoopback; client: NetClient } => {
+    const link = directLoopback(), client = new NetClient(link.client);
+    room.join(link.server, player); client.hello('', { player: player.id, name: player.id }); link.pump(); return { link, client };
+  };
+  const a = enter(lead), b = enter(other);
+  room.open();
+  for (let n = 0; n < 4; n++) { room.tick(); a.link.pump(); b.link.pump(); }
+  const was = [...b.client.entities.values()].find(info => info.id === LEAD_SEAT)?.handle;
+  expect(was).toBeDefined();
+  const heard: { kind: string; handle: number; known: boolean }[] = [];
+  b.client.onCombat(event => { if (event.kind === 'hit') heard.push({ kind: 'hit', handle: event.target, known: b.client.entities.has(event.target) }); });
+  pending.push({ kind: 'hit', tick: 5, target: LEAD_SEAT, amount: 3, at: [0, 0, 0], head: false, killed: false, by: null, seq: 0 });
+  room.tick(); // tick 5: settled, no frame yet
+  a.link.server.close(); leadName = 'Cy#3333';
+  const c = enter(lead);
+  room.tick(); a.link.pump(); b.link.pump(); c.link.pump();
+  expect(heard, 'the old body\'s hit, while the page still holds it').toEqual([{ kind: 'hit', handle: was, known: true }]);
+  expect(namesOf({ device: 'b', ...b }, LEAD_SEAT)).toEqual(['Cy#3333']);
+  expect(b.client.entities.has(was ?? 0), 'and then it goes').toBe(false);
 });

@@ -33,3 +33,5 @@ next lead's welcome reused the stale row. The same held for a page already in th
 the next frame. Now a row whose text no longer reads the same takes a fresh handle; the old one retires at the next sweep
 and each client hears its despawn before the new spawn (the client drops a body's id on despawn, so the order matters).
 No wire change: the Name still goes only in a spawn, and only when it changed. `test/dedicated-lead-name.test.ts`.
+Review (codex) found the early despawn dropped the old body's queued hits and death for a page that held it; those now go
+first, then its despawn, then the successor's spawn (`NetRoom.fight`).
