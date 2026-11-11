@@ -41,7 +41,8 @@ Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STAN
    `--rounds=N` (main-moved retries, 6), `--poll=S` (30), `--no-watch-main`. Don't commit while it runs.
  - What it prints, one line per change: `land HH:MM:SS <state> <detail>`. States in order: `start`, `rebased`,
    `stamps`, `pushing`, `ci` (`ci success, ring-1 in_progress`…), `moved`, `carried` or `rerun` (with the reason),
-   `merging`, `landed`. A stop is one `land STOP <why and what to do>` line. Exit 0: landed or nothing to land.
+   `merging`, `landed`, `canonical` (the canonical checkout's main fast-forwarded to it, or a WARNING and a receipt
+   when that checkout is dirty, diverged or busy: it is never reset). A stop is one `land STOP <why and what to do>` line. Exit 0: landed or nothing to land.
    Exit 3: landed, but main's own run went red (carried case): fix forward now. Exit 1: stopped. If a `landed`
    line came before the stop, main already moved and only the watch of main's run failed: check main's Actions
    runs by hand; running land again just says `nothing`.
