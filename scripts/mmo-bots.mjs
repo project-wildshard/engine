@@ -4,6 +4,7 @@
 //   node scripts/mmo-bots.mjs replica [--bots 32] [--seconds 120] [--seats 32] [--workers 4] [--cells driftwood-isle] [--database <url>]
 //   node scripts/mmo-bots.mjs replica --remote wildshard [--cpus 9-13] ...   (MP1.2: the replica on the box's cores, bots on this Mac)
 //   node scripts/mmo-bots.mjs replica [--remote wildshard] --server-from <main commit> ...   (MP1.2: that commit's server code)
+//   node scripts/mmo-bots.mjs replica --remote wildshard-agent --bots-on-host [--bot-cpus 14-15] ...   (MP1.2: bots on the box too)
 //   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
 // release's own commit (its tree, an offline install, build-server's `--entry`), so their build and wire are the server's.
@@ -16,6 +17,9 @@
 // port to this Mac's loopback, so the bots and their forwarded addresses are exactly as on a local replica. The host's directory goes
 // when the run ends. It never touches the host's servers, units, env files or databases. Its ssh link keeps itself alive
 // (keepalives), so a quiet half hour doesn't end the run early with every bot 'lost'.
+// `--bots-on-host` (MP1.2, J266): the bots run on the host as well, pinned to `--bot-cpus` (away from the replica's and both
+// servers'), and dial the replica on the host's loopback, so no tunnel is needed: the hardened agent account forwards no ports.
+// Their build goes over ssh into the run's host directory, their report comes back over ssh, and the directory goes as before.
 // `--server-from <commit>` (MP1.2: measure a speed-up before a staging release carries it): the replica runs that commit's server
 // code, built here under the release's build name, so the release's packs still match it. The bots are built from the same
 // commit, so their code and wire are the server's exactly. It must descend from the release's build; the report names it
@@ -34,19 +38,24 @@ const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/proje
 // it); its /health stays tailnet-only (MMO-SERVER D7).
 const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
 const STAGING_SEATS = 16, STAGING_HEADROOM = 4, REPLICA_PORT = 18796;
+// `--remote`'s ssh links keep themselves alive, so a quiet half hour doesn't end a run early with every bot 'lost'.
+const ALIVE = ['-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8', '-o', 'TCPKeepAlive=yes'];
 // The door's SOCKETS_PER_IP: through Funnel every bot is this Mac's one address, and no header pretends otherwise.
 const PER_ADDRESS = 4;
 const [mode = '', ...rest] = process.argv.slice(2);
 const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, seconds: { type: 'string' }, seats: { type: 'string', default: '32' }, workers: { type: 'string', default: '4' },
   cells: { type: 'string', default: 'driftwood-isle' }, database: { type: 'string', default: 'memory:' }, keep: { type: 'boolean', default: false },
-  remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' } } });
+  remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
+  'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' } } });
 const serverFrom = values['server-from'];
 if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
 // These reach the host's shell inside the replica's env line: only slugs and whole numbers.
 if (!/^[a-z0-9-]+(?:,[a-z0-9-]+)*$/u.test(values.cells) || !/^\d{1,3}$/u.test(values.workers) || !/^\d{1,3}$/u.test(values.seats)) throw new Error('--cells is a slug list; --workers and --seats are whole numbers');
 const remote = values.remote;
 if (remote !== undefined && (mode !== 'replica' || !/^[\w.@-]+$/u.test(remote) || values.database !== 'memory:')) throw new Error('--remote is a replica on memory saves, named by an ssh host');
-if (!/^[\d,-]+$/u.test(values.cpus)) throw new Error('--cpus is a taskset list');
+if (!/^[\d,-]+$/u.test(values.cpus) || !/^[\d,-]+$/u.test(values['bot-cpus'])) throw new Error('--cpus and --bot-cpus are taskset lists');
+const botsOnHost = values['bots-on-host'];
+if (botsOnHost && remote === undefined) throw new Error('--bots-on-host needs --remote');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
 const bots = Number(values.bots ?? (mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
 if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > 3600) throw new Error('--bots 1..64, --seconds 5..3600');
@@ -110,6 +119,10 @@ let botsChild = null;
 let stopping = null;
 /** `--remote`: ends the host's replica and removes its directory. */
 let remoteStop = () => { /* local: the replica is a child of this script */ };
+/** `--remote`: runs one command on the host; `away` is the run's directory there, under the ssh user's home. */
+/** @type {((command: string, input?: Buffer | string) => Buffer) | null} */
+let hostSsh = null;
+let away = '';
 /** The replica never outlives this script: an error, Ctrl-C or a kill takes it down too. Every caller waits on the one stop,
  * and `room` stays set until the process has gone, so the exit hook can still kill it. */
 const stopRoom = async () => {
@@ -118,7 +131,9 @@ const stopRoom = async () => {
     const players = botsChild;
     if (players !== null && players.exitCode === null && players.signalCode === null) {
       const left = new Promise(resolve => { players.once('exit', resolve); });
-      players.kill('SIGTERM');
+      // On the host, the ssh client's signal never reaches the bots: they are told there, leave, and the ssh ends with them.
+      if (botsOnHost && hostSsh !== null) try { hostSsh(`pkill -TERM -f '[/]${away}/bots/mmoBots.mjs'`); } catch { /* already gone */ }
+      else players.kill('SIGTERM');
       const force = setTimeout(() => { players.kill('SIGKILL'); }, 15_000);
       await left; clearTimeout(force);
     }
@@ -154,9 +169,9 @@ if (mode === 'replica') {
   if (remote === undefined) room = spawn(process.execPath, [join(served, 'main.mjs')], { cwd: served, env, stdio: ['ignore', 'pipe', 'pipe'] });
   else {
     // The same bundle on the host: it fetches it itself and checks the same SHA-256, and the release file goes over ssh.
-    const away = `mmo-bench/${stamp}`;
-    const alive = ['-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8', '-o', 'TCPKeepAlive=yes'];
-    const ssh = (/** @type {string} */ command, /** @type {Buffer | string} */ input = '') => execFileSync('ssh', ['-o', 'BatchMode=yes', ...alive, remote, command], { input, stdio: ['pipe', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
+    away = `mmo-bench/${stamp}`;
+    const ssh = (/** @type {string} */ command, /** @type {Buffer | string} */ input = '') => execFileSync('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, command], { input, stdio: ['pipe', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
+    hostSsh = ssh;
     ssh(`mkdir -p ${away}/server && cat > ${away}/release.json`, readFileSync(join(work, 'release.json')));
     // `--server-from` sends its own bundle and its SHA-256; a release's is fetched there and checked against the release.
     const sha = serverBundle === null ? release.bundle.sha256 : createHash('sha256').update(bytes).digest('hex');
@@ -166,9 +181,11 @@ if (mode === 'replica') {
     const there = { ...env, PACK_CACHE: `$HOME/${away}/packs`, RELEASE_URL: `file://$HOME/${away}/release.json` };
     const words = Object.entries(there).filter(([name]) => name !== 'PATH' && name !== 'HOME').map(([name, value]) => `${name}="${value}"`).join(' ');
     remoteStop = () => { try { ssh(`pkill -TERM -f '[/]${away}/server/main.mjs'; sleep 2; pkill -KILL -f '[/]${away}/server/main.mjs'; rm -rf ${away}`); } catch { /* the host already cleaned it */ } };
-    room = spawn('ssh', ['-o', 'BatchMode=yes', ...alive, '-o', 'ExitOnForwardFailure=yes', '-L', `${String(REPLICA_PORT)}:127.0.0.1:${String(REPLICA_PORT)}`, remote,
+    // Bots on the host dial its loopback themselves; otherwise a tunnel brings the port here.
+    const tunnel = botsOnHost ? [] : ['-o', 'ExitOnForwardFailure=yes', '-L', `${String(REPLICA_PORT)}:127.0.0.1:${String(REPLICA_PORT)}`];
+    room = spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, ...tunnel, remote,
       `cd ${away}/server && exec env ${words} taskset -c ${values.cpus} node "$HOME/${away}/server/main.mjs"`], { stdio: ['ignore', 'pipe', 'pipe'] });
-    note({ step: 'remote', host: remote, cpus: values.cpus, dir: `~/${away}` });
+    note({ step: 'remote', host: remote, cpus: values.cpus, dir: `~/${away}`, ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}) });
   }
   let buffer = '', ready = false;
   room.stdout?.on('data', (/** @type {Buffer} */ chunk) => {
@@ -190,16 +207,25 @@ if (mode === 'replica') {
 // --- The bots
 if (mode === 'staging') await stagingRoom('before the first hello');
 const result = join(work, 'bots.json'), playing = readings.length;
+const botArgs = [url, release.engineBuild, String(bots), String(seconds), tag];
+if (botsOnHost && hostSsh !== null) {
+  // The bots' one bundle (no wasm: their route cursor is plain math) goes to the run's host directory; nothing else of this Mac does.
+  hostSsh(`mkdir -p ${away}/bots && cat > ${away}/bots/mmoBots.mjs`, readFileSync(join(out, 'mmoBots.mjs')));
+}
 const code = await new Promise(resolve => {
-  const child = spawn(process.execPath, [join(out, 'mmoBots.mjs'), url, release.engineBuild, String(bots), String(seconds), tag, result, mode === 'replica' ? 'forwarded' : 'own'], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const child = botsOnHost && remote !== undefined
+    ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
+    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own'], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   child.on('exit', resolve);
 });
+if (botsOnHost && hostSsh !== null) writeFileSync(result, hostSsh(`cat ${away}/bots.json`));
 const after = mode === 'staging' ? await health() : null;
 await stopRoom();
 const full = readings.slice(playing).filter(row => row.players === bots);
 const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code, ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
+  ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };

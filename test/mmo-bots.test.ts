@@ -92,3 +92,17 @@ test('the replica is stopped on every way out: the end, an error, or a signal', 
   expect(driver).not.toMatch(/(?<!let )room = null;/u);
   expect(driver).toContain("[['SIGINT', 130], ['SIGHUP', 129], ['SIGTERM', 143]]");
 });
+
+test('bots on the host need --remote, dial its loopback with no tunnel, and are told to leave there before the replica stops', () => {
+  for (const args of [['--bots-on-host'], ['--remote', 'wildshard-agent', '--bots-on-host', '--bot-cpus', '14;rm']]) {
+    const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', ...args], { encoding: 'utf8', timeout: 10_000 });
+    expect(run.status, args.join(' ')).not.toBe(0);
+    expect(run.stderr).toMatch(/--bots-on-host needs --remote|--bot-cpus are taskset lists/u);
+  }
+  expect(driver).toContain("const tunnel = botsOnHost ? [] : ['-o', 'ExitOnForwardFailure=yes', '-L'");
+  // The same loopback URL and forwarded addresses as a local replica's bots, pinned to their own cores.
+  expect(driver).toContain('exec taskset -c ${values[\'bot-cpus\']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(\' \')} "$HOME/${away}/bots.json" forwarded');
+  expect(driver.indexOf("hostSsh(`pkill -TERM -f '[/]${away}/bots/mmoBots.mjs'`)")).toBeLessThan(driver.indexOf("running.kill('SIGTERM')"));
+  // Their report comes back before remoteStop removes the host directory.
+  expect(driver.indexOf('hostSsh(`cat ${away}/bots.json`)')).toBeLessThan(driver.indexOf('await stopRoom();\nconst full'));
+});
