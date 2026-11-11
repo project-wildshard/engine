@@ -34,3 +34,19 @@ J206 Codex review: no MUST; its SHOULD (cover the real VoiceChat, not
 only a stub) is a test that drives VoiceChat through asking, joining,
 on, a B off and a server "full". The solo listener is `listenPage` on
 the level scope, so it goes with the level like every other one.
+
+## Jake's correction, 21:20 Cancún
+
+Jake, on the shots: "we don't have to show a banner in single player about
+there being no voice chat. Like, don't do that. Just don't do that." The
+single-player toast (`voiceElsewhere` in `clientWorker.ts` and the `toast`
+port it rode in on) is gone; B on a page with no voice is silent again. The
+online fixes stay: "Voice off", a closed tip coming back on a press, the
+no-WebRTC tip, and B ignored under a menu.
+
+His other note, "the voice chat is still in the old position", was the
+pictures, not the code: those shots were a desktop (no touch) page at phone
+size drawn over a v0.1.6 screenshot, where the corner sits top-left. On a
+phone the corner sits over MOVE (A14, QA 42/43); `voiceUi` only appends the
+mic and tip into `chatLines`' box, so they follow it. The new shots come
+from a real local online build of this commit with a touch phone.

@@ -30,7 +30,6 @@ import { creatureBodyShape } from '@wildshard/engine/sim/bands';
 import { lockOn } from '@wildshard/engine/player/AimTargets';
 import { perfDockSection } from '@wildshard/engine/ui/perfDock';
 import { isDev } from '@wildshard/engine/core/devMode';
-import { listenPage } from '@wildshard/engine/input/dom';
 import { showError } from '@wildshard/engine/ui/ErrorModal';
 import { saveSetting, type OptionValue } from '@wildshard/engine/ui/Settings';
 import { netNeighbourRegion } from '../grid/neighbourRows';
@@ -100,8 +99,6 @@ export interface WorkerClientPorts {
   readonly system: (system: SystemSpec) => void;
   /** Link what the first rows' bodies draw, under the card. A page that reveals nothing yet has no such step. */
   readonly linkBodies?: () => Promise<void>;
-  /** A short notice at the top of the HUD. */
-  readonly toast?: (text: string) => void;
 }
 interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell }
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
@@ -115,18 +112,6 @@ const SAVE_EVERY_MS = 30_000;
 const FIRST_ROWS_MS = 1500, FIRST_ROWS_POLL_MS = 20;
 /** How often a page whose frames are parked behind a panel still hears the server. */
 const PARKED_BEAT_MS = 120;
-/** QA rows 6, 10 and 14 (Jake, 2026-11-10: "B to talk doesnt seem to give any feedback"; "the B button probably did nothing
- *  because I'm in the wrong page"): voice lives in the online shell (src/client/host/online/voiceUi.ts). A page that runs its
- *  own world has none, so B there says why instead of nothing: where the build has online worlds, it names them. */
-function voiceElsewhere(scope: Scope, toast: (text: string) => void, online: boolean): void {
-  listenPage(scope, 'keydown', event => {
-    const target = event.target as HTMLElement | null;
-    if (event.code !== 'KeyB' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (target !== null && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/u.test(target.tagName))) return;
-    if (document.documentElement.dataset['wsMenu'] !== undefined) return;
-    toast(online ? 'No voice chat in single-player. Voice is in Shard select\'s online worlds.' : 'No voice chat here: this build plays offline.');
-  }, { capture: true });
-}
 const column = (name: string): number => ANIMAL_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), STATE = column('state'), ATTACK = column('attackT'), ATTACK_DUR = column('attackDur'), ATTACK_STAMP = column('attackStamp'), WINDING = column('winding'), TARGET = column('target'), FLINCH = column('flinch'), HP = column('hp'), ALIVE = column('alive'), RIDEABLE = column('rideable'), STRAFE = column('strafe'), BRACE = column('brace'), RISE = column('rise'), ACT = column('act');
 
@@ -332,8 +317,6 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const hosted = world !== undefined && page !== null && ports.grid !== null && await bootTask('server:grid-hosted', async () => (await onlineModule()).worldHostsGrid(world, hostsGrid));
   const shell = await (world !== undefined && page !== null && serverRoute(world, page, { page: ports.grid !== null, hosted }) === 'online' ? online(world, page) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
-  // The online shell (`redials`) has voice; any other has B say why it has none.
-  if (shell.redials !== true && ports.toast !== undefined) voiceElsewhere(scope, ports.toast, world !== undefined && page !== null && ports.grid !== null);
   // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held
   // body may already be back). Once the page can save, the hold below replaces this one.
   let ended = false, leaves = shell.leave === undefined ? (): void => undefined : holdLeaving(async () => { shell.pause(); await shell.leave?.(); });

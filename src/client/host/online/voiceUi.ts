@@ -12,6 +12,8 @@ import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './v
 // QA row 6 (Jake, 2026-11-10: "B to talk doesnt seem to give any feedback"): every press says what happened. Turning voice
 // off says so for a moment, a tip the player closed comes back on the next press, a browser with no voice says that, and B
 // under an open menu does nothing, because the mic it would open is hidden there (QA row 15).
+// Only online worlds say anything: a single-player page has no voice and B there stays silent (Jake, 2026-11-10: "we
+// don't have to show a banner in single player about there being no voice chat … Just don't do that").
 
 const CYAN = '#8fe3ff', NAVY = 'rgba(9,22,36,.86)', RED = '#ff7a7a', AMBER = '#ffc56b';
 /** The first-time tip, the "you're on, alone" tip and the "voice off" tip go after this long. */
