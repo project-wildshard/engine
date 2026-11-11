@@ -1,13 +1,18 @@
 // @vitest-environment happy-dom
 // oxlint-disable-next-line import/no-nodejs-modules -- Assert actual first-document CSS/module order.
 import { readFileSync } from 'node:fs';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { installScopeEnvironment, scopeEnvironment } from '../../../shared/engine/app/scopeEnvironment';
 import { loadShellTemplate, beginNavigationShell, waitForLoadingStyles } from './shell';
 import { guardBoot } from './stuck';
 import { saveStorage } from '../saves/slots';
 import { bootWaits } from '../../../shared/engine/boot/waits';
+
+// TS11: guardBoot's error modal is a lazy chunk (stuck.ts showFailure). On a cold hosted worker its transform outlasted
+// vi.waitFor's 1 s (ci 43076662972: 1016 ms, '' for 'failed to start'). Load it before any case: the RL4 / MF3 case
+// tests the boot net's choices, not Vite's cold transform, and the same lazy import() still runs inside the case.
+beforeAll(async () => { await import('../ui/ErrorModal'); });
 
 const native = scopeEnvironment();
 let owner = new Scope('tap-test'), next = 1;
