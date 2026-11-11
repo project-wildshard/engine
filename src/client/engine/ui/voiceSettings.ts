@@ -27,25 +27,48 @@ const DEFAULTS: VoiceSettings = { input: '', volume: 1, mode: 'toggle' };
 const slot = saves.define({ key: 'voiceSettings', scope: 'device', version: 1,
   schema: v.object({ input: v.pipe(v.string(), v.maxLength(512)), volume: v.pipe(v.number(), v.minValue(0), v.maxValue(1)), mode: v.picklist(['toggle', 'hold']) }),
   initial: (): VoiceSettings => ({ ...DEFAULTS }) });
-const listeners = new Set<(now: VoiceSettings) => void>();
-let remembered: VoiceSettings = { ...DEFAULTS };
+/** What every copy of this module on a page shares. The online shell is its own bundle (`online.js`) with its own copy of this
+ *  module, of the saves and of the input service, and only the game's copies hold the player's saves and key bindings. So each
+ *  copy lends what it can reach, in load order (the game's first: Menu.ts imports this at boot), and a read takes the first answer. */
+interface Hub {
+  now: VoiceSettings | null;
+  readonly readers: Set<() => VoiceSettings>;
+  readonly writers: Set<(now: VoiceSettings) => void>;
+  readonly keys: Set<() => readonly string[] | null>;
+  readonly listeners: Set<(now: VoiceSettings) => void>;
+}
+const HUB = Symbol.for('wildshard.voiceSettings');
+const hub = ((): Hub => {
+  const page = globalThis as { [HUB]?: Hub };
+  page[HUB] ??= { now: null, readers: new Set(), writers: new Set(), keys: new Set(), listeners: new Set() };
+  return page[HUB];
+})();
+hub.readers.add(() => slot.read());
+hub.writers.add(now => { slot.write(now); });
+hub.keys.add(() => {
+  for (const { action, codes } of app.input.bindings.entries()) if (action === VOICE_TALK && codes.length > 0) return codes;
+  return null;
+});
 
 /** This device's voice settings; a page with no storage keeps them for the visit. */
 export const voiceSettings = {
-  read(): VoiceSettings { try { return slot.read(); } catch { return remembered; } },
+  read(): VoiceSettings {
+    if (hub.now !== null) return hub.now;
+    for (const reader of hub.readers) { try { hub.now = reader(); return hub.now; } catch { /* This copy has no saves: ask the next. */ } }
+    return DEFAULTS;
+  },
   write(change: Partial<VoiceSettings>): void {
     const now = { ...voiceSettings.read(), ...change };
-    remembered = now;
-    try { slot.write(now); } catch { /* Kept for this visit only. */ }
-    for (const listener of listeners) listener(now);
+    hub.now = now;
+    for (const writer of hub.writers) { try { writer(now); break; } catch { /* Kept for this visit only, unless another copy saves it. */ } }
+    for (const listener of hub.listeners) listener(now);
   },
-  on(listener: (now: VoiceSettings) => void): () => void { listeners.add(listener); return () => { listeners.delete(listener); }; },
+  on(listener: (now: VoiceSettings) => void): () => void { hub.listeners.add(listener); return () => { hub.listeners.delete(listener); }; },
 };
 
-/** The keys bound to talk now, as binding codes (`KeyB`, `Shift`, `Mouse3`); `B` where no context binds it. */
+/** The keys bound to talk now, as binding codes (`KeyB`, `Shift`, `Mouse3`); `B` where no copy's bindings name it. */
 export function voiceTalkKeys(): readonly string[] {
-  try { for (const { action, codes } of app.input.bindings.entries()) if (action === VOICE_TALK && codes.length > 0) return codes; }
-  catch { /* No input yet (a page still booting, a test): B. */ }
+  for (const keys of hub.keys) { try { const found = keys(); if (found !== null) return found; } catch { /* No input in this copy: ask the next. */ } }
   return ['KeyB'];
 }
 /** The talk key as the player reads it: `B`. */
