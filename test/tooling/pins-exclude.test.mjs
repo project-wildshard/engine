@@ -6,7 +6,8 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {excludePublished, excludeText, excludedPaths} from '../../scripts/pins-exclude.mjs';
+import {excludePublished, excludeText, excludedPaths, pinsOutputs} from '../../scripts/pins-exclude.mjs';
+import {capturePushTree} from '../../scripts/push-proof-cache.mjs';
 
 /** @type {string[]} */
 const roots = [];
@@ -60,5 +61,25 @@ describe('pins exclude block', () => {
     expect(excludeText('', [])).toBe(`${BEGIN}\n${END}\n`);
     expect([...excludedPaths(legacy)]).toEqual(['public/old']);
     expect([...excludedPaths(`${BEGIN}\n/public/x\n`)]).toEqual([]);
+  });
+
+  test("the push proof ignores this tree's own untracked pins outputs, and nothing else (voice2's fresh clone)", () => {
+    const root = mkdtempSync(join(tmpdir(), 'pins-proof-'));
+    roots.push(root);
+    git(root, ['init', '-q', '-b', 'main']);
+    writeFileSync(join(root, '.gitignore'), '/out/\n');
+    git(root, ['add', '.gitignore']);
+    git(root, ['-c', 'user.name=T', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'seed']);
+    const head = git(root, ['rev-parse', 'HEAD']);
+    // No exclude block was ever written: the published mount shows as untracked.
+    publish(root, 'public/assets/a/m.bin');
+    mkdirSync(join(root, 'out'), {recursive: true});
+    writeFileSync(join(root, 'out/.pins.json'), JSON.stringify({revision: 'r', published: ['public/assets/a/m.bin', '../escape', 'public/../x']}));
+    expect([...pinsOutputs(root)]).toEqual(['public/assets/a/m.bin']);
+    const capture = () => capturePushTree('p', {WS_PUSH_REFS: `refs/heads/main ${head} refs/heads/main ${'0'.repeat(40)}`}, root);
+    const clean = (() => { try { capture(); return ''; } catch (error) { return error instanceof Error ? error.message : String(error); } })();
+    expect(clean).not.toMatch(/clean checked tree/u);
+    publish(root, 'public/assets/a/stray.bin');
+    expect(capture).toThrow(/requires a clean checked tree/u);
   });
 });

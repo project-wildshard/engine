@@ -6,6 +6,7 @@ import {homedir,hostname} from 'node:os';
 import * as v from 'valibot';
 import {readLiftPending} from './lift-pending.mjs';
 import {pushDependencyIdentity} from './push-dependencies.mjs';
+import {pinsOutputs} from './pins-exclude.mjs';
 
 /** The scope is the actual publishing repository, never a caller's cache key.
  * @param {string} root @param {NodeJS.ProcessEnv} env @param {string} tree @param {string} runtime */
@@ -57,7 +58,11 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
     if(git(['rev-parse','--verify',`${local}^{tree}`])!==tree)throw new Error('Push target tree differs from the checked HEAD tree; check the exact target in an immutable checkout');
   }
   if(env.CI||env.GITHUB_ACTIONS)return null;
-  if(git(['status','--porcelain','--untracked-files=normal'])!==''){
+  // Pins outputs this tree's own install published are build output, like out/: a worktree whose canonical checkout
+  // never wrote the exclude block lists them untracked, and they never make the tree dirty (pins-exclude.mjs).
+  const pinned=pinsOutputs(cwd);
+  const dirty=git(['status','--porcelain','-z','--untracked-files=all']).split('\0').filter(Boolean).filter(line=>!(line.startsWith('?? ')&&pinned.has(line.slice(3))));
+  if(dirty.length>0){
     if(publishes)throw new Error('Push target requires a clean checked tree; enqueue a committed immutable checkout');
     return null;
   }
