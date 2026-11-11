@@ -207,17 +207,41 @@ function linkPackageNodeModules(repo, tree) {
   }
 }
 
+/** The global virtual store's `links/` folder when the checkout's install uses it (GVS G9), from pnpm's own metadata;
+ * undefined for a classic install, whose virtual store is the checkout's `node_modules/.pnpm`.
+ * @param {string} modules @returns {string | undefined} */
+function globalLinks(modules) {
+  try {
+    const metadataFile = realpathSync(join(modules, '.modules.yaml'));
+    const directory = virtualStoreDirectory(readFileSync(metadataFile, 'utf8'));
+    if (directory === undefined) return undefined;
+    const links = realpathSync(resolve(dirname(metadataFile), directory));
+    return links === realpathSync(dirname(metadataFile)) || links.endsWith(`${sep}.pnpm`) ? undefined : links;
+  } catch { return undefined; }
+}
+
+/** `links/<scope or @>/<name>/<version>/<hash>/node_modules/<name>`: the first installed slot of exactly that version.
+ * @param {string} links @param {string} name @param {string} version @returns {string | undefined} */
+function globalTarget(links, name, version) {
+  const [scope, bare] = name.startsWith('@') ? name.split('/') : ['@', name];
+  const folder = join(links, scope, bare, version);
+  if (!existsSync(folder)) return undefined;
+  return readdirSync(folder).sort().map(hash => join(folder, hash, 'node_modules', name)).find(target => existsSync(target));
+}
+
 /**
  * the tree's manifest can name a dependency the checkout's package folder lacks (an install made from a different working
  * manifest, e.g. another agent's uncommitted package.json): link pnpm's stored copy of exactly that version when it is
- * installed (`node_modules/.pnpm/<name>@<version>…/node_modules/<name>`), so a clean export resolves what its commit declares
+ * installed (`node_modules/.pnpm/<name>@<version>…/node_modules/<name>`, or the global store's slot of it), so a clean
+ * export resolves what its commit declares
  */
 function linkMissingDependencies(repo, pkgDir, to) {
   const manifest = join(pkgDir, 'package.json'), store = resolve(repo, 'node_modules', '.pnpm');
-  if (!existsSync(manifest) || !existsSync(store)) return;
+  const links = globalLinks(resolve(repo, 'node_modules'));
+  if (!existsSync(manifest) || (links === undefined && !existsSync(store))) return;
   const json = JSON.parse(readFileSync(manifest, 'utf8'));
   const deps = { ...json.dependencies, ...json.devDependencies, ...json.optionalDependencies };
-  const entries = readdirSync(store);
+  const entries = links === undefined ? readdirSync(store) : [];
   for (const [name, range] of Object.entries(deps)) {
     if (typeof range !== 'string' || present(join(to, name))) continue;
     if (range.startsWith('workspace:')) {
@@ -231,9 +255,9 @@ function linkMissingDependencies(repo, pkgDir, to) {
       symlinkSync(relative(dirname(link), join(sources, local)), link);
       continue;
     }
-    const prefix = `${name.replace('/', '+')}@${range.replace(/^[\^~=]/u, '')}`;
+    const version = range.replace(/^[\^~=]/u, ''), prefix = `${name.replace('/', '+')}@${version}`;
     const hit = entries.find((entry) => entry === prefix || entry.startsWith(`${prefix}_`));
-    const target = hit === undefined ? undefined : join(store, hit, 'node_modules', name);
+    const target = links !== undefined ? globalTarget(links, name, version) : hit === undefined ? undefined : join(store, hit, 'node_modules', name);
     if (target === undefined || !existsSync(target)) continue;
     mkdirSync(dirname(join(to, name)), { recursive: true });
     symlinkSync(target, join(to, name));

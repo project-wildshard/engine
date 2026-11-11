@@ -55,6 +55,9 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
       - uses: ./.github/actions/org-deps
       - run: pnpm install --frozen-lockfile --config.ci=false
       - name: Admit exact green main source
@@ -100,6 +103,9 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
       - uses: ./.github/actions/org-deps
       - run: pnpm install --frozen-lockfile --config.ci=false
       - name: Install the source's own tree

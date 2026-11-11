@@ -109,9 +109,10 @@ export function audioTableRefs(tables: {readonly sfx?: unknown; readonly music?:
 }
 /** The bundler manifest (`.vite/manifest.json`: source key → {file}) as emitted non-code file → every source naming it.
  *  A vendor source (the key starts at the install root: `node_modules/…`, or above the project: `../../../../node_modules/
- *  .pnpm/three@0.186.0/node_modules/three/…`) is keyed by its package path, `node_modules/three/…`: the relative prefix and
- *  the store layout depend on where the build ran (a local mirror vs CI's checkout broke Pine's list on CI, 5591d76604).
- *  Any other key, even one with a `node_modules/` folder inside the project, keeps its project path (sp-x9). */
+ *  .pnpm/three@0.186.0/node_modules/three/…`, or pnpm's global virtual store outside the checkout: `../../…/pnpm/store/v10/
+ *  links/@/three/0.186.0/<hash>/node_modules/three/…`, GVS G9) is keyed by its package path, `node_modules/three/…`: the
+ *  relative prefix and the store layout depend on where the build ran (a local mirror vs CI's checkout broke Pine's list on
+ *  CI, 5591d76604). Any other key, even one with a `node_modules/` folder inside the project, keeps its project path (sp-x9). */
 export function bundlerSources(manifest: unknown): ReadonlyMap<string, readonly string[]> {
   const found = new Map<string, string[]>();
   if (!object(manifest)) return found;
@@ -119,7 +120,8 @@ export function bundlerSources(manifest: unknown): ReadonlyMap<string, readonly 
     const file = object(row) ? row['file'] : undefined;
     if (typeof file !== 'string' || /\.(?:js|mjs|css)$/u.test(file)) continue;
     // a vendor key's last `node_modules/` is its package (pnpm nests the store: .pnpm/<pkg@ver>/node_modules/<pkg>/…)
-    const vendor = /^(?:\.\.\/)*node_modules\//u.test(key), at = key.lastIndexOf('/node_modules/');
+    // a key above or outside the project with a `node_modules/` in it is installed too: the global store lives elsewhere
+    const at = key.lastIndexOf('/node_modules/'), vendor = /^(?:\.\.\/)*node_modules\//u.test(key) || (/^(?:\.\.\/|\/)/u.test(key) && at !== -1);
     const source = !vendor ? key.replace(/^(?:\.\/)+/u, '') : at === -1 ? key.replace(/^(?:\.\.\/)+/u, '') : key.slice(at + 1);
     found.set(`/${file}`, [...found.get(`/${file}`) ?? [], source]);
   }

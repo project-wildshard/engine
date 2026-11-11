@@ -39,6 +39,29 @@ describe('linkNodeModules', () => {
     expect(readlinkSync(join(tree, 'src', 'format', 'node_modules', 'valibot'))).toBe(store);
   });
 
+  it('relinks a missing dependency from the global virtual store when the install uses it (GVS G9)', () => {
+    const root = scratch();
+    const repo = join(root, 'repo'), tree = join(root, 'tree'), links = join(root, 'store', 'v10', 'links');
+    const store = join(links, '@', 'valibot', '1.6.0', 'a1b2', 'node_modules', 'valibot');
+    mkdirSync(store, { recursive: true });
+    writeFileSync(join(store, 'package.json'), '{"name":"valibot","version":"1.6.0"}');
+    mkdirSync(join(repo, 'node_modules'), { recursive: true });
+    // pnpm's metadata names the store's links/ as the virtual store; the checkout has no node_modules/.pnpm at all
+    writeFileSync(join(repo, 'node_modules', '.modules.yaml'), JSON.stringify({ virtualStoreDir: relative(join(repo, 'node_modules'), links) }));
+    mkdirSync(join(repo, 'src', 'format', 'node_modules'), { recursive: true });
+    for (const dir of [repo, tree]) {
+      mkdirSync(join(dir, 'src', 'format'), { recursive: true });
+      writeFileSync(join(dir, 'src', 'format', 'package.json'), '{"name":"@wildshard/format","dependencies":{"valibot":"1.6.0"}}');
+    }
+    mkdirSync(join(tree, 'node_modules'), { recursive: true });
+    mkdirSync(join(tree, 'src', 'format', 'node_modules'), { recursive: true });
+    symlinkSync(join(links, '@', 'valibot', '1.5.0', 'c3d4', 'node_modules', 'valibot'), join(tree, 'src', 'format', 'node_modules', 'valibot'));
+
+    linkNodeModules(repo, tree);
+
+    expect(readlinkSync(join(tree, 'src', 'format', 'node_modules', 'valibot'))).toBe(store);
+  });
+
   it('repoints a package that left the workspace when its folder survives without a manifest', () => {
     const root = scratch();
     const repo = join(root, 'repo'), tree = join(root, 'tree');

@@ -18,7 +18,10 @@ runs:
       with:
         node-version-file: package.json
         cache: pnpm
-        cache-dependency-path: pnpm-lock.yaml
+        # the workspace file selects the store layout: a key on the lockfile alone never saves the first store links/
+        cache-dependency-path: |
+          pnpm-lock.yaml
+          pnpm-workspace.yaml
     - uses: ./.github/actions/org-deps
     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:

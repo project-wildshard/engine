@@ -77,7 +77,8 @@ mkdirSync(tree, { recursive: true });
 execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', release.engineBuild]) });
 for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts']) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
-execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
+// CI=1 keeps the install non-interactive; --config.ci=false keeps the global store on, which pnpm drops under ci (GVS G9)
+execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
 execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', 'mmoBots=test/fixtures/dedicated/mmoBotsEntry.ts'], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
 note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), from: release.engineBuild });
 
