@@ -27,8 +27,9 @@ import {cpus,totalmem} from 'node:os';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-/** Seconds a unit takes alone on the hosted runner (spikes 42953892606 and 42955579476); only the packing reads them. */
-export const UNIT_SECONDS=Object.freeze({static:180,e2e:20,'plan-proofs':30,quarantine:135,products:230,boundaries:60});
+/** Seconds a unit takes alone on the hosted runner; only the packing reads them. TEST-SPEED TS2 (2026-11-11): re-measured
+ * over 12 packed runs (42960973990 .. 42974435994): products grew from 205 to 347-384 s and set the long job. */
+export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quarantine:135,products:360,boundaries:32});
 const PHASE=Object.freeze({static:0,e2e:0,'plan-proofs':0,quarantine:2,products:3,boundaries:4});
 /** Units that go wherever another unit went, after it (they need its state), instead of being balanced on their own. */
 const FOLLOWS=Object.freeze(/** @type {Record<string,string>} */({boundaries:'products'}));
