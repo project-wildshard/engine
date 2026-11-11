@@ -61,3 +61,18 @@
   hello the v0 way, and four tests expected a wrong build to reload. They
   now hold 5.5: a v0.1.x hello reloads, another build of this wire plays
   (or meets a full world, as the right build would).
+- WR6, engine's half. `@wildshard/wire-released` is the wire at the last
+  release (shardfile `669d1fc` until `wire-v1.0.0` exists), installed
+  beside the bound wire; its lockfile entry keeps `path` by hand like the
+  bound one, and `wire-lockfile.test.ts` now guards every wire entry. Both
+  copies are `@wildshard/wire@0.0.0`, and TypeScript types one package as
+  the other when it resolves both, so the harness loads the released copy
+  by a specifier TypeScript never resolves, typed as the bound one's.
+  `test/contract-cross.test.ts` plays a released-wire client against the
+  real Sunscar room (hello, spawns, 30 frames with a lost ack, its cmds
+  driving the room) and this engine's NetClient against a released-wire
+  room a minor ahead (an animal field it lacks first, a kite class, an
+  unknown record, owner f64 bits, rides). `check:wire` runs the bound
+  wire's `wire check` in pre-push static checks and CI static, by the
+  package's own `bin.mjs`: both copies declare a `wire` bin, so
+  `node_modules/.bin/wire` could link either.

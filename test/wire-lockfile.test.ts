@@ -5,10 +5,13 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
-test('the wire lockfile entry keeps its subdirectory path', () => {
+// WR6 installs a second copy, the last wire release (`@wildshard/wire-released`), beside the bound one: both entries keep it.
+test('every wire lockfile entry keeps its subdirectory path', () => {
   const lock = readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8');
-  const entry = lock.split('\n\n').find(block => block.trimStart().startsWith("'@wildshard/wire@https://") && block.includes('resolution:'));
-  expect(entry, 'a @wildshard/wire package entry').toBeDefined();
-  expect(entry).toMatch(/resolution: \{path: \/packages\/wire, tarball: https:\/\/codeload\.github\.com\/project-wildshard\/shardfile\/tar\.gz\/[0-9a-f]{40}\}/u);
-  expect(entry).not.toMatch(/gitHosted/u);
+  const entries = lock.split('\n\n').filter(block => block.trimStart().startsWith("'@wildshard/wire@https://") && block.includes('resolution:'));
+  expect(entries.length, 'the bound wire, and the released one unless it is the same commit').toBeGreaterThanOrEqual(1);
+  for (const entry of entries) {
+    expect(entry).toMatch(/resolution: \{path: \/packages\/wire, tarball: https:\/\/codeload\.github\.com\/project-wildshard\/shardfile\/tar\.gz\/[0-9a-f]{40}\}/u);
+    expect(entry).not.toMatch(/gitHosted/u);
+  }
 });
