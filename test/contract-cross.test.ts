@@ -1,7 +1,9 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- The released wire's bytes are its identity.
+import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The room runs the shipped product bytes and physics module.
-import { readFileSync } from 'node:fs';
-// oxlint-disable-next-line import/no-nodejs-modules -- Where the released copy resolves is the guard that it is the release.
-import { createRequire } from 'node:module';
+import { readdirSync, readFileSync, realpathSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Walk the released package.
+import { join, relative, resolve } from 'node:path';
 import { WIRE_CLASSES as HEAD_CLASSES } from '@wildshard/wire/classes';
 import { decodeClassTables as headDecodeClassTables } from '@wildshard/wire/classTables';
 import { classColumns as headColumns, type ClassColumns } from '@wildshard/wire/columns';
@@ -56,6 +58,8 @@ import { builtProduct } from './fixtures/builtProduct';
  * TypeScript doesn't resolve: both copies are `@wildshard/wire@0.0.0`, and TypeScript would type one as the other.
  */
 const RELEASED = '@wildshard/wire-released';
+// packageDigest of shardfile 669d1fc's packages/wire (package.json "@wildshard/wire-released"): recompute when the pin moves.
+const RELEASED_DIGEST = 'b9f717b2bc9ec808541135b4c2a6cdfb5ec86f5b94af3ea350d1a0e8d342f46c';
 const released = async <Module>(path: string): Promise<Module> => (await import(/* @vite-ignore */ `${RELEASED}/${path}`)) as Module;
 const { encodeClassTables, decodeClassTables } = await released<typeof ClassTables>('classTables');
 const { WIRE_CLASSES } = await released<typeof Classes>('classes');
@@ -83,15 +87,26 @@ beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/ph
 // A released copy that is the bound one (the same pin, or a resolver that dedupes them) would make every test here green.
 beforeAll(() => {
   expect(classColumns, 'the released wire is its own copy, not the bound one').not.toBe(headColumns);
-  const path = createRequire(import.meta.url).resolve(`${RELEASED}/columns`);
-  if (path.includes('/.pnpm/')) expect(path, 'the released wire is shardfile 669d1fc').toContain('669d1fca');
-  else {
-    // On the global store (GVS G9) the slot's folder is a content hash, so pnpm's record of this install names the commit.
-    expect(path, 'the released wire is a store slot of @wildshard/wire').toMatch(/\/links\/@wildshard\/wire\/[^/]+\/[0-9a-f]+\/node_modules\/@wildshard\/wire\//u);
-    expect(readFileSync('node_modules/.pnpm/lock.yaml', 'utf8'), 'the released wire is shardfile 669d1fc')
-      .toMatch(/^ {6}'@wildshard\/wire-released':\n {8}specifier: [^\n]*\n {8}version: '@wildshard\/wire@[^'\n]*\/669d1fca/mu);
-  }
+  // The bytes the alias reaches, not where they sit: a classic slot's folder named the commit, a global-store slot's
+  // (GVS G9) is a content hash, and a link to another commit's slot passes any path check. Bump with RELEASED's pin.
+  const root = realpathSync(resolve('node_modules', RELEASED));
+  expect(packageDigest(root), 'the released wire is shardfile 669d1fc, byte for byte').toBe(RELEASED_DIGEST);
 });
+
+/** sha256 over a package's files (path and bytes, sorted), its own node_modules left out. */
+function packageDigest(root: string): string {
+  const hash = createHash('sha256');
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      if (entry.name === 'node_modules') continue;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else hash.update(`${relative(root, path)}\0`).update(readFileSync(path)).update('\0');
+    }
+  };
+  walk(root);
+  return hash.digest('hex');
+}
 
 async function sunscar(): Promise<TrustedHeadlessResident> {
   const directory = builtProduct('sunscar-dunes'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
