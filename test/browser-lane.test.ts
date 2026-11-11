@@ -11,7 +11,10 @@ const discovery = spawnSync('python3', ['-c',
 if (discovery.status !== 0) throw new Error(discovery.stderr);
 const cases: string[] = JSON.parse(discovery.stdout);
 if (cases.length === 0) throw new Error('Browser admission cases are missing');
+// TEST-SPEED TS11: the broken-lock case's own subprocess may take 12 s on a loaded machine (its wait is the 300 s
+// maximum, so waiting still fails it); every other case keeps the 8 s bound.
+const budgets: Readonly<Record<string, number>> = { test_broken_portable_lock_fails_without_waiting_or_starting_a_child: 16_000 };
 for (const name of cases) test(`browser admission: ${name}`, () => {
-  const result = spawnSync('python3', ['scripts/test_browser_lane.py', `BrowserAdmissionTests.${name}`], { encoding: 'utf8', timeout: 8000 });
+  const result = spawnSync('python3', ['scripts/test_browser_lane.py', `BrowserAdmissionTests.${name}`], { encoding: 'utf8', timeout: budgets[name] ?? 8000 });
   expect(result.status, result.stderr).toBe(0);
-}, 10000);
+}, (budgets[name] ?? 8000) + 2000);

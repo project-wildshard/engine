@@ -135,11 +135,14 @@ print('entered',flush=True);sys.stdin.read(1);sys.exit(7)
         self.assertEqual(after.returncode, 9, after.stderr)
 
     def test_broken_portable_lock_fails_without_waiting_or_starting_a_child(self):
-        env = self.portable_environment()
+        # TEST-SPEED TS11: "without waiting" is proved by the admission wait, not the wall clock. The wait is the
+        # 300 s maximum, so a run that waited for a slot could never finish inside the 12 s bound, while a loaded
+        # machine (bash, the lock helper and four kernel-lease probes starting slowly) still can.
+        env = {**self.portable_environment(), 'BROWSER_LANE_WAIT_SECONDS': '300'}
         (self.root/'.browser-lane'/'slot-0.lock').mkdir(parents=True)
         result = subprocess.run(['/bin/bash', str(ROOT/'scripts/browser-lane.sh'),
                                  'touch', str(self.root/'broken-child')],
-                                env=env, capture_output=True, text=True, timeout=3, check=False)
+                                env=env, capture_output=True, text=True, timeout=12, check=False)
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('slot lock failed', result.stderr)
         self.assertFalse((self.root/'broken-child').exists())
