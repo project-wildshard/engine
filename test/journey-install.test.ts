@@ -50,9 +50,10 @@ test('the actual SIX install bypasses a poisoned default store with a unique job
   const stores: string[] = [];
   for (const call of calls) {
     const args = call.trim().split('\n');
-    expect(args.slice(0, 5)).toEqual(['install', '--frozen-lockfile', '--package-import-method=copy', '--verify-store-integrity', '--store-dir']);
-    expect(args).toHaveLength(6);
-    stores.push(args[5] ?? 'missing');
+    // GVS G9 (J230): --config.ci=false keeps the global virtual store on under the runner's CI=true.
+    expect(args.slice(0, 6)).toEqual(['install', '--frozen-lockfile', '--config.ci=false', '--package-import-method=copy', '--verify-store-integrity', '--store-dir']);
+    expect(args).toHaveLength(7);
+    stores.push(args[6] ?? 'missing');
   }
   expect(new Set(stores)).toEqual(new Set(result.directories.map(name => resolve(result.runner, name))));
 });

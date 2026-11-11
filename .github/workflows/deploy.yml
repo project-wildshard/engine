@@ -364,7 +364,7 @@ jobs:
           git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"
       - name: Install exact recovery source dependencies
         if: ${{ success() && !cancelled() && env.RELEASE_ALLOWED == 'true' && (steps.pin.outputs.recovery == 'true' && steps.live.outputs.skip != 'true') }}
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.ci=false
       - name: Build proven recovery source with the pre-CI2 controller
         if: ${{ success() && !cancelled() && env.RELEASE_ALLOWED == 'true' && (steps.pin.outputs.recovery == 'true' && steps.live.outputs.skip != 'true') }}
         env:
@@ -452,7 +452,7 @@ jobs:
         run: |
           # An explicit recovery can name a tree from before the worker: it ships what it built.
           if [ ! -f scripts/cook-worker.mjs ]; then echo "no cook worker at the pin"; exit 0; fi
-          pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile --config.ci=false
           WILDSHARD_BUILD="$(node -p "JSON.parse(require('node:fs').readFileSync('../.vercel/output/static/version.json','utf8')).build")"
           export WILDSHARD_BUILD
           node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs recook
@@ -536,9 +536,12 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
       - uses: ./.github/actions/org-deps
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.ci=false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: test-products
@@ -592,9 +595,13 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with: {version: 10.34.9}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with: {node-version: 24, cache: pnpm}
+        with: {node-version: 24, cache: pnpm, cache-dependency-path: "pnpm-lock.yaml\npnpm-workspace.yaml"}
       - uses: ./.github/actions/org-deps
-      - run: pnpm install --frozen-lockfile
+      # GVS G9 (J230): pnpm 10.34.9 turns the global virtual store off whenever ci is true; every install here
+      # keeps the runner's CI environment and selects only the store layout, as ring-setup does.
+      - run: pnpm install --frozen-lockfile --config.ci=false
+      - name: Prove the installed global store layout
+        run: node scripts/assert-store-layout.mjs
       - name: Bind cache snapshot to source inputs
         id: inputs
         run: echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
@@ -851,9 +858,9 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with: {version: 10.34.9}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with: {node-version: '24.22.2', cache: pnpm}
+        with: {node-version: '24.22.2', cache: pnpm, cache-dependency-path: "pnpm-lock.yaml\npnpm-workspace.yaml"}
       - uses: ./.github/actions/org-deps
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --config.ci=false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: test-products
@@ -1024,10 +1031,10 @@ jobs:
         with: {version: 10.34.9}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         if: steps.admission.outputs.run == 'true'
-        with: {node-version: '24.22.2', cache: pnpm}
+        with: {node-version: '24.22.2', cache: pnpm, cache-dependency-path: "pnpm-lock.yaml\npnpm-workspace.yaml"}
       - uses: ./.github/actions/org-deps
         if: steps.admission.outputs.run == 'true'
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --config.ci=false
         if: steps.admission.outputs.run == 'true'
       - name: Bind cache snapshot to source inputs
         if: steps.admission.outputs.run == 'true'
@@ -1114,9 +1121,9 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with: {version: 10.34.9}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with: {node-version: '24.22.2', cache: pnpm}
+        with: {node-version: '24.22.2', cache: pnpm, cache-dependency-path: "pnpm-lock.yaml\npnpm-workspace.yaml"}
       - uses: ./.github/actions/org-deps
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --config.ci=false
       # Transform bytes only: Vitest keys file contents, resolve/config and
       # coverage, and checks the lockfile. Test bodies and setup still run.
       - name: Restore Vitest transformed modules
@@ -1241,9 +1248,9 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with: {version: 10.34.9}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with: {node-version: 24, cache: pnpm}
+        with: {node-version: 24, cache: pnpm, cache-dependency-path: "pnpm-lock.yaml\npnpm-workspace.yaml"}
       - uses: ./.github/actions/org-deps
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --config.ci=false
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
@@ -1351,7 +1358,7 @@ jobs:
       - name: Install exact dependencies from a fresh store
         run: |
           store="$(mktemp -d "${RUNNER_TEMP:?}/journey-pnpm-store.XXXXXX")"
-          pnpm install --frozen-lockfile --package-import-method=copy --verify-store-integrity --store-dir "$store"
+          pnpm install --frozen-lockfile --config.ci=false --package-import-method=copy --verify-store-integrity --store-dir "$store"
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/Library/Caches/ms-playwright
