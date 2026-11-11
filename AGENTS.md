@@ -78,6 +78,8 @@ When land stops (each seen on 2026-11-10/11):
  - `push of plan/<slug> … failed` (pre-push red): the failing check is printed above it. Seen: lint, an HTTPS
    remote using another GitHub login (403: use the SSH remote), a fresh clone with no pins exclude block (run
    `pnpm pins` in the canonical checkout). Fix forward, commit, run land again.
+ - `Push target requires a clean checked tree` with only pin outputs untracked (`public/programs/` and the like):
+   run `pnpm pins` in the worktree. The pins manifest is keyed by the validation revision, which LS1 moved once.
  - `origin plan/<slug> is at X, which this worktree's branch never reached`: someone else pushed your branch.
    Fetch, rebase your commits onto `origin/plan/<slug>` and run land again; or start a new worktree with a new slug
    and cherry-pick your commits. Never force over it.
