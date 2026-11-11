@@ -18,13 +18,15 @@ import { installManifestShardfile, installShardfileProduct } from '../src/client
 import { prepareBootImports } from '../src/client/app/bootDownloads';
 import { sourceManifest } from '../src/client/game/plugin/context';
 import { installShards, shards } from '../src/client/game/shard/list';
-import { game, setActiveChunk } from '../src/client/game/shard/registry';
+import { findShard, game, setActiveChunk } from '../src/client/game/shard/registry';
 import { Scope } from '../src/shared/engine/app/scope';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { leaseClientLibrary } from '../src/client/game/shardfile/clientLibrary';
 import { entryReadPlan } from '../src/client/game/grid/entryReadPrefetch';
 import { parseEntryReadSet } from '@wildshard/format/entryReads';
 import { installCatalogueFixture } from './fixtures/bootSetup';
+import { setPageMode } from '../src/shared/game/grid/pageMode';
+import { PageResidency } from '../src/client/game/grid/pageResidency';
 
 await installCatalogueFixture();
 
@@ -289,6 +291,27 @@ test.each([true, false])('first-party data admission retains Explore=%s without 
     expect(descriptorDetails.length).toBeGreaterThan(0);
     for (const detail of descriptorDetails) expect(detail).toContain(new URL(manifest.shardfile).pathname);
   } finally { installShards(previous); setActiveChunk(active.slug); }
+});
+
+// GO7, opus-tplseat: Shard select → the Template shard boots a grid page whose home is `_template`. The page admits that product
+// here, then the grid admits the same cell through the installed manifest's descriptor (`gridShardfileProduct`) and hands the home
+// claim off at the cell's regional charge (session.ts claims it, T7). This admission lost the descriptor ("not a shardfile shard")
+// and claimed the home at the one-shard page's cost ("Home residency differs"): the template card never reached its cell.
+test('a grid page\'s data home keeps its descriptor and leaves its home claim to the grid', async () => {
+  const { source, wires } = fixture(false, 0, 1, 'template');
+  const manifest = { ...sourceManifest(source), slug: '_template', shardfile: `${base}shard.json` };
+  const previous = shards(), active = game.shard, residency = new PageResidency();
+  try {
+    installShards([manifest]);
+    setPageMode('grid');
+    const installed = await installManifestShardfile(manifest, options(wires), {
+      instance: 'template-2', residency, recipes: new Map(), items: new Map(), catalogue: [],
+      voices: () => new Map(), icon: () => { throw new Error('No fixture item'); },
+    });
+    expect(installed.shardfile, 'the installed manifest names its product').toBe(manifest.shardfile);
+    expect(findShard('_template')?.shardfile, 'what the grid reads for the template cell').toBe(manifest.shardfile);
+    expect(residency.allocator.has('sim:template-2'), 'the home is the grid\'s to claim, at its regional charge').toBe(false);
+  } finally { setPageMode('shard'); residency.dispose(); installShards(previous); setActiveChunk(active.slug); }
 });
 
 test.each(['manifest', 'external'] as const)('%s admission finishes during kit imports but publishes only after them', async kind => {

@@ -17,6 +17,7 @@ import { PageResidency } from '../grid/pageResidency';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { GridRecoveryRecord } from '../../../shared/game/grid/recovery';
 import { bootPageMode, pageGridRecovery } from '../grid/pageEntry';
+import { currentPageMode } from '../../../shared/game/grid/pageMode';
 import { firstPartyInstance } from '../../../shared/game/grid/instances';
 import { game } from '../shard/registry';
 import { installShards, shards } from '../shard/list';
@@ -164,7 +165,12 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const admitted = await admitProduct(source, productOptions);
   if (prepared !== undefined) await prepared();
-  const client = clientSource(admitted, productOptions, { ...bindings, instance: bindings.residency === undefined ? firstPartyInstance(manifest.slug) : bindings.instance });
+  // T7, GO7: on a grid page (Shard select → a data cell, as the template's) a data home is claimed at the regional charge the grid's
+  // entry hands off (session.ts); a claim here at the one-shard page's cost made that handoff refuse ("Home residency differs"). A
+  // declared page keeps its claim here: session.ts admits none for it.
+  const { residency, ...unclaimed } = bindings, gridHome = residency !== undefined && currentPageMode() === 'grid' && !hasDeclaredClientPage(source);
+  const client = clientSource(admitted, productOptions, { ...(gridHome ? { ...unclaimed, allocator: residency.allocator } : bindings),
+    instance: residency === undefined ? firstPartyInstance(manifest.slug) : bindings.instance });
   const plan = sections?.get('client/plan');
   const sceneAudio = plan !== undefined && parseClientPlan(plan).features.some(row => row.kind === 'audio.scene');
   const { image: _unadmittedImage, ...mapLook } = manifest.minimap ?? {};
@@ -183,6 +189,9 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     ...(sceneAudio && page.boot !== undefined && manifest.boot?.audio !== undefined
       ? { boot: { ...page.boot, audio: manifest.boot.audio } } : {}),
     slug: manifest.slug, name: manifest.name, order: manifest.order, status: manifest.status, label: manifest.label,
+    // GO7: a grid page whose home is this shard admits its cell through the same descriptor (`gridShardfileProduct`); without it the
+    // cell stays "not a shardfile shard" and Shard select's template card never boots. A declared page keeps it by its spread.
+    shardfile: manifest.shardfile,
     ...(source.presentation === undefined ? { biome: manifest.biome, blurb: manifest.blurb, card: manifest.card } : {}),
     // The first-party viewer is authored presentation, independent of native page stages.
     ...(manifest.explore === undefined ? {} : { explore: manifest.explore }),

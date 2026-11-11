@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // GO4 on the rooms address: the grid page's gate, in a real browser, behind a front door that keeps `/health` private as D7 and
 // MS5.1's Caddy do (every plain HTTP request a 404 with no CORS; only the socket upgrade passes). The server runs WORLD_CELLS=grid
-// over Driftwood and the template, and the page must still learn the world hosts the grid: Shard select opens the deck, the template
-// card enters the grid at its cell, and the page boots past the loading card's `server` step on the world.
+// over Driftwood and the template, and the page must still learn the world hosts the grid: Shard select opens the deck, the Template
+// shard card enters the grid at the template's cell (GO7), the page boots past the loading card's `server` step on the world and the
+// player walks; then a second phone does the same from the Driftwood card and is seated in Driftwood.
 //   scripts/browser-lane.sh node scripts/grid-gate-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json>
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { connect } from 'node:net';
 import { join, resolve as absolute } from 'node:path';
@@ -46,37 +47,58 @@ try {
   note('the front door keeps /health private: 404, no CORS', shut.status === 404 && shut.headers.get('access-control-allow-origin') === null, { status: shut.status });
 
   const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
-  const context = await browser.newContext(phone), page = await context.newPage(), errors = /** @type {string[]} */ ([]), stepsSeen = new Set();
-  page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
-  // MG5: a phone's first PLAY skips the deck by design; a returning device opens it.
-  await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
-  // The template card is Developer's (its placement is hidden in the public catalogue), as in online-rig's pages.
-  await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-  await page.goto(`${rig.base}/?mute=1&nolock=1`, { waitUntil: 'load' });
-  await page.locator('.ws-main').waitFor({ state: 'visible', timeout: 120_000 }).catch(async () => { await page.screenshot({ path: join(shots, 'no-title.png') }); });
-  await page.locator('.ws-main-select').click({ timeout: 60_000 });
-  await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
-  note('Shard select opens the deck', true);
-  const index = await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].findIndex(card => /template/iu.test(card.textContent ?? '')));
-  note('the deck holds the template card', index >= 0, { index, cards: index >= 0 ? undefined : await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].map(card => card.textContent)) });
-  if (index < 0) throw new Error('No template card');
-  await page.locator(`.ws-menu-card[data-i="${String(index)}"]`).click();
-  await page.locator('.ws-menu-play').click();
-  // The guest's Name is asked once the page goes online; a page that stayed solo never asks.
-  const named = await page.locator('#ws-name-box input').waitFor({ timeout: 150_000 }).then(() => true).catch(() => false);
-  note('the grid page goes online and asks a Name', named);
-  if (named) { await page.locator('#ws-name-box input').fill('Gate'); await page.locator('#ws-name-box button[type=submit]').click(); }
-  const watch = setInterval(() => { void (async () => { const step = await page.evaluate(() => { const card = document.querySelector('.ws-load'); return card instanceof HTMLElement ? card.dataset.step ?? '' : ''; }).catch(() => ''); if (step !== '') stepsSeen.add(step); })(); }, 100);
-  const played = await page.waitForFunction(() => typeof window.__workerClient === 'function' && window.__workerClient().frames > 30, undefined, { timeout: 150_000 }).then(() => true).catch(() => false);
-  clearInterval(watch);
-  const where = await page.evaluate(() => { const state = /** @type {{ inside: string | null, cells: { instance: string, slug: string }[] }} */ (/** @type {{ state: () => unknown }} */ (window.__wildshard.shard.grid).state()); return { url: location.search, level: window.__wildshard.world?.game.level.id, inside: state.inside, slug: state.cells.find(cell => cell.instance === state.inside)?.slug, own: window.__workerClient?.().own }; }).catch((/** @type {unknown} */ error) => ({ error: String(error) }));
-  note('the template boots past `server` on the world: frames from the server', played, { steps: [...stepsSeen], ...where });
-  note('it is a grid page on the world, not the solo grid', 'level' in where && where.level === 'platform.grid' && played, where);
-  // Not this proof's gate: which cell the template card aims at is GO7's pick. With a Developer deck it names the hidden template
-  // placement, which WORLD_CELLS=grid doesn't open, so the door seats the player in Driftwood (2026-11-11, opus-gridgate's receipt).
-  console.log(`info the seat's cell: ${'slug' in where ? String(where.slug) : '?'} (the template card's cell is GO7's follow-up)`);
-  await page.screenshot({ path: join(shots, 'template-online.png') });
-  note('no page errors', errors.length === 0, errors);
+  /** One player on a fresh phone: Shard select → the card named `card` → Enter world, a Name, and play. The seat's cell must be `cell`.
+   *  @param {import('playwright').Browser} launched @param {string} card @param {string} cell @param {string} name */
+  const leg = async (launched, card, cell, name) => {
+    const context = await launched.newContext(phone), page = await context.newPage(), errors = /** @type {string[]} */ ([]), stepsSeen = new Set();
+    page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
+    // MG5: a phone's first PLAY skips the deck by design; a returning device opens it.
+    await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
+    // The template card is Developer's (its placement is hidden in the public catalogue), as in online-rig's pages.
+    await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+    await page.goto(`${rig.base}/?mute=1&nolock=1`, { waitUntil: 'load' });
+    await page.locator('.ws-main').waitFor({ state: 'visible', timeout: 120_000 }).catch(async () => { await page.screenshot({ path: join(shots, `${name}-no-title.png`) }); });
+    await page.locator('.ws-main-select').click({ timeout: 60_000 });
+    await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
+    note(`${name}: Shard select opens the deck`, true);
+    // By the card's own name: "Blender Template" (off the grid) also says template.
+    const index = await page.evaluate(wanted => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes(wanted)), card);
+    note(`${name}: the deck holds the ${card} card`, index >= 0, { index });
+    if (index < 0) throw new Error(`No ${card} card`);
+    // The deck's dot selects a card (a tap on an off-centre card lands on the captured track, as a swipe's end).
+    await page.locator('.ws-menu-dots i').nth(index).click();
+    const selected = await page.evaluate(() => document.querySelector('.ws-menu-card.selected')?.getAttribute('data-i'));
+    note(`${name}: the ${card} card is selected`, selected === String(index), { selected });
+    await page.locator('.ws-menu-play').click();
+    // The guest's Name is asked once the page goes online; a page that stayed solo never asks.
+    const named = await page.locator('#ws-name-box input').waitFor({ timeout: 150_000 }).then(() => true).catch(() => false);
+    note(`${name}: the grid page goes online and asks a Name`, named);
+    if (named) { await page.locator('#ws-name-box input').fill(name); await page.locator('#ws-name-box button[type=submit]').click(); }
+    const watch = setInterval(() => { void (async () => { const step = await page.evaluate(() => { const shown = document.querySelector('.ws-load'); return shown instanceof HTMLElement ? shown.dataset.step ?? '' : ''; }).catch(() => ''); if (step !== '') stepsSeen.add(step); })(); }, 100);
+    const played = await page.waitForFunction(() => typeof window.__workerClient === 'function' && window.__workerClient().frames > 30, undefined, { timeout: 150_000 }).then(() => true).catch(() => false);
+    clearInterval(watch);
+    const where = await page.evaluate(() => { const state = /** @type {{ inside: string | null, cells: { instance: string, slug: string }[] }} */ (/** @type {{ state: () => unknown }} */ (window.__wildshard.shard.grid).state()); return { level: window.__wildshard.world?.game.level.id, inside: state.inside, slug: state.cells.find(row => row.instance === state.inside)?.slug, own: window.__workerClient?.().own }; }).catch((/** @type {unknown} */ error) => ({ error: String(error) }));
+    note(`${name}: boots past \`server\` on the world: frames from the server`, played, { steps: [...stepsSeen], ...where });
+    note(`${name}: a grid page on the world, not the solo grid`, 'level' in where && where.level === 'platform.grid' && played, where);
+    // GO7: Shard select seats the player in the card's cell; the door's seat is the page's cell (GO5).
+    note(`${name}: seated in ${cell}`, 'inside' in where && where.inside === cell, where);
+    /** @returns {Promise<{ x: number, z: number } | null>} */
+    const feet = () => page.evaluate(() => { const at = window.__wildshard.world?.player.position; return at === undefined ? null : { x: at.x, z: at.z }; }).catch(() => null);
+    const before = await feet();
+    await page.keyboard.down('KeyW'); await new Promise(resolve => { setTimeout(resolve, 2500); }); await page.keyboard.up('KeyW');
+    const after = await feet();
+    const walked = before !== null && after !== null ? Math.hypot(after.x - before.x, after.z - before.z) : 0;
+    note(`${name}: the player walks`, walked > 1, { before, after, walked });
+    await page.screenshot({ path: join(shots, `${name}-online.png`) });
+    note(`${name}: no page errors`, errors.length === 0, errors);
+    await context.close();
+  };
+  // The template cell runs `_template` (MS7: WORLD_CELLS=grid opens it), and Driftwood is the home cell.
+  /** @type {{ grid: { cells: { instance: string, slug: string }[] } }} */
+  const catalogue = JSON.parse(readFileSync(join(dist, 'catalogue.json'), 'utf8'));
+  const templateCell = catalogue.grid.cells.find(row => row.slug === '_template')?.instance ?? '?';
+  await leg(browser, 'Template shard', templateCell, 'template');
+  await leg(browser, 'Driftwood Isle', 'driftwood-isle', 'driftwood');
   code = steps.every(step => step.ok) ? 0 : 1;
 } finally {
   writeFileSync(join(work, 'grid-gate-proof.json'), `${JSON.stringify({ steps, code }, null, 2)}\n`);
