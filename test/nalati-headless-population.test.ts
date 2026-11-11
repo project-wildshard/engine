@@ -8,9 +8,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
-import { compileProductWorker } from './fixtures/headless/compileProductWorker';
-import { productHeadlessSections } from '../src/shared/host/headlessSections';
-import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
+import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
 import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { canonicalSimDigest } from './fake/simState';
@@ -18,7 +16,7 @@ import { builtProduct } from './fixtures/builtProduct';
 import { jumpOwnerClock } from './fixtures/ownerClock';
 
 // P1-E3.1b: Nalati Grasslands' population on the shipped headless host, from its built product alone. The world's every
-// server input is a server-class file (J91); no test fixture lends a row, and the worker runs the same world as a resident.
+// server input is a server-class file (J91); no test fixture lends a row. The worker case is nalati-headless-worker.test.ts.
 
 const SLUG = 'nalati-grasslands', Roster = v.looseObject({ roster: v.looseObject({ bodies: v.array(v.looseObject({ id: v.string(), kind: v.string(), variant: v.looseObject({ id: v.string() }) })) }) });
 
@@ -107,53 +105,3 @@ test('Nalati runs its whole population headless from the product: roster, wolves
     expect(v.parse(Raid, live.host.adapters.get('nalati.raid')?.snapshot()).state.spawned).toBe(1);
   } finally { restored?.dispose(); live.dispose(); }
 }, 180_000);
-
-test('Nalati\'s worker runs the product\'s world: a route and its checkpoint match a resident exactly', async ({signal}) => {
-  // FAST-SLOW-TESTS FS1: the compiler, the worker and the resident are independent, so they run side by side rather
-  // than one after another. Every world and every check below is unchanged.
-  const compiling = compileProductWorker(undefined, signal);
-  const [loaded, compiled] = await Promise.allSettled([shipped(), compiling]);
-  if (loaded.status === 'rejected' || compiled.status === 'rejected') {
-    if (compiled.status === 'fulfilled') compiled.value.dispose();
-    throw loaded.status === 'rejected' ? loaded.reason : compiled.status === 'rejected' ? compiled.reason : new Error('unreachable');
-  }
-  const { directory, product, assets, resident } = loaded.value, prepared = compiled.value;
-  const shard = product.shardfile, plan = { ticks: 240, points: [{ x: 0, z: 232 }, { x: 40, z: 180 }] };
-  // Fresh fixed code only: both workers still admit every original byte and own
-  // independent worlds. Compilation and startup remain inside this case clock.
-  let worker: Awaited<ReturnType<typeof prepared.create>> | undefined;
-  let second: Awaited<ReturnType<typeof prepared.create>> | undefined;
-  let live: TrustedHeadlessResident | undefined;
-  try {
-    const options = { deadline: 'advisory' as const, product: directory, sections: productHeadlessSections(product) };
-    const [started, opened] = await Promise.allSettled([prepared.create(shard, assets, undefined, options), resident()]);
-    if (started.status === 'fulfilled') worker = started.value;
-    if (opened.status === 'fulfilled') live = opened.value;
-    if (started.status === 'rejected') throw started.reason;
-    if (opened.status === 'rejected') throw opened.reason;
-    if (worker === undefined || live === undefined) throw new Error('unreachable');
-    const current = live, walking = worker.walkLeg(plan);
-    walking.catch(() => undefined);
-    // let the worker take its walk before this thread runs the resident's
-    await new Promise(resolve => { setImmediate(resolve); });
-    const expected = runHeadlessJourney(current.host, input => { current.step(input); }, plan), walked = await walking;
-    expect(walked.final).toEqual(expected.final);
-    const saved = worker.checkpoint;
-    if (saved === undefined) throw new Error('The worker kept no checkpoint');
-    expect(saved.tick).toBe(live.host.state.tick);
-    // the worker's world: every roster body, on its own clock, and exactly the resident's
-    expect(saved.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
-    expect(canonicalSimDigest(decodeSimSnapshot(saved.snapshot))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
-    expect([...live.host.entities.keys()].filter(id => id.startsWith('creature:'))).toHaveLength(35);
-
-    // a second worker carries on from that checkpoint: a restore is the same world
-    second = await prepared.create(shard, assets, saved.snapshot, options);
-    const commit = await second.step([]);
-    live.step([]);
-    expect(commit.tick).toBe(saved.tick + 1);
-    expect(commit.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
-  } finally {
-    try { live?.dispose(); await second?.dispose(); await worker?.dispose(); }
-    finally { prepared.dispose(); }
-  }
-}, 120_000);

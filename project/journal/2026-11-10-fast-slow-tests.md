@@ -29,3 +29,8 @@ slow. Each now skips the idle part and keeps its assertions.
   same exact feet, flags and owner state at each boundary and the end.
   A replay that drops one input fails both versions on the same
   position equality.
+- FS1 again: hosted, the rewritten population file still took 46-56 s,
+  half of it the worker case (fresh worker compile, two workers, a
+  resident). Overlapping those steps saved nothing on a 4-vCPU runner,
+  so the worker case moves verbatim into `nalati-headless-worker.test.ts`
+  (same native group) and the population story runs on its own.

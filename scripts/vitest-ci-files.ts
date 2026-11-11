@@ -31,6 +31,7 @@ export const CI_NATIVE_GROUPS = {
   ],
   'nalati-population': [
     'test/nalati-headless-population.test.ts',
+    'test/nalati-headless-worker.test.ts',
   ],
   'nalati-bot-taming': ['test/nalati-bot-taming.test.ts'],
   'nalati-taming': ['test/nalati-taming-verbs.test.ts'],
