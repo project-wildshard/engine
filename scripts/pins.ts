@@ -35,6 +35,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
+import { excludePublished } from './pins-exclude.mjs';
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 
@@ -52,7 +53,6 @@ const MIRROR = process.env.WILDSHARD_PIN_MIRROR ?? 'https://github.com/project-w
 const ASSET_API = process.env.WILDSHARD_PIN_ASSET_API ?? 'https://api.github.com/repos/project-wildshard/engine/releases/assets';
 const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json', LEDGER = 'out/.pins.json';
 const RINGS = 'test/pins/rings.json', SLICES = 'test/pins/slices.json', SLICED = 'out/.slices', RING_CATALOGUE = 'out/.ring-catalogue.json';
-const MARK = ['# pins: mounts published under public/, begin', '# pins: mounts published under public/, end'] as const;
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
@@ -172,21 +172,6 @@ function tracked(): ReadonlySet<string> {
   }
 }
 
-function exclude(paths: readonly string[]): void {
-  // A linked worktree's `.git` is a file; Git names the real exclude path (DEV-SPEED DS6).
-  let file: string;
-  try {
-    file = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch {
-    return;
-  }
-  const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  const start = text.indexOf(MARK[0]), end = text.indexOf(MARK[1]);
-  const kept = start === -1 ? text : `${text.slice(0, start)}${text.slice(end + MARK[1].length + 1)}`;
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `${kept}${MARK[0]}\n${paths.map(path => `/${path}`).join('\n')}\n${MARK[1]}\n`);
-}
-
 async function install(only: readonly string[], fromFormat = false): Promise<void> {
   const { prepareAssetDecoders } = await import('@wildshard/format/product');
   const { validateShardfileProduct } = await import('@wildshard/format/productValidation');
@@ -263,7 +248,8 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
   mkdirSync('out', { recursive: true });
   const paths = [...published.keys()].sort((a, b) => a.localeCompare(b));
   writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
-  exclude(paths);
+  // One block per checkout in the shared exclude file: a worktree never rewrites the parent's (pins-exclude.mjs).
+  excludePublished(paths);
   if (dependency === undefined) await installSaves(pins.map(row => row.slug));
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
 }
