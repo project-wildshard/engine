@@ -14,15 +14,14 @@ describe('rooms health lines (D7)', () => {
   it('accepts the lines ship19 saw from Chromium and WebKit', () => {
     const seen = [
       { text: "Access to fetch at 'https://rooms-staging.wildshard.io/health' from origin 'https://staging.wildshard.io' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource." },
-      { text: 'Request failed https://rooms-staging.wildshard.io/health: net::ERR_FAILED' },
+      { text: 'Request failed https://rooms-staging.wildshard.io/health: net::ERR_FAILED', url: health },
       { text: 'Failed to load resource: net::ERR_FAILED', url: health },
-      { text: 'HTTP 404 https://rooms-staging.wildshard.io/health' },
+      { text: 'HTTP 404 https://rooms-staging.wildshard.io/health', url: health },
       { text: 'Failed to load resource: the server responded with a status of 404 ()', url: health },
-      { text: 'Origin https://staging.wildshard.io is not allowed by Access-Control-Allow-Origin. Status code: 404', url: health },
       { text: '/rooms-staging.wildshard.io/health due to access control checks.' },
       { text: 'Fetch API cannot load https://rooms-staging.wildshard.io/health due to access control checks.' },
-      { text: 'Request failed https://rooms-staging.wildshard.io/health: Origin https://staging.wildshard.io is not allowed by Access-Control-Allow-Origin. Status code: 404' },
-      { text: 'Failed to load resource: Origin https://staging.wildshard.io is not allowed by Access-Control-Allow-Origin. Status code: 404', url: `${health}?x=1` },
+      { text: 'Request failed https://rooms-staging.wildshard.io/health: Origin https://staging.wildshard.io is not allowed by Access-Control-Allow-Origin. Status code: 404', url: health },
+      { text: 'Failed to load resource: Origin https://staging.wildshard.io is not allowed by Access-Control-Allow-Origin. Status code: 404', url: health },
     ];
     for (const line of seen) expect(isRoomsHealthLine(line, health), line.text).toBe(true);
   });
@@ -37,12 +36,20 @@ describe('rooms health lines (D7)', () => {
       { text: 'HTTP 404 https://evilrooms-staging.wildshard.io/health' },
       { text: 'Request failed https://rooms.wildshard.io/health: net::ERR_FAILED' },
       { text: 'Socket error closed' },
+      // codex review: another status, other words about the address, a longer path, the address inside another request.
+      { text: 'HTTP 503 https://rooms-staging.wildshard.io/health', url: health },
+      { text: 'TypeError: failed to parse response from https://rooms-staging.wildshard.io/health' },
+      { text: 'HTTP 404 https://rooms-staging.wildshard.io/health.json', url: 'https://rooms-staging.wildshard.io/health.json' },
+      { text: 'Fetch API cannot load https://other.example/api?ref=https://rooms-staging.wildshard.io/health due to access control checks.' },
+      { text: 'Failed to load resource: net::ERR_FAILED', url: `${health}?x=1` },
+      { text: 'HTTP 404 https://rooms-staging.wildshard.io/health' },
+      { text: 'Origin https://staging.wildshard.io is not allowed by Access-Control-Allow-Origin. Status code: 404', url: health },
       { text: 'TypeError: x is undefined' },
     ];
     for (const line of other) expect(isRoomsHealthLine(line, health), line.text).toBe(false);
   });
   it('excuses nothing without a rooms socket', () => {
-    expect(isRoomsHealthLine({ text: 'HTTP 404 https://rooms-staging.wildshard.io/health' }, null)).toBe(false);
+    expect(isRoomsHealthLine({ text: 'HTTP 404 https://rooms-staging.wildshard.io/health', url: health }, null)).toBe(false);
   });
   it('excuses WebKit\'s address-less CORS line only before its health partner on the same page', () => {
     const cors = 'Origin https://staging.wildshard.io is not allowed by Access-Control-Allow-Origin. Status code: 404', checks = '/rooms-staging.wildshard.io/health due to access control checks.';
@@ -56,7 +63,7 @@ describe('rooms health lines (D7)', () => {
     expect(last.other.map(line => line.text)).toEqual([cors]);
   });
   it('splits a page log into excused and failing lines', () => {
-    const lines = [{ name: 'A', text: 'HTTP 404 https://rooms-staging.wildshard.io/health' }, { name: 'A', text: 'TypeError: boom' }];
+    const lines = [{ name: 'A', text: 'HTTP 404 https://rooms-staging.wildshard.io/health', url: health }, { name: 'A', text: 'TypeError: boom' }];
     const { health: excused, other } = splitRoomsHealthLines(lines, health);
     expect(excused.map(line => line.text)).toEqual(['HTTP 404 https://rooms-staging.wildshard.io/health']);
     expect(other.map(line => line.text)).toEqual(['TypeError: boom']);

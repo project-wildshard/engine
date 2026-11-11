@@ -19,3 +19,8 @@ opus-ship19 passed v0.1.9 only with hand-made copies of the staging proofs. Thre
 
 The proofs commit adds `test/staging-proof-lines.test.ts` for the line and Name rules. Phone contexts in the voice proof
 seed `firstPlayDone` (MG5), so a phone plays as a returning player.
+
+Review (codex) tightened the health rule to whole known shapes: another status, a longer path, or the address inside
+another request fails. The page roster now takes a renamed body too. Seen while proving and not fixed here: the lead body
+keeps a previous lead's Name on the wire (`Agent W sfuk B#6609` on a fresh player), because a net row reads `name` once,
+and the live proof then cannot find the new player by Name. Staging `/api/telemetry` also answers 503 (Vercel spend pause).

@@ -280,3 +280,14 @@ test('Jake, 2026-11-10: a keyboard page puts the chat bottom left too, over what
   expect(box.dataset['touch']).toBe('');
   expect(document.head.textContent).toContain('#ws-chat[data-touch]{top:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap));bottom:auto;');
 });
+
+test('a voice peer takes the body the relay renames it to (the lead seat)', () => {
+  const scope = new Scope('voice-rename-test'); owners.push(scope);
+  const listeners: ((word: VoiceHeard) => void)[] = [];
+  const voice = new VoiceChat(scope, { send: () => undefined, on: listener => { listeners.push(listener); return () => undefined; } });
+  const say = (word: VoiceHeard): void => { for (const listener of listeners) listener(word); };
+  say({ k: 'you', id: 'me' });
+  say({ k: 'roster', peers: [{ id: 'lead', name: 'Ann#4821', body: 'device-body' }] });
+  say({ k: 'roster', peers: [{ id: 'lead', name: 'Ann#4821', body: 'actor.player' }] });
+  expect(voice.roster.get('lead')?.body).toBe('actor.player');
+});

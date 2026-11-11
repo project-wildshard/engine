@@ -14,17 +14,30 @@ export function roomsHealthURL(socket) {
 /** One line a page gave: its text, and the address it is about where the browser says (a response, a failed request, a
  *  console message's location). @typedef {{text: string, url?: string | undefined}} PageLine */
 
-/** Whether a line is the browser reporting the page's fetch of the private rooms `/health` (D7), and nothing else. A line
- *  matches by address only: the address it names (Chromium and WebKit both quote it, WebKit sometimes from its second slash
- *  on), or, for a line that names none ("Failed to load resource: …", WebKit's CORS refusal), the address the browser
- *  attributes it to. @param {PageLine} line @param {string | null} healthURL */
+const quote = (/** @type {string} */ value) => value.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+
+/** Whether a line is the browser reporting the page's fetch of the private rooms `/health` (D7), and nothing else: one of the
+ *  shapes Chromium and WebKit give for that one refused fetch, each whole. A shape that names no address counts only where the
+ *  browser attributes the line to the exact health address. Another status, another address, or any other words fail.
+ *  @param {PageLine} line @param {string | null} healthURL */
 export function isRoomsHealthLine(line, healthURL) {
   if (healthURL === null) return false;
-  if (line.url !== undefined && line.url !== '') {
-    try { const at = new URL(line.url); if (`${at.origin}${at.pathname}` === healthURL) return true; } catch { /* not an address */ }
-  }
-  const host = new URL(healthURL).host.replaceAll('.', String.raw`\.`);
-  return new RegExp(`(?:^|https:/|[\\s'"(])/${host}/health(?=$|[\\s'"):.,?])`, 'u').test(line.text);
+  const health = quote(healthURL), host = quote(new URL(healthURL).host), origin = 'https://[a-z0-9.-]+';
+  const refused = `Origin ${origin} is not allowed by Access-Control-Allow-Origin\\. Status code: 404`;
+  // Chromium's CORS refusal (attributed to the page) and WebKit's "Fetch API cannot load", which Playwright may give from the
+  // address's second slash on, name the health address themselves.
+  const named = [
+    `Access to fetch at '${health}' from origin '${origin}' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource\\.`,
+    `(?:Fetch API cannot load https:/)?/${host}/health due to access control checks\\.`,
+  ];
+  // The 404 response, the failed request and "Failed to load resource" say it of the address they are attributed to.
+  const attributed = [
+    `HTTP 404 ${health}`,
+    `Request failed ${health}: (?:net::ERR_FAILED|${refused})`,
+    `Failed to load resource: (?:net::ERR_FAILED|the server responded with a status of 404 \\(\\)|${refused})`,
+  ];
+  const whole = (/** @type {string} */ shape) => new RegExp(`^${shape}$`, 'u').test(line.text);
+  return named.some(whole) || (line.url === healthURL && attributed.some(whole));
 }
 
 /** WebKit says one refused fetch as two console lines: `Origin <page> is not allowed by Access-Control-Allow-Origin. Status code:
@@ -45,8 +58,6 @@ export function splitRoomsHealthLines(lines, healthURL) {
   });
   return { health, other };
 }
-
-const quote = (/** @type {string} */ value) => value.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
 
 /** MP2.4: a seated player reads as `Name#1234` (a tag of 1000 to 9999); a server before MP2.4 shows the bare Name. The
  *  pattern's source, so a page function can take it as a plain string (`new RegExp(source, 'u')`). @param {string} name */

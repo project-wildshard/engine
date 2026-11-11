@@ -30,7 +30,7 @@ export interface VoiceLink {
 /** Where voice stands for this player. */
 export type VoiceState = 'off' | 'asking' | 'joining' | 'on' | 'denied' | 'unsupported' | 'full' | 'failed';
 /** One other player on voice; `body` is their player row's id (V7, V8), and `far` is out of earshot: 40 m or more away or out of sight. */
-export interface VoicePeer { readonly id: string; readonly name: string; readonly body?: string | null; speaking: boolean; muted: boolean; linked: boolean; far: boolean }
+export interface VoicePeer { readonly id: string; readonly name: string; body?: string | null; speaking: boolean; muted: boolean; linked: boolean; far: boolean }
 
 /** A remote level past this is talking; held this long after it drops, so a word's gaps don't flicker. */
 const SPEAKING_LEVEL = 0.03, SPEAKING_HOLD_MS = 450, LEVEL_POLL_MS = 150;
@@ -260,7 +260,10 @@ export class VoiceChat {
       for (const { id, name, body } of word.peers) {
         if (id === this.me) continue;
         now.add(id);
-        if (!this.roster.has(id)) this.roster.set(id, { id, name, body: body ?? null, speaking: false, muted: this.muted.has(id), linked: false, far: voiceNear.gain({ name, body: body ?? null }) === 0 });
+        const held = this.roster.get(id);
+        // The relay renames a seat's body once its cell says which it stands in (a room's first seat is its lead body).
+        if (held !== undefined) held.body = body ?? null;
+        else this.roster.set(id, { id, name, body: body ?? null, speaking: false, muted: this.muted.has(id), linked: false, far: voiceNear.gain({ name, body: body ?? null }) === 0 });
       }
       for (const id of this.roster.keys()) if (!now.has(id)) { this.roster.delete(id); this.drop(id); this.forget(id); }
       this.changed();
