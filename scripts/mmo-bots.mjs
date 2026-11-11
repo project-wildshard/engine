@@ -13,11 +13,11 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
-const ROOT = resolve(import.meta.dirname, '..');
+const ROOT = absolute(import.meta.dirname, '..');
 const ORIGIN = 'https://wildshard-packs.wildshard.workers.dev', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
 const STAGING = 'wss://wildshard.tailb41b20.ts.net:8443', STAGING_SEATS = 16, STAGING_HEADROOM = 4, REPLICA_PORT = 18796;
 // The door's SOCKETS_PER_IP: through Funnel every bot is this Mac's one address, and no header pretends otherwise.
@@ -28,7 +28,7 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
 const bots = Number(values.bots ?? (mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
 if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > 3600) throw new Error('--bots 1..64, --seconds 5..3600');
-const stamp = new Date().toISOString().replace(/[-:]/gu, '').replace(/\..*/u, 'Z'), work = join(ROOT, 'tmp/mmo-bots', stamp), tag = `${mode === 'replica' ? 'r' : 's'}${stamp.slice(9, 15)}`;
+const stamp = new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u, 'Z'), work = join(ROOT, 'tmp/mmo-bots', stamp), tag = `${mode === 'replica' ? 'r' : 's'}${stamp.slice(9, 15)}`;
 mkdirSync(work, { recursive: true });
 /** @param {Record<string, unknown>} line */
 const note = line => { const text = JSON.stringify({ at: 'mmo-bots', ...line }); console.info(text); writeFileSync(join(work, 'run.log'), `${text}\n`, { flag: 'a' }); };
@@ -83,14 +83,14 @@ const stopRoom = async () => {
     // The bots first: told to stop, they leave their seats (the leave flag) before the replica goes.
     const players = botsChild;
     if (players !== null && players.exitCode === null && players.signalCode === null) {
-      const left = new Promise(done => { players.once('exit', done); });
+      const left = new Promise(resolve => { players.once('exit', resolve); });
       players.kill('SIGTERM');
       const force = setTimeout(() => { players.kill('SIGKILL'); }, 15_000);
       await left; clearTimeout(force);
     }
     const running = room;
     if (running === null || running.exitCode !== null || running.signalCode !== null) return;
-    const gone = new Promise(done => { running.once('exit', done); });
+    const gone = new Promise(resolve => { running.once('exit', resolve); });
     running.kill('SIGTERM');
     const force = setTimeout(() => { running.kill('SIGKILL'); }, 10_000);
     await gone; clearTimeout(force);
@@ -111,7 +111,7 @@ if (mode === 'replica') {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: release.engineBuild, saveEpoch: release.saveEpoch, shards: release.shards });
   writeFileSync(join(work, 'release.json'), JSON.stringify({ body, signature: sign(null, Buffer.from(body), privateKey).toString('hex') }));
-  const env = { PATH: process.env['PATH'] ?? '', HOME: process.env['HOME'] ?? '', PACK_ORIGIN: ORIGIN, PACK_CACHE: join(work, 'packs'), DATABASE_URL: values.database, SEAT_SECRET: randomBytes(32).toString('hex'),
+  const env = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', PACK_ORIGIN: ORIGIN, PACK_CACHE: join(work, 'packs'), DATABASE_URL: values.database, SEAT_SECRET: randomBytes(32).toString('hex'),
     HOST: '127.0.0.1', PORT: String(REPLICA_PORT), RELEASE_CHANNEL: 'production', RELEASE_URL: pathToFileURL(join(work, 'release.json')).href,
     RELEASE_PUBLIC_KEY: publicKey.export({ type: 'spki', format: 'der' }).toString('hex'), WORLD_CELLS: values.cells, WORLD_WORKERS: values.workers, WORLD_SEATS: values.seats,
     TELEMETRY_URL: '', ERRORS_URL: '', SENTRY_DSN: '', RECORD_TAG: '' };
@@ -127,7 +127,8 @@ if (mode === 'replica') {
   });
   room.stderr?.on('data', (/** @type {Buffer} */ chunk) => { writeFileSync(log, chunk, { flag: 'a' }); });
   begun = performance.now();
-  while (!ready && room.exitCode === null && performance.now() - begun < 180_000) await new Promise(done => { setTimeout(done, 250); });
+  const booted = () => ready;
+  while (!booted() && room.exitCode === null && performance.now() - begun < 180_000) await new Promise(resolve => { setTimeout(resolve, 250); });
   if (!ready) throw new Error(`The replica did not boot; see ${log}`);
   url = `ws://127.0.0.1:${String(REPLICA_PORT)}/`;
   note({ step: 'replica', boot: Math.round((performance.now() - begun) / 1000), cells: values.cells, workers: Number(values.workers), seats: Number(values.seats) });
@@ -136,11 +137,11 @@ if (mode === 'replica') {
 // --- The bots
 if (mode === 'staging') await stagingRoom('before the first hello');
 const result = join(work, 'bots.json'), playing = readings.length;
-const code = await new Promise(done => {
+const code = await new Promise(resolve => {
   const child = spawn(process.execPath, [join(out, 'mmoBots.mjs'), url, release.engineBuild, String(bots), String(seconds), tag, result, mode === 'replica' ? 'forwarded' : 'own'], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
-  child.on('exit', done);
+  child.on('exit', resolve);
 });
 const after = mode === 'staging' ? await health() : null;
 await stopRoom();
