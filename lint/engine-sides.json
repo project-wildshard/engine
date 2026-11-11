@@ -1028,7 +1028,6 @@
     "src/client/game/systems/viewmodel/rigArms.ts": "client",
     "src/client/game/titleAssets.ts": "client",
     "src/client/game/titleDeck.ts": "client",
-    "src/client/game/titleDevPixels.ts": "client",
     "src/client/game/travel/travel.ts": "client",
     "src/client/game/ui/dataPanels.ts": "client",
     "src/client/game/ui/panels.ts": "client",

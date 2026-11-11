@@ -82,3 +82,4 @@ lands until he picks from the board.
   and on a phone `scale` and `aa` hide behind Pixel density and
   Anti-aliasing (a desktop keeps them). Rows: main (presets, density,
   readout), effects (shadows, bloom, rays, AA), setup (In-world toggle).
+- The QA 25 title card's file is deleted in its own commit (the source stamp reads HEAD's tree, so a delete can't ride with code).
