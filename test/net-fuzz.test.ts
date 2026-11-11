@@ -16,9 +16,8 @@ import { CLIENT_FLOOD_DEBT,CLIENT_MESSAGES_PER_TICK,MAX_CLIENT_MESSAGE_BYTES,MAX
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { ledgerFilings } from '../src/server/host/standalone/ledgerFilings';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
-import { BitWriter } from '../src/shared/engine/net/bits';
-import { encodeCommands } from '../src/shared/engine/net/command';
-import { encodeAct,type NetTravel } from '../src/shared/engine/net/messages';
+import { type NetTravel } from '../src/shared/engine/net/messages';
+import { actMessage, commandsMessage } from '../src/shared/engine/net/wireMessages';
 import { loadRapier,type Rapier } from '../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
@@ -133,7 +132,7 @@ test.each(['pine-hollow', 'nalati-grasslands', 'sunscar-dunes', 'driftwood-isle'
 
 // M8's half that a refusal touches: what a client's own state says it has applied, and nothing else, while it sends rubbish.
 test('refusals leave lastSeq exact, and the good half of a refused command stands', async () => {
-  const { live, room, seat } = await roomOn('pine-hollow'), plain = seat('bot:plain'), mixed = seat('bot:mixed'), { host } = live, writer = new BitWriter();
+  const { live, room, seat } = await roomOn('pine-hollow'), plain = seat('bot:plain'), mixed = seat('bot:mixed'), { host } = live;
   const walk = { viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: 1, pitch: 0, buttons: 0 };
   const start = (id: string): Vector3 => { const body = host.players.get(id); if (body === undefined) throw new Error('Missing seat'); return body.position; };
   start('bot:mixed').copy(start('bot:plain')).add(new Vector3(3, 0, 0));
@@ -142,10 +141,11 @@ test('refusals leave lastSeq exact, and the good half of a refused command stand
     plain.net.command(walk); plain.net.flush();
     const seq = mixed.net.command({ ...walk, launcher: { slot: 29, ads: 1, fire: true } }); mixed.net.flush();
     const { client } = mixed.link;
-    client.send('reliable', encodeAct(writer, { kind: 'reload', seq, slot: 29 }));
-    client.send('reliable', encodeAct(writer, { kind: 'interact', seq, id: 'nobody' }));
+    client.send('reliable', actMessage({ kind: 'reload', seq, slot: 29 }).buffer);
+    client.send('reliable', actMessage({ kind: 'interact', seq, id: 'nobody' }).buffer);
     client.send('reliable', Uint8Array.of(2, 1).buffer);
-    client.send('unreliable', encodeCommands(writer, { ackFrame: 0, commands: [{ ...walk, seq: seq - 1 }, { ...walk, seq, yaw: Number.NaN }] }, () => 0));
+    // v1 cannot carry a NaN yaw (the angle codec writes a word); the stale half is still refused by its seq.
+    client.send('unreliable', commandsMessage(0, [{ ...walk, seq: seq - 1 }, { ...walk, seq, yaw: Number.NaN }], () => 0).buffer);
     plain.link.pump(); mixed.link.pump();
     room.tick();
     plain.link.pump(); mixed.link.pump();
@@ -161,7 +161,7 @@ test('refusals leave lastSeq exact, and the good half of a refused command stand
 test('a flood is refused unread, then its sender is dropped, and the room goes on', async () => {
   const { live, room, world, seat } = await roomOn('pine-hollow'), { host } = live, clean = seat('bot:clean', 'Clean');
   const admits = vi.fn(), queue = new class extends CommandQueue { override admit(commands: Parameters<CommandQueue['admit']>[0]): void { admits(); super.admit(commands); } }();
-  const link = directLoopback(), flooder = new NetClient(link.client, CLOCK), writer = new BitWriter();
+  const link = directLoopback(), flooder = new NetClient(link.client, CLOCK);
   room.join(link.server, world.playerOf(host.addPlayer('bot:flood', host.level.player.at).id), queue);
   flooder.hello('', { player: 'flood', name: 'Flood' }); link.pump();
   const hostile = new Hostile(flooder), fuzz = new Fuzz(7);
@@ -174,7 +174,7 @@ test('a flood is refused unread, then its sender is dropped, and the room goes o
   const paid = admits.mock.calls.length;
   for (let tick = 0; tick < 200; tick++) room.tick();
   const refused = room.stats.refused;
-  link.client.send('reliable', encodeCommands(writer, { ackFrame: 0, commands: [] }, () => 0));
+  link.client.send('reliable', commandsMessage(0, [], () => 0).buffer);
   link.pump();
   expect(admits.mock.calls.length).toBe(paid + 1);
   expect(room.stats.refused).toBe(refused);

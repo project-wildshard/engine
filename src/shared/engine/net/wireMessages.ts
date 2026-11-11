@@ -5,7 +5,7 @@ import { encodeClassTables } from '@wildshard/wire/classTables';
 import { WIRE_CLASSES } from '@wildshard/wire/classes';
 import { classColumns, type ClassColumns } from '@wildshard/wire/columns';
 import { encodeEvents, eventsDecoder, eventTables } from '@wildshard/wire/eventStream';
-import { actCodec, clientTables, commandsCodec, decodeBody, encodeBody, localCodecs, TAG_ACT, TAG_CMDS, type BodyCodec } from '@wildshard/wire/game';
+import { actCodec, clientTables, commandsCodec, decodeBody, encodeBody, localCodecs, readMessage, TAG_ACT, TAG_CMDS, TAG_EVENTS, type BodyCodec } from '@wildshard/wire/game';
 import { encodeHello, encodeWelcome, tableHash, type Hello, type Welcome } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { encodeRideLawTables } from '@wildshard/wire/rideTables';
@@ -33,28 +33,28 @@ export const SERVER_TABLES: ServerTables = (() => {
 })();
 
 /** A client's first message: the bootstrap, then its hello with its command and act tables (5.1). */
-export function helloMessage(hello: Pick<Hello, 'build' | 'player' | 'name' | 'ledger'>): Uint8Array {
+export function helloMessage(hello: Pick<Hello, 'build' | 'player' | 'name' | 'ledger'>): Uint8Array<ArrayBuffer> {
   return encodeHello({ ...hello, minor: WIRE_MINOR, capabilities: [], ...clientTables() });
 }
 
 /** The server's welcome; `tables` false on a travel to a socket that already holds this hash (5.3). */
-export function welcomeMessage(welcome: Omit<NetWelcome, 'schemaHash'>, build: string, tables = true): Uint8Array {
+export function welcomeMessage(welcome: Omit<NetWelcome, 'schemaHash'>, build: string, tables = true): Uint8Array<ArrayBuffer> {
   const out: Welcome = { ...welcome, minor: WIRE_MINOR, build, capabilities: [], requiredCapabilities: [], tableHash: SERVER_TABLES.hash, ...(tables ? { tables: SERVER_TABLES.tables } : {}) };
   return encodeWelcome(out);
 }
 
 /** An events message from the server, spawns in its own layout. */
-export function eventsMessage(tick: number, events: readonly NetEvent[]): Uint8Array {
+export function eventsMessage(tick: number, events: readonly NetEvent[]): Uint8Array<ArrayBuffer> {
   return encodeEvents(tick, events.map(toWireEvent), LOCAL_SPAWNS);
 }
 
 /** A client's command bundle, targets as handles. */
-export function commandsMessage(ackFrame: number, commands: readonly NetCommand[], refs: WireRefs): Uint8Array {
+export function commandsMessage(ackFrame: number, commands: readonly NetCommand[], refs: WireRefs): Uint8Array<ArrayBuffer> {
   return encodeBody(LOCAL.commands, TAG_CMDS, { ackFrame, commands: commands.map(command => toWireCommand(command, refs)) });
 }
 
 /** A client's act. */
-export function actMessage(act: NetRoomAct): Uint8Array {
+export function actMessage(act: NetRoomAct): Uint8Array<ArrayBuffer> {
   return encodeBody(LOCAL.act, TAG_ACT, toWireAct(act));
 }
 
@@ -80,4 +80,18 @@ export function eventsReader(tables: Uint8Array, senderColumns: (id: number) => 
     const { tick, events } = read(span);
     return { tick, events: events.map(fromWireEvent).filter((event): event is NetEvent => event !== null) };
   };
+}
+
+/** The record tags a message holds, or [] when its framing is malformed: for tests, bots and the doctor. */
+export function recordTags(bytes: Uint8Array): number[] {
+  try { return readMessage(bytes).records.map(record => record.tag); } catch { return []; }
+}
+
+const LOCAL_EVENTS = eventsReader(eventTables(), id => LOCAL_COLUMNS.get(id));
+/** An events message from a server of this very build, read with this build's own tables; null if it holds none. */
+export function localEvents(bytes: Uint8Array): { readonly tick: number; readonly events: readonly NetEvent[] } | null {
+  try {
+    const record = readMessage(bytes).records.find(entry => entry.tag === TAG_EVENTS);
+    return record === undefined ? null : LOCAL_EVENTS({ bytes, start: record.start, end: record.end });
+  } catch { return null; }
 }

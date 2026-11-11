@@ -8,13 +8,18 @@ import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { ChatChannel, NetRoomAct } from '../../../shared/engine/net/acts';
 import type { NetChat } from '../../../shared/engine/net/chatWire';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
-import { BitWriter, fitText, MAX_NET_TEXT_BYTES } from '../../../shared/engine/net/bits';
-import { encodeCommands, seqAfter } from '../../../shared/engine/net/command';
+import { fitText, MAX_NET_TEXT_BYTES } from '../../../shared/engine/net/bits';
+import { seqAfter } from '../../../shared/engine/net/command';
 import { GUEST, type NetIdentity } from '../../../shared/engine/net/identity';
 import type { NetLedger } from '../../../shared/engine/net/ledgerWire';
-import { decodeFrame, FRAME_RING, NO_BASELINE, type DecodedFrame, type FrameTable } from '../../../shared/engine/net/frame';
-import { decodeEvents, decodeWelcome, encodeAct, encodeHello, messageId, MSG_EVENTS, MSG_FRAME, MSG_WELCOME, type InitialBits, type NetView, type NetCombatEvent, type NetPlayerDied, type NetRide, type NetTravel, type NetWelcome } from '../../../shared/engine/net/messages';
-import { FLAG_CLASS, initialBitsOf, NET_SCHEMA_HASH, netClassOf, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
+import { FRAME_RING, NO_BASELINE, type DecodedFrame } from '../../../shared/engine/net/frame';
+import { TAG_FRAME } from '@wildshard/wire/frameRecord';
+import { readMessage, TAG_EVENTS } from '@wildshard/wire/game';
+import { decodeWelcome } from '@wildshard/wire/handshake';
+import { WireFrameReader } from '../../../shared/engine/net/wireFrames';
+import { actMessage, commandsMessage, eventsReader, helloMessage, type Span } from '../../../shared/engine/net/wireMessages';
+import type { NetEvent, NetView, NetCombatEvent, NetPlayerDied, NetRide, NetTravel, NetWelcome } from '../../../shared/engine/net/messages';
+import { FLAG_CLASS, netClassOf, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetClass, NetValue } from '../../../shared/engine/net/schema';
 import type { Transport } from '../../../shared/engine/net/transport';
@@ -31,7 +36,8 @@ export interface NetEntityInfo { readonly handle: number; readonly id: string; r
 /** A row with its quantised values turned back into field values. */
 export type NetFields = Readonly<Record<string, NetValue>>;
 
-const initialBits: InitialBits = initialBitsOf;
+/** The welcome's record tag (5.1). */
+const TAG_WELCOME = 4;
 
 function decodeColumns(columns: NetClass<never>['row'], values: ArrayLike<number>): Record<string, NetValue> {
   const out: Record<string, NetValue> = {};
@@ -61,7 +67,6 @@ export class NetClient {
   readonly delivery: NetDelivery = new NetDelivery(this.interpolator, handle => this.entities.get(handle)?.cls.cls);
   private readonly now: () => number;
   private transport: Transport;
-  private readonly writer = new BitWriter(1024);
   private readonly frames = new Map<number, DecodedFrame>();
   private readonly listeners = new Set<(frame: DecodedFrame) => void>();
   private readonly presented = new Set<() => void>();
@@ -87,7 +92,10 @@ export class NetClient {
   readonly riders: Map<number, number> = new Map<number, number>();
   /** The flags up in this client's own world (J106): what its view of a gate or a key reads. */
   readonly phased: Set<string> = new Set<string>();
-  private readonly table: FrameTable;
+  /** The server's layout, from its welcome's tables (5.3): frames and spawns project through it. */
+  private server: WireFrameReader | null = null;
+  private serverEvents: ((span: Span) => { readonly events: readonly NetEvent[] }) | null = null;
+  private tableHash = -1;
   private readonly ids = new Map<string, number>();
   private unacked: NetCommand[] = [];
   private fresh = 0;
@@ -101,13 +109,12 @@ export class NetClient {
   constructor(transport: Transport, now: () => number = diagnosticNow) {
     installPortableMath();
     this.transport = transport; this.now = now;
-    this.table = { ownerClass: PLAYER_CLASS, classOf: handle => this.entities.get(handle)?.cls, baseline: tick => this.frames.get(tick) ?? null };
     this.off = this.listen(transport);
   }
   /** Begin the handshake. `build` is this client's engine build id; `identity` is who it says it is (J111). */
   hello(build = '', identity: NetIdentity = GUEST, ledger = 0): void {
     this.ledgerSerial = ledger; this.said = { build, identity };
-    this.transport.send('reliable', encodeHello(this.writer, { schemaHash: NET_SCHEMA_HASH, build, ...identity, ledger }));
+    this.transport.send('reliable', helloMessage({ build, player: identity.player, name: identity.name, ledger }).buffer);
   }
   /**
    * The link died and `transport` is its replacement (E7.1, C2): a fresh `hello` on it. What was held named the old link, so it
@@ -191,13 +198,13 @@ export class NetClient {
     const commands = this.unacked.slice(-(Math.min(this.fresh, 3) + REDUNDANT_COMMANDS));
     this.fresh = 0;
     const ackFrame = this.latest?.tick ?? NO_BASELINE;
-    this.transport.send('unreliable', encodeCommands(this.writer, { ackFrame, commands }, id => this.ids.get(id) ?? 0));
+    this.transport.send('unreliable', commandsMessage(ackFrame, commands, id => this.ids.get(id) ?? 0).buffer);
   }
   /** Send a non-movement action on the reliable channel. */
   act(act: NetRoomAct): void {
     const what = GATED_ACTS[act.kind];
     if (what !== undefined && !this.allows(what)) return;
-    this.transport.send('reliable', encodeAct(this.writer, act));
+    this.transport.send('reliable', actMessage(act).buffer);
   }
   /** Set what decides whether a tap may go out now (FM4); null lets everything through. */
   gateActions(gate: ((what: string) => boolean) | null): void { this.gate = gate; }
@@ -212,15 +219,32 @@ export class NetClient {
 
   private receive(bytes: Uint8Array): void {
     const arrived = this.now(); // here, never in a render frame: at 24.3 frames/s that stamp would be 41 ms of false jitter
-    switch (messageId(bytes)) {
-      case MSG_WELCOME: bootMark('server:welcome-receive'); this.welcome = decodeWelcome(bytes); this.interpolator.own = this.welcome?.handle ?? null; break;
-      case MSG_EVENTS: this.events(bytes); break;
-      case MSG_FRAME: this.decoded(decodeFrame(bytes, this.table), arrived); break;
-      default: this.dropped++;
+    let records: ReturnType<typeof readMessage>['records'];
+    try { records = readMessage(bytes).records; } catch { this.dropped++; return; }
+    for (const record of records) {
+      const span = { bytes, start: record.start, end: record.end };
+      if (record.tag === TAG_WELCOME) { bootMark('server:welcome-receive'); this.welcomed(span); }
+      else if (record.tag === TAG_EVENTS) this.events(span);
+      else if (record.tag === TAG_FRAME) this.decoded(this.server?.read(bytes) ?? null, arrived);
+      else this.dropped++;
     }
   }
-  private events(bytes: Uint8Array): void {
-    const decoded = decodeEvents(bytes, initialBits);
+  /** A welcome: the seat, and the server's tables unless this socket already holds them (a travel, 5.3). */
+  private welcomed(span: Span): void {
+    let said: ReturnType<typeof decodeWelcome>;
+    try { said = decodeWelcome(span); } catch { this.dropped++; return; }
+    const { tables } = said;
+    if (tables !== undefined) {
+      const server = new WireFrameReader(tables, handle => this.entities.get(handle)?.cls, PLAYER_CLASS);
+      this.server = server; this.tableHash = said.tableHash;
+      this.serverEvents = eventsReader(tables.eventTables, id => server.senderColumns(id));
+    } else if (said.tableHash !== this.tableHash) { this.dropped++; return; }
+    this.welcome = { handle: said.handle, player: said.player, tick: said.tick, cell: said.cell, schemaHash: said.tableHash, simHz: said.simHz, frameHz: said.frameHz };
+    this.interpolator.own = said.handle;
+  }
+  private events(span: Span): void {
+    let decoded: { readonly events: readonly NetEvent[] } | null = null;
+    try { decoded = this.serverEvents?.(span) ?? null; } catch { decoded = null; }
     if (decoded === null) { this.dropped++; return; }
     for (const event of decoded.events) {
       if (event.kind === 'player-died') {
@@ -250,7 +274,7 @@ export class NetClient {
       }
       const cls = netClassOf(event.cls);
       if (cls === undefined) continue;
-      const initial = decodeColumns(cls.initial, event.initial);
+      const initial = decodeColumns(cls.initial, this.server?.initial(cls, event.initial) ?? event.initial);
       cls.text.forEach((field, index) => { initial[field.name] = event.text[index] ?? ''; });
       this.entities.set(event.handle, { handle: event.handle, id: event.id, cls, initial });
       this.ids.set(event.id, event.handle);

@@ -537,6 +537,7 @@
     "./net/netRecord": "./src/client/engine/net/netRecord.ts",
     "./net/measurements": "./src/shared/engine/net/measurements.ts",
     "./net/messages": "./src/shared/engine/net/messages.ts",
+    "./net/wireMessages": "./src/shared/engine/net/wireMessages.ts",
     "./net/netPlayer": "./src/client/engine/net/netPlayer.ts",
     "./net/voiceNear": "./src/client/engine/net/voiceNear.ts",
     "./net/predictionWorld": "./src/client/engine/net/predictionWorld.ts",

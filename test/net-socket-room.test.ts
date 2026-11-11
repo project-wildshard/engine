@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest';
 import { WebSocket as RawSocket } from 'ws';
 import { NetClient } from '../src/client/engine/net/client';
+import { BitWriter } from '../src/shared/engine/net/bits';
+import { encodeHello } from '../src/shared/engine/net/messages';
+import { NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
 import { closeCode, closeReason, framed, SOCKET_LOST, SOCKET_RELIABLE, SOCKET_UNRELIABLE, STALL_CLOSE_BYTES } from '../src/shared/engine/net/socketFrames';
 import type { NetChannel, Transport } from '../src/shared/engine/net/transport';
 import { NetRoom } from '../src/server/engine/net/room';
@@ -84,12 +87,13 @@ test('close reasons cross the wire as the strings a room uses', async () => {
   } finally { await bench.close(); }
 });
 
-test('a stale build is refused with `reload` over a real socket', async () => {
+test('a v0.1.x hello is refused with `reload` over a real socket', async () => {
   const bench = await socketBench(), host = createSimHost(SIM_LEVEL, { rapier }), world = new SimNetWorld(host), room = new NetRoom({ world, step: () => { host.step(); }, build: 'new' });
   try {
     room.open();
     const { client, server } = await bench.link(), netClient = new NetClient(client), heard = new Promise<string>(resolve => { client.onClose(resolve); });
-    room.join(server); netClient.hello('old');
+    // WR5 (5.5): another build of this wire plays; a hello from before the wire cut (first byte 1) reloads.
+    room.join(server); client.send('reliable', encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build: 'old', player: 'device:old', name: 'Old', ledger: 0 }));
     expect(await heard).toBe('reload');
     expect(netClient.closed).toBe('reload');
   } finally { room.dispose(); host.dispose(); await bench.close(); }

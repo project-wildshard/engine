@@ -22,3 +22,12 @@
   hash, events, commands, acts), plus `WireClientReader`, a client's
   command and act codecs compiled once from its hello, and the client's
   events reader over the server's event tables and spawn columns.
+- The switch: the room, the client, the dedicated door and the doctor now
+  speak wire v1. The room reads a client's bootstrap and hello, compiles
+  that client's command and act codecs from its tables, and sends welcome,
+  events and frames the v1 way; the client builds its frame and event
+  readers from the welcome's tables. J54's build-equality refusal is gone
+  (room and door): a v0.1.x hello or an older major gets `reload`, a newer
+  major or a minor two ahead gets `retry`, another build of this wire plays.
+  Tests that spoke v0 bytes to a room now speak v1; the stale-build tests
+  became refusal-policy tests.
