@@ -90,8 +90,8 @@ has 1-root '1 files under /home or /etc hold an OpenClaw token (sk_claw); names 
 has 1-root "sshd x11forwarding is 'yes'; want no"
 has 1-root 'no fail2ban caddy jail (jails: sshd)'
 has 1-root 'WARNING auth.log has 1 accepted SSH logins as root'
-has 1-root 'sudoers.d/90-cloud-init-users: matt ALL=(ALL) NOPASSWD:ALL'
-has 1-root 'production unit sets no TRUST_PROXY or ALLOWED_ORIGINS'
+has 1-root 'sudoers.d/90-cloud-init-users: 1 rules for matt, 1 NOPASSWD'
+has 1-root 'production sets no TRUST_PROXY'
 if grep -q 'ufw is active' "$OUT/1-root.txt"; then has 1-root 'ufw rules beyond 443 and tailscale0: 22/tcp'; fi
 
 run 2-raynos runuser -u raynos -- bash /root/wildshard/scripts/vps/harden.sh --check

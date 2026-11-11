@@ -37,8 +37,13 @@ if [ "$ROOT" = 1 ]; then
   if [ -d "$R/etc/sudoers.d" ]; then
     for file in "$R"/etc/sudoers.d/*; do
       [ -f "$file" ] || continue
-      rules=$(grep -Ev '^[[:space:]]*(#|$)' "$file" 2>/dev/null | tr '\n' ';' | sed 's/;$//')
-      info VH1 "sudoers.d/$(basename "$file"): ${rules:-no rules}"
+      # Who and how, never the command text: a rule can carry a credential in its arguments.
+      rules=$(grep -Ev '^[[:space:]]*(#|$|Defaults)' "$file" 2>/dev/null)
+      count=$(printf '%s' "$rules" | grep -c . || true)
+      who=$(printf '%s\n' "$rules" | awk 'NF {print $1}' | sort -u | tr '\n' ' ' | sed 's/ $//')
+      nopasswd=$(printf '%s\n' "$rules" | grep -c NOPASSWD || true)
+      if [ "$nopasswd" = 0 ]; then nopasswd=; else nopasswd=", $nopasswd NOPASSWD"; fi
+      info VH1 "sudoers.d/$(basename "$file"): $count rules${who:+ for $who}$nopasswd"
     done
   fi
   if [ -r "$R/var/log/auth.log" ]; then
@@ -93,10 +98,24 @@ if [ "$ROOT" = 1 ] && has ufw; then
   if [ -z "$extra" ]; then ok VH4 'ufw allows only 443 and tailscale0'; else bad VH4 "ufw rules beyond 443 and tailscale0: $extra"; fi
 elif [ "$ROOT" = 1 ]; then bad VH4 'ufw is not installed'
 else unknown VH4 "ufw rules: $NEEDS_ROOT"; fi
-if has hcloud; then
-  if firewalls=$(hcloud firewall list -o noheader -o columns=name,applied_to_count 2>/dev/null); then
-    if printf '%s\n' "$firewalls" | awk '$2 > 0 {found=1} END {exit !found}'; then ok VH4 "Hetzner Cloud Firewall attached: $(printf '%s' "$firewalls" | tr '\n' ';')"
-    else bad VH4 'no Hetzner Cloud Firewall is applied to any server'; fi
+# This server is the one whose public IPv4 is one of ours; its attached firewalls' inbound rules must be TCP 443 and UDP 41641 alone.
+if has hcloud && has python3; then
+  if servers=$(hcloud server list -o json 2>/dev/null) && firewalls=$(hcloud firewall list -o json 2>/dev/null); then
+    verdict=$(HARDEN_IPS="$(hostname -I 2>/dev/null)" HARDEN_SERVERS="$servers" HARDEN_FIREWALLS="$firewalls" python3 -I -c '
+import json, os
+ips = set(os.environ["HARDEN_IPS"].split())
+servers = [s for s in json.loads(os.environ["HARDEN_SERVERS"] or "[]") if ((s.get("public_net") or {}).get("ipv4") or {}).get("ip") in ips]
+if len(servers) != 1: print("unknown cannot tell which Hetzner server this is"); raise SystemExit
+me = servers[0]["id"]
+mine = [f for f in json.loads(os.environ["HARDEN_FIREWALLS"] or "[]") if any((a.get("server") or {}).get("id") == me for a in f.get("applied_to") or [])]
+if not mine: print("fail no Hetzner Cloud Firewall is applied to this server"); raise SystemExit
+rules = sorted({(r.get("protocol"), str(r.get("port"))) for f in mine for r in f.get("rules") or [] if r.get("direction") == "in"})
+want = [("tcp", "443"), ("udp", "41641")]
+names = ",".join(f["name"] for f in mine)
+print(("ok Hetzner Cloud Firewall " + names + " lets in TCP 443 and UDP 41641 only") if rules == want else ("fail Hetzner Cloud Firewall " + names + " lets in " + " ".join(p + "/" + q for p, q in rules) + "; want tcp/443 udp/41641"))
+' 2>/dev/null)
+    verdict=${verdict:-unknown the hcloud answer could not be read}
+    case $verdict in ok\ *) ok VH4 "${verdict#ok }" ;; fail\ *) bad VH4 "${verdict#fail }" ;; *) unknown VH4 "${verdict#unknown }" ;; esac
   else unknown VH4 'hcloud has no working context (no token on this box is right; check the console)'; fi
 else unknown VH4 'Hetzner Cloud Firewall: no hcloud here; check the console'; fi
 
@@ -117,12 +136,15 @@ for origin in nodesource tailscale caddy cloudflare; do
 done
 if [ -z "$missing" ]; then ok VH5 'unattended-upgrades covers nodesource, Tailscale, Caddy and cloudflared'
 else bad VH5 "unattended-upgrades never updates:$missing"; fi
-if has pro; then
-  pro=$(pro status 2>/dev/null)
+# `pro status` writes its own log, so read the status file its timer keeps instead.
+pro_status="$R/var/lib/ubuntu-advantage/status.json"
+if [ -r "$pro_status" ] && has python3; then
   for service in esm-apps livepatch; do
-    if printf '%s\n' "$pro" | grep -Eq "^$service +yes +enabled"; then ok VH5 "pro $service enabled"; else bad VH5 "pro $service is not enabled"; fi
+    state=$(python3 -I -c 'import json, sys; print(next((s.get("status", "?") for s in json.load(open(sys.argv[1])).get("services", []) if s.get("name") == sys.argv[2]), "absent"))' "$pro_status" "$service" 2>/dev/null)
+    if [ "$state" = enabled ]; then ok VH5 "pro $service enabled"; else bad VH5 "pro $service is ${state:-unreadable}; want enabled"; fi
   done
-else unknown VH5 'no pro client'; fi
+elif [ -e "$pro_status" ]; then unknown VH5 "pro status file: $NEEDS_ROOT"
+else bad VH5 'Ubuntu Pro is not attached (no status file): no ESM Apps, no Livepatch'; fi
 
 # --- VH6: fail2ban.
 if [ "$ROOT" = 1 ] && has fail2ban-client; then
@@ -156,24 +178,43 @@ fi
 
 # --- VH9: the proxy.
 if has caddy; then
-  caddyfile=$(cat "$R/etc/caddy/Caddyfile" 2>/dev/null)
+  caddyfile=$(sed 's/#.*//' "$R/etc/caddy/Caddyfile" 2>/dev/null)
   for want in 'admin off' 'protocols h1 h2' '-CF-Connecting-IP' 'stream_close_delay'; do
     if printf '%s\n' "$caddyfile" | grep -qF -- "$want"; then ok VH9 "Caddyfile has '$want'"; else bad VH9 "Caddyfile lacks '$want'"; fi
   done
 else bad VH9 'Caddy is not installed'; fi
 if [ "$ROOT" = 1 ] && has nft; then
-  if nft list ruleset 2>/dev/null | grep -E 'dport 443' | grep -q 'ct count'; then ok VH9 'nftables caps concurrent connections on 443'
-  else bad VH9 'no nftables per-address cap on 443'; fi
+  rules443=$(nft list ruleset 2>/dev/null | grep -E 'dport 443')
+  if printf '%s\n' "$rules443" | grep -Eq 'saddr.*ct count over 20( |$)'; then ok VH9 'nftables caps 443 at 20 concurrent per source'
+  else bad VH9 'no nftables cap of 20 concurrent connections per source on 443'; fi
+  if printf '%s\n' "$rules443" | grep -Eq 'saddr.*limit rate over 30/minute'; then ok VH9 'nftables caps 443 at 30 new connections a minute per source'
+  else bad VH9 'no nftables cap of 30 new connections a minute per source on 443'; fi
 elif [ "$ROOT" = 1 ]; then bad VH9 'nft is not installed'
 else unknown VH9 "nftables ruleset: $NEEDS_ROOT"; fi
 
-# --- VH10: server-side trust. The unit names its proxy (setup.sh); the code that reads it ships in the signed release.
+# --- VH10: server-side trust. The unit names its proxy (setup.sh) and an env-file line overrides it; the code that reads it ships in
+# the signed release. Behind Funnel or Caddy only `caddy` is right: `cloudflare` would believe a client's CF-Connecting-IP, and `none`
+# puts every player behind the proxy on one address.
 if has systemctl && systemctl cat wildshard-server@.service >/dev/null 2>&1; then
   for channel in production staging; do
     environment=$(systemctl show -p Environment "wildshard-server@$channel.service" 2>/dev/null)
-    mode=$(printf '%s\n' "$environment" | grep -o 'TRUST_PROXY=[a-z]*' | head -1)
-    if [ -n "$mode" ] && printf '%s\n' "$environment" | grep -q 'ALLOWED_ORIGINS='; then ok VH10 "$channel unit sets $mode and ALLOWED_ORIGINS"
-    else bad VH10 "$channel unit sets no TRUST_PROXY or ALLOWED_ORIGINS: rerun setup.sh after the VH10 release"; fi
+    mode=$(printf '%s\n' "$environment" | grep -o 'TRUST_PROXY=[^ "]*' | tail -1 | cut -d= -f2)
+    origins=$(printf '%s\n' "$environment" | grep -o 'ALLOWED_ORIGINS=[^"]*' | tail -1 | cut -d= -f2-)
+    if [ "$ROOT" = 1 ] && [ -r "$R/etc/wildshard/$channel.env" ]; then
+      # Only these two names are read from the env file; nothing else in it is printed or kept.
+      file_mode=$(grep -E '^TRUST_PROXY=' "$R/etc/wildshard/$channel.env" | tail -1 | cut -d= -f2- | tr -d "\"' ")
+      file_origins=$(grep -E '^ALLOWED_ORIGINS=' "$R/etc/wildshard/$channel.env" | tail -1 | cut -d= -f2- | tr -d "\"'")
+      mode=${file_mode:-$mode}; origins=${file_origins:-$origins}
+    elif [ "$ROOT" != 1 ]; then unknown VH10 "$channel env-file overrides: $NEEDS_ROOT"; fi
+    cloudflared=0; if systemctl cat cloudflared.service >/dev/null 2>&1; then cloudflared=1; fi
+    if [ -z "$mode" ]; then bad VH10 "$channel sets no TRUST_PROXY: rerun setup.sh after the VH10 release"
+    elif [ "$mode" = caddy ] || { [ "$mode" = cloudflare ] && [ "$cloudflared" = 1 ]; }; then ok VH10 "$channel TRUST_PROXY=$mode"
+    else bad VH10 "$channel TRUST_PROXY=$mode; want caddy behind Funnel or Caddy (cloudflare only with a tunnel)"; fi
+    if [ -z "$origins" ]; then bad VH10 "$channel sets no ALLOWED_ORIGINS"
+    elif printf '%s\n' "$origins" | grep -q '\*'; then bad VH10 "$channel ALLOWED_ORIGINS lets any page in"
+    elif printf '%s\n' "$origins" | tr ', ' '\n\n' | grep -v '^$' | grep -Evq '^https://(play|staging|preview)\.wildshard\.io$|^https://wildshard-singleplayer\.vercel\.app$'; then
+      bad VH10 "$channel ALLOWED_ORIGINS has a page outside the game's hosts: $origins"
+    else ok VH10 "$channel ALLOWED_ORIGINS is the game's own hosts"; fi
   done
 else bad VH10 'no wildshard-server@ unit'; fi
 
@@ -187,6 +228,13 @@ if [ "$ROOT" = 1 ] && has runuser && id postgres >/dev/null 2>&1 && has psql; th
     if [ "$supers" = postgres ]; then ok VH11 'postgres is the only superuser'; else bad VH11 "superusers: $supers"; fi
     roles=$(runuser -u postgres -- psql -XtAc "select rolname from pg_roles where rolname like 'wildshard%' order by 1" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
     if [ "$roles" = 'wildshard_production wildshard_staging' ]; then ok VH11 'one role per channel'; else bad VH11 "game roles are '${roles}'; want wildshard_production and wildshard_staging"; fi
+    # Each channel's role reaches its own saves and not the other's: not by CONNECT, not by owning it, not by membership.
+    cross=$(runuser -u postgres -- psql -XtAc "select r.rolname || '->' || d.datname from pg_roles r cross join pg_database d
+      where r.rolname in ('wildshard_production','wildshard_staging') and d.datname in ('saves_production','saves_staging')
+      and d.datname <> ('saves_' || substr(r.rolname, 11))
+      and (has_database_privilege(r.oid, d.oid, 'CONNECT') or pg_has_role(r.oid, d.datdba, 'USAGE')) order by 1" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+    if [ "$roles" = 'wildshard_production wildshard_staging' ] && [ -z "$cross" ]; then ok VH11 'neither channel can open the other channel'"'"'s saves'
+    elif [ -n "$cross" ]; then bad VH11 "a channel can open the other's saves: $cross"; fi
   else unknown VH11 'PostgreSQL did not answer'; fi
 elif [ "$ROOT" = 1 ]; then bad VH11 'no PostgreSQL server: the per-channel roles do not exist'
 else unknown VH11 "PostgreSQL roles: $NEEDS_ROOT"; fi

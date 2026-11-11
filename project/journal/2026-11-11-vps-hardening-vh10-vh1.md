@@ -25,3 +25,12 @@
   hand fixes turn VH2 and VH3 clean). The first proof run caught a
   container-only `sshd -T` failure (no /run/sshd), so the unknown line
   now carries sshd's own error.
+- J206 review (Codex, read-only): six MUSTs in harden.sh, all fixed.
+  `pro status` writes a log, so VH5 reads pro's status.json instead;
+  sudoers.d lines print principals and counts, never command text;
+  VH10 reads the effective mode (env file over unit) and fails
+  `cloudflare` without a tunnel, `none`, `*` or a foreign origin;
+  VH11 asks PostgreSQL whether either channel's role can open the
+  other's saves; VH4 finds this server by its IPv4 and checks its own
+  firewall's inbound rules; VH9 ignores commented Caddy lines and
+  wants both per-source nftables caps.
