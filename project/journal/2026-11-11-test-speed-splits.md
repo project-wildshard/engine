@@ -30,3 +30,7 @@ in `scripts/vitest-ci-files.ts`, their products are in
 `test/pins/ring-2-tests.json`, `scripts/physics-native.mjs` picks the
 right module per slug, and deploy's native-routes step runs the two new
 route files.
+
+The four new files' first clocks come from the push gate's timing
+reporter (`push-preflight.mjs timings`); the parents keep their old,
+larger weights until hosted runs re-time them, so the planner errs long.
