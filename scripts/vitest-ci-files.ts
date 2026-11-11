@@ -35,6 +35,8 @@ export const CI_NATIVE_GROUPS = {
   ],
   'nalati-bot-taming': ['test/nalati-bot-taming.test.ts'],
   'nalati-taming': ['test/nalati-taming-verbs.test.ts'],
+  // FAST-SLOW-TESTS FS4: the field taming's second leg (all five rounds from a saved breaking start), its own unit.
+  'nalati-taming-rounds': ['test/nalati-taming-verbs-rounds.test.ts'],
   'nalati-awareness': ['test/nalati-awareness-verbs.test.ts'],
   // FAST-SLOW-TESTS FS5: the discovery tour's second leg, its own unit so the routes group keeps its size.
   'nalati-discovery-cave': ['test/nalati-discovery-verbs-cave.test.ts'],

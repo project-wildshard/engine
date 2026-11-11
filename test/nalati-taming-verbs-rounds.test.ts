@@ -1,0 +1,38 @@
+import {expect,test} from 'vitest';
+import * as v from 'valibot';
+import {runNalatiFieldRounds} from './fixtures/headless/nalati-taming-run';
+import {prepareHeadlessRuntime} from './fixtures/nalati-verbs';
+import {withNalatiCompanions} from './fixtures/nalati-companions-native';
+import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
+
+const press=(actorId:string):HeadlessCommand=>({kind:'script',actorId,value:1});
+const away:HeadlessCommand={kind:'player',moveX:0,moveZ:0,yaw:0,commandVersion:1,sprint:true,
+  steer:{keyX:0,keyY:1,stickX:0,stickY:0}};
+const postBondCommands:readonly (readonly HeadlessCommand[])[]=[
+  [press('nalati.whistle')],[press('nalati.companion.use')],
+  ...Array.from({length:90},()=>[away]),[press('nalati.whistle')],...Array.from({length:240},()=>[]),
+];
+
+// FAST-SLOW-TESTS FS4: the field taming's second leg; nalati-taming-verbs.test.ts walks from spawn and earns the prompt.
+test('all five native bucking rounds from a saved breaking start, a mid-round checkpoint and the companion call',async()=>{
+  expect(typeof window).toBe('undefined');expect(typeof document).toBe('undefined');
+  let verified=false;
+  // The player stands 2 m west of the living stallion and the law's own forceBreak() puts them on, as FL12's bot does.
+  // The earned checkpoint falls mid-round 4 (rounds are 210 ticks): the restored world rides into round 5 and adopts.
+  const report=await runNalatiFieldRounds({prepare:withNalatiCompanions(prepareHeadlessRuntime),postBondCommands,
+    approach:{x:-2,z:0},checkpointAt:735,verifyBonded:(first,restored)=>{
+    expect(first.phase).toBe('bonded');expect(first.upgraded).toBe(false);
+    for(const flag of ['tamed:horse','talked:elder','won:kokpar','quest:tulpar','quest:golden-king','quest:father-wind'])expect(first.flags).not.toContain(flag);
+    expect(first.quests.find(quest=>quest.id==='tulpar')).toMatchObject({started:false,complete:false,current:null});
+    expect(first.companion).not.toBeNull();expect(first.companions).not.toBeNull();
+    const called=v.parse(v.object({lastCalled:v.string(),calledDistance:v.number()}),JSON.parse(first.companions??'null'));
+    expect(called.lastCalled).toBe(first.companion?.id);expect(called.calledDistance).toBeGreaterThan(5);
+    if(first.companion===null)throw new Error('Missing earned companion');
+    const distance=Math.hypot(first.companion.x-first.player.x,first.companion.z-first.player.z);
+    expect(distance).toBeLessThan(called.calledDistance);expect(distance).toBeLessThan(4);
+    expect(restored).toEqual(first);verified=true;
+  }});
+  expect(verified).toBe(true);
+  expect(report.breakingTicks).toBeGreaterThan(0);expect(report.checkpointTick).toBeGreaterThan(0);expect(report.rounds).toBe(5);
+// The existing native taming/checkpoint proof uses this same finite bound.
+},450_000);

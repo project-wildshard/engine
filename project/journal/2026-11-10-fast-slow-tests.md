@@ -85,3 +85,20 @@ slow. Each now skips the idle part and keeps its assertions.
   J206: the input cap counts the prelude, cleanup releases every owner
   independently, and the first 3,200 inputs are no longer replayed here
   (field taming keeps the full physical walk, unreplayed).
+- FS4 field taming, split in two legs (opus-fastqual): hosted still ran
+  45-61 s on landed main, and the approach can't get shorter: from ten
+  standing spots after the walk the prompt comes 2,257-2,971 ticks
+  later (the trust law, not the spot). So the walk-earned prompt and
+  the rounds go to two files. Leg 1 (the quarantined file) walks from
+  spawn, earns the prompt with no grant, presses into breaking, saves
+  that breaking start, and the restored world rides on in step for a
+  second. Leg 2 (`nalati-taming-verbs-rounds.test.ts`, own native
+  group) stands 2 m west of the living stallion at spawn time, lets the
+  law's own `forceBreak()` put the player on (FS3's trigger), saves
+  that breaking start and rides all five rounds on the restored world:
+  the mid-round-4 checkpoint at 735, adoption, the post-bond call and
+  every bonded assertion, unchanged. Locally 19.7-21 s becomes 11.7 s
+  plus 5.3 s. A restore that drops the taming law fails the old file
+  and both legs on their restore assertions; a restore that zeroes the
+  bucking shake and roll fails the old file and leg 2 on "the earned
+  mid-round checkpoint restores quietly".

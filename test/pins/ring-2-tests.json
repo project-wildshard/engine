@@ -53,6 +53,7 @@
  "test/nalati-startup.test.ts",
  "test/nalati-stealth-verbs.test.ts",
  "test/nalati-taming-verbs.test.ts",
+ "test/nalati-taming-verbs-rounds.test.ts",
  "test/nalati-titan-room.test.ts",
  "test/nalati-world-verbs.test.ts",
  "test/native-directed-species.test.ts",
