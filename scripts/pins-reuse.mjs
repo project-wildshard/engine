@@ -144,12 +144,12 @@ export async function hashFiles(files){
   const bucket=buckets.reduce((low,next)=>next.load<low.load?next:low);
   bucket.indices.push(index);bucket.load+=(files[index]?.bytes??0)+4096;
  }
- const hashes=new Array(files.length).fill('');
- await Promise.all(buckets.filter(bucket=>bucket.indices.length>0).map(bucket=>new Promise((done,fail)=>{
+ const hashes=Array.from({length:files.length},()=>'');
+ await Promise.all(buckets.filter(bucket=>bucket.indices.length>0).map(bucket=>new Promise((_resolve,reject)=>{
   const worker=new Worker(HASHER,{eval:true,workerData:bucket.indices.map(index=>files[index]?.path)});
-  worker.once('message',(/** @type {string[]} */ result)=>{result.forEach((hash,at)=>{hashes[bucket.indices[at]??-1]=hash;});done(undefined);});
-  worker.once('error',fail);
-  worker.once('exit',code=>{if(code!==0)fail(new Error(`hash worker exited ${String(code)}`));});
+  worker.once('message',(/** @type {string[]} */ result)=>{result.forEach((hash,at)=>{hashes[bucket.indices[at]??-1]=hash;});_resolve(undefined);});
+  worker.once('error',reject);
+  worker.once('exit',code=>{if(code!==0)reject(new Error(`hash worker exited ${String(code)}`));});
  })));
  return hashes;
 }
@@ -182,7 +182,7 @@ function regularFiles(directory){
  /** @param {string} folder @returns {string} '' or the refusal */
  const walk=folder=>{
   const stat=lstatSync(folder);
-  if(!stat.isDirectory()||(stat.mode&0o300)!==0o300)return `${relative(directory,folder)||'.'} is not a writable directory`;
+  if(!stat.isDirectory()||(stat.mode&0o300)!==0o300)return `${folder===directory?'.':relative(directory,folder)} is not a writable directory`;
   for(const entry of readdirSync(folder,{withFileTypes:true})){
    const path=join(folder,entry.name);
    if(entry.isDirectory()){const refused=walk(path);if(refused!=='')return refused;continue;}
@@ -202,11 +202,11 @@ function regularFiles(directory){
  * Make `root`'s pinned products and mounts the manifest's, from this tree or another worktree with the same key, and
  * prove every byte. Undefined when no source matches or any byte differs: then the caller runs the full install.
  * The caller holds `root`'s lock (lockPins).
- * @param {string} root @param {string} key @param {{sources?:readonly string[],log?:(line:string)=>void}} [options]
+ * @param {string} tree @param {string} key @param {{sources?:readonly string[],log?:(line:string)=>void}} [options]
  * @returns {Promise<Reused|undefined>}
  */
-export async function reusePins(root,key,{sources,log=()=>{}}={}){
- root=resolve(root);
+export async function reusePins(tree,key,{sources,log=()=>undefined}={}){
+ const root=resolve(tree);
  const candidates=[root,...(sources??worktreeRoots(root)).map(path=>resolve(path)).filter(path=>path!==root)];
  const tracked=trackedPublic(root);
  for(const source of candidates){
@@ -214,7 +214,7 @@ export async function reusePins(root,key,{sources,log=()=>{}}={}){
   if(manifest===undefined){if(existsSync(join(source,MANIFEST)))log(`pins reuse: ${source} has a malformed manifest; skipped`);continue;}
   if(manifest.key!==key)continue;
   // Another tree's install must not rewrite it under the clone; a busy source is skipped, not waited for.
-  const release=source===root?()=>{}:lockPins(source,{wait:false});
+  const release=source===root?()=>undefined:lockPins(source,{wait:false});
   if(release===undefined){log(`pins reuse: ${source} is installing; skipped`);continue;}
   try{
    const reused=await reuseFrom(root,source,manifest,tracked,log);
@@ -285,7 +285,7 @@ async function reuseFrom(root,source,manifest,tracked,log){
   try{for(const folder of folders)named.push(String(JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')).pin?.hash));}
   catch{refusal='a product has no readable receipt';}
   const pins=refusal===''?pinHashes(root):[];
-  if(refusal===''&&(named.length!==pins.length||[...named].sort().join()!==[...pins].sort().join()))refusal='the products are not exactly the pins';
+  if(refusal===''&&(named.length!==pins.length||[...named].sort().join(',')!==[...pins].sort().join(',')))refusal='the products are not exactly the pins';
  }
  if(refusal!==''){
   for(const path of placed)rmSync(path,{recursive:true,force:true});
