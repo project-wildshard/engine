@@ -39,3 +39,6 @@ its only red step (the wall check after the upload is not a flaky file);
 land waits for exactly attempt 2; the quarantine file must equal the merged
 one plus land's own entries byte for byte. The tests add a rebase under the
 quarantine commit (re-dated) and a wall-step red that is not re-run.
+
+Final review: a shard report with an unhandled run error (errorCount above 0)
+is not a flaky file either.

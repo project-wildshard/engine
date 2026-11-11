@@ -771,6 +771,10 @@ describe('TS10 flaky strikes', () => {
     job([{ name: 'shard:3', blocking: true, code: 1 }]);
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: true }));
     expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
+    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: false }));
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts', 'test/slow.test.ts']);
+    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-ordinary.json'), JSON.stringify({ errorCount: 1, files: [{ file: 'test/red.test.ts', state: 'failed', durationMs: 5 }] }));
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
     const quarantine = join(root, 'quarantine.json');
     writeFileSync(quarantine, JSON.stringify({ schema: 1, entries: [] }));
     expect(quarantineFile(quarantine, 'test/red.test.ts', 'opus-testspeed-lane', 'why', now)).toBe(true);

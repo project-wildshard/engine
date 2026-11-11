@@ -169,6 +169,8 @@ export function flakyFiles(directory,failedJobs){
     const shardReport=reports.get(`shard-${shard}-${phase}.json`);
     if(shardReport===undefined)continue;
     if(shardReport===null||typeof shardReport!=='object'||!('files'in shardReport)||!Array.isArray(shardReport.files))return null;
+    // An unhandled error outside any test file is not a flaky file.
+    if('errorCount'in shardReport&&shardReport.errorCount!==0)return null;
     for(const file of shardReport.files){
      if(file===null||typeof file!=='object'||typeof file.file!=='string')return null;
      if(file.state==='failed'||(typeof file.durationMs==='number'&&file.durationMs>60_000)){files.add(file.file);named++;}
