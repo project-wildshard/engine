@@ -6,9 +6,7 @@ import { WebSocket } from 'ws';
 import { expect, test } from 'vitest';
 import { World, type WorkerLink } from '../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
-import { BitWriter } from '../src/shared/engine/net/bits';
-import { encodeHello } from '../src/shared/engine/net/messages';
-import { NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
+import { helloMessage } from '../src/shared/engine/net/wireMessages';
 import { framed, SOCKET_RELIABLE, SOCKET_VOICE } from '../src/shared/engine/net/socketFrames';
 import { cloudflareTurn, parseTurnServers } from '../src/server/host/dedicated/voiceRelay';
 import type { WorkerNews } from '../src/server/host/dedicated/cellProtocol';
@@ -40,7 +38,7 @@ test('a returning socket closed during find cannot replace its held body', async
   // The previous connection already seated this identity; only the gateway's public worker news is used.
   // Feed a normal initial seat through its load handshake first.
   const first = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
-  const hello = (): Uint8Array => framed(SOCKET_RELIABLE, encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build: 'bench', player: 'device:returning', name: 'Returning', ledger: 0 }));
+  const hello = (): Uint8Array => framed(SOCKET_RELIABLE, helloMessage({ build: 'bench', player: 'device:returning', name: 'Returning', ledger: 0 }).buffer);
   try {
     await once(first, 'open'); first.send(hello()); await looking; reply();
     await once(first, 'message'); first.send(Buffer.from([5]));
@@ -86,7 +84,7 @@ test('voice signalling joins, relays inside one cell and says leave on close', a
     });
     const next = (k: string): Promise<Word> => { const at = words.findIndex(word => word.k === k); if (at >= 0) return Promise.resolve(words.splice(at, 1)[0] as Word); return new Promise(resolve => { waiting.push({ k, resolve }); }); };
     await once(socket, 'open');
-    socket.send(framed(SOCKET_RELIABLE, encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build: 'bench', player: device, name, ledger: 0 })));
+    socket.send(framed(SOCKET_RELIABLE, helloMessage({ build: 'bench', player: device, name, ledger: 0 }).buffer));
     return { socket, words, next, say: word => { socket.send(Buffer.concat([Buffer.from([SOCKET_VOICE]), Buffer.from(JSON.stringify(word))])); } };
   };
   try {

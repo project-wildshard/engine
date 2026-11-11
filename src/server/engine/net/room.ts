@@ -124,7 +124,7 @@ interface RoomClient {
   /** waiting: said hello before the room opened. live: welcomed. */
   state: 'new' | 'waiting' | 'live';
   /** Its command and act codecs, compiled from the tables its hello carried (5.3); absent before hello. */
-  reader?: WireClientReader;
+  reader?: WireClientReader | undefined;
   ack: number; readonly acts: HeldAct[]; readonly known: Set<number>;
   /** Bodies this client has heard spawn and not yet been told what it missed of; each is sent a frame at a time. */
   readonly owed: number[];
@@ -202,13 +202,14 @@ export class NetRoom {
     const tick = this.world.tick(), travel: NetEvent = { kind: 'travel', tick, from: this.world.cell(), to: to.world.cell() };
     client.transport.send('reliable', eventsMessage(tick, [travel]).buffer);
     this.remove(client);
-    return to.adopt(client.transport, player, client.queue, client.identity);
+    return to.adopt(client.transport, player, client.queue, { identity: client.identity, reader: client.reader });
   }
-  private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, identity: NetIdentity): number | null {
-    const id = this.join(transport, player, queue), client = this.clients.find(entry => entry.id === id);
+  private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, said: { readonly identity: NetIdentity; readonly reader: WireClientReader | undefined }): number | null {
+    const id = this.join(transport, player, queue), client = this.clients.find(entry => entry.id === id), { identity } = said;
     if (client !== undefined) {
       if (this.world.identified?.(player.id, identity) === false) { this.stats.refused++; this.drop(client); return null; }
-      client.identity = identity; this.welcome(client);
+      // Its hello's tables come with it: the same socket, the same client build (5.3).
+      client.identity = identity; client.reader = said.reader; this.welcome(client);
     } // it said hello to the room it came from
     return id;
   }
