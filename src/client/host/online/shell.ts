@@ -184,6 +184,18 @@ export interface StartOnline {
  *  (src/client/engine/ui/errorScreen.ts): it holds the save hold and the loading card's report, which this module can't see. */
 const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: from })); };
 
+/** GO4 gate: whether the world this build names hosts the grid, read from its `/health` (the release names the address). Any failure
+ *  answers false, and the grid page keeps today's solo grid. */
+export async function worldHostsGrid(config: { readonly release: string; readonly key: string }, hosts: (health: unknown) => boolean, waitMs = 3000): Promise<boolean> {
+  try {
+    const { socket } = await fetchSignedRelease(config.release, config.key);
+    if (socket === undefined) return false;
+    const health = new URL('/health', socket.replace(/^ws/u, 'http'));
+    const answer = await fetch(health, { cache: 'no-store', signal: AbortSignal.timeout(waitMs) });
+    return answer.ok && hosts(await answer.json() as unknown);
+  } catch { return false; }
+}
+
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   const { release: at, key, identity, recordTag, grid, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;

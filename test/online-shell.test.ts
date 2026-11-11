@@ -3,7 +3,12 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { LinkState } from '../src/client/engine/net/redial';
 import { readSignedRelease } from '../src/client/host/online/release';
-import { connectOnline, type OnlineShell } from '../src/client/host/online/shell';
+import { connectOnline, worldHostsGrid, type OnlineShell } from '../src/client/host/online/shell';
+import { hostsGrid } from '../src/client/game/shardfile/serverRoute';
+// oxlint-disable-next-line import/no-nodejs-modules -- The release file's own origin.
+import { createServer, type Server } from 'node:http';
+// oxlint-disable-next-line import/no-nodejs-modules -- Its port.
+import type { AddressInfo } from 'node:net';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { World } from '../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
@@ -165,4 +170,22 @@ test('a quit while the link is down and redialling still lets the held body go',
   expect(bench.room(SHARD)?.holds(IDENTITY.player), 'a lost link holds its body').toBe(true);
   await leave();
   await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
+});
+
+test('GO4 gate: a world with Driftwood alone does not host the grid; one with more cells does; an unreachable world answers no', { timeout: 60_000 }, async () => {
+  const servers: Server[] = [];
+  const asked = async (cells: readonly string[]): Promise<boolean> => {
+    const room = await roomBench({ cells, workers: 2 });
+    room.server.on('request', (_request, response) => { response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify(room.world.health())); });
+    const { text, publicKey } = signedFile({ ...RELEASE, socket: room.url }), origin = createServer((_request, response) => { response.end(text); });
+    servers.push(origin);
+    await new Promise<void>(resolve => { origin.listen(0, '127.0.0.1', resolve); });
+    try { return await worldHostsGrid({ release: `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}/release.json`, key: publicKey }, hostsGrid); }
+    finally { await room.close(); }
+  };
+  try {
+    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid').toBe(false);
+    expect(await asked([SHARD, 'template-2']), 'the world hosts the grid').toBe(true);
+    expect(await worldHostsGrid({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'unreachable: solo').toBe(false);
+  } finally { for (const server of servers) server.close(); }
 });

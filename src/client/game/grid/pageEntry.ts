@@ -88,11 +88,14 @@ export function reenterGrid(instance: string): void {
   travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
 }
 
+/** GO5: set once the world's door has placed this device in the grid, so its hint is the server's; a solo grid's hint boots home, as before. */
+export const SERVER_PLACED: SaveKeyDef<boolean> = { key: 'grid.server-placed', scope: 'device', version: 1, schema: v.boolean(), initial: () => false };
+
 /** The cell a grid tap boots in. GO5: on a build with a world (play, staging) the server's place is the one save, and this device's last
  *  place is its hint, rewritten by every `resume`; elsewhere the home, and the page's own server restores where it was. */
 function entryCell(): GridCell {
   const home = gridHome();
-  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) return home;
+  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined || saves.define(SERVER_PLACED).peek() !== true) return home;
   const assembly = new GridAssembly(gridMode(DEVSERVER)), place = gridRecovery(saves).lastPlace(assembly);
   return place === null ? home : assembly.cells.find(cell => cell.instance === place.instance) ?? home;
 }

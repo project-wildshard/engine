@@ -61,6 +61,7 @@ import { gridPostCosts, gridShardfileProduct, prioritizeGridProduct, type GridPr
 import { preparationAdmission, type GridAdmissionMetadata } from './preparationAdmission';
 import { gridPostPairRefusal } from '../../../shared/game/grid/postPairs';
 import {productPostCost} from '../shardfile/productCost';
+import { SERVER_PLACED } from './pageEntry';
 import { gridRecovery, type GridRecoveryReason, type GridRecoveryRecord } from '../../../shared/game/grid/recovery';
 import { RoadRecovery, onRoad, type RoadPoint, type RoadRecoveryCell } from '../../../shared/game/grid/roadRecovery';
 import { GridCellWaitingError } from './refusal';
@@ -498,6 +499,7 @@ export class LiveGridSession {
     const cell = this.ports.assembly.cells.find(row => row.instance === instance);
     if (cell === undefined) return false;
     const road = { x: cell.origin.x + this.ports.assembly.pitch / 2 + 3.6, z: cell.origin.z, yaw: at.yaw }, recovery = gridRecovery(this.page.saves);
+    this.page.saves.define(SERVER_PLACED).write(true);
     // A stand past the cell's interior (a rim the walls hold) still names the cell: the hint keeps the cell, with the road beside it.
     try { return recovery.save(this.ports.assembly, cell, road, { kind: 'cell', x: at.x, y: at.y, z: at.z, yaw: at.yaw }); }
     catch { try { return recovery.save(this.ports.assembly, cell, road, { kind: 'road' }); } catch { return false; } }

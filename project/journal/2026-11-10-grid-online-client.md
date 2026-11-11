@@ -37,3 +37,13 @@
   the grid too; a hint write that fails (a stand past the interior) falls back
   to the road beside the cell and never holds the seat. SHOULDs taken: at most
   3 re-entries a minute a tab, and an unknown cell goes to the title.
+
+## The gate (codex-port's production hold, 2026-11-10 ~19:55 Cancún)
+
+- A grid page joins the world only once the world hosts the grid: its
+  `/health` `table` names more than the home cell (WORLD_CELLS decides).
+  Otherwise, or if the release or `/health` can't be read in 3 s, today's
+  solo grid. Play boots the hint's cell only once the server has placed this
+  device (`grid.server-placed`); a solo hint boots home as before.
+- So v0.1.7 production (WORLD_CELLS unset) keeps the solo grid; staging goes
+  online after Jake's one command opens the grid there.

@@ -48,7 +48,7 @@ import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
-import { earlyStandalone, serverRoute } from './serverRoute';
+import { earlyStandalone, hostsGrid, serverRoute } from './serverRoute';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
@@ -104,7 +104,7 @@ interface ShellModule { readonly startStandalone: (config: { slug: string; base:
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void } }) => Promise<Shell> }
+interface OnlineModule { readonly worldHostsGrid: (world: BuildWorld, hosts: (health: unknown) => boolean) => Promise<boolean>; readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void } }) => Promise<Shell> }
 interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
@@ -305,14 +305,17 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const standalone = (): Promise<Shell> => adopted?.shell ?? bootStandalone(slug, ports.grid === null, () => { card.add(); });
   // E7.2d, GO4: a build stamped with a world puts every page in it, a grid page as well as a one-shard page (no URL switches). A grid
   // page whose seat is in another cell enters the grid again there, never a `?chunk=` page; GO5's hint makes that rare.
+  const onlineModule = (): Promise<OnlineModule> => bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as Promise<OnlineModule>;
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
-    const { startOnline } = await bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as OnlineModule;
+    const { startOnline } = await onlineModule();
     const { grid } = ports, booted = grid?.booted;
     return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
       ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, cells: grid.cells.map(cell => cell.instance), placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); } } }) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
-  const shell = await (world !== undefined && page !== null && serverRoute(world, page) === 'online' ? online(world, page) : standalone()), { client } = shell;
+  // GO4 gate: a grid page joins the world only once the world hosts the grid; until then, today's solo grid.
+  const hosted = world !== undefined && page !== null && ports.grid !== null && await bootTask('server:grid-hosted', async () => (await onlineModule()).worldHostsGrid(world, hostsGrid));
+  const shell = await (world !== undefined && page !== null && serverRoute(world, page, { page: ports.grid !== null, hosted }) === 'online' ? online(world, page) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
   // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held
   // body may already be back). Once the page can save, the hold below replaces this one.
