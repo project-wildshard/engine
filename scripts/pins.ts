@@ -4,7 +4,7 @@
 //
 //   node scripts/pins.ts refresh            re-pin to the live heads (read only: GETs)
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
-//   node scripts/pins.ts install --ring 1   Ring 1 alone: its three products, its server slices and a catalogue of just those
+//   node scripts/pins.ts install --ring 1   Ring 1: pinned Template 1 and Dunes, dependency Template 2, and server slices
 //   node scripts/pins.ts install --from-format blender-template  the frozen dependency product, without network or cook
 //   node scripts/pins.ts slice              cut Ring 1's server slices from the pinned heads into test/pins/slices.json
 //   node scripts/pins.ts keep <dir>         copy every pinned and sliced tarball to <dir>, for the release that outlives J85
@@ -173,15 +173,31 @@ function tracked(): ReadonlySet<string> {
   }
 }
 
-/** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
-async function install(only: readonly string[], fromFormat = false): Promise<void> {
-  const release = lockPins(process.cwd());
-  try { await installLocked(only, fromFormat); } finally { release?.(); }
+/** The public paths an installed product published: its files under mounts/assets|programs and its cook.json rows. */
+function mountsOf(folder: string): Set<string> {
+  const paths = new Set<string>(), mounts = join(folder, 'mounts');
+  if (!existsSync(folder)) return paths;
+  for (const top of ['assets', 'programs']) {
+    const base = join(mounts, top);
+    if (!existsSync(base)) continue;
+    for (const entry of readdirSync(base, { recursive: true, withFileTypes: true })) {
+      if (entry.isFile()) paths.add(`public/${top}/${join(entry.parentPath, entry.name).slice(base.length + 1)}`);
+    }
+  }
+  const cook = join(folder, 'cook.json');
+  if (existsSync(cook)) for (const row of cookMounts(new Map([['cook.json', readFileSync(cook)]]))) if (PUBLISHED.test(row.url)) paths.add(`public${row.url}`);
+  return paths;
 }
 
-async function installLocked(only: readonly string[], fromFormat: boolean): Promise<void> {
+/** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
+async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' = 'pins'): Promise<readonly Pin[]> {
+  const release = lockPins(process.cwd());
+  try { return await installLocked(only, source); } finally { release?.(); }
+}
+
+async function installLocked(only: readonly string[], source: 'pins' | 'format' | 'ring'): Promise<readonly Pin[]> {
   // DS12: a full install whose pins match this tree's last one, or another worktree's, clones and verifies (pins-reuse.mjs).
-  const full = only.length === 0 && !fromFormat, root = process.cwd();
+  const full = only.length === 0 && source === 'pins', root = process.cwd();
   const key = full ? pinsKey(root, shardfileValidationRevision(root)) : '';
   if (full && process.env.WILDSHARD_PINS_REUSE !== '0') {
     const reused = await reusePins(root, key, { log: line => { console.log(line); } });
@@ -190,9 +206,9 @@ async function installLocked(only: readonly string[], fromFormat: boolean): Prom
       writeFileSync(LEDGER, json({ revision: shardfileValidationRevision(root), published: paths } satisfies Ledger));
       excludePublished(paths);
       await installSaves((readJson(PINS) as PinFile).shards.map(row => row.slug));
-      const source = reused.source === root ? 'this tree, unchanged' : `${reused.mode} of ${reused.source}`;
-      console.log(`pins reused: ${source}; ${reused.files} files, ${(reused.bytes / 2 ** 20).toFixed(0)} MiB verified by sha256 (clone ${reused.seconds.clone.toFixed(1)}s, verify ${reused.seconds.verify.toFixed(1)}s), ${paths.length} mounts published`);
-      return;
+      const from = reused.source === root ? 'this tree, unchanged' : `${reused.mode} of ${reused.source}`;
+      console.log(`pins reused: ${from}; ${reused.files} files, ${(reused.bytes / 2 ** 20).toFixed(0)} MiB verified by sha256 (clone ${reused.seconds.clone.toFixed(1)}s, verify ${reused.seconds.verify.toFixed(1)}s), ${paths.length} mounts published`);
+      return (readJson(PINS) as PinFile).shards;
     }
   }
   dropManifest(root);
@@ -205,17 +221,26 @@ async function installLocked(only: readonly string[], fromFormat: boolean): Prom
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
   await prepareAssetDecoders();
-  if (fromFormat && only.length !== 1) throw new Error('--from-format needs exactly blender-template');
-  const dependency = fromFormat ? (await import('./pin-format.ts')).formatTemplate(only[0] ?? '') : undefined;
-  const { shards } = dependency === undefined ? readJson(PINS) as PinFile : {shards: [dependency.pin]};
+  if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly blender-template');
+  const formatSlug = source === 'format' ? only[0] : (source === 'ring' && only.includes('blender-template') ? 'blender-template' : undefined);
+  const dependency = formatSlug === undefined ? undefined : (await import('./pin-format.ts')).formatTemplate(formatSlug);
+  const trackedPins = source === 'format' ? [] : (readJson(PINS) as PinFile).shards;
+  const shards = dependency === undefined ? trackedPins : [...trackedPins.filter(row => row.slug !== dependency.pin.slug), dependency.pin];
   const pins = only.length === 0 ? shards : shards.filter(row => only.includes(row.slug));
-  if (dependency === undefined) await fetchPinnedPublicAssets(process.cwd(), pins.map(row => row.slug));
-  const publicAssets = dependency === undefined ? pinnedPublicAssets(process.cwd(), pins.map(row => row.slug)) : [];
   const unknown = only.filter(slug => !shards.some(row => row.slug === slug));
   if (unknown.length > 0) throw new Error(`Not pinned: ${unknown.join(', ')}`);
+  const remoteSlugs = pins.filter(row => row.slug !== dependency?.pin.slug).map(row => row.slug);
+  if (remoteSlugs.length > 0) await fetchPinnedPublicAssets(process.cwd(), remoteSlugs);
+  const publicAssets = remoteSlugs.length > 0 ? pinnedPublicAssets(process.cwd(), remoteSlugs) : [];
   const revision = shardfileValidationRevision(process.cwd());
+  // T2E-1: --from-format adds Template 2 beside whatever is installed, so `pnpm test:e2e` never strips a worktree's other
+  // pins (their public assets feed the committed boot tables); only the Template 2 it replaces leaves. Every other
+  // install replaces the whole set.
+  const replaced = dependency === undefined || source !== 'format' ? new Set<string>() : mountsOf(resolve('out', dependency.pin.slug));
+  const before = existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
   // Only plain public/ paths, under folders that are this tree's own: a ledger or a linked folder never reaches outside.
-  for (const path of existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : []) {
+  for (const path of before) {
+    if (source === 'format' && !replaced.has(path)) continue;
     if (!mountPath(path)) continue;
     insideTree(root, dirname(path));
     rmSync(path, { force: true });
@@ -279,7 +304,7 @@ async function installLocked(only: readonly string[], fromFormat: boolean): Prom
       written[path] = digest(body);
     }
     mounts = published.size - beforeMounts;
-    const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision }, ...(dependency === undefined ? {} : {source: dependency.source}) })}\n`;
+    const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision }, ...(pin.slug === dependency?.pin.slug ? {source: dependency.source} : {}) })}\n`;
     writeFileSync(join(target, 'validation.json'), validation);
     written['validation.json'] = sha256(Buffer.from(validation));
     console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${mounts} mounts published`);
@@ -287,14 +312,16 @@ async function installLocked(only: readonly string[], fromFormat: boolean): Prom
   for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   if (failed > 0) process.exitCode = 1;
   mkdirSync('out', { recursive: true });
-  const paths = [...published.keys()].sort((a, b) => a.localeCompare(b));
+  const kept = source === 'format' ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
+  const paths = [...new Set([...kept, ...published.keys()])].sort((a, b) => a.localeCompare(b));
   writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
   // The shared exclude file is the canonical checkout's alone; a plan worktree leaves it untouched (pins-exclude.mjs).
   excludePublished(paths);
-  if (dependency === undefined) await installSaves(pins.map(row => row.slug));
+  if (remoteSlugs.length > 0) await installSaves(remoteSlugs);
   // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
   if (full && failed === 0 && pinsKey(root, shardfileValidationRevision(root)) === key) writeManifest(root, key, productHashes, mountHashes);
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
+  return pins;
 }
 
 const ringOf = (name: string): Ring => {
@@ -332,26 +359,31 @@ async function slice(check = false): Promise<void> {
 
 /** A catalogue a build can bake with only `slugs` on disk. Dunes takes the home cell, because a grid opens on a shard it can admit; every other
  *  cell becomes a road, as the live grid's template cell is, so the grid keeps its shape (G972) and the crossing stays real. */
-function ringCatalogue(slugs: readonly string[]): void {
+function ringCatalogue(pins: readonly Pin[]): void {
   interface Cell { slug: string; instance: string; cell: readonly [number, number] }
   const catalogue = readJson(CATALOGUE) as { shards: readonly { slug: string }[]; placements: readonly { slug: string }[]; grid: { cells: readonly Cell[] } };
-  const kept = new Set(slugs.flatMap(slug => [slug, `_${slug}`]));
+  const kept = new Set(pins.flatMap(({slug}) => [slug, `_${slug}`]));
+  const shards = catalogue.shards.filter(row => kept.has(row.slug));
+  for (const row of shards) {
+    const pin = pins.find(candidate => candidate.slug === row.slug);
+    if (pin !== undefined) Object.assign(row, {hash: pin.hash, revision: pin.revision});
+  }
   const home = catalogue.grid.cells.find(row => row.cell[0] === 0 && row.cell[1] === 0)?.instance ?? 'home';
   const cells = catalogue.grid.cells.map(row => {
     if (row.instance === home) return { instance: 'sunscar-dunes', slug: 'sunscar-dunes', cell: row.cell };
     if (row.slug === 'sunscar-dunes') return { instance: home, slug: '_template', cell: row.cell, speedClass: 'road' };
     return kept.has(row.slug) ? row : { instance: row.instance, slug: '_template', cell: row.cell, speedClass: 'road' };
   });
-  writeFileSync(RING_CATALOGUE, json({ ...catalogue, shards: catalogue.shards.filter(row => kept.has(row.slug)), placements: catalogue.placements.filter(row => kept.has(row.slug)), grid: { ...catalogue.grid, cells } }));
+  writeFileSync(RING_CATALOGUE, json({ ...catalogue, shards, placements: catalogue.placements.filter(row => kept.has(row.slug)), grid: { ...catalogue.grid, cells } }));
 }
 
 async function installRing(name: string): Promise<void> {
   const { readTar } = await import('@wildshard/format/tar');
   const { checkSlice } = await import('./slice-inputs.ts');
   const ring = ringOf(name), started = performance.now();
-  await install(ring.products);
+  const pins = await install(ring.products, 'ring');
   // A tree that held every head keeps none of the others: their mounts just left public/.
-  const wanted = new Set((readJson(PINS) as PinFile).shards.filter(row => ring.products.includes(row.slug)).map(row => row.hash));
+  const wanted = new Set(pins.map(row => row.hash));
   for (const folder of readdirSync('out')) {
     const receipt = join('out', folder, 'validation.json');
     if (existsSync(receipt) && !wanted.has((readJson(receipt) as { pin?: Pin }).pin?.hash ?? '')) rmSync(join('out', folder), { recursive: true });
@@ -370,9 +402,9 @@ async function installRing(name: string): Promise<void> {
       writeFileSync(join(target, path), file);
     }
   }
-  ringCatalogue(ring.products);
+  ringCatalogue(pins);
   await installSaves(ring.slices);
-  const { shards } = readJson(PINS) as PinFile, products = shards.filter(row => ring.products.includes(row.slug)).reduce((sum, row) => sum + row.bytes, 0);
+  const products = pins.reduce((sum, row) => sum + row.bytes, 0);
   console.log(`ring ${name}: ${((products + bytes) / 1e6).toFixed(1)} MB, products ${(products / 1e6).toFixed(1)}, slices ${(bytes / 1e6).toFixed(1)}, in ${((performance.now() - started) / 1000).toFixed(1)}s`);
 }
 
@@ -403,7 +435,7 @@ function status(): void {
 const [command = 'status', ...rest] = process.argv.slice(2);
 if (command === 'refresh') await refresh();
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1');
-else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), true);
+else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');
 else if (command === 'install') await install(rest);
 else if (command === 'slice') await slice();
 else if (command === 'verify-slices') await slice(true);
