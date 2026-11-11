@@ -65,3 +65,17 @@ test('the planner uses the table when it has one, and on a miss plans every shar
   expect(planned.unknown).toEqual([]);
   expect(planned.count).toBeLessThan(missed.count);
 });
+
+test('new files over budget only on their 60 s guesses plan on the median with a warning; a measured overrun still fails', () => {
+  const measuredFiles = Array.from({ length: 40 }, (_, index) => `test/m${String(index).padStart(2, '0')}.test.ts`);
+  const fresh = Array.from({ length: 200 }, (_, index) => `test/new${String(index).padStart(3, '0')}.test.ts`);
+  process.env['WS_TIMINGS_DIR'] = join(scratch, 'fresh');
+  writeTimings({ version: 1, run: '9', sha: 'e'.repeat(40), measuredAt: 1, full: Object.fromEntries(measuredFiles.map(file => [file, 1])), ring1: {} });
+  const plan = createEnginePlan('full', [...measuredFiles, ...fresh]);
+  expect(plan.unknown).toEqual(fresh);
+  expect(plan.count).toBe(plan.curve.length);
+  expect(Math.max(...plan.shards.map(shard => shard.expectedSeconds))).toBeLessThanOrEqual(240);
+  // One measured 200 s file can't fit any shard: that is a real floor, and it still fails.
+  writeTimings({ version: 1, run: '9', sha: 'e'.repeat(40), measuredAt: 1, full: { ...Object.fromEntries(measuredFiles.map(file => [file, 1])), 'test/m00.test.ts': 200 }, ring1: {} });
+  expect(() => createEnginePlan('full', [...measuredFiles, ...fresh])).toThrow('optimize the measured floor');
+});
