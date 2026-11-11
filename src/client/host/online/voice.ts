@@ -4,10 +4,13 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import * as v from 'valibot';
 import { saves } from '@wildshard/engine/saves/runtime';
+import { voiceNear } from '@wildshard/engine/net/voiceNear';
 
 // J218: voice chat, peer to peer. The server's main thread only says who in this cell is on voice and carries signalling
 // (`src/server/host/dedicated/voiceRelay.ts`); audio goes straight between players, or through TURN. Whoever joins offers to
 // everyone already on, so two offers never cross. Off by default: nothing touches the microphone until the player asks.
+// VOICE-POLISH V7: a voice fades with the distance to its player's body and is silent from 40 m (`voiceNear.ts`); the links stay up,
+// so walking back in range is heard at once. iOS Safari ignores a media element's volume, so an iPhone hears full or nothing.
 
 /** What the server says on the `voice` control. */
 export type VoiceHeard =
@@ -23,8 +26,8 @@ export interface VoiceLink {
 }
 /** Where voice stands for this player. */
 export type VoiceState = 'off' | 'asking' | 'joining' | 'on' | 'denied' | 'unsupported' | 'full' | 'failed';
-/** One other player on voice. */
-export interface VoicePeer { readonly id: string; readonly name: string; speaking: boolean; muted: boolean; linked: boolean }
+/** One other player on voice; `far` is out of earshot (V7), 40 m or more away or out of sight. */
+export interface VoicePeer { readonly id: string; readonly name: string; speaking: boolean; muted: boolean; linked: boolean; far: boolean }
 
 /** A remote level past this is talking; held this long after it drops, so a word's gaps don't flicker. */
 const SPEAKING_LEVEL = 0.03, SPEAKING_HOLD_MS = 450, LEVEL_POLL_MS = 150;
@@ -165,8 +168,9 @@ export class VoiceChat {
     if (muted) this.muted.add(id); else this.muted.delete(id);
     const peer = this.roster.get(id), link = this.links.get(id);
     if (peer !== undefined) { peer.muted = muted; if (muted) peer.speaking = false; }
-    if (link !== undefined) link.audio.muted = muted;
+    if (link !== undefined && peer !== undefined) this.loudness(peer, link);
     this.changed();
+    this.tellTalking();
   }
   private async checkPermission(): Promise<void> {
     try {
@@ -187,7 +191,7 @@ export class VoiceChat {
       for (const { id, name } of word.peers) {
         if (id === this.me) continue;
         now.add(id);
-        if (!this.roster.has(id)) this.roster.set(id, { id, name, speaking: false, muted: this.muted.has(id), linked: false });
+        if (!this.roster.has(id)) this.roster.set(id, { id, name, speaking: false, muted: this.muted.has(id), linked: false, far: voiceNear.gain(name) === 0 });
       }
       for (const id of this.roster.keys()) if (!now.has(id)) { this.roster.delete(id); this.drop(id); this.forget(id); }
       this.changed();
@@ -263,10 +267,12 @@ export class VoiceChat {
   }
   private open(id: string, offerer: boolean): Link {
     const pc = new RTCPeerConnection({ iceServers: [...this.ice] }), audio = document.createElement('audio');
-    audio.autoplay = true; audio.setAttribute('playsinline', ''); audio.muted = this.muted.has(id); audio.dataset['voicePeer'] = id;
+    audio.autoplay = true; audio.setAttribute('playsinline', ''); audio.muted = true; audio.dataset['voicePeer'] = id;
     // Played from memory, never mounted: a hidden element in the page would only be one more node to keep.
     const link: Link = { pc, offerer, audio, early: [], held: [], openedAt: diagnosticNow(), described: false, everLinked: false, heardAt: 0, retries: 0 };
     this.links.set(id, link);
+    const known = this.roster.get(id);
+    if (known !== undefined) this.loudness(known, link);
     for (const track of this.mic?.getAudioTracks() ?? []) if (this.mic !== null) pc.addTrack(track, this.mic);
     pc.ontrack = event => { audio.srcObject = event.streams[0] ?? new MediaStream([event.track]); void audio.play().catch(() => undefined); };
     // WebKit finds candidates before `setLocalDescription` settles: one sent ahead of its offer would reach a peer with no link to add it to.
@@ -303,6 +309,22 @@ export class VoiceChat {
   private close(): void {
     this.hangUp(); this.releaseMic();
     for (const peer of this.roster.values()) peer.speaking = false;
+    this.tellTalking();
+  }
+  /** V7: this peer's volume by the distance to their body; muted by the player or out of earshot, nothing at all. */
+  private loudness(peer: VoicePeer, link: Link): number {
+    const gain = voiceNear.gain(peer.name);
+    peer.far = gain === 0;
+    link.audio.muted = peer.muted || peer.far;
+    link.audio.volume = Math.min(1, Math.max(0, gain));
+    return gain;
+  }
+  /** V8: the Names heard talking, for the ring over their heads. */
+  private tellTalking(): void {
+    const names = new Set<string>();
+    for (const peer of this.roster.values()) if (peer.speaking) names.add(peer.name);
+    const was = voiceNear.talking;
+    if (names.size !== was.size || [...names].some(name => !was.has(name))) voiceNear.talking = names;
   }
   private releaseMic(): void {
     for (const track of this.mic?.getTracks() ?? []) track.stop();
@@ -339,10 +361,16 @@ export class VoiceChat {
       if (link.offerer && this.state === 'on' && !link.everLinked && link.pc.connectionState !== 'connected' && now - link.openedAt > UNANSWERED_MS && link.retries < RETRIES) { void this.offer(id, link.retries + 1); continue; }
       const peer = this.roster.get(id);
       if (peer === undefined) continue;
+      const far = peer.far;
+      this.loudness(peer, link);
+      if (far !== peer.far) moved = true;
       if (await heardLevel(link.pc) > SPEAKING_LEVEL) link.heardAt = now;
-      const speaking = !peer.muted && now - link.heardAt < SPEAKING_HOLD_MS;
+      // Talking is what this player hears: a muted or far player's voice never lights their name or their head.
+      const speaking = !peer.muted && !peer.far && now - link.heardAt < SPEAKING_HOLD_MS;
       if (speaking !== peer.speaking) { peer.speaking = speaking; moved = true; }
     }
+    for (const peer of this.roster.values()) if (!this.links.has(peer.id)) { const far = voiceNear.gain(peer.name) === 0; if (far !== peer.far) { peer.far = far; moved = true; } }
+    this.tellTalking();
     if (moved) this.changed();
   }
   private set(state: VoiceState): void { this.state = state; this.changed(); }

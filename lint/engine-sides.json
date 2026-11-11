@@ -254,6 +254,7 @@
     "src/client/engine/net/netPlayer.ts": "client",
     "src/client/engine/net/onRep.ts": "client",
     "src/client/engine/net/otherPlayers.ts": "client",
+    "src/client/engine/net/voiceNear.ts": "client",
     "src/client/engine/net/predictionWorld.ts": "client",
     "src/client/engine/net/predictor.ts": "client",
     "src/client/engine/net/redial.ts": "client",
