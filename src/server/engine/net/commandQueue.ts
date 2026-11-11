@@ -30,6 +30,11 @@ function holdsOf(command: NetCommand): NetCommand {
   const { attack: _attack, hookTarget: _hook, launcher, ...rest } = command;
   return { ...rest, viewTick: 0, buttons: command.buttons & ~NET_PRESSES, ...(launcher === undefined ? {} : { launcher: { slot: launcher.slot, ads: launcher.ads } }) };
 }
+/** A command whose wire seq (a u16) is not after `newest`: the queue would drop it whatever the rest of it says. */
+function spentSeq(raw: unknown, newest: number): boolean {
+  const seq = typeof raw === 'object' && raw !== null ? (raw as { readonly seq?: unknown }).seq : undefined;
+  return typeof seq === 'number' && Number.isInteger(seq) && seq >= 0 && seq <= 0xffff && !seqAfter(seq, newest);
+}
 /** Only a tick's first command reaches the weapon systems, so one that fires anything waits for a tick of its own. */
 const motionOnly = (command: NetCommand): boolean => (command.buttons & NET_PRESSES) === 0 && command.attack === undefined && command.launcher?.fire !== true;
 
@@ -48,9 +53,14 @@ export class CommandQueue {
   lastSeq = 0;
   /** Commands refused by admission, and copies dropped as duplicates. */
   refused = 0; duplicates = 0;
-  /** Queue a decoded bundle, oldest first. A replayed `seq` is dropped, so redundancy cannot repeat a jump. */
+  /**
+   * Queue a decoded bundle, oldest first. A replayed `seq` is dropped, so redundancy cannot repeat a jump. MMO-PLAN MP1.2:
+   * every bundle repeats up to REDUNDANT_COMMANDS older commands, so a copy whose seq is already spent is dropped before
+   * its schema check (it was checked on arrival), and counts as a duplicate even if the copy itself is malformed.
+   */
   admit(commands: readonly NetCommand[]): void {
     for (const raw of commands) {
+      if (this.newest !== null && spentSeq(raw, this.newest)) { this.duplicates++; continue; }
       const parsed = v.safeParse(NetCommandSchema, raw);
       if (!parsed.success) { this.refused++; continue; }
       const command = parsed.output;
