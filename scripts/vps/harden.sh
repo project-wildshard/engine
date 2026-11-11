@@ -334,6 +334,9 @@ kernel.unprivileged_bpf_disabled >= 1
 kernel.yama.ptrace_scope >= 1
 EOF
   if [ -z "$drift" ]; then ok VH15 'sysctl matches'; else bad VH15 "sysctl drift:$drift"; fi
+  if has systemctl && systemctl list-unit-files apport.service >/dev/null 2>&1 && [ "$(systemctl is-enabled apport.service 2>/dev/null)" != masked ]; then
+    bad VH15 'apport is not masked: it resets fs.suid_dumpable=2 at boot'
+  fi
 else unknown VH15 'sysctl is missing'; fi
 
 printf '%-7s %-5s %s\n' summary '' "$FAILS fail, $UNKNOWNS unknown"

@@ -167,6 +167,12 @@ kernel.unprivileged_bpf_disabled = 1
 kernel.yama.ptrace_scope = 1
 EOF
 then sysctl -q -p /etc/sysctl.d/90-wildshard.conf; fi
+# apport sets fs.suid_dumpable=2 each time it starts, after sysctl.d, so VH15 drifted at every boot: it stays off.
+if systemctl list-unit-files apport.service >/dev/null 2>&1 && [ "$(systemctl is-enabled apport.service 2>/dev/null)" != masked ]; then
+  systemctl disable --now --quiet apport.service 2>/dev/null || true; systemctl mask --quiet apport.service
+  [ -f /etc/default/apport ] && sed -i 's/^enabled=.*/enabled=0/' /etc/default/apport
+  say doing VH15 'apport off and masked: it no longer resets fs.suid_dumpable at boot'
+fi
 
 # --- J266 (MS3.5): the agents' own account. No password, key only, its key from the Mac's ~/.ssh/wildshard_agent_ed25519.
 # Its key file and folder are root's, so the account cannot add a key of its own. sudo and SSH sessions report to Sentry
