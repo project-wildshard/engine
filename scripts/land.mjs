@@ -82,6 +82,13 @@ export function shaVerdict(data,sha){
  return {state,runs:latest,summary:rows.map(row=>`${row.name} ${row.run===undefined?'none':row.run.status==='completed'?row.run.conclusion:row.run.status}`).join(', ')};
 }
 
+/** A red verdict whose every unsuccessful run was cancelled, not failed: on main, a newer push replacing the run.
+ * @param {ReturnType<typeof shaVerdict>} verdict */
+export function cancelledOnly(verdict){
+ const unsuccessful=Object.values(verdict.runs).filter(run=>run.conclusion!=='success');
+ return verdict.state==='red'&&unsuccessful.length>0&&unsuccessful.every(run=>run.conclusion==='cancelled');
+}
+
 /** @param {string} repo @param {string} path */
 function ghApi(repo,path){
  const result=spawnSync('gh',['api',`repos/${repo}/${path}`],{encoding:'utf8',timeout:30_000,maxBuffer:64<<20});
@@ -430,7 +437,7 @@ class Landing{
  /** After GitHub's main moved, bring the canonical checkout's main along (Jake, 2026-11-10 ~23:50 Cancún: "go to
   * the main checkout, pull main, make sure it's up to date, and then merge fast forward only in the main checkout").
   * The push came first, so the canonical checkout is never ahead of GitHub. Only a fast-forward, under worktree.mjs's
-  * followMain guards (on main, clean, not diverged, no git operation or other process in it); anything else is a
+  * followMain guards (on main, clean, not diverged, no git operation in progress); anything else is a
   * warning and a receipt, never a reset or a stash. The landing stands either way. */
  followCanonical(){
   let canonical='',outcome='';
@@ -444,6 +451,24 @@ class Landing{
   this.receipt(`canonical checkout not fast-forwarded after landing: ${outcome}`);
  }
 
+ /** Main's own run for `head`. Lands a minute apart make GitHub cancel a main run in favour of the next push, so a
+  * run that was only cancelled while a newer main commit contains `head` is superseded, not red: land watches that
+  * newer run instead, and reports red only if that one is. A cancel with nothing newer on main stays red.
+  * @param {string} head */
+ async watchMain(head){
+  /** @type {string[]} */const superseded=[];
+  let sha=head;
+  for(;;){
+   const verdict=await this.waitCI(sha,'main');
+   if(!cancelledOnly(verdict))return {verdict,sha,superseded};
+   const tip=this.fetchMain();
+   if(tip===sha||!isAncestor(this.root,sha,tip))return {verdict,sha,superseded};
+   this.say('superseded',`main's run for ${short(sha)} was cancelled by a newer main push; ${short(tip)} contains it, watching that run`);
+   superseded.push(sha);
+   sha=tip;
+  }
+ }
+
  /** @param {string} rule @param {string} why @param {number} round @param {string} before */
  async landed(rule,why,round,before){
   const head=this.head();
@@ -455,9 +480,10 @@ class Landing{
   let code=0,mainCI='reuses the branch run';
   if(rule==='carried'){
    if(this.options.watchMain){
-    const verdict=await this.waitCI(head,'main');
-    mainCI=verdict.state==='green'?`green (${Object.values(verdict.runs).map(run=>run.id).join(', ')})`:`RED: ${('failed'in verdict?verdict.failed:[]).join(' | ')}`;
-    if(verdict.state!=='green'){code=3;this.say('red',`main's hosted run is red for ${short(head)}: fix forward now`);}
+    const {verdict,sha,superseded}=await this.watchMain(head);
+    const via=superseded.length===0?'':`superseded by ${short(sha)}, `;
+    mainCI=verdict.state==='green'?`${via}green (${Object.values(verdict.runs).map(run=>run.id).join(', ')})`:`${via}RED: ${('failed'in verdict?verdict.failed:[]).join(' | ')}`;
+    if(verdict.state!=='green'){code=3;this.say('red',`main's hosted run is red for ${short(sha)}${sha===head?'':`, which contains ${short(head)}`}: fix forward now`);}
    }else mainCI='not watched';
   }
   const seconds=Math.round((Date.now()-this.started)/1000);
