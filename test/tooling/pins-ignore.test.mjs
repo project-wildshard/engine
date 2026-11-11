@@ -12,7 +12,7 @@ import {afterAll, beforeAll, describe, expect, test} from 'vitest';
 const ROOT = resolve(import.meta.dirname, '../..');
 const ENV = {...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null'};
 
-/** One published path per pin-output folder, as `pins.ts install` wrote them on 2026-11-11. */
+/** A published path from each kind of pin-output folder (not every folder), as `pins.ts install` wrote them on 2026-11-11. */
 const PUBLISHED = [
   // The paths that kept go7-one-way-in, mmo-keep and ms7-rooms from the reaper.
   'public/assets/nalati/astc6/nalati/cards.phone-b3a5391d.ktx2',
@@ -52,7 +52,7 @@ function ignored(paths) {
 }
 
 describe('pins outputs and .gitignore', () => {
-  test('every pin-output folder is ignored by .gitignore, without the canonical info/exclude', () => {
+  test('a pin output of each kind is ignored by .gitignore, without the canonical info/exclude', () => {
     expect(PUBLISHED.filter(path => !ignored([path]).includes(path))).toEqual([]);
   });
 
