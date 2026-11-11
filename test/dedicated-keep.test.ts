@@ -174,15 +174,31 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
   const db = await database(), roll = die(20261111), heard: string[] = [], allWrites: SaveWrite[] = [];
   // The oracle: every reward the game granted, by boot, as the event the player sees. A crash loses what its process never committed.
   const durable: string[] = [], lost: string[] = [], orderings: Record<string, number> = {};
+  // The other side of the oracle, kept apart from grant emission: each death the test itself caused, by boot and body. A reward
+  // must name one of these, and a death pays its player at most one coin roll and each item once.
+  const deaths = new Map<string, number>(), rewards = new Map<string, string[]>();
+  let died: Parameters<Parameters<DedicatedRoom['host']['events']['on']>[1]>[0] | null = null;
   let pending: string[] = [], boots = 0, kills = 0, recovered = 0;
   const open = async (): Promise<{ at: Room; phone: Phone; saves: Saves; faults: Faults }> => {
     const faults: Faults = { dead: false, next: 'none' }, saves = savesOf(db, faults), at = await boot(DRIFTWOOD, `kills-${String(++boots)}`, saves);
-    at.room.host.events.on('reward.granted', ({ coins: amount, item }) => { pending.push(item === undefined ? `${at.bootId}|coins|${String(amount)}` : `${at.bootId}|item|${item}`); }, at.room.host.scope);
+    at.room.host.events.on('reward.granted', ({ coins: amount, item, body }) => {
+      const key = `${at.bootId}|${body}`, grant = item === undefined ? 'coins' : `item|${item}`;
+      rewards.set(key, [...rewards.get(key) ?? [], grant]);
+      pending.push(item === undefined ? `${at.bootId}|coins|${String(amount)}` : `${at.bootId}|item|${item}`);
+    }, at.room.host.scope);
+    at.room.host.events.on('actor.died', row => { died = row; }, at.room.host.scope);
     const saved = await saves.read('a', DRIFTWOOD), phone = seat(at, 'a', saved);
     if ((saved.recovery?.length ?? 0) > 0) recovered++;
     phone.client.onLedger(row => { heard.push(row.id); });
     run(at, phone, 5);
     return { at, phone, saves, faults };
+  };
+  /** A kill the test caused, counted on its own. */
+  const slay = (at: Room, id: string, creature: AnimalSim): boolean => {
+    if (!kill(at, 'a', creature)) return false;
+    const key = `${at.bootId}|${id}`;
+    deaths.set(key, (deaths.get(key) ?? 0) + 1);
+    return true;
   };
   /** Let every checkpoint due land: the debounce passes, and the queue empties into Postgres. */
   const settle = async (at: Room, phone: Phone, saves: Saves): Promise<void> => { run(at, phone, 90); expect(await saves.drain(10_000)).toBe(true); durable.push(...pending); pending = []; };
@@ -195,8 +211,8 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
       if (ordering === 'torn') {
         // A kill lands in a checkpoint, the process dies, and that newest doc is torn: the player boots from `previous`, and the
         // receipts it lacks come back through recovery.
-        const [, last] = living(at)[0] ?? [];
-        if (last !== undefined && kill(at, 'a', last)) kills++;
+        const [lastId, last] = living(at)[0] ?? [];
+        if (lastId !== undefined && last !== undefined && slay(at, lastId, last)) kills++;
         await settle(at, phone, saves);
         faults.dead = true;
         const { rows } = await db.query('select revision from player_save where player_id = $1', ['a']);
@@ -204,8 +220,8 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
       } else if (ordering === 'crash') {
         // Everything checkpointed lands; then one more kill is paid live, and the process dies before its checkpoint.
         await settle(at, phone, saves);
-        const [, last] = living(at)[0] ?? [];
-        if (last !== undefined && kill(at, 'a', last)) kills++;
+        const [lastId, last] = living(at)[0] ?? [];
+        if (lastId !== undefined && last !== undefined && slay(at, lastId, last)) kills++;
         run(at, phone, 2);
         lost.push(...pending); pending = [];
         faults.dead = true;
@@ -224,12 +240,12 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
       ({ at, phone, saves, faults } = await open());
       continue;
     }
-    const [, creature] = alive[Math.floor(roll() * alive.length)] ?? [];
-    if (creature === undefined) continue;
-    if (kill(at, 'a', creature)) {
+    const [id, creature] = alive[Math.floor(roll() * alive.length)] ?? [];
+    if (id === undefined || creature === undefined) continue;
+    if (slay(at, id, creature)) {
       kills++;
-      // A replayed death: the corpse is hit again, which must pay nothing.
-      if (roll() < 0.3) expect(kill(at, 'a', creature), 'a corpse does not die twice').toBe(false);
+      // A replayed death: the very death is heard again, and the corpse is hit again. Neither may pay.
+      if (roll() < 0.3 && died !== null) { at.room.host.events.emit('actor.died', died); expect(kill(at, 'a', creature), 'a corpse does not die twice').toBe(false); }
     }
     run(at, phone, 2 + Math.floor(roll() * 40));
   }
@@ -239,6 +255,13 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
   expect(await saves.drain(10_000)).toBe(true);
   expect(boots, 'restarts fell among the kills').toBeGreaterThan(5);
   expect(Object.keys(orderings).sort(), 'every ordering ran').toEqual(['ack-lost', 'before-commit', 'crash', 'drain', 'torn']);
+  for (const [key, grants] of rewards) {
+    const times = deaths.get(key) ?? 0;
+    expect(times, `${key} was paid for a death the test caused`).toBeGreaterThan(0);
+    expect(grants.filter(grant => grant === 'coins').length, `${key}: at most one coin roll a death`).toBeLessThanOrEqual(times);
+    for (const grant of new Set(grants.filter(row => row !== 'coins'))) expect(grants.filter(row => row === grant).length, `${key}: ${grant} once a death`).toBeLessThanOrEqual(times);
+  }
+  expect(rewards.size, 'deaths paid rewards').toBeGreaterThan(10);
   expect(recovered, 'a torn doc was admitted through its recovery receipts').toBeGreaterThan(0);
   expect(new Set(heard).size, 'no grant was heard twice').toBe(heard.length);
   const receipts = await receiptsOf(db, 'a');
