@@ -31,11 +31,16 @@ def acquire_cpu(root, entry, capacity, deadline):
             state['cpuNext'] += 1
             pending.append(entry)
         head = min(pending, key=lambda row: row['ticket'])
-        if head['token'] == entry['token'] and sum(row['slots'] for row in active) + entry['slots'] <= capacity:
-            pending[:] = [row for row in pending if row['token'] != entry['token']]
-            active.append(entry)
-            return True
+        if head['token'] != entry['token'] or sum(row['slots'] for row in active) + entry['slots'] > capacity:
+            return False
+        pending[:] = [row for row in pending if row['token'] != entry['token']]
+        active.append(entry)
+    # GVS G10 (J230): the grant is saved, so a store prune's scan sees it; only now check the prune's
+    # reservation. One of the two always sees the other. While a prune runs, give the grant back and wait.
+    if lane.store_reservation() is not None:
+        release_cpu(root, entry['token'])
         return False
+    return True
 
 
 def release_cpu(root, token):

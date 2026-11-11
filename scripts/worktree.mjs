@@ -59,6 +59,28 @@ const tryGit=(cwd,args)=>spawnSync('git',args,{cwd,encoding:'utf8',maxBuffer:256
 const nul=(/** @type {string} */ text)=>text.split('\0').filter(Boolean);
 
 /** @param {string[]} argv */
+/**
+ * GVS G10 (J230): run a store install only while no pnpm store prune runs. This install is announced in
+ * `store-users/` before it checks the prune's reservation (an exclusive flock its pnpm child inherits), and the prune
+ * takes that lock before it scans, so one of the two always sees the other (meta scripts/prune-store.sh). Paths can
+ * be moved for tests.
+ * @template T @param {NodeJS.ProcessEnv} env @param {string} what @param {() => T} fn @returns {T}
+ */
+export function withStoreUse(env,what,fn){
+ const users=env.WS_STORE_USERS??join(homedir(),'.cache/wildshard/store-users');
+ const reservation=env.WS_STORE_RESERVATION??join(homedir(),'.cache/wildshard/store-maintenance.lock');
+ mkdirSync(users,{recursive:true});
+ const mine=join(users,`${process.pid}.json`);
+ writeFileSync(mine,JSON.stringify({pid:process.pid,what,at:Date.now()}));
+ try{
+  // The prune holds an exclusive flock that its pnpm child inherits; Node has no flock, so Python probes it.
+  const probe=spawnSync('python3',['-c','import fcntl,sys\ntry:\n f=open(sys.argv[1],"rb")\nexcept OSError:\n sys.exit(0)\ntry:\n fcntl.flock(f,fcntl.LOCK_SH|fcntl.LOCK_NB)\nexcept BlockingIOError:\n sys.exit(3)\n',reservation],{encoding:'utf8'});
+  if(probe.status===3)throw new Error('worktree: a pnpm store prune is running (meta make prune); run this again when it ends');
+  if(probe.status!==0)throw new Error(`worktree: could not check the store prune reservation (${probe.error?.message??probe.stderr.trim()})`);
+  return fn();
+ }finally{rmSync(mine,{force:true});}
+}
+
 export function parseArgs(argv){
  const [command,slug,...rest]=argv;
  if(command!=='new'||slug===undefined)throw new StopError(USAGE);
@@ -272,7 +294,7 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
  }finally{unlock();}
  const scripts=/** @type {{scripts?:Record<string,string>}} */(JSON.parse(readFileSync(join(tree,'package.json'),'utf8'))).scripts??{};
  const childEnv=Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_')));
- if(options.install)timed('install',()=>run(tree,'pnpm',['install','--frozen-lockfile','--offline'],childEnv));
+ if(options.install)timed('install',()=>withStoreUse(env,'worktree install',()=>run(tree,'pnpm',['install','--frozen-lockfile','--offline'],childEnv)));
  if(options.pins&&scripts.pins!==undefined)timed('pins',()=>run(tree,'pnpm',['--silent','pins'],childEnv));
  if(options.herdr&&env.HERDR_ENV==='1'&&env.HERDR_PANE_ID!==undefined&&env.HERDR_PANE_ID!==''){
   const named=spawnSync('herdr',['pane','rename',env.HERDR_PANE_ID,`${basename(canonical)} ${branch}`],{encoding:'utf8'});

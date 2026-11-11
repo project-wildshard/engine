@@ -1,11 +1,11 @@
 // DEV-SPEED DS12: scripts/worktree.mjs against real git. A bare repo stands in for GitHub; the canonical checkout is a
 // clone of it with local edits and a local commit, so the tests can tell a cloned file from the origin/main blob.
 import {spawn, spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {SLUG, parseArgs} from '../../scripts/worktree.mjs';
+import {SLUG, parseArgs, withStoreUse} from '../../scripts/worktree.mjs';
 
 const SCRIPT = resolve(import.meta.dirname, '../../scripts/worktree.mjs');
 /** @type {string[]} */
@@ -264,5 +264,39 @@ describe('worktree new', () => {
     expect(readFileSync(join(tree, 'odd\nname.txt'), 'utf8')).toBe('odd\r\n');
     // checkout-index writes CRLF under autocrlf; a raw LF clone would have passed the hash.
     expect(readFileSync(join(tree, 'plain.txt'), 'utf8')).toBe('line\r\n');
+  });
+});
+
+describe('worktree install and the store prune reservation (GVS G10)', () => {
+  /** @returns {{users: string, reservation: string, env: NodeJS.ProcessEnv}} */
+  const box = () => {
+    const base = mkdtempSync(join(tmpdir(), 'store-use-'));
+    roots.push(base);
+    const users = join(base, 'store-users'), reservation = join(base, 'store-maintenance.lock');
+    return {users, reservation, env: {WS_STORE_USERS: users, WS_STORE_RESERVATION: reservation}};
+  };
+  /** A stand-in prune: holds the exclusive flock until killed. @param {string} path */
+  const holdLock = (path) => {
+    const child = spawn('python3', ['-c', 'import fcntl,sys,time\nf=open(sys.argv[1],"a+")\nfcntl.flock(f,fcntl.LOCK_EX)\nprint("held",flush=True)\ntime.sleep(30)', path]);
+    return new Promise((resolveHeld) => { child.stdout.once('data', () => resolveHeld(child)); });
+  };
+  test('announces itself before it checks, refuses while a prune holds the store, and cleans up', async () => {
+    const {users, reservation, env} = box();
+    let seen = /** @type {string[]} */ ([]);
+    expect(withStoreUse(env, 'worktree install', () => { seen = readdirSync(users); return 7; })).toBe(7);
+    expect(seen).toEqual([`${process.pid}.json`]);
+    expect(readdirSync(users)).toEqual([]);
+    const prune = /** @type {import('node:child_process').ChildProcess} */ (await holdLock(reservation));
+    try {
+      let ran = false;
+      expect(() => withStoreUse(env, 'worktree install', () => { ran = true; })).toThrow(/store prune is running/u);
+      expect(ran).toBe(false);
+      expect(readdirSync(users)).toEqual([]);
+    } finally { prune.kill(); }
+  });
+  test('a lock file nobody holds (a finished prune) does not block an install', () => {
+    const {reservation, env} = box();
+    writeFileSync(reservation, '');
+    expect(withStoreUse(env, 'worktree install', () => 'ok')).toBe('ok');
   });
 });

@@ -192,3 +192,52 @@ print(json.dumps(True))
 `], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   expect(JSON.parse(result)).toBe(true);
 });
+
+test('GVS G10: a store-prune reservation keeps leases queued, outlives a killed prune owner, and ends with its last child', () => {
+  const result = execFileSync('python3', ['-c', `
+import json, os, pathlib, subprocess, sys, tempfile, time
+repo = pathlib.Path.cwd()
+with tempfile.TemporaryDirectory(prefix='store-reservation-test-', dir=repo/'tmp') as temporary:
+ root = pathlib.Path(temporary)
+ env = {key:value for key,value in os.environ.items() if not key.startswith('WS_HEAVY_')}
+ env['WS_HEAVY_ROOT'] = str(root/'leases')
+ lock = root/'store-maintenance.lock'
+ env['WS_STORE_RESERVATION'] = str(lock)
+ # A prune owner takes the lock, starts its long child with the lock inherited, then is killed.
+ owner = subprocess.Popen([sys.executable,'-c',
+  "import fcntl,subprocess,sys,time\\nf=open(sys.argv[1],'a+')\\nfcntl.flock(f,fcntl.LOCK_EX)\\nc=subprocess.Popen(['sleep','30'],pass_fds=(f.fileno(),))\\nprint(c.pid,flush=True)\\ntime.sleep(30)",
+  str(lock)], stdout=subprocess.PIPE, text=True)
+ child = int(owner.stdout.readline())
+ owner.kill(); owner.wait()
+ build = subprocess.Popen([sys.executable,str(repo/'scripts/heavy-lane.py'),'build','--',sys.executable,'-c',"print('ran')"],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+ time.sleep(1.5)
+ waited = build.poll() is None and not list((root/'leases').glob('build*.active.json'))
+ queued = any(row['token'] for row in json.loads((root/'leases'/'queue.json').read_text()).get('queue', []))
+ os.kill(child, 9)
+ out, err = build.communicate(timeout=20)
+ print(json.dumps({'waited': waited, 'stillQueued': queued, 'ran': build.returncode == 0 and out.strip() == 'ran'}))
+`], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  expect(JSON.parse(result)).toEqual({ waited: true, stillQueued: true, ran: true });
+});
+
+test('GVS G10: CPU admission gives its grant back and waits while a store prune holds the store', () => {
+  const result = execFileSync('python3', ['-c', `
+import fcntl, json, os, pathlib, subprocess, sys, tempfile, time
+repo = pathlib.Path.cwd()
+with tempfile.TemporaryDirectory(prefix='cpu-reservation-test-', dir=repo/'tmp') as temporary:
+ root = pathlib.Path(temporary)
+ env = {key:value for key,value in os.environ.items() if not key.startswith('WS_HEAVY_') and key != 'WS_CPU_ROOT'}
+ env['WS_CPU_ROOT'] = str(root/'cpu')
+ lock = root/'store-maintenance.lock'
+ env['WS_STORE_RESERVATION'] = str(lock)
+ held = open(lock, 'a+'); fcntl.flock(held, fcntl.LOCK_EX)
+ run = subprocess.Popen([sys.executable,str(repo/'scripts/cpu-admission.py'),'run','--slots','1','--capacity','1','--',sys.executable,'-c',"print('ran')"],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+ time.sleep(1.5)
+ state = json.loads((root/'cpu'/'queue.json').read_text())
+ waited = run.poll() is None and state.get('cpuActive', []) == []
+ fcntl.flock(held, fcntl.LOCK_UN); held.close()
+ out, err = run.communicate(timeout=20)
+ print(json.dumps({'waited': waited, 'ran': run.returncode == 0 and 'ran' in out}))
+`], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  expect(JSON.parse(result)).toEqual({ waited: true, ran: true });
+});

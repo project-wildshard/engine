@@ -186,6 +186,25 @@ tests related to the pushed change. Run the tests of what you touched instead:
 Override, for the coordinator only: WS_FULL_SUITE=1 <command>."""
 
 
+def store_reservation():
+    """True while a pnpm store prune holds the store (meta scripts/prune-store.sh, GVS G10), else None.
+
+    The prune holds an exclusive flock on this file, and its `pnpm store prune` child inherits it, so the
+    reservation lasts exactly as long as anything of the prune runs: no PID to go stale or be reused."""
+    path = Path(os.environ.get('WS_STORE_RESERVATION') or Path.home() / '.cache/wildshard/store-maintenance.lock')
+    try:
+        probe = path.open('rb')
+    except OSError:
+        return None
+    with probe:
+        try:
+            fcntl.flock(probe, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(probe, fcntl.LOCK_UN)
+    return None
+
+
 def full_suite_allowed():
     return bool(os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS')) or os.environ.get('WS_FULL_SUITE') == '1'
 
@@ -343,10 +362,19 @@ def acquire(root, entry, deadline=None):
                     fd.close()
                 return None
             leases.append(selected[0]); held.append(selected[1])
-        state['queue'] = [row for row in state['queue'] if row['token'] != entry['token']]
         entry['leases'] = leases
         for resource in leases:
             write_active(root, resource, entry)
+        # GVS G10 (J230): a store prune reserves the store first, then scans for live leases; this lease is
+        # visible before it checks, so one of the two always sees the other. While a prune runs, stay queued.
+        if store_reservation() is not None:
+            for resource in leases:
+                (root / (resource + '.active.json')).unlink(missing_ok=True)
+            for fd in held:
+                fd.close()
+            entry.pop('leases', None)
+            return None
+        state['queue'] = [row for row in state['queue'] if row['token'] != entry['token']]
         return held
 
 
