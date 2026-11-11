@@ -32,7 +32,7 @@ const json = (bytes: Uint8Array | undefined): unknown => JSON.parse(new TextDeco
 const PREPARED = '7d1dd888'.padEnd(64, '0'), MOVED = '6d0a0a78'.padEnd(64, '0');
 
 /** Template as `wildshard prepare` leaves it: sdk 0.3, a cook v3 preparation recorded on `renderer`, fence packs, a program mount. */
-function prepared(renderer: string): Map<string, Uint8Array> {
+function prepared(renderer: string, fenced = true): Map<string, Uint8Array> {
   const files = new Map(readTar(legacy)), held = parseOutputIndex(json(files.get('shard.json')));
   const old = readCookData(json(files.get('cook.json'))), slug = held.identity.slug;
   const program = validationSourceBytes({version: 2, build: 'stale-fixture', lines: ['void main() {}'], shaders: [[0]], programs: [[0, 0]]});
@@ -42,7 +42,7 @@ function prepared(renderer: string): Map<string, Uint8Array> {
     {url: `/programs/${slug}.json`, path: `mounts/programs/${slug}.json`, hash: digest(program), bytes: program.length},
     {url: '/assets/stale-proof.bin', path: 'mounts/assets/stale-proof.bin', hash: digest(asset), bytes: asset.length}];
   const index = parseOutputIndex({...held, sdk: '0.3'});
-  const cook = validationSourceBytes({version: 3, renderer, mounts, packs: 'fence', fence: [digest(asset)], programs: json(program),
+  const cook = validationSourceBytes({version: 3, renderer, mounts, packs: 'fence', fence: fenced ? [digest(asset)] : [], programs: json(program),
     inputHash: digest(cookPreparationBytes(index, mounts, renderer))});
   files.set('cook.json', cook);
   files.set('shard.json', validationSourceBytes({...index, cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
@@ -90,6 +90,15 @@ test('a stale preparation cooks to the same bytes as the matching renderer, and 
   expect(movedRest).toEqual(fastRest);
   // The author's recorded programs still ship at their URL, and the fence still shapes the phone's entry set.
   expect(moved.report.loose).toContain('/programs/template.json');
+  const entry = (cooked: {report: CookReport}, dir: string): string[] => {
+    const row = cooked.report.manifests.find(manifest => manifest.tier === 'phone' && manifest.set === 'entry');
+    if (row === undefined) throw new Error('No phone entry manifest');
+    return (json(readFileSync(join(root, dir, row.url.slice(1)))) as {files: {url: string}[]}).files.map(file => file.url);
+  };
+  // The stale cook still goes by the author's fence: its recorded read is in the entry set, and gone when the fence is empty.
+  const unfenced = await cook(writeTar(prepared(PREPARED, false)), 'stale-unfenced', MOVED);
+  expect(entry(moved, 'stale').some(url => url.startsWith('/assets/stale-proof.bin'))).toBe(true);
+  expect(entry(unfenced, 'stale-unfenced').some(url => url.startsWith('/assets/stale-proof.bin'))).toBe(false);
   expect(moved.files['programs/template.json']).toBe(digest(prepared(PREPARED).get('mounts/programs/template.json') ?? new Uint8Array()));
 });
 
