@@ -33,13 +33,31 @@ const ENTRY_LEG=['nomad-camp','sheep-pasture','bridge','sky-road','horse-plains'
 const CAVE_START={x:141.67510716876185,y:37.026160557768485,z:-36.54738863838429};
 let start:string|undefined;
 if(leg==='cave'){
-  // A position set at tick zero on a fresh world, saved; the recorder and the replay worker both start from that save.
+  // Same world, the entry leg's discoveries first: the player stands in each of its places (a position set), which
+  // earns each one and its notice once, then stands where the entry leg leaves the snow leopard cave. That world is
+  // saved; the recorder and the replay worker both start from the save, so the tour below runs on every earlier
+  // discovery and a duplicate notice or a quest fact from the whole set still fails.
   const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);assert.ok(descriptor);
   const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const placed=await createNativeProofResident({shard,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm')),product},prepareHeadlessRuntime);
   try{
-    const player=leadPlayer(placed.host);assert.equal(placed.host.state.tick,0);
+    const player=leadPlayer(placed.host),earlier=new Map<string,number>();
+    const places=v.parse(ChapterViewSchema,await product.json('quests/content.json')).places;
+    for(const id of ENTRY_LEG){
+      const row=places.find(place=>place.id===id);assert.ok(row);
+      player.position.set(row.x,placed.host.groundHeightAt(row.x,row.z)+.1,row.z);player.velocity.set(0,0,0);player.motor.resetAt(player.position);
+      for(let tick=0;tick<30&&!placed.host.flags.has(`seen:${id}`);tick++){
+        placed.step([]);
+        for(const effect of placed.effects){
+          assert.equal(effect.kind,'hint','discovery cannot grant quest facts, inventory or damage');
+          if(effect.kind==='hint')earlier.set(effect.text,(earlier.get(effect.text)??0)+1);
+        }
+      }
+      assert.ok(placed.host.flags.has(`seen:${id}`),`standing in ${id} discovers it`);
+    }
+    for(const row of places)assert.equal(earlier.get(`Discovered · ${row.label}`)??0,row.quiet===true||!ENTRY_LEG.includes(row.id)?0:1,`one earlier notice for ${row.id}`);
+    assert.equal(placed.host.quests.some(quest=>quest.isComplete),false);
     player.position.set(CAVE_START.x,CAVE_START.y,CAVE_START.z);player.velocity.set(0,0,0);player.motor.resetAt(player.position);
     start=serializeSimSnapshot(snapshotSimHostBytes(placed.host));
   }finally{placed.dispose();}
@@ -54,7 +72,7 @@ try{
   const ids=new Set(rows.map(row=>row.id));assert.ok(ENTRY_LEG.every(id=>ids.has(id)),'the entry leg names real places');
   const target=leg==='all'?rows:leg==='entry'?rows.filter(row=>ENTRY_LEG.includes(row.id)):rows.filter(row=>!ENTRY_LEG.includes(row.id));
   first=await createNativeProofResident({shard,assets:session.assets,rapier,product},prepareHeadlessRuntime,start);
-  const active=first,{host}=active,frames:HeadlessCommand[][]=[];
+  const active=first,{host}=active,frames:HeadlessCommand[][]=[],base=host.state.tick;
   const replay=await session.ready(),recordStarted=performance.now(),replayStarted=performance.now();
   let alignmentTicks=0;
   const owner=host.adapters.get('nalati.world');assert.ok(owner);
@@ -76,12 +94,12 @@ try{
   });
   stopReplay=pipeline.stop;
   const mark=async():Promise<void>=>{
-    if(marks.at(-1)?.tick===frames.length)return;
+    if(marks.at(-1)?.tick===base+frames.length)return;
     assert.equal(host.adapters.get('nalati.world'),owner,'the recorder retains its actual observation owner');
     const state=owner.snapshot();if(typeof state!=='string')throw new Error('Discovery owner requires its actual JSON wire');
-    const expected={tick:frames.length,position:leadPlayer(host).position.toArray(),flags:[...host.flags.all],state};
+    const expected={tick:base+frames.length,position:leadPlayer(host).position.toArray(),flags:[...host.flags.all],state};
     const chunk=frames.slice(offset);assert.ok(chunk.length>0&&chunk.length<=PART);
-    assert.equal(expected.tick,offset+chunk.length,'every recorded boundary is consumed once, in order');
+    assert.equal(expected.tick,base+offset+chunk.length,'every recorded boundary is consumed once, in order');
     const index=marks.length;marks.push(expected);
     // The preceding checked request must settle before this one is offered.
     // After offer returns, the worker runs this part beside the next capture.
@@ -89,6 +107,10 @@ try{
     backpressureMs+=performance.now()-started;offset=frames.length;
   };
   const arrived=new Map<string,{tick:number;position:number[]}>(),notices=new Map<string,number>();
+  // The cave leg starts on the entry leg's discoveries; they are not arrivals of this recording.
+  const before=new Set(rows.filter(row=>host.flags.has(`seen:${row.id}`)).map(row=>row.id));
+  assert.deepEqual([...before].sort(),leg==='cave'?[...ENTRY_LEG].sort():[],'only the cave leg starts on earlier discoveries');
+  for(const id of before)arrived.set(id,{tick:-1,position:[]});
   const step=async(commands:readonly HeadlessCommand[]):Promise<void>=>{
     pipeline.check();
     assert.ok(frames.length<60_000,'outdoor discoveries keep the original finite native tape allowance');
@@ -175,7 +197,7 @@ try{
       Math.hypot(a.x-leadPlayer(host).position.x,a.z-leadPlayer(host).position.z)-Math.hypot(b.x-leadPlayer(host).position.x,b.z-leadPlayer(host).position.z));
     const place=pending[0];assert.ok(place);await discover(place);
   }
-  for(const row of rows)assert.equal(notices.get(`Discovered · ${row.label}`)??0,row.quiet===true||!arrived.has(row.id)?0:1,`one original notice for ${row.id}`);
+  for(const row of rows)assert.equal(notices.get(`Discovered · ${row.label}`)??0,row.quiet===true||before.has(row.id)||!arrived.has(row.id)?0:1,`one original notice for ${row.id}`);
   for(const row of target)assert.ok(arrived.has(row.id),`the ${leg} leg discovers ${row.id}`);
   assert.equal(host.quests.some(quest=>quest.isComplete),false);
   await mark();
