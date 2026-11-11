@@ -8,7 +8,7 @@ import { playerSavesOver } from '../src/server/host/dedicated/playerSaves';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { openPglite } from './fixtures/pgliteDatabase';
-import { SHARD, clock, shippedInput, rooms, post, open, readBack, enter, run, opening, earn, purse, quit } from './fixtures/dedicatedDoc';
+import { SHARD, clock, shippedInput, rooms, open, readBack, enter, run, opening, earn, purse, quit } from './fixtures/dedicatedDoc';
 
 // TEST-SPEED TS5 (J255): dedicated-doc was 31-44 s hosted. Split from dedicated-doc.test.ts by case; bodies unchanged.
 test('an incomplete ledger event is rejected before any room tick', async () => {

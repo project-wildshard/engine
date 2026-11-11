@@ -8,7 +8,7 @@ import { playerSavesOver } from '../src/server/host/dedicated/playerSaves';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { openPglite } from './fixtures/pgliteDatabase';
-import { SHARD, clock, shippedInput, rooms, post, open, readBack, enter, run, stand, bookOf, ring, opening, earn, purse, quit, RING, writes } from './fixtures/dedicatedDoc';
+import { SHARD, clock, shippedInput, rooms, open, readBack, enter, run, stand, bookOf, ring, opening, earn, purse, quit, RING } from './fixtures/dedicatedDoc';
 
 // TEST-SPEED TS5 (J255): dedicated-doc was 31-44 s hosted. Some cases moved to dedicated-doc-refusals.test.ts; the helpers are in test/fixtures/dedicatedDoc.ts.
 test('mid-quest with coins and gear, on the lead seat', { timeout: 120_000 }, async () => {

@@ -1,5 +1,4 @@
 // TEST-SPEED TS5 (J255): dedicated-save-safety was 27-35 s hosted.
-import { test } from 'vitest';
 import { type SaveWrite } from '../../src/server/host/dedicated/saves/saveStore';
 import type { PlayerDoc } from '../../src/server/host/dedicated/playerDoc';
 
