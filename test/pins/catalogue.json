@@ -783,8 +783,8 @@
     {
       "slug": "nalati-grasslands",
       "name": "Nalati Grasslands",
-      "revision": 2,
-      "hash": "bc6e2b7a18ed6c12789f05141efce427df068bbd1fffd0354a2b9243a3d94526"
+      "revision": 4,
+      "hash": "7a5ba3d3c3de0a19a35400721fc9d5f565e8e0d2a1bfa49c6fb439bc15075615"
     },
     {
       "slug": "nine-dragon-stack",
@@ -909,8 +909,8 @@
     {
       "slug": "pine-hollow",
       "name": "Pine Hollow",
-      "revision": 4,
-      "hash": "55f512f25f3601ff5fe50ab25d5cba37b8e1ebecf571104eb6fab8ade05ea36c"
+      "revision": 6,
+      "hash": "0e246ab03210d777619bf1fb09bbaa9da1bbcaea5093a8adfce913508762f084"
     },
     {
       "slug": "sunscar-dunes",

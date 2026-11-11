@@ -25,3 +25,12 @@ preview from this commit would narrow them.
 
 Proof: `test/cook-preparation.proof.ts` now checks that a capture-only
 phone lists the default set and no mounts, and a desktop every mount.
+
+Pinned: Pine Hollow revision 6 (`0e246ab0`) and Nalati revision 4
+(`7a5ba3d3`), uploaded with the creator key, staged, flipped live and
+pinned by `pins.ts refresh` (`catalogue-acceptance` left out, as before).
+Both tarballs are on the `pins` release. Their release saves name the
+new pins and resume. `pnpm build:game` cooks `2 current, 26 stale,
+0 none` (the 26 were prepared on renderer `49a01af1`) and all 28 are
+inside their ceilings. `loading-card-proof.mjs` on Pine, Nalati and
+`--grid`, Chromium and WebKit: 0 faults.
