@@ -60,25 +60,28 @@ test('a seat in a cell the page has not loaded says so, and takes no body', { ti
   expect(bench.room(SHARD)?.holds(IDENTITY.player)).toBe(false);
 });
 
-test('GO4: a grid page whose seat is in another cell is told where, never reloaded, and takes its body there', { timeout: 60_000 }, async () => {
+test('GO4: a grid page in its seat\'s cell takes its body there; a seat in another cell re-enters the grid, never a `?chunk=` page', { timeout: 60_000 }, async () => {
   const saves = memoryPlayerSaves();
-  saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'open-plot-night-market', cell: 'open-plot-nw', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
-  bench = await roomBench({ cells: [SHARD, 'open-plot-nw'], workers: 2, saves });
-  const reloads: string[] = [], placed: { cell: string; at: unknown }[] = [];
-  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, grid: true },
-    { link: () => undefined, countdown: () => undefined, elsewhere: shard => { reloads.push(shard); }, placed: (cell, at) => { placed.push({ cell, at }); } });
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'template-2'], workers: 2, saves });
+  const reloads: string[] = [], regrids: string[] = [], placed: { cell: string; at: unknown }[] = [];
+  const view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (shard: string): void => { reloads.push(shard); }, placed: (cell: string, at: unknown): void => { placed.push({ cell, at }); }, regrid: (cell: string): void => { regrids.push(cell); } };
+  const away = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, gridCell: SHARD }, view);
+  await vi.waitFor(() => { expect(regrids).toEqual(['template-2']); }, { timeout: 5000 });
+  expect(placed).toEqual([{ cell: 'template-2', at: expect.objectContaining({ x: expect.any(Number), z: expect.any(Number) }) as unknown }]);
+  expect(reloads, 'no `?chunk=` reload').toEqual([]);
+  expect(bench.room('template-2')?.holds(IDENTITY.player), 'no body while the page goes').toBe(false);
+  away.dispose();
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: '_template', identity: IDENTITY, gridCell: 'template-2' }, view);
   const { client, booted, ready } = shell;
   pump = setInterval(() => { client.present(); client.flush(); }, 16);
   await booted;
-  expect(placed).toEqual([{ cell: 'open-plot-nw', at: expect.objectContaining({ x: expect.any(Number), z: expect.any(Number) }) as unknown }]);
   ready();
-  await vi.waitFor(() => { expect(bench?.room('open-plot-nw')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
-  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('open-plot-nw')); }, { timeout: 5000 });
-  expect(reloads, 'no `?chunk=` reload: the grid session follows the frames').toEqual([]);
+  await vi.waitFor(() => { expect(bench?.room('template-2')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('template-2')); }, { timeout: 5000 });
+  expect({ regrids, reloads }).toEqual({ regrids: ['template-2'], reloads: [] });
 });
 
-// QA row 16: a player who chose to go is gone for everyone at once, not after J114's 30 s hold, and a page that leaves before
-// it was seated never gets a body at all.
 test('a seated page that leaves takes its body with it at once', { timeout: 30_000 }, async () => {
   bench = await roomBench();
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });

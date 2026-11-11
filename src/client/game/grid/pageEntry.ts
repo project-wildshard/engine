@@ -67,10 +67,28 @@ export function showGridDestination(slug: string): void {
   document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
 }
 
+/** GO4: the world seats this player in another cell than the page booted. Enter the grid again in that cell, as a title tap enters it:
+ *  the intent names the cell, and the page that boots is a grid page with a bare URL, never a `?chunk=` page. */
+export function reenterGrid(instance: string): void {
+  const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
+  if (cell === undefined || target === undefined) throw new Error(`The world seats this player in ${instance}, which this build's grid has no page for`);
+  pageGridIntents().set({ instance: cell.instance, slug: target.slug });
+  travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
+}
+
+/** The cell a grid tap boots in. GO5: on a build with a world (play, staging) the server's place is the one save, and this device's last
+ *  place is its hint, rewritten by every `resume`; elsewhere the home, and the page's own server restores where it was. */
+function entryCell(): GridCell {
+  const home = gridHome();
+  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) return home;
+  const assembly = new GridAssembly(gridMode(DEVSERVER)), place = gridRecovery(saves).lastPlace(assembly);
+  return place === null ? home : assembly.cells.find(cell => cell.instance === place.instance) ?? home;
+}
+
 /** Paint the loading shell before the title's durable handoff and fresh-page navigation. */
 export function enterGrid(): void {
   if (navigating !== null && !navigating.disposed) return;
-  const home = gridHome();
+  const home = entryCell();
   const target = findTitleManifest(home.slug);
   if (target === undefined) throw new Error(`The grid's home cell names no shard: ${home.slug}`);
   const shown = gridDestination(gridRecovery(saves).lastPlace(new GridAssembly(gridMode(DEVSERVER))), target);

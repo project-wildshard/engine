@@ -37,8 +37,8 @@ export interface OnlineConfig {
   /** The cell this page has loaded. */
   readonly loaded: string;
   readonly identity: NetIdentity;
-  /** GO4: a grid page. Its seat may be in any cell: the session follows the frames there, so `elsewhere` never reloads it. */
-  readonly grid?: true;
+  /** GO4: a grid page, and the grid cell (instance) it booted in. A seat elsewhere re-enters the grid there, never a `?chunk=` page. */
+  readonly gridCell?: string;
   /** Optional anonymous measurements; the page supplies the existing API sink. */
   readonly record?:{readonly install:string;readonly session:string;readonly tag?:string;readonly send:(record:NetRecord)=>void};
 }
@@ -51,6 +51,8 @@ export interface OnlineView {
   readonly elsewhere: (shard: string) => void;
   /** GO4, GO5: a grid page's seat, by instance, and where in it. */
   readonly placed?: (cell: string, at: SeatPlace | undefined) => void;
+  /** GO4: a grid page's seat is in a cell it didn't boot: enter the grid again there. */
+  readonly regrid?: (cell: string) => void;
 }
 /** A running online session. */
 export interface OnlineShell {
@@ -105,8 +107,11 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       if (control === 'countdown') { const said = decodeCountdown(bytes); if (said !== null) view.countdown(said); return; }
       if (control !== 'resume') return;
       const resume = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))), seat = resume.shard;
-      if (config.grid === true) view.placed?.(resume.cell ?? seat, resume.at);
-      else if (seat !== config.loaded) { view.elsewhere(seat); return; }
+      if (config.gridCell !== undefined) {
+        const cell = resume.cell ?? seat;
+        view.placed?.(cell, resume.at);
+        if (cell !== config.gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
+      } else if (seat !== config.loaded) { view.elsewhere(seat); return; }
       arrive({ tick: 0, restored: false });
       if (loaded) transport.control('ready'); else unseated = transport;
     });
@@ -160,8 +165,8 @@ export interface StartOnline {
   readonly loaded: string; readonly build: string;
   /** Who this device is. A Name given here is kept with its id, and asked only once. */
   readonly identity: (name?: string) => NetIdentity;
-  /** GO4: a grid page, told where its seat stands instead of being reloaded there. */
-  readonly grid?: (cell: string, at: SeatPlace) => void;
+  /** GO4: a grid page: the cell it booted in, where its seat stands, and how it enters the grid again in another cell. */
+  readonly grid?: { readonly cell: string; readonly placed: (cell: string, at: SeatPlace) => void; readonly reenter: (cell: string) => void };
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
   readonly recordTag?:string;
@@ -192,10 +197,12 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
-  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { grid: true as const }), socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
+  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell }), socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
     countdown: said => { screens.countdown(said); preload(); },
-    placed: (cell, stand) => { if (stand !== undefined) grid?.(cell, stand); },
+    placed: (cell, stand) => { if (stand !== undefined) grid?.placed(cell, stand); },
+    // A grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
+    regrid: cell => { entering(link.loaded); markUnload(`online seat in another grid cell (${cell})`); grid?.reenter(cell); },
     elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); markUnload(`online seat elsewhere (${seat})`); location.replace(url); },
   });
   shellNow = shell;
