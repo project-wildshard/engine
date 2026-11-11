@@ -55,7 +55,7 @@ const coins = (at: Room, device: string): number => at.room.cell.owned.of(at.roo
 function kill(at: Room, device: string, creature: AnimalSim): boolean {
   const player = at.room.bodyOf(device);
   if (player === undefined) throw new Error('No body');
-  return at.room.host.combat.hit({ source: player.health, sourceTags: [player.id, 'cover.checked'], target: creature.combatActor(), amount: creature.maxHp * 10, point: creature.position.clone(), dir: new Vector3(0, 0, 1) })?.killed ?? false;
+  return at.room.host.combat.hit({ source: player.health, sourceTags: [player.id as `${string}.${string}`, 'cover.checked'], target: creature.combatActor(), amount: creature.maxHp * 10, point: creature.position.clone(), dir: new Vector3(0, 0, 1) })?.killed ?? false;
 }
 const living = (at: Room): [string, AnimalSim][] => [...at.room.host.entities].filter(([, sim]) => sim.alive);
 /** A seeded die, so a red run can be read again. */
