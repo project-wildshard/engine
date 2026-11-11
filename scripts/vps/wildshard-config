@@ -132,16 +132,22 @@ def main(argv):
         if len(args) != 2:
             stop('usage: wildshard-config split <channel>')
         env_rows = read_rows(env_path)
-        moving = [row for row in env_rows if key_of(row) in SETTINGS]
+        # systemd strips one pair of matching quotes; a value that still fails its rule stays in the .env, never dropped.
+        def plain(row):
+            value = row.split('=', 1)[1].strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+                value = value[1:-1]
+            return value
+        moving = [row for row in env_rows if key_of(row) in SETTINGS and SETTINGS[key_of(row)](plain(row), channel)]
         if not moving:
             print(f'ok      {env_path} holds no settings')
             return 0
         settings_rows = read_rows(settings_path) or list(HEADER)
         have = {key_of(row) for row in settings_rows}
         # A value already in the settings file wins: it is read last, so it is the one the server runs with today.
-        settings_rows += [row for row in moving if key_of(row) not in have and SETTINGS[key_of(row)](row.split('=', 1)[1], channel)]
+        settings_rows += [f'{key_of(row)}={plain(row)}' for row in moving if key_of(row) not in have]
         write_rows(settings_path, settings_rows, channel)
-        write_rows(env_path, [row for row in env_rows if key_of(row) not in SETTINGS], channel)
+        write_rows(env_path, [row for row in env_rows if row not in moving], channel)
         print(f'doing   move {", ".join(key_of(row) for row in moving)} from {channel}.env to {channel}.settings')
         return 0
 

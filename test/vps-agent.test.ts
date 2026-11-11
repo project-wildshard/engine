@@ -87,6 +87,11 @@ test("setup.sh's split moves the settings out of the .env once, and leaves every
   expect(settings).toContain('WORLD_CELLS=driftwood-isle\nWORLD_WORKERS=2\nWORLD_SEATS=16\n');
   expect(settings).not.toContain('SEAT_SECRET');
   expect(config(root, 'split', 'production').out).toContain('holds no settings');
+  // A quoted value moves without its quotes; one that fails its rule stays where it was, never lost.
+  writeFileSync(join(root, 'etc/wildshard/staging.env'), 'SEAT_SECRET=s\nWORLD_CELLS="grid"\nWORLD_WORKERS=99\n');
+  expect(config(root, 'split', 'staging').status).toBe(0);
+  expect(read(root, 'staging.settings')).toContain('WORLD_CELLS=grid\n');
+  expect(read(root, 'staging.env')).toBe('SEAT_SECRET=s\nWORLD_WORKERS=99\n');
   expect(read(root, 'production.settings')).toBe(settings);
 });
 
