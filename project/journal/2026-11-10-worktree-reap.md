@@ -40,3 +40,7 @@ explicit list of four files. The markdown hook resolves with `realpath`.
 
 Clocks for `test/tooling/pins-reuse.test.mjs` and `test/tooling/worktree-reap.test.mjs`
 recorded with `push-test-timings.mjs record` from the bounced gate.
+
+The AGENTS.md change went out as its own docs push from the canonical
+checkout: on a plan branch it made DS1 select full, so every rebase
+reran hosted CI.
