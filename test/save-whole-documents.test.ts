@@ -5,6 +5,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as v from 'valibot';
 import { expect, test } from 'vitest';
+import { keepUnknown, known, saveShape } from '../src/shared/engine/saves/shape';
 import { SaveStore, type SaveKeyDef, type SaveStorage, type SchemaFailure } from '../src/shared/engine/saves/store';
 import { inventoryKey } from '../src/shared/game/localSaveKeys';
 import { walletSaves } from '../src/shared/game/grid/wallet';
@@ -112,11 +113,22 @@ test('a same-version PlayerDoc keeps fields this server does not know, and a bro
 test.runIf(process.env['SAVES_PIN_WRITE'] === '1')('capture the whole-document pin', { timeout: 20_000 }, async () => {
   const room = await open('wr7-pin'), phone = enter(room, 'device:pin'); earn(room, phone.device, 'paid');
   const player = quit(phone), local = new MemoryStorage(), store = new SaveStore({ local, session: local });
-  for (const definition of definitions().values()) store.define(definition).write(definition.initial(), definition.scope === 'shard' ? NS : undefined);
+  // This file's own wr7.* test keys are in the process registry too; they are not the engine's.
+  for (const definition of [...definitions().values()].filter(entry => !entry.key.startsWith('wr7.'))) store.define(definition).write(definition.initial(), definition.scope === 'shard' ? NS : undefined);
   const prefix = nameOf(local, 'global').slice(0, -'global'.length);
   const docs = Object.fromEntries([...local.values].map(([name, raw]) => [name.slice(prefix.length), JSON.parse(raw) as unknown]));
   const epoch = (JSON.parse(readFileSync('save-epoch.json', 'utf8')) as { saveEpoch: number }).saveEpoch;
   const release = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
   mkdirSync('test/pins/saves/documents', { recursive: true });
   writeFileSync(`test/pins/saves/documents/epoch-${String(epoch)}.json`, `${JSON.stringify({ release, saveEpoch: epoch, shard: SHARD, docs, player: { saveVersion: player.saveVersion, doc: player.doc } }, null, 1)}\n`);
+});
+
+test('unknown fields stay under a lazy schema and with numeric ids, and a lazy shape change moves the fingerprint', () => {
+  const row = v.strictObject({ id: v.number(), n: v.number() });
+  const rows = v.lazy((input: unknown) => (Array.isArray(input) ? v.array(row) : v.null()));
+  expect(known(rows, [{ id: 1, n: 1, extra: true }])).toEqual([{ id: 1, n: 1 }]);
+  expect(keepUnknown(v.array(row), [{ id: 1, n: 1, a: 'one' }, { id: 2, n: 2, a: 'two' }], [{ id: 2, n: 5 }, { id: 1, n: 6 }, { id: 3, n: 0 }]))
+    .toEqual([{ id: 2, n: 5, a: 'two' }, { id: 1, n: 6, a: 'one' }, { id: 3, n: 0 }]);
+  const tree = (leaf: v.GenericSchema): v.GenericSchema => { const node: v.GenericSchema = v.lazy(() => v.union([leaf, v.array(node)])); return node; };
+  expect(JSON.stringify(saveShape(tree(v.string())))).not.toBe(JSON.stringify(saveShape(tree(v.number()))));
 });

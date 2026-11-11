@@ -74,12 +74,16 @@ for(const pin of documentPins)test(`released ${pin.release} whole save documents
   const probe=defs.find(definition=>definition.scope==='global');if(probe===undefined)throw new Error('No global key');
   store.define(probe).write(probe.initial());const prefix=([...values.keys()][0]??'').slice(0,-'global'.length);values.clear();
   for(const [scope,doc] of Object.entries(pin.docs))values.set(prefix+scope,JSON.stringify(doc));
-  let valid=0;
+  let pinned=0;
   for(const definition of defs){
     const namespace=definition.scope==='shard'?pin.shard:undefined,slot=store.define(definition),status=slot.status?.(namespace);
-    expect(status,`${definition.scope}/${definition.key}`).not.toBe('invalid');if(status==='valid')valid++;slot.read(namespace);
+    const doc=pin.docs[namespace??definition.scope] as {keys?:Record<string,unknown>}|undefined;
+    // Every entry the pin holds is valid; a key the pin never wrote reads as absent.
+    if(doc?.keys?.[definition.key]!==undefined){pinned++;expect(status,`${definition.scope}/${definition.key}`).toBe('valid');}
+    else expect(status,`${definition.scope}/${definition.key}`).toBe('absent');
+    slot.read(namespace);
   }
-  expect(valid).toBeGreaterThan(defs.length/2);
+  expect(pinned).toBe(Object.values(pin.docs).reduce<number>((sum,doc)=>sum+Object.keys((doc as {keys:object}).keys).length,0));
   expect([...values.keys()].filter(name=>name.includes('.corrupt.'))).toEqual([]);
   for(const raw of values.values())expect(Object.keys((JSON.parse(raw) as {keys:object}).keys).filter(key=>key.includes('.corrupt.'))).toEqual([]);
   expect(failures).toEqual([]);

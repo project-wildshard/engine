@@ -21,7 +21,8 @@ function children(s: Node): unknown[] {
   for (const key of ['wrapped', 'item', 'value', 'rest']) if (record(s[key])) out.push(s[key]);
   if (record(s['entries'])) out.push(...Object.values(s['entries']));
   for (const key of ['items', 'options']) if (Array.isArray(s[key])) out.push(...(s[key] as unknown[]).filter(record));
-  if (s.type === 'lazy') { try { out.push(lazy(s, undefined)); } catch { return [OPAQUE]; } }
+  // A lazy getter's answer can depend on its input: whatever it reaches is unknown until a real value resolves it.
+  if (s.type === 'lazy') return [OPAQUE];
   return out.filter(child => child === OPAQUE || (record(child) && child['kind'] === 'schema'));
 }
 /** Which object types a schema reaches, once per schema: `strict` for `known`, `objects` for `keepUnknown`. Most save
@@ -78,9 +79,10 @@ export function known(schema: Schema, value: unknown): unknown {
   return value;
 }
 
-/** Array items keep their unknown fields by `id` when every item has a string one, or by place when the length is the same. */
+/** Array items keep their unknown fields by `id` when every item has a string or number one, or by place when the length is
+ *  the same. Items with no identity in arrays that changed length keep none: no rule can say which item they belonged to. */
 function pairs(prior: readonly unknown[], next: readonly unknown[]): (unknown)[] {
-  const id = (item: unknown): string | undefined => record(item) && typeof item['id'] === 'string' ? item['id'] : undefined;
+  const id = (item: unknown): string | number | undefined => record(item) && (typeof item['id'] === 'string' || typeof item['id'] === 'number') ? item['id'] : undefined;
   if (prior.every(item => id(item) !== undefined) && next.every(item => id(item) !== undefined)) {
     const byId = new Map(prior.map(item => [id(item), item]));
     return next.map(item => byId.get(id(item)));
@@ -124,11 +126,18 @@ export function keepUnknown(schema: Schema, prior: unknown, next: unknown): unkn
 }
 
 /** A schema's canonical shape: types, fields, bounds and literals, never a function's source. */
-export function saveShape(schema: Schema, depth = 0): unknown {
+export function saveShape(schema: Schema, depth = 0, lazies: readonly unknown[] = []): unknown {
   const s = node(schema);
-  if (depth > 32) return { type: s.type };
+  if (depth > 64) return { type: s.type };
   const out: Record<string, unknown> = { type: s.type };
-  const sub = (child: unknown): unknown => saveShape(child as Schema, depth + 1);
+  const sub = (child: unknown): unknown => saveShape(child as Schema, depth + 1, lazies);
+  if (s.type === 'lazy') {
+    // A recursive lazy is named by how far up its own path it sits; a getter that needs its input is opaque.
+    const seen = lazies.indexOf(s);
+    if (seen !== -1) return { type: 'lazy', ref: lazies.length - seen };
+    try { out['resolved'] = saveShape(lazy(s, undefined), depth + 1, [...lazies, s]); } catch { out['opaque'] = true; }
+    return out;
+  }
   const plain = (value: unknown): unknown => typeof value === 'function' ? 'fn' : value instanceof RegExp ? String(value) : value;
   if (record(s['entries'])) out['entries'] = Object.fromEntries(Object.keys(s['entries']).sort().map(key => [key, sub((s['entries'] as Record<string, unknown>)[key])]));
   for (const key of ['wrapped', 'item', 'key', 'value', 'rest']) if (record(s[key]) && (s[key] as Node)['kind'] === 'schema') out[key] = sub(s[key]);

@@ -41,7 +41,7 @@ const PlayerLedger: v.GenericSchema<unknown, PlayerDoc['ledger']> = v.pipe(v.loo
 export const PlayerDocSchema: v.GenericSchema<unknown, PlayerDoc> = v.pipe(v.looseObject({
   at: v.looseObject({ x: coordinate, y: coordinate, z: coordinate, yaw: finite }),
   health: v.looseObject({ state: v.looseObject({ version: v.literal(1), attributes: v.record(v.string(), finite) }), sinceHurt: finite }),
-  book: v.looseObject({ player: v.string(), flags: v.array(v.string()), quests: v.array(v.unknown()), parts: v.record(v.string(), v.string()) }),
+  book: v.looseObject({ player: v.string(), flags: v.array(v.string()), quests: v.array(v.looseObject({ version: v.number(), id: v.string(), started: v.boolean(), currentId: v.nullable(v.string()) })), parts: v.record(v.string(), v.string()) }),
   respawn: v.nullable(v.looseObject({ fade: finite, falls: natural })),
   seats: v.array(v.unknown()),
   store: v.record(v.string(), v.string()),
@@ -63,7 +63,13 @@ export function admitDoc(doc: unknown, version: number, shard: string, contract?
   return parsed;
 }
 /** The doc to write: `next`, with every field of the doc the seat was read from that this server does not know. */
-export function carryDoc(read: PlayerDoc | null, next: PlayerDoc): PlayerDoc { return read === null ? next : keepUnknown(PlayerDocSchema, read, next) as PlayerDoc; }
+export function carryDoc(read: PlayerDoc | null, next: PlayerDoc): PlayerDoc {
+  if (read === null) return next;
+  const carried = keepUnknown(PlayerDocSchema, read, next) as PlayerDoc;
+  // Quests match by id (keepUnknown), and the shard's pack fixes which there are: QuestBook.restore refuses any other set.
+  // Weapon seats are by place: seats past this server's own stay, and importSeats never reads them.
+  return read.seats.length > next.seats.length ? { ...carried, seats: [...carried.seats, ...read.seats.slice(next.seats.length)] } : carried;
+}
 /** What a seat's owner keeps of a player beside the sim. */
 export interface DocStores { readonly store: Readonly<Record<string, string>>; readonly ledger: PlayerDoc['ledger'] }
 const NOW_MS = 1000;

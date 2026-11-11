@@ -12,6 +12,8 @@ import { expect, test } from 'vitest';
 import type { SaveKeyDef } from '../src/shared/engine/saves/store';
 import { saveShape } from '../src/shared/engine/saves/shape';
 import { definitions } from './fixtures/saveDefinitions';
+import { PLAYER_DOC_VERSION, PlayerDocSchema } from '../src/server/host/dedicated/playerDoc';
+import { SIM_SNAPSHOT_CONTRACT } from '../src/shared/engine/sim/snapshotData';
 
 const LOCK = 'src/shared/engine/saves/saves.lock.json';
 /** Files that hold a save definition and are not read above, each with why. */
@@ -35,9 +37,40 @@ interface LockKey { readonly version: number; readonly shape: string; readonly m
 interface Lock { readonly format: 1; readonly keys: Readonly<Record<string, LockKey>>; readonly retired: Readonly<Record<string, number>> }
 
 const fingerprint = (definition: SaveKeyDef<unknown>): string => createHash('sha256').update(JSON.stringify(saveShape(definition.schema))).digest('hex').slice(0, 16);
+const hash = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
+/** The closing parenthesis of the call whose `(` is at `open`. */
+function closing(source: string, open: number): number {
+  let depth = 0;
+  for (let at = open; at < source.length; at++) { const char = source[at]; if (char === '(') depth++; else if (char === ')' && --depth === 0) return at; }
+  return source.length;
+}
+/** `jsonSlot(key, scope, initial?, schema?)` calls: version 1 always, so any change to a call's key, initial or schema is a
+ *  shape change. A computed key is named by its source text. */
+function jsonSlots(): Record<string, LockKey> {
+  const found = new Map<string, string[]>();
+  const walk = (dir: string): void => { for (const name of readdirSync(dir)) { const path = `${dir}/${name}`; if (statSync(path).isDirectory()) walk(path); else if (path.endsWith('.ts') && !path.endsWith('.test.ts')) scan(path); } };
+  const scan = (path: string): void => {
+    const source = readFileSync(path, 'utf8');
+    for (const match of source.matchAll(/\bjsonSlot\(/gu)) {
+      const open = match.index + match[0].length - 1, args = source.slice(open + 1, closing(source, open)).replace(/\s+/gu, ' ').trim();
+      const call = /^(.+?), ?'(global|profile|shard|device|session)'(.*)$/u.exec(args);
+      if (call === null) continue; // jsonSlot's own declaration and its scope-variable loop
+      const id = `json:${call[2] ?? ''}/${call[1] ?? ''}`;
+      found.set(id, [...(found.get(id) ?? []), call[3] ?? '']);
+    }
+  };
+  walk('src');
+  return Object.fromEntries([...found].sort(([a], [b]) => a.localeCompare(b)).map(([id, rest]) => [id, { version: 1, shape: hash([...new Set(rest)].sort().join('|')), migrations: [] }]));
+}
 function generate(defs: ReadonlyMap<string, SaveKeyDef<unknown>>): Record<string, LockKey> {
-  return Object.fromEntries([...defs].map(([id, definition]) => [id, { version: definition.version, shape: fingerprint(definition),
-    migrations: Object.keys(definition.migrate ?? {}).map(Number).sort((a, b) => a - b) }]));
+  return {
+    ...Object.fromEntries([...defs].map(([id, definition]) => [id, { version: definition.version, shape: fingerprint(definition),
+      migrations: Object.keys(definition.migrate ?? {}).map(Number).sort((a, b) => a - b) }])),
+    ...jsonSlots(),
+    // Saves outside SaveStore: the dedicated server's player doc and the sim snapshot (WIRE-STABILITY section 6).
+    'server/player-doc': { version: PLAYER_DOC_VERSION, shape: hash(JSON.stringify(saveShape(PlayerDocSchema))), migrations: [] },
+    'shared/sim.snapshot': { version: SIM_SNAPSHOT_CONTRACT.version, shape: hash(JSON.stringify(saveShape(SIM_SNAPSHOT_CONTRACT.schema))), migrations: [...SIM_SNAPSHOT_CONTRACT.migrations] },
+  };
 }
 /** What breaks the save contract between `lock` and `next`. */
 function violations(lock: Lock, next: Readonly<Record<string, LockKey>>): string[] {
@@ -48,6 +81,8 @@ function violations(lock: Lock, next: Readonly<Record<string, LockKey>>): string
     if (now.version < old.version) out.push(`${id}: version went down from ${String(old.version)} to ${String(now.version)}`);
     else if (now.version === old.version && now.shape !== old.shape) out.push(`${id}: shape changed at version ${String(now.version)}; bump version and add migrate[${String(now.version)}]`);
     else for (let step = old.version; step < now.version; step++) if (!now.migrations.includes(step)) out.push(`${id}: version ${String(now.version)} has no migrate[${String(step)}]`);
+    // An old save still on a device needs every step it climbed through.
+    for (const step of old.migrations) if (now.version >= old.version && !now.migrations.includes(step)) out.push(`${id}: migrate[${String(step)}] was removed; saves at version ${String(step)} could no longer load`);
   }
   for (const [id, now] of Object.entries(next)) if (lock.retired[id] !== undefined && now.version <= (lock.retired[id] ?? 0)) out.push(`${id}: a retired key came back without a newer version`);
   return out;
@@ -87,6 +122,9 @@ test("changing wallet.ts's loadout schema without a bump fails the check", () =>
   // A bump with no migration still fails; with migrate[1] it is the allowed path.
   expect(violations(lock, generate(new Map([...defs, ['shard/platform.loadout', { ...changed, version: 2 }]])))).toEqual(['shard/platform.loadout: version 2 has no migrate[1]']);
   expect(violations(lock, generate(new Map([...defs, ['shard/platform.loadout', { ...changed, version: 2, migrate: { 1: (old: unknown) => old } }]])))).toEqual([]);
+  // Removing a migration fails: titlePrefetch v1 saves still exist.
+  const prefetch = defs.get('device/titlePrefetch'); if (prefetch === undefined) throw new Error('No titlePrefetch definition');
+  expect(violations(lock, generate(new Map([...defs, ['device/titlePrefetch', { ...prefetch, migrate: {} }]])))).toEqual(['device/titlePrefetch: migrate[1] was removed; saves at version 1 could no longer load']);
   // A dropped key and a lower version fail too.
   const without = new Map(defs); without.delete('shard/platform.loadout');
   expect(violations(lock, generate(without))[0]).toMatch(/^shard\/platform\.loadout: removed/u);

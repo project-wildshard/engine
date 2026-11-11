@@ -142,6 +142,8 @@ const packedSnapshotV1 = v.strictObject({ ...sharedEntries, version, apiVersion:
 const wire = v.variant('version', [v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(3), snapshot: packedSnapshot }),
   v.strictObject({ format: v.literal('sim.snapshot'), version: v.literal(2), snapshot: packedSnapshotV2 }),
   v.strictObject({ format: v.literal('sim.snapshot'), version, snapshot: packedSnapshotV1 })]);
+/** WIRE-STABILITY WR7: the persisted `sim.snapshot` contract, for saves.lock.json: version 3, read up from 1 and 2. */
+export const SIM_SNAPSHOT_CONTRACT: { readonly version: number; readonly schema: v.GenericSchema<unknown, unknown>; readonly migrations: readonly number[] } = { version: 3, schema: wire, migrations: [1, 2] };
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 // A JSON-tree fence also rejects cycles/accessors/classes before lazy recursive schemas run.

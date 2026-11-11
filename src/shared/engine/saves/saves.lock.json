@@ -3,22 +3,22 @@
   "keys": {
     "device/boot.reports": {
       "version": 1,
-      "shape": "e6a4881a6e7367d8",
+      "shape": "ed885051d6fe831e",
       "migrations": []
     },
     "device/boot.times": {
       "version": 1,
-      "shape": "bd66880d87f4fb15",
+      "shape": "4090af64fb4750de",
       "migrations": []
     },
     "device/boot.trace": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "device/debug.open": {
       "version": 1,
-      "shape": "e6a4881a6e7367d8",
+      "shape": "ed885051d6fe831e",
       "migrations": []
     },
     "device/devMode": {
@@ -28,7 +28,7 @@
     },
     "device/err.queue": {
       "version": 1,
-      "shape": "e6a4881a6e7367d8",
+      "shape": "ed885051d6fe831e",
       "migrations": []
     },
     "device/grid.last-played": {
@@ -63,22 +63,22 @@
     },
     "device/ktx2set": {
       "version": 1,
-      "shape": "bd66880d87f4fb15",
+      "shape": "4090af64fb4750de",
       "migrations": []
     },
     "device/life.alive.once": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "device/life.lastEnd": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "device/life.lastUnload": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "device/perf.lap": {
@@ -123,7 +123,7 @@
     },
     "device/titleArrival.once": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "device/titlePrefetch": {
@@ -135,7 +135,7 @@
     },
     "device/ui.fold": {
       "version": 1,
-      "shape": "bd66880d87f4fb15",
+      "shape": "4090af64fb4750de",
       "migrations": []
     },
     "device/voice": {
@@ -155,27 +155,27 @@
     },
     "global/gfx": {
       "version": 1,
-      "shape": "bd66880d87f4fb15",
+      "shape": "4090af64fb4750de",
       "migrations": []
     },
     "global/hints": {
       "version": 1,
-      "shape": "e6a4881a6e7367d8",
+      "shape": "ed885051d6fe831e",
       "migrations": []
     },
     "global/review": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "global/review.queue": {
       "version": 1,
-      "shape": "e6a4881a6e7367d8",
+      "shape": "ed885051d6fe831e",
       "migrations": []
     },
     "global/settings": {
       "version": 1,
-      "shape": "bd66880d87f4fb15",
+      "shape": "4090af64fb4750de",
       "migrations": []
     },
     "global/summary": {
@@ -190,7 +190,7 @@
     },
     "session/boot.lowPower": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "session/boot.selfReload": {
@@ -205,22 +205,22 @@
     },
     "session/clearDownloads.report": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "session/err.reloads": {
       "version": 1,
-      "shape": "e6a4881a6e7367d8",
+      "shape": "ed885051d6fe831e",
       "migrations": []
     },
     "session/err.session": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "session/gpu.reloads": {
       "version": 1,
-      "shape": "e6a4881a6e7367d8",
+      "shape": "ed885051d6fe831e",
       "migrations": []
     },
     "session/grid.recovery.once": {
@@ -240,17 +240,17 @@
     },
     "session/life.alive": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "session/loadAttempt": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "session/resume.brand": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "session/resume.shot": {
@@ -270,7 +270,7 @@
     },
     "session/titleArrival": {
       "version": 1,
-      "shape": "b3f74097d2157d92",
+      "shape": "0180a3cec9d631b6",
       "migrations": []
     },
     "session/travel.handoff": {
@@ -402,6 +402,99 @@
       "version": 1,
       "shape": "ebb68e68b6118b2e",
       "migrations": []
+    },
+    "json:device/'devPixels'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'download.outcomes'": {
+      "version": 1,
+      "shape": "107bebf3449c60a5",
+      "migrations": []
+    },
+    "json:device/'firstPlayDone'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'gfx.knob.density'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'gfx.worldToggle'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'graphics'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'ktx2set'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'menu.whatsNew.hiddenOn'": {
+      "version": 1,
+      "shape": "f221da58340f9bc6",
+      "migrations": []
+    },
+    "json:device/'storage.persisted'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/`debug.plugin.${levelId}.${spec.id}`": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/`gfx.knob.${id}`": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/EARLY_PROGRAMS_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/key": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/LEVEL_DOWNLOAD_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:session/'firstPlay.pending'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:shard/rows.store.slot": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "server/player-doc": {
+      "version": 1,
+      "shape": "77f6372593cb48a2",
+      "migrations": []
+    },
+    "shared/sim.snapshot": {
+      "version": 3,
+      "shape": "919db6c2fce38e58",
+      "migrations": [
+        1,
+        2
+      ]
     }
   },
   "retired": {}

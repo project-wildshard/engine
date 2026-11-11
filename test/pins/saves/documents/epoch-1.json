@@ -378,20 +378,6 @@
       "owned": [],
       "worn": {}
      }
-    },
-    "wr7.moved": {
-     "v": 2,
-     "data": 0
-    },
-    "wr7.same": {
-     "v": 1,
-     "data": 0
-    },
-    "wr7.strict": {
-     "v": 1,
-     "data": {
-      "a": 0
-     }
     }
    }
   }
