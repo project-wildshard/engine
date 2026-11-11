@@ -134,7 +134,7 @@ export async function runNalatiFieldRounds(options:RoundsProofOptions):Promise<{
   let restored:Resident|undefined;
   try{
     const {taming,mounted,original}=stallionOf(first),step=checkedStep(first);
-    assert.equal(taming.phase,'breaking');assert.equal(mounted.horse,original);
+    assert.equal(nativeTamingOf(first.host)?.phase,'breaking','the restored world is still breaking');assert.equal(mounted.horse,original);
     const pilot=createNalatiTamingPilot();let breakingTicks=0,checkpointTick=0,rounds=0;
     for(let tick=0;tick<40000&&taming.phase!=='bonded';tick++){
       const commands=pilot(first.host,original.entityId);
