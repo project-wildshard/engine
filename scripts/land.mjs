@@ -1,20 +1,16 @@
-// J240 (Jake, 2026-11-10): land a plan worktree on main by fast-forward only.
-// From a linked worktree on plan/<slug>: push the branch, wait until the exact
-// SHA is green in hosted `ci` (one workflow since CI-JOB-PACKING), rebase onto origin/main, and push
-// that SHA to main as a fast-forward. Never a forced main push; if main moved,
-// rebase and retry. Each worktree lands on its own: there is no lock between
-// worktrees except git's own fast-forward check (and GitHub's protect-main rule).
-//
-// After a rebase (J249, Jake, 2026-11-10 ~23:35 Cancún: "if CI passes on the branch/worktree and the merge/rebase
-// is clean with no conflicts then it goes in… they don't have to re-CI on rebase… we just risk main going red
-// because of edge cases." And: "no locking… people collaborate together without locks."):
-//   exact    main had not moved: main gets the SHA hosted CI proved.
-//   carried  main moved and the rebase was clean (a conflict only in the generated stamps, which land regenerates,
-//            counts as clean): the stamps are regenerated for the rebased tree and it goes straight to main on the
-//            branch's green run. Its main push runs lint, TypeScript and the static checks, no Vitest
-//            (WS_LAND_MAIN_PUSH=carried, LS3); then land watches
-//            main's own hosted run. No path, harness or dependency rule sends it back to branch CI.
-//   A real conflict stops land with the paths. The resolved commit is new, so it needs its own branch CI.
+// LAND-SIMPLIFY (J240, J249, J250, J258): land a plan worktree on main by fast-forward, then get out of the way.
+//   1. From .worktrees/<slug> on plan/<slug> (scripts/worktree.mjs new): one land per worktree (its lock).
+//   2. Rebase first if main is already ahead, then push plan/<slug> under a lease its own reflog vouches for; the
+//      split pre-push runs (DS9).
+//   3. Wait for that exact SHA's `ci` to go green.
+//   4. Rebase onto origin/main if it moved during CI. A conflict only in the generated stamps is regenerated; any other stops.
+//      A clean rebase carries the branch's green run (J249: "they don't have to re-CI on rebase").
+//   5. Push the SHA to main, never forced. The pre-push knows it is land's (WS_LAND_MAIN_PUSH): exact runs nothing
+//      more, carried runs lint, TypeScript and the static checks, no Vitest (LS3). A lost race rebases and retries,
+//      at most 5 tries (J258).
+//   6. Fast-forward the canonical checkout when it is on main and clean (J247, WL7).
+//   7. A `landed` receipt; main-watch follows main's own `ci` and reports it (LS5).
+//   8. Delete origin's plan branch and remove this worktree (--keep skips it).
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {appendFileSync,existsSync,linkSync,mkdirSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
@@ -52,21 +48,19 @@ export function githubSlug(remote){
 /** Refuse anything but the known options. Any spelling of force is refused by name.
  * @param {string[]} argv */
 export function parseArgs(argv){
- // LS5 (J258): land returns once main is pushed (main-watch reports main's ci; --watch-main still waits), retries a
- // lost main race at most 5 times, and removes its worktree and origin plan branch after landing (--keep keeps them).
- const options={pollSeconds:30,timeoutMinutes:60,appearMinutes:5,rounds:5,watchMain:false,keep:false};
+ const options={pollSeconds:30,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false};
  for(const arg of argv){
   if(/^-f$|force/iu.test(arg))throw new StopError(`refused ${arg}: land never force-pushes main (J240: fast-forward only). If main moved, land rebases and retries by itself`);
   const [name,value]=arg.split('=',2);
   const number=Number(value);
-  if(name==='--watch-main'&&value===undefined)options.watchMain=true;
-  else if(name==='--no-watch-main'&&value===undefined)options.watchMain=false;
-  else if(name==='--keep'&&value===undefined)options.keep=true;
+  // --no-watch-main is accepted for old callers: land never watches main now (LS8).
+  if(name==='--no-watch-main'&&value===undefined)continue;
+  if(name==='--keep'&&value===undefined)options.keep=true;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--poll')options.pollSeconds=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--timeout')options.timeoutMinutes=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--appear')options.appearMinutes=number;
   else if(value!==undefined&&Number.isSafeInteger(number)&&number>0&&name==='--rounds')options.rounds=number;
-  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--watch-main] [--keep]`);
+  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--keep]`);
  }
  return options;
 }
@@ -85,13 +79,6 @@ export function shaVerdict(data,sha){
  const rows=LAND_WORKFLOWS.map(name=>({name,run:latest[name]}));
  const state=rows.some(row=>row.run===undefined||row.run.status!=='completed')?'pending':rows.every(row=>row.run?.conclusion==='success')?'green':'red';
  return {state,runs:latest,summary:rows.map(row=>`${row.name} ${row.run===undefined?'none':row.run.status==='completed'?row.run.conclusion:row.run.status}`).join(', ')};
-}
-
-/** A red verdict whose every unsuccessful run was cancelled, not failed: on main, a newer push replacing the run.
- * @param {ReturnType<typeof shaVerdict>} verdict */
-export function cancelledOnly(verdict){
- const unsuccessful=Object.values(verdict.runs).filter(run=>run.conclusion!=='success');
- return verdict.state==='red'&&unsuccessful.length>0&&unsuccessful.every(run=>run.conclusion==='cancelled');
 }
 
 /** @param {string} repo @param {string} path */
@@ -148,7 +135,6 @@ class Landing{
   /** @type {number[]} */this.runs=[];
   /** @type {string|null} */this.planTip=null;
   this.expected='';
-  this.reruns=0;
   /** @type {string|null} */this.landedSha=null;
  }
 
@@ -451,27 +437,6 @@ class Landing{
   this.receipt(`canonical checkout not fast-forwarded after landing: ${outcome}`);
  }
 
- /** Main's own run for `head`. Lands a minute apart make GitHub cancel a main run in favour of the next push, so a
-  * run that was only cancelled while a newer main commit contains `head` is superseded, not red: land watches that
-  * newer run instead, and reports red only if that one is. A cancel with nothing newer on main stays red.
-  * @param {string} head */
- async watchMain(head){
-  /** @type {string[]} */const superseded=[];
-  // One deadline for the whole chain (J206 review): each newer run would otherwise restart waitCI's own timeout.
-  const deadline=Date.now()+this.options.timeoutMinutes*60_000;
-  let sha=head;
-  for(;;){
-   const verdict=await this.waitCI(sha,'main');
-   if(!cancelledOnly(verdict))return {verdict,sha,superseded};
-   const tip=this.fetchMain();
-   if(tip===sha||!isAncestor(this.root,sha,tip))return {verdict,sha,superseded};
-   if(Date.now()>deadline){this.say('superseded',`main keeps replacing its runs; stopped following after ${this.options.timeoutMinutes} min at ${short(sha)}`);return {verdict,sha,superseded};}
-   this.say('superseded',`main's run for ${short(sha)} was cancelled by a newer main push; ${short(tip)} contains it, watching that run`);
-   superseded.push(sha);
-   sha=tip;
-  }
- }
-
  /** LAND-SIMPLIFY LS5 (J258): main's verdict belongs to scripts/main-watch.mjs. It follows this SHA in the
   * background until main's ci judges it, writes the receipt and messages this pane on red. It runs from the
   * canonical checkout, so it outlives this worktree. WS_MAIN_WATCH=0 turns it off.
@@ -524,23 +489,16 @@ class Landing{
  }
 
  /** @param {string} rule @param {string} why @param {number} round @param {string} before */
- async landed(rule,why,round,before){
+ landed(rule,why,round,before){
   const head=this.head();
   this.say('landed',`main ${short(before)} -> ${short(head)} (${rule}: ${why})`);
   this.landedSha=head;
   this.followCanonical();
   this.startWatcher(head);
   this.say('rule',`main's own CI runs on ${short(head)} now. If it goes red, the lane that landed last fixes it forward or reverts it, at once (J249)`);
-  let code=0,mainCI=rule==='carried'?'followed by main-watch':'reuses the branch run';
-  if(rule==='carried'&&this.options.watchMain){
-   const {verdict,sha,superseded}=await this.watchMain(head);
-   const via=superseded.length===0?'':`superseded by ${short(sha)}, `;
-   mainCI=verdict.state==='green'?`${via}green (${Object.values(verdict.runs).map(run=>run.id).join(', ')})`:`${via}RED: ${('failed'in verdict?verdict.failed:[]).join(' | ')}`;
-   if(verdict.state!=='green'){code=3;this.say('red',`main's hosted run is red for ${short(sha)}${sha===head?'':`, which contains ${short(head)}`}: fix forward now`);}
-  }
   const seconds=Math.round((Date.now()-this.started)/1000);
-  this.receipt(`${code===0?'landed':'landed, MAIN RED'} ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; hosted reruns ${this.reruns}; branch ci ${this.runs.join(', ')||'none'}; main ci ${mainCI}; ${seconds} s`);
-  return code;
+  this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; branch ci ${this.runs.join(', ')||'none'}; main ci ${rule==='carried'?'followed by main-watch':'reuses the branch run'}; ${seconds} s`);
+  return 0;
  }
 }
 

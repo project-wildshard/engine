@@ -134,8 +134,8 @@ function fixture() {
     return script;
   };
   const state = (extra: Record<string, unknown>) => writeFileSync(files.state, JSON.stringify({ log: files.gh, pushed: files.pushed, ...extra }));
-  // Most tests look at the worktree after landing and at main's watch, so they keep both (LS5 tests use `bare`).
-  const KEPT = ['--keep', '--watch-main'];
+  // Most tests look at the worktree after landing, so they keep it (the LS5 tests pass no flags).
+  const KEPT = ['--keep'];
   const land = (cwd: string, args: readonly string[] = KEPT) => spawnSync(process.execPath, [LAND, '--poll=0.05', '--appear=0.05', ...args], { cwd, env, encoding: 'utf8', timeout: 60_000 });
   const landAsync = (cwd: string) => new Promise<{ code: number | null; stdout: string }>(done => {
     const child = execFile(process.execPath, [LAND, '--poll=0.05', '--appear=0.05', ...KEPT], { cwd, env, encoding: 'utf8', timeout: 60_000 }, (error, stdout) => { done({ code: error === null ? 0 : (typeof error.code === 'number' ? error.code : 1), stdout }); });
@@ -164,7 +164,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(main).toMatch(new RegExp(`^land=exact:${tip} ${tip} ${tip} refs/heads/main [a-f0-9]{40}$`, 'u'));
     expect(rest).toEqual([]);
     expect(f.read(f.files.gh)).toContain(`head_sha=${tip}`);
-    expect(f.read(f.files.receipts)).toMatch(new RegExp(`^\\d\\d:\\d\\d UTC fixture-lane land plan/foo landed ${tip.slice(0, 10)} on main .*; exact; rounds 1; hosted reruns 0;`, 'mu'));
+    expect(f.read(f.files.receipts)).toMatch(new RegExp(`^\\d\\d:\\d\\d UTC fixture-lane land plan/foo landed ${tip.slice(0, 10)} on main .*; exact; rounds 1;`, 'mu'));
   }, 60_000);
 
   test('after landing, land starts main-watch to follow the SHA from the canonical checkout (LS5)', async () => {
@@ -213,7 +213,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     expect(g.land(kept, ['--keep']).stdout).not.toContain('cleaned');
     expect(existsSync(kept)).toBe(true);
-    expect(parseArgs([])).toMatchObject({ rounds: 5, watchMain: false, keep: false });
+    expect(parseArgs([])).toEqual({ pollSeconds: 30, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false });
   }, 60_000);
 
   test('after the main push, the canonical checkout fast-forwards to it (Jake: land into the main checkout)', () => {
@@ -245,7 +245,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     }
   }, 120_000);
 
-  test('main moved to disjoint paths: rebase, carry the hosted proof, split pre-push, then watch main', () => {
+  test('main moved to disjoint paths: rebase, carry the hosted proof, static pre-push, then return (main-watch follows)', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     const tested = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
@@ -256,43 +256,12 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(landed).not.toBe(tested);
     expect(f.git(f.remote, ['log', '--format=%s', '-3', 'main']).split('\n')).toEqual(['feat: add feature', 'peer lands', 'seed']);
     expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
-    // The rebased SHA reached main only, under the split gate; plan/foo still holds the tested SHA.
+    // The rebased SHA reached main only, under the static gate; plan/foo still holds the tested SHA.
     expect(prepushLines(f).at(-1)).toMatch(new RegExp(`^land=carried:${landed} ${landed} ${landed} refs/heads/main [a-f0-9]{40}$`, 'u'));
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
-    expect(f.read(f.files.gh)).toContain(`head_sha=${landed}`);
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0; .*main ci green/u);
-  }, 60_000);
-
-  test('a main run cancelled by a newer main push is superseded, not red: land watches the newer run', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    // Main moves once during the branch CI (so the landing is carried and main's run is watched), then a peer lands
-    // on top of it while land watches, and GitHub cancels the landed SHA's run in favour of the peer's.
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] },
-      onMain: { marker: join(f.root, 'on-main'), command: ['sh', f.peerScript('src/later.ts', null, 'export const later = 3;')] }, cancelMain: 'superseded' });
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    const newer = f.remoteMain();
-    const landed = f.git(f.remote, ['rev-parse', 'main~1']);
-    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main~1'])).toBe('feat: add feature');
-    expect(result.stdout).toMatch(new RegExp(`superseded main's run for ${landed.slice(0, 10)} was cancelled by a newer main push; ${newer.slice(0, 10)} contains it`, 'u'));
-    expect(result.stdout).not.toMatch(/ red /u);
-    expect(f.read(f.files.gh)).toContain(`head_sha=${newer}`);
-    expect(f.read(f.files.receipts)).toMatch(new RegExp(`landed ${landed.slice(0, 10)} on main .*main ci superseded by ${newer.slice(0, 10)}, green`, 'u'));
-    expect(f.read(f.files.receipts)).not.toMatch(/MAIN RED/u);
-  }, 60_000);
-
-  test('a cancelled main run with nothing newer on main is still red', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] }, cancelMain: 'always' });
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(3);
-    expect(result.stdout).not.toMatch(/superseded/u);
-    expect(result.stdout).toMatch(new RegExp(`red +main's hosted run is red for ${f.remoteMain().slice(0, 10)}: fix forward now`, 'u'));
-    expect(f.read(f.files.receipts)).toMatch(/landed, MAIN RED .*main ci RED: ci run \d+ cancelled/u);
+    // LS8: land never asks GitHub about main's own run; main-watch does.
+    expect(f.read(f.files.gh)).not.toContain(`head_sha=${landed}`);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; .*main ci followed by main-watch/u);
   }, 60_000);
 
   test('main moved over the same file: a clean rebase lands on the branch run, no second branch CI (J249)', () => {
@@ -310,7 +279,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
     expect(prepushLines(f).filter(line => line.includes('refs/heads/plan/foo'))).toHaveLength(1);
     expect(result.stdout).toMatch(/rule +main's own CI runs on [0-9a-f]{10} now\. If it goes red, the lane that landed last fixes it forward or reverts it/u);
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1;/u);
   }, 60_000);
 
   test('main moves during the merge itself: the push loses the race, land rebases and retries', () => {
@@ -612,7 +581,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1;/u);
   }, 60_000);
 
   test('a plan that changes hosted CI carries after a clean rebase too (J249)', () => {
@@ -623,7 +592,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1;/u);
   }, 60_000);
 
   test('two worktrees land at once with no shared lock; both reach main', async () => {
