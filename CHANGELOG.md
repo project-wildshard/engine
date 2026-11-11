@@ -8,6 +8,12 @@ To release: add the next version's section at the top, commit and push it, then 
 and `--finish` as before. `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose
 `package.json` version has no valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.7 (2026-11-10)
+
+- Tapping through the title quickly on iPhone no longer reports a loading error.
+- Double-tap HOVER to boost. The chat corner takes up less space until you open it.
+- Home-screen icons make it easier to tell the live game, staging and preview apart.
+
 ## v0.1.6 (2026-11-10)
 
 - Phones get Low and High graphics. Low Power Mode switches to Low on its own, and the first time you play you can try both in Driftwood.
