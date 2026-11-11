@@ -53,6 +53,10 @@ if [ "$MODE" = close ]; then
   say ok VH4 'ufw has no 443 rule: 443 is shut'; exit 0
 fi
 if [ "$MODE" = open ]; then
+  # Any 443 rule that is not one of these ranges goes first, so "nothing else" is true.
+  for number in $(ufw status numbered | grep -E '^\[ *[0-9]+\] 443/tcp ' | grep -v 'Cloudflare (J264)' | sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn); do
+    ufw --force delete "$number" >/dev/null
+  done
   for range in "${CF_V4[@]}" "${CF_V6[@]}"; do ufw allow proto tcp from "$range" to any port 443 comment 'Cloudflare (J264)' >/dev/null; done
   say ok VH4 "ufw lets ${#CF_V4[@]} IPv4 and ${#CF_V6[@]} IPv6 Cloudflare ranges reach 443, and nothing else"; exit 0
 fi
@@ -109,8 +113,10 @@ else
   ufw allow 41641/udp comment 'Tailscale direct paths' >/dev/null
   ufw --force enable >/dev/null
 fi
-# Anything else ufw lets in is drift: an old 22, a stray port. 443 belongs to --open-443 and stays.
-for rule in $(ufw status numbered | grep -E 'ALLOW IN' | grep -Ev '^\[ *[0-9]+\] (443/tcp|41641/udp|Anywhere( \(v6\))? on tailscale0)' | sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn); do
+# Anything else ufw lets in is drift: an old 22, a stray port, a 443 rule that is not Cloudflare's. --open-443's rules stay.
+for rule in $(ufw status numbered | grep -E 'ALLOW IN' | grep -Ev '^\[ *[0-9]+\] (41641/udp|Anywhere( \(v6\))? on tailscale0)' \
+  | grep -Ev '^\[ *[0-9]+\] 443/tcp .*Cloudflare \(J264\)' | sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn); do
+  arm_deadman
   say doing VH4 "delete ufw rule $rule: $(ufw status numbered | grep -E "^\[ *$rule\]" | sed 's/  */ /g')"; ufw --force delete "$rule" >/dev/null
 done
 

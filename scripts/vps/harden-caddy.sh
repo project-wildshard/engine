@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # VPS-HARDENING VH9 as J264 changed it: stock Caddy behind Cloudflare. Cloudflare's SSL mode is Full (strict) against a
-# Cloudflare Origin CA certificate, and Caddy takes a connection only with Cloudflare's origin-pull client certificate
-# (Authenticated Origin Pulls), so nothing but Cloudflare's proxy for this zone reaches the servers through it.
+# Cloudflare Origin CA certificate, and Caddy takes a connection only with Cloudflare's shared origin-pull client certificate
+# (Authenticated Origin Pulls, zone-level). That proves the caller is Cloudflare's network, not that it is this zone: another
+# Cloudflare customer could point a proxied name here. A per-zone client certificate closes that, later, if it matters.
 #   rooms.wildshard.io          WebSocket upgrade on / to production 127.0.0.1:8790; /up is 200 while production's /health is
 #   rooms-staging.wildshard.io  the same to staging 127.0.0.1:8791 (D2)
 # Everything else is 404, /health included (it stays tailnet-only); a page outside the game's own hosts gets 403.
@@ -91,6 +92,12 @@ EOF
 	handle {
 		respond 404
 	}
+	# A failed upstream is a bare status, never Caddy's error page; /up says only 503.
+	handle_errors {
+		@up path /up
+		respond @up 503
+		respond {err.status_code}
+	}
 }
 EOF
 }
@@ -147,8 +154,9 @@ table inet wildshard {
 	}
 }'
 nft_file=/etc/wildshard/nft-443.nft
+nft_changed=0
 if [ -r "$nft_file" ] && [ "$(cat "$nft_file")" = "$nft_rules" ]; then say ok VH9 "$nft_file"
-else printf '%s\n' "$nft_rules" > "$nft_file"; chmod 640 "$nft_file"; chown root:root "$nft_file"; say doing VH9 "write $nft_file"; fi
+else printf '%s\n' "$nft_rules" > "$nft_file"; chmod 640 "$nft_file"; chown root:root "$nft_file"; say doing VH9 "write $nft_file"; nft_changed=1; fi
 unit='[Unit]
 Description=Wildshard nftables floors on 443 (VPS-HARDENING VH9)
 After=network-pre.target
@@ -165,12 +173,20 @@ WantedBy=multi-user.target'
 if [ "$(cat /etc/systemd/system/wildshard-nft.service 2>/dev/null)" != "$unit" ]; then
   printf '%s\n' "$unit" > /etc/systemd/system/wildshard-nft.service; systemctl daemon-reload; say doing VH9 'write wildshard-nft.service'
 fi
-systemctl enable --quiet wildshard-nft.service; systemctl restart wildshard-nft.service
+systemctl enable --quiet wildshard-nft.service
+# A rerun with the same rules leaves the live table, and its connection counts, alone.
+if [ "$nft_changed" = 1 ] || ! systemctl is-active --quiet wildshard-nft.service; then systemctl restart wildshard-nft.service; say doing VH9 'load the 443 floors'; fi
 
 # Caddy starts only with its certificate. 443 is still shut by ufw until --open-443.
+# A new certificate or key restarts Caddy too: their hash is kept beside them.
+stamp=$ORIGIN/.loaded
+if [ -f "$CERT" ] && [ -f "$KEY" ] && [ "$(cat "$stamp" 2>/dev/null)" != "$(cat "$CERT" "$KEY" "$PULL_CA" | sha256sum | cut -d' ' -f1)" ]; then changed=1; fi
 if [ -f "$CERT" ] && [ -f "$KEY" ]; then
   systemctl enable --quiet caddy.service
-  if [ "$changed" = 1 ] || ! systemctl is-active --quiet caddy.service; then systemctl restart caddy.service; say doing VH9 'restart caddy'; else say ok VH9 'caddy running'; fi
+  if [ "$changed" = 1 ] || ! systemctl is-active --quiet caddy.service; then
+    systemctl restart caddy.service; say doing VH9 'restart caddy'
+    (umask 077; cat "$CERT" "$KEY" "$PULL_CA" | sha256sum | cut -d' ' -f1 > "$stamp")
+  else say ok VH9 'caddy running'; fi
 else
   say wait VH9 "copy the Origin CA certificate and key to $CERT and $KEY (root:caddy 640), then rerun harden.sh; Caddy stays off"
 fi

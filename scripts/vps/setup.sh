@@ -121,7 +121,8 @@ RAYNOS_UID=$(id -u raynos 2>/dev/null) || { RAYNOS_UID=-1; fail 'Cannot identify
 WILDSHARD_GID=$(getent group wildshard | cut -d: -f3) || WILDSHARD_GID=
 if [ -z "$WILDSHARD_GID" ]; then fail 'Phase 1 group wildshard is missing'; fi
 if [ -L "$ETC" ] || [ -L "$HOME_DIR" ]; then fail 'Refuse symlinked Wildshard roots'; fi
-for path in "$LIB" "$LOGS" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps"; do
+for path in "$LIB" "$LOGS" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/production/packs" "$HOME_DIR/production/logs" \
+  "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/staging/packs" "$HOME_DIR/staging/logs" "$HOME_DIR/packs" "$HOME_DIR/dumps"; do
   if [ -L "$path" ]; then fail "Refuse symlinked owned folder: $path"; fi
 done
 for name in setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs; do
@@ -373,6 +374,13 @@ EOF
 
 # --- Bring up only Wildshard objects, then recheck ownership before each route.
 systemctl daemon-reload
+# VH11: a server started before the hand-over still runs as the old user; it restarts as its own (the restart is the deploy path).
+for channel in production staging; do
+  pid=$(systemctl show -p MainPID --value "wildshard-server@$channel.service" 2>/dev/null || printf 0)
+  if [ "${pid:-0}" != 0 ] && [ "$(ps -o user:32= -p "$pid" 2>/dev/null | tr -d ' ')" != "wildshard-$channel" ]; then
+    say doing "restart $channel as wildshard-$channel"; systemctl restart "wildshard-server@$channel.service"
+  fi
+done
 for channel in production staging; do
   if ! systemctl is-active --quiet "wildshard-server@$channel.service"; then
     if [ "$channel" != production ] || ! systemctl is-active --quiet wildshard-health-stub.service; then

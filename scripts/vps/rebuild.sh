@@ -277,13 +277,18 @@ EOF
       fi
       pg "revoke connect, temporary on database $DB from public"
     }
+    # The restore check's own role: it owns only the scratch database and is no superuser (restore-check.sh).
+    ROLE=wildshard_restore
+    step "postgres role $ROLE" have_role make_role
     for CHANNEL in production staging; do
       ROLE=wildshard_$CHANNEL DB=saves_$CHANNEL
       step "postgres role $ROLE" have_role make_role
       step "database $DB, owned by $ROLE alone" have_channel_db make_channel_db
     done
-    # The shared role from before VH11 goes once it owns nothing.
+    # The shared role from before VH11 goes once it owns nothing. Its servers stop first, so no process keeps the old user,
+    # role or folders; setup.sh starts them again as their own users.
     if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
+      say doing 'stop both servers for the VH11 hand-over'; systemctl stop wildshard-server@production.service wildshard-server@staging.service || true
       say doing 'drop the shared role wildshard (VH11)'
       for DB in saves_production saves_staging; do runuser -u postgres -- psql --cluster "$PG_VERSION/main" -qtAc 'drop owned by wildshard' "$DB"; done
       pg 'drop role wildshard'
@@ -293,6 +298,7 @@ EOF
 # MAPNAME   SYSTEM-USERNAME        PG-USERNAME
 wildshard   wildshard-production   wildshard_production
 wildshard   wildshard-staging      wildshard_staging
+wildshard   postgres               wildshard_restore
 EOF
     then PG_RELOAD=1; fi
     if put "/etc/postgresql/$PG_VERSION/main/pg_hba.conf" 640 postgres:postgres <<'EOF'
@@ -301,6 +307,7 @@ EOF
 local   all               postgres               peer
 local   saves_production  wildshard_production   peer map=wildshard
 local   saves_staging     wildshard_staging      peer map=wildshard
+local   saves_restore_check wildshard_restore    peer map=wildshard
 local   all               all                    reject
 EOF
     then PG_RELOAD=1; fi
