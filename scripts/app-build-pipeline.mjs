@@ -11,6 +11,7 @@ import { writeChunkReport } from "./app-build/chunkReport.mjs";
 import { bakeGridSeams, writeGridSeams } from "./app-build/gridSeams.mjs";
 import { checkNoTopLevelAwait } from "./app-build/noTopLevelAwait.mjs";
 import { checkImportMaps } from "./app-build/importMap.mjs";
+import { nameChunksByFinalBytes } from "./app-build/finalChunkNames.mjs";
 import { writeTitleAssets } from "./title-assets.mjs";
 import {
   copyOutputProducts,
@@ -100,6 +101,10 @@ export function prepareAppBuild() {
  * @param {{outDir:string,buildId:string,mode:string,deferPublic:boolean}} options */
 export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   assertHeavyLease("build");
+  // Vite writes a dynamic import's preload list after the importer's hash: name those chunks after their final bytes,
+  // before anything reads the file names (main ci 43076662972, app-build/finalChunkNames.mjs)
+  const renamed = nameChunksByFinalBytes(outDir);
+  if (renamed.length > 0) console.log(`final chunk names: ${renamed.length} chunks renamed after their preload lists`);
   if (deferPublic) copyDeferredPublic(process.cwd(), outDir);
   // E7.5 prep: the Connection doctor's page, in its own small module graph (app-build/doctorOutput.mjs)
   await (
