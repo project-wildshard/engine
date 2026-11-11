@@ -104,3 +104,7 @@ slow. Each now skips the idle part and keeps its assertions.
   mid-round checkpoint restores quietly".
   Leg 2's first local clock (8.6 s, from the push gate) is recorded;
   the full plan is 237.4 s of 240 with 14 shards.
+  J206 (Codex): leg 1 now also asserts no unearned flag or Tulpar quest
+  state at its breaking start, on both worlds (the original checked
+  them only after the bond), and every resident is disposed
+  independently, so a throwing dispose never leaves another one live.

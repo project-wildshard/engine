@@ -85,6 +85,19 @@ async function restoreQuietly(from:Resident,preparation:Preparation,prepare:Prep
   catch(error){restored.dispose();throw error;}
   return restored;
 }
+/** Dispose every resident, each independently: one throwing never leaves another live. */
+function disposeAll(...residents:readonly (Resident|undefined)[]):void {
+  const errors:unknown[]=[];
+  for(const resident of residents){try{resident?.dispose();}catch(error){errors.push(error);}}
+  if(errors.length===1)throw errors[0];if(errors.length>1)throw new AggregateError(errors,'resident disposal failed');
+}
+/** Flags and quest state that walking, the approach or taming may never grant on their own. */
+export const UNEARNED_FLAGS=['tamed:horse','talked:elder','won:kokpar','quest:tulpar','quest:golden-king','quest:father-wind'] as const;
+function assertNothingUnearned(resident:Resident):void {
+  for(const flag of UNEARNED_FLAGS)assert.equal([...resident.host.flags.all].includes(flag),false,`taming never grants ${flag}`);
+  const tulpar=resident.host.quests.find(quest=>quest.def.id==='tulpar');assert.ok(tulpar);
+  assert.deepEqual({started:tulpar.isStarted,complete:tulpar.isComplete,current:tulpar.current?.id??null},{started:false,complete:false,current:null});
+}
 
 /** FAST-SLOW-TESTS FS4, leg 1 of 2: from spawn, the real walk to the plains, then a physical approach that earns the
  * living stallion's prompt with no trust grant or forced break, and the press that starts breaking. That breaking
@@ -110,8 +123,9 @@ export async function runNalatiFieldApproach(options:TamingProofOptions):Promise
     assert.equal(taming.phase,'breaking');
     assert.equal(canonicalSimDigest(snapshotSimHostBytes(restored.host)),canonicalSimDigest(snapshotSimHostBytes(first.host)),
       'the restored breaking start rides on in step');
+    assertNothingUnearned(first);assertNothingUnearned(restored);
     return {approachTicks,promptTick,breakingTick};
-  }finally{restored?.dispose();first.dispose();}
+  }finally{disposeAll(restored,first);}
 }
 
 /** FAST-SLOW-TESTS FS4, leg 2 of 2: every bucking round, the earned mid-round checkpoint, adoption and the post-bond
@@ -122,17 +136,15 @@ export async function runNalatiFieldApproach(options:TamingProofOptions):Promise
 export async function runNalatiFieldRounds(options:RoundsProofOptions):Promise<{ticks:number;breakingTicks:number;checkpointTick:number;rounds:number}> {
   const prepare=options.prepare??prepareHeadlessRuntime,{preparation,spawn}=await nalatiPreparation();
   const after=v.parse(v.pipe(v.array(v.pipe(v.array(TickCommandSchema),v.maxLength(1024))),v.maxLength(600)),options.postBondCommands??[]);
-  const seed=await createNativeProofResident(preparation,prepare);let first:Resident;
+  let seed:Resident|undefined=await createNativeProofResident(preparation,prepare),first:Resident|undefined,restored:Resident|undefined;
   try{
-    const stallion=stallionOf(seed),step=checkedStep(seed),pilot=createNalatiTamingPilot();
+    const stallion=stallionOf(seed),seedStep=checkedStep(seed),seedPilot=createNalatiTamingPilot();
     assert.equal(leadPlayer(seed.host).position.x,spawn.x);assert.equal(leadPlayer(seed.host).position.z,spawn.z);
     standBy(seed,stallion,options.approach);
-    for(let tick=0;tick<30;tick++)step(pilot(seed.host,stallion.original.entityId));
+    for(let tick=0;tick<30;tick++)seedStep(seedPilot(seed.host,stallion.original.entityId));
     assert.equal(stallion.taming.phase,'wild');stallion.taming.forceBreak();assert.equal(stallion.taming.phase,'breaking');
     first=await restoreQuietly(seed,preparation,prepare,'the breaking start restores quietly');
-  }finally{seed.dispose();}
-  let restored:Resident|undefined;
-  try{
+    const retired=seed;seed=undefined;retired.dispose();
     const {taming,mounted,original}=stallionOf(first),step=checkedStep(first);
     assert.equal(nativeTamingOf(first.host)?.phase,'breaking','the restored world is still breaking');assert.equal(mounted.horse,original);
     const pilot=createNalatiTamingPilot();let breakingTicks=0,checkpointTick=0,rounds=0;
@@ -164,5 +176,5 @@ export async function runNalatiFieldRounds(options:RoundsProofOptions):Promise<{
     };
     options.verifyBonded?.(observe(first),observe(restored));
     return {ticks:first.host.state.tick,breakingTicks,checkpointTick,rounds};
-  }finally{restored?.dispose();first.dispose();}
+  }finally{disposeAll(restored,first,seed);}
 }
