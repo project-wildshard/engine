@@ -11,7 +11,8 @@
 //   exact    main had not moved: main gets the SHA hosted CI proved.
 //   carried  main moved and the rebase was clean (a conflict only in the generated stamps, which land regenerates,
 //            counts as clean): the stamps are regenerated for the rebased tree and it goes straight to main on the
-//            branch's green run. The pre-push still runs its split gate there (WS_PUSH_POST_CI=1); then land watches
+//            branch's green run. Its main push runs lint, TypeScript and the static checks, no Vitest
+//            (WS_LAND_MAIN_PUSH=carried, LS3); then land watches
 //            main's own hosted run. No path, harness or dependency rule sends it back to branch CI.
 //   A real conflict stops land with the paths. The resolved commit is new, so it needs its own branch CI.
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
@@ -380,8 +381,9 @@ class Landing{
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
   const args=mainPushArgs(head);
-  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${carried?'; split pre-push on the rebased tree (WS_PUSH_POST_CI=1)':'; hosted-green SHA'}`);
-  const env=carried?{...this.env,WS_PUSH_POST_CI:'1'}:this.env;
+  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${carried?'; static pre-push on the rebased tree, no Vitest (LS3)':'; the hosted-green SHA, no local gate'}`);
+  // LS3 (J258): the pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
+  const env={...this.env,WS_LAND_MAIN_PUSH:`${carried?'carried':'exact'}:${head}`};
   const result=spawnSync('git',args,{cwd:this.root,env,encoding:'utf8',stdio:['ignore','pipe','inherit']});
   if(result.status===0)return 'landed';
   // A lost race is main having moved; anything else (a red pre-push) stops.

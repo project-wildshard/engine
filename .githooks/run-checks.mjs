@@ -43,18 +43,21 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   const {PUSH_PROFILE,SPLIT_PROFILE}=await import('../scripts/push-budget.mjs');
   const {pushSelection}=await import('../scripts/push-selection.mjs');
   const {capturePushTree,readPushProof}=await import('../scripts/push-proof-cache.mjs');
-  const {planBaseRefs,pushedRefs,splitRequested}=await import('../scripts/push-local-split.mjs');
-  const {hostedGreen}=await import('../scripts/push-hosted-green.mjs');
+  const {landMainMode,planBaseRefs,splitRequested}=await import('../scripts/push-local-split.mjs');
   const env = pushEnvironment(Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))));
-  // J240: a plan lands by fast-forwarding main to the exact SHA its branch CI
-  // proved. That main push reuses the hosted green; it never re-runs locally.
-  const pushed=pushedRefs(env.WS_PUSH_REFS),head=git(['rev-parse','HEAD']).trim();
-  if(!env.CI&&!env.GITHUB_ACTIONS&&pushed.length>0&&pushed.every(row=>row.remote==='refs/heads/main'&&row.local===head)){
-    const runs=hostedGreen(head,env.WS_PUSH_DESTINATION??git(['remote','get-url','--push','origin']).trim());
-    if(runs!==null){
-      console.error(`  - hosted-green reuse (J240): ${head} is green in ${Object.entries(runs).map(([name,run])=>`${name} run ${run.id}`).join(', ')}; no local gate`);
+  // LAND-SIMPLIFY LS3 (J249, J258): land marks its own main push. History, secrets, size, the changelog and
+  // AGENTS.md already ran above in pre-push. `exact` is the SHA branch CI proved: nothing more runs. `carried` is
+  // a clean rebase of it: lint, TypeScript and the static checks run, never Vitest (Jake: "we run all the fast and
+  // cheap stuff, ignoring vitest, but still run lint & typescript"). Any other main push keeps the full gate.
+  // The marker is read from the hook's own environment: the gate's environment keeps only its allowlist.
+  const landMain=landMainMode({...env,WS_LAND_MAIN_PUSH:process.env.WS_LAND_MAIN_PUSH},env.WS_PUSH_REFS);
+  if(landMain!==null){
+    if(landMain==='exact'){
+      console.error('  - land main push (exact, LS3): the SHA branch CI proved; no local gate');
       process.exit(0);
     }
+    const {landMainChecks}=await import('./push-checks.mjs');
+    process.exit(await landMainChecks(env));
   }
   const split=splitRequested(env);
   const context=capturePushTree(split?SPLIT_PROFILE:PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS));

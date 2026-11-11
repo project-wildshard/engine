@@ -28,19 +28,28 @@ export function pushedRefs(refs){
   .filter(([,local])=>!/^0+$/u.test(local??'')).map(([,local,remote,base])=>({local:local??'',remote:remote??'',base:base??''}));
 }
 
-/** The split is for pushes that hosted CI gates before or after they land:
- * a `plan/*` branch push (J240: its branch CI must be green before the
- * fast-forward merge), or a driver that sets WS_PUSH_POST_CI=1 because it
- * watches the exact SHA's hosted run after the push. A hand push to main,
- * a tag, a release and hosted CI itself keep the complete local gate.
+/** The split is for a `plan/*` branch push (J240: its branch CI must be green
+ * before land fast-forwards main). Land's own main push has its own lane
+ * (WS_LAND_MAIN_PUSH, LS3). A hand push to main, a tag, a release and hosted
+ * CI itself keep the complete local gate.
  * @param {NodeJS.ProcessEnv} env @param {string|undefined} refs */
 export function splitRequested(env,refs=env.WS_PUSH_REFS){
  if(env.CI||env.GITHUB_ACTIONS)return false;
  // No refs (a release check) or any tag/other branch keeps the complete gate.
  const pushed=pushedRefs(refs);
  if(pushed.length===0)return false;
- if(pushed.every(row=>PLAN_REF.test(row.remote)))return true;
- return env.WS_PUSH_POST_CI==='1'&&pushed.every(row=>row.remote==='refs/heads/main');
+ return pushed.every(row=>PLAN_REF.test(row.remote));
+}
+
+/** LAND-SIMPLIFY LS3 (J258): land's own main push, by the kind land marked it, or null for every other push,
+ * which keeps its normal gate. The marker is `WS_LAND_MAIN_PUSH=<exact|carried>:<sha>` and binds the one SHA land
+ * proved: a push of anything else, of any ref but main, or on hosted CI never qualifies (J206 review).
+ * @param {NodeJS.ProcessEnv} env @param {string|undefined} refs @returns {'exact'|'carried'|null} */
+export function landMainMode(env,refs){
+ const marker=/^(exact|carried):([a-f0-9]{40})$/u.exec(env.WS_LAND_MAIN_PUSH??'');
+ if(env.CI||env.GITHUB_ACTIONS||marker===null)return null;
+ const pushed=pushedRefs(refs),[,mode,sha]=marker;
+ return pushed.length>0&&pushed.every(row=>row.remote==='refs/heads/main'&&row.local===sha)?/** @type {'exact'|'carried'} */(mode):null;
 }
 
 /** A first push of a plan branch has no remote tip. Select against the
