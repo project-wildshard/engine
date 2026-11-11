@@ -34,6 +34,8 @@ export class LedgerBook {
     if (book.rows.length > KEPT_RECEIPTS) book.rows.splice(0, book.rows.length - KEPT_RECEIPTS);
     return true;
   }
+  /** Whether this player's book already holds this grant: a filing it would refuse. */
+  has(player: string, id: string): boolean { return this.books.get(player)?.ids.has(fits(id)) ?? false; }
   /** A player's receipts after `serial`. */
   since(player: string, serial: number): readonly NetLedger[] {
     const book = this.books.get(player);

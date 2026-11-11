@@ -282,7 +282,9 @@ export class DedicatedRoom {
     }
   }
   private filings(): readonly LedgerFiling[] {
-    const { host, cell, bodies } = this, filings = ledgerFilings(host, LEAD_SEAT, cell.effects(), cell.fact, this.options.bootId).filter(filing => bodies.has(filing.player) && !this.playerRefusals.has(filing.player));
+    // MP3.1: a grant the player's book already holds (a replayed tick, a boot id that came round again) is paid once, so it never
+    // reaches the purse a second time while the book refuses its receipt.
+    const { host, cell, bodies, book } = this, filings = ledgerFilings(host, LEAD_SEAT, cell.effects(), cell.fact, this.options.bootId).filter(filing => bodies.has(filing.player) && !this.playerRefusals.has(filing.player) && !book.has(filing.player, filing.id));
     for (const filing of filings) { cell.owned.of(filing.player).file(filing); const seat = bodies.get(filing.player); if (seat !== undefined) this.dirty(seat); }
     return filings;
   }
