@@ -54,7 +54,10 @@ class LeaseOrderTests(unittest.TestCase):
         while not predicate():
             for process in watched:
                 if process.poll() is not None:
-                    out, err = process.communicate()
+                    try:
+                        out, err = process.communicate(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        out, err = '', '(a descendant still holds its output pipes)'
                     self.fail('fixture exited %s before it was ready: %s' % (process.returncode, (out + err)[-2000:]))
             if time.monotonic() > until:
                 self.fail('fixture synchronization timed out')

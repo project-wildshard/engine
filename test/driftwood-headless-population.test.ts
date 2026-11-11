@@ -86,15 +86,17 @@ test('Driftwood spawns, moves, kills and returns its mixed population headless, 
 
 test('the worker runs Driftwood from its built product, tick for tick with the resident', async () => {
   const { directory, shard, assets, resident } = await shipped();
-  // TS11 / FL23: the worker's start (its own thread loading ~700 source modules) is most of this case. The resident is
+  // TS11 / FL23: the worker's start (its own thread loading ~530 source modules) is most of this case. The resident is
   // built and stepped on this thread meanwhile, instead of after it: the same two owners, inputs and ticks.
   const starting = HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', product: directory });
+  starting.catch(() => undefined); // observed now; `await starting` below still throws its refusal
   let live: TrustedHeadlessResident | undefined;
   try {
     live = await resident();
     const sim = await starting, commands = [{ kind: 'player' as const, moveX: 0.6, moveZ: 0.8, yaw: 0 }];
     const part = sim.verbTapePart({ version: 1, observe: [], segments: [{ id: 'same-300-inputs', ticks: 300, commands }] });
     part.catch(() => undefined); // awaited below; a throw on this thread first must not leave it unhandled
+    await new Promise(resolve => { setImmediate(resolve); }); // let the tape request reach the worker before this thread steps
     for (let tick = 0; tick < 300; tick++) live.step(commands);
     const result = await part;
     expect(result.commit.tick).toBe(300);
