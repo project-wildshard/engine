@@ -38,11 +38,14 @@ Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STAN
  - Start: from the canonical checkout, `node scripts/worktree.mjs new <slug>`, then `cd .worktrees/<slug>`.
    Commit there by pathspec as usual. One plan, one worktree, one `plan/<slug>` branch.
  - Land: `WS_LANE_NAME=<lane> node scripts/land.mjs` from the worktree. Options: `--timeout=MIN` (CI wait, 60),
-   `--rounds=N` (main-moved retries, 6), `--poll=S` (30), `--no-watch-main`. Don't commit while it runs.
+   `--rounds=N` (tries at the main push, 5), `--poll=S` (30), `--watch-main` (wait for main's own run),
+   `--keep` (keep the worktree and branch). Don't commit while it runs.
+ - Land returns as soon as main is pushed (LS5, J258). It then deletes `origin plan/<slug>` and removes the worktree
+   and its branch; `cd` back to the canonical checkout. A worktree with uncommitted or untracked files is kept.
  - What it prints, one line per change: `land HH:MM:SS <state> <detail>`. States in order: `start`, `rebased`,
    `stamps`, `pushing`, `ci` (`ci success, ring-1 in_progress`…), `moved`, `carried` (with the reason), `merging`,
-   `landed`, `canonical` (the canonical checkout's main fast-forwarded to it, or a WARNING and a receipt
-   when that checkout is dirty, diverged or busy: it is never reset), `rule` (main's CI and who fixes it). A stop is one `land STOP <why and what to do>` line. Exit 0: landed or nothing to land.
+   `landed`, `watch`, `canonical` (the canonical checkout's main fast-forwarded to it, or a WARNING and a receipt
+   when that checkout is dirty, diverged or busy: it is never reset), `rule` (main's CI and who fixes it), `cleaned`. A stop is one `land STOP <why and what to do>` line. Exit 0: landed or nothing to land.
    Exit 3: landed, but main's own run went red (carried case): fix forward now. Exit 1: stopped. If a `landed`
    line came before the stop, main already moved and only the watch of main's run failed: check main's Actions
    runs by hand; running land again just says `nothing`.
@@ -51,7 +54,7 @@ Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STAN
  - J249 (Jake: "if CI passes on the branch/worktree and the merge/rebase is clean with no conflicts then it goes
    in… they don't have to re-CI on rebase"): `exact` when main didn't move (main reuses the branch run); `carried`
    when main moved and the rebase was clean (a conflict only in the generated stamps counts as clean: land
-   regenerates them): it goes to main on the branch's green run, after the split pre-push on the rebased tree. No
+   regenerates them): it goes to main on the branch's green run; its main push runs lint, TypeScript and the static checks, no Vitest (LS3). No
    path or harness rule sends it back to branch CI, and no lock is shared between worktrees (one land per
    worktree). A real conflict stops; the resolved commit is new and gets its own branch CI.
  - Main's CI runs after every land. If it goes red, the lane that landed last fixes it forward or reverts it, at
@@ -59,7 +62,7 @@ Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STAN
  - `scripts/main-watch.mjs` reports main's CI (LAND-SIMPLIFY LS5): land starts it to follow the landed SHA. It writes a
    `main green` or `MAIN RED <range>` receipt naming the landers, and messages each lander's herdr pane on red. A
    cancelled run that a newer push replaced is `superseded`, never red. Sweep by hand: `node scripts/main-watch.mjs`.
- - Clean up landed worktrees with `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an
+ - Abandoned worktrees: `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an
    unlanded, dirty or busy one.
 
 When land stops (each seen on 2026-11-10/11):

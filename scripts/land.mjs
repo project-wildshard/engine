@@ -52,17 +52,21 @@ export function githubSlug(remote){
 /** Refuse anything but the known options. Any spelling of force is refused by name.
  * @param {string[]} argv */
 export function parseArgs(argv){
- const options={pollSeconds:30,timeoutMinutes:60,appearMinutes:5,rounds:6,watchMain:true};
+ // LS5 (J258): land returns once main is pushed (main-watch reports main's ci; --watch-main still waits), retries a
+ // lost main race at most 5 times, and removes its worktree and origin plan branch after landing (--keep keeps them).
+ const options={pollSeconds:30,timeoutMinutes:60,appearMinutes:5,rounds:5,watchMain:false,keep:false};
  for(const arg of argv){
   if(/^-f$|force/iu.test(arg))throw new StopError(`refused ${arg}: land never force-pushes main (J240: fast-forward only). If main moved, land rebases and retries by itself`);
   const [name,value]=arg.split('=',2);
   const number=Number(value);
-  if(name==='--no-watch-main'&&value===undefined)options.watchMain=false;
+  if(name==='--watch-main'&&value===undefined)options.watchMain=true;
+  else if(name==='--no-watch-main'&&value===undefined)options.watchMain=false;
+  else if(name==='--keep'&&value===undefined)options.keep=true;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--poll')options.pollSeconds=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--timeout')options.timeoutMinutes=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--appear')options.appearMinutes=number;
   else if(value!==undefined&&Number.isSafeInteger(number)&&number>0&&name==='--rounds')options.rounds=number;
-  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--no-watch-main]`);
+  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--watch-main] [--keep]`);
  }
  return options;
 }
@@ -145,6 +149,7 @@ class Landing{
   /** @type {string|null} */this.planTip=null;
   this.expected='';
   this.reruns=0;
+  /** @type {string|null} */this.landedSha=null;
  }
 
  /** @param {string} state @param {string} detail */
@@ -425,8 +430,8 @@ class Landing{
    if(outcome==='moved'){this.say('moved','main moved during the merge; rebasing and retrying');continue;}
    return this.landed(rule,why,round,main);
   }
-  this.receipt(`STOP gave up after ${this.options.rounds} rounds; main kept moving`);
-  throw new StopError(`main kept moving for ${this.options.rounds} rounds; run land again`);
+  this.receipt(`STOP gave up after ${this.options.rounds} tries; main kept moving`);
+  throw new StopError(`main kept moving: ${this.options.rounds} tries each lost the race to another push (J258 stops at 5). Nothing landed; run land again when main is quieter`);
  }
 
  /** After GitHub's main moved, bring the canonical checkout's main along (Jake, 2026-11-10 ~23:50 Cancún: "go to
@@ -472,32 +477,66 @@ class Landing{
   * canonical checkout, so it outlives this worktree. WS_MAIN_WATCH=0 turns it off.
   * @param {string} head */
  startWatcher(head){
-  const script=join(this.root,'scripts/main-watch.mjs');
-  if(this.env.WS_MAIN_WATCH==='0'||!existsSync(script))return;
+  const own=join(this.root,'scripts/main-watch.mjs');
+  if(this.env.WS_MAIN_WATCH==='0'||!existsSync(own))return;
+  // Run the canonical checkout's copy when it has one: this worktree may be removed before node has read its own
+  // (J206 review). Otherwise a private copy, rooted at the canonical checkout.
+  const canonical=canonicalRoot(this.root),shared=join(canonical,'scripts/main-watch.mjs');
+  let script=shared,env=this.env;
+  if(!existsSync(shared)){
+   script=join(homedir(),'.cache/wildshard/main-watch/main-watch.mjs');
+   mkdirSync(dirname(script),{recursive:true});writeFileSync(script,readFileSync(own));
+   env={...this.env,WS_MAIN_WATCH_ROOT:canonical};
+  }
   const args=[script,`--follow=${head}`,`--lane=${this.lane}`,...(this.env.HERDR_PANE_ID?[`--pane=${this.env.HERDR_PANE_ID}`]:[])];
   try{
-   spawn(process.execPath,args,{cwd:canonicalRoot(this.root),env:this.env,detached:true,stdio:'ignore'}).unref();
+   spawn(process.execPath,args,{cwd:canonical,env,detached:true,stdio:'ignore'}).unref();
    this.say('watch',`main-watch follows ${short(head)} and reports main's ci (receipt, and a message here on red)`);
   }catch(error){this.say('watch',`main-watch not started (${error instanceof Error?error.message:String(error)}); run node scripts/main-watch.mjs by hand`);}
+ }
+
+ /** LS5 (J258, Jake: "Yes, land cleans up its own"): after landing, delete origin's plan branch (under a lease on the
+  * SHA land pushed) and remove this worktree with its local branch, from the canonical checkout. A worktree with
+  * uncommitted or untracked work is kept and named. The reaper stays only for abandoned worktrees.
+  * @returns {string} what happened */
+ cleanUp(){
+  const head=this.landedSha;
+  if(head===null)return 'nothing landed';
+  const canonical=canonicalRoot(this.root),parts=[];
+  if(this.planTip!==null){
+   const deleted=tryGit(this.root,['push','--quiet',`--force-with-lease=refs/heads/${this.branch}:${this.planTip}`,'origin','--delete',this.branch]);
+   parts.push(deleted.status===0?`origin ${this.branch} deleted`:`origin ${this.branch} kept (${deleted.stderr.trim().split('\n').at(-1)??'push refused'})`);
+  }
+  const dirty=tryGit(this.root,['status','--porcelain']).stdout.trim();
+  const now=tryGit(this.root,['symbolic-ref','--quiet','HEAD']).stdout.trim(),at=tryGit(this.root,['rev-parse','HEAD']).stdout.trim();
+  if(now!==`refs/heads/${this.branch}`||at!==head)parts.push(`worktree kept: HEAD moved off ${this.branch} ${short(head)} after landing`);
+  else if(dirty!=='')parts.push(`worktree kept: ${dirty.split('\n').length} uncommitted or untracked path(s)`);
+  else{
+   const removed=tryGit(canonical,['worktree','remove',this.root]);
+   if(removed.status===0){
+    tryGit(canonical,['update-ref','-d',`refs/heads/${this.branch}`,head]);
+    parts.push(`worktree and ${this.branch} removed; continue from ${canonical}`);
+   }else parts.push(`worktree kept (${removed.stderr.trim().split('\n').at(-1)??'git worktree remove refused'})`);
+  }
+  const line=parts.join('; ');
+  this.say('cleaned',line);
+  return line;
  }
 
  /** @param {string} rule @param {string} why @param {number} round @param {string} before */
  async landed(rule,why,round,before){
   const head=this.head();
   this.say('landed',`main ${short(before)} -> ${short(head)} (${rule}: ${why})`);
+  this.landedSha=head;
   this.followCanonical();
   this.startWatcher(head);
   this.say('rule',`main's own CI runs on ${short(head)} now. If it goes red, the lane that landed last fixes it forward or reverts it, at once (J249)`);
-  // origin plan/<slug> stays: the next land rewrites it under a lease, and the
-  // DS13 reaper deletes it with the worktree (a delete push would run the pre-push).
-  let code=0,mainCI='reuses the branch run';
-  if(rule==='carried'){
-   if(this.options.watchMain){
-    const {verdict,sha,superseded}=await this.watchMain(head);
-    const via=superseded.length===0?'':`superseded by ${short(sha)}, `;
-    mainCI=verdict.state==='green'?`${via}green (${Object.values(verdict.runs).map(run=>run.id).join(', ')})`:`${via}RED: ${('failed'in verdict?verdict.failed:[]).join(' | ')}`;
-    if(verdict.state!=='green'){code=3;this.say('red',`main's hosted run is red for ${short(sha)}${sha===head?'':`, which contains ${short(head)}`}: fix forward now`);}
-   }else mainCI='not watched';
+  let code=0,mainCI=rule==='carried'?'followed by main-watch':'reuses the branch run';
+  if(rule==='carried'&&this.options.watchMain){
+   const {verdict,sha,superseded}=await this.watchMain(head);
+   const via=superseded.length===0?'':`superseded by ${short(sha)}, `;
+   mainCI=verdict.state==='green'?`${via}green (${Object.values(verdict.runs).map(run=>run.id).join(', ')})`:`${via}RED: ${('failed'in verdict?verdict.failed:[]).join(' | ')}`;
+   if(verdict.state!=='green'){code=3;this.say('red',`main's hosted run is red for ${short(sha)}${sha===head?'':`, which contains ${short(head)}`}: fix forward now`);}
   }
   const seconds=Math.round((Date.now()-this.started)/1000);
   this.receipt(`${code===0?'landed':'landed, MAIN RED'} ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; hosted reruns ${this.reruns}; branch ci ${this.runs.join(', ')||'none'}; main ci ${mainCI}; ${seconds} s`);
@@ -521,7 +560,11 @@ export async function land(argv,cwd=process.cwd(),env=process.env){
  try{
   const landing=new Landing(cwd,parseArgs(argv),env);
   unlock=landing.lock();
-  return await landing.run();
+  const code=await landing.run();
+  // Cleanup runs under the land lock (J206 review): no second land can start here meanwhile. The lock file lives in
+  // this worktree's git dir, so removing the worktree removes it too; the release below then finds nothing.
+  if(!landing.options.keep)landing.cleanUp();
+  return code;
  }catch(error){
   if(error instanceof StopError){process.stdout.write(`land STOP ${error.message}\n`);return 1;}
   throw error;

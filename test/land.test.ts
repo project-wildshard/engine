@@ -134,9 +134,11 @@ function fixture() {
     return script;
   };
   const state = (extra: Record<string, unknown>) => writeFileSync(files.state, JSON.stringify({ log: files.gh, pushed: files.pushed, ...extra }));
-  const land = (cwd: string, args: readonly string[] = []) => spawnSync(process.execPath, [LAND, '--poll=0.05', '--appear=0.05', ...args], { cwd, env, encoding: 'utf8', timeout: 60_000 });
+  // Most tests look at the worktree after landing and at main's watch, so they keep both (LS5 tests use `bare`).
+  const KEPT = ['--keep', '--watch-main'];
+  const land = (cwd: string, args: readonly string[] = KEPT) => spawnSync(process.execPath, [LAND, '--poll=0.05', '--appear=0.05', ...args], { cwd, env, encoding: 'utf8', timeout: 60_000 });
   const landAsync = (cwd: string) => new Promise<{ code: number | null; stdout: string }>(done => {
-    const child = execFile(process.execPath, [LAND, '--poll=0.05', '--appear=0.05'], { cwd, env, encoding: 'utf8', timeout: 60_000 }, (error, stdout) => { done({ code: error === null ? 0 : (typeof error.code === 'number' ? error.code : 1), stdout }); });
+    const child = execFile(process.execPath, [LAND, '--poll=0.05', '--appear=0.05', ...KEPT], { cwd, env, encoding: 'utf8', timeout: 60_000 }, (error, stdout) => { done({ code: error === null ? 0 : (typeof error.code === 'number' ? error.code : 1), stdout }); });
     child.stdin?.end();
   });
   const remoteMain = () => git(remote, ['rev-parse', 'main']);
@@ -178,6 +180,40 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const seen = JSON.parse(readFileSync(marker, 'utf8')) as { argv: string[]; cwd: string };
     expect(seen.argv).toEqual([`--follow=${tip}`, '--lane=fixture-lane', '--pane=w0:p9']);
     expect(realpathSync(seen.cwd)).toBe(realpathSync(f.repo));
+  }, 60_000);
+
+  test('LS5: land returns at the main push, then removes its worktree, local branch and origin plan branch', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    // Main moves, so the land is carried: before LS5 it waited for main's own run here.
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
+    const result = f.land(wt, []);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/carried\s+clean rebase/u);
+    expect(result.stdout).not.toContain('ci        main ');
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; .*main ci followed by main-watch/u);
+    expect(result.stdout).toMatch(/cleaned\s+origin plan\/foo deleted; worktree and plan\/foo removed/u);
+    expect(existsSync(wt)).toBe(false);
+    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.repo, env: f.env }).status).not.toBe(0);
+    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.remote, env: f.env }).status).not.toBe(0);
+  }, 60_000);
+
+  test('LS5: a worktree with untracked work is kept after landing; --keep keeps everything', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    writeFileSync(join(wt, 'notes.txt'), 'mine');
+    const result = f.land(wt, []);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/origin plan\/foo deleted; worktree kept: 1 uncommitted or untracked path/u);
+    expect(existsSync(join(wt, 'notes.txt'))).toBe(true);
+    const g = fixture();
+    const kept = g.worktree('bar');
+    g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    expect(g.land(kept, ['--keep']).stdout).not.toContain('cleaned');
+    expect(existsSync(kept)).toBe(true);
+    expect(parseArgs([])).toMatchObject({ rounds: 5, watchMain: false, keep: false });
   }, 60_000);
 
   test('after the main push, the canonical checkout fast-forwards to it (Jake: land into the main checkout)', () => {
