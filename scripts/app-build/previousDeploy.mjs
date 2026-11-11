@@ -3,6 +3,7 @@
  * this: the files must sit inside the live one. As many builds as the prune keeps, this one included. A build whose
  * files production no longer has drops out whole, and chunk recovery moves its tabs on.
  * This is a plain output step, never a bundler plugin or a runtime prefetch. */
+import {execFileSync} from 'node:child_process';
 import {copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
 import {KEEP_PROMOTED} from '../prune-deployments.mjs';
@@ -81,13 +82,38 @@ async function pool(rows, work) {
   }));
   if (failure !== undefined) throw failure;
 }
+/** The build the carried origin (or directory) serves right now: its version.json. Unknown is none.
+ * @param {{previousDirectory?: string, previousOrigin?: string}} options @returns {Promise<string[]>} */
+async function liveBuilds(options) {
+  try {
+    if (options.previousDirectory !== undefined) return [String(JSON.parse(readFileSync(join(options.previousDirectory, 'version.json'), 'utf8')).build)];
+    if (options.previousOrigin === undefined) return [];
+    const response = await fetch(new URL('/version.json', options.previousOrigin), {cache: 'no-store', signal: AbortSignal.timeout(30000)});
+    return response.ok ? [String((await response.json()).build)] : [];
+  } catch { return []; }
+}
+/** A build id `<sha7>-<stamp>` is this repository's when that commit is in its history.
+ * @param {string} build @returns {boolean} */
+function ownBuild(build) {
+  const sha = build.split('-')[0] ?? '';
+  if (!/^[0-9a-f]{7,40}$/u.test(sha)) return false;
+  try { execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], {stdio: 'ignore'}); return true; } catch { return false; }
+}
+
 /** Carry files from a built previous output (local --rev proof), or production's published manifest. The new manifest
  * names each graph once; the build's own files stay unchanged, and a carried file is never a source map.
+ * A kept graph that collides with a path this build writes is dropped with a warning, unless it is the build live at
+ * the origin right now and that build is this repository's: open tabs on it lazy-load these chunks, so the build fails,
+ * naming the file and the deploy. A live build from another repository (the singleplayer shell that J210 retires) is the
+ * one this deploy replaces, so its clash is a warning.
  * @param {string} directory
- * @param {{previousDirectory?: string, previousOrigin?: string}} [options]
+ * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean}} [options]
  */
 export async function carryPreviousDeploy(directory, options = {}) {
   const current = currentManifest(directory);
+  /** @type {readonly string[] | undefined} */
+  let live = options.live;
+  const ours = options.ours ?? ownBuild;
   /** @type {Graph[]} */
   let previous = [];
   if (options.previousDirectory !== undefined) {
@@ -102,11 +128,18 @@ export async function carryPreviousDeploy(directory, options = {}) {
   let carried = 0, bytes = 0;
   for (const graph of previous.filter(row => row.build !== current.build).slice(0, KEEP_PROMOTED - 1)) {
     const fresh = [];
-    for (const row of graph.files) {
-      const size = held.get(row.path);
-      if (size === undefined) fresh.push(row);
-      else if (size !== row.bytes) throw new Error(`Immutable deploy chunk changed size: ${row.path}`);
+    // A path this build writes with other bytes than a kept build's: a chunk hash that doesn't cover what Vite adds after
+    // hashing (`__vite__mapDeps`), seen across checkouts (main ci 43064007268). This build's bytes win and that kept build
+    // is dropped whole, named in the log, rather than failing the build or serving a mixed graph.
+    const clash = graph.files.find(row => held.has(row.path) && held.get(row.path) !== row.bytes);
+    if (clash !== undefined) {
+      const where = options.previousOrigin ?? options.previousDirectory ?? '';
+      live ??= await liveBuilds(options); // read only on a clash
+      if (live.includes(graph.build) && ours(graph.build)) throw new Error(`Immutable deploy chunk changed size: ${clash.path} in the live deploy ${graph.build} (${where})`);
+      console.warn(`Dropped previous build ${graph.build}${live.includes(graph.build) ? ' (live, another repository\'s)' : ''}: ${clash.path} has other bytes in this build`);
+      continue;
     }
+    for (const row of graph.files) if (!held.has(row.path)) fresh.push(row);
     try {
       await pool(fresh, async row => {
         const target = join(directory, row.path);

@@ -164,3 +164,9 @@ test('phase banks keep initial and late code isolated and retain unchanged contr
     expect(controlBytes(writtenBundle(outDir, root))).toEqual(before);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('a shared chunk named after the checkout folder gets one fixed name, so its importers are the same bytes everywhere', () => {
+  expect(controlChunkFileName({ name: 'engine' }, 'b/c', 'engine')).toBe('b/c/shared-[hash].js');
+  expect(controlChunkFileName({ name: 'engine-source' }, 'b/c', 'engine-source')).toBe('b/c/shared-[hash].js');
+  expect(controlChunkFileName({ name: 'late' }, 'b/c', 'engine')).toBe('b/c/late-[hash].js');
+});

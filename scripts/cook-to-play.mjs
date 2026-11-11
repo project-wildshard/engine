@@ -3,7 +3,7 @@
 // the other two Ring 1 pins. Each then reaches actual gameplay from those bytes.
 // Ring 2: includes a fresh client build and cold q11 cooks (over ten seconds).
 import {execFileSync} from 'node:child_process';
-import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
+import {mkdirSync,mkdtempSync,readFileSync,realpathSync,rmSync,writeFileSync} from 'node:fs';
 import {createServer} from 'node:http';
 import {homedir} from 'node:os';
 import {join,resolve as resolvePath} from 'node:path';
@@ -39,8 +39,12 @@ try {
   const live=JSON.parse(readFileSync('out/.ring-catalogue.json','utf8'));
   const selected={...live,shards:live.shards.filter(row=>row.slug==='template'),placements:live.placements.filter(row=>bareSlug(row.slug)==='template')};
   const catalogue=join(work,'catalogue.json');writeFileSync(catalogue,JSON.stringify(selected));
+  // The tree is a `git archive` under this checkout's tmp/, so `git rev-parse` there names the outer checkout: hand the
+  // build HEAD's own file list instead (source-input-proof.mjs's inventory), as build-mirror.mjs does (main ci 43064007268)
+  const files=join(work,'tree-files.json');
+  writeFileSync(files,JSON.stringify({root:realpathSync(tree),files:execFileSync('git',['ls-tree','-r','--name-only','-z','HEAD'],{encoding:'utf8',maxBuffer:16*1024*1024}).split('\0').filter(file=>file!=='')}));
   execFileSync('python3',['scripts/heavy-lane.py','build','--',process.execPath,'scripts/build-app.mjs'],{
-    cwd:tree,env:{...process.env,VERCEL_GIT_COMMIT_SHA:sha,WILDSHARD_CATALOGUE:catalogue},stdio:'inherit',timeout:300000});
+    cwd:tree,env:{...process.env,VERCEL_GIT_COMMIT_SHA:sha,WILDSHARD_CATALOGUE:catalogue,WS_GENERATION_TREE_FILES:files,WS_GENERATION_TREE_ROOT:realpathSync(tree)},stdio:'inherit',timeout:300000});
   const dist=join(tree,'dist'),{build}=JSON.parse(readFileSync(join(dist,'version.json'),'utf8'));
   const cooked=join(work,'cooked');
   node(['scripts/ring-cook.mjs',`--out=${cooked}`,`--build=${build}`]);

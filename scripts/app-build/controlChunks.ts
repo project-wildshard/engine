@@ -96,6 +96,11 @@ export function controlChunkGroups(root: string): Rolldown.CodeSplittingGroup[] 
 
 /** Entry-aware subgroup labels contain '~'; named module banks accept only
  * URL-safe tokens. Keep the content hash, not a permissive bank parser. */
-export function controlChunkFileName(chunk: Pick<Rolldown.PreRenderedChunk, 'name'>, directory = 'assets'): string {
-  return `${directory}/${chunk.name.replaceAll(/[^a-zA-Z0-9_.-]/gu, '-')}-[hash].js`;
+export function controlChunkFileName(chunk: Pick<Rolldown.PreRenderedChunk, 'name'>, directory = 'assets', checkout = ''): string {
+  // Rolldown names a shared chunk with no group after the modules' common folder: the checkout's own name ('engine' in CI,
+  // a worktree's slug here, 'engine-source' in the shell). Its importers list it in `__vite__mapDeps` after their hash is
+  // taken, so the same importer hash carried different bytes per checkout and the previous-deploy carry refused the build
+  // ("Immutable deploy chunk changed size", main ci 43064007268). One fixed name keeps every importer's bytes the same.
+  const name = checkout !== '' && chunk.name === checkout ? 'shared' : chunk.name;
+  return `${directory}/${name.replaceAll(/[^a-zA-Z0-9_.-]/gu, '-')}-[hash].js`;
 }

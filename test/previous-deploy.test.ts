@@ -129,3 +129,40 @@ test('J217 (LD6): a newer deploy shares unchanged code and still serves an old b
     expect(manifest.builds.find(row => row.build === 'b')?.files.map(row => row.path)).toEqual(['b/b/main-bbbbbbbb.js', 'b/c/newonly-33333333.js', 'b/c/world-11111111.js']);
   } finally {rmSync(root, {recursive: true, force: true});}
 });
+
+test('a kept build whose chunk this build writes with other bytes is dropped whole, and the build goes on', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-clash-'));
+  const output = (name: string, files: Record<string, string>): string => {
+    const dir = join(root, name); writeFileSync(join(mkdirSync(dir, {recursive: true}) ?? dir, 'version.json'), JSON.stringify({build: name}));
+    for (const [path, code] of Object.entries(files)) { mkdirSync(join(dir, path, '..'), {recursive: true}); writeFileSync(join(dir, path), code); }
+    return dir;
+  };
+  try {
+    // the same content-hash name, other bytes: the importer lists a dependency named after another checkout
+    const old = output('old', {'b/c/late-dummy-Ci9ql7Om.js': 'import("b/c/engine-source-X.js")', 'b/c/old-only-AAAAAAAA.js': 'old'});
+    await carryPreviousDeploy(old);
+    const now = output('now', {'b/c/late-dummy-Ci9ql7Om.js': 'import("b/c/shared-X.js")'});
+    expect(await carryPreviousDeploy(now, {previousDirectory: old})).toMatchObject({carried: 0});
+    expect(readFileSync(join(now, 'b/c/late-dummy-Ci9ql7Om.js'), 'utf8')).toBe('import("b/c/shared-X.js")');
+    expect(existsSync(join(now, 'b/c/old-only-AAAAAAAA.js'))).toBe(false);
+  } finally {rmSync(root, {recursive: true, force: true});}
+});
+
+test('a clash with the deploy live right now, when it is ours, fails the build and names the file and the deploy', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-live-'));
+  const output = (name: string, files: Record<string, string>): string => {
+    const dir = join(root, name); mkdirSync(dir, {recursive: true}); writeFileSync(join(dir, 'version.json'), JSON.stringify({build: name}));
+    for (const [path, code] of Object.entries(files)) { mkdirSync(join(dir, path, '..'), {recursive: true}); writeFileSync(join(dir, path), code); }
+    return dir;
+  };
+  try {
+    const live = output('live', {'b/c/late-dummy-Ci9ql7Om.js': 'import("b/c/engine-source-X.js")'});
+    await carryPreviousDeploy(live);
+    const next = output('next', {'b/c/late-dummy-Ci9ql7Om.js': 'import("b/c/shared-X.js")'});
+    // the previous directory's own build is the live one; `ours` says it is this repository's
+    await expect(carryPreviousDeploy(next, {previousDirectory: live, ours: () => true}))
+      .rejects.toThrow(/b\/c\/late-dummy-Ci9ql7Om\.js in the live deploy live/u);
+    // another repository's live build (the shell J210 retires) is replaced, with a warning
+    await expect(carryPreviousDeploy(next, {previousDirectory: live, ours: () => false})).resolves.toMatchObject({carried: 0});
+  } finally {rmSync(root, {recursive: true, force: true});}
+});

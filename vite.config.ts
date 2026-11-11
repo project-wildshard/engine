@@ -3,7 +3,7 @@ import { assetTableAddresses, readAssetTables } from './scripts/app-build/assetT
 import { readGridSeams } from './scripts/app-build/gridSeams.mjs';
 import { readFileSync } from 'node:fs';
 import { shardfileValidationRevision } from './scripts/shardfile-validation-revision.mjs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { rapierAlias } from './vite/rapier';
 import { viteTmpRoot } from './scripts/vite-tmp.mjs';
 import { assertHeavyLease } from './scripts/heavy-lane-lease.mjs';
@@ -50,7 +50,7 @@ export default defineConfig(({ mode, command }) => {
         input: { main: join(process.cwd(), 'index.html'), calibration: join(process.cwd(), 'calibration/index.html') },
         preserveEntrySignatures: false,
         output: {
-          strictExecutionOrder: true, chunkFileNames: chunk => controlChunkFileName(chunk, shared),
+          strictExecutionOrder: true, chunkFileNames: chunk => controlChunkFileName(chunk, shared, basename(process.cwd())),
           assetFileNames: asset => `${asset.names.some(name => /\.(?:js|css|wasm)$/u.test(name)) ? shared : 'assets'}/[name]-[hash][extname]`,
           codeSplitting: { groups: controlChunkGroups(process.cwd()) },
         },
