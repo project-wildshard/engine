@@ -13,7 +13,7 @@ export async function run(browser,phone,base) {
     await page.evaluate(()=>{
       const world=Reflect.get(window,'__wildshard').requireWorld(),link=world.player.link;if(link===null)throw new Error('No wire');
       const client=Reflect.get(link,'client'),command=client.command.bind(client),seen={attacks:0,heavy:0,hits:0,amount:0};Reflect.set(window,'__repairMelee',seen);
-      client.command=(/** @type {import('@wildshard/format/netCommand').NetCommand} */input)=>{
+      client.command=(/** @type {import('@wildshard/wire/netCommand').NetCommand} */input)=>{
         if(input.attack!==undefined){seen.attacks++;if((input.buttons&128)!==0)seen.heavy++;}return command(input);
       };
       client.onCombat((/** @type {import('../src/shared/engine/net/messages').NetCombatEvent} */event)=>{if(event.kind==='hit'&&event.confirmFor>0){seen.hits++;seen.amount=event.amount;}});

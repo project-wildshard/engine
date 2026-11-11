@@ -4,7 +4,7 @@ import { bootMark } from '../../../shared/engine/boot/timing';
 // read its rows in E4.3. It knows nothing of how bytes travel, and imports nothing from the server.
 import { installPortableMath } from '../../../shared/engine/core/portableMath';
 import type { QuestProgress } from '../../../shared/engine/quest/progress';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { ChatChannel, NetRoomAct } from '../../../shared/engine/net/acts';
 import type { NetChat } from '../../../shared/engine/net/chatWire';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
@@ -14,7 +14,7 @@ import { GUEST, type NetIdentity } from '../../../shared/engine/net/identity';
 import type { NetLedger } from '../../../shared/engine/net/ledgerWire';
 import { decodeFrame, FRAME_RING, NO_BASELINE, type DecodedFrame, type FrameTable } from '../../../shared/engine/net/frame';
 import { decodeEvents, decodeWelcome, encodeAct, encodeHello, messageId, MSG_EVENTS, MSG_FRAME, MSG_WELCOME, type InitialBits, type NetView, type NetCombatEvent, type NetPlayerDied, type NetRide, type NetTravel, type NetWelcome } from '../../../shared/engine/net/messages';
-import { FLAG_CLASS, NET_CLASSES, NET_SCHEMA_HASH, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
+import { FLAG_CLASS, initialBitsOf, NET_SCHEMA_HASH, netClassOf, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetClass, NetValue } from '../../../shared/engine/net/schema';
 import type { Transport } from '../../../shared/engine/net/transport';
@@ -31,7 +31,7 @@ export interface NetEntityInfo { readonly handle: number; readonly id: string; r
 /** A row with its quantised values turned back into field values. */
 export type NetFields = Readonly<Record<string, NetValue>>;
 
-const initialBits: InitialBits = cls => { const entry = NET_CLASSES[cls]; return entry === undefined ? undefined : { bits: entry.initial.map(column => column.bits), text: entry.text.length }; };
+const initialBits: InitialBits = initialBitsOf;
 
 function decodeColumns(columns: NetClass<never>['row'], values: ArrayLike<number>): Record<string, NetValue> {
   const out: Record<string, NetValue> = {};
@@ -248,7 +248,7 @@ export class NetClient {
         this.entities.delete(event.handle);
         continue;
       }
-      const cls = NET_CLASSES[event.cls];
+      const cls = netClassOf(event.cls);
       if (cls === undefined) continue;
       const initial = decodeColumns(cls.initial, event.initial);
       cls.text.forEach((field, index) => { initial[field.name] = event.text[index] ?? ''; });

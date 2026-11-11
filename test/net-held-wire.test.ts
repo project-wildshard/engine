@@ -4,7 +4,7 @@ import { runtimeAssets } from './fixtures/engine-lift/product';
 import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
 import { createTrustedHeadlessResident,type TrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { tickCommands } from '@wildshard/engine/host/tickProtocol';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { readFileSync } from 'node:fs';
 import { Group } from 'three';
 import { beforeAll,expect,test } from 'vitest';

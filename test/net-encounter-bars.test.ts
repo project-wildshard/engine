@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { beforeAll, expect, test } from 'vitest';
 import type { BossPresentation } from '../src/shared/engine/ai/BossBrain';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../src/client/engine/net/client';
 import { PhaseEncounter, silentBossPresentation, type PhaseEncounterSpec } from '../src/server/engine/ai/phases';
 import { NetRoom, type NetTickInput } from '../src/server/engine/net/room';

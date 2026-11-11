@@ -1,6 +1,6 @@
 import type { MotionPlatform, MotionRide } from '../../shared/engine/player/motion';
 import { validateLocalMovement, type LocalMovementCommand } from '../../shared/engine/input/commands';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { Vector3 } from 'three';
 import { Scope, type DisposeStep } from '../../shared/engine/app/scope';
 import { withOwner } from '../../shared/engine/app/ownership';

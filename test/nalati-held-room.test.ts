@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The product and Rapier are shipped bytes.
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { NetTickAct } from '../src/shared/engine/net/acts';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { heldArmsOf } from '../src/server/game/weapons/nativeHeld';

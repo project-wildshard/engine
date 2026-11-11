@@ -1,4 +1,4 @@
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../src/client/engine/net/client';
 import { Rng } from '../../src/shared/engine/core/rng';
 import type { NetRoomAct } from '../../src/shared/engine/net/acts';

@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { NetCommandSchema, type NetCommand } from '@wildshard/format/netCommand';
+import { NetCommandSchema, type NetCommand } from '@wildshard/wire/netCommand';
 import { NET_PRESSES, seqAfter } from '../../../shared/engine/net/command';
 
 /** Steps a client may run ahead of the clock, so a burst or a late packet costs it nothing. */

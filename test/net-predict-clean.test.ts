@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { beforeAll, expect, test } from 'vitest';
 import type { Rapier } from '../src/shared/engine/physics/rapier';
 import { HostSide, loadCourseRapier, POOL_X, type MotionScenario } from './fixtures/motion-trace/parity';

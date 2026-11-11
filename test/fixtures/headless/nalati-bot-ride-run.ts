@@ -4,7 +4,7 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native behavior assertions run in this bounded child.
 import assert from 'node:assert/strict';
-import type {NetCommand} from '@wildshard/format/netCommand';
+import type {NetCommand} from '@wildshard/wire/netCommand';
 import {builtProduct} from '../builtProduct';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';

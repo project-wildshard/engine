@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { zlibSync } from 'fflate';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { MountProfile } from '@wildshard/format/riding';
 import { SkinnedMesh, Vector3 } from 'three';
 import { afterEach, beforeAll, expect, test } from 'vitest';

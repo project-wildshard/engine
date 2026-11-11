@@ -1,7 +1,7 @@
 // Portable Math before anything, as every server entry starts (E7.2).
 import '@wildshard/engine/core/portableMathFirst';
 import { readFileSync } from 'node:fs';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../../src/client/engine/net/client';
 import { NET_BUTTONS } from '../../../src/shared/engine/input/netButtons';
 import { installAppIdentity } from '../../../src/shared/engine/app/identity';

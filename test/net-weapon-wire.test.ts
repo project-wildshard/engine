@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { BoxGeometry, MeshBasicMaterial, Vector3 } from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { beforeAll, expect, test, vi } from 'vitest';
 import { app } from '../src/client/engine/app/runtime';
 import { SweptMelee } from '../src/client/engine/combat/view/SweptMelee';

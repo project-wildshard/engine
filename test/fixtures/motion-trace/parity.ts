@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the shipped player and host against native Rapier.
 import { readFileSync } from 'node:fs';
 import { PerspectiveCamera, Vector3 } from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { Scope } from '../../../src/shared/engine/app/scope';
 import { app } from '../../../src/client/engine/app/runtime';
 import { lockOn, type AimTarget } from '../../../src/client/engine/player/AimTargets';

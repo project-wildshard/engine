@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The room runs the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../src/client/engine/net/client';
 import { questBooks } from '../src/shared/engine/quest/players';
 import { NetRoom, type NetTickInput } from '../src/server/engine/net/room';

@@ -1,6 +1,6 @@
 // P1-E5.2 (E5-REPLICATION §4.2): NetCommand on the wire. One command is about 14 bytes; a bundle carries every sim step
 // the client frame ran plus up to 4 older unacked commands, so a lost packet costs no input.
-import type { NetAim, NetCommand } from '@wildshard/format/netCommand';
+import type { NetAim, NetCommand } from '@wildshard/wire/netCommand';
 import { NET_BUTTONS } from '../input/netButtons';
 import { bitsToFloat, BitReader, floatToBits, NetDecodeError, type BitWriter } from './bits';
 import { MSG_CMDS } from './messages';

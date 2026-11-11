@@ -1,4 +1,4 @@
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NET_BUTTONS } from '../input/netButtons';
 import { localWalkingMove } from '../player/walk';
 import type { SimCommand } from '../../../server/engine/sim';

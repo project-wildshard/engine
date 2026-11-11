@@ -1,4 +1,4 @@
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../../src/client/engine/net/client';
 import { NetPlayer } from '../../../src/client/engine/net/netPlayer';
 import { NetRoom } from '../../../src/server/engine/net/room';

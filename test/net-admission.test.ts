@@ -5,7 +5,7 @@ import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
 import { decodeCommands, encodeCommands, MAX_BUNDLE, seqAfter } from '../src/shared/engine/net/command';
 import { CommandQueue, COMMAND_HEADROOM, MAX_QUEUED_COMMANDS, STALL_TICKS } from '../src/server/engine/net/commandQueue';
 import { localWalkingMove } from '../src/shared/engine/player/walk';
-import { NetActSchema, NetCommandSchema, type NetCommand } from '@wildshard/format/netCommand';
+import { NetActSchema, NetCommandSchema, type NetCommand } from '@wildshard/wire/netCommand';
 import { netPlayerCommand, netTickCommands } from '../src/shared/host/standalone/netInput';
 import { TickCommandSchema, tickCommands } from '../src/shared/host/tickProtocol';
 

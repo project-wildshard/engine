@@ -1,26 +1,32 @@
-import { ENCOUNTER_STATES, type EncounterNetView } from '../sim/encounterRows';
-import { netSchema, type NetSchema } from './schema';
+import type { EncounterNetView } from '../sim/encounterRows';
+import { ENCOUNTER, ENCOUNTER_STATES } from '@wildshard/wire/classes';
+import { bindClass, type NetSchema } from './schema';
 
 // P1-E3.4 (E5-REPLICATION §3.2): what a boss bar or an elite bar shows. No position: a bar is shown anywhere in the cell.
-const metres = { kind: 'f32q', min: -260, max: 260, bits: 16 } as const;
+/** A state the wire declares for a bar. */
+type EncounterState = (typeof ENCOUNTER_STATES)[number];
+const DECLARED: ReadonlySet<string> = new Set(ENCOUNTER_STATES);
+const isDeclared = (state: string): state is EncounterState => DECLARED.has(state);
+/** A brain's state as the wire carries it; an undeclared one throws, as the v0 column always has. */
+function declaredState(state: string): EncounterState {
+  if (!isDeclared(state)) throw new RangeError(`Undeclared state value ${state}`);
+  return state;
+}
 /** The `encounter` class. */
-export const ENCOUNTER_NET: NetSchema<EncounterNetView> = netSchema<EncounterNetView>({
-  cls: 'encounter',
-  fields: {
-    state: { kind: 'enum', values: ENCOUNTER_STATES, read: view => view.state },
-    hp: { kind: 'f32q', min: 0, max: 1, bits: 10, read: view => Math.max(0, Math.min(1, view.hp)) },
-    phase: { kind: 'u8', read: view => view.phase },
-    shield: { kind: 'bool', read: view => view.shield },
-    body: { kind: 'ref', read: view => view.body },
-    skip: { kind: 'f32q', min: 0, max: 1, bits: 6, read: view => view.skip },
-    banners: { kind: 'u8', read: view => view.banners % 256 },
-    signatures: { kind: 'u8', read: view => view.signatures % 256 },
-    known: { kind: 'bool', read: view => view.known },
-    sleep: { kind: 'f32q', min: 0, max: 1, bits: 8, read: view => view.sleep },
-    rewarded: { kind: 'bool', read: view => view.reward !== null },
-    rewardX: { ...metres, read: view => view.reward?.x ?? 0 },
-    rewardY: { ...metres, read: view => view.reward?.y ?? 0 },
-    rewardZ: { ...metres, read: view => view.reward?.z ?? 0 },
-    kind: { kind: 'text', send: 'initial', read: view => view.kind },
-  },
+export const ENCOUNTER_NET: NetSchema<EncounterNetView> = bindClass<EncounterNetView, typeof ENCOUNTER>(ENCOUNTER, {
+  state: view => declaredState(view.state),
+  hp: view => Math.max(0, Math.min(1, view.hp)),
+  phase: view => view.phase,
+  shield: view => view.shield,
+  body: view => view.body,
+  skip: view => view.skip,
+  banners: view => view.banners % 256,
+  signatures: view => view.signatures % 256,
+  known: view => view.known,
+  sleep: view => view.sleep,
+  rewarded: view => view.reward !== null,
+  rewardX: view => view.reward?.x ?? 0,
+  rewardY: view => view.reward?.y ?? 0,
+  rewardZ: view => view.reward?.z ?? 0,
+  kind: view => view.kind,
 });

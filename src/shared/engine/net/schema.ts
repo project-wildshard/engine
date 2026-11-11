@@ -1,6 +1,8 @@
 // P1-E5.2 (J4, E5-REPLICATION §3): entity state declares what replicates. Declarations are plain data tables with
 // accessors, as Source's SendTables and Unreal's replicated properties are lists; a field no table names stays on the
 // server. Each table compiles once into columns; encode and decode are plain loops over those columns.
+import type { ClassBindings, WireClass } from '@wildshard/wire/grammar';
+import { v0Field } from '@wildshard/wire/v0Field';
 import { fnv1a32 } from '../core/rng';
 import { bitsToFloat, floatToBits } from './bits';
 
@@ -26,12 +28,29 @@ export type NetField<S> = NetFieldBase & (
 /** One entity class's declaration. */
 export interface NetSchema<S> {
   readonly cls: string;
+  /** The class's stable id in `@wildshard/wire`'s lock (WIRE-STABILITY 5.2); absent for a test-only table. */
+  readonly stableId?: number;
   readonly fields: Readonly<Record<string, NetField<S>>>;
   /** Replicated only within this many metres of the receiver's player; absent means everywhere in the cell. */
   readonly relevance?: { readonly radius: number };
 }
 /** Declare a class. Typed as a function so a table's accessors infer `S`. */
 export function netSchema<S>(schema: NetSchema<S>): NetSchema<S> { return schema; }
+/**
+ * Bind engine accessors to a class `@wildshard/wire` declares (WIRE-STABILITY WR2): the descriptor owns every field's id,
+ * form, audience and order, engine owns only how a view reads it. One accessor per declared field, so a descriptor field
+ * with no binding, or a binding with no field, fails the typecheck. The v0 wire still runs until WR5, from these forms.
+ */
+export function bindClass<S, D extends WireClass>(descriptor: D, read: ClassBindings<D, S>): NetSchema<S> {
+  const accessors: Readonly<Record<string, (view: S) => unknown>> = read;
+  const fields: Record<string, NetField<S>> = {};
+  for (const field of descriptor.fields) {
+    const accessor = accessors[field.name];
+    if (accessor === undefined) throw new RangeError(`${descriptor.name}.${field.name} has no binding`);
+    fields[field.name] = { ...v0Field(field), read: accessor } as NetField<S>; // ClassBindings typed each accessor to its node
+  }
+  return { cls: descriptor.name, stableId: descriptor.id, fields, ...(descriptor.relevance === undefined ? {} : { relevance: { radius: descriptor.relevance } }) };
+}
 
 /** Maps stable string ids to the receiver's net handles for `ref` fields (§3.4). */
 export type NetRefs = (id: string) => number;
@@ -43,7 +62,10 @@ export interface NetColumn<S> {
 }
 /** A compiled class: its fields split by audience. A row holds one quantised value per `row` column. */
 export interface NetClass<S> {
+  /** The class number the v0 wire carries in a spawn: its index in `NET_CLASSES` until WR5 moves the wire to stable ids. */
   readonly id: number; readonly cls: string;
+  /** The class's stable `@wildshard/wire` id, or null for a test-only table. */
+  readonly stableId: number | null;
   /** Delta rows for everyone: `all` and `others` fields. */
   readonly row: readonly NetColumn<S>[];
   /** The owner block, written whole every frame: `all`, `owner` and `predicted` fields. */
@@ -117,7 +139,7 @@ export function compileSchema<S>(schema: NetSchema<S>, id: number): NetClass<S> 
   if (row.length > MAX_ROW_FIELDS) throw new RangeError(`${schema.cls} declares more than ${String(MAX_ROW_FIELDS)} row fields`);
   const at = (name: string): number => row.findIndex(entry => entry.name === name);
   const x = at('x'), y = at('y'), z = at('z');
-  return { id, cls: schema.cls, row, owner, initial, text, radius: schema.relevance?.radius ?? null, position: x < 0 || y < 0 || z < 0 ? null : [x, y, z] };
+  return { id, cls: schema.cls, stableId: schema.stableId ?? null, row, owner, initial, text, radius: schema.relevance?.radius ?? null, position: x < 0 || y < 0 || z < 0 ? null : [x, y, z] };
 }
 
 /** The canonical text of a declaration: class, field names, kinds, bounds and order. */

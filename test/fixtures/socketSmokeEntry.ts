@@ -3,7 +3,7 @@ import '@wildshard/engine/core/portableMathFirst';
 import { readFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { WebSocketServer } from 'ws';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../src/client/engine/net/client';
 import { Redial } from '../../src/client/engine/net/redial';
 import { WebSocketTransport } from '../../src/client/engine/net/webSocketTransport';

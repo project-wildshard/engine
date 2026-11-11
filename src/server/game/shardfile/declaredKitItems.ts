@@ -3,7 +3,7 @@
 // HOST_PROBE and the lantern never lit. Each player now holds their own runtimes here, fed by their wire: a press with its
 // aim, a held heavy, an equip by slot and a lantern scene. What the lantern burns reaches its owner as owned lines.
 import { Vector3 } from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import { ItemRuntime, type ItemHook, type ItemState, type ItemTarget } from '@wildshard/engine/combat/items';

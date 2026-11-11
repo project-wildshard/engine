@@ -1,4 +1,4 @@
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { STORY_ACT, type NetTickAct } from '@wildshard/engine/net/acts';
 import type { NetTickInput } from '@wildshard/engine/net/room';
 import { actRoutes, lockValue, type ActRoutes } from '@wildshard/engine/sim/actRoutes';
