@@ -1,0 +1,34 @@
+// The game's pages on Cloudflare Workers static assets (meta OFF-VERCEL-PLAN OV1, J272): three Workers, one config.
+// Production is the top level (`--env ''`, said out loud), `--env staging` and `--env preview` are the other two.
+// Each has its own versions and domain, so preview's hourly deploys never touch production.
+// No custom domains yet: OV6 to OV8 attach them.
+{
+  "name": "wildshard-play",
+  "main": "worker.ts",
+  "compatibility_date": "2026-11-01",
+  // No <name>.workers.dev address; version URLs stay on (noindex comes from OV2's _headers).
+  "workers_dev": false,
+  "preview_urls": true,
+  "assets": {
+    // The built page (`pnpm build:game` writes dist/), relative to this file.
+    "directory": "../dist",
+    "binding": "ASSETS",
+    // A missing chunk must 404, never return HTML: previousDeploy.mjs treats text/html as gone.
+    "not_found_handling": "none",
+    // Only the page itself runs worker.ts (the ?doctor 302 and no-store); everything else is a free asset request.
+    "run_worker_first": ["/", "/index.html"]
+  },
+  "observability": { "enabled": true },
+  "env": {
+    "staging": {
+      "name": "wildshard-play-staging",
+      "workers_dev": false,
+      "preview_urls": true
+    },
+    "preview": {
+      "name": "wildshard-play-preview",
+      "workers_dev": false,
+      "preview_urls": true
+    }
+  }
+}

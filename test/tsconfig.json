@@ -562,6 +562,7 @@
     "../scripts/app-build/controlChunks.ts",
     "../scripts/pin-packs.ts",
     "../scripts/pin-assets.ts",
-    "../scripts/engine-ci-plan.ts"
+    "../scripts/engine-ci-plan.ts",
+    "../pages/worker.ts"
   ]
 }
