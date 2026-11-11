@@ -16,17 +16,17 @@ test('the gate, both sides: a grid page joins the world only once the world host
   expect([earlyStandalone(WORLD), earlyStandalone(undefined)]).toEqual([false, true]);
 });
 
-test('a world hosts the grid when its /health table names more than the home cell', () => {
-  expect(hostsGrid({ cells: 1, table: { 'driftwood-isle': 0 } }), 'WORLD_CELLS unset: Driftwood alone').toBe(false);
-  expect(hostsGrid({ cells: 2, table: { 'driftwood-isle': 1, 'nalati-grasslands': 0 } })).toBe(true);
-  expect([hostsGrid({ cells: 1 }), hostsGrid(null), hostsGrid('nope'), hostsGrid({ table: null })], 'a server from before GO3, or nonsense').toEqual([false, false, false, false]);
+test('a world hosts the grid when the door\'s world word counts more than the home cell', () => {
+  expect(hostsGrid({ cells: 1 }), 'WORLD_CELLS unset: Driftwood alone').toBe(false);
+  expect(hostsGrid({ cells: 25 }), 'WORLD_CELLS=grid').toBe(true);
+  expect([hostsGrid({ cells: '2' }), hostsGrid(null), hostsGrid('nope'), hostsGrid({ table: { a: 0, b: 1 } })], 'nonsense, or a /health answer').toEqual([false, false, false, false]);
 });
 
 test('an online build\'s grid page never calls bootStandalone once the world hosts the grid: the worker client asks the route', () => {
   const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
   const gate = source.split('\n').find(line => line.includes('const shell = await ('));
   expect(gate).toMatch(/serverRoute\(world, page, \{ page: ports\.grid !== null, hosted \}\) === 'online' \? online\(world, page\) : standalone\(\)/u);
-  expect(source, 'whether the world hosts the grid is asked of its /health').toMatch(/worldHostsGrid\(world, hostsGrid\)/u);
+  expect(source, 'whether the world hosts the grid is asked of the door').toMatch(/worldHostsGrid\(world, hostsGrid\)/u);
   expect(source).toMatch(/if \(!earlyStandalone\(/u);
   expect(source.match(/bootStandalone\(/gu), 'one definition, the early boot and the route\'s standalone branch').toHaveLength(3);
 });

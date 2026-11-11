@@ -178,7 +178,9 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
   const servers: Server[] = [];
   const asked = async (cells: readonly string[]): Promise<boolean> => {
     const room = await roomBench({ cells, workers: 2 });
-    room.server.on('request', (_request, response) => { response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify(room.world.health())); });
+    // The rooms address as D7 has it (MS5.1): Caddy passes only the socket upgrade, so `/health` and everything else is a 404 with no
+    // CORS. A gate that reads `/health` answers no here, and the grid page stays one-shard.
+    room.server.on('request', (_request, response) => { response.writeHead(404).end(); });
     const { text, publicKey } = signedFile({ ...RELEASE, socket: room.url }), origin = createServer((_request, response) => { response.end(text); });
     servers.push(origin);
     await new Promise<void>(resolve => { origin.listen(0, '127.0.0.1', resolve); });
@@ -198,6 +200,6 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
     const { text, publicKey } = signedFile({ ...RELEASE, socket: `ws://127.0.0.1:${String((stalled.address() as AddressInfo).port)}/` }), origin = createServer((_request, response) => { response.end(text); });
     servers.push(origin);
     await new Promise<void>(resolve => { origin.listen(0, '127.0.0.1', resolve); });
-    expect(await worldHostsGrid({ release: `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}/release.json`, key: publicKey }, hostsGrid, 500), 'a stalled /health: solo').toBe(false);
+    expect(await worldHostsGrid({ release: `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}/release.json`, key: publicKey }, hostsGrid, 500), 'a socket that never opens: solo').toBe(false);
   } finally { for (const server of servers) { server.closeAllConnections(); server.close(); } }
 });

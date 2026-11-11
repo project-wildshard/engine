@@ -17,6 +17,7 @@ import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
 import { askName } from './nameBox';
+import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { fetchSignedRelease } from './release';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
@@ -197,18 +198,47 @@ export function gotoSocket(socket: string, cell: string | undefined): string {
   return url.href;
 }
 
-/** GO4 gate: whether the world this build names hosts the grid, read from its `/health` (the release names the address). Any failure
- *  answers false, and the grid page keeps today's solo grid. */
-export async function worldHostsGrid(config: { readonly release: string; readonly key: string }, hosts: (health: unknown) => boolean, waitMs = 3000): Promise<boolean> {
-  // One deadline over both reads: a stalled release file must not hold the page either.
+/** GO4 gate: whether the world this build names hosts the grid. The release names the address; a socket there hears the door's first
+ *  word (`world`, its cell count) and closes before any hello, so no seat is taken. Not `/health`: D7 keeps that off the rooms address
+ *  (a 404 with no CORS), and only loopback answers it. Any failure answers false, and the grid page keeps today's solo grid. */
+export async function worldHostsGrid(config: { readonly release: string; readonly key: string }, hosts: (world: unknown) => boolean, waitMs = 3000): Promise<boolean> {
+  // The title, a `?chunk=` page and the grid page each ask within seconds, and every socket counts against the door's 10 a minute
+  // per address: a tab keeps a yes for a minute. A no is asked again, since a stall or a blip answers no as well.
+  if (keptYes(config.release)) return true;
+  const answer = await askWorld(config, hosts, waitMs);
+  if (answer) keepYes(config.release);
+  return answer;
+}
+const GATE_KEEP_MS = 60_000;
+/** The tab's kept yes (a session save), made on first use so a page that never asks defines nothing. */
+const gateSlot = (): ReturnType<typeof jsonSlot> => jsonSlot('gridGate', 'session');
+function keptYes(release: string): boolean {
+  try {
+    const kept = gateSlot().read();
+    return typeof kept === 'object' && kept !== null && !Array.isArray(kept) && kept['release'] === release && typeof kept['at'] === 'number' && Math.abs(Date.now() - kept['at']) < GATE_KEEP_MS;
+  } catch { return false; }
+}
+function keepYes(release: string): void {
+  try { gateSlot().write({ release, at: Date.now() }); } catch { /* a page that can keep nothing asks again */ }
+}
+async function askWorld(config: { readonly release: string; readonly key: string }, hosts: (world: unknown) => boolean, waitMs: number): Promise<boolean> {
+  // One deadline over the release file and the socket: a stall in either must not hold the page.
   const scope = new Scope('online.grid-gate'), late = new Promise<false>(resolve => { scope.timeout(waitMs, () => { resolve(false); }); });
+  const asked: { transport?: WebSocketTransport } = {};
   const read = (async (): Promise<boolean> => {
     const { socket } = await fetchSignedRelease(config.release, config.key);
-    if (socket === undefined) return false;
-    const answer = await fetch(new URL('/health', socket.replace(/^ws/u, 'http')), { cache: 'no-store', signal: AbortSignal.timeout(waitMs) });
-    return answer.ok && hosts(await answer.json() as unknown);
+    if (socket === undefined || scope.disposed) return false;
+    const transport = new WebSocketTransport(socket);
+    asked.transport = transport;
+    return new Promise<boolean>(resolve => {
+      transport.onClose(() => { resolve(false); });
+      transport.onControl((control, bytes) => {
+        if (control !== 'world') return;
+        try { resolve(hosts(JSON.parse(new TextDecoder().decode(bytes)) as unknown)); } catch { resolve(false); }
+      });
+    });
   })().catch(() => false);
-  try { return await Promise.race([read, late]); } finally { scope.dispose(); }
+  try { return await Promise.race([read, late]); } finally { scope.dispose(); asked.transport?.close(); }
 }
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */

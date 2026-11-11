@@ -41,22 +41,24 @@ export async function intoWorld(page) {
 }
 
 /** `pgBin` 'memory:' keeps the saves in the server's memory, for a proof that never reads them back (voice-proof.mjs): no Postgres.
- * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin: string, pgData: string, shard?: string, seats?: number }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgData, shard = 'driftwood-isle', seats }) {
+ * `more` are other shards the release names, `cells` the server's `WORLD_CELLS` (default `shard`), and `socket` the address the
+ * release names when a proof puts its own front door before the server (grid-gate-proof.mjs).
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin: string, pgData: string, shard?: string, seats?: number, more?: string[], cells?: string, socket?: string }} options */
+export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgData, shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/` }) {
   const memory = pgBin === 'memory:';
   const key = JSON.parse(readFileSync(keyFile, 'utf8')), build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
   mkdirSync(work, { recursive: true });
-  const folder = run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${shard}'))`], 'the product read').trim();
+  const slugs = [shard, ...more], books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
   const origin = join(work, 'origin'), server = join(work, 'server');
   rmSync(join(work, 'packs'), { recursive: true, force: true });
-  run(['scripts/server-origin.mjs', origin, build, `${shard}=${folder}`], 'the server book');
-  if (nextBuild !== '') run(['scripts/server-origin.mjs', origin, nextBuild, `${shard}=${folder}`], 'the next server book');
+  run(['scripts/server-origin.mjs', origin, build, ...books], 'the server book');
+  if (nextBuild !== '') run(['scripts/server-origin.mjs', origin, nextBuild, ...books], 'the next server book');
   run(['scripts/build-server.mjs', '--build', build, '--out', server], 'the server build');
 
   let signed = '';
   /** @param {number} serial @param {string} engineBuild */
   const publish = (serial, engineBuild) => {
-    const body = JSON.stringify({ channel: 'production', serial, engineBuild, saveEpoch: 1, shards: [{ slug: shard, revision: 1 }], socket: `ws://127.0.0.1:${String(WORLD_PORT)}/` });
+    const body = JSON.stringify({ channel: 'production', serial, engineBuild, saveEpoch: 1, shards: slugs.map(slug => ({ slug, revision: 1 })), socket });
     signed = JSON.stringify({ body, signature: sign(null, Buffer.from(body), key.private).toString('hex') });
   };
   publish(1, build);
@@ -73,7 +75,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgDat
 
   const world = (running = build) => {
     const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(WORLD_PORT), ALLOWED_ORIGINS: `http://127.0.0.1:${String(PAGE_PORT)}`, WILDSHARD_BUILD: running, WORLD_CELLS: shard, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) } } });
+      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(WORLD_PORT), ALLOWED_ORIGINS: `http://127.0.0.1:${String(PAGE_PORT)}`, WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) } } });
     room.stdout.pipe(log, { end: false }); room.stderr.pipe(log, { end: false });
     return room;
   };

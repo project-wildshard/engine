@@ -15,7 +15,7 @@ import { cleanName } from '@wildshard/engine/net/chatFilter';
 import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { decodeFirstMessage } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
-import { encodeCountdown } from '@wildshard/engine/net/socketFrames';
+import { encodeCountdown, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
@@ -235,6 +235,9 @@ export class World {
     // QA row 16: a clean quit counts from the first byte, not only once seated (`pumpSocket`'s own). A quit that lands while the door
     // still admits this link (in the same read as its `ready`, or before a held body is handed back) ends it with no seat and no hold.
     end.onControl((control, bytes) => { if (control === 'ready' && new Uint8Array(bytes)[0] === LEAVE_FLAG) { this.quits.add(end); end.close(LEFT); } });
+    // GO4: the door's first word, before any hello: how many cells it hosts. D7 keeps `/health` private on the rooms address, and a
+    // grid page asks this on a socket of its own (`worldHostsGrid`). No build, serial or player data.
+    end.control('world', new TextEncoder().encode(JSON.stringify({ cells: this.links.size } satisfies WorldWord)).buffer);
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });

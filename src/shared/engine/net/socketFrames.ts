@@ -6,9 +6,12 @@ import type { NetChannel } from './transport';
 // `NET_SCHEMA_HASH` does not move.
 
 /** The prefix byte of every message on a game socket. */
-export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8;
+export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9;
 /** The messages outside the game protocol: the server's word on where to load, the client's that it has, and the server's that a new build is coming (J174). */
-export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice';
+export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world';
+/** GO4: the door's first word on every socket, before any hello: how many grid cells it hosts, and nothing else (D7 keeps `/health`
+ *  off the rooms address, so a page learns this here). A build from before it ignores the prefix. */
+export interface WorldWord { readonly cells: number }
 /** J218: a voice word is JSON in a few hundred bytes; an SDP travels in pieces of this many characters, under the room's 1024-byte cap. */
 export const VOICE_PIECE_CHARS = 400;
 /** The server sends no frame while this much is waiting (E7.1). Delta-against-ack heals, and the next frame is just bigger. */
@@ -39,7 +42,7 @@ export function closeReason(code: number): string {
 /** The prefix of a game message on `channel`. */
 export const channelPrefix = (channel: NetChannel): number => channel === 'reliable' ? SOCKET_RELIABLE : SOCKET_UNRELIABLE;
 /** The prefix of a control message. */
-export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : SOCKET_COUNTDOWN;
+export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : SOCKET_COUNTDOWN;
 /** J174: seconds until everyone moves, and the build they move to, which a client preloads. */
 export interface Countdown { readonly seconds: number; readonly build: string }
 /** A `countdown` word. */

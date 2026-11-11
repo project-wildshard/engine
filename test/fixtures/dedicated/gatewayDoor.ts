@@ -37,7 +37,9 @@ export async function gatewayDoor(options: Partial<WorldOptions> = {}) {
     socket.on('error', () => { arrivals.delete(device); resolve(false); });
     socket.on('close', code => { closes.push(code); arrivals.delete(device); resolve(false); });
     socket.once('open', () => { socket.send(framed(SOCKET_RELIABLE, helloMessage({ build: 'bench', player: device, name: 'Guest', ledger: 0 }).buffer)); });
-    socket.once('message', () => { socket.send(Buffer.from([5])); });
+    // The door's `world` word (GO4) comes first; `ready` answers its `resume`.
+    const ready = (data: Buffer): void => { if (data[0] !== 4) return; socket.off('message', ready); socket.send(Buffer.from([5])); };
+    socket.on('message', ready);
   });
   return { world, seats, closes, upgrade, admit, close: async (): Promise<void> => { for (const socket of sockets) socket.terminate(); world.dispose(); for (const seat of seats) seat.port.close(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); } };
 }

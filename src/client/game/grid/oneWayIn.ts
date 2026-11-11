@@ -17,7 +17,7 @@ export function shardCell(slug: string, assembly: GridAssembly = new GridAssembl
 export interface OneWayIn {
   /** the build is stamped with a world (play, staging) */
   readonly online: boolean;
-  /** the world's `/health` table names more than the home cell (GO4's gate) */
+  /** the door's `world` word counts more than the home cell (GO4's gate) */
   readonly hosted: boolean;
   /** the shard the URL names */
   readonly slug: string;
@@ -32,7 +32,7 @@ export function oneWayIn(page: OneWayIn, assembly?: GridAssembly): GridCell | nu
 }
 
 /** The online module's gate, as `clientWorker.ts` reads it; a page with no world never asks. */
-interface OnlineGate { readonly worldHostsGrid: (world: { readonly release: string; readonly key: string }, hosts: (health: unknown) => boolean) => Promise<boolean> }
+interface OnlineGate { readonly worldHostsGrid: (world: { readonly release: string; readonly key: string }, hosts: (world: unknown) => boolean) => Promise<boolean> }
 
 /** One deadline over the whole read, the online module's import included (GO4's 3 s). */
 const HOSTED_MS = 3000;
