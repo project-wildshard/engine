@@ -134,9 +134,9 @@ const STRIKE_WINDOW_MS=24*60*60*1000,QUARANTINE_MS=48*60*60*1000;
 /** The test files to strike when a packed ci run's every blocking failure is a test file, from its downloaded
  * `engine-ci-*` artifacts and the names of its failed jobs; null when any failure is something else (a static check,
  * a unit, a shard over its wall, a job with no report) or nothing names a file.
- * @param {string} directory @param {readonly string[]} failedJobs blocking failed job names, e.g. `tests (2)`
+ * @param {string} directory @param {readonly string[]} jobNames blocking failed job names, e.g. `tests (2)`
  * @returns {string[]|null} */
-export function flakyFiles(directory,failedJobs){
+export function flakyFiles(directory,jobNames){
  /** @type {Map<string,unknown>} */const reports=new Map();
  /** @param {string} at */
  const walk=at=>{
@@ -152,7 +152,7 @@ export function flakyFiles(directory,failedJobs){
  };
  walk(directory);
  /** @type {Set<string>} */const files=new Set();
- for(const name of failedJobs){
+ for(const name of jobNames){
   const job=/^tests \((\d+)\)(?: \([a-z_]+\))?$/u.exec(name)?.[1];
   if(job===undefined)return null;
   const report=reports.get(`job-${job}.json`);
@@ -386,7 +386,7 @@ class Landing{
   * file a strike and queue a quarantine for one with strikes from two plans in 24 h.
   * @param {string} sha @param {Awaited<ReturnType<Landing['waitCI']>>} verdict @returns {Promise<Awaited<ReturnType<Landing['waitCI']>>|null>} */
  async retryFlaky(sha,verdict){
-  const run=verdict.runs['ci'];
+  const run=verdict.runs.ci;
   if(run===undefined||run.conclusion!=='failure'||run.attempt>1)return null;
   const jobs=runFailures(this.repo,run.id);
   // A failure after the tests (the wall check after the artifact upload, a later step) is never a flaky file.
@@ -401,7 +401,7 @@ class Landing{
   if(files===null)return null;
   this.say('flaky',`ci run ${run.id} red only on test files ${files.join(', ')}; re-running its failed jobs once (TS10)`);
   const rerun=spawnSync('gh',['run','rerun',String(run.id),'-R',this.repo,'--failed'],{encoding:'utf8',timeout:60_000});
-  if(rerun.status!==0){this.say('flaky',`re-run refused (${`${rerun.stderr}`.trim().split('\n').at(-1)??''}); stopping as red`);return null;}
+  if(rerun.status!==0){this.say('flaky',`re-run refused (${rerun.stderr.trim().split('\n').at(-1)??''}); stopping as red`);return null;}
   // Wait for this run's own second attempt: never attempt one's stale verdict, never another run of the SHA.
   const deadline=Date.now()+this.options.timeoutMinutes*60_000;
   for(;;){

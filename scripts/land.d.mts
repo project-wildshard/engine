@@ -6,6 +6,6 @@ export function shaVerdict(data: unknown, sha: string): { state: 'pending' | 'gr
 export function failedJobs(data: unknown): { blocking: string[]; nonblocking: string[] };
 export function mainPushArgs(sha: string): string[];
 export function land(argv: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<number>;
-export function flakyFiles(directory: string, failedJobs: readonly string[]): string[] | null;
+export function flakyFiles(directory: string, jobNames: readonly string[]): string[] | null;
 export function strikePlans(book: string, file: string, now: number): string[];
 export function quarantineFile(path: string, file: string, owner: string, reason: string, now: number): boolean;
