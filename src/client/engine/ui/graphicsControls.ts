@@ -30,16 +30,18 @@ export interface GraphicsControl {
   readonly when?: () => boolean;
 }
 
-const registered = new Map<string, GraphicsControl>();
+/** by id; each registration is its own entry, so a stale disposer never removes a later registration of the same id */
+const registered = new Map<string, { readonly control: GraphicsControl }>();
 const listeners = new Set<() => void>();
 const changed = (): void => { for (const listener of listeners) listener(); };
 
 /** Add a control to Settings ▸ Graphics (or replace the one with the same id); returns the disposer. */
 export function registerGraphicsControl(control: GraphicsControl): () => void {
-  registered.set(control.id, control); changed();
-  return () => { if (registered.get(control.id) === control) { registered.delete(control.id); changed(); } };
+  const entry = { control };
+  registered.set(control.id, entry); changed();
+  return () => { if (registered.get(control.id) === entry) { registered.delete(control.id); changed(); } };
 }
 /** The registered controls (built-ins are merged in by the tab: settingsTabs.ts). */
-export function graphicsControls(): readonly GraphicsControl[] { return [...registered.values()]; }
+export function graphicsControls(): readonly GraphicsControl[] { return [...registered.values()].map((entry) => entry.control); }
 /** Hear registrations come and go; returns the unsubscribe. */
 export function onGraphicsControls(fn: () => void): () => void { listeners.add(fn); return () => { listeners.delete(fn); }; }

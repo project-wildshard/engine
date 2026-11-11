@@ -7,6 +7,7 @@ import { graphicsMode, lowPowerOn, lowPowerRefusal, saveGraphicsMode, PIXELS_EVE
 import { firstPlayDone, resetFirstPlay } from '../boot/firstPlayMark';
 import { pendingReload, saveSetting, savedSetting } from './Settings';
 import { reloadWithPicks } from './ReloadPrompt';
+import { withOwner } from '../../../shared/engine/app/ownership';
 import { GRAPHICS_SECTIONS, graphicsControls, onGraphicsControls, type GraphicsControl, type GraphicsSection } from './graphicsControls';
 /**
  * The in-game Settings (J245, Jake 2026-11-10: "Settings, let's do A, like the bag. The tabs at the top, 5 tabs. Developer mode
@@ -105,15 +106,20 @@ export function buildSettingsTabs(scope: Scope, opts: SettingsTabsOptions): Sett
 
   // ── GRAPHICS: the registry over the built-ins, built once each, re-laid when a registration comes or goes ──
   const builtins = builtinGraphics(scope, opts.applyPending);
-  const built = new Map<string, { control: GraphicsControl; row: HTMLElement }>();
+  // each control is built under its own child of the menu's scope (Codex review): replacing or unregistering one disposes
+  // its listeners with its row, and a late registration's subscriptions belong to the menu, not to whoever registered it
+  const built = new Map<string, { control: GraphicsControl; row: HTMLElement; owner: Scope }>();
   const layGraphics = (): void => {
     const merged = new Map<string, GraphicsControl>(builtins.controls.map((control) => [control.id, control]));
     for (const control of graphicsControls()) merged.set(control.id, control);
-    for (const [id, { control, row }] of built) if (merged.get(id) !== control) { row.remove(); built.delete(id); }
+    for (const [id, { control, row, owner }] of built) if (merged.get(id) !== control) { row.remove(); owner.dispose(); built.delete(id); }
     const order = [...merged.values()].sort((a, b) => GRAPHICS_SECTIONS.indexOf(a.section) - GRAPHICS_SECTIONS.indexOf(b.section) || a.order - b.order);
     for (const control of order) {
       let entry = built.get(control.id);
-      if (entry === undefined) { const row = control.build(scope); row.dataset['gfx'] = control.id; entry = { control, row }; built.set(control.id, entry); }
+      if (entry === undefined) {
+        const owner = scope.child(`gfx.${control.id}`), row = withOwner(owner, () => control.build(owner));
+        row.dataset['gfx'] = control.id; entry = { control, row, owner }; built.set(control.id, entry);
+      }
       groups.get(`graphics.${control.section}`)?.slot.append(entry.row);
     }
   };

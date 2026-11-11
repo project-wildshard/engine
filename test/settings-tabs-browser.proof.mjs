@@ -111,6 +111,14 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       assert.equal(await page.locator('.ws-gmenu-svgroup[data-sv-group="graphics.effects"] [data-gfx="proofShadows"]').count(), 1, `${kind}: under Effects`);
       assert.equal(await page.locator('[data-gfx="reload"]').isVisible(), false, `${kind}: a reopened menu shows no Reload now while nothing is pending`);
       await page.screenshot({ path: join(SHOTS, `${kind}-graphics-registered.png`) });
+      // a replacement swaps the row (one row, the new one); its disposer takes it away
+      const gone = await page.evaluate(() => {
+        const s = /** @type {any} */ (window).__settings;
+        const off = s.registerGraphicsControl({ id: 'proofShadows', section: 'effects', order: 10, build: () => { const b = document.createElement('button'); b.className = 'ws-gmenu-switch'; b.textContent = 'Shadows 2'; return b; } });
+        const rows = [...document.querySelectorAll('[data-gfx="proofShadows"]')].map(r => r.textContent);
+        off(); return { rows, after: document.querySelectorAll('[data-gfx="proofShadows"]').length };
+      });
+      assert.deepEqual(gone, { rows: ['Shadows 2'], after: 0 }, `${kind}: replace and unregister a graphics control`);
 
       // SOUND
       await open('sound');

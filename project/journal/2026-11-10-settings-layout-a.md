@@ -31,3 +31,9 @@ it. The commit lane's typecheck stamps the renderer revision from
 `git ls-tree HEAD`, so a commit that edits code and deletes a tracked
 `src/client` file stops with ENOENT. Worth a fix in the stamp: hash the
 index, not HEAD.
+
+Codex's review (J206) found the registry's lifecycle loose: a replaced or
+unregistered control kept its listeners, a late registration's
+subscriptions belonged to whoever registered it, and a stale disposer
+could drop a newer registration of the same id. Each control now builds
+under its own child of the menu's scope, disposed with its row.
