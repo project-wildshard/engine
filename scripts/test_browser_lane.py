@@ -27,14 +27,24 @@ class BrowserAdmissionTests(unittest.TestCase):
                     'SERVE_BUILD_DIR': str(self.root / 'builds'),
                     'SERVE_REG_DIR': str(self.root / 'servers'),
                     'BROWSER_LANES': '1', 'BROWSER_LANE_WAIT_SECONDS': '1'}
-        self.command('ps', "print('100 00:01 bash scripts/browser-lane.sh _slot 0 marker 60 fixture')\nprint('101 00:01 bash scripts/browser-lane.sh _slot 1 marker 60 fixture')\n")
-        self.command('pgrep', 'import sys\nsys.exit(1)\n')
-        self.command('xcrun', "print('{\"devices\":{}}')\n")
+        # The timed saturation case repeatedly inventories the same holders.
+        # Keep the exact responses without paying interpreter startup per scan.
+        self.shell_command('ps', r"""printf '%s\n' \
+    '100 00:01 bash scripts/browser-lane.sh _slot 0 marker 60 fixture' \
+    '101 00:01 bash scripts/browser-lane.sh _slot 1 marker 60 fixture'
+""")
+        self.shell_command('pgrep', 'exit 1\n')
+        self.shell_command('xcrun', "printf '%s\\n' '{\"devices\":{}}'\n")
         self.command('osascript', "raise RuntimeError('No app should be touched')\n")
 
     def command(self, name, code):
         path = self.bin / name
         path.write_text(f'#!{sys.executable}\n' + code)
+        path.chmod(0o755)
+
+    def shell_command(self, name, code):
+        path = self.bin / name
+        path.write_text('#!/bin/sh\n' + code)
         path.chmod(0o755)
 
     def lane(self, *args, **extra):
@@ -51,9 +61,7 @@ class BrowserAdmissionTests(unittest.TestCase):
     def portable_environment(self):
         # This fake reports no processes. Avoid starting Python for every
         # empty ps scan while four real kernel-lease supervisors are held.
-        empty_ps = self.bin / 'ps'
-        empty_ps.write_text('#!/bin/sh\nexit 0\n')
-        empty_ps.chmod(0o755)
+        self.shell_command('ps', 'exit 0\n')
         # Model a host without BSD lockf, while using real kernel flock locks.
         shell = self.root / 'bash-env'
         shell.write_text('''command() {
