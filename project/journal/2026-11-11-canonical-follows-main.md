@@ -40,3 +40,12 @@ hookless writer finishing inside those milliseconds could slip through.
 That residue is recorded in WORKTREE-LAND-STANDARD WL7 for a shared
 canonical writer lock. If the merge fails after HEAD moved, it says so
 loudly instead of quietly.
+
+2026-11-11, simplified (coordinator, on Jake asking whether the follow
+is over-engineered): the process check is gone. It skipped every land
+tonight, mostly for stale preview servers and idle terminals sitting in
+the folder. The follow now fast-forwards whenever the checkout is on
+main, clean and behind, with no git operation in progress; `merge
+--ff-only` itself refuses a dirty tree or diverged history. Anything
+else is one line saying why it was left alone. The last-look recheck
+went with it: the merge refuses on its own if HEAD moved.

@@ -17,12 +17,12 @@
 // (scripts/worktree-reap.mjs) removes landed, clean, idle worktrees with their branches, local and on origin.
 import {execFileSync,spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,realpathSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
-import {parseReapArgs,processDirectories,reap} from './worktree-reap.mjs';
+import {parseReapArgs,reap} from './worktree-reap.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REGULAR=/^100(?:644|755)$/u;
@@ -150,19 +150,13 @@ function cloneTrackedFiles(canonical,tree){
 /** Git states in which moving HEAD would break an operation someone is part way through. */
 const BUSY_GIT=['index.lock','MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','BISECT_LOG','rebase-merge','rebase-apply','sequencer'];
 
-/** This process and the shell that started it: `worktree new` runs from the canonical checkout, so its own shell sits
- * there. Nothing further up counts as ours: an agent whose session works in the canonical checkout still blocks the
- * follow (J206 review). @returns {Set<number>} */
-function selfAndShell(){
- return new Set([process.pid,process.ppid]);
-}
-
 /** Keep the canonical checkout on origin/main (Jake, 2026-11-10: "If the main checkout of the engine is stale, we
- * definitely need to get it up to date"). Only a fast-forward, and only when nobody can be mid-change there: it is on
- * main with no tracked edit, nothing staged and no commit origin/main lacks; no merge, rebase, am, cherry-pick,
- * revert, bisect or index lock is in progress; and no other process has its working directory in the checkout itself
- * (worktrees under .worktrees/ don't count; this command's own shell doesn't either). The merge never overwrites an
- * ignored or untracked file and never autostashes. Anything else is named and left alone, never reset.
+ * definitely need to get it up to date"). A plain fast-forward when it is on main, clean and behind: no tracked edit,
+ * nothing staged, no commit origin/main lacks, and no merge, rebase, am, cherry-pick, revert, bisect or index lock in
+ * progress. `git merge --ff-only` itself refuses a dirty tree or diverged history, never overwrites an ignored or
+ * untracked file and never autostashes. A terminal or dev server sitting in the folder doesn't stop it (coordinator,
+ * 2026-11-11: that check skipped every land, mostly for stale preview servers). Anything else is one line saying why
+ * it was left alone, never a reset.
  * @param {string} canonical @param {string} base origin/main @returns {string} what it did, for the step line */
 export function followMain(canonical,base){
  const branch=tryGit(canonical,['symbolic-ref','--quiet','HEAD']).stdout.trim();
@@ -175,17 +169,6 @@ export function followMain(canonical,base){
  if(git(canonical,['status','--porcelain','--untracked-files=no']).trim()!=='')return leave('tracked edits');
  const busy=BUSY_GIT.find(name=>existsSync(resolve(canonical,git(canonical,['rev-parse','--git-path',name]).trim())));
  if(busy!==undefined)return leave(`git ${busy} in progress`);
- const directories=processDirectories();
- if(directories===undefined)return leave('cannot list process working directories');
- const real=realpathSync(canonical),trees=join(real,WORKTREES),own=selfAndShell();
- const inside=[...directories].filter(([pid,path])=>!own.has(pid)&&(path===real||path.startsWith(`${real}/`))&&path!==trees&&!path.startsWith(`${trees}/`));
- if(inside.length>0)return leave(`pid ${inside.map(([pid])=>String(pid)).join(', ')} working in it`);
- // Last look, right before git takes the index: a canonical commit holds index.lock from before its pre-commit hook
- // until its index and HEAD are written, so one that started is seen here, and one that starts after this either
- // waits on the merge's lock or fails on it. Git has no lock covering the merge's own few milliseconds before it
- // locks the index; only a hookless writer could finish inside them (WORKTREE-LAND-STANDARD WL7).
- const late=BUSY_GIT.find(name=>existsSync(resolve(canonical,git(canonical,['rev-parse','--git-path',name]).trim())));
- if(late!==undefined||git(canonical,['rev-parse','HEAD']).trim()!==head)return leave(late===undefined?'HEAD moved during the check':`git ${late} started during the check`);
  const merged=tryGit(canonical,['merge','--ff-only','--no-autostash','--no-overwrite-ignore','--quiet',base]);
  if(merged.status!==0&&git(canonical,['rev-parse','HEAD']).trim()!==head)return `CANONICAL MAIN NEEDS A LOOK: the fast-forward failed after HEAD moved (${merged.stderr.trim().split('\n')[0]})`;
  return merged.status===0?`canonical main fast-forwarded ${behind} commit(s)`:leave(`fast-forward refused (${merged.stderr.trim().split('\n')[0]})`);
