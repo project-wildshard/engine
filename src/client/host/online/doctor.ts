@@ -189,7 +189,8 @@ const CLOSED: Readonly<Record<string, readonly [string, string]>> = {
 function checkJoin(config: DoctorConfig, learned: Learned, ms: number): Promise<Outcome> {
   const socket = learned.socket;
   if (socket === undefined || learned.release === undefined) return Promise.resolve(skip('needs the release file'));
-  // The door seats only the build it runs, so an accepted hello proves the server runs the build the hello named: the page's own.
+  // WR5 (5.5): an accepted hello proves the server speaks this page's wire within one minor, not that it runs this build;
+  // the build shown is the client's own.
   const build = config.build || learned.release.engineBuild, scope = learned.scope.child('doctor.join');
   return new Promise<Outcome>(resolve => {
     let ws: WebSocket, opened = false, sent = 0, deploy = '';
@@ -222,7 +223,7 @@ function checkJoin(config: DoctorConfig, learned: Learned, ms: number): Promise<
         let seat = '';
         try { seat = (JSON.parse(new TextDecoder().decode(event.data.slice(1))) as { shard?: string }).shard ?? ''; } catch { /* the seat's cell is a nicety */ }
         // Stay for the pings: the latency check reads them.
-        scope.timeout(Math.max(0, PINGS * PING_GAP_MS - 100), () => { done(pass(`accepted${seat === '' ? '' : ` · ${seat}`} · build ${short(build)}${deploy}`)); });
+        scope.timeout(Math.max(0, PINGS * PING_GAP_MS - 100), () => { done(pass(`accepted${seat === '' ? '' : ` · ${seat}`} · client build ${short(build)}${deploy}`)); });
       }
     });
     scope.listen(ws, 'close', event => {

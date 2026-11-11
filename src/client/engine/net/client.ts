@@ -95,6 +95,8 @@ export class NetClient {
   /** The server's layout, from its welcome's tables (5.3): frames and spawns project through it. */
   private server: WireFrameReader | null = null;
   private serverEvents: ((span: Span) => { readonly events: readonly NetEvent[] }) | null = null;
+  /** Every spawned handle's class by the server's class id, known to this build or not: frames decode by it (5.4). */
+  private readonly senderClasses = new Map<number, number>();
   private tableHash = -1;
   private readonly ids = new Map<string, number>();
   private unacked: NetCommand[] = [];
@@ -225,7 +227,7 @@ export class NetClient {
       const span = { bytes, start: record.start, end: record.end };
       if (record.tag === TAG_WELCOME) { bootMark('server:welcome-receive'); this.welcomed(span); }
       else if (record.tag === TAG_EVENTS) this.events(span);
-      else if (record.tag === TAG_FRAME) this.decoded(this.server?.read(bytes) ?? null, arrived);
+      else if (record.tag === TAG_FRAME) this.decoded(this.server?.read(span) ?? null, arrived);
       else this.dropped++;
     }
   }
@@ -235,10 +237,18 @@ export class NetClient {
     try { said = decodeWelcome(span); } catch { this.dropped++; return; }
     const { tables } = said;
     if (tables !== undefined) {
-      const server = new WireFrameReader(tables, handle => this.entities.get(handle)?.cls, PLAYER_CLASS);
-      this.server = server; this.tableHash = said.tableHash;
-      this.serverEvents = eventsReader(tables.eventTables, id => server.senderColumns(id));
-    } else if (said.tableHash !== this.tableHash) { this.dropped++; return; }
+      // Both readers or neither: a table this build can't project (one lacking a required field) is a server this build
+      // can't play, so it closes as `reload` and the page decides from version.json (5.5), never hanging unwelcomed.
+      let built: { readonly server: WireFrameReader; readonly events: (span: Span) => { readonly events: readonly NetEvent[] } };
+      try {
+        const server = new WireFrameReader(tables, handle => this.senderClasses.get(handle), PLAYER_CLASS);
+        built = { server, events: eventsReader(tables.eventTables, id => server.senderColumns(id)) };
+      } catch (error) {
+        if (!(error instanceof Error && error.name === 'WireDecodeError')) throw error;
+        this.dropped++; this.transport.close('reload'); return;
+      }
+      this.server = built.server; this.serverEvents = built.events; this.tableHash = said.tableHash;
+    } else if (said.tableHash !== this.tableHash) { this.dropped++; this.transport.close('reload'); return; }
     this.welcome = { handle: said.handle, player: said.player, tick: said.tick, cell: said.cell, schemaHash: said.tableHash, simHz: said.simHz, frameHz: said.frameHz };
     this.interpolator.own = said.handle;
   }
@@ -269,19 +279,23 @@ export class NetClient {
       if (event.kind === 'despawn') {
         const id = this.entities.get(event.handle)?.id;
         if (id !== undefined) this.ids.delete(id);
-        this.entities.delete(event.handle);
+        this.entities.delete(event.handle); this.senderClasses.delete(event.handle);
         continue;
       }
+      // The server's class id (game index + 1, 5.2), kept even for a class this build lacks so its rows still decode.
+      const senderId = event.cls + 1;
+      this.senderClasses.set(event.handle, senderId);
       const cls = netClassOf(event.cls);
       if (cls === undefined) continue;
-      const initial = decodeColumns(cls.initial, this.server?.initial(cls, event.initial) ?? event.initial);
-      cls.text.forEach((field, index) => { initial[field.name] = event.text[index] ?? ''; });
+      const initial = decodeColumns(cls.initial, this.server?.initial(senderId, event.initial) ?? event.initial);
+      const texts = this.server?.text(senderId, event.text) ?? event.text;
+      cls.text.forEach((field, index) => { initial[field.name] = texts[index] ?? ''; });
       this.entities.set(event.handle, { handle: event.handle, id: event.id, cls, initial });
       this.ids.set(event.id, event.handle);
     }
   }
   /** Everything it holds named the cell it left. Commands stand: the player's own stream goes on. */
-  private left(): void { this.welcome = null; this.latest = null; this.deathTick = -1; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entities.clear(); this.ids.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
+  private left(): void { this.welcome = null; this.latest = null; this.deathTick = -1; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entities.clear(); this.senderClasses.clear(); this.ids.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
   private receipt(event: NetLedger): void {
     if (event.serial <= this.ledgerSerial || this.granted.has(event.id)) return;
     this.ledgerSerial = event.serial; this.granted.add(event.id);
