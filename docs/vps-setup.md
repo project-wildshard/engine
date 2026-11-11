@@ -246,6 +246,12 @@ because the bucket-scoped object token cannot create/check a bucket.
 The blank default keeps dumps only on the VPS; it does not prove offsite
 backup. Do not enable a lifecycle rule shorter than the seven-day policy.
 
+`SENTRY_CRON_DSN` (J252) is the `wildshard-server` Sentry project's DSN.
+With it set, each dump checks in to the Sentry Crons monitor
+`wildshard-dump` on start and on finish (`ok` or `error`), and the
+agents' hourly read sees a failed or missed backup. All Sentry
+notifications for it are off; blank skips the check-in.
+
 During the VPS sitting Jake runs this in a subshell, so failure preserves
 his shell and does not print credentials:
 

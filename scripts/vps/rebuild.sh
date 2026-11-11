@@ -267,6 +267,8 @@ elif put_once "$ETC/ops.env" 600 root:root <<'EOF'
 # E7.8: the nightly dump and the uptime check. Both run with these blank: the dump stays on this disk, and a stopped server only logs.
 # Where a stopped server is told. Any URL taking a POSTed line, such as https://ntfy.sh/<a long random topic>
 ALERT_URL=
+# J252: the wildshard-server project's Sentry DSN, so the dump checks in to the Crons monitor wildshard-dump. Blank skips it.
+SENTRY_CRON_DSN=
 # The private bucket, for example r2:wildshard-backups. Blank keeps dumps local.
 BACKUP_REMOTE=
 RCLONE_CONFIG_R2_TYPE=s3
