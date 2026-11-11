@@ -9,7 +9,7 @@
 // Signed files come from each channel's RELEASE_URL, and from the ones the box keeps beside each bundle it has served.
 import { spawnSync } from 'node:child_process';
 import { createPublicKey, verify } from 'node:crypto';
-import { closeSync, constants, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, opendirSync, openSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Public SPKI DER, equal to setup.sh's EXPECTED_RELEASE_PUBLIC_KEY (the engine's test holds them equal). Never a signing key.
@@ -56,13 +56,23 @@ async function signedFiles() {
     if (url !== undefined && url.startsWith('https://')) {
       try {
         const answer = await fetch(url, { signal: AbortSignal.timeout(20_000), redirect: 'error' });
-        if (answer.ok) texts.push(await answer.text());
+        // A signed release file is a few hundred bytes; read at most 64 KiB of any answer.
+        const parts = [];
+        let size = 0;
+        if (answer.ok && answer.body !== null) {
+          for await (const part of answer.body) { size += part.length; if (size > 65_536) break; parts.push(part); }
+          if (size <= 65_536) texts.push(Buffer.concat(parts).toString('utf8'));
+        }
       } catch { say('warn', `${channel}'s signed release file did not answer`); }
     }
     // pull.mjs keeps each bundle's signed file beside it, so a tag that was live here before can be applied again.
     const bundles = `/var/lib/wildshard/${channel}/bundles`;
-    if (existsSync(bundles)) {
-      for (const name of readdirSync(bundles)) {
+    if (existsSync(bundles) && lstatSync(bundles).isDirectory()) {
+      const folder = opendirSync(bundles);
+      // At most 256 entries: the channel's user owns this folder and could fill it.
+      for (let count = 0, entry = folder.readSync(); entry !== null && count < 256; count += 1, entry = folder.readSync()) {
+        if (!entry.isDirectory()) continue;
+        const name = entry.name;
         // The channel's user owns these folders: never follow a link, never block on a FIFO, never read a big file.
         let fd;
         try {
@@ -71,6 +81,7 @@ async function signedFiles() {
           if (stat.isFile() && stat.size <= 65_536) texts.push(readFileSync(fd, 'utf8'));
         } catch { /* not a kept release */ } finally { if (fd !== undefined) closeSync(fd); }
       }
+      folder.closeSync();
     }
   }
   return texts;
@@ -79,13 +90,22 @@ async function signedFiles() {
 /** git as root with no user or system config, so nothing outside this call shapes what it fetches. @param {string[]} args */
 function git(args) {
   const run = spawnSync('/usr/bin/git', ['-c', 'transfer.fsckObjects=true', '-c', 'protocol.allow=never', '-c', 'protocol.https.allow=always', ...args],
-    { encoding: 'utf8', env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0', LANG: 'C.UTF-8' } });
+    { encoding: 'utf8', cwd: '/', env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0', LANG: 'C.UTF-8' } });
   if (run.status !== 0) stop(`git ${args[0] === '-C' ? args[2] : args[0]} failed: ${(run.stderr || '').trim().split('\n').pop() ?? ''}`);
   return run.stdout;
 }
 
 async function main() {
   const [tag, which, ...rest] = process.argv.slice(2);
+  // Nothing is found by way of the caller's folder: not a git repository, not a profile (Codex J206).
+  if (test === undefined) process.chdir('/');
+  // One apply at a time: a second waits for the first under flock, so neither deletes the folder the other runs from.
+  if (test === undefined && process.env.WILDSHARD_APPLY_LOCKED !== '1') {
+    mkdirSync(WORK, { recursive: true, mode: 0o700 });
+    const locked = spawnSync('/usr/bin/flock', [join(WORK, '.lock'), process.execPath, process.argv[1] ?? '', ...process.argv.slice(2)],
+      { stdio: 'inherit', env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.UTF-8', WILDSHARD_APPLY_LOCKED: '1' } });
+    process.exit(locked.status ?? 1);
+  }
   if (tag === undefined || which === undefined || rest.length > 0 || !(which in SCRIPTS)) stop('usage: wildshard-apply <tag> harden|setup|rebuild');
   if (!TAG.test(tag)) stop(`${tag} is not a release tag (vX.Y.Z or server-staging-<sha>)`);
   const key = test !== undefined ? process.env.WILDSHARD_APPLY_TEST_KEY ?? '' : RELEASE_PUBLIC_KEY;

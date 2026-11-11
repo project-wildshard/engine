@@ -121,7 +121,8 @@ if put /etc/audit/rules.d/90-wildshard.rules 640 root:root VH16 <<'EOF'
 -w /opt/wildshard-vps/ -p wa -k wildshard
 -w /usr/local/sbin/ -p wa -k wildshard
 EOF
-then augenrules --load >/dev/null 2>&1 || say warn VH16 'augenrules did not load the rules; auditd keeps its old ones until a restart'; fi
+then audit_changed=1; fi
+audit_changed=${audit_changed:-0}
 banner='Authorized access only. Every session and command on this system is logged and monitored.
 Disconnect now if you are not an authorized user.'
 for file in /etc/issue /etc/issue.net; do if put "$file" 644 root:root VH16 <<<"$banner"; then :; fi; done
@@ -175,14 +176,14 @@ if systemctl list-unit-files apport.service >/dev/null 2>&1 && [ "$(systemctl is
 fi
 
 # --- J266 (MS3.5): the agents' own account. No password, key only, its key from the Mac's ~/.ssh/wildshard_agent_ed25519.
-# Its home, key folder and key file are root's, so the account cannot add a key of its own. sudo and SSH sessions report to Sentry
+# sshd reads its key only from root's /etc/ssh/authorized_keys/wildshard-agent (a Match in VH3's file), never from its own
+# home, so the account cannot add a key of its own (Codex J206). sudo and SSH sessions report to Sentry
 # through the same PAM lines as raynos's (VH14). Off in one command: usermod --expiredate 1 wildshard-agent.
 AGENT=wildshard-agent
 if ! id "$AGENT" >/dev/null 2>&1; then useradd --create-home --shell /bin/bash "$AGENT"; say doing J266 "create $AGENT"; fi
 if [ "$(passwd -S "$AGENT" | awk '{print $2}')" != L ]; then passwd -l "$AGENT" >/dev/null; say doing J266 "$AGENT has no password"; fi
-# The home is root's too: an account that owned it could rename .ssh away and bring its own key.
-install -d -m 755 -o root -g root "/home/$AGENT" "/home/$AGENT/.ssh"
-if put "/home/$AGENT/.ssh/authorized_keys" 644 root:root J266 < "$HERE/wildshard-agent.pub"; then :; fi
+install -d -m 755 -o root -g root /etc/ssh/authorized_keys
+if put "/etc/ssh/authorized_keys/$AGENT" 644 root:root J266 < "$HERE/wildshard-agent.pub"; then :; fi
 if ! id -nG "$AGENT" | tr ' ' '\n' | grep -qx systemd-journal; then usermod -aG systemd-journal "$AGENT"; say doing J266 "$AGENT reads the journal by group"; fi
 
 # Shutting public SSH before the box is on the tailnet would lock everyone out of a fresh Rebuild, so VH3 and VH4 wait for it.
@@ -225,10 +226,18 @@ AllowTcpForwarding no
 AllowAgentForwarding no
 LogLevel VERBOSE
 MaxSessions 2
+# J266: the agents' account reads root's copy of its key, never a file in its own home. Last in this file on purpose.
+Match User wildshard-agent
+    AuthorizedKeysFile /etc/ssh/authorized_keys/wildshard-agent
 EOF
 then
   arm_deadman
   sshd -t; systemctl try-reload-or-restart ssh.service
+fi
+# What sshd will really do for each account: the agent's Match must reach it alone, and raynos must keep his own keys.
+sshd_keys() { sshd -T -C "user=$1,host=wildshard,addr=100.64.0.1" 2>/dev/null | awk 'tolower($1)=="authorizedkeysfile" {$1=""; sub(/^ /,""); print}'; }
+if [ "$(sshd_keys "$AGENT")" != /etc/ssh/authorized_keys/wildshard-agent ] || ! sshd_keys raynos | grep -q '\.ssh/authorized_keys'; then
+  say stop VH3 "sshd's key files are wrong (agent '$(sshd_keys "$AGENT")', raynos '$(sshd_keys raynos)'); the dead-man undoes the sshd file"; exit 1
 fi
 if ! [ -s /home/raynos/.ssh/authorized_keys ]; then say stop VH3 'raynos has no authorized_keys: refusing to turn Tailscale SSH off'; exit 1; fi
 if tailscale debug prefs 2>/dev/null | grep -q '"RunSSH": true'; then
@@ -251,8 +260,13 @@ sysctl -q -p /etc/sysctl.d/90-wildshard.conf
 OPT=/opt/wildshard-vps
 if [ "$HERE" != "$OPT" ] && ! diff -rq "$HERE" "$OPT" >/dev/null 2>&1; then
   rm -rf /opt/wildshard-vps.new; cp -R "$HERE" /opt/wildshard-vps.new; chown -R root:root /opt/wildshard-vps.new; chmod -R go-w /opt/wildshard-vps.new
-  rm -rf /opt/wildshard-vps; mv /opt/wildshard-vps.new /opt/wildshard-vps; say doing J266 "refresh $OPT from $HERE"
+  rm -rf /opt/wildshard-vps; mv /opt/wildshard-vps.new /opt/wildshard-vps; say doing J266 "refresh $OPT from $HERE"; audit_changed=1
 else say ok J266 "$OPT"; fi
+# The audit watches load after the folders they watch exist; a replaced /opt/wildshard-vps needs its watch again.
+if [ "$audit_changed" = 1 ]; then
+  if augenrules --load >/dev/null 2>&1 && auditctl -l 2>/dev/null | grep -q 'wildshard-vps'; then say ok VH16 'audit watches loaded'
+  else say warn VH16 'the audit watches did not load; auditd keeps its old ones until it restarts'; fi
+fi
 # The two helpers (MS3.5): settings without secrets, and a signed tag's scripts.
 for pair in wildshard-config:wildshard-config wildshard-apply.mjs:wildshard-apply; do
   if ! cmp -s "$HERE/${pair%%:*}" "/usr/local/sbin/${pair#*:}"; then
@@ -278,6 +292,8 @@ if put /usr/local/sbin/wildshard-lynis 755 root:root VH8 <<'EOF'
 #!/bin/bash
 # VPS-HARDENING VH16: `lynis audit system` as root, for the pre-open gate. No arguments; its report stays in /var/log.
 set -uo pipefail
+# From /, so lynis finds no profile or plugin in the caller's folder (Codex J206).
+cd / || exit 1
 lynis audit system --quiet --no-colors >/dev/null 2>&1
 grep -E '^(hardening_index|warning\[\]|suggestion\[\])=' /var/log/lynis-report.dat
 EOF
@@ -290,7 +306,7 @@ for unit in "${units[@]}"; do
 done
 # The operator stops the dead-man from a new session once it has proved it still gets in.
 rules="$rules, /usr/bin/systemctl stop wildshard-harden-deadman.timer, /usr/bin/systemctl start wildshard-dump, /usr/bin/systemctl restart caddy, /usr/bin/systemctl --no-pager status caddy"
-rules="$rules, /usr/local/sbin/wildshard-lynis, /usr/local/sbin/wildshard-harden --check, /usr/local/sbin/wildshard-harden --open-443, /usr/local/sbin/wildshard-harden --close-443"
+rules="$rules, /usr/local/sbin/wildshard-lynis \"\", /usr/local/sbin/wildshard-harden --check, /usr/local/sbin/wildshard-harden --open-443, /usr/local/sbin/wildshard-harden --close-443"
 # A dump path and the age key file are its arguments (sudo drops AGE_IDENTITY from the environment).
 rules="$rules, /usr/local/sbin/wildshard-restore-check"
 # MS8.3: the day Jake plays on the rooms address, the Funnel goes (D3).

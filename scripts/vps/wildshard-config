@@ -94,16 +94,18 @@ def healthy(channel):
     return False
 
 
-def restart(channel):
-    """Restart the server only if it runs: a channel still waiting for its first release keeps its health stub."""
-    unit = f'wildshard-server@{channel}.service'
+def running(channel):
     if TEST:
-        print(f'would   restart {unit}')
-        return True
-    if subprocess.run(['/usr/bin/systemctl', 'is-active', '--quiet', unit]).returncode != 0:
-        print(f'skip    {unit} is not running; the setting takes effect when it starts')
-        return True
+        return os.environ.get('WILDSHARD_CONFIG_TEST_RUNNING') == '1'
+    return subprocess.run(['/usr/bin/systemctl', 'is-active', '--quiet', f'wildshard-server@{channel}.service']).returncode == 0
+
+
+def restart(channel):
+    """Restart the server and wait for /health. Only called for a server that was running before the change."""
+    unit = f'wildshard-server@{channel}.service'
     print(f'doing   restart {unit}')
+    if TEST:
+        return os.environ.get('WILDSHARD_CONFIG_TEST_HEALTHY', '1') == '1'
     subprocess.run(['/usr/bin/systemctl', 'restart', unit])
     return healthy(channel)
 
@@ -160,14 +162,24 @@ def main(argv):
         stop(f'{key} must be {RULES[key]}')
     if channel == 'production' and not production:
         stop('a production change needs --production')
+    # One change at a time per channel: a second caller waits, so neither rolls back the other's change.
+    import fcntl
+    # 600, so VH12's world-readable check never sees it.
+    lock = os.fdopen(os.open(f'{ETC}/.{channel}.settings.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+    fcntl.flock(lock, fcntl.LOCK_EX)
     before = read_rows(settings_path)
     rows = list(before) or list(HEADER)
     rows = [row for row in rows if key_of(row) != key] + [f'{key}={value}']
     if rows == before:
         print(f'ok      {channel} {key} is already {value}')
         return 0
+    was_running = running(channel)
     write_rows(settings_path, rows, channel)
     print(f'doing   {channel} {key}={value}')
+    if not was_running:
+        # A channel still waiting for its first release keeps its health stub; the setting takes effect when it starts.
+        print(f'skip    wildshard-server@{channel} is not running; {key}={value} takes effect when it starts')
+        return 0
     if restart(channel):
         print(f'ok      {channel} is healthy with {key}={value}')
         return 0
@@ -177,7 +189,9 @@ def main(argv):
     else:
         os.unlink(settings_path)
     print(f'undo    {channel} was not healthy in two minutes; the old settings are back', file=sys.stderr)
-    restart(channel)
+    if not restart(channel):
+        print(f'stop    {channel} is not healthy on its old settings either: look at journalctl -u wildshard-server@{channel}', file=sys.stderr)
+        return 2
     return 1
 
 

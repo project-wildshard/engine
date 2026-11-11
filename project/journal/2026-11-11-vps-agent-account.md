@@ -11,3 +11,7 @@
   as pull.mjs checks it). Bootstrap still needs one root run of this
   harden.sh; after that the agent updates itself through wildshard-apply.
 - Folded in VH16's lynis floor at the coordinator's ask (443 gate needs 80).
+- Codex J206 round 1 NO-GO, folded: the agent's key now lives only in root's
+  `/etc/ssh/authorized_keys/wildshard-agent` (a Match, checked with `sshd -T -C`), the
+  config rollback restarts even a dead unit, root reads of channel-owned files are bounded,
+  and setup.sh had backticks inside unit heredocs that bash would have run as root.

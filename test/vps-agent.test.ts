@@ -29,7 +29,10 @@ function etc(): string {
   return root;
 }
 function config(root: string, ...args: string[]) {
-  const run = spawnSync('python3', [CONFIG, ...args], { encoding: 'utf8', env: { PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root } });
+  return configWith(root, {}, ...args);
+}
+function configWith(root: string, env: Readonly<Record<string, string>>, ...args: string[]) {
+  const run = spawnSync('python3', [CONFIG, ...args], { encoding: 'utf8', env: { PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_RUNNING: '1', ...env } });
   return { status: run.status, out: run.stdout + run.stderr };
 }
 const read = (root: string, name: string) => readFileSync(join(root, 'etc/wildshard', name), 'utf8');
@@ -63,7 +66,7 @@ test('wildshard-config writes one setting, keeps the others and never touches th
   const root = etc(), envBefore = read(root, 'staging.env');
   const first = config(root, 'set', 'staging', 'WORLD_WORKERS', '3');
   expect(first.status, first.out).toBe(0);
-  expect(first.out).toContain('would   restart wildshard-server@staging.service');
+  expect(first.out).toContain('doing   restart wildshard-server@staging.service');
   expect(config(root, 'set', 'staging', 'WORLD_CELLS', 'grid').status).toBe(0);
   expect(config(root, 'set', 'staging', 'WORLD_WORKERS', '4').status).toBe(0);
   const settings = read(root, 'staging.settings');
@@ -74,6 +77,20 @@ test('wildshard-config writes one setting, keeps the others and never touches th
   const shown = config(root, 'show', 'staging');
   expect(shown.out).toBe('WORLD_CELLS=grid\nWORLD_WORKERS=4\n');
   expect(shown.out).not.toContain('planted');
+});
+
+test('a change that leaves the server unhealthy is undone, and the old settings are started again', () => {
+  const root = etc();
+  expect(config(root, 'set', 'staging', 'WORLD_SEATS', '16').status).toBe(0);
+  const before = read(root, 'staging.settings');
+  const bad = configWith(root, { WILDSHARD_CONFIG_TEST_HEALTHY: '0' }, 'set', 'staging', 'WORLD_SEATS', '20');
+  expect(bad.status).toBe(2);
+  expect(bad.out.match(/doing {3}restart/gu)).toHaveLength(2);
+  expect(read(root, 'staging.settings')).toBe(before);
+  const idle = configWith(root, { WILDSHARD_CONFIG_TEST_RUNNING: '0' }, 'set', 'staging', 'WORLD_SEATS', '24');
+  expect(idle.status).toBe(0);
+  expect(idle.out).toContain('is not running');
+  expect(idle.out).not.toContain('restart');
 });
 
 test("setup.sh's split moves the settings out of the .env once, and leaves every secret there", () => {
@@ -150,6 +167,7 @@ test("the agent's allowlist is raynos's fixed commands, the two helpers and the 
   const { raynos, agent } = sudoers();
   const commands = (line: string) => line.replace(/^\S+ ALL=\(root\) NOPASSWD: /u, '').split(', ');
   const extra = commands(agent).filter(command => !commands(raynos).includes(command));
+  expect(commands(raynos)).toContain('/usr/local/sbin/wildshard-lynis ""');
   expect(extra).toEqual(['/usr/local/sbin/wildshard-config', '/usr/local/sbin/wildshard-apply', '/usr/bin/bash /opt/wildshard-vps/rebuild.sh', '/usr/bin/bash /opt/wildshard-vps/harden.sh']);
   expect(commands(raynos).every(command => commands(agent).includes(command))).toBe(true);
   for (const command of commands(agent)) {
@@ -171,8 +189,10 @@ test("the agent logs in by root's copy of its key only, and sshd lets in raynos 
   expect(drop.split('\n').filter(row => row.startsWith('AllowUsers'))).toEqual(['AllowUsers raynos wildshard-agent']);
   for (const want of ['PasswordAuthentication no', 'PermitRootLogin no', 'AllowTcpForwarding no', 'AllowAgentForwarding no', 'MaxSessions 2', 'LogLevel VERBOSE']) expect(drop).toContain(want);
   expect(harden).toContain('passwd -l "$AGENT"');
-  expect(harden).toContain('put "/home/$AGENT/.ssh/authorized_keys" 644 root:root J266 < "$HERE/wildshard-agent.pub"');
-  expect(harden).toContain('install -d -m 755 -o root -g root "/home/$AGENT" "/home/$AGENT/.ssh"');
+  expect(harden).toContain('put "/etc/ssh/authorized_keys/$AGENT" 644 root:root J266 < "$HERE/wildshard-agent.pub"');
+  // The Match is the file's last block, so nothing after it is scoped to the agent by accident.
+  expect(drop.trimEnd().split('\n').slice(-2)).toEqual(['Match User wildshard-agent', '    AuthorizedKeysFile /etc/ssh/authorized_keys/wildshard-agent']);
+  expect(harden).not.toMatch(/\/home\/\$AGENT/u);
   expect(harden).not.toMatch(/usermod[^\n]*\bsudo\b[^\n]*wildshard-agent|-aG sudo "\$AGENT"/u);
   const key = readFileSync('scripts/vps/wildshard-agent.pub', 'utf8').trim().split('\n');
   expect(key).toHaveLength(1);

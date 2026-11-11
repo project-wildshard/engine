@@ -91,8 +91,13 @@ if [ "$LISTENERS_OK" = 1 ] && wildcard_on 22; then info VH3 'sshd listens on eve
 
 # --- J266 (MS3.5): the agents' account. Key only, root's key file, the root-owned scripts its allowlist runs.
 if id wildshard-agent >/dev/null 2>&1; then
-  keys="$R/home/wildshard-agent/.ssh/authorized_keys"
-  if [ "$(stat -c '%U %a' "$keys" 2>/dev/null)" = 'root 644' ] && [ "$(stat -c '%U' "$R/home/wildshard-agent" "$R/home/wildshard-agent/.ssh" 2>/dev/null | sort -u)" = root ]; then ok J266 'wildshard-agent keys are root'"'"'s'; else bad J266 'wildshard-agent home, .ssh or authorized_keys is not root'"'"'s: the account could add a key'; fi
+  keys="$R/etc/ssh/authorized_keys/wildshard-agent"
+  if [ "$(stat -c '%U %a' "$keys" 2>/dev/null)" = 'root 644' ]; then ok J266 'wildshard-agent key is root'"'"'s copy'; else bad J266 'no root-owned /etc/ssh/authorized_keys/wildshard-agent'; fi
+  if [ "$ROOT" = 1 ] && has sshd; then
+    agent_keys=$(sshd -T -C user=wildshard-agent,host=wildshard,addr=100.64.0.1 2>/dev/null | awk 'tolower($1)=="authorizedkeysfile" {$1=""; sub(/^ /,""); print}')
+    if [ "$agent_keys" = /etc/ssh/authorized_keys/wildshard-agent ]; then ok J266 'sshd reads the agent'"'"'s key from root'"'"'s file alone'
+    else bad J266 "sshd reads the agent's keys from '${agent_keys}': it could add its own"; fi
+  fi
   if [ -d "$R/opt/wildshard-vps" ] && [ -z "$(find "$R/opt/wildshard-vps" \( ! -user root -o -perm /go=w \) 2>/dev/null | head -1)" ]; then ok J266 '/opt/wildshard-vps is root'"'"'s and nobody else writes it'
   else bad J266 '/opt/wildshard-vps is missing, or someone besides root can write it'; fi
   if [ "$ROOT" = 1 ]; then

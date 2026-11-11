@@ -264,7 +264,7 @@ Environment=PLAYTEST_DIR=$HOME_DIR/%i/logs
 Environment=TRUST_PROXY=caddy
 Environment="ALLOWED_ORIGINS=https://play.wildshard.io https://staging.wildshard.io https://preview.wildshard.io https://wildshard-singleplayer.vercel.app"
 EnvironmentFile=$ETC/%i.env
-# J266 (MS3.5): the non-secret settings, read after the secrets so they win; `wildshard-config set` writes them.
+# J266 (MS3.5): the non-secret settings, read after the secrets so they win; wildshard-config set writes them.
 EnvironmentFile=-$ETC/%i.settings
 # It exits 0 on a bad hash, so the old bundle comes back up (E7.2c).
 ExecStartPre=$NODE $LIB/pull.mjs
@@ -359,7 +359,7 @@ SupplementaryGroups=wildshard
 Environment=WILDSHARD_HOME=$HOME_DIR/%i
 Environment=RELEASE_CHANNEL=%i
 EnvironmentFile=$ETC/%i.env
-# J266 (MS3.5): the non-secret settings, read after the secrets so they win; `wildshard-config set` writes them.
+# J266 (MS3.5): the non-secret settings, read after the secrets so they win; wildshard-config set writes them.
 EnvironmentFile=-$ETC/%i.settings
 ExecCondition=/bin/sh -c '! systemctl is-active --quiet wildshard-server@%i.service'
 ExecStart=$NODE $LIB/pull.mjs --fetch
@@ -388,7 +388,7 @@ User=wildshard-%i
 Group=wildshard-%i
 SupplementaryGroups=wildshard
 EnvironmentFile=$ETC/%i.env
-# J266 (MS3.5): the non-secret settings, read after the secrets so they win; `wildshard-config set` writes them.
+# J266 (MS3.5): the non-secret settings, read after the secrets so they win; wildshard-config set writes them.
 EnvironmentFile=-$ETC/%i.settings
 ExecStart=$NODE $LIB/health-stub.mjs %i
 NoNewPrivileges=yes
