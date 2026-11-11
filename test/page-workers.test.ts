@@ -94,3 +94,17 @@ test('the page comes from the assets with no-store, /index.html as /', async () 
     expect(seen).toEqual(['/']);
   }
 });
+
+test('a missing file reaches the Worker but goes back to the assets untouched, ?doctor or not', async () => {
+  for (const path of ['/b/gone/main-x.js', '/b/gone/main-x.js?doctor', '/doctor']) {
+    const seen: string[] = [];
+    const env: Env = { ASSETS: { fetch: request => {
+      seen.push(new URL(request.url).pathname);
+      return Promise.resolve(new Response('', { status: 404 }));
+    } } };
+    const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), env);
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBeNull();
+    expect(seen).toEqual([new URL(path, 'https://x').pathname]);
+  }
+});

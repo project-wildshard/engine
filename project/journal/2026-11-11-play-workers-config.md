@@ -19,6 +19,10 @@ redirects and the page's `no-store`. It serves `/index.html` as `/`:
 Vercel answered it 200, while the assets' default HTML handling would
 307 it.
 
+A path with no asset reaches the Worker too (codex's review caught
+it), so anything but the page goes back to the assets untouched: a
+missing chunk 404s with no `no-store`, even with `?doctor`.
+
 `test/page-workers.test.ts` reads the config through wrangler's own
 reader, checks no name clashes with packs, voice-ice, api or www, runs
 `wrangler deploy --dry-run` for all three envs offline and drives the
