@@ -20,6 +20,8 @@ try {
     // The host brotli's a loose file itself; q5 is near enough for the report and costs no cache.
     wireBytes: (url, bytes) => servedAsIs(url, bytes) ? bytes.length : brotliCompressSync(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: 5 } }).length,
     warn: line => { console.warn(`warning: ${line}`); },
+    // J262: the worker computed its renderer fingerprint; this child may not run git.
+    ...(process.env.COOK_RENDERER === undefined || process.env.COOK_RENDERER === '' ? {} : { renderer: process.env.COOK_RENDERER }),
   });
   console.log(JSON.stringify(report));
   process.exit(0);

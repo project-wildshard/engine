@@ -65,10 +65,12 @@ void test('a prepared SDK-shaped product consumes hash-valued mounted fence rows
   const half = shardHalf(opened, (_url, bytes) => bytes.length);
   assert.ok(half.mountRows('phone', 'entry').some(row => row.url.startsWith('/assets/prep-proof.bin')));
 });
-void test('a coherent recording for a different renderer refuses before any part is written', async (): Promise<void> => {
-  const out = join(root, 'foreign-renderer');
-  await assert.rejects(cookShard(writeTar(modern('0'.repeat(64))), out, {wireBytes: (_url, bytes) => bytes.length, now: () => performance.now()}), /Stale renderer preparation.*wildshard prepare/u);
-  assert.equal(existsSync(out), false);
+void test('a coherent recording for a different renderer cooks as stale (J262)', async (): Promise<void> => {
+  const out = join(root, 'foreign-renderer'), warned: string[] = [];
+  const report = await cookShard(writeTar(modern('0'.repeat(64))), out, {wireBytes: (_url, bytes) => bytes.length, now: () => performance.now(), warn: line => { warned.push(line); }});
+  assert.equal(report.preparation, 'stale');
+  assert.ok(warned.includes('stale preparation: template'));
+  assert.equal(existsSync(out), true);
 });
 void test('a changed bound product refuses before any part is written', async (): Promise<void> => {
   const files = modern(), index = parseOutputIndex(json(files.get('shard.json'))), out = join(root, 'changed');

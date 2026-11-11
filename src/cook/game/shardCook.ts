@@ -38,9 +38,18 @@ export const servedAsIs = (url: string, bytes: Uint8Array): boolean => bytes.len
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const CONTENT_NAMED = /\/[a-f0-9]{64}\.[a-z0-9]+$/u;
 
+/** J262 (SP1a): which author preparation a cook goes by. `current`: recorded on this renderer fingerprint, the fast path.
+ *  `stale`: recorded on another one and used as it is (fence, fence policy, recorded programs): a stale list costs link
+ *  hitches after control, never a wrong frame, and nobody re-uploads. `none`: no author preparation (`sdk: '0.2'`), or a
+ *  capture-only open. A cook preparation made for this renderer (SP1b) is not built yet. */
+export type PreparationState = 'current' | 'stale' | 'none';
+/** The line every entry point prints for a cook that took the stale path, so `grep 'stale preparation'` finds them all. */
+export const stalePreparationLine = (slug: string): string => `stale preparation: ${slug}`;
+
 /** A shardfile opened from its tarball, every read checked against its index. */
 export interface OpenShardfile {
   readonly preparationOnly?: boolean;
+  readonly preparation: PreparationState;
   readonly slug: string;
   readonly index: OutputIndex;
   readonly source: Shardfile;
@@ -48,6 +57,14 @@ export interface OpenShardfile {
   readonly cook: CookData | undefined;
   readonly header: Uint8Array;
   readonly read: (path: string) => Uint8Array;
+}
+
+/** This engine's renderer fingerprint, once per process: hashing the client inputs costs a git listing. A host that can't
+ *  compute it (no checkout, no stamp) cooks anyway; it just can't call any preparation `current`. */
+let ownRenderer: string | null | undefined;
+function engineRenderer(): string | null {
+  if (ownRenderer === undefined) { try { ownRenderer = rendererRevision(); } catch { ownRenderer = null; } }
+  return ownRenderer;
 }
 
 function parsedCook(bytes: Uint8Array, slug: string): CookData {
@@ -74,13 +91,14 @@ export function openShardfile(tarball: Uint8Array, options: Readonly<{preparatio
     const bytes = files.get(mount.path);
     if (bytes === undefined || bytes.length !== mount.bytes || sha256(bytes) !== mount.hash) throw new Error(`Stale cook preparation mount ${mount.url}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
   }
+  let preparation: PreparationState = 'none';
   if (options.preparationOnly !== true) {
+    // Checked whole against its own stored renderer and inputs: corrupt or forged preparation still refuses here.
     requireCookPreparation(index, cook, sha256);
-    if (cook?.version === 3 && cook.renderer !== (options.renderer ?? rendererRevision())) {
-      throw new Error(`Stale renderer preparation for ${index.identity.slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
-    }
+    // J262: a renderer move no longer refuses. The cook goes by the author's lists and says so (SP1a).
+    if (cook?.version === 3) preparation = cook.renderer === (options.renderer ?? engineRenderer()) ? 'current' : 'stale';
   }
-  return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read, preparationOnly: options.preparationOnly === true};
+  return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read, preparationOnly: options.preparationOnly === true, preparation};
 }
 
 /** Each string's first place in the sections (`world/scenes:libraries.24.tiles.0.files.3.file`), in section order: a
@@ -264,6 +282,8 @@ export async function cookServerPack(rows: readonly {readonly path: string; read
 
 export interface CookReport {
   readonly slug: string;
+  /** J262: which author preparation this cook went by. */
+  readonly preparation: PreparationState;
   readonly seconds: number;
   readonly manifests: readonly {readonly url: string; readonly tier: CookTier; readonly set: CookSet; readonly files: number; readonly totalBytes: number; readonly wireBytes: number}[];
   readonly loose: readonly string[];
@@ -271,7 +291,14 @@ export interface CookReport {
   readonly server: {readonly url: string; readonly index: string; readonly wireBytes: number; readonly files: number};
 }
 
-export interface CookShardOptions {readonly wireBytes: WireBytes; readonly now: () => number; readonly encoder?: PartEncoder; readonly warn?: (line: string) => void}
+export interface CookShardOptions {
+  readonly wireBytes: WireBytes;
+  readonly now: () => number;
+  readonly encoder?: PartEncoder;
+  readonly warn?: (line: string) => void;
+  /** The renderer fingerprint to cook for; this engine's own unless a build names it. */
+  readonly renderer?: string;
+}
 
 /** `cook <shardfile> → <packs>`: the shard's half of every manifest, its parts, and its loose mounts at their URLs. */
 export async function cookShard(tarball: Uint8Array, out: string, options: CookShardOptions): Promise<CookReport> {
@@ -282,7 +309,9 @@ export async function cookShard(tarball: Uint8Array, out: string, options: CookS
 }
 
 async function cookWith(tarball: Uint8Array, out: string, options: CookShardOptions, encoder: PartEncoder): Promise<CookReport> {
-  const started = options.now(), half = shardHalf(openShardfile(tarball), options.wireBytes, options.warn);
+  const started = options.now(), shard = openShardfile(tarball, options.renderer === undefined ? {} : {renderer: options.renderer});
+  if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
+  const half = shardHalf(shard, options.wireBytes, options.warn);
   const before = encoder.stats();
   const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.productRows(tier, set), ...half.mountRows(tier, set)]})));
   const whole = table.filter(row => row.set === 'whole');
@@ -314,6 +343,6 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
     const file = join(out, 'shardfiles', half.shard.slug, path);
     mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.shard.read(path));
   }
-  return {slug: half.shard.slug, seconds: (options.now() - started) / 1000, manifests, loose: loose.map(row => row.url), server: {url: server.url, index: `/${serverIndex}`, wireBytes: [server, ...server.more ?? []].reduce((sum, part) => sum + part.wireBytes, 0), files: [server, ...server.more ?? []].reduce((sum, part) => sum + part.files.length, 0)},
+  return {slug: half.shard.slug, preparation: half.shard.preparation, seconds: (options.now() - started) / 1000, manifests, loose: loose.map(row => row.url), server: {url: server.url, index: `/${serverIndex}`, wireBytes: [server, ...server.more ?? []].reduce((sum, part) => sum + part.wireBytes, 0), files: [server, ...server.more ?? []].reduce((sum, part) => sum + part.files.length, 0)},
     parts: {count: after.parts - before.parts, rawBytes: after.rawBytes - before.rawBytes, wireBytes: after.wireBytes - before.wireBytes}};
 }

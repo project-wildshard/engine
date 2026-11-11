@@ -11,7 +11,7 @@ import {createHash} from 'node:crypto';
 import {readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnManifestAddress} from '../../shared/game/shardfile/spawnManifest';
 import {assetIdentities, audioTableRefs, bundlerSources as manifestSources, identityFiles, joinRefs, standInRefs, packMembers, readFenceReads, resolveFenceReads, sectionRefs, type PackPart} from './fenceReads';
 import {createPartEncoder, writeSpawnManifestFiles, writeSpawnParts, type CookedMember, type SpawnPartEncoding} from './spawnParts';
-import {cookParts, cookShardServerPack, openShardfile, servedAsIs, shardHalf} from './shardCook';
+import {cookParts, cookShardServerPack, openShardfile, servedAsIs, shardHalf, stalePreparationLine, type PreparationState} from './shardCook';
 import type {ServerPack} from '../../shared/game/shardfile/serverPack';
 import {contentNamed} from './contentNamed';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -176,6 +176,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     sources.set(row.url, () => bytes);
     return [row];
   });
+  const preparations: Partial<Record<PreparationState, string[]>> = {};
   for (const prefix of Object.keys(bank.products)) {
     const directory = prefix.split('/')[2]; if (directory === undefined || !/^[a-z0-9_-]+$/u.test(directory)) throw new Error('Invalid spawn shard');
     const product = join(root, 'out', directory), index = parseOutputIndex(JSON.parse(readFileSync(join(product, 'shard.json'), 'utf8')));
@@ -183,6 +184,9 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     // C1: the shard half comes from the shardfile alone, one tarball per product, and its parts from the shard's own cook.
     const half = shardHalf(openShardfile(productTarball(product), {preparationOnly: build.preparationOnly === true,
       ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision})}), wireBytes, undefined, directory), {sections} = half.shard;
+    // J262 (SP1a): a preparation from another renderer cooks as it is, and the build says which shards took that path.
+    (preparations[half.shard.preparation] ??= []).push(directory);
+    if (half.shard.preparation === 'stale') console.warn(stalePreparationLine(directory));
     const shardRows = {phone: {entry: half.productRows('phone', 'entry'), whole: half.productRows('phone', 'whole')},
       desktop: {entry: half.productRows('desktop', 'entry'), whole: half.productRows('desktop', 'whole')}};
     for (const [url, member] of await cookParts(output, half, [{tier: 'phone', rows: shardRows.phone.whole}, {tier: 'desktop', rows: shardRows.desktop.whole}], encoder)) cooked.set(url, member);
@@ -270,6 +274,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
       (packsGridAt[mode] ??= {})[directory] = {phone: write('phone', 'grid', homes[directory], mode, true), desktop: write('desktop', 'grid', homes[directory], mode, true)};
     }
   }
+  if (Object.keys(preparations).length > 0) console.info(`cook preparation: ${(['current', 'stale', 'none'] as const).map(state => `${preparations[state]?.length ?? 0} ${state}`).join(', ')}`);
   // DL5: every manifest is known, so pack their files into shared parts, then write each manifest with its own table.
   const packed = pending.flatMap((row, index) => row.packed ? [index] : []);
   const packedTables = await writeSpawnParts(output, packed.map(index => ({rows: pending[index]?.manifest.files ?? [], public: pending[index]?.public === true, desktop: pending[index]?.manifest.tier === 'desktop'})), url => {
