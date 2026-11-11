@@ -83,7 +83,14 @@ beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/ph
 // A released copy that is the bound one (the same pin, or a resolver that dedupes them) would make every test here green.
 beforeAll(() => {
   expect(classColumns, 'the released wire is its own copy, not the bound one').not.toBe(headColumns);
-  expect(createRequire(import.meta.url).resolve(`${RELEASED}/columns`), 'the released wire is shardfile 669d1fc').toContain('669d1fca');
+  const path = createRequire(import.meta.url).resolve(`${RELEASED}/columns`);
+  if (path.includes('/.pnpm/')) expect(path, 'the released wire is shardfile 669d1fc').toContain('669d1fca');
+  else {
+    // On the global store (GVS G9) the slot's folder is a content hash, so pnpm's record of this install names the commit.
+    expect(path, 'the released wire is a store slot of @wildshard/wire').toMatch(/\/links\/@wildshard\/wire\/[^/]+\/[0-9a-f]+\/node_modules\/@wildshard\/wire\//u);
+    expect(readFileSync('node_modules/.pnpm/lock.yaml', 'utf8'), 'the released wire is shardfile 669d1fc')
+      .toMatch(/^ {6}'@wildshard\/wire-released':\n {8}specifier: [^\n]*\n {8}version: '@wildshard\/wire@[^'\n]*\/669d1fca/mu);
+  }
 });
 
 async function sunscar(): Promise<TrustedHeadlessResident> {
