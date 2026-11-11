@@ -31,7 +31,7 @@ Run from the repo root.
   one per worktree under a build lease; `node scripts/e2e-client.mjs
   stop` frees it, and it idles out after 10 min). A one-line client edit
   is ready again in about 12 s. Each run's split is in
-  `tmp/e2e/receipt.json`. `pnpm test:e2e:offline` runs it with outbound
+  `tmp/e2e/receipt.json`. `bash scripts/e2e-offline.sh` runs it with outbound
   networking denied by macOS.
 - `pnpm lint:fix` / `pnpm format`: the hooks only check; these fix.
 - `node src/cli/main.ts --help`: the CLI without installing it. `serve [--port n]` starts the server (default 4402).
