@@ -307,7 +307,7 @@ export class World {
       end.onClose(off);end.control('playtest');
     }
     pumpSocket(end, port1);
-    this.voice.attach(end, slug, entry.name);
+    this.voice.attach(end, slug, entry.name, entry.body);
     this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
   }
   /** A held body whose player quit on the link that came back for it: the cell takes it as a seat whose link has already left. */

@@ -8,7 +8,7 @@ import { loadTrainingDummy } from '../practice/TrainingDummyAssets';
 import type { DummyJoint, DummyJoints } from '../practice/TrainingDummy';
 import { buildHoverboard } from '../render/hoverboardGeometry';
 import type { NetClient } from './client';
-import { voiceNear } from './voiceNear';
+import { talkerKey, voiceNear, type Talker } from './voiceNear';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp');
@@ -116,7 +116,10 @@ class OtherBody {
   /** Whether a row has put it anywhere yet. */
   placed = false;
   shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, talking: false };
-  constructor(name: string) {
+  /** Its player row's id, which voice names its talker by. */
+  readonly id: string;
+  constructor(name: string, id: string) {
+    this.id = id;
     this.shown = { ...this.shown, name };
     this.tag = nameTag(name);
     buildHoverboard(this.board);
@@ -150,7 +153,7 @@ class OtherBody {
     if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : 0);
     this.pose(gait, this.speed, dt);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
-    const talking = voiceNear.talking.has(this.shown.name);
+    const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
     this.ring.visible = talking;
     if (talking) { this.talkPhase = (this.talkPhase + dt * TALK_PULSE) % (Math.PI * 2); this.ring.scale.setScalar(TALK_SIZE * (1 + TALK_SWELL * Math.sin(this.talkPhase))); }
     this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held: row[HELD] ?? 0, hp: row[HP] ?? 0, talking };
@@ -182,16 +185,16 @@ export class OtherPlayers {
   constructor(client: NetClient, scene: THREE.Object3D, scope: Scope, me: Readonly<THREE.Vector3> | null = null) {
     this.client = client; this.scene = scene; this.scope = scope; this.me = me;
     scope.onDispose(() => { for (const handle of this.bodies.keys()) this.drop(handle); });
-    if (me !== null) scope.onDispose(voiceNear.lend({ distanceTo: name => this.distanceTo(name) }));
+    if (me !== null) scope.onDispose(voiceNear.lend({ distanceTo: talker => this.distanceTo(talker) }));
   }
-  /** Metres to the nearest body with this Name, as drawn; two players may share a Name, and the nearer one speaks for both. */
-  distanceTo(name: string): number | null {
+  /** Metres to a talker's body, as drawn: the body with its row's id, or, from a server that names none, the nearest with its Name. */
+  distanceTo(talker: Talker): number | null {
     const { me } = this;
     if (me === null) return null;
     let nearest: number | null = null;
     for (const body of this.bodies.values()) {
       const { shown } = body;
-      if (shown.name !== name || !body.placed) continue;
+      if ((talker.body === null ? shown.name !== talker.name : body.id !== talker.body) || !body.placed) continue;
       const metres = Math.hypot(shown.x - me.x, shown.y - me.y, shown.z - me.z);
       if (nearest === null || metres < nearest) nearest = metres;
     }
@@ -204,11 +207,11 @@ export class OtherPlayers {
     for (const handle of bodies.keys()) if (!client.entities.has(handle)) this.drop(handle);
     for (const [handle, info] of client.entities) {
       if (info.cls.cls !== PLAYER_CLASS.cls || handle === own || !client.interpolator.sample(handle, renderTick, row)) continue;
-      (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''))).show(row, dt, client.riders.has(handle));
+      (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''), info.id)).show(row, dt, client.riders.has(handle));
     }
   }
-  private enter(handle: number, name: string): OtherBody {
-    const body = new OtherBody(name);
+  private enter(handle: number, name: string, id: string): OtherBody {
+    const body = new OtherBody(name, id);
     this.bodies.set(handle, body); this.scene.add(body.group);
     void this.dress(handle, body);
     return body;

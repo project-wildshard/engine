@@ -99,7 +99,7 @@ test('voice signalling joins, relays inside one cell and says leave on close', a
     // B hears A is on voice without joining: the prompt says who to join.
     let roster = await b.next('roster');
     while ((roster.peers ?? []).length === 0) roster = await b.next('roster');
-    expect(roster.peers).toEqual([{ id: aId, name: 'Jake' }]);
+    expect(roster.peers).toEqual([{ id: aId, name: 'Jake', body: expect.any(String) as string }]); // V7: the body id lets a page find Jake's body
     b.say({ k: 'join' });
     expect((await b.next('hi')).peers).toEqual([aId]);
     b.say({ k: 'sig', to: aId, m: 1, i: 0, n: 1, d: '{"type":"offer"}' });
@@ -113,7 +113,7 @@ test('voice signalling joins, relays inside one cell and says leave on close', a
     b.socket.close(); await once(b.socket, 'close');
     let left = await a.next('roster');
     while ((left.peers ?? []).length !== 1) left = await a.next('roster');
-    expect(left.peers).toEqual([{ id: aId, name: 'Jake' }]);
+    expect(left.peers).toEqual([{ id: aId, name: 'Jake', body: expect.any(String) as string }]);
   } finally { for (const socket of sockets) socket.terminate(); world.dispose(); for (const port of ports) port.close(); server.closeAllConnections(); await new Promise(resolve => { server.close(resolve); }); }
 });
 
