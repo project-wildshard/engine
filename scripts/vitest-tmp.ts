@@ -90,7 +90,7 @@ export async function runVitest(args: readonly string[]): Promise<number> {
       const {assertHeavyLease}=await import('./heavy-lane-lease.mjs');
       assertHeavyLease('full-test');
       const {startCpuBroker}=await import('./cpu-broker.mjs');
-      broker=await startCpuBroker({scopeSlots:PUSH_BUDGET.workers});
+      broker=await startCpuBroker({scopeSlots:PUSH_BUDGET.vitestSlots});
     }
     // Each real file now owns CPU admission before collection. Performance and
     // uncapped encoder files reserve the whole budget, so their original clocks

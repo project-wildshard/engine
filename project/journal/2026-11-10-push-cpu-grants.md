@@ -18,3 +18,12 @@ took 328.3 seconds and failed the unrelated ci-bisect Git fixture during
 pack-directory cleanup. The runs had different host load. Keep ten
 workers until six can meet the wall-clock and repeatability targets.
 Clock-driven server proofs still hold their grants while live.
+
+The ten-worker, ten-slot trial finished in 483.1 seconds under
+concurrent gates and hit two original ten-second Nalati deadlines.
+The ten-worker candidate allows twelve Vitest slots for native children
+on the measured sixteen-slot machine. Static jobs use the same machine
+budget, including the four builders, and still have to acquire it.
+At twelve slots the full gate passed 6,516 cases and one existing skip
+in 468.6 seconds with concurrent host work. These observations qualify
+the changed grants for one run and leave the six-worker target open.
