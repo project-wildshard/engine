@@ -15,7 +15,7 @@ Only the scaffold exists:
 - `src/shared/`: zod schemas used on both sides of the wire.
 - `src/client/`: the Preact web app, with its own `tsconfig.json` (DOM lib).
 - `src/tools/build-web.ts`: esbuild into `src/dist/web` (`--dev` watches and serves).
-- `src/e2e/`: Playwright smoke test (CI).
+- `src/e2e/`: Playwright: the status page, and `smoke/`, the Template 2 smoke.
 - `src/cook/`: shardfile to runtime packs.
 - `src/scripts/check-sides.mjs`: the side rule (`pnpm check:sides`).
 - `src/scripts/`: repo tooling (asks, md-wrap), plain JS.

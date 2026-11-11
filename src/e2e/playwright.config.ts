@@ -17,12 +17,33 @@ const config: PlaywrightTestConfig = defineConfig({
   forbidOnly: process.env['CI'] !== undefined,
   reporter: process.env['CI'] === undefined ? 'list' : 'github',
   use: { baseURL: BASE_URL, trace: 'retain-on-failure' },
+  // The status page first (0.1 s), then the Template 2 smoke (T2E-2): one worker, one page, headless.
+  workers: 1,
   projects: [
     {
       name: 'chromium',
+      testMatch: 'status.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: { args: [...KEYCHAIN_ARGS] },
+      },
+    },
+    {
+      name: 'template-2',
+      testDir: 'smoke',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 402, height: 874 },
+        trace: 'retain-on-failure',
+        launchOptions: {
+          args: [
+            ...KEYCHAIN_ARGS,
+            '--mute-audio',
+            '--ignore-gpu-blocklist',
+            // The real GPU on the Mac, SwiftShader on hosted Linux (as ring-1's boot-smoke, scripts/parity/lane-browser.mjs)
+            `--use-angle=${process.platform === 'darwin' ? 'metal' : 'swiftshader'}`,
+          ],
+        },
       },
     },
   ],
