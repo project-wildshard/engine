@@ -179,7 +179,7 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
   // The oracle, apart from grant emission: for each death the test causes, the shard's own loot tables are rolled on a copy of the
   // room's loot stream, so the expected coins and items are known before the room pays anything. Items already paid this boot are
   // owned, as the room counts them.
-  const input = await serverInput(DRIFTWOOD), economy = input.product.has('economy/loot') ? input.product.section('economy/loot') : undefined;
+  const input = await serverInput(DRIFTWOOD), economy = input.product?.has('economy/loot') === true ? input.product.section('economy/loot') : undefined;
   const coinRoll = personalCoinTable(economy), itemRoll = personalItemTable(economy), owned = new Map<string, Set<string>>();
   if (coinRoll === null) throw new Error('Driftwood\'s kills pay coins');
   let died: Parameters<Parameters<DedicatedRoom['host']['events']['on']>[1]>[0] | null = null;
