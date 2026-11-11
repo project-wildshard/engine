@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { progressOfCard, stuckMessage, watchStuckStep, type StuckStepPorts } from './stuckStep';
+import { progressOfCard, stuckContext, stuckMessage, watchStuckStep, type StuckStepPorts } from './stuckStep';
 
 /** A fake clock and timer: `tick(ms)` advances the clock and runs the repeating timer once a second. */
 function harness(progress: () => { step: string; signature: string }) {
@@ -98,4 +98,24 @@ test('a part streaming for minutes before its first member verifies is progress,
 test('the fatal line names the step, for a hang and for a throw', () => {
   expect(stuckMessage('world.props', { stuckMs: 60_400 })).toBe('The game stopped loading at step "world.props" (no progress for 60 s)');
   expect(stuckMessage('admission.download', { error: new TypeError('Load failed') })).toBe('The game failed to start at step "admission.download" (TypeError: Load failed)');
+});
+
+test('S4: a stalled card reports its step, last 8 rows, files, bytes, link and visibility', () => {
+  const rows = Array.from({ length: 11 }, (_, i) => `row ${String(i + 1)}`);
+  const card = { dataset: { step: 'world.props', spawnFilesDone: '41', spawnFilesTotal: '89', readBytes: '18300000', streamedBytes: '0', setup: '62' }, rows };
+  expect(stuckContext(card, { connection: '4g', visibility: 'visible' })).toEqual({
+    step: 'world.props', rows: rows.slice(-8), filesDone: 41, filesTotal: 89, readBytes: 18_300_000, streamedBytes: 0, setup: 62,
+    connection: '4g', visibility: 'visible',
+  });
+});
+
+test('S4: no card and no browser facts still give a complete, honest context', () => {
+  expect(stuckContext(null)).toEqual({ step: 'modules', rows: [], filesDone: null, filesTotal: null, readBytes: null, streamedBytes: null,
+    setup: null, connection: 'unknown', visibility: 'unknown' });
+  expect(stuckContext({ dataset: { step: 'gap', readBytes: 'NaN' } })['readBytes']).toBeNull();
+});
+
+test('S4: rows lose every query and fragment before they leave the page', () => {
+  const rows = ['parts/driftwood-0.bin?token=secret&id=7 1.2 MB', 'world#frag done'];
+  expect(stuckContext({ dataset: { step: 'download' }, rows })['rows']).toEqual(['parts/driftwood-0.bin 1.2 MB', 'world done']);
 });

@@ -66,3 +66,34 @@ export function stuckMessage(step: string, what: { readonly stuckMs: number } | 
   const error = what.error;
   return `The game failed to start at step "${step}" (${error instanceof Error ? `${error.name}: ${error.message}` : String(error)})`;
 }
+
+/** What the card shows that a report needs (S4): its data and, when it has them, its step rows (`.ws-load-log`). */
+export interface StuckReportCard extends StuckCard { readonly rows?: readonly string[] }
+/** The browser facts a stall depends on: the link's effective type and the page's visibility. */
+export interface StuckEnvironment { readonly connection?: string | undefined; readonly visibility?: string | undefined }
+const count = (value: string | undefined): number | null => {
+  if (value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+/**
+ * SENTRY-TRIAGE S4: why a start stopped, attached to the stuck or failed start's report: the card's step, its last 8
+ * rows, spawn files done and total, bytes read and streamed, the link and visibility. Small and explicit (no storage).
+ */
+export function stuckContext(card: StuckReportCard | null, environment: StuckEnvironment = {}): Record<string, unknown> {
+  const data = card?.dataset ?? {};
+  return {
+    step: data['step'] ?? 'modules',
+    // a row may name a file by its address: drop every query and fragment, so no token or id leaves the page (Codex, J206)
+    rows: (card?.rows ?? []).slice(-8).map((row) => row.replaceAll(/[?#]\S*/gu, '').slice(0, 160)),
+    filesDone: count(data['spawnFilesDone']), filesTotal: count(data['spawnFilesTotal']),
+    readBytes: count(data['readBytes']), streamedBytes: count(data['streamedBytes']), setup: count(data['setup']),
+    connection: environment.connection ?? 'unknown', visibility: environment.visibility ?? 'unknown',
+  };
+}
+/** The live card as a StuckReportCard: its dataset and the text of its step rows. */
+export function reportCardOf(card: HTMLElement | null): StuckReportCard | null {
+  if (card === null) return null;
+  const rows = [...card.querySelectorAll<HTMLElement>('.ws-load-log > *')].map((row) => (row.textContent ?? '').replaceAll(/\s+/gu, ' ').trim()).filter((text) => text !== '');
+  return { dataset: card.dataset, rows };
+}

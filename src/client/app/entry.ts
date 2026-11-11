@@ -27,7 +27,7 @@ import { prepareBootImports, startTitleWarmup } from './bootDownloads';
  */
 import { startLowPowerProbe, startTitleLowPowerProbe } from '@wildshard/engine/boot/lowPower';
 import { guardBoot } from '@wildshard/engine/boot/stuck';
-import { progressOfCard, stuckMessage, watchStuckStep } from '@wildshard/engine/boot/stuckStep';
+import { progressOfCard, reportCardOf, stuckContext, stuckMessage, watchStuckStep } from '@wildshard/engine/boot/stuckStep';
 import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/shell';
 import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wildshard/engine/boot/bootTrace';
 import { Scope } from '@wildshard/engine/app/scope';
@@ -198,11 +198,19 @@ export async function start(): Promise<void> {
   // DL21: a start whose card stops moving (step, setup share, bytes) names its step after a bounded wait instead of
   // leaving a dead card; the fatal modal's RELOAD HERE is the retry (src/client/engine/boot/stuckStep.ts)
   const card = (): HTMLElement | null => document.querySelector<HTMLElement>('.ws-load');
+  // S4: the report says why: the card's step, rows, files, bytes, the link and visibility
+  // best effort: a failed read never stops the report or the modal (Codex, J206)
+  const stall = (): Record<string, unknown> => {
+    try {
+      return stuckContext(reportCardOf(card()), {
+        connection: (navigator as Navigator & { connection?: { effectiveType?: string } }).connection?.effectiveType, visibility: document.visibilityState });
+    } catch { return { unreadable: true }; }
+  };
   const started = startSelected();
   watchStuckStep(started, {
     progress: () => progressOfCard(card()),
     every: (ms, run) => { const timer = entryScope.interval(ms, run); return () => { entryScope.cancelTimer(timer); }; },
-    stalled: (step, stuckMs) => { void (async () => { (await import('@wildshard/engine/ui/ErrorModal')).showError(stuckMessage(step, { stuckMs })); })(); },
+    stalled: (step, stuckMs) => { const why = stall(); void (async () => { (await import('@wildshard/engine/ui/ErrorModal')).showError(stuckMessage(step, { stuckMs }), '', why); })(); },
   });
   try { await started; }
   catch (error) {
@@ -211,7 +219,7 @@ export async function start(): Promise<void> {
       // Admission can refuse before startSession installs its fatal-load boundary. main starts asynchronously;
       // paint the same fatal card here, naming the step it died on, instead of leaving a rejected boot behind the loader.
       const { showError } = await import('@wildshard/engine/ui/ErrorModal');
-      showError(stuckMessage(progressOfCard(card()).step, { error }), error instanceof Error ? error.stack ?? '' : '');
+      showError(stuckMessage(progressOfCard(card()).step, { error }), error instanceof Error ? error.stack ?? '' : '', stall());
       return;
     }
     clearGridRecovery();

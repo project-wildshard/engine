@@ -235,7 +235,7 @@ function showChip(sent: Promise<ReportOutcome>): void {
   } catch { /* never throw from here */ }
 }
 
-function report(system: string, error: unknown, flags: { fatal?: boolean; disabled?: boolean }): Promise<ReportOutcome> {
+function report(system: string, error: unknown, flags: { fatal?: boolean; disabled?: boolean; stall?: Record<string, unknown> }): Promise<ReportOutcome> {
   if (system !== 'lifecycle') {
     let level = '';
     try { level = activeLevel().id; } catch { /* the registry may not be ready during early boot */ }
@@ -245,7 +245,7 @@ function report(system: string, error: unknown, flags: { fatal?: boolean; disabl
       shard: level,
       bootStage: document.querySelector<HTMLElement>('.ws-load')?.dataset['step'] ?? loopState(),
       fatal: flags.fatal === true,
-      diagnostic: bootDiagnostic(),
+      diagnostic: flags.stall === undefined ? bootDiagnostic() : { ...bootDiagnostic(), stall: flags.stall },
     });
   }
   try { return reporter?.report(system, error, flags) ?? Promise.resolve('dropped'); } catch { return Promise.resolve('dropped'); }
@@ -263,10 +263,11 @@ function handle(f: Fault): void {
 }
 
 /** Show the fatal modal explicitly (main().catch: the boot failed) and report it. */
-export function showError(message: string, stack = ''): void {
+/** `stall`: S4's context for a stuck or failed start (stuckStep.ts stuckContext); it rides the report as `stall`. */
+export function showError(message: string, stack = '', stall?: Record<string, unknown>): void {
   app.setState('error');
   try {
-    showFatal(message, stack, report('boot', new DescribedError(message, stack), { fatal: true }));
+    showFatal(message, stack, report('boot', new DescribedError(message, stack), { fatal: true, ...(stall === undefined ? {} : { stall }) }));
   } catch { /* the modal must never throw */ }
 }
 

@@ -213,7 +213,11 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
 
   /** The same bounded evidence also accompanies handled errors through the working first-party inbox. */
   function bootDiagnostic(): Record<string, unknown> {
-    if (current === null) return {};
+    // S4: with no boot trace (an older page, storage refused) the report still says where the card stood
+    if (current === null) {
+      const card = typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('.ws-load');
+      return card === null ? { trace: 'none' } : { trace: 'none', stage: card.dataset['step'] ?? '', setup: card.dataset['setup'] ?? '' };
+    }
     return { attempt: current.id, previousBuild: current.build, stage: current.stage, detail: current.detail ?? '',
       elapsedMs: current.updatedAt - current.startedAt, status: current.status, checkpoints: current.checkpoints ?? [] };
   }
