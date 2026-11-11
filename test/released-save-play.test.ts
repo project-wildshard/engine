@@ -21,13 +21,14 @@ import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
 import {builtProduct,runtimeAssets} from './fixtures/engine-lift/product';
 
-interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
+// `shardfile` is where the save was made; `pin`, when present, is the later shard pin it is proven to resume on (D5-4).
+interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;pin?:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
 const fixtures=readdirSync('test/pins/saves').filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`test/pins/saves/${name}`,'utf8')) as ReleasedSave);
 const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')) as {shards:{slug:string;hash:string}[]};
 const epoch=JSON.parse(readFileSync('save-epoch.json','utf8')) as {saveEpoch:number};
 for(const fixture of fixtures)test(`released ${fixture.slug} save resumes in place and keeps walking`,async()=>{
   const {slug}=fixture;
-  expect(fixture.shardfile).toBe(pins.shards.find(row=>row.slug===slug)?.hash);
+  expect(fixture.pin??fixture.shardfile).toBe(pins.shards.find(row=>row.slug===slug)?.hash);
   expect(fixture.saveEpoch).toBe(epoch.saveEpoch);
   const bytes=readFileSync(fixture.remote===true?join(process.env['WILDSHARD_PIN_CACHE']??join(homedir(),'.cache/wildshard/pins'),fixture.file):`test/pins/saves/${fixture.file}`);
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(fixture.sha256);
