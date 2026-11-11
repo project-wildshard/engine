@@ -8,6 +8,8 @@ import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A local Actions API double for the main-run reuse check.
 import { createServer } from 'node:http';
+// oxlint-disable-next-line import/no-nodejs-modules -- Evaluate ci.yml's real concurrency-key expressions.
+import { runInNewContext } from 'node:vm';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -33,10 +35,19 @@ if (sha !== undefined) {
     fs.writeFileSync(state.once.marker, '');
     execFileSync(state.once.command[0], state.once.command.slice(1), { stdio: 'ignore' });
   }
-  const branches = [...new Set(pushed.filter(([, tip]) => tip === sha).map(([ref]) => ref.replace('refs/heads/', '')))];
+  const onMain = pushed.some(([ref, tip]) => ref === 'refs/heads/main' && tip === sha);
+  if (state.onMain !== undefined && onMain && !fs.existsSync(state.onMain.marker)) {
+    fs.writeFileSync(state.onMain.marker, '');
+    execFileSync(state.onMain.command[0], state.onMain.command.slice(1), { stdio: 'ignore' });
+  }
+  const after = fs.existsSync(state.pushed) ? fs.readFileSync(state.pushed, 'utf8').trim().split('\\n').filter(Boolean).map(line => line.split(' ')) : [];
+  const mainTip = after.filter(([ref]) => ref === 'refs/heads/main').at(-1)?.[1];
+  // GitHub cancels a main run when a newer main push replaces it ('superseded'), or for any reason ('always').
+  const cancelled = branch => branch === 'main' && (state.cancelMain === 'always' || (state.cancelMain === 'superseded' && sha !== mainTip));
+  const branches = [...new Set(after.filter(([, tip]) => tip === sha).map(([ref]) => ref.replace('refs/heads/', '')))];
   const workflow_runs = branches.flatMap(branch => ['ci', 'ring-1'].map(name => {
     const red = state.red?.[branch]?.[name];
-    return { id: runId(sha, name), name, event: 'push', head_sha: sha, head_branch: branch, status: 'completed', conclusion: red === undefined ? 'success' : 'failure', html_url: '' };
+    return { id: runId(sha, name), name, event: 'push', head_sha: sha, head_branch: branch, status: 'completed', conclusion: cancelled(branch) ? 'cancelled' : red === undefined ? 'success' : 'failure', html_url: '' };
   }));
   process.stdout.write(JSON.stringify({ workflow_runs }));
 } else {
@@ -202,6 +213,38 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
     expect(f.read(f.files.gh)).toContain(`head_sha=${landed}`);
     expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0; .*main ci green/u);
+  }, 60_000);
+
+  test('a main run cancelled by a newer main push is superseded, not red: land watches the newer run', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    // Main moves once during the branch CI (so the landing is carried and main's run is watched), then a peer lands
+    // on top of it while land watches, and GitHub cancels the landed SHA's run in favour of the peer's.
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] },
+      onMain: { marker: join(f.root, 'on-main'), command: ['sh', f.peerScript('src/later.ts', null, 'export const later = 3;')] }, cancelMain: 'superseded' });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    const newer = f.remoteMain();
+    const landed = f.git(f.remote, ['rev-parse', 'main~1']);
+    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main~1'])).toBe('feat: add feature');
+    expect(result.stdout).toMatch(new RegExp(`superseded main's run for ${landed.slice(0, 10)} was cancelled by a newer main push; ${newer.slice(0, 10)} contains it`, 'u'));
+    expect(result.stdout).not.toMatch(/ red /u);
+    expect(f.read(f.files.gh)).toContain(`head_sha=${newer}`);
+    expect(f.read(f.files.receipts)).toMatch(new RegExp(`landed ${landed.slice(0, 10)} on main .*main ci superseded by ${newer.slice(0, 10)}, green`, 'u'));
+    expect(f.read(f.files.receipts)).not.toMatch(/MAIN RED/u);
+  }, 60_000);
+
+  test('a cancelled main run with nothing newer on main is still red', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] }, cancelMain: 'always' });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(3);
+    expect(result.stdout).not.toMatch(/superseded/u);
+    expect(result.stdout).toMatch(new RegExp(`red +main's hosted run is red for ${f.remoteMain().slice(0, 10)}: fix forward now`, 'u'));
+    expect(f.read(f.files.receipts)).toMatch(/landed, MAIN RED .*main ci RED: ci run \d+ cancelled/u);
   }, 60_000);
 
   test('main moved over the same file: a clean rebase lands on the branch run, no second branch CI (J249)', () => {
@@ -634,6 +677,27 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect((await reused([run()], ciJobs, {}, { scope: (at: number) => String(at > Date.parse('2026-11-10T20:10:00Z')), now: steady.now })).reason).toMatch(/predates a quarantine or lift-pending change/u);
     expect((await exactBranchProof('ci.yml', env('http://127.0.0.1:9'), steady)).reused).toBe(false);
   });
+  test('main pushes get one concurrency group per SHA, so lands a minute apart never cancel each other\'s main run', () => {
+    const text = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const top = text.split('\njobs:\n')[0] ?? '';
+    const template = /^ {2}group: (.+)$/mu.exec(top)?.[1];
+    const cancel = /^ {2}cancel-in-progress: (.+)$/mu.exec(top)?.[1];
+    if (template === undefined || cancel === undefined) throw new Error('ci.yml has no top-level concurrency group');
+    type Context = { event_name: string; ref: string; sha: string; run_id: string };
+    const evaluate = (source: string, github: Context): unknown => source.replaceAll(/\$\{\{(.*?)\}\}/gu, (_match: string, expression: string) =>
+      String(runInNewContext(expression.replaceAll(/\bstartsWith\(/gu, 'starts(').replaceAll("'", '"').replaceAll('==', '==='), {
+        github, starts: (value: string, prefix: string) => value.startsWith(prefix), format: (pattern: string, argument: string) => pattern.replace('{0}', argument),
+      })));
+    const main = { event_name: 'push', ref: 'refs/heads/main', sha: 'a'.repeat(40), run_id: '1' };
+    const next = { ...main, sha: 'b'.repeat(40), run_id: '2' };
+    expect(evaluate(template, main)).not.toBe(evaluate(template, next));
+    expect(evaluate(cancel, main)).toBe('false');
+    // A plan branch keeps one group, and its newer push cancels the older run.
+    const plan = { ...main, ref: 'refs/heads/plan/foo' };
+    expect(evaluate(template, plan)).toBe(evaluate(template, { ...plan, sha: next.sha, run_id: '2' }));
+    expect(evaluate(cancel, plan)).toBe('true');
+  });
+
   test('ci runs on plan/** pushes; every job gates itself on the reuse check, and ring-1 is gone (CI-JOB-PACKING)', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     expect(text).toMatch(/push:\n {4}branches: \[main, 'plan\/\*\*'\]/u);

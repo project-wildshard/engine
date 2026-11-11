@@ -27,7 +27,10 @@ permissions:
 concurrency:
   # Qualification dispatches must execute, rather than replacing a pending
   # publication run. Ordinary push/PR ordering retains its existing group.
-  group: ci-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-qualification-{0}', github.run_id) || '' }}
+  # Main pushes get one group per SHA: GitHub keeps one pending run per group and cancels the older pending one even
+  # with cancel-in-progress false, so lands a minute apart cancelled each other's main runs and main never confirmed
+  # anything (J249 needs main's own run). Main runs are mostly the cheap exact-reuse check, so running each costs little.
+  group: ci-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-qualification-{0}', github.run_id) || '' }}${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   # A newer push to the same plan branch supersedes its older SHA; main never cancels.
   cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/plan/') }}
 
