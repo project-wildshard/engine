@@ -2,12 +2,15 @@
 import { WIRE_CLASSES } from '@wildshard/wire/classes';
 import { classColumns, type ClassColumns } from '@wildshard/wire/columns';
 import { encodeEvents as encodeWire, eventsDecoder, eventTables } from '@wildshard/wire/eventStream';
-import { readMessage } from '@wildshard/wire/game';
+import { actCodec, clientTables, commandsCodec, decodeBody, encodeBody, localCodecs, readMessage, TAG_ACT, TAG_CMDS } from '@wildshard/wire/game';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { spawnColumns } from '@wildshard/wire/spawnColumns';
 import { expect, test } from 'vitest';
 import { BitWriter } from '../src/shared/engine/net/bits';
-import { decodeEvents, encodeEvents, type InitialBits, type NetEvent } from '../src/shared/engine/net/messages';
-import { fromWireEvent, toWireEvent } from '../src/shared/engine/net/wireValues';
+import type { NetRoomAct } from '../src/shared/engine/net/acts';
+import { decodeCommands, encodeCommands } from '../src/shared/engine/net/command';
+import { decodeAct, decodeEvents, encodeAct, encodeEvents, type InitialBits, type NetEvent } from '../src/shared/engine/net/messages';
+import { fromWireAct, fromWireCommand, fromWireEvent, toWireAct, toWireCommand, toWireEvent } from '../src/shared/engine/net/wireValues';
 
 const COLUMNS = new Map<number, ClassColumns>(WIRE_CLASSES.map(entry => [entry.id, classColumns(entry)]));
 const SPAWNS = spawnColumns(id => COLUMNS.get(id));
@@ -57,4 +60,51 @@ test('every event form reads back through wire v1 as it does through v0', () => 
 
 test('an event kind this build has no form for is left out, not guessed', () => {
   expect(fromWireEvent({ event: 'aurora', fields: {} })).toBeNull();
+});
+
+const ROOM_IDS = ['', 'boar:1', 'player:ana', 'door:west'];
+const refs = (id: string): number => Math.max(0, ROOM_IDS.indexOf(id));
+const ids = (handle: number): string | undefined => (handle > 0 ? ROOM_IDS[handle] : undefined);
+const STEER = { keyX: 1, keyY: -0.5, stickX: 0.25, stickY: 0 };
+const AIM = { origin: { x: 1.5, y: 2, z: -3 }, direction: { x: 0, y: 0.6, z: 0.8 } };
+const COMMANDS: readonly NetCommand[] = [
+  { seq: 1, viewTick: 2, steer: STEER, yaw: 1.25, pitch: -0.3, buttons: 5 },
+  { seq: 65_535, viewTick: 0, steer: STEER, yaw: -7, pitch: 1.5, buttons: 0x1_05, attack: { aim: AIM } },
+  { seq: 3, viewTick: 4, steer: STEER, yaw: 0, pitch: 0, buttons: 0, attack: { targetId: 'boar:1', aim: AIM }, heavyTarget: 'player:ana', lockTarget: 'door:west', hookTarget: 77 },
+  { seq: 5, viewTick: 6, steer: STEER, yaw: 3, pitch: 0.1, buttons: 0x80, launcher: { slot: 3, ads: 0.5, fire: true } },
+  { seq: 7, viewTick: 8, steer: STEER, yaw: 3, pitch: 0.1, buttons: 0, launcher: { slot: 31, ads: 1 } },
+];
+const ACTS: readonly NetRoomAct[] = [
+  { kind: 'interact', seq: 1, id: 'door' }, { kind: 'reload', seq: 2, slot: 1 }, { kind: 'equip', seq: 3, slot: 0 },
+  { kind: 'chat', seq: 4, channel: 'proximity', text: 'héllo' }, { kind: 'report', seq: 5, line: 9 },
+  { kind: 'ride', seq: 6, action: 'mount' }, { kind: 'climate', seq: 7, op: 'time', name: 'dusk', at: 0.75 },
+  { kind: 'buy', seq: 8, good: 4 }, { kind: 'board', seq: 9, op: 'tear', slot: 2 }, { kind: 'wear', seq: 10, id: 'hat' },
+  { kind: 'pose', seq: 11, names: 'wave' },
+] as NetRoomAct[];
+
+test('every command form reads back through wire v1 as it does through v0', () => {
+  const v0 = decodeCommands(new Uint8Array(encodeCommands(new BitWriter(), { ackFrame: 9, commands: COMMANDS }, refs)), ids);
+  const local = localCodecs(), server = commandsCodec(clientTables().commandTable);
+  const bytes = encodeBody(local.commands, TAG_CMDS, { ackFrame: 9, commands: COMMANDS.map(command => toWireCommand(command, refs)) });
+  const [record] = readMessage(bytes).records;
+  if (record === undefined) throw new Error('no cmds record');
+  const read = decodeBody(server, { bytes, start: record.start, end: record.end });
+  const commands = (read['commands'] as readonly Record<string, never>[]).map(fields => fromWireCommand(fields, ids));
+  expect(near({ ackFrame: read['ackFrame'], commands })).toEqual(near(v0));
+});
+
+test('a command naming a handle the room does not know refuses, as in v0', () => {
+  const fields = toWireCommand({ seq: 1, viewTick: 1, steer: STEER, yaw: 0, pitch: 0, buttons: 0, lockTarget: 'boar:1' }, () => 99);
+  expect(() => fromWireCommand(fields, ids)).toThrow(RangeError);
+});
+
+test('every act form reads back through wire v1 as it does through v0', () => {
+  const local = localCodecs(), server = actCodec(clientTables().actTable);
+  for (const act of ACTS) {
+    const v0 = decodeAct(new Uint8Array(encodeAct(new BitWriter(), act)));
+    const bytes = encodeBody(local.act, TAG_ACT, toWireAct(act));
+    const [record] = readMessage(bytes).records;
+    if (record === undefined) throw new Error('no act record');
+    expect(near(fromWireAct(decodeBody(server, { bytes, start: record.start, end: record.end }))), act.kind).toEqual(near(v0));
+  }
 });

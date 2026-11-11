@@ -6,3 +6,7 @@
   sends every event form through the wire codec and checks it reads back as
   the v0 codec reads it, to 9 places (the wire's quantised decode differs
   from v0's in the last ulp). Next: the room and client switch over.
+- Commands and acts too: `toWireCommand`/`fromWireCommand` (the high
+  button byte apart, targets as handles, an unknown handle refuses as v0
+  did) and `toWireAct`/`fromWireAct`. Every command and act form sent
+  through the wire codec reads back as v0 reads it.
