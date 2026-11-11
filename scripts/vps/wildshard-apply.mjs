@@ -53,7 +53,7 @@ async function signedFiles() {
   for (const channel of ['production', 'staging']) {
     // Only RELEASE_URL is read from the root-only env file; nothing else in it is kept or printed.
     const env = existsSync(`/etc/wildshard/${channel}.env`) ? readFileSync(`/etc/wildshard/${channel}.env`, 'utf8') : '';
-    const url = env.split('\n').findLast(row => row.startsWith('RELEASE_URL='))?.slice('RELEASE_URL='.length).trim().replaceAll(/^["']|["']$/gu, '');
+    const url = [...env.matchAll(/^RELEASE_URL=(.*)$/gmu)].pop()?.[1]?.trim().replaceAll(/^["']|["']$/gu, '');
     if (url !== undefined && url.startsWith('https://')) {
       try {
         const answer = await fetch(url, { signal: AbortSignal.timeout(20_000), redirect: 'error' });
