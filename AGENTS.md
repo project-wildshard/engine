@@ -56,6 +56,9 @@ Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STAN
    worktree). A real conflict stops; the resolved commit is new and gets its own branch CI.
  - Main's CI runs after every land. If it goes red, the lane that landed last fixes it forward or reverts it, at
    once (J249). Land prints this rule when it lands.
+ - `scripts/main-watch.mjs` reports main's CI (LAND-SIMPLIFY LS5): land starts it to follow the landed SHA. It writes a
+   `main green` or `MAIN RED <range>` receipt naming the landers, and messages each lander's herdr pane on red. A
+   cancelled run that a newer push replaced is `superseded`, never red. Sweep by hand: `node scripts/main-watch.mjs`.
  - Clean up landed worktrees with `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an
    unlanded, dirty or busy one.
 

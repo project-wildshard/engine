@@ -15,7 +15,7 @@
 //            main's own hosted run. No path, harness or dependency rule sends it back to branch CI.
 //   A real conflict stops land with the paths. The resolved commit is new, so it needs its own branch CI.
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
-import {execFileSync,spawnSync} from 'node:child_process';
+import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {appendFileSync,existsSync,linkSync,mkdirSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
@@ -472,11 +472,26 @@ class Landing{
   }
  }
 
+ /** LAND-SIMPLIFY LS5 (J258): main's verdict belongs to scripts/main-watch.mjs. It follows this SHA in the
+  * background until main's ci judges it, writes the receipt and messages this pane on red. It runs from the
+  * canonical checkout, so it outlives this worktree. WS_MAIN_WATCH=0 turns it off.
+  * @param {string} head */
+ startWatcher(head){
+  const script=join(this.root,'scripts/main-watch.mjs');
+  if(this.env.WS_MAIN_WATCH==='0'||!existsSync(script))return;
+  const args=[script,`--follow=${head}`,`--lane=${this.lane}`,...(this.env.HERDR_PANE_ID?[`--pane=${this.env.HERDR_PANE_ID}`]:[])];
+  try{
+   spawn(process.execPath,args,{cwd:canonicalRoot(this.root),env:this.env,detached:true,stdio:'ignore'}).unref();
+   this.say('watch',`main-watch follows ${short(head)} and reports main's ci (receipt, and a message here on red)`);
+  }catch(error){this.say('watch',`main-watch not started (${error instanceof Error?error.message:String(error)}); run node scripts/main-watch.mjs by hand`);}
+ }
+
  /** @param {string} rule @param {string} why @param {number} round @param {string} before */
  async landed(rule,why,round,before){
   const head=this.head();
   this.say('landed',`main ${short(before)} -> ${short(head)} (${rule}: ${why})`);
   this.followCanonical();
+  this.startWatcher(head);
   this.say('rule',`main's own CI runs on ${short(head)} now. If it goes red, the lane that landed last fixes it forward or reverts it, at once (J249)`);
   // origin plan/<slug> stays: the next land rewrites it under a lease, and the
   // DS13 reaper deletes it with the worktree (a delete push would run the pre-push).
