@@ -24,3 +24,12 @@ Review (codex) tightened the health rule to whole known shapes: another status, 
 another request fails. The page roster now takes a renamed body too. Seen while proving and not fixed here: the lead body
 keeps a previous lead's Name on the wire (`Agent W sfuk B#6609` on a fresh player), because a net row reads `name` once,
 and the live proof then cannot find the new player by Name. Staging `/api/telemetry` also answers 503 (Vercel spend pause).
+
+## The lead body's Name follows its holder (opus-leadname)
+
+Fixed the open item above. `NetHandles.touch` read a row's text (the `name` field, initial-only) once, when the id first
+took a handle. A room left empty takes no ticks (Q80), so no sweep retired `actor.player` after its holder left, and the
+next lead's welcome reused the stale row. The same held for a page already in the room when the next lead sat down before
+the next frame. Now a row whose text no longer reads the same takes a fresh handle; the old one retires at the next sweep
+and each client hears its despawn before the new spawn (the client drops a body's id on despawn, so the order matters).
+No wire change: the Name still goes only in a spawn, and only when it changed. `test/dedicated-lead-name.test.ts`.

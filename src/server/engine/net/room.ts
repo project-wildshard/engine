@@ -485,6 +485,8 @@ export class NetRoom {
   }
   private send(client: RoomClient, frame: WorldFrame, retired: readonly number[], combat: readonly RoomCombat[], lines: readonly ChatLine[], riders: ReadonlyMap<number, number>): void {
     const { handles, world } = this, own = handles.refs(client.player.id), view = this.view(client, frame, own), events: NetEvent[] = [];
+    // A body whose Name changed (the next player in a room's lead body) comes back under a fresh handle: the old one goes first.
+    for (const handle of retired) if (handles.renewed.has(handle) && client.known.delete(handle)) events.push({ kind: 'despawn', handle });
     for (const handle of view.visible) {
       if (client.known.has(handle)) continue;
       const row = handles.row(handle);
