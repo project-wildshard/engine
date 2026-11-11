@@ -51,3 +51,9 @@ reflog no longer counts. Instead the pre-push hook records every plan/* push
 from the worktree, hand pushes included (`.githooks/record-plan-push.mjs`), and
 ownership is "one of those pushes or an ancestor of one". New test: a foreign
 tip the branch was reset to or merged, then left, still stops.
+
+Second J206 pass (one MUST): the hook records before the gate decides, so a
+refused push of a descendant of a foreign commit must not make that commit
+ours. Attempts (`wildshard-plan-pushes`, from the hook) now count only for
+the exact SHA; only land's confirmed pushes (`wildshard-land-tip`, written
+after git reports success) vouch for ancestors.

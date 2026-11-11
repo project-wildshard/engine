@@ -155,6 +155,7 @@ class Landing{
   /** @type {string|null} */this.planTip=null;
   this.expected='';
   this.tipFile=resolve(this.root,git(this.root,['rev-parse','--git-path','wildshard-land-tip']));
+  this.attemptFile=resolve(this.root,git(this.root,['rev-parse','--git-path','wildshard-plan-pushes']));
   this.reruns=0;
  }
 
@@ -307,7 +308,7 @@ class Landing{
   const rewrite=tip!==null&&!isAncestor(this.root,tip,sha);
   // Rewrite only a tip this worktree made itself; anyone else's commits stop it.
   if(rewrite&&!this.ownsTip(tip)){
-   const mine=this.ownTips().at(-1)??null;
+   const mine=this.shas(this.tipFile).at(-1)??null;
    this.receipt(`STOP origin ${this.branch} is at ${short(tip)}, not this worktree's last push`);
    throw new StopError(`origin ${this.branch} is at ${short(tip)}, which this worktree did not push last (${mine===null?'no record':short(mine)}). Someone else pushed it: fetch and integrate their commits, or rename this plan's branch.`);
   }
@@ -322,20 +323,22 @@ class Landing{
   this.planTip=sha;appendFileSync(this.tipFile,`${sha}\n`);
  }
 
- /** Every commit this worktree pushed to its plan branch, oldest first: land appends its own pushes, and the
-  * pre-push hook appends every plan/* push, hand pushes included (.githooks/record-plan-push.mjs). A commit's mere
-  * presence in a reflog proves nothing about who pushed it, so reflogs don't count. @returns {string[]} */
- ownTips(){
-  return [...new Set(existsSync(this.tipFile)?readFileSync(this.tipFile,'utf8').split('\n').map(line=>line.trim()).filter(line=>SHA.test(line)):[])];
+ /** SHAs from one of this worktree's records, oldest first. @param {string} file @returns {string[]} */
+ shas(file){
+  return [...new Set(existsSync(file)?readFileSync(file,'utf8').split('\n').map(line=>line.trim()).filter(line=>SHA.test(line)):[])];
  }
 
- /** The origin tip is this worktree's own: one of its pushes, or an ancestor of one (origin still holds an older
-  * push of ours). Anything else is someone else's. @param {string} tip */
+ /** The origin tip is this worktree's own when land itself pushed it, or pushed a descendant of it (a confirmed push:
+  * land records only after git reports success), or when this worktree attempted to push exactly that SHA (the
+  * pre-push hook records every plan/* push, hand pushes included, before the gate decides:
+  * .githooks/record-plan-push.mjs). An attempt never vouches for ancestors: a refused push of a descendant of
+  * someone else's commit must not make theirs ours. Reflogs prove nothing about who pushed, so they don't count.
+  * @param {string} tip */
  ownsTip(tip){
-  const own=this.ownTips();
-  if(own.includes(tip))return true;
+  const confirmed=this.shas(this.tipFile);
+  if(confirmed.includes(tip)||this.shas(this.attemptFile).includes(tip))return true;
   if(tryGit(this.root,['cat-file','-e',`${tip}^{commit}`]).status!==0)return false;
-  return own.slice(-50).some(sha=>tryGit(this.root,['cat-file','-e',`${sha}^{commit}`]).status===0&&isAncestor(this.root,tip,sha));
+  return confirmed.slice(-50).some(sha=>tryGit(this.root,['cat-file','-e',`${sha}^{commit}`]).status===0&&isAncestor(this.root,tip,sha));
  }
 
  /** Poll the exact SHA until both landing workflows are complete.

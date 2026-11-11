@@ -447,6 +447,27 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     }
   }, 90_000);
 
+  test('a refused push of a descendant never makes someone else\'s ancestor tip ours', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const base = f.git(wt, ['rev-parse', 'HEAD']);
+    f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
+    f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
+    const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
+    f.git(wt, ['fetch', '--quiet', 'origin']);
+    f.git(wt, ['reset', '--quiet', '--hard', theirs]);
+    f.commit(wt, 'src/d.ts', 'export const d = 1;', 'feat: on top of theirs');
+    writeFileSync(f.files.fail, '');
+    expect(spawnSync('git', ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo'], { cwd: wt, env: f.env, encoding: 'utf8' }).status).not.toBe(0);
+    rmSync(f.files.fail);
+    f.git(wt, ['reset', '--quiet', '--hard', base]);
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(1);
+    expect(result.stdout).toContain('which this worktree did not push last');
+    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
+  }, 60_000);
+
   test('a plan that changes hosted CI reruns it after any rebase', () => {
     const f = fixture();
     const wt = f.worktree('foo');
