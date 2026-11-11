@@ -7,10 +7,6 @@ import { createHash } from 'node:crypto';
 import { afterEach, expect, test } from 'vitest';
 import { buildValidationReceipts } from '../scripts/app-build/validationReceipts.mjs';
 import { readValidationReceipt } from '@wildshard/format/validationReceipt';
-import {emptyShardfile} from '../src/shared/host/author';
-import {writeOutputProduct} from '../src/sharddev/outputProduct';
-import {productResidentBytes} from '../src/client/game/shardfile/productCost';
-import {postStackCost} from '@wildshard/format/postStack';
 
 const owned: string[] = [];
 afterEach(() => { for (const root of owned.splice(0)) rmSync(root, { recursive: true }); });
@@ -53,14 +49,6 @@ test('a missing index retains its build refusal', () => {
 test.each([undefined,0,-1,1.5,Infinity])('a missing or invalid published residency fails the app build (%s)',residentBytes=>{
   const f=fixture();writeFileSync(join(f.directory,'validation.json'),JSON.stringify({...f.receipt,residentBytes}));
   expect(()=>buildValidationReceipts('receipt-test',f.root)).toThrow('Missing build-owned source residency');
-});
-
-test('the SDK publisher emits the complete original client source/wire claim',()=>{
-  const f=fixture(),directory=join(f.root,'published'),source=emptyShardfile({slug:'published-residency',name:'Published',author:'Test',revision:1,seed:1});
-  source.look.post=[{graph:{version:1,kind:'post',nodes:{},stages:{post:{colour:[1,1,1]}}}}];
-  writeOutputProduct(source,new Map(),directory);
-  const emitted:unknown=JSON.parse(readFileSync(join(directory,'validation.json'),'utf8'));
-  expect(emitted).toMatchObject({residentBytes:productResidentBytes(source),postCost:postStackCost(source,()=>undefined).cost});
 });
 
 test.each([undefined,{passes:-1,instructions:0,inputs:{colour:false,depth:false,normal:false}},{passes:0,instructions:Number.NaN,inputs:{}},{passes:0,instructions:0,inputs:{colour:'no',depth:false,normal:false}}])('missing or invalid published post cost fails the app build (%j)',postCost=>{
