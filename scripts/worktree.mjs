@@ -169,6 +169,8 @@ export function followMain(canonical,base){
  if(git(canonical,['status','--porcelain','--untracked-files=no']).trim()!=='')return leave('tracked edits');
  const busy=BUSY_GIT.find(name=>existsSync(resolve(canonical,git(canonical,['rev-parse','--git-path',name]).trim())));
  if(busy!==undefined)return leave(`git ${busy} in progress`);
+ // Last look right before the merge (J206 review): merge --ff-only would happily move another branch's HEAD.
+ if(tryGit(canonical,['symbolic-ref','--quiet','HEAD']).stdout.trim()!=='refs/heads/main'||git(canonical,['rev-parse','HEAD']).trim()!==head)return leave('HEAD moved during the check');
  const merged=tryGit(canonical,['merge','--ff-only','--no-autostash','--no-overwrite-ignore','--quiet',base]);
  if(merged.status!==0&&git(canonical,['rev-parse','HEAD']).trim()!==head)return `CANONICAL MAIN NEEDS A LOOK: the fast-forward failed after HEAD moved (${merged.stderr.trim().split('\n')[0]})`;
  return merged.status===0?`canonical main fast-forwarded ${behind} commit(s)`:leave(`fast-forward refused (${merged.stderr.trim().split('\n')[0]})`);

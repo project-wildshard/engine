@@ -457,12 +457,15 @@ class Landing{
   * @param {string} head */
  async watchMain(head){
   /** @type {string[]} */const superseded=[];
+  // One deadline for the whole chain (J206 review): each newer run would otherwise restart waitCI's own timeout.
+  const deadline=Date.now()+this.options.timeoutMinutes*60_000;
   let sha=head;
   for(;;){
    const verdict=await this.waitCI(sha,'main');
    if(!cancelledOnly(verdict))return {verdict,sha,superseded};
    const tip=this.fetchMain();
    if(tip===sha||!isAncestor(this.root,sha,tip))return {verdict,sha,superseded};
+   if(Date.now()>deadline){this.say('superseded',`main keeps replacing its runs; stopped following after ${this.options.timeoutMinutes} min at ${short(sha)}`);return {verdict,sha,superseded};}
    this.say('superseded',`main's run for ${short(sha)} was cancelled by a newer main push; ${short(tip)} contains it, watching that run`);
    superseded.push(sha);
    sha=tip;
