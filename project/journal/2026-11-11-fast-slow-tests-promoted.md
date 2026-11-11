@@ -24,7 +24,10 @@ budget or calibration change:
 - Coordinator call, reversible: the full planner's `maxShards` goes from
   14 to 15. Since CI packing (7c97b585) shards run one after another
   inside the five packed jobs, so one more shard only lengthens a job.
-  With 15 the plan is 235.4 s per shard at most (240 ceiling). Packed by
+  With 15 the plan is 235.7 s per shard at most (240 ceiling). Packed by
   `scripts/ci-pack.mjs` at planner estimates, the longest job goes from
   895 to 941 s; the estimates overstate, and the last packed run's
   longest real job took 570 s (plan/ci-pack), so expect about 600 s.
+
+The rounds leg's clock is re-recorded for its reviewed blob (12.0 s
+locally, from the push gate); the full plan is then 235.7 s.

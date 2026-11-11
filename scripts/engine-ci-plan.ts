@@ -69,7 +69,7 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
   // since CI packing (7c97b585) shards run one after another inside the five
   // packed jobs, so one more shard only lengthens a job a little. It lets
   // FL11-FL13 leave quarantine: 14 shards floor at 247 s with them, 15 plan
-  // at 235.4 s, still under the 240 s per-shard ceiling.
+  // at 235.7 s, still under the 240 s per-shard ceiling.
   const maxShards=ring==='full'?15:12;
   const curve=Array.from({length:maxShards},(_,index)=>({count:index+1,seconds:Math.max(...shards(index+1).map(shard=>shard.expectedSeconds)),gain:0}));
   const first=curve[0]?.seconds??0,best=Math.min(...curve.map(row=>row.seconds));

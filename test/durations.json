@@ -895,7 +895,7 @@
   "test/nalati-room-sand.test.ts": 1.1318750770000001,
   "test/nalati-startup.test.ts": 3.969256673,
   "test/nalati-stealth-verbs.test.ts": 26.733517536999997,
-  "test/nalati-taming-verbs-rounds.test.ts": 8.551903915999999,
+  "test/nalati-taming-verbs-rounds.test.ts": 12.004433791000002,
   "test/nalati-taming-verbs.test.ts": 72.903,
   "test/nalati-titan-room.test.ts": 12.580871041999998,
   "test/nalati-world-verbs.test.ts": 14.789788389,
