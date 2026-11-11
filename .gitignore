@@ -144,3 +144,8 @@ public/assets/driftwood-isle/map/top.webp
 /public/assets/driftwood-isle/
 
 .tsc-layers/
+
+# Pin outputs: `pins.ts install` publishes each pinned shardfile's program mount here (mounts/programs/<slug>.json). The
+# canonical checkout's info/exclude lists the files it once wrote; a new pin's file showed up untracked in worktrees and
+# the pre-push refused it (2026-11-11). Pure build output, never committed.
+/public/programs/
