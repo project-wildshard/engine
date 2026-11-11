@@ -56,3 +56,4 @@ slow. Each now skips the idle part and keeps its assertions.
   dropped replay input fails both.
   The cave leg gets its own native group (the routes group would push the planner past its floor); its first local clock, 41 s on a loaded machine, and the worker file's 28 s are recorded; the full plan is 232.8 s of 240.
   J206 MUST: a fresh cave-leg world lost the whole-tour check (duplicate notices or a quest fact once all 17 are found). The cave leg's save now first earns the eight entry places in the same world by standing in each (one notice each, checked), so its tour runs on every earlier discovery and must add no repeat notice.
+  Both new files join their originals in test/pins/ring-2-tests.json (Ring 1 has no full Nalati product: the cave leg hit ENOENT there), so their Ring 1 weights go.
