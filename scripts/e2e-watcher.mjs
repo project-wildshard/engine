@@ -124,7 +124,11 @@ const onEvent = event => {
 watcher.on('event', onEvent);
 watcher.on('change', () => { status.dirty = true; });
 // What the bundle doesn't watch: source the finish builds, and the build scripts this process has loaded.
-watch(join(root, 'src'), { recursive: true }, () => { status.changedAt = performance.now(); });
+// Not the outputs other tools write under src/: the status page's build and Playwright's results.
+const OUTPUTS = /^(?:dist|e2e\/test-results|e2e\/playwright-report)(?:\/|$)/u;
+watch(join(root, 'src'), { recursive: true }, (_event, name) => {
+  if (name !== null && !OUTPUTS.test(name)) { status.changedAt = performance.now(); console.log(`e2e-watcher: src/${name} changed`); }
+});
 watch(join(root, 'scripts'), { recursive: true }, (_event, name) => { if (name !== null && !name.endsWith('.json')) status.stale = true; });
 
 await ready();
