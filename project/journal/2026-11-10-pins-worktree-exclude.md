@@ -24,3 +24,4 @@ pins are covered already; an extra path a plan publishes shows as untracked in
 that worktree only, which `land` and `worktree new` ignore (tracked-only checks).
 CRLF and a missing end marker no longer swallow lines.
 Clocks re-recorded for the reworked test.
+(The rework itself landed in the commit after this paragraph's.)

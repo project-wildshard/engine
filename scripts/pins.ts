@@ -248,7 +248,7 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
   mkdirSync('out', { recursive: true });
   const paths = [...published.keys()].sort((a, b) => a.localeCompare(b));
   writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
-  // One block per checkout in the shared exclude file: a worktree never rewrites the parent's (pins-exclude.mjs).
+  // The shared exclude file is the canonical checkout's alone; a plan worktree leaves it untouched (pins-exclude.mjs).
   excludePublished(paths);
   if (dependency === undefined) await installSaves(pins.map(row => row.slug));
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);

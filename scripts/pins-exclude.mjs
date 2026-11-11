@@ -1,66 +1,54 @@
 // `pins.ts install` keeps the mounts it publishes under public/ out of `git status` with a marked block in Git's
-// exclude file. That file lives in the common Git dir, so every worktree of the repo reads and writes the same one
-// (J240, DEV-SPEED DS6). Each checkout therefore owns its own block: the canonical checkout keeps the original
-// markers, a linked worktree's markers name it, and a write replaces only the writer's block (plus blocks of
-// worktrees that no longer exist), never another checkout's. Patterns are root-anchored and Git applies the file to
-// each worktree's own root, so the union only ever hides published mount paths.
+// exclude file. That file lives in the common Git dir: every worktree of the repo reads the same one (J240, DEV-SPEED
+// DS6), and Git has no per-worktree exclude file. So only the canonical checkout writes the block. A linked plan
+// worktree never touches it (codex-port, 2026-11-10: a worktree's `--from-format` install replaced the parent's block
+// and broke its pins). A worktree with the same pins is already covered by the canonical block; a path a plan
+// publishes beyond it shows as untracked there, which hides nothing and blocks nothing (commits are by pathspec, and
+// `land` and `worktree new` check tracked files only).
 import {execFileSync} from 'node:child_process';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
-import {dirname,relative,resolve} from 'node:path';
+import {dirname} from 'node:path';
 
 const BEGIN='# pins: mounts published under public/, begin',END='# pins: mounts published under public/, end';
-const MARKER=/^# pins: mounts published under public\/, (begin|end)(?: \(worktree (.+)\))?$/u;
-
-/** @param {string} id '' for the canonical checkout */
-const markers=id=>id===''?[BEGIN,END]:[`${BEGIN} (worktree ${id})`,`${END} (worktree ${id})`];
 
 /**
- * The exclude text with `id`'s block set to `paths` and every other live checkout's block kept.
- * @param {string} text the current exclude file
- * @param {string} id '' for the canonical checkout, else the worktree's path relative to it
- * @param {readonly string[]} paths repo-relative published paths
- * @param {(id: string) => boolean} [live] whether another worktree's block still has its worktree
+ * The exclude text with the pins block set to `paths`; every other line kept as it was.
+ * @param {string} text the current exclude file @param {readonly string[]} paths repo-relative published paths
  * @returns {string}
  */
-export function excludeText(text,id,paths,live=()=>true){
- const lines=text===''?[]:text.replace(/\n$/u,'').split('\n');
- /** @type {string[]} */const kept=[];
- /** @type {string|undefined} */let inside;
- let keep=true;
- for(const line of lines){
-  const marker=MARKER.exec(line);
-  if(inside===undefined&&marker?.[1]==='begin'){
-   inside=marker[2]??'';
-   keep=inside!==id&&(inside===''||live(inside));
-   if(keep)kept.push(line);
-   continue;
-  }
-  if(inside!==undefined&&marker?.[1]==='end'&&(marker[2]??'')===inside){
-   if(keep)kept.push(line);
-   inside=undefined;keep=true;
-   continue;
-  }
-  if(inside===undefined||keep)kept.push(line);
- }
- // An unterminated block of another checkout is closed rather than left to swallow ours.
- if(inside!==undefined&&keep)kept.push(markers(inside)[1]??END);
- const [begin,end]=markers(id);
- return `${[...kept,begin,...paths.map(path=>`/${path}`),end].join('\n')}\n`;
+export function excludeText(text,paths){
+ const lines=text===''?[]:text.replace(/\r?\n$/u,'').split(/\r?\n/u);
+ const start=lines.indexOf(BEGIN),end=start===-1?-1:lines.indexOf(END,start);
+ // No end marker: only the begin line is dropped, never the lines after it.
+ const kept=start===-1?lines:[...lines.slice(0,start),...lines.slice(end===-1?start+1:end+1)];
+ return `${[...kept,BEGIN,...paths.map(path=>`/${path}`),END].join('\n')}\n`;
 }
 
-/** Write this checkout's block of published paths into the shared exclude file.
- * @param {readonly string[]} paths @param {string} [cwd] */
+/** The pins block's paths in an exclude file. @param {string} text @returns {Set<string>} */
+export function excludedPaths(text){
+ const lines=text.split(/\r?\n/u),start=lines.indexOf(BEGIN),end=start===-1?-1:lines.indexOf(END,start);
+ return new Set(start===-1||end===-1?[]:lines.slice(start+1,end).map(line=>line.replace(/^\//u,'')));
+}
+
+/** Write the canonical checkout's block of published paths; in a linked worktree, leave the shared file alone.
+ * @param {readonly string[]} paths @param {string} [cwd]
+ * @returns {{written:boolean,uncovered:number}} */
 export function excludePublished(paths,cwd=process.cwd()){
  /** @param {string[]} args */
  const git=args=>execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
- let file,top,common;
+ let file,gitDir,common;
  try{
   file=git(['rev-parse','--path-format=absolute','--git-path','info/exclude']);
-  top=git(['rev-parse','--show-toplevel']);
+  gitDir=git(['rev-parse','--path-format=absolute','--git-dir']);
   common=git(['rev-parse','--path-format=absolute','--git-common-dir']);
- }catch{return;}
- const canonical=dirname(common),id=top===canonical?'':relative(canonical,top).replaceAll('\\','/');
+ }catch{return {written:false,uncovered:paths.length};}
  const text=existsSync(file)?readFileSync(file,'utf8'):'';
+ if(gitDir!==common){
+  const covered=excludedPaths(text),uncovered=paths.filter(path=>!covered.has(path)).length;
+  console.log(`pins: linked worktree; the shared exclude stays the canonical checkout's${uncovered===0?'':` (${uncovered} published paths it doesn't cover show as untracked here)`}`);
+  return {written:false,uncovered};
+ }
  mkdirSync(dirname(file),{recursive:true});
- writeFileSync(file,excludeText(text,id,paths,other=>existsSync(resolve(canonical,other,'.git'))));
+ writeFileSync(file,excludeText(text,paths));
+ return {written:true,uncovered:0};
 }
