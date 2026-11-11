@@ -1,4 +1,4 @@
-import type { ChatReport } from '@wildshard/engine/net/chat';
+import type { ChatReport, WorldLine } from '@wildshard/engine/net/chat';
 import type { PlayerDoc } from './playerDoc';
 import type { SaveReceipt, SaveWrite } from './saves/saveStore';
 import type {PlaytestHit} from './playtest';
@@ -26,6 +26,8 @@ export type CellOrder =
   | { readonly kind: 'find'; readonly id: number; readonly slug: string; readonly device: string }
   | ({ readonly kind: 'seat'; readonly slug: string; readonly port: MessagePort; readonly hello: ArrayBuffer } & SeatEntry)
   | { readonly kind: 'drain' }
+  /** MP4.1: a `room` line said in cell `from`, for every other awake cell on this worker. */
+  | { readonly kind: 'chat'; readonly from: string; readonly line: WorldLine }
   | { readonly kind: 'close' };
 /** One 10 s reading of a worker (E7.8). */
 export interface WorkerReading {
@@ -41,7 +43,9 @@ export type RoomNews =
   | { readonly kind: 'seated'; readonly device: string; readonly body: string; readonly seats: number }
   | { readonly kind: 'refused'; readonly device: string; readonly reason: string }
   | { readonly kind: 'recovered'; readonly device: string; readonly seq: number }
-  | { readonly kind: 'save'; readonly write: SaveWrite };
+  | { readonly kind: 'save'; readonly write: SaveWrite }
+  /** MP4.1: a `room` line said here, for the rest of the world. */
+  | { readonly kind: 'chat'; readonly line: WorldLine };
 /** What a worker says to the door. */
 export type WorkerNews =
   | { readonly kind: 'booted'; readonly ms: number }

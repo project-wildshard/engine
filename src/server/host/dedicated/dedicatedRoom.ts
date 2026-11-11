@@ -94,7 +94,7 @@ export class DedicatedRoom {
       return true;
     };
     this.sim.nameOf = body => bodies.get(body)?.name;
-    this.net = new NetRoom({ world: this.sim, build: options.build, book: this.book, step: inputs => { this.step(inputs); }, ...(options.reports === undefined ? {} : { reports: options.reports }) });
+    this.net = new NetRoom({ world: this.sim, build: options.build, book: this.book, step: inputs => { this.step(inputs); }, shout: line => { options.post({ kind: 'chat', line }); }, ...(options.reports === undefined ? {} : { reports: options.reports }) });
     this.net.open();
     this.parkLead();
     this.shop = new ShopGate(this.host);

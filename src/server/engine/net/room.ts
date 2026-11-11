@@ -4,7 +4,7 @@
 import * as v from 'valibot';
 import { installPortableMath } from '../../../shared/engine/core/portableMath';
 import { NetRoomActSchema, type NetChatReport, type NetChatSay, type NetTickAct } from '../../../shared/engine/net/acts';
-import { CHAT_RADIUS, RoomChat, type ChatLine, type ChatReports } from './chat';
+import { CHAT_RADIUS, RoomChat, type ChatLine, type ChatReports, type WorldLine } from './chat';
 import { cleanName } from './chatFilter';
 import type { CombatEvent } from './combatWire';
 import type { QuestProgress } from '../../../shared/engine/quest/progress';
@@ -101,6 +101,8 @@ export interface NetRoomOptions {
   readonly book?: LedgerBook;
   /** Where reports of chat go. Absent, a report is checked and goes nowhere. */
   readonly reports?: ChatReports;
+  /** MP4.1: where a `room` line goes so every other cell hears it. Absent, `room` is this room alone. */
+  readonly shout?: (line: WorldLine) => void;
 }
 
 /** An act and the tick it stops waiting for its command. */
@@ -176,7 +178,9 @@ export class NetRoom {
   private opened = false;
   private serial = 0;
   private clientIds = 0;
-  constructor(options: NetRoomOptions) { installPortableMath(); this.world = options.world; this.step = options.step; this.build = options.build ?? ''; this.required = options.requiredCapabilities ?? []; this.book = options.book ?? new LedgerBook(); this.chat = new RoomChat(options.reports); }
+  constructor(options: NetRoomOptions) { installPortableMath(); this.world = options.world; this.step = options.step; this.build = options.build ?? ''; this.required = options.requiredCapabilities ?? []; this.book = options.book ?? new LedgerBook(); this.chat = new RoomChat(options.reports, options.shout); }
+  /** MP4.1: a `room` line said in another cell, for everyone here. */
+  hear(line: WorldLine): void { this.chat.hear(line, this.world.tick()); }
   /** Who a client said it is, its Name cleaned. */
   identityOf(client: number): NetIdentity | null { return this.clients.find(entry => entry.id === client)?.identity ?? null; }
   /** The last command `seq` applied for a client, or 0. */

@@ -17,6 +17,12 @@ Reward keys are schema-validated on admission. A room binds reward
 identity to its verified seat, and clears the binding when either an
 added player leaves or the retained lead seat is emptied.
 
+The door claims each player's Name with a four-digit tag before it
+seats them (`saves/names.ts`, MMO-PLAN MP2.4), so everyone reads
+`Name#1234`; a Name with a listed word reads as Guest. A `room` chat
+line is the world's: its cell cleans and flood-checks it, and the door
+relays it to every other awake cell (MP4.1). Proximity stays in its cell.
+
 `test/dedicated-*.test.ts` exercises the gateway, rooms, saves and
 release boundary. `scripts/room-deploy.mjs` is a local proof: two bots,
 a rejected hash, restart onto the retained release, a valid bundle

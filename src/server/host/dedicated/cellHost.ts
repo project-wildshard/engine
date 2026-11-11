@@ -97,6 +97,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   };
   const handle = (order: CellOrder): void => {
     if (order.kind === 'close') { dispose(); return; }
+    // MP4.1: a line from the world reaches each awake cell here but the one that said it. A cell asleep or starting over hears nothing.
+    if (order.kind === 'chat') { const source = cells.get(order.from); if (ready) for (const cell of cells.values()) if (cell !== source && cell.waking === null && cell.room.taken > 0) cell.room.net.hear(order.line); return; }
     if (!ready) { fail(new Error('A worker was told something before it booted')); return; }
     if (order.kind === 'drain') { clock?.pause(); for (const { room } of cells.values()) room.drain(); post({ kind: 'drained' }); return; }
     const cell = cells.get(order.slug);

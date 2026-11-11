@@ -173,6 +173,7 @@ export class World {
     else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);
     else if (news.kind === 'save') this.options.saves.write(news.write);
     else if (news.kind === 'report') { if (!this.options.saves.report(news.report, cellShard(news.slug))) this.refuse('report-backlog'); }
+    else if (news.kind === 'chat') { for (const link of this.workers) link.send({ kind: 'chat', from: news.slug, line: news.line }); }
     else if(news.kind==='playtest')this.options.playtest?.(news.row);
     else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
     else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
