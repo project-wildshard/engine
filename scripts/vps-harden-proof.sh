@@ -4,8 +4,8 @@
 # clawdbot, an OpenClaw unit holding a planted token, a pending reboot, the server unit without VH10's trust). It runs on the Mac's
 # own architecture, as scripts/vps-rebuild-proof.sh does.
 #   bash scripts/vps-harden-proof.sh [--keep]     needs Docker; writes tmp/vps-harden-proof/<stamp>/; removes its container
-# The runs: --check as root (must fail, row by row); --check as raynos (root-only reads must say unknown); the apply mode (must say it
-# applies nothing); then a few VH2 and VH3 fixes by hand and --check again (those rows must turn ok). After every run, nothing under
+# The runs: --check as root (must fail, row by row); --check as raynos (root-only reads must say unknown); the apply mode without
+# root (must refuse); then a few VH2 and VH3 fixes by hand and --check again (those rows must turn ok). After every run, nothing under
 # /etc, /home, /root, /usr, /opt or /var/lib may be newer than the marker set before the first, and the planted token never prints.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
@@ -100,9 +100,10 @@ has 2-raynos 'unknown VH3   sshd -T: needs sudo'
 has 2-raynos 'unknown VH6   fail2ban-client status: needs sudo'
 has 2-raynos 'unknown VH2   OpenClaw token search: needs sudo'
 
-run 3-apply bash /root/wildshard/scripts/vps/harden.sh
-[ "$(cat "$OUT/3-apply.exit")" = 0 ] || fail 'the apply mode did not exit 0'
-has 3-apply 'applies nothing yet'
+# The apply mode changes the box by design (MS3.1), and is proved on the box itself; here only its refusals are run.
+run 3-apply runuser -u raynos -- bash /root/wildshard/scripts/vps/harden.sh
+[ "$(cat "$OUT/3-apply.exit")" = 1 ] || fail 'the apply mode without root did not stop'
+has 3-apply 'Run with sudo'
 
 # --- A few of VH2's and VH3's fixes by hand: the rows they belong to must read clean.
 box sh -c "gpasswd -d matt sudo >/dev/null && groupdel docker && userdel -r clawdbot 2>/dev/null; usermod -s /usr/sbin/nologin matt \

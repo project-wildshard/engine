@@ -3,16 +3,13 @@
 # VH2 to VH15. It changes nothing: it only reads files, `sshd -T`, `ufw status`, `fail2ban-client status`, `systemd-analyze security`,
 # `sysctl`, `pro status`, PostgreSQL's catalogue, auth.log and, when `hcloud` is set up, the Hetzner Cloud Firewall.
 #   sudo bash harden.sh --check   the full report; without root, what root alone can read says `unknown`
-#   sudo bash harden.sh           applies nothing yet: VH3 to VH15 are scripted into it next, and proved in a container first
+#   sudo bash harden.sh           apply VH3 to VH15 (harden-apply.sh beside it; --open-443 and --close-443 are its too)
 # Exit 0 is a clean box, 1 is any `fail`, 2 is no `fail` but something unreadable. It never prints a secret: a secret search
 # reports a count of files, and env files are tested for a name, never read out.
 # HARD STOP (Jake, 2026-11-09): nothing here touches the old VPS beyond reading it, and Jake runs it there, not an agent.
 # HARDEN_ROOTFS prefixes every file it reads, so the engine's test can hand it a made-up box; commands come from PATH.
 set -uo pipefail
-if [ "${1:-}" != --check ]; then
-  if [ "$#" != 0 ]; then printf 'stop    Expected no arguments or --check\n'; exit 1; fi
-  printf 'skip    harden.sh applies nothing yet (VPS-HARDENING VH3 to VH15 come next); run it with --check for the report\n'; exit 0
-fi
+if [ "${1:-}" != --check ]; then here=${BASH_SOURCE[0]%/*}; [ "$here" != "${BASH_SOURCE[0]}" ] || here=.; exec bash "$here/harden-apply.sh" "$@"; fi
 R=${HARDEN_ROOTFS:-}
 FAILS=0 UNKNOWNS=0
 line() { printf '%-7s %-5s %s\n' "$1" "$2" "$3"; }
@@ -89,13 +86,18 @@ else unknown VH3 "sshd -T: $NEEDS_ROOT"; fi
 if [ "$LISTENERS_OK" = 1 ] && wildcard_on 22; then info VH3 'sshd listens on every address; ufw and the Hetzner firewall decide who reaches it'; fi
 
 # --- VH4: firewall, two layers.
+CF_RANGES_RE='173\.245\.48\.0/20|103\.21\.244\.0/22|103\.22\.200\.0/22|103\.31\.4\.0/22|141\.101\.64\.0/18|108\.162\.192\.0/18|190\.93\.240\.0/20|188\.114\.96\.0/20|197\.234\.240\.0/22|198\.41\.128\.0/17|162\.158\.0\.0/15|104\.16\.0\.0/13|104\.24\.0\.0/14|172\.64\.0\.0/13|131\.0\.72\.0/22|2400:cb00::/32|2606:4700::/32|2803:f800::/32|2405:b500::/32|2405:8100::/32|2a06:98c0::/29|2c0f:f248::/32'
 if [ "$ROOT" = 1 ] && has ufw; then
   status=$(ufw status verbose 2>/dev/null)
   if printf '%s\n' "$status" | grep -q '^Status: active'; then ok VH4 'ufw is active'; else bad VH4 'ufw is not active'; fi
   if printf '%s\n' "$status" | grep -q 'deny (incoming)'; then ok VH4 'ufw denies incoming by default'; else bad VH4 'ufw does not deny incoming by default'; fi
   # A rule line has an action column; keep the ones that are neither 443 nor the tailnet interface.
-  extra=$(printf '%s\n' "$status" | grep -E ' (ALLOW|DENY|REJECT|LIMIT)( IN| OUT)? ' | grep -Ev '^443(/tcp)?( \(v6\))? |on tailscale0' | sed 's/  */ /g; s/ $//' | tr '\n' ';' | sed 's/;$//')
-  if [ -z "$extra" ]; then ok VH4 'ufw allows only 443 and tailscale0'; else bad VH4 "ufw rules beyond 443 and tailscale0: $extra"; fi
+  # Beyond the tailnet and Tailscale's 41641/udp, only 443 from Cloudflare's ranges (J264).
+  extra=$(printf '%s\n' "$status" | grep -E ' (ALLOW|DENY|REJECT|LIMIT)( IN| OUT)? ' | grep -Ev '^41641/udp( \(v6\))? |on tailscale0' \
+    | grep -Ev "^443/tcp +ALLOW IN +($CF_RANGES_RE)( |$)" | sed 's/  */ /g; s/ $//' | tr '\n' ';' | sed 's/;$//')
+  if [ -z "$extra" ]; then ok VH4 'ufw allows only tailscale0, 41641/udp and 443 from Cloudflare'; else bad VH4 "ufw rules beyond tailscale0, 41641/udp and Cloudflare's 443: $extra"; fi
+  opened=$(printf '%s\n' "$status" | grep -cE '^443/tcp +ALLOW IN' || true)
+  if [ "$opened" = 0 ]; then info VH4 '443 is shut in ufw'; else info VH4 "443 is open in ufw to $opened Cloudflare ranges"; fi
 elif [ "$ROOT" = 1 ]; then bad VH4 'ufw is not installed'
 else unknown VH4 "ufw rules: $NEEDS_ROOT"; fi
 # This server is the one whose public IPv4 is one of ours; its attached firewalls' inbound rules must be TCP 443 and UDP 41641 alone.
@@ -141,17 +143,17 @@ pro_status="$R/var/lib/ubuntu-advantage/status.json"
 if [ -r "$pro_status" ] && has python3; then
   for service in esm-apps livepatch; do
     state=$(python3 -I -c 'import json, sys; print(next((s.get("status", "?") for s in json.load(open(sys.argv[1])).get("services", []) if s.get("name") == sys.argv[2]), "absent"))' "$pro_status" "$service" 2>/dev/null)
-    if [ "$state" = enabled ]; then ok VH5 "pro $service enabled"; else bad VH5 "pro $service is ${state:-unreadable}; want enabled"; fi
+    if [ "$state" = enabled ]; then ok VH5 "pro $service enabled"; else info VH5 "pro $service is ${state:-unreadable} (D6: Ubuntu Pro skipped)"; fi
   done
 elif [ -e "$pro_status" ]; then unknown VH5 "pro status file: $NEEDS_ROOT"
-else bad VH5 'Ubuntu Pro is not attached (no status file): no ESM Apps, no Livepatch'; fi
+else info VH5 'Ubuntu Pro is not attached (D6: skipped; the daily reboot takes new kernels)'; fi
 
 # --- VH6: fail2ban.
 if [ "$ROOT" = 1 ] && has fail2ban-client; then
   jails=$(fail2ban-client status 2>/dev/null | sed -n 's/.*Jail list:[[:space:]]*//p')
-  for jail in sshd caddy; do
-    if printf '%s\n' "$jails" | tr ', ' '\n\n' | grep -qx "$jail"; then ok VH6 "fail2ban jail $jail"; else bad VH6 "no fail2ban $jail jail (jails: ${jails:-none})"; fi
-  done
+  if printf '%s\n' "$jails" | tr ', ' '\n\n' | grep -qx sshd; then ok VH6 'fail2ban jail sshd'; else bad VH6 "no fail2ban sshd jail (jails: ${jails:-none})"; fi
+  # J264: behind Cloudflare a ban by source address would ban an edge; the per-player limits are the server's (VH10).
+  info VH6 'no caddy jail: behind Cloudflare the server limits each player by CF-Connecting-IP'
 elif [ "$ROOT" = 1 ]; then bad VH6 'fail2ban is not installed'
 else unknown VH6 "fail2ban-client status: $NEEDS_ROOT"; fi
 
@@ -172,23 +174,25 @@ if has ps; then
 else unknown VH8 'ps is missing'; fi
 if [ "$LISTENERS_OK" = 1 ]; then
   tails=$( { tailscale ip -4; tailscale ip -6; } 2>/dev/null | tr '\n' '|' | sed 's/|$//' | sed 's/\./\\./g')
-  exposed=$(printf '%s\n' "$LISTENERS" | grep -E ':(8790|8791|8792)$' | grep -Ev "^(127\.0\.0\.1|\[::1\]${tails:+|\[?($tails)\]?}):" | tr '\n' ' ' | sed 's/ $//')
+  # ss writes a device suffix (`%tailscale0`) inside or after the brackets; it is dropped before the address is judged.
+  exposed=$(printf '%s\n' "$LISTENERS" | grep -E ':(8790|8791|8792)$' | sed -E 's/%[^]:]+//' | grep -Ev "^(127\.0\.0\.1|\[::1\]${tails:+|\[?($tails)\]?}):" | tr '\n' ' ' | sed 's/ $//')
   if [ -z "$exposed" ]; then ok VH8 'game and cook ports listen on loopback or the tailnet only'; else bad VH8 "game or cook port on a public address: $exposed"; fi
 fi
 
 # --- VH9: the proxy.
 if has caddy; then
   caddyfile=$(sed 's/#.*//' "$R/etc/caddy/Caddyfile" 2>/dev/null)
-  for want in 'admin off' 'protocols h1 h2' '-CF-Connecting-IP' 'stream_close_delay'; do
+  for want in 'admin off' 'protocols h1 h2' '-CF-Connecting-IP' 'stream_close_delay' 'client_auth' 'require_and_verify' 'trusted_proxies static' 'client_ip_headers CF-Connecting-IP'; do
     if printf '%s\n' "$caddyfile" | grep -qF -- "$want"; then ok VH9 "Caddyfile has '$want'"; else bad VH9 "Caddyfile lacks '$want'"; fi
   done
 else bad VH9 'Caddy is not installed'; fi
 if [ "$ROOT" = 1 ] && has nft; then
   rules443=$(nft list ruleset 2>/dev/null | grep -E 'dport 443')
-  if printf '%s\n' "$rules443" | grep -Eq 'saddr.*ct count over 20( |$)'; then ok VH9 'nftables caps 443 at 20 concurrent per source'
-  else bad VH9 'no nftables cap of 20 concurrent connections per source on 443'; fi
-  if printf '%s\n' "$rules443" | grep -Eq 'saddr.*limit rate over 30/minute'; then ok VH9 'nftables caps 443 at 30 new connections a minute per source'
-  else bad VH9 'no nftables cap of 30 new connections a minute per source on 443'; fi
+  # J264: every source is a Cloudflare edge carrying many players, so these are flood floors per edge, not per player.
+  if printf '%s\n' "$rules443" | grep -Eq 'saddr ct count over 2000( |$)'; then ok VH9 'nftables floors 443 at 2000 concurrent per Cloudflare edge'
+  else bad VH9 'no nftables floor of 2000 concurrent connections per source on 443'; fi
+  if printf '%s\n' "$rules443" | grep -Eq 'saddr limit rate over 600/minute'; then ok VH9 'nftables floors 443 at 600 new connections a minute per Cloudflare edge'
+  else bad VH9 'no nftables floor of 600 new connections a minute per source on 443'; fi
 elif [ "$ROOT" = 1 ]; then bad VH9 'nft is not installed'
 else unknown VH9 "nftables ruleset: $NEEDS_ROOT"; fi
 
@@ -262,12 +266,16 @@ if [ -r "$dump" ]; then
 elif [ -e "$dump" ]; then unknown VH13 "dump.sh: $NEEDS_ROOT"
 else bad VH13 'no installed dump.sh'; fi
 if has age; then ok VH13 'age is installed'; else bad VH13 'age is not installed'; fi
+if [ "$ROOT" = 1 ]; then
+  if grep -Eqs '^AGE_RECIPIENT=age1[a-z0-9]{58}$' "$R/etc/wildshard/ops.env"; then ok VH13 'ops.env names an age recipient'; else bad VH13 'ops.env names no AGE_RECIPIENT: dumps go up unencrypted'; fi
+fi
 
 # --- VH14: alert on auth.
 if [ -d "$R/var/log/journal" ] || grep -Eqs '^Storage=persistent' "$R"/etc/systemd/journald.conf "$R"/etc/systemd/journald.conf.d/*.conf; then ok VH14 'journald is persistent'
 else bad VH14 'journald keeps no log across a reboot'; fi
 if [ "$ROOT" = 1 ]; then
-  if grep -Eqs '^ALERT_URL=.' "$R/etc/wildshard/ops.env"; then ok VH14 'ops.env names an ALERT_URL'; else bad VH14 'ops.env names no ALERT_URL'; fi
+  # J252: auth events go to Sentry for the agents, not to ALERT_URL.
+  if grep -Eqs '^SENTRY_CRON_DSN=https://.' "$R/etc/wildshard/ops.env"; then ok VH14 'ops.env names the Sentry DSN auth events go to (J252)'; else bad VH14 'ops.env names no SENTRY_CRON_DSN (J252)'; fi
   if grep -rqs 'ALERT_URL\|wildshard-alert' "$R/etc/pam.d" "$R/etc/ssh/sshrc"; then ok VH14 'SSH logins and sudo alert'; else bad VH14 'SSH logins and sudo raise no alert'; fi
   if grep -rqs 'ALERT_URL\|wildshard-alert' "$R/etc/fail2ban"; then ok VH14 'fail2ban bans alert'; else bad VH14 'fail2ban bans raise no alert'; fi
 else unknown VH14 "alert hooks: $NEEDS_ROOT"; fi

@@ -113,6 +113,62 @@ releases, the cook worker has written the shard's index, and nothing
 listens on 80 or 443. The stubbed parts are the tailnet (Jake's) and
 api-server; `api.wildshard.io` resolves to nothing inside the box.
 
+## Hardening (VPS-HARDENING VH3 to VH15, MMO-SERVER-PLAN MS3.1)
+
+`sudo bash scripts/vps/harden.sh` applies every row; `rebuild.sh` runs it
+before Phase 2, and a rerun changes nothing. What it does:
+
+- **VH3, VH4 (D1):** waits until the box is on the tailnet, then ufw
+  denies in and allows only `tailscale0` and UDP 41641; sshd takes keys
+  only, `raynos` only, no root; Tailscale SSH is turned off, so tailnet
+  SSH reaches that sshd. A dead-man (`wildshard-harden-deadman.timer`)
+  undoes ufw, Tailscale SSH and the sshd file 10 minutes later unless
+  the operator stops it from a new SSH session.
+- **MS3.3:** `/etc/sudoers.d/20-wildshard-agents` lets `raynos` run, with
+  no password, only `systemctl start|stop|restart|--no-pager status` on
+  the two servers, the two pull units and the cook, `restart` and
+  `status` of Caddy, `/usr/local/sbin/wildshard-harden --check` and
+  `/usr/local/sbin/wildshard-restore-check` (root-owned copies). The
+  journal comes from the `systemd-journal` group, and `wildshard-lynis`
+  runs the gate's audit. Anything else (a rerun of `rebuild.sh`,
+  `setup.sh` or `harden.sh` itself) is Jake's, with his own `raynos`
+  password, which is also the Hetzner console break-glass:
+  `ssh -t wildshard 'sudo bash ~/vps-build/scripts/vps/rebuild.sh'`.
+- **VH5:** unattended-upgrades for NodeSource, Tailscale, Caddy and
+  Cloudflare, rebooting at 04:30 UTC. No Ubuntu Pro (D6).
+- **VH6, VH14 (J252):** fail2ban's `sshd` jail. Every SSH or console
+  login, `sudo` session and ban sends one Sentry event (logger
+  `wildshard-auth`, DSN from `ops.env`'s `SENTRY_CRON_DSN`) for the
+  agents' read. No `caddy` jail: behind Cloudflare a ban by address
+  would ban an edge, and the server limits each player by
+  `CF-Connecting-IP`.
+- **VH7:** sandbox drop-ins for both servers (production `MemoryMax=18G`,
+  staging `6G`), the cook (`4G`, keeps user and network namespaces) and
+  Caddy. They take effect at each unit's next restart.
+- **VH9 (J264):** `harden-caddy.sh` writes Caddy for
+  `rooms.wildshard.io` (8790, plus `/up`, a bare 200 while production's
+  `/health` is) and `rooms-staging.wildshard.io` (8791): a Cloudflare
+  Origin CA certificate at `/etc/caddy/origin/rooms-origin.{pem,key}`,
+  Authenticated Origin Pulls (client certificate required, CA pinned),
+  `CF-Connecting-IP` believed only from Cloudflare's ranges and passed on
+  as the single `X-Forwarded-For` hop (`TRUST_PROXY=caddy` reads it),
+  Origin allowlist, `admin off`, HTTP/1.1 and 2 only. nftables floors per
+  Cloudflare edge sit beside ufw. Caddy starts once the certificate is
+  there. Port 443 opens only with `sudo bash harden.sh --open-443`
+  (Cloudflare's ranges, nothing else) after the pre-open gate, and
+  `--close-443` shuts it again.
+- **VH11, VH12:** `rebuild.sh` gives each channel its own OS user
+  (`wildshard-<channel>`) and database role (`wildshard_<channel>`),
+  peer-mapped over the socket, each owning one database with `CONNECT`
+  revoked from `PUBLIC`; `setup.sh` runs each channel's units as its user
+  with `PGUSER`, its own folder, pack cache and logs, and env files
+  `640 root:wildshard-<channel>`.
+- **VH13:** with `AGE_RECIPIENT` in `ops.env`, `dump.sh` encrypts each
+  dump to that age key (`.dump.age`) before it touches disk. The private
+  key stays on the Mac (`~/.config/wildshard/backup-age-key.txt`); a
+  restore check copies it over for the run only:
+  `AGE_IDENTITY=<file> restore-check.sh <dump>`.
+
 ## Hardening report (VPS-HARDENING VH1)
 
 `scripts/vps/harden.sh --check` reads what an unprivileged audit cannot
