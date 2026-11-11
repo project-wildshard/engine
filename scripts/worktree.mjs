@@ -58,7 +58,6 @@ const git=(cwd,args,input)=>execFileSync('git',args,{cwd,encoding:'utf8',input,s
 const tryGit=(cwd,args)=>spawnSync('git',args,{cwd,encoding:'utf8',maxBuffer:256<<20});
 const nul=(/** @type {string} */ text)=>text.split('\0').filter(Boolean);
 
-/** @param {string[]} argv */
 /**
  * GVS G10 (J230): run a store install only while no pnpm store prune runs. This install is announced in
  * `store-users/` before it checks the prune's reservation (an exclusive flock its pnpm child inherits), and the prune
@@ -81,6 +80,7 @@ export function withStoreUse(env,what,fn){
  }finally{rmSync(mine,{force:true});}
 }
 
+/** @param {string[]} argv */
 export function parseArgs(argv){
  const [command,slug,...rest]=argv;
  if(command!=='new'||slug===undefined)throw new StopError(USAGE);
