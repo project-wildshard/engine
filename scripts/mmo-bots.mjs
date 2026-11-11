@@ -120,7 +120,7 @@ let stopping = null;
 /** `--remote`: ends the host's replica and removes its directory. */
 let remoteStop = () => { /* local: the replica is a child of this script */ };
 /** `--remote`: runs one command on the host; `away` is the run's directory there, under the ssh user's home. */
-/** @type {((command: string, input?: Buffer | string) => Buffer) | null} */
+/** @type {((command: string, input?: Buffer | string, timeout?: number) => Buffer) | null} */
 let hostSsh = null;
 let away = '';
 /** The replica never outlives this script: an error, Ctrl-C or a kill takes it down too. Every caller waits on the one stop,
@@ -132,7 +132,7 @@ const stopRoom = async () => {
     if (players !== null && players.exitCode === null && players.signalCode === null) {
       const left = new Promise(resolve => { players.once('exit', resolve); });
       // On the host, the ssh client's signal never reaches the bots: they are told there, leave, and the ssh ends with them.
-      if (botsOnHost && hostSsh !== null) try { hostSsh(`pkill -TERM -f '[/]${away}/bots/mmoBots.mjs'`); } catch { /* already gone */ }
+      if (botsOnHost && hostSsh !== null) try { hostSsh(`pkill -TERM -f '[/]${away}/bots/mmoBots.mjs'`, '', 20_000); } catch { /* already gone */ }
       else players.kill('SIGTERM');
       const force = setTimeout(() => { players.kill('SIGKILL'); }, 15_000);
       await left; clearTimeout(force);
@@ -170,7 +170,7 @@ if (mode === 'replica') {
   else {
     // The same bundle on the host: it fetches it itself and checks the same SHA-256, and the release file goes over ssh.
     away = `mmo-bench/${stamp}`;
-    const ssh = (/** @type {string} */ command, /** @type {Buffer | string} */ input = '') => execFileSync('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, command], { input, stdio: ['pipe', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
+    const ssh = (/** @type {string} */ command, /** @type {Buffer | string} */ input = '', timeout = 0) => execFileSync('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, command], { input, stdio: ['pipe', 'pipe', 'inherit'], maxBuffer: 1 << 30, timeout });
     hostSsh = ssh;
     ssh(`mkdir -p ${away}/server && cat > ${away}/release.json`, readFileSync(join(work, 'release.json')));
     // `--server-from` sends its own bundle and its SHA-256; a release's is fetched there and checked against the release.
@@ -180,7 +180,9 @@ if (mode === 'replica') {
     ssh(`cd ${away} && echo '${sha}  server.tar.gz' | sha256sum -c --quiet && tar -xzf server.tar.gz -C server && rm server.tar.gz`);
     const there = { ...env, PACK_CACHE: `$HOME/${away}/packs`, RELEASE_URL: `file://$HOME/${away}/release.json` };
     const words = Object.entries(there).filter(([name]) => name !== 'PATH' && name !== 'HOME').map(([name, value]) => `${name}="${value}"`).join(' ');
-    remoteStop = () => { try { ssh(`pkill -TERM -f '[/]${away}/server/main.mjs'; sleep 2; pkill -KILL -f '[/]${away}/server/main.mjs'; rm -rf ${away}`); } catch { /* the host already cleaned it */ } };
+    // Bots on the host go first whatever their ssh link did (a dropped link leaves them running there): told, then killed.
+    const hostBots = botsOnHost ? `pkill -TERM -f '[/]${away}/bots/mmoBots.mjs' && sleep 8; pkill -KILL -f '[/]${away}/bots/mmoBots.mjs'; ` : '';
+    remoteStop = () => { try { ssh(`${hostBots}pkill -TERM -f '[/]${away}/server/main.mjs'; sleep 2; pkill -KILL -f '[/]${away}/server/main.mjs'; rm -rf ${away}`, '', 60_000); } catch { /* the host already cleaned it */ } };
     // Bots on the host dial its loopback themselves; otherwise a tunnel brings the port here.
     const tunnel = botsOnHost ? [] : ['-o', 'ExitOnForwardFailure=yes', '-L', `${String(REPLICA_PORT)}:127.0.0.1:${String(REPLICA_PORT)}`];
     room = spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, ...tunnel, remote,

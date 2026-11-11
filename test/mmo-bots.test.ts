@@ -103,6 +103,9 @@ test('bots on the host need --remote, dial its loopback with no tunnel, and are 
   // The same loopback URL and forwarded addresses as a local replica's bots, pinned to their own cores.
   expect(driver).toContain('exec taskset -c ${values[\'bot-cpus\']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(\' \')} "$HOME/${away}/bots.json" forwarded');
   expect(driver.indexOf("hostSsh(`pkill -TERM -f '[/]${away}/bots/mmoBots.mjs'`)")).toBeLessThan(driver.indexOf("running.kill('SIGTERM')"));
+  // A dropped bots link still leaves no bot running: the host stop tells, then kills them before the replica goes.
+  expect(driver).toContain("const hostBots = botsOnHost ? `pkill -TERM -f '[/]${away}/bots/mmoBots.mjs' && sleep 8; pkill -KILL -f '[/]${away}/bots/mmoBots.mjs'; ` : '';");
+  expect(driver).toContain("ssh(`${hostBots}pkill -TERM -f '[/]${away}/server/main.mjs';");
   // Their report comes back before remoteStop removes the host directory.
   expect(driver.indexOf('hostSsh(`cat ${away}/bots.json`)')).toBeLessThan(driver.indexOf('await stopRoom();\nconst full'));
 });
