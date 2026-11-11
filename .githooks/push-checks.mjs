@@ -103,6 +103,8 @@ function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
     // WIRE-STABILITY WR6: the bound wire's lock is current against v0, under 1 s (release rules come with a newer pin).
     {name:'check:wire',commands:[['pnpm','run','--silent','check:wire']]},
+    // WIRE-STABILITY WR7: saves.lock.json, every save key's version, shape and migrations (test/saves-lock.test.ts).
+    {name:'check:saves',commands:[['pnpm','run','--silent','check:saves']]},
   ];
 }
 

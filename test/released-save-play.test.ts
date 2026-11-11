@@ -20,6 +20,9 @@ import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
 import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
 import {builtProduct,runtimeAssets} from './fixtures/engine-lift/product';
+import {SaveStore,type SaveStorage,type SchemaFailure} from '../src/shared/engine/saves/store';
+import {admitDoc} from '../src/server/host/dedicated/playerDoc';
+import {definitions} from './fixtures/saveDefinitions';
 
 // `shardfile` is where the save was made; `pin`, when present, is the later shard pin it is proven to resume on (D5-4).
 interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;pin?:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
@@ -59,3 +62,26 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save resumes in pla
     } finally {live.dispose();}
   }
 },10_000);
+
+// WIRE-STABILITY WR7: released whole save documents, every local key's document and a server PlayerDoc, load with no `.corrupt`
+// key and no schema report. The epoch check above makes the epoch-2 cut (WR8) recapture them: test/save-whole-documents.test.ts.
+interface DocumentPin {release:string;saveEpoch:number;shard:string;docs:Record<string,unknown>;player:{saveVersion:number;doc:unknown}}
+const documentPins=readdirSync('test/pins/saves/documents').filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`test/pins/saves/documents/${name}`,'utf8')) as DocumentPin);
+for(const pin of documentPins)test(`released ${pin.release} whole save documents load with no .corrupt key`,()=>{
+  expect(pin.saveEpoch).toBe(epoch.saveEpoch);
+  const values=new Map<string,string>(),local:SaveStorage={get length(){return values.size;},key:index=>[...values.keys()][index]??null,getItem:name=>values.get(name)??null,setItem:(name,value)=>{values.set(name,value);},removeItem:name=>{values.delete(name);}};
+  const failures:SchemaFailure[]=[],store=new SaveStore({local,session:local,report:failure=>{failures.push(failure);}}),defs=[...definitions().values()];
+  const probe=defs.find(definition=>definition.scope==='global');if(probe===undefined)throw new Error('No global key');
+  store.define(probe).write(probe.initial());const prefix=([...values.keys()][0]??'').slice(0,-'global'.length);values.clear();
+  for(const [scope,doc] of Object.entries(pin.docs))values.set(prefix+scope,JSON.stringify(doc));
+  let valid=0;
+  for(const definition of defs){
+    const namespace=definition.scope==='shard'?pin.shard:undefined,slot=store.define(definition),status=slot.status?.(namespace);
+    expect(status,`${definition.scope}/${definition.key}`).not.toBe('invalid');if(status==='valid')valid++;slot.read(namespace);
+  }
+  expect(valid).toBeGreaterThan(defs.length/2);
+  expect([...values.keys()].filter(name=>name.includes('.corrupt.'))).toEqual([]);
+  for(const raw of values.values())expect(Object.keys((JSON.parse(raw) as {keys:object}).keys).filter(key=>key.includes('.corrupt.'))).toEqual([]);
+  expect(failures).toEqual([]);
+  expect(admitDoc(pin.player.doc,pin.player.saveVersion,pin.shard)).not.toBeNull();
+});

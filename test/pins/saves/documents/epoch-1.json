@@ -1,0 +1,470 @@
+{
+ "release": "0.1.8",
+ "saveEpoch": 1,
+ "shard": "driftwood-isle",
+ "docs": {
+  "device": {
+   "keys": {
+    "boot.reports": {
+     "v": 1,
+     "data": []
+    },
+    "boot.times": {
+     "v": 1,
+     "data": {}
+    },
+    "boot.trace": {
+     "v": 1,
+     "data": null
+    },
+    "debug.open": {
+     "v": 1,
+     "data": []
+    },
+    "devMode": {
+     "v": 1,
+     "data": false
+    },
+    "err.queue": {
+     "v": 1,
+     "data": []
+    },
+    "grid.last-played": {
+     "v": 1,
+     "data": null
+    },
+    "grid.recovery.guard": {
+     "v": 1,
+     "data": null
+    },
+    "grid.recovery.once": {
+     "v": 1,
+     "data": null
+    },
+    "grid.reset.pending": {
+     "v": 1,
+     "data": null
+    },
+    "grid.server-placed": {
+     "v": 1,
+     "data": false
+    },
+    "gridIntent.once": {
+     "v": 1,
+     "data": null
+    },
+    "ktx2set": {
+     "v": 1,
+     "data": {}
+    },
+    "life.alive.once": {
+     "v": 1,
+     "data": null
+    },
+    "life.lastEnd": {
+     "v": 1,
+     "data": null
+    },
+    "life.lastUnload": {
+     "v": 1,
+     "data": null
+    },
+    "perf.lap": {
+     "v": 1,
+     "data": null
+    },
+    "perf.probe": {
+     "v": 1,
+     "data": null
+    },
+    "perf.rec": {
+     "v": 1,
+     "data": null
+    },
+    "session.crash-position": {
+     "v": 1,
+     "data": null
+    },
+    "storage.persisted": {
+     "v": 1,
+     "data": false
+    },
+    "telemetry.heartbeat": {
+     "v": 1,
+     "data": null
+    },
+    "telemetry.install": {
+     "v": 1,
+     "data": ""
+    },
+    "telemetry.reported": {
+     "v": 1,
+     "data": []
+    },
+    "titleArrival.once": {
+     "v": 1,
+     "data": null
+    },
+    "titlePrefetch": {
+     "v": 2,
+     "data": null
+    },
+    "ui.fold": {
+     "v": 1,
+     "data": {}
+    },
+    "voice": {
+     "v": 1,
+     "data": {
+      "wanted": false,
+      "seen": false
+     }
+    },
+    "voiceSettings": {
+     "v": 1,
+     "data": {
+      "input": "",
+      "volume": 1,
+      "mode": "toggle"
+     }
+    }
+   }
+  },
+  "session": {
+   "keys": {
+    "boot.lowPower": {
+     "v": 1,
+     "data": null
+    },
+    "boot.selfReload": {
+     "v": 1,
+     "data": null
+    },
+    "boot.staleBuild": {
+     "v": 1,
+     "data": null
+    },
+    "clearDownloads.report": {
+     "v": 1,
+     "data": null
+    },
+    "err.reloads": {
+     "v": 1,
+     "data": []
+    },
+    "err.session": {
+     "v": 1,
+     "data": null
+    },
+    "gpu.reloads": {
+     "v": 1,
+     "data": []
+    },
+    "grid.recovery.once": {
+     "v": 1,
+     "data": null
+    },
+    "grid.reentries": {
+     "v": 1,
+     "data": []
+    },
+    "gridIntent": {
+     "v": 1,
+     "data": null
+    },
+    "life.alive": {
+     "v": 1,
+     "data": null
+    },
+    "loadAttempt": {
+     "v": 1,
+     "data": null
+    },
+    "resume.brand": {
+     "v": 1,
+     "data": null
+    },
+    "resume.shot": {
+     "v": 1,
+     "data": null
+    },
+    "shardRefusals": {
+     "v": 1,
+     "data": {}
+    },
+    "telemetry.heartbeat": {
+     "v": 1,
+     "data": null
+    },
+    "titleArrival": {
+     "v": 1,
+     "data": null
+    },
+    "travel.handoff": {
+     "v": 1,
+     "data": null
+    }
+   }
+  },
+  "global": {
+   "keys": {
+    "controls": {
+     "v": 1,
+     "data": {}
+    },
+    "gfx": {
+     "v": 1,
+     "data": {}
+    },
+    "hints": {
+     "v": 1,
+     "data": []
+    },
+    "review": {
+     "v": 1,
+     "data": null
+    },
+    "review.queue": {
+     "v": 1,
+     "data": []
+    },
+    "settings": {
+     "v": 1,
+     "data": {}
+    },
+    "summary": {
+     "v": 1,
+     "data": {
+      "v": 1,
+      "shards": {}
+     }
+    }
+   }
+  },
+  "profile": {
+   "keys": {
+    "platform.ledger": {
+     "v": 1,
+     "data": {
+      "facts": {},
+      "entitlements": {},
+      "items": {},
+      "achievements": {}
+     }
+    }
+   }
+  },
+  "driftwood-isle": {
+   "keys": {
+    "(legacy bond)": {
+     "v": 1,
+     "data": null
+    },
+    "(legacy cosmetics)": {
+     "v": 1,
+     "data": {
+      "owned": [],
+      "worn": {}
+     }
+    },
+    "(legacy names)": {
+     "v": 1,
+     "data": {}
+    },
+    "(quest reward)": {
+     "v": 1,
+     "data": false
+    },
+    "bosses": {
+     "v": 1,
+     "data": {}
+    },
+    "bounty": {
+     "v": 1,
+     "data": {}
+    },
+    "compendium": {
+     "v": 1,
+     "data": {}
+    },
+    "continuation": {
+     "v": 1,
+     "data": null
+    },
+    "continuationSite": {
+     "v": 1,
+     "data": null
+    },
+    "creature-rewards": {
+     "v": 1,
+     "data": {
+      "legacyOwner": null,
+      "players": {}
+     }
+    },
+    "elites": {
+     "v": 1,
+     "data": {}
+    },
+    "finish-pickups": {
+     "v": 1,
+     "data": {}
+    },
+    "flags": {
+     "v": 1,
+     "data": []
+    },
+    "inventory": {
+     "v": 1,
+     "data": {
+      "counts": {},
+      "order": []
+     }
+    },
+    "owned": {
+     "v": 1,
+     "data": {
+      "owned": [],
+      "worn": []
+     }
+    },
+    "platform.buildings": {
+     "v": 1,
+     "data": {}
+    },
+    "platform.continuation": {
+     "v": 1,
+     "data": null
+    },
+    "platform.grid-position": {
+     "v": 1,
+     "data": null
+    },
+    "platform.loadout": {
+     "v": 1,
+     "data": {
+      "selected": null,
+      "items": []
+     }
+    },
+    "platform.region": {
+     "v": 1,
+     "data": null
+    },
+    "platform.runtime-logical": {
+     "v": 1,
+     "data": null
+    },
+    "platform.runtime-state": {
+     "v": 1,
+     "data": null
+    },
+    "progress": {
+     "v": 1,
+     "data": {
+      "counts": {},
+      "earned": [],
+      "title": null,
+      "playS": 0
+     }
+    },
+    "purse": {
+     "v": 1,
+     "data": 0
+    },
+    "skins": {
+     "v": 1,
+     "data": {
+      "owned": [],
+      "worn": {}
+     }
+    },
+    "wr7.moved": {
+     "v": 2,
+     "data": 0
+    },
+    "wr7.same": {
+     "v": 1,
+     "data": 0
+    },
+    "wr7.strict": {
+     "v": 1,
+     "data": {
+      "a": 0
+     }
+    }
+   }
+  }
+ },
+ "player": {
+  "saveVersion": 1,
+  "doc": {
+   "at": {
+    "x": 0,
+    "y": 1.2,
+    "z": -194,
+    "yaw": 3.141592653589793
+   },
+   "health": {
+    "state": {
+     "version": 1,
+     "effectTags": [],
+     "cause": null,
+     "previousMode": "foot",
+     "attributes": {
+      "health": 100,
+      "maxHealth": 100,
+      "incomingCap": 20,
+      "dodgeCooldownMul": 1
+     }
+    },
+    "sinceHurt": 0
+   },
+   "book": {
+    "player": "actor.player",
+    "flags": [],
+    "quests": [
+     {
+      "version": 1,
+      "id": "sealed-ring",
+      "started": false,
+      "currentId": "shards"
+     }
+    ],
+    "parts": {
+     "chapter:driftwood.finale": "z:eddc5d6f9b3a18c0f1efe26baf02f2ce57a9a3c9094e6b8d400e38cdba28dffdc8861048d26d47ad8ea6eeafdf4d633f7e7b00dbbbd951bc98aab66521d29114ebb270955e3b911e2fe589143613a9c82abb7187b2cc1e36b6d0b979a89d7e32b590c216bbbdab7d237dd0df4c617cb87931854bd77ae7b42d1e7cb9902233fab62e144ab1b185ad9f7b6d2b73d05518cdd6cf428acad4aeacee74de568410dfc4164fd79dd44e574e9ca468279d3e1e9b55554667af7e66a5481f975214e6bb0bb54e574fc685887658290ecfa6e8979c642fae5b7b17d7950ce2dae5b631e1d7a0feb286de80e7a2416497b12eb02b392d7d64bbc26efe61914761b6d637bf4ddf8bcef746a4d1e95326a237affb89685fd2cf9d8576bcfb19682b3f7706fafd0dd330d82c3e7b1a7a5177b3d0edbb9f330d4b29ea7565773e3299c449ace7d3783a992f329d24d3c96a3dcda2c968b69e4f8d5e99f5389b8eb3649a45ab6c369925d379368f32bd4ed62b1daffa078b38aaf3d9a9fce1a9ba535589f4a6ce664aa4eaadb355091f124ed7a6f13965a1d1ed091be27dcaeed437c5527549e8c50c9e78083a3fc33b1db5556d589bf9dbcec247a4c4492a715e4cfa78ec561ccedd66bea50a47af0a2f571bd53cc436f23c15a9c283bc2a3dc961fc2547fdf84be9757c97982eb629b98eebad753891aef8bac525d3fd0697d2f031f632d25b679394a30adf64a8be97fef065aae6d3fcdbd33798f7dbe9eb3e137277c95d378fb7f3d68590b7fe27dbefff3679c3ad90e40d9237887e3377bd33e9af4f9e5f76736751222df679de1eaece34b70367d7df7c7ece476ec8d549f42e3ac7ebdbc81bf78f30095338eb5e95481751e4fbdc96d9de57a5eadd17a6e1c5c63fc36fe6b5497dee7415aab7b66817b3d5df9548e390b1735cf7207e1e561b9fc85f86ed72fd6aaa2fdf7ba15fe2a85d7613ef7fdd6bf3e3bfb4699eff709c647269914ceec6fff859bc7f2b76bad25be34c15d23993335f18ae63836bd7228a6279e9fdde9522b39559bbe682aa44b977bb7db375b9d75df3ec8bb23077531a5dbeee4514257706badc513f6a94d19d512ea7d9478d3296d78fa4b7a77fd82893db517abbdfbb86093bc77ed5ec03b62cc25bb1f4dbc77359bb9bdd635f879bbfdf8e371bb30e2f51d85576fa509c7f74af97fff1cfde5436dcf1fd0bb6d99bdcff994cc7891f64678af61f09e19edf6c24e737b3d0db0fdc54b6665b563e878f910400000000000000000000000000000000000000000000007f92642ea7e35f940000000000000000000000000000000000000000000000803f4d3c9ecb7831fa7fff9380e958c6d158c68b4426f15ccee732194de4622293682ae3912ff07571bc90c968249344ce47329e4de462261711ffa1010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008077584a259ef272a5f35a89f4f1a844a1b746895489af5f6ba79df91a29219570afbba6b8d86f57a60a652f3adf378591122779af71fc1b8de3b71a27ef1979f49ec6e3df68fcc5cfdbe76fa36dbeaf8c4f602495c86cad57b9c99448373aafcd6979924a1cca2acfda145bffc7228a7c74377456d98d3b9465f6b0b185ce4d186d57d6d6d9b2f00dbbe7b5b126cffc6847dff1a62a7f98e23c9854c216ce547aedec8befd8557b1366b93345668b27dfd3f2244eff02",
+     "dialogue:sealed-ring": "{}",
+     "cable:driftwood.quest": "{\"riding\":false,\"s\":0,\"v\":0}",
+     "gear:driftwood.quest": "{\"iron\":false,\"rewardOwned\":false,\"skins\":[]}",
+     "reward:driftwood.quest": "{\"elapsed\":-1,\"carried\":false,\"player\":{\"pitch\":0,\"carried\":false},\"from\":{\"x\":0,\"y\":0,\"z\":0,\"yaw\":0,\"pitch\":0,\"phase\":0}}",
+     "pack:driftwood.quest": "{\"counts\":{},\"order\":[]}"
+    }
+   },
+   "respawn": null,
+   "seats": [
+    "{\"held\":0,\"queued\":false,\"struck\":false,\"opened\":false,\"windows\":0,\"target\":null,\"swings\":0,\"hits\":0,\"clocks\":[{\"move\":null,\"swingT\":0,\"comboIdx\":0,\"lastSwingEnd\":-1000000000,\"cooldown\":0,\"charging\":false,\"chargeT\":0,\"releaseQueued\":false,\"chargePending\":false,\"heldPrev\":false,\"time\":0},{\"move\":null,\"swingT\":0,\"comboIdx\":0,\"lastSwingEnd\":-1000000000,\"cooldown\":0,\"charging\":false,\"chargeT\":0,\"releaseQueued\":false,\"chargePending\":false,\"heldPrev\":false,\"time\":0}]}"
+   ],
+   "store": {
+    "wildshard.save.v2.device": "{\"keys\":{}}",
+    "wildshard.save.v2.session": "{\"keys\":{}}",
+    "wildshard.save.v2.global": "{\"keys\":{}}",
+    "wildshard.save.v2.driftwood-isle": "{\"keys\":{\"purse\":{\"v\":1,\"data\":7},\"owned\":{\"v\":1,\"data\":{\"owned\":[\"cape\"],\"worn\":[]}}}}"
+   },
+   "ledger": {
+    "serial": 1,
+    "rows": [
+     {
+      "id": "paid",
+      "tick": 1,
+      "grant": "coins",
+      "name": "coins",
+      "amount": 7,
+      "pending": false,
+      "kind": "ledger",
+      "serial": 1
+     }
+    ]
+   }
+  }
+ }
+}

@@ -1,0 +1,408 @@
+{
+  "format": 1,
+  "keys": {
+    "device/boot.reports": {
+      "version": 1,
+      "shape": "e6a4881a6e7367d8",
+      "migrations": []
+    },
+    "device/boot.times": {
+      "version": 1,
+      "shape": "bd66880d87f4fb15",
+      "migrations": []
+    },
+    "device/boot.trace": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "device/debug.open": {
+      "version": 1,
+      "shape": "e6a4881a6e7367d8",
+      "migrations": []
+    },
+    "device/devMode": {
+      "version": 1,
+      "shape": "7cb541e84f226754",
+      "migrations": []
+    },
+    "device/err.queue": {
+      "version": 1,
+      "shape": "e6a4881a6e7367d8",
+      "migrations": []
+    },
+    "device/grid.last-played": {
+      "version": 1,
+      "shape": "66dc5635d4718d9f",
+      "migrations": []
+    },
+    "device/grid.recovery.guard": {
+      "version": 1,
+      "shape": "548c23cb3a8eb913",
+      "migrations": []
+    },
+    "device/grid.recovery.once": {
+      "version": 1,
+      "shape": "cb35ee0a77338158",
+      "migrations": []
+    },
+    "device/grid.reset.pending": {
+      "version": 1,
+      "shape": "6a66f2f7508fd76b",
+      "migrations": []
+    },
+    "device/grid.server-placed": {
+      "version": 1,
+      "shape": "7cb541e84f226754",
+      "migrations": []
+    },
+    "device/gridIntent.once": {
+      "version": 1,
+      "shape": "048e5228c21903ad",
+      "migrations": []
+    },
+    "device/ktx2set": {
+      "version": 1,
+      "shape": "bd66880d87f4fb15",
+      "migrations": []
+    },
+    "device/life.alive.once": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "device/life.lastEnd": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "device/life.lastUnload": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "device/perf.lap": {
+      "version": 1,
+      "shape": "12a1ed11d8fdcd34",
+      "migrations": []
+    },
+    "device/perf.probe": {
+      "version": 1,
+      "shape": "12a1ed11d8fdcd34",
+      "migrations": []
+    },
+    "device/perf.rec": {
+      "version": 1,
+      "shape": "12a1ed11d8fdcd34",
+      "migrations": []
+    },
+    "device/session.crash-position": {
+      "version": 1,
+      "shape": "2c462c3f66231a50",
+      "migrations": []
+    },
+    "device/storage.persisted": {
+      "version": 1,
+      "shape": "7cb541e84f226754",
+      "migrations": []
+    },
+    "device/telemetry.heartbeat": {
+      "version": 1,
+      "shape": "58aa2bf25f19d23c",
+      "migrations": []
+    },
+    "device/telemetry.install": {
+      "version": 1,
+      "shape": "00404e686415370f",
+      "migrations": []
+    },
+    "device/telemetry.reported": {
+      "version": 1,
+      "shape": "a5e802163b34f633",
+      "migrations": []
+    },
+    "device/titleArrival.once": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "device/titlePrefetch": {
+      "version": 2,
+      "shape": "5f50b6eed0f7e80d",
+      "migrations": [
+        1
+      ]
+    },
+    "device/ui.fold": {
+      "version": 1,
+      "shape": "bd66880d87f4fb15",
+      "migrations": []
+    },
+    "device/voice": {
+      "version": 1,
+      "shape": "baab6d63cbf973ff",
+      "migrations": []
+    },
+    "device/voiceSettings": {
+      "version": 1,
+      "shape": "e4171f902783b127",
+      "migrations": []
+    },
+    "global/controls": {
+      "version": 1,
+      "shape": "ee80b1503ece8a78",
+      "migrations": []
+    },
+    "global/gfx": {
+      "version": 1,
+      "shape": "bd66880d87f4fb15",
+      "migrations": []
+    },
+    "global/hints": {
+      "version": 1,
+      "shape": "e6a4881a6e7367d8",
+      "migrations": []
+    },
+    "global/review": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "global/review.queue": {
+      "version": 1,
+      "shape": "e6a4881a6e7367d8",
+      "migrations": []
+    },
+    "global/settings": {
+      "version": 1,
+      "shape": "bd66880d87f4fb15",
+      "migrations": []
+    },
+    "global/summary": {
+      "version": 1,
+      "shape": "9706c5c7768dbe99",
+      "migrations": []
+    },
+    "profile/platform.ledger": {
+      "version": 1,
+      "shape": "8be1caab5909f46d",
+      "migrations": []
+    },
+    "session/boot.lowPower": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "session/boot.selfReload": {
+      "version": 1,
+      "shape": "12a1ed11d8fdcd34",
+      "migrations": []
+    },
+    "session/boot.staleBuild": {
+      "version": 1,
+      "shape": "12a1ed11d8fdcd34",
+      "migrations": []
+    },
+    "session/clearDownloads.report": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "session/err.reloads": {
+      "version": 1,
+      "shape": "e6a4881a6e7367d8",
+      "migrations": []
+    },
+    "session/err.session": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "session/gpu.reloads": {
+      "version": 1,
+      "shape": "e6a4881a6e7367d8",
+      "migrations": []
+    },
+    "session/grid.recovery.once": {
+      "version": 1,
+      "shape": "cb35ee0a77338158",
+      "migrations": []
+    },
+    "session/grid.reentries": {
+      "version": 1,
+      "shape": "fc4027ee3b95c805",
+      "migrations": []
+    },
+    "session/gridIntent": {
+      "version": 1,
+      "shape": "048e5228c21903ad",
+      "migrations": []
+    },
+    "session/life.alive": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "session/loadAttempt": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "session/resume.brand": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "session/resume.shot": {
+      "version": 1,
+      "shape": "12a1ed11d8fdcd34",
+      "migrations": []
+    },
+    "session/shardRefusals": {
+      "version": 1,
+      "shape": "38f9382551bd2019",
+      "migrations": []
+    },
+    "session/telemetry.heartbeat": {
+      "version": 1,
+      "shape": "58aa2bf25f19d23c",
+      "migrations": []
+    },
+    "session/titleArrival": {
+      "version": 1,
+      "shape": "b3f74097d2157d92",
+      "migrations": []
+    },
+    "session/travel.handoff": {
+      "version": 1,
+      "shape": "c8a8f68d82dc5bd9",
+      "migrations": []
+    },
+    "shard/(legacy bond)": {
+      "version": 1,
+      "shape": "12a1ed11d8fdcd34",
+      "migrations": []
+    },
+    "shard/(legacy cosmetics)": {
+      "version": 1,
+      "shape": "ebb68e68b6118b2e",
+      "migrations": []
+    },
+    "shard/(legacy names)": {
+      "version": 1,
+      "shape": "6c6add02dca4dd14",
+      "migrations": []
+    },
+    "shard/(quest reward)": {
+      "version": 1,
+      "shape": "7cb541e84f226754",
+      "migrations": []
+    },
+    "shard/bosses": {
+      "version": 1,
+      "shape": "77faa5cf3d8c8084",
+      "migrations": []
+    },
+    "shard/bounty": {
+      "version": 1,
+      "shape": "924b0a280869293e",
+      "migrations": []
+    },
+    "shard/compendium": {
+      "version": 1,
+      "shape": "597851850b9ea36e",
+      "migrations": []
+    },
+    "shard/continuation": {
+      "version": 1,
+      "shape": "49946497e73fc1fa",
+      "migrations": []
+    },
+    "shard/continuationSite": {
+      "version": 1,
+      "shape": "b4f977d595e93cdc",
+      "migrations": []
+    },
+    "shard/creature-rewards": {
+      "version": 1,
+      "shape": "99922ac468e7afb0",
+      "migrations": []
+    },
+    "shard/elites": {
+      "version": 1,
+      "shape": "680e4ab83a24f76b",
+      "migrations": []
+    },
+    "shard/finish-pickups": {
+      "version": 1,
+      "shape": "4dd393919ac5b1b8",
+      "migrations": []
+    },
+    "shard/flags": {
+      "version": 1,
+      "shape": "a5e802163b34f633",
+      "migrations": []
+    },
+    "shard/inventory": {
+      "version": 1,
+      "shape": "715770676190edc3",
+      "migrations": []
+    },
+    "shard/owned": {
+      "version": 1,
+      "shape": "8f7b0798ba030c9a",
+      "migrations": []
+    },
+    "shard/platform.buildings": {
+      "version": 1,
+      "shape": "4f9d847a6aefbcd8",
+      "migrations": []
+    },
+    "shard/platform.continuation": {
+      "version": 1,
+      "shape": "df86f0b2953a9a15",
+      "migrations": []
+    },
+    "shard/platform.grid-position": {
+      "version": 1,
+      "shape": "66dc5635d4718d9f",
+      "migrations": []
+    },
+    "shard/platform.loadout": {
+      "version": 1,
+      "shape": "075d87e901975941",
+      "migrations": []
+    },
+    "shard/platform.region": {
+      "version": 1,
+      "shape": "dc6615b9076eaff4",
+      "migrations": []
+    },
+    "shard/platform.runtime-logical": {
+      "version": 1,
+      "shape": "d8ca2399fd265417",
+      "migrations": []
+    },
+    "shard/platform.runtime-state": {
+      "version": 1,
+      "shape": "18a2526f4deb26b9",
+      "migrations": []
+    },
+    "shard/progress": {
+      "version": 1,
+      "shape": "571734e1618144f5",
+      "migrations": []
+    },
+    "shard/purse": {
+      "version": 1,
+      "shape": "25f406efd376bb0a",
+      "migrations": []
+    },
+    "shard/skins": {
+      "version": 1,
+      "shape": "ebb68e68b6118b2e",
+      "migrations": []
+    }
+  },
+  "retired": {}
+}
