@@ -73,6 +73,19 @@
   driving the room) and this engine's NetClient against a released-wire
   room a minor ahead (an animal field it lacks first, a kite class, an
   unknown record, owner f64 bits, rides). `check:wire` runs the bound
-  wire's `wire check` in pre-push static checks and CI static, by the
+  wire's `wire check` (a pin-sanity check at `a51f56f`: the installed
+  lock equals its descriptors and holds against v0; the release rules
+  come with a newer pin) in pre-push static checks and CI static, by the
   package's own `bin.mjs`: both copies declare a `wire` bin, so
   `node_modules/.bin/wire` could link either.
+- The WR6 Opus review (one-shot): MUSTs folded. The released client's
+  frames are now read beside the bound wire and must match word for
+  word, the room's stepped yaw and buttons must be what it sent, and the
+  HEAD client's hello, cmds and chat act are read by the released codecs
+  as the bound ones read them. Also folded: a room at the release's own
+  tables as well as one a minor ahead, a chat act and a clean close both
+  ways, the released-copy guard in `beforeAll` (its path names
+  `669d1fca`), and one lockfile entry per wire pin. Carried to the plan:
+  shardfile's `inSourceRepo` throws from a copy nested in another repo,
+  so `wire check` fails in engine once engine pins past `5139b41`; and
+  engine could apply the release rules against the released copy's lock.

@@ -101,7 +101,7 @@ function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
     {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
-    // WIRE-STABILITY WR6: the wire lock and its release rules, under 1 s.
+    // WIRE-STABILITY WR6: the bound wire's lock is current against v0, under 1 s (release rules come with a newer pin).
     {name:'check:wire',commands:[['pnpm','run','--silent','check:wire']]},
   ];
 }
