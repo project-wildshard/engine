@@ -9,7 +9,7 @@ export type LinkState = 'live' | 'reconnecting' | 'resuming' | 'lost' | 'full' |
 /** Why a link is down, as far as a browser can tell (meta MMO-FAILURE-MODES-PLAN FM4): `silent` stopped carrying frames (a half-open
  *  socket), `closed` was closed with no word (1006, a reset), `restart` was closed by a restarting server, `hidden` went quiet while the
  *  page was out of view. It rides `onState`'s reason for `reconnecting` and `resuming`. */
-export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden';
+export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden' | 'updating';
 /** Where the dial is, for a screen that shows it: dials so far, the wait to the next (null while one is out), and how long it's been down. */
 export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number }
 
@@ -43,6 +43,12 @@ export interface RedialOptions {
   readonly onState: (state: LinkState, reason?: string) => void;
   /** FM4: the cause changed while the link stayed down (a restart close mid-dial, a return to the tab after a silent spell). */
   readonly onCause?: (cause: LinkCause) => void;
+  /**
+   * WR5 (5.5, the cut): a `reload` or `refused` before this client ever heard a frame may be an older server that can't read
+   * a v1 hello, not a verdict on this build. The link stays down as "Server updating" and keeps dialling; this asks the page
+   * to check `version.json` and reload only if it names another build.
+   */
+  readonly onCut?: (reason: string) => void;
   readonly now?: () => number;
   readonly random?: () => number;
 }
@@ -141,9 +147,14 @@ export class Redial {
   }
   private closed(reason: string): void {
     const now = this.now();
-    if (FINAL.has(reason)) { this.stop(); this.show('ended', reason); return; }
+    // 5.5: `retry` is a newer client at an older server: back off and dial again, never reload. A refusal before the first
+    // frame may be the cut (an old server); the page decides from version.json, and until then the server is updating.
+    const cut = (reason === 'reload' || reason === 'refused') && this.heardAt === null;
+    if (FINAL.has(reason) && !cut) { this.stop(); this.show('ended', reason); return; }
+    if (reason === 'retry' || cut) this.because('updating');
+    if (cut) this.options.onCut?.(reason);
     if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }
-    if (this.phase === 'up') { this.because(reason === 'restart' ? 'restart' : 'closed'); this.lose(now, false); }
+    if (this.phase === 'up') { if (this.cause !== 'updating') this.because(reason === 'restart' ? 'restart' : 'closed'); this.lose(now, false); }
     else if (this.phase === 'down') { if (reason === 'restart') this.because('restart'); this.failedDial(now); }
   }
   /** The link is gone or no use: from now it is dialled, and a player's 35 s count from the last frame. */

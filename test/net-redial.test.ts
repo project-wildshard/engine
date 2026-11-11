@@ -187,3 +187,35 @@ test('dialNow brings a waiting dial forward and leaves the cause alone', () => {
   expect(redial.why).toBe(cause);
   redial.dispose();
 });
+
+// WR5 (5.5): the refusal policy as a client sees it.
+test('`retry` from an older server says Server updating and dials again, never ending the link', () => {
+  const { heard, run, links, redial, states } = harness();
+  heard(); links[0]?.fail('retry'); run(30_000);
+  expect(states).not.toContain('ended');
+  expect(links.length, 'it dials again, and again').toBeGreaterThanOrEqual(4);
+  expect(redial.why).toBe('updating');
+  redial.dispose();
+});
+
+test('a refusal before any frame is the cut: the page is asked, and the link keeps dialling as Server updating', () => {
+  let clock = 0;
+  const first = new FakeLink(), links = [first], said: [string, string | undefined][] = [], cuts: string[] = [];
+  const client = new NetClient(first, () => clock);
+  const redial = new Redial({ client, transport: first, now: () => clock, random: () => 0.5, onState: (state, reason) => { said.push([state, reason]); },
+    onCut: reason => { cuts.push(reason); }, dial: () => { const link = new FakeLink(); links.push(link); return link; } });
+  first.fail('reload');
+  for (let at = 0; at < 200; at++) { clock += 50; vi.advanceTimersByTime(50); }
+  expect(cuts).toEqual(['reload']);
+  expect(said.map(([state]) => state)).not.toContain('ended');
+  expect(redial.why).toBe('updating');
+  expect(links.length).toBeGreaterThan(1);
+  redial.dispose(); client.dispose();
+});
+
+test('after the first frame, `reload` still ends the link: a refused build reloads once', () => {
+  const { heard, links, states, redial } = harness();
+  heard(); links[0]?.fail('reload');
+  expect(states).toContain('ended');
+  redial.dispose();
+});

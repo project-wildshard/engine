@@ -98,6 +98,7 @@ export interface LinkScreens {
 function bannerFor(state: LinkState, cause: LinkCause, dials: number): { ids: string; tone: 'info' | 'warn'; title: string; line: string } {
   if (state === 'resuming') return { ids: 'resuming', tone: 'warn', title: 'Still reconnecting', line: 'we\'ll keep trying' };
   if (cause === 'restart') return { ids: 'restart', tone: 'info', title: 'Restarting', line: 'the world is back in a moment' };
+  if (cause === 'updating') return { ids: 'updating', tone: 'info', title: 'Server updating', line: dials > 0 ? `try ${String(dials + 1)}` : 'back in a moment' };
   if (cause === 'hidden') return { ids: 'background-short', tone: 'warn', title: 'Reconnecting', line: 'welcome back' };
   if (cause === 'silent') return { ids: 'half-open', tone: 'warn', title: 'Reconnecting', line: dials > 0 ? `try ${String(dials + 1)}` : 'no word from the world' };
   return { ids: 'drop reset', tone: 'warn', title: 'Reconnecting', line: dials > 0 ? `try ${String(dials + 1)}` : 'one moment' };

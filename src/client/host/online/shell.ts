@@ -47,6 +47,8 @@ export interface OnlineConfig {
 /** What the link tells the page. */
 export interface OnlineView {
   readonly link: (state: LinkState, reason?: string) => void;
+  /** WR5 (5.5, the cut): a refusal before any frame; the page reloads only if version.json names another build. */
+  readonly cut?: (reason: string) => void;
   /** J174: a deploy is due, and play goes on. */
   readonly countdown: (countdown: Countdown) => void;
   /** The seat is in a cell this page hasn't loaded. */
@@ -123,7 +125,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const first = hear(new WebSocketTransport(config.socket)), client = new NetClient(first);
   const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
-  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(config.socket));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); } });
+  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(config.socket));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); } });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
   // GO4: on a grid page, a held seat in another cell than the page booted re-enters the grid there, as a `resume` would say.
   const offFirst = client.onFrame(() => {
@@ -222,6 +224,8 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
+    // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
+    cut: () => { void reloadStale(); },
     countdown: said => { screens.countdown(said); preload(); },
     placed: (cell, stand) => { if (stand !== undefined) grid?.placed(cell, stand); },
     // A grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
