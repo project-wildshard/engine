@@ -170,7 +170,13 @@ test('a clash with the deploy live right now, when it is ours, fails the build a
 test('a paused production origin (503) stops a release build, but a CI test build warns once and carries nothing', async () => {
   mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-paused-'));
   // Vercel's spend cap answers every path 503 DEPLOYMENT_PAUSED (main ci 43111080979)
-  const server = createServer((_request, response) => {response.writeHead(503, {'x-vercel-error': 'DEPLOYMENT_PAUSED'}); response.end();});
+  let mode: 'paused' | 'reset' | 'garbage' = 'paused';
+  const server = createServer((_request, response) => {
+    if (mode === 'paused') {response.writeHead(503, {'x-vercel-error': 'DEPLOYMENT_PAUSED'}); response.end(); return;}
+    response.writeHead(200, {'Content-Type': 'application/json', 'Content-Length': '100'});
+    if (mode === 'garbage') {response.end('{not json'.padEnd(100)); return;}
+    response.write('{"format":'); setTimeout(() => {response.socket?.destroy();}, 10);
+  });
   await new Promise<void>(resolve => {server.listen(0, '127.0.0.1', resolve);});
   const warned: string[] = [], warn = console.warn;
   console.warn = (...args: unknown[]): void => {warned.push(args.join(' '));};
@@ -188,6 +194,13 @@ test('a paused production origin (503) stops a release build, but a CI test buil
     await expect(carryPreviousDeploy(root, {previousOrigin: closed})).rejects.toThrow();
     expect(await carryPreviousDeploy(root, {previousOrigin: closed, optional: true})).toMatchObject({builds: 1, carried: 0});
     expect(warned[1]).toMatch(/^Previous deploy manifest unavailable \(fetch failed from http:\/\/127\.0\.0\.1:1\)/u);
+    // a reset after the headers is a transport failure too; a whole body that is not a manifest always refuses
+    mode = 'reset';
+    await expect(carryPreviousDeploy(root, {previousOrigin})).rejects.toThrow();
+    expect(await carryPreviousDeploy(root, {previousOrigin, optional: true})).toMatchObject({builds: 1, carried: 0});
+    expect(warned).toHaveLength(3);
+    mode = 'garbage';
+    await expect(carryPreviousDeploy(root, {previousOrigin, optional: true})).rejects.toThrow(SyntaxError);
   } finally {
     console.warn = warn;
     await new Promise<void>((resolve, reject) => {server.close(error => {if (error === undefined) resolve(); else reject(error);});});

@@ -55,6 +55,8 @@ function currentManifest(directory) {
 }
 /** Production has moved past this build, or its bytes never arrived: not a reason to refuse this one. */
 class GoneError extends Error { name = 'GoneError'; }
+/** The origin answered, and the answer refuses this build in every mode. */
+class RefusedError extends Error { name = 'RefusedError'; }
 /** @param {string} path @param {string} origin @returns {Promise<Uint8Array>} */
 async function fetchRow(path, origin) {
   for (let attempt = 1; ; attempt++) {
@@ -120,23 +122,24 @@ export async function carryPreviousDeploy(directory, options = {}) {
   if (options.previousDirectory !== undefined) {
     previous = readManifest(JSON.parse(readFileSync(join(options.previousDirectory, MANIFEST), 'utf8')));
   } else if (options.previousOrigin !== undefined) {
-    /** @type {Response | undefined} */
-    let response;
-    try {
-      response = await fetch(new URL(`/${MANIFEST}`, options.previousOrigin), {cache: 'no-store', signal: AbortSignal.timeout(30000)});
-    } catch (error) {
-      if (options.optional !== true) throw error;
-      console.warn(`Previous deploy manifest unavailable (${error instanceof Error ? error.message : String(error)} from ${options.previousOrigin}), so this test build carries no previous builds`);
-    }
     // A test build may meet a paused or failing production (Vercel's spend cap answers 503 DEPLOYMENT_PAUSED, main ci
-    // 43111080979): it warns and carries nothing. A release still refuses, so it never ships without the kept graphs.
-    if (response !== undefined && options.optional === true && response.status >= 500) {
-      console.warn(`Previous deploy manifest unavailable (${response.status} from ${options.previousOrigin}), so this test build carries no previous builds`);
-      response = undefined;
+    // 43111080979): a 5xx or a transport failure (before or after the headers) warns and carries nothing. A release still
+    // refuses, so it never ships without the kept graphs. A body that arrives but is not a valid manifest always refuses.
+    /** @param {string} why */
+    const unavailable = why => { console.warn(`Previous deploy manifest unavailable (${why} from ${options.previousOrigin}), so this test build carries no previous builds`); };
+    /** @type {{status: number, html: boolean, body: string} | undefined} */
+    let answer;
+    try {
+      const response = await fetch(new URL(`/${MANIFEST}`, options.previousOrigin), {cache: 'no-store', signal: AbortSignal.timeout(30000)});
+      if (options.optional === true && response.status >= 500) unavailable(String(response.status));
+      // The first release of this output format has no predecessor manifest.
+      else if (!response.ok && response.status !== 404) throw new RefusedError(`Previous deploy manifest returned ${response.status}`);
+      else answer = {status: response.status, html: response.headers.get('content-type')?.includes('text/html') === true, body: await response.text()};
+    } catch (error) {
+      if (options.optional !== true || error instanceof RefusedError) throw error;
+      unavailable(error instanceof Error ? error.message : String(error));
     }
-    // The first release of this output format has no predecessor manifest.
-    if (response !== undefined && !response.ok && response.status !== 404) throw new Error(`Previous deploy manifest returned ${response.status}`);
-    if (response !== undefined && response.status !== 404 && !response.headers.get('content-type')?.includes('text/html')) previous = readManifest(await response.json());
+    if (answer !== undefined && answer.status !== 404 && !answer.html) previous = readManifest(JSON.parse(answer.body));
   }
   const held = new Map(current.files.map(row => [row.path, row.bytes])), kept = [current];
   let carried = 0, bytes = 0;
