@@ -73,7 +73,7 @@ test('a server that is down fails health and the socket, with the tunnel hint', 
   const rows = await run(config(await serveOrigin(signed(releaseFor(socket)))));
   expect(rows['release']?.state).toBe('pass');
   expect(rows['server']?.state).toBe('fail');
-  expect(rows['server']?.hint).toContain('Server unreachable: the server address');
+  expect(rows['server']?.hint).toMatch(/^Server unreachable: [^ ]+ is down/u);
   expect(rows['join']?.state).toBe('fail');
   expect(rows['latency']?.state).toBe('skip');
 });

@@ -16,7 +16,7 @@ import { botTarget } from './mmoBotsGuard';
 import { RoomBot } from './roomBot';
 
 const [url = '', build = '', botsArg = '0', secondsArg = '0', tag = 'mp0', result = '', addresses = 'own'] = process.argv.slice(2);
-const bots = Number(botsArg), seconds = Number(secondsArg), { url: parsed } = botTarget(url, addresses, bots);
+const bots = Number(botsArg), seconds = Number(secondsArg), { url: parsed, loopback } = botTarget(url, addresses, bots);
 assert.ok(seconds >= 5 && seconds <= 3600 && /^[a-z0-9-]{1,16}$/u.test(tag) && result !== '');
 /** The door's leave: `ready` with this flag lets a seat go now rather than holding the body 30 s (J114). */
 const LEAVE_FLAG = 1;
@@ -39,11 +39,17 @@ function othersSeen(walker: Walker): number {
   return seen;
 }
 
-/** `RoomBot` dials the global `WebSocket` as it is made; for that moment it is one that says this bot's address. */
+/** MS7: Caddy in front of rooms-staging seats a socket only from an allowed page Origin (MS6); a loopback replica doesn't ask. */
+const STAGING_PAGE = 'https://staging.wildshard.io';
+/** `RoomBot` dials the global `WebSocket` as it is made; for that moment it is one that says this bot's address and, off loopback,
+ *  the staging page's Origin. */
 function withAddress<T>(index: number, make: () => T): T {
-  if (addresses === 'own') return make();
-  const Native = globalThis.WebSocket, address = `198.18.${String(Math.floor(index / 250))}.${String(index % 250 + 1)}`;
-  globalThis.WebSocket = class extends Native { constructor(at: string | URL) { super(at, { headers: { 'x-forwarded-for': address } } as unknown as string[]); } };
+  const headers: Record<string, string> = {};
+  if (addresses === 'forwarded') headers['x-forwarded-for'] = `198.18.${String(Math.floor(index / 250))}.${String(index % 250 + 1)}`;
+  if (!loopback) headers['origin'] = STAGING_PAGE;
+  if (Object.keys(headers).length === 0) return make();
+  const Native = globalThis.WebSocket;
+  globalThis.WebSocket = class extends Native { constructor(at: string | URL) { super(at, { headers } as unknown as string[]); } };
   try { return make(); } finally { globalThis.WebSocket = Native; }
 }
 const walkers: Walker[] = [], started = performance.now();

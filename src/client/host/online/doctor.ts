@@ -166,13 +166,13 @@ async function checkServer(learned: Learned, ms: number): Promise<Outcome> {
     }
     return pass(`build ${short(learned.serverBuild ?? '?')}${players}${up}`);
   } catch (error) {
-    if (error instanceof TimedOutError) return fail(`${new URL(url).host}: ${error.message}`, 'Server unreachable: the server address (rooms.wildshard.io) is down or the server is stopped. Tell Jake.');
+    if (error instanceof TimedOutError) return fail(`${new URL(url).host}: ${error.message}`, `Server unreachable: ${new URL(url).host} is down or the server is stopped. Tell Jake.`);
     // A server from before the doctor sends no CORS header: an opaque answer still proves the tunnel and TLS are up.
     try {
       await limited(learned.scope, ms, signal => fetch(url, { mode: 'no-cors', cache: 'no-store', signal }));
       return pass(`${new URL(url).host} reachable (details need a newer server)`);
     } catch {
-      return fail(`${new URL(url).host}: no answer`, 'Server unreachable: the server address (rooms.wildshard.io) is down, its TLS is failing, or the server is stopped. Tell Jake.');
+      return fail(`${new URL(url).host}: no answer`, `Server unreachable: ${new URL(url).host} is down, its TLS is failing, or the server is stopped. Tell Jake.`);
     }
   }
 }

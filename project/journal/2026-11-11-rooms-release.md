@@ -15,3 +15,5 @@
   serves a small CORS `/health`, or the Doctor learns the server build another way. That's Jake's D7 call.
 - Second commit: the bots guard keeps one list, `STAGING_SOCKETS`; `mmo-bots.mjs` dials the socket its signed release
   names once it is on that list, so the switch is the release variable alone. The Doctor hint stops naming Funnel.
+- Review fold (Codex): the bots send the staging page Origin off loopback, since Caddy refuses a socket without an allowed
+  Origin (checked: Node with no Origin is refused, with it 101). The Doctor hint names the host it tried.
