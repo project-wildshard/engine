@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { shardfileValidationRevision } from './scripts/shardfile-validation-revision.mjs';
 import { join } from 'node:path';
 import { rapierAlias } from './vite/rapier';
+import { viteTmpRoot } from './scripts/vite-tmp.mjs';
 import { assertHeavyLease } from './scripts/heavy-lane-lease.mjs';
 import { buildValidationReceipts } from './scripts/app-build/validationReceipts.mjs';
 import { BUILD_ID_EXPRESSION, VALIDATOR_EXPRESSION, VERDICTS_EXPRESSION, SHARED_CODE_DIRECTORY, codeDirectory } from './scripts/app-build/buildIdentity.mjs';
@@ -30,6 +31,7 @@ export default defineConfig(({ mode, command }) => {
   const validationRevision = shardfileValidationRevision();
   buildValidationReceipts(validationRevision); // Fail before bundling on any stale or missing product.
   return {
+    plugins: [viteTmpRoot({ janitor: join(process.cwd(), 'scripts/temp-janitor.mjs') })],
     // DS11: plan worktrees under .worktrees/ are other checkouts; the dev watcher never follows them
     server: { port: 5173, host: true, watch: { ignored: worktreeWatchIgnored() } },
     // js-payload D2 (Jake): on-phone stacks show Rolldown's mangled names; hidden source maps resolve them on desktop

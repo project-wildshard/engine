@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 import { rapierAlias } from './vite/rapier';
 import { assertVitestLane, vitestMaxWorkers, vitestNodeExecArgv } from './scripts/vitest-lane';
-import { vitestTmpRoot } from './scripts/vitest-tmp';
+import { viteTmpRoot } from './scripts/vite-tmp.mjs';
 import { vitestModuleCache } from './scripts/vitest-module-cache';
 import { setPriority } from 'node:os';
 import { resolve } from 'node:path';
@@ -22,7 +22,7 @@ const quarantined = (ci || githubActions) && quarantine === 'blocking' ? activeQ
 if (!ci && !githubActions && pushProfile !== 'full-v1') setPriority(10);
 export default defineConfig(withTestEnvironments({
   define: { __TITLE_ASSET_URLS__: readFileSync('scripts/title-assets.generated.json', 'utf8') },
-  plugins: [vitestTmpRoot(), vitestModuleCache()],
+  plugins: [viteTmpRoot({ janitor: resolve('scripts/temp-janitor.mjs') }), vitestModuleCache()],
   resolve: { alias: rapierAlias }, assetsInclude: ['**/*.bin', '**/*.wasm'],
   // DS11: watch mode never follows the plan worktrees under .worktrees/; include globs are root-anchored, exclude is belt and braces
   server: { watch: { ignored: worktreeWatchIgnored() } },
