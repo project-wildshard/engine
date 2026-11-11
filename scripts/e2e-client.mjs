@@ -12,7 +12,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
-import { CATALOGUE, E2E_DIR, STATE_FILE, TEMPLATE, WATCH_LOG } from './e2e-paths.mjs';
+import { CATALOGUE, E2E_DIR, START_LOCK, STATE_FILE, TEMPLATE, WATCH_LOG } from './e2e-paths.mjs';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 
 const root = resolvePath(import.meta.dirname, '..');
@@ -57,12 +57,17 @@ function catalogue() {
   if (!existsSync(path) || readFileSync(path, 'utf8') !== text) writeFileSync(path, text);
 }
 
+/** @param {number} pid */
+const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
 /** @returns {{pid:number,port:number,token:string,origin:string}|undefined} */
 function watcherState() {
   const path = join(root, STATE_FILE);
   if (!existsSync(path)) return undefined;
   const state = JSON.parse(readFileSync(path, 'utf8'));
-  try { process.kill(state.pid, 0); return state; } catch { rmSync(path, { force: true }); return undefined; }
+  if (alive(state.pid)) return state;
+  rmSync(path, { force: true });
+  return undefined;
 }
 
 /** @param {{port:number,token:string}} state @param {string} path */
@@ -71,22 +76,40 @@ async function ask(state, path) {
   return { status: response.status, body: await response.json() };
 }
 
+/** Start this worktree's watcher, or wait for the one another run is starting: one starter at a time holds START_LOCK
+ * (its pid inside), so two runs never build into the same folders. */
 async function startWatcher() {
-  const log = openSync(join(root, WATCH_LOG), 'a');
-  const child = spawn('python3', ['scripts/heavy-lane.py', 'build', '--max', '30', '--', process.execPath, '--import', './scripts/format-hook.mjs', 'scripts/e2e-watcher.mjs'],
-    { cwd: root, detached: true, stdio: ['ignore', log, log], env: { ...process.env, WILDSHARD_CATALOGUE: join(root, CATALOGUE) } });
-  let exited = false;
-  child.once('exit', () => { exited = true; });
-  child.unref();
+  const lock = join(root, START_LOCK);
+  /** @type {import('node:child_process').ChildProcess|undefined} */
+  let child;
+  try {
+    writeFileSync(lock, `${String(process.pid)}\n`, { flag: 'wx' });
+  } catch {
+    if (!alive(Number(readFileSync(lock, 'utf8')))) { rmSync(lock, { force: true }); return startWatcher(); }
+  }
+  if (readFileSync(lock, 'utf8').trim() === String(process.pid)) {
+    const log = openSync(join(root, WATCH_LOG), 'a');
+    child = spawn('python3', ['scripts/heavy-lane.py', 'build', '--max', '30', '--', process.execPath, '--import', './scripts/format-hook.mjs', 'scripts/e2e-watcher.mjs'],
+      { cwd: root, detached: true, stdio: ['ignore', log, log], env: { ...process.env, WILDSHARD_CATALOGUE: join(root, CATALOGUE) } });
+    child.unref();
+  }
   const deadline = performance.now() + START_TIMEOUT_MS;
-  for (;;) {
-    const state = watcherState();
-    if (state !== undefined) return state;
-    if (exited || performance.now() > deadline) {
-      const tail = readFileSync(join(root, WATCH_LOG), 'utf8').split('\n').slice(-30).join('\n');
-      throw new Error(`e2e-client: the watcher ${exited ? 'exited' : 'did not start in time'}; ${WATCH_LOG} ends:\n${tail}`);
+  try {
+    for (;;) {
+      const state = watcherState();
+      if (state !== undefined) return state;
+      const exited = child !== undefined && child.exitCode !== null;
+      const lost = child === undefined && !existsSync(lock);
+      if (exited || lost || performance.now() > deadline) {
+        // A starter that gives up takes its whole process group with it, so no late watcher writes beside the next.
+        if (child?.pid !== undefined && child.exitCode === null) { try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ } }
+        const tail = readFileSync(join(root, WATCH_LOG), 'utf8').split('\n').slice(-30).join('\n');
+        throw new Error(`e2e-client: the watcher ${exited || lost ? 'exited' : 'did not start in time'}; ${WATCH_LOG} ends:\n${tail}`);
+      }
+      await sleep(200);
     }
-    await sleep(200);
+  } finally {
+    if (child !== undefined) rmSync(lock, { force: true });
   }
 }
 

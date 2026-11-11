@@ -7,6 +7,8 @@ import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
+/** Each in-world wait fails on its own within this, so a planted fault names its step, not the test's timeout. */
+const STEP = { timeout: 30_000 }
 
 interface Snapshot {
   readonly pos: Readonly<Record<'x' | 'y' | 'z', number>>
@@ -121,6 +123,7 @@ async function reach(page: Page, axis: 'y' | 'z', past: number): Promise<void> {
     ([key, value]): boolean =>
       (globalThis.__wildshard?.state().player.pos[key] ?? 0) > value,
     [axis, past] as const,
+    STEP,
   )
 }
 
@@ -143,6 +146,19 @@ async function walkTo(
   }
 }
 
+/** Resolves once the door's row reads open and its panel no longer blocks. */
+async function doorOpens(page: Page): Promise<void> {
+  await page.waitForFunction(
+    (): boolean =>
+      globalThis.__workerClientRow?.('blender.door.open') === 1 &&
+      globalThis.__wildshard?.shard.shardfile
+        ?.targets()
+        .every((target): boolean => !target.solid) === true,
+    undefined,
+    STEP,
+  )
+}
+
 /** Resolves once the quest flag is earned. */
 async function earned(page: Page, flag: string): Promise<void> {
   await page.waitForFunction(
@@ -150,6 +166,7 @@ async function earned(page: Page, flag: string): Promise<void> {
       globalThis.__wildshard?.state().quest.adventure?.quest?.includes(name) ===
       true,
     flag,
+    STEP,
   )
 }
 
@@ -166,15 +183,20 @@ async function hideAndSave(page: Page): Promise<void> {
     })
     globalThis.document.dispatchEvent(new globalThis.Event('visibilitychange'))
   })
-  await page.waitForFunction((tick): boolean => {
-    const report = globalThis.__workerClient?.()
-    return report !== undefined && report.savedOk && report.savedTick > tick
-  }, before)
+  await page.waitForFunction(
+    (tick): boolean => {
+      const report = globalThis.__workerClient?.()
+      return report !== undefined && report.savedOk && report.savedTick > tick
+    },
+    before,
+    STEP,
+  )
 }
 
 export type { Client, Snapshot }
 export {
   ROOT,
+  doorOpens,
   earned,
   enter,
   hideAndSave,

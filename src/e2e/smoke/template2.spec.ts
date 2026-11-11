@@ -7,6 +7,7 @@ import { expect, test } from '@playwright/test'
 
 import {
   ROOT,
+  doorOpens,
   earned,
   enter,
   hideAndSave,
@@ -25,7 +26,8 @@ const PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
 )
-/** Template 2's hall (shardfile corpus/handwritten): the door at z = 15.6, the guardian's 4 m region at z = 32. */
+/** Template 2's hall (shardfile corpus/handwritten): the door at z = 15.6, the guardian's 4 m region at z = 32. Steps 4
+ * (a pickup) and 5 (a fight) wait for Template 2 content: shardfile rows S2-1 and S2-2. */
 const BEFORE_DOOR_Z = 13.8
 const GUARDIAN_Z = 28.5
 
@@ -66,9 +68,16 @@ test('Template 2: title, walk, door, guardian, reload', async ({
     (url: Readonly<URL>): boolean =>
       url.protocol.startsWith('http') && url.hostname !== '127.0.0.1',
     async (route): Promise<void> => {
-      const { hostname } = new URL(route.request().url())
-      if (hostname !== DRAFT_THUMBS) {
-        errors.push(`left the machine: ${hostname}`)
+      const request = route.request()
+      const { hostname, pathname } = new URL(request.url())
+      if (
+        hostname !== DRAFT_THUMBS ||
+        request.resourceType() !== 'image' ||
+        !pathname.startsWith('/draft/')
+      ) {
+        errors.push(
+          `left the machine: ${request.method()} ${hostname}${pathname}`,
+        )
       }
       await route.fulfill({
         status: 200,
@@ -94,6 +103,7 @@ test('Template 2: title, walk, door, guardian, reload', async ({
 
   await test.step('3. E opens the door', async (): Promise<void> => {
     await page.keyboard.press('KeyE')
+    await doorOpens(page)
     await earned(page, 'blender.door')
     const open = await snapshot(page)
     expect(open.door).toBe(1)
@@ -114,7 +124,13 @@ test('Template 2: title, walk, door, guardian, reload', async ({
     const back = await snapshot(page)
     expect(back.door).toBe(1)
     expect(back.solid).toBe(false)
-    expect(back.flags).toContain('blender.complete')
+    expect(back.flags).toEqual(
+      expect.arrayContaining([
+        'blender.door',
+        'blender.guardian',
+        'blender.complete',
+      ]),
+    )
     lap('reload')
   })
 

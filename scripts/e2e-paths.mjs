@@ -12,6 +12,8 @@ export const CLIENT_DIR = `${E2E_DIR}/client`;
 /** The live watcher: pid, control port and token, preview origin. Removed when it exits. */
 export const STATE_FILE = `${E2E_DIR}/watcher.json`;
 export const WATCH_LOG = `${E2E_DIR}/watcher.log`;
+/** Held by the one run starting a watcher, with its pid. */
+export const START_LOCK = `${E2E_DIR}/start.lock`;
 /** The last smoke run's split, the pre-push receipt (TB-4). */
 export const RECEIPT = `${E2E_DIR}/receipt.json`;
 export const BUILD_ID = 'e2e-smoke';
