@@ -25,3 +25,9 @@ after a reopen, because `when` ran after its own paint.
 
 Gotcha: a substring filter for `.ws-gmenu-pane` also matched
 `.ws-gmenu-panel`, and took the menu's base panel rules with it.
+
+The two deleted modules go in their own commit, with nothing else code in
+it. The commit lane's typecheck stamps the renderer revision from
+`git ls-tree HEAD`, so a commit that edits code and deletes a tracked
+`src/client` file stops with ENOENT. Worth a fix in the stamp: hash the
+index, not HEAD.
