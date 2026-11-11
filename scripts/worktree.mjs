@@ -1,7 +1,8 @@
 // DEV-SPEED DS12 (J221, J240): `node scripts/worktree.mjs new <slug>` makes a plan worktree at
 // <canonical>/.worktrees/<slug> on plan/<slug> from origin/main, ready to work in and land from.
 //
-//   1. a short per-repo setup lock, then `git fetch origin main` and `git worktree add --no-checkout`;
+//   1. a short per-repo setup lock, then `git fetch origin main`, a fast-forward of the canonical checkout's main when
+//      it is clean and only behind (followMain: never a reset), and `git worktree add --no-checkout`;
 //   2. the tracked tree: a file whose blob and mode match a clean regular file of the canonical checkout, with no
 //      checkout conversion (filter, eol, text, ident, encoding), is an APFS clone of it (copy-on-write, no new
 //      blocks); every clone is then hashed raw against its blob and mode-checked, and a mismatch is deleted; git
@@ -146,6 +147,23 @@ function cloneTrackedFiles(canonical,tree){
  return kept;
 }
 
+/** Keep the canonical checkout on origin/main (Jake, 2026-11-10: "If the main checkout of the engine is stale, we
+ * definitely need to get it up to date"). Only a fast-forward, and only when it is on main, has no tracked edit and
+ * no commit origin/main lacks: anything else is named and left alone, never reset. Git itself refuses a fast-forward
+ * that would overwrite an untracked file. Returns what it did, for the step line.
+ * @param {string} canonical @param {string} base origin/main @returns {string} */
+export function followMain(canonical,base){
+ const branch=tryGit(canonical,['symbolic-ref','--quiet','HEAD']).stdout.trim();
+ if(branch!=='refs/heads/main')return `canonical not on main (${branch===''?'detached':branch}); left alone`;
+ const head=git(canonical,['rev-parse','HEAD']).trim();
+ if(head===base)return 'canonical main current';
+ const [ahead='0',behind='0']=git(canonical,['rev-list','--left-right','--count',`${head}...${base}`]).trim().split(/\s+/u);
+ if(ahead!=='0')return `CANONICAL MAIN DIVERGED: ${ahead} ahead, ${behind} behind origin/main; left alone, tell the coordinator`;
+ if(git(canonical,['status','--porcelain','--untracked-files=no']).trim()!=='')return `canonical main ${behind} behind with tracked edits; left alone`;
+ const merged=tryGit(canonical,['merge','--ff-only','--quiet',base]);
+ return merged.status===0?`canonical main fast-forwarded ${behind} commit(s)`:`canonical main ${behind} behind; fast-forward refused (${merged.stderr.trim().split('\n')[0]})`;
+}
+
 /** The repo's hooks must be live in the worktree: core.hooksPath inside it, and each tracked hook executable there.
  * @param {string} tree */
 function checkHooks(tree){
@@ -212,7 +230,7 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
  try{
   if(existsSync(tree))throw new StopError(`${relative} already exists; work there, or pick another slug`);
   if(tryGit(canonical,['rev-parse','--verify','--quiet',`refs/heads/${branch}`]).status===0)throw new StopError(`branch ${branch} already exists; delete it or pick another slug`);
-  timed('fetch',()=>{git(canonical,['fetch','--quiet','origin','main']);base=git(canonical,['rev-parse','origin/main']).trim();return `origin/main ${base.slice(0,10)}`;});
+  timed('fetch',()=>{git(canonical,['fetch','--quiet','origin','main']);base=git(canonical,['rev-parse','origin/main']).trim();return `origin/main ${base.slice(0,10)}; ${followMain(canonical,base)}`;});
   // Git refuses `-b` for a branch that appeared since the check, before anything here owns one.
   timed('add',()=>{git(canonical,['worktree','add','--quiet','--no-checkout','-b',branch,relative,base]);});
   try{

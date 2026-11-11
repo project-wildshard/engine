@@ -88,6 +88,36 @@ describe('worktree new', () => {
     expect(readFileSync(receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC lane-x worktree new engine\/\.worktrees\/foo on plan\/foo from [0-9a-f]{10} in /mu);
   });
 
+  test('keeps the canonical checkout on origin/main: fast-forwards a clean one, never moves a diverged or edited one', () => {
+    const {origin, canonical, base} = repos();
+    // The fixture's canonical checkout has a local commit and an edit: it is named and left exactly where it is.
+    const before = git(canonical, ['rev-parse', 'HEAD']);
+    const diverged = worktree(canonical, ['new', 'a', '--no-install']);
+    expect(diverged.status, diverged.stderr).toBe(0);
+    expect(diverged.stdout).toMatch(/CANONICAL MAIN DIVERGED: 1 ahead, 0 behind origin\/main; left alone/u);
+    expect(git(canonical, ['rev-parse', 'HEAD'])).toBe(before);
+    expect(readFileSync(join(canonical, 'src/dirty.ts'), 'utf8')).toBe('export const dirty = "uncommitted";\n');
+    // A second, clean clone that is only behind is fast-forwarded to origin/main.
+    const clean = join(base, 'clean');
+    git(base, ['clone', '-q', origin, clean]);
+    const pusher = join(base, 'pusher');
+    git(base, ['clone', '-q', origin, pusher]);
+    put(pusher, 'src/new.ts', 'export const fresh = 1;\n');
+    git(pusher, ['add', 'src/new.ts']);
+    git(pusher, ['commit', '-q', '-m', 'main moves']);
+    git(pusher, ['push', '-q', 'origin', 'main']);
+    const behind = worktree(clean, ['new', 'b', '--no-install']);
+    expect(behind.status, behind.stderr).toBe(0);
+    expect(behind.stdout).toMatch(/canonical main fast-forwarded 1 commit\(s\)/u);
+    expect(git(clean, ['rev-parse', 'HEAD'])).toBe(git(clean, ['rev-parse', 'origin/main']));
+    // With a tracked edit it is left alone.
+    git(pusher, ['commit', '-q', '--allow-empty', '-m', 'main moves again']);
+    git(pusher, ['push', '-q', 'origin', 'main']);
+    put(clean, 'src/same.ts', 'export const same = 2;\n');
+    const edited = worktree(clean, ['new', 'c', '--no-install']);
+    expect(edited.stdout).toMatch(/canonical main 1 behind with tracked edits; left alone/u);
+  });
+
   test('from inside a linked worktree it still makes the new one under the canonical checkout', () => {
     const {canonical} = repos();
     expect(worktree(canonical, ['new', 'one', '--no-install']).status).toBe(0);
