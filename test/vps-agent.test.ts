@@ -167,7 +167,7 @@ test("the agent logs in by root's copy of its key only, and sshd lets in raynos 
   for (const want of ['PasswordAuthentication no', 'PermitRootLogin no', 'AllowTcpForwarding no', 'AllowAgentForwarding no', 'MaxSessions 2', 'LogLevel VERBOSE']) expect(drop).toContain(want);
   expect(harden).toContain('passwd -l "$AGENT"');
   expect(harden).toContain('put "/home/$AGENT/.ssh/authorized_keys" 644 root:root J266 < "$HERE/wildshard-agent.pub"');
-  expect(harden).toContain('install -d -m 755 -o root -g root "/home/$AGENT/.ssh"');
+  expect(harden).toContain('install -d -m 755 -o root -g root "/home/$AGENT" "/home/$AGENT/.ssh"');
   expect(harden).not.toMatch(/usermod[^\n]*\bsudo\b[^\n]*wildshard-agent|-aG sudo "\$AGENT"/u);
   const key = readFileSync('scripts/vps/wildshard-agent.pub', 'utf8').trim().split('\n');
   expect(key).toHaveLength(1);

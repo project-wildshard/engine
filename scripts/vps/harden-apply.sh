@@ -175,12 +175,13 @@ if systemctl list-unit-files apport.service >/dev/null 2>&1 && [ "$(systemctl is
 fi
 
 # --- J266 (MS3.5): the agents' own account. No password, key only, its key from the Mac's ~/.ssh/wildshard_agent_ed25519.
-# Its key file and folder are root's, so the account cannot add a key of its own. sudo and SSH sessions report to Sentry
+# Its home, key folder and key file are root's, so the account cannot add a key of its own. sudo and SSH sessions report to Sentry
 # through the same PAM lines as raynos's (VH14). Off in one command: usermod --expiredate 1 wildshard-agent.
 AGENT=wildshard-agent
 if ! id "$AGENT" >/dev/null 2>&1; then useradd --create-home --shell /bin/bash "$AGENT"; say doing J266 "create $AGENT"; fi
 if [ "$(passwd -S "$AGENT" | awk '{print $2}')" != L ]; then passwd -l "$AGENT" >/dev/null; say doing J266 "$AGENT has no password"; fi
-install -d -m 755 -o root -g root "/home/$AGENT/.ssh"
+# The home is root's too: an account that owned it could rename .ssh away and bring its own key.
+install -d -m 755 -o root -g root "/home/$AGENT" "/home/$AGENT/.ssh"
 if put "/home/$AGENT/.ssh/authorized_keys" 644 root:root J266 < "$HERE/wildshard-agent.pub"; then :; fi
 if ! id -nG "$AGENT" | tr ' ' '\n' | grep -qx systemd-journal; then usermod -aG systemd-journal "$AGENT"; say doing J266 "$AGENT reads the journal by group"; fi
 
