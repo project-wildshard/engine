@@ -151,13 +151,16 @@ export function createShardProduct(input: ShardProductInput): ShardProduct {
       : input.builtJson === true ? parseNamedJson(bytes) : await (input.jsonCheck ?? readCheckedNamedJson)(file.jsonSchema, bytes, () => pacedResolve(undefined));
     if(input.builtJson!==true){
       const comment=typeof file.jsonSchema?.['$comment']==='string'?file.jsonSchema['$comment']:undefined;
-      // TEST-SPEED TS4: both checks only read the decoded value, which this product's verified reader decodes from the
-      // same hashed bytes each time, so a name that passed once passes again: skip the repeat (every resident a world
-      // opens reads the same files). Only a pass is remembered; a refusal is checked again.
-      if(!passedJson.has(name)){
+      // TEST-SPEED TS4: both checks only read the decoded value. With a pure decoder (plain JSON, or a checker marked
+      // `pure`), the same verified bytes decode to the same value, so a name and hash that passed once pass again: skip
+      // the repeat (every resident a world opens reads the same files). Only a pass is remembered; a refusal, or any
+      // value from a checker not marked pure, is checked every time.
+      const pure=file.jsonSchema===undefined||(input.jsonCheck??readCheckedNamedJson).pure===true;
+      const key=`${name}\u0000${file.hash}`;
+      if(!pure||!passedJson.has(key)){
         try{validatePlatformFile(name,comment,decoded);if(contract!==undefined)validateRegisteredJson(name,decoded);}
         catch(error){throw new ProductError(slug,name,'schema',`registered JSON refuses its defining contract: ${String(error)}`);}
-        passedJson.add(name);
+        if(pure)passedJson.add(key);
       }
     }
     return input.check === true ? deepFreeze(decoded) : decoded;

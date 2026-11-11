@@ -32,3 +32,9 @@ Players: loading a Nalati save into a resident on an already-loaded
 product went from 672-725 ms to 367-415 ms; Driftwood 73-79 → 68-72 ms.
 Saving is unchanged (684 → 663 ms, noise). The first open of a product
 (cold boot) still checks every file.
+
+Review (J206): a custom `jsonCheck` may decode the same bytes differently, so
+the skip now applies only to a pure decoder: plain JSON, or a checker marked
+`pure` (the default `readCheckedNamedJson` and `nodeNamedJsonCheck`), keyed by
+name and hash. `test/product-json-checked-once.test.ts` proves a checker not
+marked pure is re-checked and a refusal is never remembered.
