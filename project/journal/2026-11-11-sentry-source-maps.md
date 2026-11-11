@@ -19,3 +19,5 @@ between the build and the strip, `continue-on-error` so a Sentry outage
 never holds a preview, and docs/server-release.md tells the release
 lane to run it before its own strip. That lane needs the token on this
 Mac (`~/.config/wildshard/sentry-auth-token`), which only Jake can make.
+
+The token read uses `env.SENTRY_AUTH_TOKEN` (the lint's dot-notation rule).

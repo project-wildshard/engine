@@ -61,7 +61,7 @@ export function sentryMapPlan({ dir, version, build, environment, roots }) {
 
 /** @returns {string} the auth token, or '' when this machine holds none */
 export function sentryToken(env = process.env, file = join(homedir(), '.config/wildshard/sentry-auth-token')) {
-  const fromEnv = (env['SENTRY_AUTH_TOKEN'] ?? '').trim();
+  const fromEnv = (env.SENTRY_AUTH_TOKEN ?? '').trim();
   if (fromEnv !== '') return fromEnv;
   return existsSync(file) ? readFileSync(file, 'utf8').trim() : '';
 }
