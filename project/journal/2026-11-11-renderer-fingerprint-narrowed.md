@@ -39,3 +39,5 @@ Proofs:
   preview (broad `49a01af1`) and again on an `ac225144` preview (broad
   `e920f041`) have the same narrowed hash. All 26 recorded program lists are
   identical with `build` dropped, including Template.
+
+The replay script is typed for the checkJs layer (fix commit after the first push).

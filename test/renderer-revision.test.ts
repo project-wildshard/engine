@@ -38,7 +38,7 @@ describe('narrowed renderer fingerprint (J259)', () => {
   it('picks up a new file that patches shader text on its own', () => {
     expect(edited('src/client/game/newLook.ts', () => 'material.onBeforeCompile = () => {};', ['src/client/game/newLook.ts'])).not.toBe(base);
   });
-  it('holds for scripts/, public/, the lockfile, tests and client code with no shader text', () => {
+  it('holds for scripts/, the lockfile, tests and client code with no shader text', () => {
     expect(edited('scripts/gen.mjs', text => `${text}\n// one line\n`)).toBe(base);
     expect(edited('pnpm-lock.yaml', text => `${text}\n# one line\n`)).toBe(base);
     if (plain === undefined) throw new Error('No committed client file without shader text');
