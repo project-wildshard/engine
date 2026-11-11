@@ -17,7 +17,8 @@ import { engineString } from '../../../shared/engine/strings';
  * ones that skip the title, so the reload lands back on this title screen. Reuses the in-game menu's look (gmenu.css).
  */
 import { automaticTier, TIER, gfxPrefs, saveGfxPrefs } from '../core/tier';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode } from '../core/graphicsMode';
+import { lowPowerOn, lowPowerRefusal, PIXELS_EVENT } from '../core/graphicsMode';
+import { buildGraphicsBlock } from './graphicsBlock';
 import { firstPlayDone, resetFirstPlay } from '../boot/firstPlayMark';
 
 import { isDev, onDev } from '../core/devMode';
@@ -149,9 +150,13 @@ function build(): HTMLElement {
   // MG3: under Low Power Mode the row reads Low, and High is refused with the reason under it
   const refusal = words('ws-gmenu-note', lowPowerRefusal());
   const showRefusal = (refused: boolean): void => { refusal.hidden = !refused && !lowPowerOn(); };
-  const mobile = phone ? [seg(engineString('s_gfx_mode'), false, [{ v: 'low', text: engineString('s_gfx_low') }, { v: 'high', text: engineString('s_gfx_high') }], graphicsMode, (v) => { if (v === 'low' || v === 'high') showRefusal(!saveGraphicsMode(v)); }), refusal] : [];
+  // MG8: on a phone the Graphics controls are the shared block (ui/graphicsBlock.ts: Low · High · Custom, Pixel density, Sun
+  // shadows, Bloom, Sun rays, Anti-aliasing); the boot-time render scale and AA rows are the desktop's
+  const block = buildGraphicsBlock(scope);
+  if (block !== null) paints.push(block.paint);
+  const mobile = block === null ? [] : [block.root];
   paints.push(() => { showRefusal(false); }); showRefusal(false);
-  const scaleShown = (): void => { scale.hidden = phone && !isDev(); };
+  const scaleShown = (): void => { scale.hidden = phone; };
   // MG6 (Jake: "something in settings that allows me to… clear the first time thing and go back to the first time flow")
   const replay = phone ? [(() => {
     const line = el('ws-gmenu-row', engineString('s_135d0923e690', [engineString('s_first_play_row'), '']));
@@ -163,8 +168,8 @@ function build(): HTMLElement {
   scaleShown();
   dbg.hidden = !isDev(); tools.hidden = !isDev(); onDev((on) => { dbg.hidden = !on; tools.hidden = !on; scaleShown(); if (on) { debug?.paint(); developerTools?.paint(); } });
   p.append(running,
-    el('ws-gmenu-label', engineString('s_a874fca87cdd')), ...mobile, ...replay, row('tier', LABELS.tier), scale,
-    seg(engineString('s_c77c3af22c64'), false, aaOpts, () => gfxPrefs.aa, (v) => { if (v === 'auto' || v === 'on' || v === 'off') { gfxPrefs.aa = v; saveGfxPrefs(); } }),
+    el('ws-gmenu-label', engineString('s_a874fca87cdd')), ...mobile, ...replay, phone ? seg(LABELS.tier.label, false, [{ v: 'phone', text: engineString('s_63dceb8800b2') }, { v: 'desktop', text: engineString('s_9bd88f2485ac') }], () => { const saved = savedSetting('tier'); return saved === 'auto' ? automaticTier : saved; }, (v) => { if (v === 'phone' || v === 'desktop') saveSetting('tier', v); }) : row('tier', LABELS.tier), scale,
+    ...phone ? [] : [seg(engineString('s_c77c3af22c64'), false, aaOpts, () => gfxPrefs.aa, (v) => { if (v === 'auto' || v === 'on' || v === 'off') { gfxPrefs.aa = v; saveGfxPrefs(); } })],
     el('ws-gmenu-label', engineString('s_799c26913574')), row('touch', LABELS.touch),
     buildMusicStyleRow(scope),
     ...offline === null ? [] : [offline], // G727 / I9: Download everything, before the first shard

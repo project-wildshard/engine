@@ -111,10 +111,16 @@ export const practiceFps = { on: false };
 // Capture protocol only: retired stored Frame cap picks never affect play.
 let fpsSearch: string | undefined, harnessFps: string | null = null;
 
+/** MOBILE-GRAPHICS MG12 prototype (Jake, 2026-11-10 ~23:15 Cancún: "only when graphics mode is low and low power mode is off"
+ *  60 fps; otherwise G896's 30): the phone's cap in force, which the game sets (core/graphicsQuality.ts frameCapFor). Client
+ *  rendering only: the sim's fixed step (FIXED_STEP, 60 Hz) and every server tick are untouched. */
+let mobileCap: () => number = () => 30;
+export function setMobileFrameCap(fn: () => number): () => void { mobileCap = fn; return () => { if (mobileCap === fn) mobileCap = () => 30; }; }
+
 export function frameCapFps(): number {
   if (frameProbe.uncapped) return 0;
   const search = typeof location === 'undefined' ? '' : location.search;
   if (search !== fpsSearch) { fpsSearch = search; harnessFps = new URLSearchParams(search).get('fps'); }
-  if (MOBILE_DEVICE) return harnessFps === '60' ? 0 : 30;
+  if (MOBILE_DEVICE) return harnessFps === '60' ? 0 : mobileCap();
   return harnessFps === '30' ? 30 : 0;
 }

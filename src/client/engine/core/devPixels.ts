@@ -1,6 +1,7 @@
 import { isDev } from './devMode';
 import { jsonSlot } from '../saves/slots';
-import { graphicsMode, LOW_PIXEL_RATIO, PIXELS_EVENT } from './graphicsMode';
+import { graphicsMode, PIXELS_EVENT } from './graphicsMode';
+import { densityIn } from './graphicsQuality';
 /**
  * QA row 25 (Jake, 2026-11-10, Low Power Mode at 19-23 fps, GPU bound: "when developer mode is on, allow me to switch between 2x
  * and 1x pixel density. Allow me to switch between 3x screen, 2x screen, 1x screen. So that's 6 permutations, and I can just try
@@ -46,9 +47,12 @@ export function devPixelRatio(device: number, pick: DevPixels): number { return 
 /** The drawing buffer's pixel ratio: the Developer pick when there is one; else, on a phone (`phone`: the phone tier with no
  *  explicit render scale), its Low graphics (MG2, graphicsMode.ts); else the tier's cap, the production rule as it was. */
 export function drawingPixelRatio(device: number, tierCap: number, phone = false): number {
+  // MG8 (Jake, 2026-11-10 ~23:45 Cancún: one "Pixel density" control): on a phone, Settings ▸ Graphics ▸ Pixel density is the
+  // only pixel control (graphicsQuality.ts; untouched since a preset: Low 1×, High 2×), never past the screen's own
+  if (phone) return Math.min(device, densityIn(graphicsMode()));
+  // elsewhere a Developer's pick (QA 25, no menu any more: a test's override), else the tier's cap
   const pick = activeDevPixels();
-  if (pick !== null) return devPixelRatio(device, pick);
-  return phone && graphicsMode() === 'low' ? Math.min(device, LOW_PIXEL_RATIO) : Math.min(device, tierCap);
+  return pick === null ? Math.min(device, tierCap) : devPixelRatio(device, pick);
 }
 
 /** What a ratio makes of a CSS size: the drawing buffer's size and pixel count (three.js floors each side). */

@@ -111,6 +111,7 @@ import type { RowBodies } from '@wildshard/engine/entities/RowBodies';
 import { whenControl } from '@wildshard/engine/boot/prefetch';
 import { installMemoryWarning, residentOverLimit } from '../grid/memoryWarning';
 import { installFirstPlay } from '../firstPlay';
+import { registerGraphicsSettings } from '@wildshard/engine/ui/graphicsBlock';
 import { ACCENTS } from '@wildshard/format/accent';
 import { installShardHoverSpeed } from '../../../shared/game/grid/rules';
 import { findShard } from '../shard/registry';
@@ -134,6 +135,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // and a neighbour's cold estimate shows nowhere (the G217 blocked cell screen reads the policy, not the chip)
   if (session.memory !== undefined && pageMode() !== 'grid') installMemoryWarning(session.memory, game.levelScope, manifest.slug);
   installFirstPlay(game.levelScope, hud.root, manifest.slug); // MOBILE-GRAPHICS MG5: the title's first play, once the player has control
+  game.levelScope.onDispose(registerGraphicsSettings()); // MOBILE-GRAPHICS MG8: the phone's Graphics controls in Settings ▸ Graphics
 
   let playground: Playground | null = null;
   const away = (): boolean => getArena()?.entered === true || playground?.entered === true;

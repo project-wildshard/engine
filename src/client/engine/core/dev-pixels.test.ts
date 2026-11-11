@@ -34,7 +34,7 @@ test('QA row 25: off by default, ignored with Developer mode off, applied live w
   } finally { document.removeEventListener(DEV_PIXELS_EVENT, hear); }
 });
 
-test('MG2: a phone\'s Low graphics draws at 1x, High at the tier cap; desktop and the Developer pick are untouched', () => {
+test('MG2 / MG8: a phone\'s Low draws at 1x and High at 2x; on a phone Pixel density is the only pixel control, the Developer pick only elsewhere', () => {
   expect(savedGraphicsMode()).toBe('high');
   expect(drawingPixelRatio(3, 2, true)).toBe(2);
   saveGraphicsMode('low');
@@ -42,5 +42,6 @@ test('MG2: a phone\'s Low graphics draws at 1x, High at the tier cap; desktop an
   expect(drawingPixelRatio(3, 2, true)).toBe(1);
   expect(drawingPixelRatio(3, 2, false)).toBe(2); // desktop (or an explicit render scale) keeps the tier's cap
   setDev(true); saveDevPixels({ screen: 3, density: 2 });
-  expect(drawingPixelRatio(3, 2, true)).toBe(3); // the Developer pick wins
+  expect(drawingPixelRatio(3, 2, true)).toBe(1); // Jake, ~23:45: one pixel control on the phone, whatever a Developer saved
+  expect(drawingPixelRatio(3, 2, false)).toBe(3); // the Developer pick still drives a test off the phone path
 });

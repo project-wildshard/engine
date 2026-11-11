@@ -386,11 +386,19 @@
 .ws-gmenu .ws-gmenu-svtab.dev.active::after { background: rgb(255, 196, 120); box-shadow: 0 0 10px rgba(255, 196, 120, 0.7); }
 .ws-gmenu .ws-gmenu-svsub { display: block; font-family: var(--ws-mono); font-weight: 400; font-size: 9px; line-height: 1.4; letter-spacing: 0.06em; text-transform: none; color: var(--ws-text-dim); }
 /* the phone's Low / High: two big cards (MG2), High dimmed while Low Power Mode holds it (MG3) */
-.ws-gmenu .ws-gmenu-svmode { flex: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.ws-gmenu .ws-gmenu-svmode { flex: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .ws-gmenu .ws-gmenu-svmodecard { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-height: 86px; padding: 14px 12px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(6, 10, 18, 0.5); border: 1px solid rgba(143, 227, 255, 0.25); color: var(--ws-text-dim); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .ws-gmenu .ws-gmenu-svmodeword { font-family: var(--ws-display); font-weight: 700; font-size: 22px; line-height: 1; letter-spacing: 0.24em; text-transform: uppercase; }
 .ws-gmenu .ws-gmenu-svmodecard.active { border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.16); color: #fff; box-shadow: 0 0 16px rgba(143, 227, 255, 0.18); }
 .ws-gmenu .ws-gmenu-svmodecard.active .ws-gmenu-svmodeword { color: var(--ws-cyan); }
 .ws-gmenu .ws-gmenu-svmodecard.locked { opacity: 0.45; }
+/* MG8: Custom is an indicator, never a button (Jake, ~23:05 Cancún): dashed and dim, lit amber when the values match no preset */
+.ws-gmenu .ws-gmenu-svmodecard.indicator { cursor: default; border-style: dashed; opacity: 0.55; }
+.ws-gmenu .ws-gmenu-svmodecard.indicator.active { opacity: 1; border-color: #ffc56b; background: rgba(255, 197, 107, 0.12); box-shadow: none; }
+.ws-gmenu .ws-gmenu-svmodecard.indicator.active .ws-gmenu-svmodeword { color: #ffc56b; }
+.ws-gmenu .ws-gmenu-svmodeword { font-size: clamp(15px, 4.6vw, 22px); }
+/* the same Custom indicator in the title's Graphics row: dashed, never pressed, amber while lit */
+.ws-gmenu .ws-gmenu-segbtn.indicator { cursor: default; border-style: dashed; opacity: 0.55; }
+.ws-gmenu .ws-gmenu-segbtn.indicator.active { opacity: 1; color: #ffc56b; border-color: #ffc56b; background: rgba(255, 197, 107, 0.12); }
 .ws-gmenu .ws-gmenu-svreload { border-color: rgba(255, 196, 120, 0.45); }
 .ws-gmenu.ws-gmenu-svmenu .ws-gmenu-bar .ws-gmenu-title { letter-spacing: 0.1em; }

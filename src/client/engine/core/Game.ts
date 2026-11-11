@@ -36,7 +36,7 @@ import { SkyRig as Sky } from '../world/skyRig';
 import type { BackdropLayer } from '../world/backdropLayer';
 import { GradeEffect } from './Grade';
 import { VolumetricsEffect, makeNoiseTexture } from './Volumetrics';
-import { TIER, TIER_CONFIG, frameCapFps, gfxPrefs, type Tier } from './tier';
+import { TIER, TIER_CONFIG, frameCapFps, gfxPrefs, setMobileFrameCap, type Tier } from './tier';
 import { pacedSkip, slowGpuPacingFor, webglRendererName, type SlowGpuPacing } from './slowGpuPacing';
 import { worldTime } from '../../../shared/engine/core/time';
 import { installViewport, viewportHeight } from './viewport';
@@ -53,7 +53,8 @@ import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 import { isDev, onDev } from './devMode';
 import { activeDevPixels, drawingPixelRatio } from './devPixels';
-import { graphicsMode, noteFastFrames, PIXELS_EVENT } from './graphicsMode';
+import { graphicsMode, lowPowerOn, noteFastFrames, PIXELS_EVENT } from './graphicsMode';
+import { flagOn, frameCapFor, noteShipped, presetLabel, setFrameReadout, type ShippedLook } from './graphicsQuality';
 import { classifyFrames } from '../boot/lowPower';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
 import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/memorySaver';
@@ -521,8 +522,22 @@ export class Game {
     this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics));
     // the new ratio waits for the frame that draws (RT3: never in the task that decided it, whose cleared canvas nothing
     // would replace; under a menu or the title the world stays as it was until play draws again)
-    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; };
+    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; this.applyQuality(); };
     this.engineScope.listen(document, PIXELS_EVENT, repixel);
+    // MG8 prototype: the player has control, so the boot's shadow draws are done: a no-shadows mode clears the maps once more
+    this.engineScope.listen(document, 'ws:control-ready', () => { this.qualityClearedMaps = new WeakSet(); });
+    // MG12 prototype: the phone's cap follows the preset and Low Power live (60 only on exactly Low with Low Power off); read
+    // off a cached value, refreshed on every PIXELS_EVENT (a control, a preset, a Low Power flip) and the 2 s mode check
+    if (this.phoneGraphics) this.engineScope.onDispose(setMobileFrameCap(() => this.qualityCap));
+    // MG8 prototype: Settings ▸ Graphics' frame readout (fps over the last half second, the median and slow frames, draws)
+    this.engineScope.onDispose(setFrameReadout(() => {
+      const ms = [...this.frameMs].filter((v) => v > 0).sort((a, b) => a - b);
+      if (ms.length === 0) return '';
+      const at = (q: number): number => ms[Math.min(ms.length - 1, Math.floor(ms.length * q))] ?? 0;
+      // the cap is the one in force now; the rest is the play before this menu opened (a menu over the world holds its frames)
+      const cap = frameCapFps();
+      return `Cap now ${cap > 0 ? `${String(cap)} fps` : 'none'}. Last play: ${String(this.stats.fps)} fps · frame ${at(0.5).toFixed(1)} ms, slow ${at(0.95).toFixed(1)} ms · ${String(this.lastFrame.calls)} draws`;
+    }));
     // MG3: Low Power Mode is switched in the phone's own settings, away from the page. As the page comes back it counts a second
     // of its frames: faster than 30 Hz proves Low Power off (a busy page cannot prove it on: the idle title reads that). The
     // reading itself lands, lapses or flips on its own clock, so the mode in force is compared every two seconds, and a
@@ -541,6 +556,7 @@ export class Game {
     });
     let mode = graphicsMode();
     this.engineScope.interval(2000, () => {
+      this.qualityCap = this.phoneGraphics ? frameCapFor(presetLabel(), lowPowerOn()) : 30;
       const now = graphicsMode();
       if (now !== mode) { mode = now; document.dispatchEvent(new CustomEvent(PIXELS_EVENT)); }
     });
@@ -562,6 +578,21 @@ export class Game {
     const drawShadows = (): void => { if (passLights !== null && passScene !== null && passCamera !== null) renderShadows(passLights, passScene, passCamera); };
     const dropColour = (rt: THREE.WebGLRenderTarget): void => { dropShadowColour(this.renderer, rt); };
     shadowMap.render = (lights, scene, camera) => {
+      // MG8 prototype: Settings ▸ Graphics ▸ Shadows off clears each cascade once (a pass that draws nothing) and then draws
+      // none: nothing is shadowed and the shadow pass costs nothing
+      if (this.qualityShadowsOff) {
+        // Codex review: track the maps cleared, not the calls (a parked draw's stand-in map, or a map three made anew, is not
+        // the one a clear covered)
+        const shadows: { needsUpdate: boolean; map: object | null }[] = [];
+        for (const light of lights) { const shadow: unknown = Reflect.get(light, 'shadow'); if (shadow instanceof THREE.LightShadow) shadows.push(shadow as { needsUpdate: boolean; map: object | null }); }
+        if (shadows.every((shadow) => shadow.map !== null && this.qualityClearedMaps.has(shadow.map))) return;
+        const held = camera.layers.mask;
+        for (const shadow of shadows) shadow.needsUpdate = true;
+        camera.layers.disableAll();
+        try { renderShadows(lights, scene, camera); } finally { camera.layers.mask = held; }
+        for (const shadow of shadows) if (shadow.map !== null) this.qualityClearedMaps.add(shadow.map);
+        return;
+      }
       const mask = camera.layers.mask;
       camera.layers.enable(SHADOW_LAYER);
       passLights = lights; passScene = scene; passCamera = camera;
@@ -718,11 +749,20 @@ export class Game {
     // tier or level has it on (SMAA's edge and weight targets are gone, E189's phone option for every tier)
     // FC9 / QB20: the phone frame runs no FXAA pass by default (a full 2x-frame read and write, ~47 % of Driftwood's post
     // GPU time); Settings ▸ Graphics ▸ Anti-aliasing On keeps the old look, and an explicit player choice beats a level's
-    const aa = gfxPrefs.aa === 'on' ? 'fxaa' : gfxPrefs.aa === 'off' ? 'off' : knobs.aa ?? (TIER === 'phone' || TIER_CONFIG.smaa === 'off' ? 'off' : 'fxaa');
-    const fxaa = aa === 'off' ? null : new FXAAEffect();
-    const raysOn = knobs.godRays ?? true;
+    // MG8: on a phone, Settings ▸ Graphics ▸ Anti-aliasing replaces the boot-time AA pref, so High's AA is the level's own
+    const levelAa = knobs.aa ?? (TIER === 'phone' || TIER_CONFIG.smaa === 'off' ? 'off' : 'fxaa');
+    const shippedAa = this.phoneGraphics ? levelAa : gfxPrefs.aa === 'on' ? 'fxaa' : gfxPrefs.aa === 'off' ? 'off' : levelAa;
     // G945: the phone's engine chain keeps bloom off; desktop keeps its existing chain.
-    const bloomOn = TIER !== 'phone';
+    this.qualityShipped = { bloom: TIER !== 'phone', rays: knobs.godRays ?? true, aa: shippedAa !== 'off' };
+    noteShipped(this.qualityShipped);
+    // MG8: on a phone, Settings ▸ Graphics' Bloom, Sun rays and Anti-aliasing decide what the chain holds (since a preset: as
+    // shipped); a change rebuilds the chain live (applyQuality → rebuildComposer)
+    const chainNow = this.qualityChainWanted();
+    this.qualityChainBuilt = chainNow;
+    const aa = chainNow.fxaa ? 'fxaa' : 'off';
+    const fxaa = aa === 'off' ? null : new FXAAEffect();
+    const raysOn = chainNow.rays;
+    const bloomOn = chainNow.bloom;
     const chain = (clean: boolean): BuiltChain => {
       const godRays = new GodRaysEffect(this.camera, this.sky.sunDisc, {
         blendFunction: BlendFunction.SCREEN, kernelSize: KernelSize.MEDIUM, density: 0.96, decay: 0.95, weight: 0.5,
@@ -785,6 +825,54 @@ export class Game {
     // G749: with nothing between the scene and the colour pass, the output buffer only ever holds the graded frame
     if (aoPass === null && composer.passes.indexOf(colour) === composer.passes.indexOf(this.renderPass) + 1) ldrOutputBuffer(composer);
     this._composer = composer;
+    this.applyQuality();
+  }
+
+  /** MG12 prototype: the phone's frame cap in force (frameCapFor), cached for the loop */
+  private qualityCap: 30 | 60 = 30;
+  /** MG8 prototype: the shadows-off state (the shadow pass wrapper) and the cascade maps it has cleared */
+  private qualityShadowsOff = false;
+  private qualityClearedMaps = new WeakSet();
+  /** what the level ships (bloom, rays, edges), and what the chain was last built with */
+  private qualityShipped: ShippedLook = { bloom: TIER !== 'phone', rays: true, aa: false };
+  private qualityChainBuilt: { bloom: boolean; rays: boolean; fxaa: boolean } | null = null;
+  /** the chain the controls ask for now (off a phone: as shipped) */
+  private qualityChainWanted(): { bloom: boolean; rays: boolean; fxaa: boolean } {
+    const S = this.qualityShipped;
+    if (!this.phoneGraphics) return { bloom: S.bloom, rays: S.rays, fxaa: S.aa };
+    const mode = graphicsMode();
+    return { bloom: flagOn('bloom', mode, S.bloom), rays: flagOn('rays', mode, S.rays), fxaa: flagOn('aa', mode, S.aa) };
+  }
+  /**
+   * MG8 (meta MOBILE-GRAPHICS-PLAN MG8): Settings ▸ Graphics' controls, live, on a phone. Shadows through the wrapper above;
+   * bloom, sun rays and anti-aliasing (FXAA) by rebuilding the colour chain when what it should hold changes (an effect in the
+   * chain at opacity 0 still costs its composite; out of it, nothing). Pixel density follows through drawingPixelRatio. On
+   * High every control is as shipped, so this changes nothing.
+   */
+  applyQuality(): void {
+    if (!this.phoneGraphics) return;
+    this.qualityCap = frameCapFor(presetLabel(), lowPowerOn());
+    const mode = graphicsMode();
+    // cleared again on every apply: the boot's own shadow draws (the loading card's parted map, the warm turns) fill the maps
+    // outside this wrapper's frames, so a clear made before them would not hold (and control-ready clears once more)
+    this.qualityShadowsOff = !flagOn('shadows', mode, true); this.qualityClearedMaps = new WeakSet();
+    const composer = this._composer;
+    if (composer === null) return;
+    const want = this.qualityChainWanted(), built = this.qualityChainBuilt;
+    if (built !== null && (want.bloom !== built.bloom || want.rays !== built.rays || want.fxaa !== built.fxaa)) { this.rebuildComposer(); return; }
+    this.kickLoop();
+  }
+  /** MG8 prototype: the composer again, as the controls now ask (its buffers freed; its effects left to the GC: a look's LUT
+   *  texture is the sky's, and Effect.dispose would free it) */
+  private rebuildComposer(): void {
+    const old = this._composer;
+    if (old === null) return;
+    this._composer = null;
+    this.buildComposer();
+    (this._composer as EffectComposer | null)?.setSize(window.innerWidth, viewportHeight());
+    old.inputBuffer.dispose(); old.outputBuffer.dispose();
+    this.compositionChanged = true;
+    this.kickLoop();
   }
 
   /**
@@ -1569,7 +1657,8 @@ export class Game {
   private pickedRatio: number | null = null;
   /** MG2: Low / High applies to this page: the phone tier with no explicit render scale, as it booted (a render-scale pick
    *  waiting for its reload does not switch Low off early) */
-  private readonly phoneGraphics: boolean = TIER === 'phone' && gfxPrefs.dpr === 'auto';
+  // MG8: Settings ▸ Graphics ▸ Pixel density replaces the boot-time render scale on a phone (Jake ~23:45: one pixel control)
+  private readonly phoneGraphics: boolean = TIER === 'phone';
   resize(): void { this.fitSize(); this.kickLoop(); }
   private fitSize(): void {
     const w = window.innerWidth, h = viewportHeight();
