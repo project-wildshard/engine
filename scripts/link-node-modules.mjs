@@ -60,9 +60,27 @@ function installedVirtualStoreTarget(from, target, name) {
     /** @type {unknown} */
     const manifest = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
     if (typeof manifest !== 'object' || manifest === null || !Object.hasOwn(manifest, 'name')
-      || !('name' in manifest) || manifest.name !== name) return undefined;
+      || !('name' in manifest) || typeof manifest.name !== 'string') return undefined;
+    if (manifest.name !== name && !declaredAlias(dirname(from), name, manifest.name, installed)) return undefined;
     return installed;
   } catch { return undefined; } // Missing/corrupt metadata is not authority to lend outside source.
+}
+
+/** The checkout's own manifest names `name` as an alias of `real` (GVS G9): a store slot holds an aliased package under
+ * its real name (`@wildshard/wire-released` is `links/…/node_modules/@wildshard/wire`). A classic install never gets
+ * here, its alias lives inside the repo. Only a non-registry spec, or an `npm:` spec of exactly `real`, lends the slot.
+ * @param {string} repo @param {string} name @param {string} real @param {string} installed */
+function declaredAlias(repo, name, real, installed) {
+  if (!installed.endsWith(`${sep}node_modules${sep}${real.split('/').join(sep)}`)) return false;
+  try {
+    /** @type {Record<string, Record<string, unknown> | undefined>} */
+    const manifest = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'));
+    const spec = [manifest.dependencies, manifest.devDependencies, manifest.optionalDependencies]
+      .map(deps => deps !== undefined && Object.hasOwn(deps, name) ? deps[name] : undefined).find(value => typeof value === 'string');
+    if (typeof spec !== 'string') return false;
+    if (spec.startsWith('npm:')) return spec.slice(4).replace(/(?<=.)@[^@]*$/u, '') === real;
+    return /^(?:github:|git\+|git:|https?:|file:|link:)/u.test(spec);
+  } catch { return false; } // No readable manifest declares the alias.
 }
 
 /** Classify canonical destinations on every path, including retried exports.

@@ -204,4 +204,35 @@ describe('linkNodeModules', () => {
     expect(() => linkNodeModules(repo, tree)).toThrow();
     expect(() => linkNodeModules(repo, tree)).toThrow();
   });
+
+  it('links an aliased dependency from the global store only when the checkout declares that alias (GVS G9)', () => {
+    const root = scratch();
+    const repo = join(root, 'repo'), links = join(root, 'store', 'v10', 'links');
+    // `@wildshard/wire-released` is a github alias: its store slot holds the package under its real name.
+    const slot = join(links, '@wildshard', 'wire', '0.0.0', 'e5f6', 'node_modules', '@wildshard', 'wire');
+    mkdirSync(slot, { recursive: true });
+    writeFileSync(join(slot, 'package.json'), '{"name":"@wildshard/wire","version":"0.0.0"}');
+    mkdirSync(join(repo, 'node_modules', '@wildshard'), { recursive: true });
+    writeFileSync(join(repo, 'node_modules', '.modules.yaml'), JSON.stringify({ virtualStoreDir: relative(join(repo, 'node_modules'), links) }));
+    symlinkSync(slot, join(repo, 'node_modules', '@wildshard', 'wire-released'));
+    const manifest = (spec: string | undefined) => writeFileSync(join(repo, 'package.json'), JSON.stringify(
+      { name: '@wildshard/engine', devDependencies: spec === undefined ? {} : { '@wildshard/wire-released': spec } }));
+
+    manifest('github:project-wildshard/shardfile#669d1fc&path:/packages/wire');
+    const declared = join(root, 'declared'); mkdirSync(declared);
+    linkNodeModules(repo, declared);
+    expect(realpathSync(join(declared, 'node_modules', '@wildshard', 'wire-released'))).toBe(slot);
+
+    manifest('npm:@wildshard/wire@0.0.0');
+    const npm = join(root, 'npm'); mkdirSync(npm);
+    linkNodeModules(repo, npm);
+    expect(realpathSync(join(npm, 'node_modules', '@wildshard', 'wire-released'))).toBe(slot);
+
+    // Not declared, a registry range, or an npm alias naming another package: the slot is not this name's.
+    for (const spec of [undefined, '0.0.0', 'npm:@wildshard/other@0.0.0']) {
+      manifest(spec);
+      const refused = join(root, `refused-${String(spec).length}`); mkdirSync(refused);
+      expect(() => linkNodeModules(repo, refused)).toThrow(/points outside the repo/u);
+    }
+  });
 });
