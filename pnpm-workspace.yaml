@@ -1,7 +1,9 @@
-# P3: one package; scripts and the build mirror read node_modules/.pnpm.
+# P3: one package. GVS G9 (J230): installs link into pnpm's global virtual store; scripts and the build mirror
+# read through node_modules links (G4). confirmModulesPurge: false lets a classic checkout move over without a TTY.
 packages:
   - .
-enableGlobalVirtualStore: false
+enableGlobalVirtualStore: true
+confirmModulesPurge: false
 packageExtensions:
   postprocessing:
     peerDependencies:

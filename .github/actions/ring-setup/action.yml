@@ -24,7 +24,12 @@ runs:
       with:
         path: ~/.cache/wildshard/pins
         key: ${{ inputs.pins-cache-scope }}-pins-${{ hashFiles('test/pins/slices.json', 'test/pins/shardfiles.json', 'test/pins/rings.json') }}
-    - run: pnpm install --frozen-lockfile
+    # GVS G9 (J230): pnpm 10.34.9 turns the global virtual store off whenever ci is true; keep the runner's CI
+    # environment and select only the installer layout, as the consumers do. setup-node caches that store.
+    - run: pnpm install --frozen-lockfile --config.ci=false
+      shell: bash
+    - name: Prove the installed global store layout
+      run: node scripts/assert-store-layout.mjs
       shell: bash
     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
       with:

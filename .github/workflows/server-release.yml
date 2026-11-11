@@ -56,7 +56,7 @@ jobs:
           node-version-file: package.json
           cache: pnpm
       - uses: ./.github/actions/org-deps
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --config.ci=false
       - name: Admit exact green main source
         id: source
         env:
@@ -101,10 +101,10 @@ jobs:
           node-version-file: package.json
           cache: pnpm
       - uses: ./.github/actions/org-deps
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --config.ci=false
       - name: Install the source's own tree
         working-directory: source
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.ci=false
       # The same bytes CI built for this SHA: the asset step refuses a tag asset that differs, so no run can
       # sign a replaced archive.
       - name: Build deterministic dedicated bundle
