@@ -4,6 +4,8 @@ export const CI_NATIVE_GROUPS = {
   'room-performance': [
     'test/net-bots.test.ts',
   ],
+  // TEST-SPEED TS5: Driftwood's 32-player tick proof, split from net-bots, is its own timing unit.
+  'room-performance-driftwood': ['test/net-bots-driftwood.test.ts'],
   'escape-titan': [
     'test/tooling/parity/browser-escape.test.mjs',
     'test/nalati-titan-verbs.test.ts',
@@ -80,4 +82,4 @@ export const CI_NATIVE_GROUPS = {
 } as const;
 export const CI_SERIAL_TESTS = Object.values(CI_NATIVE_GROUPS).flat();
 /** Timing and uncapped encoder proofs hold the whole CPU budget, so they run alone. */
-export const CPU_EXCLUSIVE_TESTS = ['test/net-bots.test.ts', 'test/cook-cpu-limit.test.ts'] as const;
+export const CPU_EXCLUSIVE_TESTS = ['test/net-bots.test.ts', 'test/net-bots-driftwood.test.ts', 'test/cook-cpu-limit.test.ts'] as const;

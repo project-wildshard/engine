@@ -1,90 +1,16 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { OWNED_ROW } from '../src/shared/game/loot/ownedRows';
-import { questBooks, type QuestBook } from '../src/shared/engine/quest/players';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
-import { parseDoc, PLAYER_DOC_VERSION, type PlayerDoc } from '../src/server/host/dedicated/playerDoc';
+import { PLAYER_DOC_VERSION } from '../src/server/host/dedicated/playerDoc';
 import type { RoomNews } from '../src/server/host/dedicated/cellProtocol';
-import { writeSave, type SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { playerSavesOver } from '../src/server/host/dedicated/playerSaves';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
-import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
+import { directLoopback } from '../src/test/engine/netLoopback';
 import { openPglite } from './fixtures/pgliteDatabase';
-import { serverInput } from './fixtures/dedicated/roomBench';
+import { SHARD, clock, shippedInput, rooms, post, open, readBack, enter, run, stand, bookOf, ring, opening, earn, purse, quit, RING, writes } from './fixtures/dedicatedDoc';
 
-// E7.4a: a save leaves a room and comes back on Driftwood's `sealed-ring`, mid-quest with coins and gear, on the lead's seat and on an
-// added one, and across them.
-const SHARD = 'driftwood-isle', RING = 'sealed-ring';
-interface Phone { readonly device: string; readonly client: NetClient; readonly link: DirectLoopback }
-let clock = 0;
-// VITEST-BENCH VB16: the shipped input (product, assets, Rapier) is immutable, so it loads once per file;
-// every room is still booted fresh in each case.
-const inputs = new Map<string, ReturnType<typeof serverInput>>();
-function shippedInput(slug: string): ReturnType<typeof serverInput> {
-  let found = inputs.get(slug);
-  if (found === undefined) { found = serverInput(slug); inputs.set(slug, found); }
-  return found;
-}
-const rooms: DedicatedRoom[] = [], writes: SaveWrite[] = [];
-const post = (row: RoomNews): void => { if (row.kind === 'save') writes.push(row.write); else if (row.kind === 'refused') throw new Error(row.reason); };
-async function open(boot: string): Promise<DedicatedRoom> {
-  const room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: boot, input: await shippedInput(SHARD), now: () => clock, post });
-  rooms.push(room);
-  return room;
-}
-afterEach(() => { for (const room of rooms.splice(0)) room.dispose(); writes.length = 0; });
-// oxlint-disable-next-line unicorn/prefer-structured-clone -- Exercise the actual persisted JSON representation.
-const readBack = (saved: SaveWrite): PlayerDoc | null => parseDoc(JSON.parse(JSON.stringify(saved.doc)), saved.saveVersion);
-function enter(room: DedicatedRoom, device: string, saved?: SaveWrite): Phone {
-  const link = directLoopback(), client = new NetClient(link.client);
-  room.seat({ device, name: device, body: `p.${device}`, doc: saved === undefined ? null : readBack(saved), seq: saved?.seq ?? 0 }, link.server, () => { client.hello('', { player: device, name: device }); link.pump(); });
-  link.pump();
-  return { device, client, link };
-}
-function run(room: DedicatedRoom, phones: readonly Phone[], ticks: number): void {
-  for (let tick = 0; tick < ticks; tick++) {
-    for (const { client, link } of phones) { client.command({ viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: 0 }); client.flush(); link.pump(); }
-    clock += 1000 / 60; room.tick();
-    for (const { link } of phones) link.pump();
-  }
-}
-const stand = (room: DedicatedRoom, device: string, x: number, z: number): void => { room.bodyOf(device)?.resetPose({ x, y: room.host.groundHeightAt(x, z) + 0.05, z }, 0); };
-function bookOf(room: DedicatedRoom, device: string): QuestBook {
-  const body = room.bodyOf(device);
-  if (body === undefined) throw new Error('No body');
-  return questBooks(room.host).of(body.id);
-}
-const ring = (room: DedicatedRoom, device: string): QuestBook['quests'][number] | undefined => bookOf(room, device).quests.find(quest => quest.def.id === RING);
-/** The opening of Driftwood's quest, and some gear: talk, then the chest, which holds a flint. */
-function opening(room: DedicatedRoom, phone: Phone): void {
-  run(room, [phone], 10);
-  stand(room, phone.device, -22, -71.5); run(room, [phone], 3);
-  phone.client.act({ kind: 'interact', seq: 0, id: 'castaway.talk' }); run(room, [phone], 4);
-  stand(room, phone.device, -22, -62.9); run(room, [phone], 3);
-  phone.client.act({ kind: 'interact', seq: 0, id: 'castaway-chest' }); run(room, [phone], 4);
-  expect(ring(room, phone.device)?.isStarted).toBe(true);
-  expect(bookOf(room, phone.device).flags.has('has:flint')).toBe(true);
-}
-/** Coins and gear the way a tick files them. */
-function earn(room: DedicatedRoom, device: string, id: string): void {
-  const body = room.bodyOf(device);
-  if (body === undefined) throw new Error('No body');
-  room.cell.owned.of(body.id).file({ grant: 'coins', name: 'coins', amount: 7 });
-  room.cell.owned.of(body.id).file({ grant: 'item', name: 'cape', amount: 1 });
-  room.book.file({ player: body.id, id, tick: 1, grant: 'coins', name: 'coins', amount: 7, pending: false });
-}
-function purse(room: DedicatedRoom, device: string): { coins: number; cape: boolean } {
-  const owned = room.cell.owned.of(room.bodyOf(device)?.id ?? '');
-  return { coins: owned.purse.coins, cape: owned.owned.has('cape') };
-}
-function quit(phone: Phone): SaveWrite {
-  const before = writes.length;
-  phone.link.server.close('left');
-  const write = writes.slice(before).at(-1);
-  if (write === undefined) throw new Error('No write');
-  return write;
-}
-
+// TEST-SPEED TS5 (J255): dedicated-doc was 31-44 s hosted. Some cases moved to dedicated-doc-refusals.test.ts; the helpers are in test/fixtures/dedicatedDoc.ts.
 test('mid-quest with coins and gear, on the lead seat', { timeout: 120_000 }, async () => {
   const room = await open('a'), a = enter(room, 'a');
   expect(room.bodyOf('a')?.id).toBe('actor.player');
@@ -253,66 +179,4 @@ test.each(['not json', 'truncated', 'wrong envelope', 'wrong purse'])('a %s purs
     const saved = quit({ device: phone.device, client, link }); saves.write(saved); expect(await saves.drain(1000)).toBe(true);
     expect((await saves.read(phone.device, SHARD)).doc?.store[key]).toContain('500');
   } finally { saves.queue.dispose(); saves.reports.dispose(); await db.close(); }
-});
-
-test('an incomplete ledger event is rejected before any room tick', async () => {
-  const room = await open('ledger'), saved = quit(enter(room, 'device:ledger')), doc = readBack(saved);
-  if (doc === null) throw new Error('No doc');
-  expect(parseDoc({ ...doc, ledger: { serial: 1, rows: [{ serial: 1, id: 'broken' }] } }, PLAYER_DOC_VERSION)).toBeNull();
-});
-
-test.each([{ axis: 'x', value: 1e308 }, { axis: 'z', value: 1e308 }, { axis: 'x', value: 100_000 }, { axis: 'z', value: 100_000 }])('an outside-world saved $axis=$value cannot reach the next room tick', { timeout: 9000 }, async ({ axis, value }) => {
-  const source = await open('place-source'), saved = quit(enter(source, 'device:place')), doc = readBack(saved);
-  if (doc === null) throw new Error('No document');
-  const news: RoomNews[] = [], room = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'place-target', input: await shippedInput(SHARD), now: () => clock, post: row => { news.push(row); } }); rooms.push(room);
-  const link = directLoopback(); let closed = ''; link.server.onClose(reason => { closed = reason; });
-  room.seat({ device: 'device:place', name: 'P', body: 'p.place', doc: { ...doc, at: { ...doc.at, [axis]: value } }, seq: saved.seq }, link.server, () => undefined);
-  expect(() => { room.tick(); }).not.toThrow(); expect(closed).toBe('refused'); expect(room.taken).toBe(0);
-});
-
-test.each(['missing document', 'missing slot', 'import failure', 'absurd position'])('a %s tries the good previous checkpoint', { timeout: 9000 }, async damage => {
-  const source = await open('fallback-source'), phone = enter(source, 'device:fallback'); earn(source, phone.device, 'paid');
-  const good = quit(phone), doc = readBack(good); if (doc === null) throw new Error('No document');
-  const store = { ...doc.store }, key = Object.keys(store).find(name => name.endsWith(`.${SHARD}`)); if (key === undefined) throw new Error('No purse');
-  if (damage === 'missing document') delete store[key];
-  if (damage === 'missing slot') { const envelope = JSON.parse(store[key] ?? '') as { keys: Record<string, unknown> }; delete envelope.keys['purse']; store[key] = JSON.stringify(envelope); }
-  const receipt = { serial: doc.ledger.serial + 1, factId: 'after-previous', grant: 'coins', name: 'coins', amount: 3 };
-  const bad = damage === 'import failure' ? { ...doc, book: { ...doc.book, quests: [] }, ledger: { serial: receipt.serial, rows: [...doc.ledger.rows, { serial: receipt.serial, id: receipt.factId, kind: 'ledger', grant: receipt.grant, name: receipt.name, amount: receipt.amount, tick: 1, pending: false }] } } : damage === 'absurd position' ? { ...doc, at: { ...doc.at, x: 1e308 } } : { ...doc, store };
-  const db = await openPglite(); await migrate(db); const saves = playerSavesOver(db, 0, () => undefined);
-  try {
-    await writeSave(db, 0, { ...good, seq: 1 }); await writeSave(db, 0, { ...good, seq: 2, doc: bad, receipts: damage === 'import failure' ? [receipt] : good.receipts });
-    const loaded = await saves.read(phone.device, SHARD), fresh = await open('fallback-target'), link = directLoopback(), client = new NetClient(link.client);
-    if (damage === 'absurd position') expect(loaded.doc?.at).toEqual(doc.at);
-    if (damage === 'import failure') expect(loaded.doc?.book.quests).toEqual([]);
-    fresh.seat({ device: phone.device, name: 'F', body: 'p.fallback', ...loaded }, link.server, () => { client.hello('', { player: phone.device, name: 'F' }); link.pump(); });
-    const coins = damage === 'import failure' ? 10 : 7;
-    expect(fresh.bodyOf(phone.device)).toBeDefined(); expect(purse(fresh, phone.device)).toEqual({ coins, cape: true });
-    run(fresh, [{ device: phone.device, link, client }], 1);
-    saves.write(quit({ device: phone.device, link, client })); expect(await saves.drain(1000)).toBe(true);
-    expect((await saves.read(phone.device, SHARD)).doc?.store[key]).toContain(String(coins));
-  } finally { saves.queue.dispose(); saves.reports.dispose(); await db.close(); }
-});
-
-
-test.each(['inventory', 'owned', 'platform.ledger'])('a damaged %s slot cannot pass store admission', async slot => {
-  const source = await open('slots'), phone = enter(source, 'device:slots');
-  source.cell.owned.of(source.bodyOf(phone.device)?.id ?? '').purse.add(500);
-  const good = quit(phone), doc = readBack(good); if (doc === null) throw new Error('No document');
-  const key = Object.keys(doc.store).find(name => name.endsWith(`.${SHARD}`)); if (key === undefined) throw new Error('No purse document');
-  const target = slot === 'platform.ledger' ? `${key.slice(0, -SHARD.length)}profile` : key;
-  const bad = { ...doc, store: { ...doc.store, [target]: JSON.stringify({ keys: { [slot]: { v: 1, data: 'damaged' } } }) } };
-  expect(parseDoc(bad, PLAYER_DOC_VERSION)).toBeNull();
-});
-
-test('a mismatched recovered fact refuses its seat without throwing or saving', async () => {
-  const source = await open('fact-source'), phone = enter(source, 'device:fact');
-  const baseline = quit(phone), again = enter(source, phone.device, baseline); opening(source, again);
-  const paid = quit(again), fact = paid.receipts.find(row => row.grant === 'fact'), doc = readBack(baseline);
-  if (fact === undefined || doc === null) throw new Error('No fact');
-  const identity: unknown = JSON.parse(fact.factId); if (!Array.isArray(identity) || typeof identity[4] !== 'number') throw new Error('Bad fact identity');
-  identity[4]++;
-  const news: RoomNews[] = [], fresh = await DedicatedRoom.boot({ slug: SHARD, build: '', bootId: 'fact-target', input: await shippedInput(SHARD), now: () => clock, post: row => { news.push(row); } }); rooms.push(fresh);
-  const link = directLoopback(); let closed = ''; link.server.onClose(reason => { closed = reason; });
-  expect(() => { fresh.seat({ device: phone.device, name: 'F', body: 'p.fact', doc, seq: paid.seq, recovery: [{ ...fact, serial: 1, factId: JSON.stringify(identity) }] }, link.server, () => undefined); }).not.toThrow();
-  expect(closed).toBe('refused'); expect(fresh.taken).toBe(0); fresh.drain(); expect(news.filter(row => row.kind === 'save')).toHaveLength(0);
 });
