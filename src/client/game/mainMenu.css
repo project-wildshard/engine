@@ -36,6 +36,7 @@
 .ws-main .ws-main-cards { display: flex; gap: 12px; width: min(560px, 100%); }
 .ws-main .ws-main-card { position: relative; flex: 1 1 0; min-width: 0; aspect-ratio: 1 / 0.86; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 14px 8px; appearance: none; -webkit-appearance: none; background: rgba(9, 22, 36, 0.86); border: 1px solid rgba(143, 227, 255, 0.4); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); color: var(--ws-cyan); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: background 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .ws-main .ws-main-cards.one .ws-main-card { aspect-ratio: 1 / 0.43; }
+.ws-main .ws-main-card[hidden] { display: none; }
 /* the four cyan corner brackets of the board's cards */
 .ws-main .ws-main-card::before, .ws-main .ws-main-card::after { content: ''; position: absolute; inset: -3px; pointer-events: none; border: 2px solid var(--ws-cyan);
   -webkit-mask: linear-gradient(#000 0 0) top left / 16px 16px no-repeat, linear-gradient(#000 0 0) top right / 16px 16px no-repeat, linear-gradient(#000 0 0) bottom left / 16px 16px no-repeat, linear-gradient(#000 0 0) bottom right / 16px 16px no-repeat;

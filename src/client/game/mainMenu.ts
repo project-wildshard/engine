@@ -21,6 +21,7 @@ import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type TitleCard, type TitleDeck, type TitleDeckOptions } from './titleDeck';
 import { gridEntryShown, menuMode, gridMode } from './grid/menu';
 import { dropGridIntent, enterGrid, gridRecoveryLoop } from './grid/pageEntry';
+import { worldHosted } from './grid/oneWayIn';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { findTitleManifest, titleManifests } from './shard/titleList';
@@ -100,6 +101,9 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     onEnter: (card) => { if (card !== firstEntry) dropFirstPlay(); firstEntry = null; leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
     onExplore: (card) => { dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
   const grid = gridEntryShown(mode());
+  // GO7 (DG4): on a build with a world, Infinite Wildshard shows once the world says it hosts the grid; until then it stays hidden.
+  let hosted = false;
+  const world = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__;
   const s = GAME_STRINGS.mainMenu;
   const dev = mode().developer;
   // E7.5 prep: a build stamped with a world (`__WS_WORLD__`, as clientWorker.ts reads it) offers the Connection doctor on its title
@@ -115,7 +119,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     <div class="ws-main-foot">
       <div class="ws-main-cards${grid ? '' : ' one'}" role="group" aria-label="${s.label}">
         <button class="ws-main-card ws-main-select" type="button"><span class="ws-main-icon">${CARDS_ICON}</span><b>${s.shardSelect}</b></button>
-        ${grid ? `<button class="ws-main-card ws-main-grid" type="button"><span class="ws-main-icon">${GRID_ICON}</span><b>${s.infinite}</b> <i class="ws-main-card-exp">${s.experimental}</i></button>` : ''}
+        ${grid || world !== undefined ? `<button class="ws-main-card ws-main-grid" type="button"${grid ? '' : ' hidden'}><span class="ws-main-icon">${GRID_ICON}</span><b>${s.infinite}</b> <i class="ws-main-card-exp">${s.experimental}</i></button>` : ''}
       </div>
       <div class="ws-main-row">
         <button class="ws-main-settings" type="button">${s.settings}</button>
@@ -189,7 +193,13 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   };
   deck.onTap(selectCard, play);
   const gridCard = main.querySelector('.ws-main-grid');
-  if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode())) { dropFirstPlay(); onGrid(); leaveTitle(); } });
+  if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode(), undefined, hosted)) { dropFirstPlay(); onGrid(); leaveTitle(); } });
+  if (!grid && world !== undefined && gridCard instanceof HTMLButtonElement) {
+    void (async (): Promise<void> => {
+      if (!await worldHosted(world) || owner.disposed) return;
+      hosted = true; gridCard.hidden = false; main.querySelector('.ws-main-cards')?.classList.remove('one');
+    })();
+  }
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).
   let started = false;

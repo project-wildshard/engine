@@ -10,13 +10,16 @@ import { saves } from '@wildshard/engine/saves/runtime';
  * device as a backup (iOS home-screen navigation can replace WebContent between the title and the game document, and the
  * new process may lose the session). Both copies are consumed together; the receiving navigation must start within 60 s.
  */
-export interface GridIntent { readonly instance: string; readonly slug: string; readonly at: number }
+export interface GridIntent { readonly instance: string; readonly slug: string; readonly at: number;
+  /** GO7: a chosen destination (Shard select on a world that hosts the grid). The page asks the world to seat it in this cell,
+   *  where a title tap's PLAY takes the seat the world already keeps (GO5). */
+  readonly goto?: boolean }
 const finite = v.pipe(v.number(), v.finite());
-const schema: v.GenericSchema<unknown, GridIntent | null> = v.nullable(v.object({ instance: v.string(), slug: v.string(), at: finite }));
+const schema: v.GenericSchema<unknown, GridIntent | null> = v.nullable(v.object({ instance: v.string(), slug: v.string(), at: finite, goto: v.exactOptional(v.boolean()) }));
 
 export interface GridIntents {
   /** the title's tap on Infinite Wildshard: the home cell the grid boots into; false if neither copy persisted */
-  set: (target: { readonly instance: string; readonly slug: string }) => boolean;
+  set: (target: { readonly instance: string; readonly slug: string; readonly goto?: boolean }) => boolean;
   /** Read-only accounting hint, never entry authority; consumes neither copy. */
   pending: (slug: string) => boolean;
   /** the boot's one read: the intent for this page's shard (fresh at document arrival, at most 60 s old) or null; both copies are removed */
@@ -36,7 +39,7 @@ export function gridIntents(store: Store, now: () => number = Date.now): GridInt
   return {
     pending: slug => fresh(session.read(), slug) !== null || fresh(device.read(), slug) !== null,
     set: (target) => {
-      const intent: GridIntent = { instance: target.instance, slug: target.slug, at: now() };
+      const intent: GridIntent = { instance: target.instance, slug: target.slug, at: now(), ...(target.goto === true ? { goto: true } : {}) };
       const inSession = session.write(intent), onDevice = device.write(intent);
       return inSession || onDevice;
     },

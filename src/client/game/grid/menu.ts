@@ -24,9 +24,10 @@ export const DEVSERVER: boolean = typeof __DEVSERVER__ === 'boolean' && __DEVSER
 export interface MenuMode { readonly developer: boolean; readonly devserver: boolean }
 export function menuMode(): MenuMode { return { developer: isDev(), devserver: DEVSERVER }; }
 
-/** Infinite Wildshard is on the title only with Settings ▸ Developer on, until SF22's gates pass (G61 E1) */
-export function gridEntryShown(mode: MenuMode = menuMode(), gatesPassed: boolean = GRID_GATES_PASSED): boolean {
-  return gatesPassed || mode.developer;
+/** Infinite Wildshard is on the title only with Settings ▸ Developer on, until SF22's gates pass (G61 E1). GO7 (DG4): on a build whose
+ *  world hosts the grid (`hosted`, GO4's gate) it shows to everyone, since Shard select and Infinite Wildshard enter the same world. */
+export function gridEntryShown(mode: MenuMode = menuMode(), gatesPassed: boolean = GRID_GATES_PASSED, hosted = false): boolean {
+  return gatesPassed || mode.developer || hosted;
 }
 
 /** Select a shard's ENTER WORLD, per §3.3's table: `restricted` is a card the shipped game shows locked (experimental,

@@ -634,6 +634,7 @@
     "src/client/game/grid/neighbourLife.ts": "client",
     "src/client/game/grid/neighbourPanels.ts": "client",
     "src/client/game/grid/neighbourRows.ts": "client",
+    "src/client/game/grid/oneWayIn.ts": "client",
     "src/client/game/grid/pageEntry.ts": "client",
     "src/client/game/grid/pageResidency.ts": "client",
     "src/client/game/grid/pageShell.ts": "client",

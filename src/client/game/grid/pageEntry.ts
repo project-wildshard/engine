@@ -10,7 +10,7 @@ import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly'
 import { pageGridIntents } from './intent';
 import { DEVSERVER, gridMode, type MenuMode } from './menu';
 import { gridRecovery, recoveryCatalogue, type GridRecoveryRecord, type GridServerSite } from '../../../shared/game/grid/recovery';
-import { setPageMode } from '../../../shared/game/grid/pageMode';
+import { setPageGoto, setPageMode } from '../../../shared/game/grid/pageMode';
 import { pageGridCells as gridCells } from '../../../shared/game/grid/cellEvents';
 import type { PageMode } from '../plugin/context';
 import { findTitleManifest, type TitleManifest } from '../shard/titleList';
@@ -131,6 +131,7 @@ export function bootPageMode(slug: string): PageMode {
   if (recovery !== null && [slug].includes(recovery.slug)) intent = { instance: recovery.instance, slug: recovery.slug, at: recovery.at };
   const mode: PageMode = intent === null ? 'shard' : 'grid';
   setPageMode(mode);
+  setPageGoto(intent !== null && 'goto' in intent && intent.goto ? intent.instance : null);
   if (intent !== null) gridCells.enter({ instance: intent.instance, slug: intent.slug }); // the home cell: the page starts inside it
   if (intent !== null) {
     const target = intent;

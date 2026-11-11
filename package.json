@@ -869,6 +869,7 @@
     "./game/grid/recovery": "./src/shared/game/grid/recovery.ts",
     "./game/grid/runtimeCheckpoint": "./src/shared/game/grid/runtimeCheckpoint.ts",
     "./game/grid/pageEntry": "./src/client/game/grid/pageEntry.ts",
+    "./game/grid/oneWayIn": "./src/client/game/grid/oneWayIn.ts",
     "./game/grid/menu": "./src/client/game/grid/menu.ts",
     "./game/grid/entryDownloads": "./src/client/game/grid/entryDownloads.ts",
     "./game/grid/prefetch": "./src/client/game/grid/prefetch.ts",

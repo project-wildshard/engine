@@ -177,7 +177,9 @@ export interface StartOnline {
   /** Who this device is. A Name given here is kept with its id, and asked only once. */
   readonly identity: (name?: string) => NetIdentity;
   /** GO4: a grid page: the cell it booted in, where its seat stands, and how it enters the grid again in another cell. */
-  readonly grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: SeatPlace) => void; readonly reenter: (cell: string) => void };
+  readonly grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: SeatPlace) => void; readonly reenter: (cell: string) => void;
+    /** GO7: Shard select sent this page to `cell`, so every dial asks the door to seat it there (`gotoSocket`). */
+    readonly goto?: boolean };
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
   readonly recordTag?:string;
@@ -185,6 +187,15 @@ export interface StartOnline {
 /** E7.5 prep: ask the page to leave for the Connection doctor, saying which screen asked. The page's own bundle answers
  *  (src/client/engine/ui/errorScreen.ts): it holds the save hold and the loading card's report, which this module can't see. */
 const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: from })); };
+
+/** GO7: the address a page dials. A page Shard select sent to a grid cell names it (`?chunk=`, the shard page's own name for where it
+ *  enters, ZS5), and the door seats it there when it
+ *  hosts that cell; any other page dials the bare address and takes the seat the world keeps (GO5). An older door ignores the query. */
+export function gotoSocket(socket: string, cell: string | undefined): string {
+  if (cell === undefined) return socket;
+  const url = new URL(socket); url.searchParams.set('chunk', cell);
+  return url.href;
+}
 
 /** GO4 gate: whether the world this build names hosts the grid, read from its `/health` (the release names the address). Any failure
  *  answers false, and the grid page keeps today's solo grid. */
@@ -222,7 +233,7 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
-  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
+  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, grid?.goto === true ? grid.cell : undefined), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
     // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
     cut: () => { void reloadStale(); },

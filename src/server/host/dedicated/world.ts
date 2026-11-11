@@ -41,6 +41,12 @@ const HELLO_MS = 5000, READY_MS = 120_000;
 const DRAIN_MS = 10_000;
 /** J177: one address, and no slug on it. */
 const WORLD_PATH = /^\/(?:\?.*)?$/u;
+/** GO7: the cell a page asks to be seated in (`/?chunk=<instance>`, `gotoSocket` in the online shell: the page's own `?chunk=` turned into
+ *  a goto, ZS5), or null. Only a name shaped like a grid instance is kept; whether this world opens it is the door's question (`cellFor`). */
+export function gotoCell(path: string | undefined): string | null {
+  const query = path?.indexOf('?') ?? -1, cell = query < 0 ? null : new URLSearchParams(path?.slice(query + 1)).get('chunk');
+  return cell !== null && /^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(cell) && cell.length <= 64 ? cell : null;
+}
 
 /** IPv6 privacy addresses share their household /64; mapped IPv4 keeps its IPv4 bucket. */
 function connectionKey(address: string): string {
@@ -197,7 +203,8 @@ export class World {
     const ip = connectionKey(trustedAddress(request.socket.remoteAddress ?? '', request.headers, this.options.trustProxy ?? DEFAULT_TRUST_PROXY));
     const attempt = this.attempt(ip);
     if (attempt === null) { this.refuse('connections'); socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
-    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, ip, attempt); });
+    const goto = gotoCell(request.url);
+    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, ip, attempt, goto); });
   }
   /** Actual retained limiter state, also recorded in the worker operational log. */
   get connectionStats(): { readonly addresses: number; readonly attempts: number } {
@@ -217,7 +224,7 @@ export class World {
   private sweepConnects(now: number): void {
     for (const [ip, times] of this.connects) if (now - (times.at(-1)?.at ?? -Infinity) >= MINUTE_MS) this.connects.delete(ip);
   }
-  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt): void {
+  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, goto: string | null): void {
     const end = new SocketTransport(socket);
     this.sockets.set(ip, (this.sockets.get(ip) ?? 0) + 1); this.ends.add(end);
     end.onClose(reason => {
@@ -228,11 +235,11 @@ export class World {
     // still admits this link (in the same read as its `ready`, or before a held body is handed back) ends it with no seat and no hold.
     end.onControl((control, bytes) => { if (control === 'ready' && new Uint8Array(bytes)[0] === LEAVE_FLAG) { this.quits.add(end); end.close(LEFT); } });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
-    const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes); });
+    const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
   }
-  private async joining(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
-    try { await this.hello(end, bytes); }
+  private async joining(end: SocketTransport, bytes: ArrayBuffer, goto: string | null): Promise<void> {
+    try { await this.hello(end, bytes, goto); }
     catch (error) { if (!end.isOpen) return; this.options.log({ at: 'world.join', error: String(error) }); this.refuse('join-failed'); end.close(error instanceof SaveQuarantinedError ? 'refused' : 'retry'); }
   }
   /** Everyone in the grid or on their way: the cap counts all of them, whichever cell they stand in (J182). */
@@ -256,7 +263,7 @@ export class World {
     } finally { this.finds.delete(id); scope.dispose(); }
   }
   /** The join: check, find where they stand, let them load, seat them. */
-  private async hello(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
+  private async hello(end: SocketTransport, bytes: ArrayBuffer, goto: string | null): Promise<void> {
     const view = new Uint8Array(bytes);
     // WR5 (5.5, J54 replaced): the door reads the v1 bootstrap. A v0.1.x hello or an older major reloads, a newer major
     // retries, and the minor window is one either way; builds no longer have to match.
@@ -286,7 +293,7 @@ export class World {
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const last = await saves.where(device);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    const slug = this.cellFor(last), saved = await saves.read(device, cellShard(slug));
+    const slug = this.cellFor(last, goto), saved = await saves.read(device, cellShard(slug));
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const { spawn } = await this.ask(slug, device, end);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
@@ -302,9 +309,12 @@ export class World {
     this.pending.delete(device);
     this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) }, bytes);
   }
-  private cellFor(last: string | null): string {
+  /** GO7: a page Shard select sent to a cell this world opens is seated there; otherwise where the player last stood, else the first. */
+  private cellFor(last: string | null, goto: string | null = null): string {
     const first = this.options.cells[0];
     if (first === undefined) throw new Error('A world has at least one cell');
+    const asked = goto === null ? null : cellName(goto);
+    if (asked !== null && this.links.has(asked)) return asked;
     const cell = last === null ? null : cellName(last);
     return cell !== null && this.links.has(cell) ? cell : first;
   }
