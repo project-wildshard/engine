@@ -109,6 +109,13 @@ test("setup.sh's split moves the settings out of the .env once, and leaves every
   expect(config(root, 'split', 'staging').status).toBe(0);
   expect(read(root, 'staging.settings')).toContain('WORLD_CELLS=grid\n');
   expect(read(root, 'staging.env')).toBe('SEAT_SECRET=s\nWORLD_WORKERS=99\n');
+  // The last assignment decides: a key whose last value fails stays whole in the .env, so the precedence never flips.
+  writeFileSync(join(root, 'etc/wildshard/staging.env'), 'WORLD_SEATS=8\nWORLD_SEATS=9999\nWORLD_CELLS=a\nWORLD_CELLS=b\n');
+  rmSync(join(root, 'etc/wildshard/staging.settings'));
+  expect(config(root, 'split', 'staging').status).toBe(0);
+  expect(read(root, 'staging.env')).toBe('WORLD_SEATS=8\nWORLD_SEATS=9999\n');
+  expect(read(root, 'staging.settings')).toContain('WORLD_CELLS=b\n');
+  expect(read(root, 'staging.settings')).not.toContain('WORLD_CELLS=a');
   expect(read(root, 'production.settings')).toBe(settings);
 });
 
@@ -146,6 +153,10 @@ test('wildshard-apply runs only a tag a signed release names, and refuses a bad 
   // Signed by another key: the box's pinned key believes none of it.
   const other = releases([{ tag, commit: good }]);
   expect(apply(other.dir, key, tag, 'harden').out).toContain(`no signed release names ${tag}`);
+});
+
+test('wildshard-apply never reads a file a channel user owns', () => {
+  expect(readFileSync(APPLY, 'utf8')).not.toMatch(/\/var\/lib\/wildshard\/\$\{channel\}|bundles/u);
 });
 
 test("wildshard-apply pins the same release public key setup.sh embeds", () => {

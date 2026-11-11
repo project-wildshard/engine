@@ -211,6 +211,17 @@ for rule in $drift; do
   say doing VH4 "delete ufw rule $rule: $(ufw status numbered | grep -E "^\[ *$rule\]" | sed 's/  */ /g')"; ufw --force delete "$rule" >/dev/null
 done
 
+# What sshd will really do for each account, checked before any reload: the agent's Match reaches it alone, and raynos
+# keeps his own keys.
+sshd_keys() { sshd -T -C "user=$1,host=wildshard,addr=100.64.0.1" | awk 'tolower($1)=="authorizedkeysfile" {$1=""; sub(/^ /,""); print}'; }
+sshd_verify() {
+  local agent raynos
+  agent=$(sshd_keys "$AGENT") || { say stop VH3 'sshd -T -C failed for the agent'; exit 1; }
+  raynos=$(sshd_keys raynos) || { say stop VH3 'sshd -T -C failed for raynos'; exit 1; }
+  if [ "$agent" != /etc/ssh/authorized_keys/wildshard-agent ] || ! printf '%s\n' "$raynos" | grep -q '\.ssh/authorized_keys'; then
+    say stop VH3 "sshd's key files are wrong (agent '$agent', raynos '$raynos'); not reloaded, and the dead-man undoes the file"; exit 1
+  fi
+}
 # --- VH3: sshd, and SSH over the tailnet to that sshd (D1). Tailscale SSH would bypass sshd's rules, root included.
 if put /etc/ssh/sshd_config.d/10-wildshard.conf 644 root:root VH3 <<'EOF'
 # VPS-HARDENING VH3: keys only, raynos and the agents' account (J266) only, over the tailnet only (ufw and the Hetzner
@@ -232,13 +243,9 @@ Match User wildshard-agent
 EOF
 then
   arm_deadman
-  sshd -t; systemctl try-reload-or-restart ssh.service
+  sshd -t; sshd_verify; systemctl try-reload-or-restart ssh.service
 fi
-# What sshd will really do for each account: the agent's Match must reach it alone, and raynos must keep his own keys.
-sshd_keys() { sshd -T -C "user=$1,host=wildshard,addr=100.64.0.1" 2>/dev/null | awk 'tolower($1)=="authorizedkeysfile" {$1=""; sub(/^ /,""); print}'; }
-if [ "$(sshd_keys "$AGENT")" != /etc/ssh/authorized_keys/wildshard-agent ] || ! sshd_keys raynos | grep -q '\.ssh/authorized_keys'; then
-  say stop VH3 "sshd's key files are wrong (agent '$(sshd_keys "$AGENT")', raynos '$(sshd_keys raynos)'); the dead-man undoes the sshd file"; exit 1
-fi
+sshd_verify
 if ! [ -s /home/raynos/.ssh/authorized_keys ]; then say stop VH3 'raynos has no authorized_keys: refusing to turn Tailscale SSH off'; exit 1; fi
 if tailscale debug prefs 2>/dev/null | grep -q '"RunSSH": true'; then
   arm_deadman

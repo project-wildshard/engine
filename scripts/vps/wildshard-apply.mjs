@@ -6,10 +6,11 @@
 // `bundle.name` must sit under that tag. Its `engineBuild` commit is fetched from GitHub by hash, the tag must point at the
 // same commit, and scripts/vps is unpacked from it into a fresh root-only folder, which is the only place the script runs
 // from. It never runs anything from a path another user can write. Installed root-owned as /usr/local/sbin/wildshard-apply.
-// Signed files come from each channel's RELEASE_URL, and from the ones the box keeps beside each bundle it has served.
+// Signed files come only from each channel's RELEASE_URL, so the tag must be one a channel serves now. Nothing a channel's
+// own user can write (its bundle folders) is read: root never opens a path another account controls (Codex J206).
 import { spawnSync } from 'node:child_process';
 import { createPublicKey, verify } from 'node:crypto';
-import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, opendirSync, openSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Public SPKI DER, equal to setup.sh's EXPECTED_RELEASE_PUBLIC_KEY (the engine's test holds them equal). Never a signing key.
@@ -64,24 +65,6 @@ async function signedFiles() {
           if (size <= 65_536) texts.push(Buffer.concat(parts).toString('utf8'));
         }
       } catch { say('warn', `${channel}'s signed release file did not answer`); }
-    }
-    // pull.mjs keeps each bundle's signed file beside it, so a tag that was live here before can be applied again.
-    const bundles = `/var/lib/wildshard/${channel}/bundles`;
-    if (existsSync(bundles) && lstatSync(bundles).isDirectory()) {
-      const folder = opendirSync(bundles);
-      // At most 256 entries: the channel's user owns this folder and could fill it.
-      for (let count = 0, entry = folder.readSync(); entry !== null && count < 256; count += 1, entry = folder.readSync()) {
-        if (!entry.isDirectory()) continue;
-        const name = entry.name;
-        // The channel's user owns these folders: never follow a link, never block on a FIFO, never read a big file.
-        let fd;
-        try {
-          fd = openSync(join(bundles, name, 'release.json'), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-          const stat = fstatSync(fd);
-          if (stat.isFile() && stat.size <= 65_536) texts.push(readFileSync(fd, 'utf8'));
-        } catch { /* not a kept release */ } finally { if (fd !== undefined) closeSync(fd); }
-      }
-      folder.closeSync();
     }
   }
   return texts;

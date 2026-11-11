@@ -120,6 +120,12 @@ def main(argv):
         stop('the channel is production or staging')
     channel = args[1]
     settings_path, env_path = f'{ETC}/{channel}.settings', f'{ETC}/{channel}.env'
+    if verb in ('set', 'split'):
+        # One change at a time per channel, held through publication and rollback: a second caller waits, so neither
+        # overwrites or rolls back the other's change. 600, so VH12's world-readable check never sees it.
+        import fcntl
+        lock = os.fdopen(os.open(f'{ETC}/.{channel}.settings.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+        fcntl.flock(lock, fcntl.LOCK_EX)
 
     if verb == 'show':
         if len(args) != 2:
@@ -140,17 +146,21 @@ def main(argv):
             if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
                 value = value[1:-1]
             return value
-        moving = [row for row in env_rows if key_of(row) in SETTINGS and SETTINGS[key_of(row)](plain(row), channel)]
+        # The last assignment of a key is the one systemd uses; a key moves only if that one passes its rule, and then all of
+        # its rows move, so the precedence never changes (Codex J206).
+        last = {key_of(row): row for row in env_rows if key_of(row) in SETTINGS}
+        keys = {key for key, row in last.items() if SETTINGS[key](plain(row), channel)}
+        moving = [row for row in env_rows if key_of(row) in keys]
         if not moving:
             print(f'ok      {env_path} holds no settings')
             return 0
         settings_rows = read_rows(settings_path) or list(HEADER)
         have = {key_of(row) for row in settings_rows}
         # A value already in the settings file wins: it is read last, so it is the one the server runs with today.
-        settings_rows += [f'{key_of(row)}={plain(row)}' for row in moving if key_of(row) not in have]
+        settings_rows += [f'{key}={plain(last[key])}' for key in sorted(keys, key=lambda name: list(SETTINGS).index(name)) if key not in have]
         write_rows(settings_path, settings_rows, channel)
         write_rows(env_path, [row for row in env_rows if row not in moving], channel)
-        print(f'doing   move {", ".join(key_of(row) for row in moving)} from {channel}.env to {channel}.settings')
+        print(f'doing   move {", ".join(sorted(keys))} from {channel}.env to {channel}.settings')
         return 0
 
     if len(args) != 4:
@@ -162,11 +172,6 @@ def main(argv):
         stop(f'{key} must be {RULES[key]}')
     if channel == 'production' and not production:
         stop('a production change needs --production')
-    # One change at a time per channel: a second caller waits, so neither rolls back the other's change.
-    import fcntl
-    # 600, so VH12's world-readable check never sees it.
-    lock = os.fdopen(os.open(f'{ETC}/.{channel}.settings.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
-    fcntl.flock(lock, fcntl.LOCK_EX)
     before = read_rows(settings_path)
     rows = list(before) or list(HEADER)
     rows = [row for row in rows if key_of(row) != key] + [f'{key}={value}']

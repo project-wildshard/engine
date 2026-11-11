@@ -15,3 +15,5 @@
   `/etc/ssh/authorized_keys/wildshard-agent` (a Match, checked with `sshd -T -C`), the
   config rollback restarts even a dead unit, root reads of channel-owned files are bounded,
   and setup.sh had backticks inside unit heredocs that bash would have run as root.
+- Round 2 NO-GO on the last MUST: wildshard-apply now reads nothing a channel user owns,
+  only the bounded RELEASE_URL answers, so a tag must be one a channel serves today.
