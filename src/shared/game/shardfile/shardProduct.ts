@@ -115,6 +115,8 @@ export function productClosureFile(product: ShardProduct, hash: string): Promise
 /** Build the product the loader passes to a runtime. Pure: it fetches nothing and decodes nothing itself. */
 export function createShardProduct(input: ShardProductInput): ShardProduct {
   const { slug, sections, files, check = false } = input, streamed = input.streamed ?? new Set<string>();
+  /** Named JSON that already passed its platform and registered checks for this product. */
+  const passedJson = new Set<string>();
   for (const name of new Set([...sections.keys(), ...streamed])) if (!isPlatformDataSection(name) && !OUTPUT_SECTIONS.some(row => row.name === name)) throw new ProductError(slug, name, 'schema', 'only platform sections are admitted');
   for (const name of files.keys()) if (name.startsWith('custom/')) throw new ProductError(slug, name, 'schema', 'custom output names are retired');
   const value = (name: string): unknown => {
@@ -148,8 +150,15 @@ export function createShardProduct(input: ShardProductInput): ShardProduct {
     const decoded: unknown = file.jsonSchema === undefined ? JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
       : input.builtJson === true ? parseNamedJson(bytes) : await (input.jsonCheck ?? readCheckedNamedJson)(file.jsonSchema, bytes, () => pacedResolve(undefined));
     if(input.builtJson!==true){
-      try{validatePlatformFile(name,typeof file.jsonSchema?.['$comment']==='string'?file.jsonSchema['$comment']:undefined,decoded);if(contract!==undefined)validateRegisteredJson(name,decoded);}
-      catch(error){throw new ProductError(slug,name,'schema',`registered JSON refuses its defining contract: ${String(error)}`);}
+      const comment=typeof file.jsonSchema?.['$comment']==='string'?file.jsonSchema['$comment']:undefined;
+      // TEST-SPEED TS4: both checks only read the decoded value, which this product's verified reader decodes from the
+      // same hashed bytes each time, so a name that passed once passes again: skip the repeat (every resident a world
+      // opens reads the same files). Only a pass is remembered; a refusal is checked again.
+      if(!passedJson.has(name)){
+        try{validatePlatformFile(name,comment,decoded);if(contract!==undefined)validateRegisteredJson(name,decoded);}
+        catch(error){throw new ProductError(slug,name,'schema',`registered JSON refuses its defining contract: ${String(error)}`);}
+        passedJson.add(name);
+      }
     }
     return input.check === true ? deepFreeze(decoded) : decoded;
   }
