@@ -48,6 +48,24 @@ export function eventsMessage(tick: number, events: readonly NetEvent[]): Uint8A
   return encodeEvents(tick, events.map(toWireEvent), LOCAL_SPAWNS);
 }
 
+/** A message's room under wire's 64 KiB cap (5.1), with margin for the record head growing as events are added. */
+const EVENTS_BUDGET = 60_000;
+/**
+ * A tick's events as one or more messages, each under the wire's cap, in order. v0 had no cap, so a burst of spawns or
+ * views went as one message; a v1 message over 64 KiB is refused whole by the receiver, losing every event in it.
+ */
+export function eventsMessages(tick: number, events: readonly NetEvent[]): Uint8Array<ArrayBuffer>[] {
+  const said = events.map(toWireEvent), base = encodeEvents(tick, [], LOCAL_SPAWNS).length, out: Uint8Array<ArrayBuffer>[] = [];
+  let start = 0, used = base;
+  for (let at = 0; at < said.length; at++) {
+    const event = said[at], size = event === undefined ? 0 : encodeEvents(tick, [event], LOCAL_SPAWNS).length - base;
+    if (at > start && used + size > EVENTS_BUDGET) { out.push(encodeEvents(tick, said.slice(start, at), LOCAL_SPAWNS)); start = at; used = base; }
+    used += size;
+  }
+  if (start < said.length) out.push(encodeEvents(tick, said.slice(start), LOCAL_SPAWNS));
+  return out;
+}
+
 /** A client's command bundle, targets as handles. */
 export function commandsMessage(ackFrame: number, commands: readonly NetCommand[], refs: WireRefs): Uint8Array<ArrayBuffer> {
   return encodeBody(LOCAL.commands, TAG_CMDS, { ackFrame, commands: commands.map(command => toWireCommand(command, refs)) });

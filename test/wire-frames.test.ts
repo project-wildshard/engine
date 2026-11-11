@@ -11,11 +11,20 @@ import { BitWriter } from '../src/shared/engine/net/bits';
 import { decodeFrame, encodeFrame, WorldFrame, type DecodedFrame, type FrameInput } from '../src/shared/engine/net/frame';
 import { ANIMAL_CLASS, PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 import type { NetClass } from '../src/shared/engine/net/schema';
-import { snapshotOf, WireFrameReader } from '../src/shared/engine/net/wireFrames';
+import { snapshotOf, WireFrameReader, type FrameSpan } from '../src/shared/engine/net/wireFrames';
+import { readMessage } from '@wildshard/wire/game';
 
 const OWNER: NetClass<never> = PLAYER_CLASS, ANIMAL: NetClass<never> = ANIMAL_CLASS;
 const TABLES = { classTables: encodeClassTables(WIRE_CLASSES), rideLawTables: encodeRideLawTables(RIDE_LAWS) };
 const RIDE_WORDS = 38;
+/** The animal's wire class id (5.2), as its spawn names it. */
+const ANIMAL_ID = 2;
+/** A frame message's one record. */
+function frameSpan(bytes: Uint8Array): FrameSpan {
+  const [record] = readMessage(bytes).records;
+  if (record === undefined) throw new Error('no frame record');
+  return { bytes, start: record.start, end: record.end };
+}
 
 /** Three animals; `step` moves some of them, so a delta and a held row both appear. */
 function world(tick: number, step: number): WorldFrame {
@@ -41,12 +50,12 @@ function inputs(): FrameInput[] {
 
 test('a frame sequence projects to the frames v0 decodes, owner f64 bits and ride words included', () => {
   const v0Frames = new Map<number, DecodedFrame>(), writer = new BitWriter(4096);
-  const reader = new WireFrameReader(TABLES, () => ANIMAL, OWNER);
+  const reader = new WireFrameReader(TABLES, () => ANIMAL_ID, OWNER);
   for (const input of inputs()) {
     const v0 = decodeFrame(new Uint8Array(encodeFrame(writer, input)), { ownerClass: OWNER, classOf: () => ANIMAL, baseline: tick => v0Frames.get(tick) ?? null });
     if (v0 === null) throw new Error('v0 frame did not decode');
     v0Frames.set(v0.tick, v0);
-    const v1 = reader.read(encodeWire(snapshotOf(input)));
+    const v1 = reader.read(frameSpan(encodeWire(snapshotOf(input))));
     expect(v1).toEqual(v0);
     expect(new Uint8Array(v1?.owner.buffer ?? new ArrayBuffer(0))).toEqual(new Uint8Array(v0.owner.buffer));
   }
@@ -55,7 +64,7 @@ test('a frame sequence projects to the frames v0 decodes, owner f64 bits and rid
 test('a frame against a baseline the client never held cannot apply yet', () => {
   const [, second] = inputs();
   if (second === undefined) throw new Error('no second frame');
-  expect(new WireFrameReader(TABLES, () => ANIMAL, OWNER).read(encodeWire(snapshotOf(second)))).toBeNull();
+  expect(new WireFrameReader(TABLES, () => ANIMAL_ID, OWNER).read(frameSpan(encodeWire(snapshotOf(second))))).toBeNull();
 });
 
 // The WR4 review, carried to WR5: a prediction correction through a skewed table keeps px..vz bit for bit (J140). The sender's
@@ -73,8 +82,8 @@ test('a sender with an extra owner field before px projects px..vz bit for bit',
   const columns = new Map(classes.map(entry => [entry.name, classColumns(entry)]));
   const input = { ...snapshotOf(first), ownerClass: classColumns(skewed), owner: Float64Array.from(sender.map((column, at) => value(column.id, at))),
     classOf: (handle: number) => (handle > 0 ? columns.get('animal') : undefined) };
-  const reader = new WireFrameReader({ classTables: encodeClassTables(classes), rideLawTables: TABLES.rideLawTables }, () => ANIMAL, OWNER);
-  const decoded = reader.read(encodeWire(input));
+  const reader = new WireFrameReader({ classTables: encodeClassTables(classes), rideLawTables: TABLES.rideLawTables }, () => ANIMAL_ID, OWNER);
+  const decoded = reader.read(frameSpan(encodeWire(input)));
   if (decoded === null) throw new Error('frame did not decode');
   for (const id of [11, 12, 13, 14, 15, 16]) {
     const at = local.findIndex(column => column.id === id), want = new Float64Array([exact[id - 11] ?? 0]), got = new Float64Array([decoded.owner[at] ?? Number.NaN]);

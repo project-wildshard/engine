@@ -46,3 +46,14 @@
   client's codecs per hello and caches none across clients, so the LRU cap
   the review asked for has nothing to bound yet; a shared cache would need
   one.
+- Codex review of the branch (J206), its five MUSTs folded in with a
+  regression each (`test/wire-review.test.ts`): reliable events now split
+  into messages under the wire's 64 KiB cap, in order (v0 had no cap); the
+  client keeps every spawned handle's sender class id, so a class this
+  build lacks decodes and is left out of the projection instead of
+  blocking the frame; spawn text projects by field id; a frame record after
+  another record in one message applies (the reader takes the record's
+  span); and a welcome whose tables this build can't project closes as
+  `reload` instead of leaving the client unwelcomed. SHOULD: a room checks
+  its required capabilities on a traveller too. NIT: the doctor says an
+  accepted hello proves wire compatibility, not the same build.

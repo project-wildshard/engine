@@ -4,7 +4,7 @@
 import { decodeClassTables } from '@wildshard/wire/classTables';
 import { WIRE_CLASSES } from '@wildshard/wire/classes';
 import { classColumns, type ClassColumns } from '@wildshard/wire/columns';
-import { decodeFrameMessage } from '@wildshard/wire/frameRecord';
+import { decodeFrame } from '@wildshard/wire/frameRecord';
 import { projectClasses, projectRides, projectRow, type ClassProjection, type RideProjection } from '@wildshard/wire/projection';
 import { decodeRideLawTables } from '@wildshard/wire/rideTables';
 import { MOUNT, RIDE_LAWS } from '@wildshard/wire/rides';
@@ -45,19 +45,29 @@ export interface FrameTables { readonly classTables: Uint8Array; readonly rideLa
 /** How many raw frames the client keeps as baselines. */
 const RAW_RING = 64;
 
-/** Reads one server's frames into this build's layout; the raw frames it keeps are that server's own. */
+/** Where a record body lies in a message. */
+export type FrameSpan = Parameters<typeof decodeFrame>[0];
+
+/**
+ * Reads one server's frames into this build's layout; the raw frames it keeps are that server's own. Rows are decoded by
+ * the sender's class ids, which spawns name, so a class this build doesn't know still decodes (and is left out of the
+ * projection) rather than blocking the frame (5.4).
+ */
 export class WireFrameReader {
   private readonly sender: ReadonlyMap<number, ClassColumns>;
   private readonly projected: ReadonlyMap<number, ClassProjection>;
   private readonly rides: ReadonlyMap<number, RideProjection>;
   private readonly laws: ReadonlyMap<number, RideLaw>;
   private readonly raw = new Map<number, RawFrame>();
-  private readonly classOf: (handle: number) => NetClass<never> | undefined;
-  private readonly owner: NetClass<never>;
+  private readonly classIdOf: (handle: number) => number | undefined;
+  private readonly ownerId: number;
 
-  /** `classOf` names a handle's class from its spawn; the welcome's tables name the sender's layout. */
-  constructor(tables: FrameTables, classOf: (handle: number) => NetClass<never> | undefined, owner: NetClass<never>) {
-    this.classOf = classOf; this.owner = owner;
+  /**
+   * `classIdOf` names a handle's class by the sender's id, from its spawn; the welcome's tables name the sender's
+   * layout. Throws (a WireDecodeError) when the tables can't be read or projected, as a table lacking a required field.
+   */
+  constructor(tables: FrameTables, classIdOf: (handle: number) => number | undefined, owner: NetClass<never>) {
+    this.classIdOf = classIdOf; this.ownerId = IDS.get(owner.cls) ?? 0;
     const classes = decodeClassTables(tables.classTables), laws = decodeRideLawTables(tables.rideLawTables);
     this.sender = new Map(classes.map(entry => [entry.id, classColumns(entry)]));
     this.projected = projectClasses(classes, WIRE_CLASSES);
@@ -69,23 +79,24 @@ export class WireFrameReader {
   senderColumns(id: number): ClassColumns | undefined { return this.sender.get(id); }
 
   /** A spawn's initial words, sent in the sender's layout, in this build's. */
-  initial(cls: NetClass<never>, words: readonly number[]): number[] {
-    const slots = this.projected.get(IDS.get(cls.cls) ?? 0);
+  initial(senderId: number, words: readonly number[]): number[] {
+    const slots = this.projected.get(senderId);
     return slots === undefined ? [...words] : [...projectRow(slots.initial, words)];
   }
 
-  private senderOf(cls: NetClass<never> | undefined): ClassColumns | undefined {
-    const id = cls === undefined ? undefined : IDS.get(cls.cls);
-    return id === undefined ? undefined : this.sender.get(id);
+  /** A spawn's text fields, sent in the sender's order, in this build's by field id; a field it lacks is ''. */
+  text(senderId: number, texts: readonly string[]): string[] {
+    const sent = this.sender.get(senderId)?.text ?? [], local = this.projected.get(senderId)?.local.text ?? sent;
+    return local.map(id => { const at = sent.indexOf(id); return at === -1 ? '' : texts[at] ?? ''; });
   }
 
-  /** One frame message, projected; null when it is malformed or cannot apply yet. */
-  read(bytes: Uint8Array): DecodedFrame | null {
-    const ownerClass = this.senderOf(this.owner);
+  /** One frame record, projected; null when it is malformed or cannot apply yet. */
+  read(span: FrameSpan): DecodedFrame | null {
+    const ownerClass = this.sender.get(this.ownerId);
     if (ownerClass === undefined) return null;
     let raw: RawFrame | undefined;
     try {
-      raw = decodeFrameMessage(bytes, { ownerClass, classOf: handle => this.senderOf(this.classOf(handle)), rideLaw: id => this.laws.get(id), baseline: tick => this.raw.get(tick) });
+      raw = decodeFrame(span, { ownerClass, classOf: handle => { const id = this.classIdOf(handle); return id === undefined ? undefined : this.sender.get(id); }, rideLaw: id => this.laws.get(id), baseline: tick => this.raw.get(tick) });
     } catch (error) { if (error instanceof Error && error.name === 'WireDecodeError') return null; throw error; }
     if (raw === undefined) return null;
     this.raw.set(raw.tick, raw);
@@ -94,10 +105,10 @@ export class WireFrameReader {
   }
 
   private project(raw: RawFrame): DecodedFrame {
-    const ownerId = IDS.get(this.owner.cls) ?? 0, owner = this.projected.get(ownerId);
+    const owner = this.projected.get(this.ownerId);
     const rows = new Map<number, Uint32Array>();
     for (const [handle, row] of raw.rows) {
-      const cls = this.classOf(handle), slots = cls === undefined ? undefined : this.projected.get(IDS.get(cls.cls) ?? 0);
+      const id = this.classIdOf(handle), slots = id === undefined ? undefined : this.projected.get(id);
       if (slots !== undefined) rows.set(handle, Uint32Array.from(projectRow(slots.row, row)));
     }
     const ride = raw.ride === undefined ? undefined : this.rides.get(raw.ride.law);

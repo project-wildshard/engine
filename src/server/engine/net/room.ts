@@ -16,7 +16,7 @@ import { readMessage, TAG_ACT, TAG_CMDS } from '@wildshard/wire/game';
 import { decodeFirstMessage } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { snapshotOf } from '../../../shared/engine/net/wireFrames';
-import { eventsMessage, welcomeMessage, WireClientReader, type Span } from '../../../shared/engine/net/wireMessages';
+import { eventsMessage, eventsMessages, welcomeMessage, WireClientReader, type Span } from '../../../shared/engine/net/wireMessages';
 import { NetHandles } from './handles';
 import { GUEST, NetIdentitySchema, type NetIdentity } from '../../../shared/engine/net/identity';
 import type { NetDied, NetPlayerDied, NetView, NetEvent, NetHit, NetReward } from '../../../shared/engine/net/messages';
@@ -127,6 +127,8 @@ interface RoomClient {
   state: 'new' | 'waiting' | 'live';
   /** Its command and act codecs, compiled from the tables its hello carried (5.3); absent before hello. */
   reader?: WireClientReader | undefined;
+  /** The capabilities its hello named; a room it travels to checks its own requirements against them. */
+  capabilities?: readonly number[] | undefined;
   ack: number; readonly acts: HeldAct[]; readonly known: Set<number>;
   /** Bodies this client has heard spawn and not yet been told what it missed of; each is sent a frame at a time. */
   readonly owed: number[];
@@ -205,14 +207,16 @@ export class NetRoom {
     const tick = this.world.tick(), travel: NetEvent = { kind: 'travel', tick, from: this.world.cell(), to: to.world.cell() };
     client.transport.send('reliable', eventsMessage(tick, [travel]).buffer);
     this.remove(client);
-    return to.adopt(client.transport, player, client.queue, { identity: client.identity, reader: client.reader });
+    return to.adopt(client.transport, player, client.queue, { identity: client.identity, reader: client.reader, capabilities: client.capabilities ?? [] });
   }
-  private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, said: { readonly identity: NetIdentity; readonly reader: WireClientReader | undefined }): number | null {
+  private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, said: { readonly identity: NetIdentity; readonly reader: WireClientReader | undefined; readonly capabilities: readonly number[] }): number | null {
     const id = this.join(transport, player, queue), client = this.clients.find(entry => entry.id === id), { identity } = said;
     if (client !== undefined) {
       if (this.world.identified?.(player.id, identity) === false) { this.stats.refused++; this.drop(client); return null; }
+      // A room that requires a capability this client's hello lacked refuses it here too, as at hello (5.3).
+      if (this.required.some(need => !said.capabilities.includes(need))) { this.stats.refused++; client.transport.close('reload'); this.drop(client); return null; }
       // Its hello's tables come with it: the same socket, the same client build (5.3).
-      client.identity = identity; client.reader = said.reader; this.welcome(client);
+      client.identity = identity; client.reader = said.reader; client.capabilities = said.capabilities; this.welcome(client);
     } // it said hello to the room it came from
     return id;
   }
@@ -321,7 +325,7 @@ export class NetRoom {
     if (this.world.identified?.(client.player.id, identity) === false) { this.stats.refused++; this.drop(client); return; }
     client.identity = identity;
     client.ledgerSeen = hello.ledger;
-    client.reader = new WireClientReader(hello);
+    client.reader = new WireClientReader(hello); client.capabilities = hello.capabilities;
     client.state = 'waiting';
     if (this.opened) this.welcome(client);
   }
@@ -484,9 +488,10 @@ export class NetRoom {
     for (const receipt of this.book.since(client.player.id, client.ledgerSeen)) { events.push({ ...receipt, tick: frame.tick }); client.ledgerSeen = receipt.serial; }
     for (const handle of retired) if (client.known.delete(handle)) events.push({ kind: 'despawn', handle });
     if (events.length > 0) {
-      const bytes = eventsMessage(frame.tick, events).buffer;
-      this.stats.eventBytes += bytes.byteLength;
-      client.transport.send('reliable', bytes);
+      for (const message of eventsMessages(frame.tick, events)) {
+        this.stats.eventBytes += message.byteLength;
+        client.transport.send('reliable', message.buffer);
+      }
     }
     const acked = client.ack < 0 ? null : this.ring.at(client.ack), seen = client.views.find(entry => entry.tick === client.ack);
     const base = acked === frame || seen === undefined ? null : acked;
