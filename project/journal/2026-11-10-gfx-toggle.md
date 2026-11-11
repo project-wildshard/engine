@@ -83,3 +83,4 @@ lands until he picks from the board.
   Anti-aliasing (a desktop keeps them). Rows: main (presets, density,
   readout), effects (shadows, bloom, rays, AA), setup (In-world toggle).
 - The QA 25 title card's file is deleted in its own commit (the source stamp reads HEAD's tree, so a delete can't ride with code).
+- Test timings for the three new test files recorded on the new base (the CI planner charges an unmeasured file 60 s, which tipped its shard plan over budget).
