@@ -29,4 +29,4 @@ beside the others.
 
 Under `sandbox-exec` with outbound networking denied, a cold run passed
 in 31 s: Template 2 was installed from the dependency and `pins.ts
-status` named it as the source. `pnpm test:e2e:offline` repeats that.
+status` named it as the source. `bash scripts/e2e-offline.sh` repeats that.
