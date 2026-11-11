@@ -323,6 +323,7 @@
     "src/client/engine/render/displayColour.ts": "client",
     "src/client/engine/render/doubleElements.ts": "client",
     "src/client/engine/render/drawGuards.ts": "client",
+    "src/client/engine/render/lightUniforms.ts": "client",
     "src/client/engine/render/fencedUnits.ts": "client",
     "src/client/engine/render/firstFrameParts.ts": "client",
     "src/client/engine/render/drawHooks.ts": "client",

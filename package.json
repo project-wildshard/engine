@@ -756,6 +756,7 @@
     "./render/scatterInstances": "./src/client/engine/render/scatterInstances.ts",
     "./models/geometryPack": "./src/client/engine/models/geometryPack.ts",
     "./render/drawGuards": "./src/client/engine/render/drawGuards.ts",
+    "./render/lightUniforms": "./src/client/engine/render/lightUniforms.ts",
     "./script/ownedSimBatchV2": "./src/server/engine/script/ownedSimBatchV2.ts",
     "./script/groupBankV2": "./src/shared/engine/script/groupBankV2.ts",
     "./script/groupStepV2": "./src/shared/engine/script/groupStepV2.ts",

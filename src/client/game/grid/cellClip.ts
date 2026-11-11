@@ -7,6 +7,7 @@ import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
 import { onCellField, onCellMethods } from './cellChanges';
 import { skinEnvelope, uploadedSkinBounds } from './skinEnvelope';
 import { guardObjectDraw, type DrawGuard } from '@wildshard/engine/render/drawGuards';
+import { ownLightUniforms } from '@wildshard/engine/render/lightUniforms';
 import { instanceEnvelope } from '@wildshard/engine/render/instancedGeometry';
 
 
@@ -325,7 +326,7 @@ export function cellClip(root: Object3D, half: number, scope: Scope, options: Ce
         // Shared content keeps its original material. Animated colours and shader
         // uniform cells remain borrowed; the clip uniform belongs to this variant.
         for (const [key, value] of Object.entries(material)) if (value instanceof Color) Reflect.set(variant, key, value);
-        if (material instanceof ShaderMaterial && variant instanceof ShaderMaterial) variant.uniforms = { ...material.uniforms };
+        if (material instanceof ShaderMaterial && variant instanceof ShaderMaterial) variant.uniforms = ownLightUniforms({ ...material.uniforms });
         const variantScope = scope.child('cell.clip-material');
         variantScopes.set(variant, variantScope); users.set(variant, new Set());
         patched.set(material, variant); variantScope.own(variant); clipProgram(variant, cell, camera, variantScope);

@@ -22,6 +22,7 @@ import { drawNeutral } from '../drawNeutral';
 import { ClassicCodec } from './glslCodec';
 import { latestCascades } from '../../world/cascadeLights';
 import { hasShaderPatch } from '../shaderPatches';
+import { LIGHT_UNIFORMS } from '../lightUniforms';
 
 /** the uniforms a variant keeps its own (a creature's tint, a borrowed map); every other one is shared with its source */
 const OWN_UNIFORMS: ReadonlySet<string> = new Set(['wsMaterialColour', 'wsMaterialEmissive', 'wsMaterialEmissiveIntensity', 'wsMeshMap', 'wsBumpMap',
@@ -175,7 +176,11 @@ export class GraphShaderMaterial extends THREE.ShaderMaterial {
     this.codec = source instanceof GraphShaderMaterial && source.codec !== null ? new ClassicCodec() : null;
     this.shadowDepth = source instanceof GraphShaderMaterial ? source.shadowDepth : null;
     this.instanceColour = source instanceof GraphShaderMaterial && source.instanceColour;
-    for (const [name, uniform] of Object.entries(uniforms)) this.uniforms[name] = OWN_UNIFORMS.has(name) ? { value: ownValue(uniform.value) } : uniform;
+    // S2: three's light uniforms are always the copy's own holders (lightUniforms.ts): shared, a draw of one in another
+    // render state repoints the other's lights at that state's arrays
+    for (const [name, uniform] of Object.entries(uniforms)) {
+      this.uniforms[name] = OWN_UNIFORMS.has(name) ? { value: ownValue(uniform.value) } : LIGHT_UNIFORMS.has(name) ? { value: uniform.value } : uniform;
+    }
     return this;
   }
 

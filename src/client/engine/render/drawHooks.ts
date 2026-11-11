@@ -1,6 +1,8 @@
 import { BatchedMesh, BufferGeometry, CompressedTexture, InstancedMesh, Material, MeshDepthMaterial, MeshDistanceMaterial, RenderTarget, Texture } from 'three';
 import type { Renderer } from './renderer';
 import { renderCounter } from './frameCounter';
+import { emitFault } from '../../../shared/engine/core/faults';
+import { LIGHT_UNIFORMS } from './lightUniforms';
 
 type Draw = Renderer['renderBufferDirect'];
 type ShadowDraw = (draw: Draw, camera: Parameters<Draw>[0], scene: Parameters<Draw>[1], geometry: Parameters<Draw>[2],
@@ -67,8 +69,16 @@ export function drawHooks(renderer: DrawTarget): DrawHooks {
       hooks.labels?.(camera, scene, geometry, material, object, group);
       const selected = hooks.material === undefined ? material : hooks.material(camera, scene, geometry, material, object, group);
       if (selected !== null) {
-        if (hooks.ownership === undefined) draw(camera, scene, geometry, selected, object, group);
-        else hooks.ownership(draw, camera, scene, geometry, selected, object, group);
+        try {
+          if (hooks.ownership === undefined) draw(camera, scene, geometry, selected, object, group);
+          else hooks.ownership(draw, camera, scene, geometry, selected, object, group);
+        } catch (error: unknown) {
+          // S2: a lit draw whose light holders point at a shorter state's arrays is rebound and drawn once more; a
+          // second throw, or any other error, goes on as before
+          if (!staleLightDraw(renderer, selected, error)) throw error;
+          if (hooks.ownership === undefined) draw(camera, scene, geometry, selected, object, group);
+          else hooks.ownership(draw, camera, scene, geometry, selected, object, group);
+        }
         submitted = true;
       }
       complete = true;
@@ -83,6 +93,51 @@ export function drawHooks(renderer: DrawTarget): DrawHooks {
   }
   renderer.renderBufferDirect = submit;
   return hooks;
+}
+
+/** Materials whose stale light binding was already reported (once each, a session). */
+const reportedLightFaults = new WeakSet();
+/** The light uniforms whose holder holds fewer entries than the bound program's struct array reads, as `name held/read`. */
+function shortLightArrays(row: object): string[] {
+  const uniforms: unknown = Reflect.get(row, 'uniforms'), program: unknown = Reflect.get(row, 'currentProgram');
+  if (typeof uniforms !== 'object' || uniforms === null || typeof program !== 'object' || program === null) return [];
+  const read: unknown = Reflect.get(program, 'getUniforms');
+  const table: unknown = typeof read === 'function' ? Reflect.get(Reflect.apply(read, program, []) ?? {}, 'map') : undefined;
+  if (typeof table !== 'object' || table === null) return [];
+  const short: string[] = [];
+  for (const name of LIGHT_UNIFORMS) {
+    const seq: unknown = Reflect.get(Reflect.get(table, name) ?? {}, 'seq'), held: unknown = Reflect.get(Reflect.get(uniforms, name) ?? {}, 'value');
+    if (Array.isArray(seq) && Array.isArray(held) && seq.length > held.length) short.push(`${name} ${String(held.length)}/${String(seq.length)}`);
+  }
+  return short;
+}
+/**
+ * SENTRY-TRIAGE S2's draw guard (`WILDSHARD-GAME-84`): a lit material whose light uniforms point at another render state's
+ * shorter arrays throws inside three's struct upload (`undefined.position`), every frame, until the render system's
+ * faults stop the loop. Only that case is taken, proved by the bound program reading more entries than a light holder
+ * has: the binding is marked stale (three's `getProgram` repoints the holders at the drawing state's arrays when the
+ * version differs) and the current program is unbound, so the redraw uploads every uniform, lights included. It is
+ * reported once, with the material and the short arrays. Any other error is the caller's, as before.
+ */
+export function staleLightDraw(renderer: object, material: Material, error: unknown): boolean {
+  if (!(error instanceof TypeError)) return false;
+  const properties: unknown = Reflect.get(renderer, 'properties'), state: unknown = Reflect.get(renderer, 'state');
+  if (typeof properties !== 'object' || properties === null || typeof state !== 'object' || state === null) return false;
+  const get: unknown = Reflect.get(properties, 'get'), useProgram: unknown = Reflect.get(state, 'useProgram');
+  if (typeof get !== 'function' || typeof useProgram !== 'function') return false;
+  const row: unknown = Reflect.apply(get, properties, [material]);
+  if (typeof row !== 'object' || row === null || Reflect.get(row, 'needsLights') !== true) return false;
+  const short = shortLightArrays(row);
+  if (short.length === 0) return false;
+  Reflect.set(row, 'lightsStateVersion', -1);
+  Reflect.apply(useProgram, state, [null]);
+  if (!reportedLightFaults.has(material)) {
+    reportedLightFaults.add(material);
+    const fault = new Error(`render: ${material.name === '' ? material.type : material.name} drew with a stale light binding (${short.join(', ')}); `
+      + `its lights were rebound and it drew again: ${error.message}`, { cause: error });
+    emitFault({ system: 'render.lights', error: fault, verdict: 'retry' });
+  }
+  return true;
 }
 
 interface PropertyHooks {
