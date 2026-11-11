@@ -78,6 +78,6 @@ try {
 } catch (error) {
   // CLI and fetch errors can carry argv or headers: only redacted text leaves this process.
   console.error(redact(error instanceof RefusedError ? error.message : `${channel} ${phase} failed: ${error instanceof Error ? error.message : String(error)}`));
-  console.error('alias not moved unless a PASS line above says so');
+  console.error('the alias did not move unless an ALIAS MOVED line is above');
   process.exitCode = 1;
 }

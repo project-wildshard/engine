@@ -3,6 +3,7 @@
 import {createHash, generateKeyPairSync, sign} from 'node:crypto';
 import {expect, test} from 'vitest';
 import {CHANNELS, PHASES, RefusedError, runPhase, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
+import {PROJECTS, runRedacted} from '../scripts/page-release/hosts/vercel.mjs';
 
 const build = 'a'.repeat(40);
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
@@ -201,4 +202,17 @@ test('--dry-run mutates nothing, reports gates and never prints a credential', a
   expect(refusals.some(line => line.includes('health shows'))).toBe(true);
   expect(lines.join('\n')).not.toContain(token);
   expect(lines.some(line => line.startsWith('DRY-RUN would host goLive'))).toBe(true);
+});
+
+test('child output reaches the terminal with the token replaced', () => {
+  const echo = ['-e', 'process.stdout.write(process.env.SECRET)'];
+  const out = runRedacted(process.execPath, echo, {cwd: '.', env: {SECRET: token}}, [token]);
+  expect(out).toBe('<token>');
+  expect(() => runRedacted(process.execPath, ['-e', 'process.exit(3)'], {cwd: '.', env: {SECRET: token}}, [token])).toThrow(/exited 3/);
+});
+
+test('the Vercel host tells production deployments from staging ones', () => {
+  expect(PROJECTS.production.host.test('https://wildshard-e7-g9ykhchce-raynos-projects.vercel.app')).toBe(true);
+  expect(PROJECTS.production.host.test('https://wildshard-e7-staging-q82kfzcen-raynos-projects.vercel.app')).toBe(false);
+  expect(PROJECTS.staging.host.test('https://wildshard-e7-staging-q82kfzcen-raynos-projects.vercel.app')).toBe(true);
 });

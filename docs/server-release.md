@@ -49,7 +49,7 @@ node scripts/page-release.mjs production build|upload|check|go-live --after-stag
 | Phase | Does | Never |
 | --- | --- | --- |
 | `build` | `pnpm build:game` with `WS_BUILD_ID=<sha>` and `WILDSHARD_RELEASE_URL=https://packs.wildshard.io/releases/<channel>.json` (PACKS-CDN PC3), then the host's packaging. Checks the output names this build, this channel's release file and key, and not the other channel's file. | uploads |
-| `upload` | The server book and parts to the packs bucket, parts first and the book last, each read back through `packs.wildshard.io` with the channel page's `Origin` (CORS). Existing objects must have the same bytes. Then the page, unaliased. | moves the alias |
+| `upload` | The server book and parts to the packs bucket, parts first and the book last, each read back through `packs.wildshard.io` with the channel page's `Origin` (CORS). Existing objects must have the same bytes. Each read adds a fresh query, because the CDN caches 404s. Then the page, unaliased. | moves the alias |
 | `check` | The uploaded page's `version.json` and `index.html` equal the local build; the packs answer with CORS; then waits (`--wait=<minutes>`, 45) until the signed release file names this build, epoch and channel socket and the channel's tailnet `/health` shows this build at that serial. | moves the alias |
 | `go-live` | Re-reads the signed file and `/health` and refuses unless they still match, then moves the alias (last) and waits for the domain to serve the build. | runs without a fresh match |
 
@@ -60,7 +60,11 @@ SHA and `staging.wildshard.io` already serving it; `go-live` needs
 `--after-staging-proofs`, which says the strict staging proofs passed:
 `e7-doctor-proof.mjs` 7/7 and `e7-live-staging-proof.mjs` on Chromium
 and WebKit. J205: the script opens no socket; production's own proof is
-`e7-doctor-proof.mjs <origin> <sha> <key> --human-static`.
+`e7-doctor-proof.mjs <origin> <sha> <key> --human-static`. The scratch
+scripts' `/api/*` 401 checks are gone: play's `/api` is moving to
+`api.wildshard.io` (API-CLOUDFLARE AC11) and is 503 on Vercel today.
+If go-live fails after an `ALIAS MOVED` line, the alias did move; fix
+forward (J179).
 
 `--dry-run` prints every step with the token as `<token>`, reads the
 live signed file and `/health`, and lists what would refuse today. It
@@ -79,8 +83,8 @@ package, upload, deployed digests, go-live). Today that is Vercel:
 `vercel pull`, `build-vercel-output.mjs`, `e7-page-routes.mjs`,
 `vercel deploy --prebuilt --skip-domain`, the deployment's file index
 (a file's `uid` is its SHA-1) and `vercel promote`. The token is
-`~/.config/vercel/api-token`, else the CLI's own login; it is never
-printed. Pack writes use `wrangler r2 object put` with wrangler's login.
+`~/.config/vercel/api-token`, else the CLI's own login, passed in
+`VERCEL_TOKEN`; child output is captured and printed redacted. Pack writes use `wrangler r2 object put` with wrangler's login.
 OFF-VERCEL OV4 adds `hosts/workers.mjs` without changing the flow.
 
 **Staging alignment.** Run this workflow by hand (`workflow_dispatch`) on

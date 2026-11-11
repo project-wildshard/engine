@@ -4,10 +4,10 @@
 // file index, and `vercel promote` as the alias move. A Vercel file's `uid` is the SHA-1 of its bytes (checked on
 // v0.1.9 staging dpl_G6iXAuksHU2SLqgPmWcPcwqNf4dK: version.json and index.html both equal their local SHA-1). OV4's hosts/workers.mjs replaces this file and nothing else.
 //
-// The token is the long-lived ~/.config/vercel/api-token, else the CLI's own (8-hour) auth.json. It goes to the CLI as
-// --token (as the scratch scripts and build-vercel-output.mjs pass it) and to REST in a header; it is never logged,
-// and page-release.mjs redacts it from any error text.
-import {execFileSync} from 'node:child_process';
+// The token is the long-lived ~/.config/vercel/api-token, else the CLI's own (8-hour) auth.json. It goes to the CLI in
+// VERCEL_TOKEN (never argv; build-vercel-output.mjs alone still passes its VERCEL_BUILD_TOKEN as --token) and to REST
+// in a header. Every child's stdout and stderr is captured and printed redacted, and page-release.mjs redacts errors.
+import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
@@ -33,17 +33,33 @@ export function vercelToken() {
 }
 
 /**
- * @param {{token: () => string, exec?: typeof execFileSync, fetch?: typeof fetch}} options
+ * Run a child with its output captured, then print it with every secret replaced. Throws on a non-zero exit.
+ * @param {string} file @param {string[]} args @param {{cwd: string, env: NodeJS.ProcessEnv}} options @param {string[]} secrets
+ * @returns {string} stdout, redacted
+ */
+export function runRedacted(file, args, options, secrets) {
+  const hide = (/** @type {string} */ text) => secrets.reduce((out, secret) => secret === '' ? out : out.split(secret).join('<token>'), text);
+  const result = spawnSync(file, args, {...options, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024});
+  if (result.stderr !== '') process.stderr.write(hide(result.stderr));
+  if (result.error !== undefined) throw new Error(`${file} ${args[0] ?? ''} could not start: ${hide(result.error.message)}`);
+  if (result.status !== 0) {
+    process.stdout.write(hide(result.stdout));
+    throw new Error(`${file} ${args[0] ?? ''} exited ${String(result.status)}`);
+  }
+  return hide(result.stdout);
+}
+
+/**
+ * @param {{token: () => string, exec?: typeof runRedacted, fetch?: typeof fetch}} options
  * @returns {import('../flow.mjs').PageHost}
  */
-export function vercelHost({token, exec = execFileSync, fetch: get = fetch}) {
+export function vercelHost({token, exec = runRedacted, fetch: get = fetch}) {
   /** @param {import('../flow.mjs').HostContext} context */
   const project = context => PROJECTS[context.channel.channel];
   /** @param {import('../flow.mjs').HostContext} context */
   const env = context => ({...process.env, VERCEL_PROJECT_ID: project(context).projectId, VERCEL_ORG_ID: TEAM});
-  /** @param {import('../flow.mjs').HostContext} context @param {string[]} args @param {Record<string, string>} [extra] */
-  const cli = (context, args, extra = {}) => exec('vercel', [...args, '--scope', SCOPE, '--token', token()],
-    {cwd: context.root, env: {...env(context), ...extra}, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 8 * 1024 * 1024});
+  /** @param {import('../flow.mjs').HostContext} context @param {string[]} args */
+  const cli = (context, args) => exec('vercel', [...args, '--scope', SCOPE], {cwd: context.root, env: {...env(context), VERCEL_TOKEN: token()}}, [token()]);
   /** @param {string} path */
   const rest = async path => {
     const response = await get(`https://api.vercel.com${path}`, {headers: {Authorization: `Bearer ${token()}`}, redirect: 'error', signal: AbortSignal.timeout(20_000)});
@@ -62,17 +78,17 @@ export function vercelHost({token, exec = execFileSync, fetch: get = fetch}) {
       if (!existsSync(file)) writeFileSync(file, `${JSON.stringify({projectId, orgId: TEAM, projectName})}\n`, {flag: 'wx'});
       const linked = JSON.parse(readFileSync(file, 'utf8'));
       if (linked.projectId !== projectId || linked.orgId !== TEAM) throw new Error(`${file} links ${linked.projectName ?? linked.projectId}, not ${projectName}: use a separate clone per channel`);
-      cli(context, ['pull', '--yes', '--environment', 'production']);
+      process.stdout.write(cli(context, ['pull', '--yes', '--environment', 'production']));
       return Promise.resolve();
     },
     package(context) {
-      exec('python3', ['scripts/heavy-lane.py', 'build', '--', 'node', 'scripts/build-vercel-output.mjs'],
-        {cwd: context.root, env: {...env(context), VERCEL_BUILD_TOKEN: token()}, stdio: 'inherit'});
-      exec('node', ['scripts/e7-page-routes.mjs', '.'], {cwd: context.root, env: env(context), stdio: 'inherit'});
+      process.stdout.write(exec('python3', ['scripts/heavy-lane.py', 'build', '--', 'node', 'scripts/build-vercel-output.mjs'],
+        {cwd: context.root, env: {...env(context), VERCEL_BUILD_TOKEN: token()}}, [token()]));
+      process.stdout.write(exec('node', ['scripts/e7-page-routes.mjs', '.'], {cwd: context.root, env: env(context)}, [token()]));
       return Promise.resolve();
     },
     upload(context) {
-      const output = String(cli(context, ['deploy', '--prebuilt', '--target=production', '--skip-domain', '--yes', '--json']));
+      const output = cli(context, ['deploy', '--prebuilt', '--target=production', '--skip-domain', '--yes', '--json']);
       const deployed = JSON.parse(output);
       if (deployed.status !== 'ok' || deployed.deployment?.readyState !== 'READY') throw new Error('vercel deploy did not report a READY deployment');
       if (!project(context).host.test(deployed.deployment.url)) throw new Error(`deployment ${deployed.deployment.url} is not on ${project(context).projectName}`);
@@ -107,12 +123,12 @@ export function vercelHost({token, exec = execFileSync, fetch: get = fetch}) {
       return digests;
     },
     goLive(context) {
-      cli(context, ['promote', context.deployment.url, '--yes']);
+      process.stdout.write(cli(context, ['promote', context.deployment.url, '--yes']));
       return Promise.resolve();
     },
     describe(step, context) {
       const {projectName} = project(context);
-      const t = `--scope ${SCOPE} --token <token>`;
+      const t = `--scope ${SCOPE} with VERCEL_TOKEN=<token>`;
       return {
         prepare: [`link .vercel/project.json to ${projectName}`, `run vercel pull --yes --environment production ${t}`],
         package: ['run python3 scripts/heavy-lane.py build -- node scripts/build-vercel-output.mjs', 'run node scripts/e7-page-routes.mjs .'],

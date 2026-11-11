@@ -11,3 +11,7 @@ for the signed serial and matching `/health`, alias last. Pages bake `https://pa
 
 Found on the way: a Vercel deployment file's `uid` is the SHA-1 of its bytes (checked on v0.1.9 staging), so the
 deployed-bytes check reads only the file index, not base64 bodies.
+
+Codex review fixes: the Vercel CLI gets its token in `VERCEL_TOKEN` and child output is printed redacted; every
+pack read carries a fresh query because `packs.wildshard.io` caches 404s (MISS then HIT, checked 11-11); go-live logs
+`ALIAS MOVED` the moment it moves the alias.

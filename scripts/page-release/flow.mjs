@@ -188,6 +188,7 @@ export async function runPhase(phase, deps) {
   for (const line of deps.host.describe('goLive', deployed)) plan(line);
   if (dry) return {refusals};
   await deps.host.goLive(deployed);
+  deps.log(`ALIAS MOVED ${channel.origin} -> ${deployment.id}; checking the domain`);
   await waitForDomain(channel, deps, refuse);
   deps.state.write('go-live', {build: deps.build, channel: channel.channel, deployment, serial: gate.serial});
   deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} after matching serial ${gate.serial} (alias last)`);

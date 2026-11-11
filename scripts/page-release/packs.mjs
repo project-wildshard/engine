@@ -22,9 +22,14 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
  * @returns {import('./flow.mjs').PackStore}
  */
 export function r2Packs({log, exec = execFileSync, fetch: get = fetch, sleep = delay}) {
+  let reads = 0;
   /** @param {string} path @param {string} cors @param {Uint8Array} expected @returns {Promise<boolean>} false on 404 */
   async function current(path, cors, expected) {
-    const response = await get(new URL(path, PACKS_ORIGIN), {headers: {Origin: cors}, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(60_000)});
+    // The CDN caches a 404 (seen 2026-11-11: MISS, then HIT) and keys on the query, so every read carries a fresh one:
+    // a part checked before its upload never hides it afterwards, and each read is the bucket's own bytes.
+    const url = new URL(path, PACKS_ORIGIN);
+    url.searchParams.set('page-release', `${Date.now().toString(36)}-${(reads++).toString(36)}`);
+    const response = await get(url, {headers: {Origin: cors}, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(60_000)});
     if (response.status === 404) return false;
     if (response.status !== 200) throw new Error(`${path} answered ${response.status}`);
     if (response.headers.get('access-control-allow-origin') !== cors) throw new Error(`${path} CORS is ${response.headers.get('access-control-allow-origin')}, not ${cors}`);
@@ -68,6 +73,9 @@ export function r2Packs({log, exec = execFileSync, fetch: get = fetch, sleep = d
       if (!file.startsWith(`${resolve(dist)}/`)) throw new Error(`${part.url} escapes dist`);
       const compressed = readFileSync(file), decoded = brotliDecompressSync(compressed);
       if (compressed.length !== part.wireBytes || decoded.length !== part.bytes || sha256(decoded) !== part.hash) throw new Error(`local ${part.url} does not match the book`);
+      for (const [path, offset, size] of part.files) {
+        if (path === '' || path.split('/').includes('..') || offset < 0 || size < 0 || offset + size > decoded.length) throw new Error(`${part.url} member ${path} is out of bounds`);
+      }
       return {file, decoded};
     };
     return {dist, bookPath, bookBytes, parts, local};
