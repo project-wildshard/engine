@@ -4,7 +4,7 @@ alter table player add column profile jsonb not null default '{"titles":[],"cosm
   constraint player_profile_platform_only check (jsonb_typeof(profile) = 'object' and profile ?& array['titles', 'cosmetics', 'achievements']
     and profile - array['titles', 'cosmetics', 'achievements'] = '{}'::jsonb
     and jsonb_typeof(profile -> 'titles') = 'array' and jsonb_typeof(profile -> 'cosmetics') = 'array' and jsonb_typeof(profile -> 'achievements') = 'array'
-    and not jsonb_path_exists(profile, '$.*[*] ? (@.type() != "string")'));
+    and not jsonb_path_exists(profile, 'strict $.*[*] ? (@.type() != "string")'));
 
 -- Profile grants are filed under `@platform`, and only there: a shard can't mint a title, and the platform files nothing else.
 alter table ledger_receipt add constraint ledger_receipt_profile_platform check ((grant_kind in ('title', 'cosmetic', 'achievement')) = (shard = '@platform'));

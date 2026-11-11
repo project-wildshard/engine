@@ -63,7 +63,7 @@ test('no global coin: with the guard switched off, the profile still holds no ke
   await claimName(db, 'device:a', 'Ann');
   await db.exec('alter table player disable trigger player_profile_guard');
   await expect(db.query(`update player set profile = profile || '{"coins":5}' where id = 'device:a'`)).rejects.toThrow(/player_profile_platform_only/u);
-  for (const bad of ['{"titles":"Cheater","cosmetics":[],"achievements":[]}', '{}', '{"titles":[],"cosmetics":[]}', '{"titles":[{"coins":500}],"cosmetics":[],"achievements":[]}'])
+  for (const bad of ['{"titles":"Cheater","cosmetics":[],"achievements":[]}', '{}', '{"titles":[],"cosmetics":[]}', '{"titles":[{"coins":500}],"cosmetics":[],"achievements":[]}', '{"titles":[["nested"]],"cosmetics":[],"achievements":[]}'])
     await expect(db.query('update player set profile = $1::jsonb where id = $2', [bad, 'device:a']), bad).rejects.toThrow(/player_profile_platform_only/u);
   expect(await readProfile(db, 'device:a')).toEqual(EMPTY_PROFILE);
 });
