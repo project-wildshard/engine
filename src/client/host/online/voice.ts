@@ -4,7 +4,7 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import * as v from 'valibot';
 import { saves } from '@wildshard/engine/saves/runtime';
-import { voiceNear } from '@wildshard/engine/net/voiceNear';
+import { talkerKey, voiceNear } from '@wildshard/engine/net/voiceNear';
 
 // J218: voice chat, peer to peer. The server's main thread only says who in this cell is on voice and carries signalling
 // (`src/server/host/dedicated/voiceRelay.ts`); audio goes straight between players, or through TURN. Whoever joins offers to
@@ -15,7 +15,7 @@ import { voiceNear } from '@wildshard/engine/net/voiceNear';
 /** What the server says on the `voice` control. */
 export type VoiceHeard =
   | { readonly k: 'you'; readonly id: string }
-  | { readonly k: 'roster'; readonly peers: readonly { readonly id: string; readonly name: string }[] }
+  | { readonly k: 'roster'; readonly peers: readonly { readonly id: string; readonly name: string; readonly body?: string }[] }
   | { readonly k: 'hi'; readonly ice: readonly RTCIceServer[]; readonly peers: readonly string[] }
   | { readonly k: 'full' }
   | { readonly k: 'sig'; readonly from: string; readonly m: number; readonly i: number; readonly n: number; readonly d: string };
@@ -26,8 +26,8 @@ export interface VoiceLink {
 }
 /** Where voice stands for this player. */
 export type VoiceState = 'off' | 'asking' | 'joining' | 'on' | 'denied' | 'unsupported' | 'full' | 'failed';
-/** One other player on voice; `far` is out of earshot (V7), 40 m or more away or out of sight. */
-export interface VoicePeer { readonly id: string; readonly name: string; speaking: boolean; muted: boolean; linked: boolean; far: boolean }
+/** One other player on voice; `body` is their player row's id (V7, V8), and `far` is out of earshot: 40 m or more away or out of sight. */
+export interface VoicePeer { readonly id: string; readonly name: string; readonly body?: string | null; speaking: boolean; muted: boolean; linked: boolean; far: boolean }
 
 /** A remote level past this is talking; held this long after it drops, so a word's gaps don't flicker. */
 const SPEAKING_LEVEL = 0.03, SPEAKING_HOLD_MS = 450, LEVEL_POLL_MS = 150;
@@ -66,6 +66,9 @@ const MIC: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: t
 interface Link { readonly pc: RTCPeerConnection; readonly offerer: boolean; readonly audio: HTMLAudioElement; readonly early: RTCIceCandidateInit[]; readonly held: RTCIceCandidateInit[]; readonly openedAt: number; described: boolean; everLinked: boolean; heardAt: number; retries: number }
 interface Pieces { readonly from: string; readonly n: number; readonly at: number; readonly parts: (string | undefined)[]; got: number }
 type Signal = { readonly sdp: RTCSessionDescriptionInit } | { readonly cand: RTCIceCandidateInit };
+
+/** Who a peer is, for their body. */
+const talker = (peer: VoicePeer): { readonly body: string | null; readonly name: string } => ({ body: peer.body ?? null, name: peer.name });
 
 /** This device's voice choices: on when it last left (so a grid crossing keeps it on), and whether the first tip was seen. */
 export interface VoicePrefs { readonly wanted: boolean; readonly seen: boolean }
@@ -188,10 +191,10 @@ export class VoiceChat {
     }
     if (word.k === 'roster') {
       const now = new Set<string>();
-      for (const { id, name } of word.peers) {
+      for (const { id, name, body } of word.peers) {
         if (id === this.me) continue;
         now.add(id);
-        if (!this.roster.has(id)) this.roster.set(id, { id, name, speaking: false, muted: this.muted.has(id), linked: false, far: voiceNear.gain(name) === 0 });
+        if (!this.roster.has(id)) this.roster.set(id, { id, name, body: body ?? null, speaking: false, muted: this.muted.has(id), linked: false, far: voiceNear.gain({ name, body: body ?? null }) === 0 });
       }
       for (const id of this.roster.keys()) if (!now.has(id)) { this.roster.delete(id); this.drop(id); this.forget(id); }
       this.changed();
@@ -313,7 +316,7 @@ export class VoiceChat {
   }
   /** V7: this peer's volume by the distance to their body; muted by the player or out of earshot, nothing at all. */
   private loudness(peer: VoicePeer, link: Link): number {
-    const gain = voiceNear.gain(peer.name);
+    const gain = voiceNear.gain(talker(peer));
     peer.far = gain === 0;
     link.audio.muted = peer.muted || peer.far;
     link.audio.volume = Math.min(1, Math.max(0, gain));
@@ -322,7 +325,7 @@ export class VoiceChat {
   /** V8: the Names heard talking, for the ring over their heads. */
   private tellTalking(): void {
     const names = new Set<string>();
-    for (const peer of this.roster.values()) if (peer.speaking) names.add(peer.name);
+    for (const peer of this.roster.values()) if (peer.speaking) names.add(talkerKey(talker(peer)));
     const was = voiceNear.talking;
     if (names.size !== was.size || [...names].some(name => !was.has(name))) voiceNear.talking = names;
   }
@@ -364,12 +367,15 @@ export class VoiceChat {
       const far = peer.far;
       this.loudness(peer, link);
       if (far !== peer.far) moved = true;
-      if (await heardLevel(link.pc) > SPEAKING_LEVEL) link.heardAt = now;
+      const level = await heardLevel(link.pc);
+      // Stopped, hung up or redialled while the stats were read: this link's word is no longer anyone's.
+      if (this.links.get(id) !== link) continue;
+      if (level > SPEAKING_LEVEL) link.heardAt = now;
       // Talking is what this player hears: a muted or far player's voice never lights their name or their head.
       const speaking = !peer.muted && !peer.far && now - link.heardAt < SPEAKING_HOLD_MS;
       if (speaking !== peer.speaking) { peer.speaking = speaking; moved = true; }
     }
-    for (const peer of this.roster.values()) if (!this.links.has(peer.id)) { const far = voiceNear.gain(peer.name) === 0; if (far !== peer.far) { peer.far = far; moved = true; } }
+    for (const peer of this.roster.values()) if (!this.links.has(peer.id)) { const far = voiceNear.gain(talker(peer)) === 0; if (far !== peer.far) { peer.far = far; moved = true; } }
     this.tellTalking();
     if (moved) this.changed();
   }

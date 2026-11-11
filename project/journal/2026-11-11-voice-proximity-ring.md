@@ -22,3 +22,10 @@ sits on `globalThis` under `Symbol.for('wildshard.voiceNear')`. The online rig (
 with saves in memory, to let its own page origin past the door's allowlist, and to press the Name box's submit button
 now that a doctor button sits beside it. With those, three real pages (Listener, Nearby at 10 m, Faraway at 60 m)
 proved V7 and V8: Nearby heard and ringed, Faraway muted as too far until it walked back to 24 m.
+
+Codex's review (J206) found the Name match a real bug: two players called Alex, one at 5 m and one at 60 m, both came
+through at full volume. The relay now adds each voice peer's player row id (`body`, `bodyId(secret, device)`, the id
+every page already gets with that row) to its roster, so a voice finds its own body. That is a field in the voice
+control's JSON, not the game wire. The same review's other SHOULD is in too: a `getStats()` that resolves after a stop
+no longer relights a peer. Its iOS point (no fade, only the 40 m cutoff, since Safari ignores element volume) stays a
+known limit, said to Jake: a Web Audio `GainNode` per peer would fix it, at the risk of silence on iOS's suspended contexts.

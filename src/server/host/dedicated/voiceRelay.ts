@@ -23,7 +23,7 @@ export interface VoiceIceServer { readonly urls: string | readonly string[]; rea
 /** What the server says. */
 export type VoiceHeard =
   | { readonly k: 'you'; readonly id: string }
-  | { readonly k: 'roster'; readonly peers: readonly { readonly id: string; readonly name: string }[] }
+  | { readonly k: 'roster'; readonly peers: readonly { readonly id: string; readonly name: string; readonly body?: string }[] }
   | { readonly k: 'hi'; readonly ice: readonly VoiceIceServer[]; readonly peers: readonly string[] }
   | { readonly k: 'full' }
   | { readonly k: 'sig'; readonly from: string; readonly m: number; readonly i: number; readonly n: number; readonly d: string };
@@ -33,7 +33,7 @@ export interface VoiceSocket {
   readonly onControl: (listener: (control: SocketControl, bytes: ArrayBuffer) => void) => () => void;
   readonly onClose: (listener: (reason: string) => void) => () => void;
 }
-interface Seat { readonly id: string; readonly cell: string; readonly name: string; readonly end: VoiceSocket; joined: boolean; joining: boolean; joins: number }
+interface Seat { readonly id: string; readonly cell: string; readonly name: string; readonly body: string | undefined; readonly end: VoiceSocket; joined: boolean; joining: boolean; joins: number }
 /** Public STUN only: two phones behind carrier NAT may not meet without TURN. */
 export const STUN_ONLY: readonly VoiceIceServer[] = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
 
@@ -48,9 +48,10 @@ export class VoiceRelay {
   private readonly seats = new Map<string, Seat>();
   private readonly ice: () => Promise<readonly VoiceIceServer[]>;
   constructor(ice: () => Promise<readonly VoiceIceServer[]> = () => Promise.resolve(STUN_ONLY)) { this.ice = ice; }
-  /** A seated socket: it may join voice in `cell` until it closes. */
-  attach(end: VoiceSocket, cell: string, name: string): void {
-    const seat: Seat = { id: newId(), cell, name, end, joined: false, joining: false, joins: 0 };
+  /** A seated socket: it may join voice in `cell` until it closes. `body` is its player row's id, the one every page already
+   *  hears on the wire, so a page can put a voice to a body (VOICE-POLISH V7: proximity; V8: the ring over a head). */
+  attach(end: VoiceSocket, cell: string, name: string, body?: string): void {
+    const seat: Seat = { id: newId(), cell, name, body, end, joined: false, joining: false, joins: 0 };
     this.seats.set(seat.id, seat);
     const off = end.onControl((control, bytes) => { if (control === 'voice') this.heard(seat, bytes); });
     end.onClose(() => { off(); this.seats.delete(seat.id); if (seat.joined) { seat.joined = false; this.roster(cell); } });
@@ -91,7 +92,7 @@ export class VoiceRelay {
     this.roster(seat.cell);
   }
   private rosterOf(cell: string): VoiceHeard {
-    return { k: 'roster', peers: [...this.seats.values()].filter(seat => seat.joined && seat.cell === cell).map(seat => ({ id: seat.id, name: seat.name })) };
+    return { k: 'roster', peers: [...this.seats.values()].filter(seat => seat.joined && seat.cell === cell).map(seat => (seat.body === undefined ? { id: seat.id, name: seat.name } : { id: seat.id, name: seat.name, body: seat.body })) };
   }
   /** Everyone in the cell hears who is on voice, joined or not, so the prompt can say who to join. */
   private roster(cell: string): void {
