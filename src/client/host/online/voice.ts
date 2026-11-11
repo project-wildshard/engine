@@ -79,6 +79,9 @@ interface Link { readonly pc: RTCPeerConnection; readonly offerer: boolean; read
 interface Pieces { readonly from: string; readonly n: number; readonly at: number; readonly parts: (string | undefined)[]; got: number }
 type Signal = { readonly sdp: RTCSessionDescriptionInit } | { readonly cand: RTCIceCandidateInit };
 
+/** Hold to talk needs a key: a touch-first device always toggles, whatever a keyboard saved (Codex review). */
+const keyboardFirst = (): boolean => typeof matchMedia !== 'function' || matchMedia('(pointer: fine)').matches;
+
 /** Who a peer is, for their body. */
 const talker = (peer: VoicePeer): { readonly body: string | null; readonly name: string } => ({ body: peer.body ?? null, name: peer.name });
 
@@ -119,6 +122,8 @@ export class VoiceChat {
   private readonly iceUrl: string;
   /** V11: the talk key is down (hold mode opens the mic only while it is). */
   private held = false;
+  /** Bumped by every microphone switch, so only the newest pick lands. */
+  private inputAsks = 0;
   private input = voiceSettings.read().input;
   constructor(scope: Scope, link: VoiceLink, iceUrl: string = VOICE_ICE_URL) {
     this.link = link; this.iceUrl = iceUrl;
@@ -148,9 +153,10 @@ export class VoiceChat {
     const context = this.analyser === null && typeof AudioContext === 'function' ? new AudioContext() : null;
     void context?.resume().catch(() => undefined);
     const turn = this.ask();
-    let mic: MediaStream;
+    let mic: MediaStream, asked = this.input;
     try {
-      mic = this.mic ?? await openMic(this.input);
+      asked = this.input;
+      mic = this.mic ?? await openMic(asked);
     } catch (error) {
       void context?.close().catch(() => undefined);
       if (session !== this.session) return;
@@ -162,6 +168,8 @@ export class VoiceChat {
     if (session !== this.session || !this.wanted) { void context?.close().catch(() => undefined); if (mic !== this.mic) for (const track of mic.getTracks()) track.stop(); return; }
     this.mic = mic; this.openTrack();
     if (context !== null) this.listenToSelf(context);
+    // Codex review: a microphone picked while the browser asked is swapped in now.
+    if (asked !== this.input) void this.switchInput();
     this.set('joining');
     // The TURN list is in hand before joining, so nobody's offer can arrive while this page still waits for it.
     this.turned = await turn;
@@ -186,7 +194,7 @@ export class VoiceChat {
   }
   toggle(): void { if (this.state === 'on' || this.state === 'joining' || this.state === 'asking') this.stop(); else void this.start(); }
   /** The talk key's mode, from Settings ▸ Sound ▸ Voice. */
-  get mode(): VoiceMode { return voiceSettings.read().mode; }
+  get mode(): VoiceMode { return voiceSettings.read().mode === 'hold' && keyboardFirst() ? 'hold' : 'toggle'; }
   /** Whether this player's voice goes out now: on voice, and in hold mode only while the key is held. */
   get sending(): boolean { return this.state === 'on' && (this.mode === 'toggle' || this.held); }
   /** V11: the talk key went down. Toggle mode turns voice on or off; hold mode joins if need be and opens the mic while held. */
@@ -208,17 +216,21 @@ export class VoiceChat {
   }
   /** V10: a new microphone, mid-call: every link's sender swaps to it, and the old one is given back. */
   private async switchInput(): Promise<void> {
-    const old = this.mic, session = this.session;
+    const old = this.mic, session = this.session, ask = ++this.inputAsks;
     if (old === null) return;
     let next: MediaStream;
     try { next = await openMic(this.input); } catch { return; }
-    if (session !== this.session || this.mic !== old) { for (const track of next.getTracks()) track.stop(); return; }
+    // Stopped, redialled or asked again for a newer pick while this one opened: only the newest pick is kept.
+    if (session !== this.session || this.mic !== old || ask !== this.inputAsks) { for (const track of next.getTracks()) track.stop(); return; }
     const track = next.getAudioTracks()[0] ?? null;
+    // Codex review: the old mic goes quiet before the senders swap, and is given back however the swap ends.
+    for (const gone of old.getTracks()) gone.enabled = false;
     this.mic = next; this.openTrack();
-    for (const { pc } of this.links.values()) for (const sender of pc.getSenders()) if (sender.track?.kind === 'audio' || sender.track === null) await sender.replaceTrack(track).catch(() => undefined);
-    for (const gone of old.getTracks()) gone.stop();
+    try {
+      for (const { pc } of this.links.values()) for (const sender of pc.getSenders()) if (sender.track?.kind === 'audio' || sender.track === null) await sender.replaceTrack(track).catch(() => undefined);
+    } finally { for (const gone of old.getTracks()) gone.stop(); }
     const context = this.analyser?.context ?? null;
-    if (context !== null) { this.analyser = null; this.listenToSelf(context); }
+    if (context !== null && this.mic === next) { this.analyser = null; this.listenToSelf(context); }
   }
   /** Silence one player, for this player only. */
   mute(id: string, muted: boolean): void {
@@ -372,8 +384,10 @@ export class VoiceChat {
   private loudness(peer: VoicePeer, link: Link): number {
     const gain = voiceNear.gain(talker(peer));
     peer.far = gain === 0;
-    link.audio.muted = peer.muted || peer.far;
-    link.audio.volume = Math.min(1, Math.max(0, gain * voiceSettings.read().volume));
+    const volume = Math.min(1, Math.max(0, gain * voiceSettings.read().volume));
+    // Muted, not only quiet, at a volume of 0: iOS ignores an element's volume (Codex review).
+    link.audio.muted = peer.muted || peer.far || volume === 0;
+    link.audio.volume = volume;
     return gain;
   }
   /** V8: the Names heard talking, for the ring over their heads. */

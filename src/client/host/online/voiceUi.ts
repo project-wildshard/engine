@@ -66,7 +66,9 @@ const isTalkKey = (code: string): boolean => { const keys = voiceTalkKeys(); ret
 /** A press of the talk key that is meant for voice: not typed into a field, not a repeat, not a shortcut, and not under an open menu. */
 function voiceKey(event: KeyboardEvent): boolean {
   const target = event.target as HTMLElement | null;
-  if (!isTalkKey(event.code) || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return false;
+  const self = event.code.replace(/(?:Left|Right)$/u, '');
+  // A shortcut is not a press, unless the modifier held is the talk key itself (talk on Alt).
+  if (!isTalkKey(event.code) || event.repeat || (event.ctrlKey && self !== 'Control') || (event.metaKey && self !== 'Meta') || (event.altKey && self !== 'Alt')) return false;
   if (target !== null && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/u.test(target.tagName))) return false;
   return document.documentElement.dataset['wsMenu'] === undefined;
 }

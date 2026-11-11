@@ -46,7 +46,8 @@ const hub = ((): Hub => {
 hub.readers.add(() => slot.read());
 hub.writers.add(now => { slot.write(now); });
 hub.keys.add(() => {
-  for (const { action, codes } of app.input.bindings.entries()) if (action === VOICE_TALK && codes.length > 0) return codes;
+  // An action bound here answers, even with no key: a cleared talk key opens nothing (Codex review).
+  for (const { action, codes } of app.input.bindings.entries()) if (action === VOICE_TALK) return codes;
   return null;
 });
 
@@ -72,7 +73,7 @@ export function voiceTalkKeys(): readonly string[] {
   return ['KeyB'];
 }
 /** The talk key as the player reads it: `B`. */
-export const voiceTalkKey = (): string => keycap(voiceTalkKeys()[0] ?? 'KeyB');
+export const voiceTalkKey = (): string => { const [key] = voiceTalkKeys(); return key === undefined ? engineString('s_keys_none') : keycap(key); };
 /** Whether a keyboard is the main way in: the talk mode and the key only mean something there. */
 const keyboard = (): boolean => typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches;
 

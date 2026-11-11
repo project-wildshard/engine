@@ -20,3 +20,9 @@ The first proof caught the online shell's own bundle again: `online.js` carries 
 service and this module, so voice read the default settings and the default key. `voiceSettings.ts` now keeps a page-wide
 hub (`Symbol.for('wildshard.voiceSettings')`): each copy lends a reader, a writer and a key lookup, in load order, and a
 read takes the first that answers, so the game's saves and bindings speak for the voice shell.
+
+Codex's review (J206) had two MUSTs, both in: a mic switch now quiets the old mic before the senders swap and gives
+it back however the swap ends, and a touch-first device always toggles, since a hold mode saved on a keyboard would
+have left a phone's tap silent with the mode row hidden. Its SHOULDs are in as well: only the newest mic pick lands,
+a pick made while the browser asked is swapped in after, a cleared talk key opens nothing, talk can sit on Alt, and a
+voice volume of 0 mutes (iOS ignores an element's volume).
