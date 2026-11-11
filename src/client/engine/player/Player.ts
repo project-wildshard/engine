@@ -18,7 +18,7 @@ import type { InputService } from '../input/InputService';
 import type { Events } from '../../../shared/engine/events/events';
 import { dodgeFx, dodgeEnv } from '../../../shared/engine/player/dodge';
 import * as THREE from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { heightAt } from '../../../shared/engine/world/Heightfield';
 import { app } from '../app/runtime';
 import { WaterLine, type WaterLineView } from './WaterLine';

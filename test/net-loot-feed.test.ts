@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { beforeAll, expect, test } from 'vitest';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../src/client/engine/net/client';
 import { NetRoom, type NetTickInput } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';

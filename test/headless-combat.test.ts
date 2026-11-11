@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, expect, test, vi } from 'vitest';
 import * as v from 'valibot';
 import { BoxGeometry, MeshBasicMaterial, Vector3 } from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { app } from '../src/client/engine/app/runtime';
 import { BowWeaponProfileSchema, MeleeWeaponProfileSchema, parseNativeFirearmProfile } from '@wildshard/format/weaponProfiles';
 import { NetClient } from '../src/client/engine/net/client';

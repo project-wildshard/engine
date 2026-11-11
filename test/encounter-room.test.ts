@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Rapier is a shipped binary.
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test, vi } from 'vitest';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { bossHealthScale, bossTargetCount } from '../src/shared/engine/ai/bossScale';
 import { PhaseEncounter, type PhaseEncounterSpec } from '../src/server/engine/ai/phases';
 import { NetClient } from '../src/client/engine/net/client';

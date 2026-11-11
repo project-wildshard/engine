@@ -42,7 +42,7 @@ const REPO = fileURLToPath(new URL('../', import.meta.url));
 const liftedSpecifier = (source) => source.replace(/^@wildshard\/engine\/game\//u, '@wildshard/game/').replace(/^@wildshard\/engine\/host\//u, '@wildshard/sdk/');
 const unsidedPath = (path) => path.replace(/^src\/(client|shared|server|cook)\/(engine|game)\//u, 'src/$2/$1/').replace(/^src\/(?:client|shared|server|cook)\/host\//u, 'src/sdk/').replace(/^src\/test\/(engine|game)\//u, 'src/$1/test/').replace(/^src\/client\/app\/([^/]+)$/u, 'src/$1');
 const layerKey = (layer, sub) => (sub === undefined ? '.' : `./${{ engine: '', game: 'game/', sdk: 'host/' }[layer] ?? ''}${sub}`);
-const LAYER_PACKAGE = /^@wildshard\/(engine|format|game|sdk|sharddev|commons)(?:\/([^?]+))?/u;
+const LAYER_PACKAGE = /^@wildshard\/(engine|format|wire|game|sdk|sharddev|commons)(?![\w-])(?:\/([^?]+))?/u;
 const packageTarget = (source) => {
   const m = LAYER_PACKAGE.exec(liftedSpecifier(source));
   if (!m) return null;
@@ -55,7 +55,7 @@ const exported = (source) => {
   const m = LAYER_PACKAGE.exec(liftedSpecifier(source));
   if (!m) return false;
   if (!packageExports.has(m[1])) {
-    const file = ['format', 'sharddev'].includes(m[1]) ? resolve(process.cwd(), `node_modules/@wildshard/${m[1]}/package.json`) : new URL('../package.json', import.meta.url);
+    const file = ['format', 'wire', 'sharddev'].includes(m[1]) ? resolve(process.cwd(), `node_modules/@wildshard/${m[1]}/package.json`) : new URL('../package.json', import.meta.url);
     packageExports.set(m[1], existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')).exports ?? {} : {});
   }
   return Object.hasOwn(packageExports.get(m[1]), layerKey(m[1], m[2]));
@@ -311,9 +311,11 @@ const modulePath = (filename, source) => {
 };
 const layerOf = (liftedPath) => {
   const path = unsidedPath(liftedPath);
-  const match = /^src\/(engine|format|game|sdk|sharddev|commons|shards)(?:\/([^/]+)?)?$/u.exec(path) ?? /^src\/(engine|format|game|sdk|sharddev|commons|shards)\/([^/]+)?/u.exec(path);
+  const match = /^src\/(engine|format|wire|game|sdk|sharddev|commons|shards)(?:\/([^/]+)?)?$/u.exec(path) ?? /^src\/(engine|format|wire|game|sdk|sharddev|commons|shards)\/([^/]+)?/u.exec(path);
   if (!match) return /^src\/[^/]+$/u.test(path) ? { name: 'app', rank: 6, slug: null } : null;
-  return { name: match[1], rank: ['format', 'engine', 'game', 'sdk', 'sharddev', 'commons', 'shards'].indexOf(match[1]), slug: match[1] === 'shards' ? match[2] : null };
+  // WIRE-STABILITY WR2: @wildshard/wire is a pure contract package beside format, at its rank
+  const rank = match[1] === 'wire' ? 0 : ['format', 'engine', 'game', 'sdk', 'sharddev', 'commons', 'shards'].indexOf(match[1]);
+  return { name: match[1], rank, slug: match[1] === 'shards' ? match[2] : null };
 };
 const engineWords = JSON.parse(readFileSync(new URL('engine-words.json', import.meta.url), 'utf8'));
 // P3: the generated list needs shard source. Where that has left, the pin keeps these rules' words.
@@ -395,7 +397,7 @@ const layerWalk = (kind) => (context) => {
     const target = layerOf(targetPath);
     // SF54: @wildshard/kit is dissolved; a workspace specifier names one of the layer packages or nothing
     if (kind === 'layer' && source.startsWith('@wildshard/') && packageTarget(source) === null) report(context, node, `No such layer package: ${source}`);
-    if (kind === 'layer' && own.name === 'commons' && target && !['commons', 'sdk', 'sharddev', 'format'].includes(target.name)) report(context, node, `Commons author tools import only the SDK and pure format contracts: ${source}`);
+    if (kind === 'layer' && own.name === 'commons' && target && !['commons', 'sdk', 'sharddev', 'format', 'wire'].includes(target.name)) report(context, node, `Commons author tools import only the SDK and pure format contracts: ${source}`);
     if (kind === 'layer' && own.name === 'commons' && targetPath.startsWith('src/sharddev/runtime/')) report(context, node, `Commons author tools cannot import trusted runtime code: ${source}`);
     const shardLocal = /^src\/shards\/[^/]+\/(.+)$/u.exec(pathOf(context))?.[1];
     if (kind === 'layer' && shardLocal !== undefined) {
@@ -412,7 +414,7 @@ const layerWalk = (kind) => (context) => {
     const publicPath = !dynamic && (exported(source) || new RegExp(`^src/${target.name}(?:/index(?:\\.[jt]s)?)?$`, 'u').test(targetPath));
     if (target.rank > own.rank || (own.name === 'shards' && target.name === 'shards' && own.slug !== target.slug)) {
       if (kind === 'layer') report(context, node, `Layer import ${own.name} → ${target.name}: ${source}`);
-    } else if (kind === 'public' && own.name !== target.name && ['engine', 'format', 'game', 'sdk', 'sharddev', 'commons'].includes(target.name) && !publicPath) {
+    } else if (kind === 'public' && own.name !== target.name && ['engine', 'format', 'wire', 'game', 'sdk', 'sharddev', 'commons'].includes(target.name) && !publicPath) {
       report(context, node, `Cross-layer imports use the public index: ${source}`);
     }
   };

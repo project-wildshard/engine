@@ -2,7 +2,7 @@
 // predictor steps at once; each frame takes the newest owner block and reconciles; `flush` runs once a frame, so at Low Power
 // Mode's 2.47 steps a frame a bundle carries them all (J121). Nothing here knows how bytes travel or what the server runs.
 import { Vector3 } from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { OwnHit, WeaponWire } from '../../../shared/engine/combat/Weapon';
 import { NET_BUTTONS } from '../../../shared/engine/input/netButtons';
 import { MAX_FIXED_STEPS } from '../../../shared/engine/core/fixedStep';

@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { NetActSchema, type NetAct } from '@wildshard/format/netCommand';
+import { NetActSchema, type NetAct } from '@wildshard/wire/netCommand';
 
 // P1-E5.2c (§4.2): the acts the engine adds to the format's own. Chat is the engine's concern, so it never reaches the shard format.
 

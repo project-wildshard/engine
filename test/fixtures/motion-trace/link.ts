@@ -1,4 +1,4 @@
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { predictedPlayer, PredictionWorld } from '../../../src/client/engine/net/predictionWorld';
 import { Predictor } from '../../../src/client/engine/net/predictor';
 import { quantiseCommand } from '../../../src/shared/engine/net/command';

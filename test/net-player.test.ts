@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { beforeAll, expect, test } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { NetPlayer } from '../src/client/engine/net/netPlayer';

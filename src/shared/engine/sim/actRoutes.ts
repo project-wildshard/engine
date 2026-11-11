@@ -1,4 +1,4 @@
-import type { NetAct } from '@wildshard/format/netCommand';
+import type { NetAct } from '@wildshard/wire/netCommand';
 import type { NetClimateAct } from '../net/acts';
 import type { SimHost } from '../../../server/engine/sim';
 

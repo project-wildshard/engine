@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Count collections around a tight loop.
 import { PerformanceObserver } from 'node:perf_hooks';
 import { Vector3 } from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { beforeAll, expect, test } from 'vitest';
 import { PREDICTION_RING, Predictor, type PredictedBody } from '../src/client/engine/net/predictor';
 import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';

@@ -3,7 +3,7 @@
 // only a difference over tolerance puts the server's state back and replays the commands the server has not reached.
 // The world is never rolled back, only this character (J59 Q10).
 import type { Vector3 } from 'three';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { seqAfter } from '../../../shared/engine/net/command';
 import type { NetColumn } from '../../../shared/engine/net/schema';
 import { CAPTURED, captureMotion, MOTION_WORDS, restoreMotion } from '../../../shared/engine/player/motionState';

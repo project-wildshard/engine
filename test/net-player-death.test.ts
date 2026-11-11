@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { beforeAll, expect, test } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { NetPlayer } from '../src/client/engine/net/netPlayer';
@@ -11,7 +11,7 @@ import { PlayerHealth } from '../src/shared/engine/combat/health';
 import type { DeathCause } from '../src/shared/engine/combat/pipeline';
 import { Events } from '../src/shared/engine/events/events';
 import { decodeEvents, messageId, MSG_EVENTS, type NetPlayerDied } from '../src/shared/engine/net/messages';
-import { NET_CLASSES } from '../src/shared/engine/net/netSchemas';
+import { initialBitsOf } from '../src/shared/engine/net/netSchemas';
 import type { Rapier } from '../src/shared/engine/physics/rapier';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { installRoomRespawn } from '../src/server/game/roomRespawn';
@@ -41,7 +41,7 @@ test.each([false, true, undefined])('the server death reaches only its owner onc
   scope.onDispose(other.onPlayerDied(event => { foreign.push(event); }));
   scope.onDispose(otherLink.client.onMessage((_channel, bytes) => {
     if (messageId(new Uint8Array(bytes)) !== MSG_EVENTS) return;
-    const decoded = decodeEvents(new Uint8Array(bytes), cls => { const table = NET_CLASSES[cls]; return table === undefined ? undefined : { bits: table.initial.map(column => column.bits), text: table.text.length }; });
+    const decoded = decodeEvents(new Uint8Array(bytes), initialBitsOf);
     for (const event of decoded?.events ?? []) if (event.kind === 'player-died') foreignWire.push(event);
   }));
   installPlayerDeath(events, scope, health, { position: () => page.player.position, died: (cause, taken) => { shown.push({ cause, checkpoint: taken }); } });

@@ -9,7 +9,7 @@ import { extname, join, resolve } from 'node:path';
 import { chromium, devices } from 'playwright';
 import { build } from 'vite';
 import { expect, test } from 'vitest';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetRoom } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { createSimHost } from '../src/server/engine/sim';

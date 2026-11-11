@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The product and Rapier are shipped bytes.
 import { readFileSync } from 'node:fs';
 import { beforeAll } from 'vitest';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { NetClient } from '../../src/client/engine/net/client';
 import { NET_BUTTONS } from '../../src/shared/engine/input/netButtons';
 import type { Transport } from '../../src/shared/engine/net/transport';

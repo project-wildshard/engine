@@ -15,7 +15,7 @@ import { encodeFrame, FRAME_RING, WorldFrameRing, type WorldFrame } from '../../
 import { NetHandles } from './handles';
 import { GUEST, NetIdentitySchema, type NetIdentity } from '../../../shared/engine/net/identity';
 import { decodeAct, decodeHello, encodeEvents, encodeWelcome, messageId, MSG_ACT, MSG_CMDS, MSG_HELLO, type InitialBits, type NetDied, type NetPlayerDied, type NetView, type NetEvent, type NetHit, type NetReward } from '../../../shared/engine/net/messages';
-import { NET_CLASSES, NET_SCHEMA_HASH } from '../../../shared/engine/net/netSchemas';
+import { initialBitsOf, NET_SCHEMA_HASH } from '../../../shared/engine/net/netSchemas';
 import type { NetClass, NetRefs } from '../../../shared/engine/net/schema';
 import type { FightViewCall } from '../../../shared/engine/sim/shardRows';
 import { LedgerBook, type LedgerFiling } from './ledgerBook';
@@ -137,7 +137,7 @@ interface RoomClient {
   readonly owner: Float64Array; dispose: () => void;
 }
 
-const initialBits: InitialBits = cls => { const entry = NET_CLASSES[cls]; return entry === undefined ? undefined : { bits: entry.initial.map(column => column.bits), text: entry.text.length }; };
+const initialBits: InitialBits = initialBitsOf;
 
 function rowPosition(frame: WorldFrame, at: number, cls: NetClass<never>): { x: number; y: number; z: number } | null {
   if (cls.position === null) return null;

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { decodeCommands, encodeCommands } from '../src/shared/engine/net/command';
 import { BitWriter } from '../src/shared/engine/net/bits';
 import { decodeAct, encodeAct } from '../src/shared/engine/net/messages';

@@ -15,7 +15,7 @@ import type { NativeSweptMeleeInput } from '@wildshard/engine/game/plugin/native
 import { installPortableMath } from '@wildshard/engine/core/portableMath';
 import { createSimHost, type SimHost, type SimHostPorts, type SimLevel, type SimTickCommand } from '@wildshard/engine/sim';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { NetTickAct } from '@wildshard/engine/net/acts';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { netInteractCommands, netRide, netTickCommands } from '../../shared/host/standalone/netInput';

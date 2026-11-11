@@ -1,4 +1,4 @@
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { AnimalPoseSample } from '../../../shared/engine/entities/AnimalSim';
 import type { SimHost } from '../sim';
 import { leadPlayer } from '../../../shared/engine/sim/leadPlayer';

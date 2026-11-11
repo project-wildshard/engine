@@ -1,6 +1,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Real Rapier bytes.
 import { readFileSync } from 'node:fs';
-import type { NetCommand } from '@wildshard/format/netCommand';
+import type { NetCommand } from '@wildshard/wire/netCommand';
 import { beforeAll, expect, test } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { STALL_TICKS } from '../src/server/engine/net/commandQueue';
