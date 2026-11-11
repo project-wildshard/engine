@@ -25,16 +25,16 @@ Git hygiene
    SHA's hosted `ci` and `ring-1` to go green, rebases onto main and fast-forwards main. On red or a conflict, fix
    forward on the branch and run it again.
  - `--force-with-lease` only on your own `plan/*` branch after a rebase (land does this itself); never force main.
- - The canonical checkout stays on main. The shared push queue (`scripts/push-queue.mjs`) is only for docs and
-   releases from there.
+ - The canonical checkout stays on main. Docs and release pushes from there are a plain `git push origin main`
+   through the normal pre-push (the shared push queue is gone, LAND-SIMPLIFY LS7).
  - Use pre-commit & pre-push git hooks for keeping checks/quality/lints etc.
  - Push often after every commit.
  - Every meaningful commit writes a journal into project/journal, the why & informal.
 
 Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STANDARD-PLAN.md`)
 
- - When: every code change. Docs-only and release work in the canonical checkout go through
-   `node scripts/push-queue.mjs enqueue` instead. Never land from `tmp/`, a scratchpad or a private clone.
+ - When: every code change. Docs-only and release work in the canonical checkout push main directly with a plain
+   `git push origin main`. Never land from `tmp/`, a scratchpad or a private clone.
  - Start: from the canonical checkout, `node scripts/worktree.mjs new <slug>`, then `cd .worktrees/<slug>`.
    Commit there by pathspec as usual. One plan, one worktree, one `plan/<slug>` branch.
  - Land: `WS_LANE_NAME=<lane> node scripts/land.mjs` from the worktree. Options: `--timeout=MIN` (CI wait, 60),
@@ -97,7 +97,8 @@ When land stops (each seen on 2026-11-10/11):
 
 Never:
 
- - push main by hand (`git push origin main`, `HEAD:main`, a bare `git push` on main): land or the queue only;
+ - push main by hand from a worktree (`git push origin HEAD:main`): code lands only through land; the canonical
+   checkout's docs and release pushes are the one plain `git push origin main`;
  - force main, or force anything but your own `plan/*` branch, and then only `--force-with-lease` (land does it);
  - `--no-verify`, `SKIP_*`, `ALLOW_*` or `WS_LAND_MAIN_PUSH` by hand (land sets it on its own main push);
  - commit in the canonical checkout off main, or in someone else's worktree; remove a worktree by hand (`reap`).
