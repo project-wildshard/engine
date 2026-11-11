@@ -231,7 +231,7 @@ Read `docs/design/blender-practice.md` first.
 - Take `lockf -k ~/projects/localai/.model.lock` for Cycles bakes or
   anything over a minute.
 - Build into `~/.cache/wildshard-blender/<target>/`, then
-  `pnpm exec gltf-transform meshopt <in> <out> --level medium`, then
+  `pnpm dlx @gltf-transform/cli meshopt <in> <out> --level medium`, then
   copy into the owning repo's `public/`.
 - Existing builders to copy from: `$SD/scripts/blender/` and each shard
   repo's `scripts/blender/`; add a `targets.json` row and build with
@@ -340,7 +340,7 @@ Read `docs/design/blender-practice.md` first.
   (*(history)* `art/pine-hollow/round-15-rifle/board.jpg` is the
   pattern).
 - **A spin clip** of about 10 s, when the form is the question:
-  `scripts/model-spin.mjs --url=<build> --shard=<slug> --models=<id,…> --out=<art path>.mp4`,
+  `node scripts/model-spin.mjs --url=<build> --shard=<slug> --models=<id,…> --out=<art path>.mp4`,
   run inside `scripts/browser-lane.sh` (M9). It turns 1–5 models on the
   real Model Explorer at phone size. Files over 30 MB silently don't
   arrive.

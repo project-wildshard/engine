@@ -92,9 +92,9 @@ def cameras(a):
     if a.shard:
         for c in json.load(open(os.path.join(g, 'cameras24.json')))['cameras'][a.shard]:
             cid = f'{c["n"]:02d}-{c["name"]}'
-            cols = []
-            legacy = os.path.join(g, 'legacy', f'{cid}.jpg')
-            if os.path.exists(legacy): cols.append(('LEGACY golden', Image.open(legacy).convert('RGB')))
+            cols = []  # LEGACY is all or nothing per shard, so every board row has the same columns
+            if os.path.isdir(os.path.join(g, 'legacy')):
+                cols.append(('LEGACY golden', Image.open(os.path.join(g, 'legacy', f'{cid}.jpg')).convert('RGB')))
             golden = Image.open(os.path.join(g, 'shardfile', f'{cid}.jpg')).convert('RGB')
             cols.append(('SHARDFILE golden', golden.crop((0, STRIP, golden.width, golden.height))))
             now = find(os.path.join(a.now, a.shard), (f'{cid}-shardfile.png', f'{cid}.png', f'{cid}.jpg'))
@@ -161,13 +161,15 @@ def main():
     draw = ImageDraw.Draw(board)
     draw.text((6, 6), f'GOLDEN RERUN {slug} | {columns}', fill=INK, font=f)
     status = f'RED: {",".join(map(str, sorted(red)))}' if red else 'No mean colour-shift flags; VISUAL REVIEW REQUIRED'
-    draw.text((6, f.size + 12), status, fill=RED if red else INK, font=f)
+    if missing: status = f'INCOMPLETE: {len(missing)} of {len(cams)} cameras missing. ' + status
+    draw.text((6, f.size + 12), status, fill=RED if red or missing else INK, font=f)
     for i, t in enumerate(small): board.paste(t, (4 + (i % cols) * (tw + 4), head + (i // cols) * (th + 4)))
     for q in (80, 72, 64, 56, 48, 40):
         buf = io.BytesIO(); board.save(buf, 'JPEG', quality=q)
         if buf.tell() <= 500_000: break
     path = os.path.join(a.out, f'board-{slug}.jpg'); open(path, 'wb').write(buf.getvalue())
     print(f'{path} {buf.tell() // 1000} KB, {len(small)} cameras')
+    if missing: raise SystemExit(f'INCOMPLETE: {len(missing)} NOW frames missing; the board is not a green run')
 
 
 if __name__ == '__main__':

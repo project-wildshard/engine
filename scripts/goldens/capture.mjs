@@ -208,7 +208,7 @@ try{for(const slug of slugs){
   }
   row.status=row.errors.length===0?'complete':'errors';
  }catch(error){row.status='failed';row.failure=String(error);if(page)await page.screenshot({path:`${dir}/failure.jpg`,type:'jpeg',quality:80,scale:'css'}).catch(()=>{});}
- finally{rows.push(row);writeFileSync(`${root}/receipts.json`,JSON.stringify(rows,null,2));await context.close();
+ finally{rows.push(row);writeFileSync(`${root}/receipts-${slug}.json`,JSON.stringify(row,null,1));writeFileSync(`${root}/receipts.json`,JSON.stringify(rows,null,2));await context.close();
   console.log(JSON.stringify({slug,status:row.status,poses:row.poses.length,idle:row.poses.map(p=>p.idle.settled),failure:row.failure,errors:row.errors.slice(0,3),warnings:Object.values(row.warnings).reduce((n,c)=>n+c,0)}));}
  if(row.status==='failed')process.exitCode=1;
 }}finally{try{await browser.close();}finally{await owner?.close();}}

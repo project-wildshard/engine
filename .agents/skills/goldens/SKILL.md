@@ -89,7 +89,7 @@ plus `--red 11,12`.
 - **Any red camera: don't land.** Fix and re-capture those cameras, or
   (a look change meant to be seen, with Jake's ruling) promote in the
   shard repo:
-  `board.py --goldens $G --shard $SLUG --now $RUN/raw --promote 11,12 --source "<sha10> <ruling>"`,
+  `python3 scripts/goldens/board.py --goldens $G --shard $SLUG --now $RUN/raw --promote 11,12 --source "<sha10> <ruling>"`,
   plus a line in `$G/README.md`, committed in that shard repo.
 - Green: copy the board to `$G/runs/<date>-<sha10>-board.jpg`, commit it
   in the shard repo by pathspec, and put
@@ -104,5 +104,5 @@ plus `--red 11,12`.
 
 The plot set and its capture belong to `shard-open-plots`
 (`art/goldens/<plot>/`); run its goldens skill from that checkout.
-`board.py --goldens <shard-open-plots>/art/goldens --plot <plot>` builds
+`python3 scripts/goldens/board.py --goldens <shard-open-plots>/art/goldens --plot <plot>` builds
 the GOLDEN · NOW board.
