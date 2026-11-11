@@ -102,3 +102,5 @@ slow. Each now skips the idle part and keeps its assertions.
   and both legs on their restore assertions; a restore that zeroes the
   bucking shake and roll fails the old file and leg 2 on "the earned
   mid-round checkpoint restores quietly".
+  Leg 2's first local clock (8.6 s, from the push gate) is recorded;
+  the full plan is 237.4 s of 240 with 14 shards.
