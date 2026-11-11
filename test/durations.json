@@ -1175,6 +1175,7 @@
   "test/spawn-parts-reader.test.ts": 2.645607118000001,
   "test/spawn-parts.test.ts": 12.901499604000001,
   "test/spawn-postcontrol-quota.test.ts": 0.7474281869999998,
+  "test/spawn-stable-names.test.ts": 11.526476168000002,
   "test/spawn-view-files.test.ts": 0.080052277,
   "test/species-kinds.test.ts": 0.18198846299999996,
   "test/specimen-explorer.test.ts": 2.2419684999999996,

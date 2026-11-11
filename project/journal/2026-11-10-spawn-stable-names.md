@@ -40,3 +40,6 @@ read; it now fails at once (the job's catch aborts the sibling) and cancels
 any copy no store kept. Its SHOULD (cancel clones on a parse or store
 failure) is in the same change. Real boots: `loading-card-proof.mjs` single
 and `--grid` pass on Chromium and WebKit with 0 faults.
+
+Timings: the pre-push asked for committed clocks for the new test file;
+`push-test-timings.mjs record` wrote them (full and Ring 1).

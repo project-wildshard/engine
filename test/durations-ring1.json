@@ -1077,6 +1077,7 @@
   "test/spawn-packs-book.test.ts": 0.185389406,
   "test/spawn-part-members.test.ts": 0.3681604860000001,
   "test/spawn-parts-reader.test.ts": 3.286055935,
+  "test/spawn-stable-names.test.ts": 9.279576251000003,
   "test/spawn-view-files.test.ts": 0.10389517000000006,
   "test/specimen-explorer.test.ts": 1.5111633760000003,
   "test/splat-draw-tier.test.ts": 0.08510267200000005,
