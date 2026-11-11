@@ -19,3 +19,7 @@ already failing on main and sit in `test/lift-pending.json` (J200).
 A review found the marker matched as a prefix and only the root file was
 guarded; the marker must now be a whole line, and every AGENTS.md at any
 depth keeps its top.
+
+Landing (opus-k10): rebased onto main 9df77b1; the pre-push asked for
+clocks of test/server-route.test.ts, new on main without timings, so
+its recorded full and Ring 1 timings ride along.
