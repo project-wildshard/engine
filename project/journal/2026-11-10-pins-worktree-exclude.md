@@ -12,3 +12,5 @@ replaces only the writer's block and drops blocks of worktrees that no
 longer exist. Patterns are root-anchored, so the union only hides published
 mount paths. The real-Git test fails on a single shared block (the parent's
 mounts show as `?? public/`).
+
+Clocks for `test/tooling/pins-exclude.test.mjs` recorded with `push-preflight.mjs timings`.

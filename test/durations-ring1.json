@@ -1103,6 +1103,7 @@
   "test/tooling/parity/browser-escape.test.mjs": 22.548,
   "test/tooling/parity/native-chrome-warm.test.mjs": 9.171567277000001,
   "test/tooling/parity/resources.test.mjs": 0.05571249300000002,
+  "test/tooling/pins-exclude.test.mjs": 0.5954466660000001,
   "test/tooling/soak/boundary.test.mjs": 0.08834931200000003,
   "test/tooling/soak/inspector.test.mjs": 0.07907460399999997,
   "test/tooling/worktree-ignore.test.mjs": 3.0824463319999995,
