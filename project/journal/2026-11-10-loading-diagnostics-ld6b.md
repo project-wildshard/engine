@@ -28,3 +28,4 @@ Timings: `test/chunk-import-map.test.ts` runs in about 0.1 s; its clocks are in 
 Review (Codex, J206): no must-fix. Two shoulds, both done: dynamic import literals are decoded by the parser, so an
 escape or `$` cannot hide a request; and the worker and shell bundles under `/b/` are checked too, by direct files
 only, since they run without the map. The check moved to just before the service worker, once every bundle is written.
+The review fix changed the test file, so its clocks were taken again.
