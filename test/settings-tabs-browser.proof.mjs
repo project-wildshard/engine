@@ -4,6 +4,8 @@
 // the real GameMenu (test/settings-tabs/page.ts) on a phone (iPhone, 402 × 874) and a desktop (1440 × 900). Every tab opens
 // from its button, every row lands in the tab this list says (written from meta SETTINGS-REDESIGN-PLAN.md, not read from the
 // page), and every control changes the setting it names. Headless Chromium with the keychain flags (J148).
+// SR13: with the review inbox unlocked there is no second tab bar; System ▸ Feedback opens the composer and its back bar
+// returns to System. SR11: the title's Settings (BootSettings.ts) is the same tab bar, walked tab by tab, without Review.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -166,6 +168,49 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       await tap('.ws-gmenu-svpane[data-sv-pane="system"] .ws-gmenu-switch[role="switch"]');
       await page.waitForTimeout(100);
       assert.deepEqual(await shownTabs(), TABS, `${kind}: five tabs again with Developer mode off`);
+
+      // SR13: unlock the review inbox (the inbox's check answered by a stub), then Feedback is a System row, not a tab bar
+      await page.route('**/inbox**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+      await page.locator('.ws-gmenu-svpane[data-sv-pane="system"] .ws-gmenu-input[type="password"]').fill('proof');
+      await tap('.ws-gmenu-svpane[data-sv-pane="system"] .ws-gmenu-review .ws-gmenu-unlock');
+      await page.waitForFunction(() => /** @type {any} */ (window).__settings.reviewUnlocked() === true);
+      await page.waitForTimeout(100);
+      assert.equal(await page.locator('.ws-gmenu-tabs').isVisible(), false, `${kind}: no outer SETTINGS · FEEDBACK bar with review unlocked`);
+      assert.deepEqual(await shownTabs(), TABS, `${kind}: still the five tabs`);
+      await page.screenshot({ path: join(SHOTS, `${kind}-system-feedback-row.png`) });
+      await tap('.ws-gmenu-svpane[data-sv-pane="system"] [data-setting="feedback"] button');
+      assert.equal(await page.locator('[data-proof="composer"]').isVisible(), true, `${kind}: System ▸ Feedback opens the composer`);
+      assert.equal(await read('s.composed()'), 1, `${kind}: the composer mounted once`);
+      assert.equal(await page.locator('.ws-gmenu-tabs').isVisible(), false, `${kind}: the composer has no tab bar either`);
+      await page.screenshot({ path: join(SHOTS, `${kind}-feedback.png`) });
+      await tap('.ws-gmenu-fbback');
+      assert.equal(await page.$eval('.ws-gmenu-svtab.active', b => /** @type {HTMLElement} */ (b).dataset['svTab']), 'system', `${kind}: back returns to System`);
+      assert.equal(await page.locator('.ws-gmenu-svpane[data-sv-pane="system"]').isVisible(), true, `${kind}: System shows again`);
+      await tap('.ws-gmenu-svpane[data-sv-pane="system"] .ws-gmenu-review .ws-gmenu-row:not([data-setting]) .ws-gmenu-unlock'); // LOCK
+      await page.evaluate(() => { /** @type {any} */ (window).__settings.menu.close(); });
+
+      // SR11: the title's Settings is the same tabs (BootSettings.ts), without the in-game-only rows
+      await page.evaluate(() => { /** @type {any} */ (window).__settings.openBootSettings(); });
+      await page.waitForTimeout(200);
+      const boot = '.ws-gmenu-boot';
+      const bootTabs = () => page.$$eval(`${boot} .ws-gmenu-svtab`, bs => bs.filter(b => !b.hidden).map(b => /** @type {HTMLElement} */ (b).dataset['svTab']));
+      assert.deepEqual(await bootTabs(), TABS, `${kind}: the title has the same five tabs`);
+      for (const tab of TABS) {
+        await page.locator(`${boot} .ws-gmenu-svtab[data-sv-tab="${tab}"]`).click(); await page.waitForTimeout(60);
+        const active = await page.$$eval(`${boot} .ws-gmenu-svpane.active`, ps => ps.map(p => /** @type {HTMLElement} */ (p).dataset['svPane']));
+        assert.deepEqual(active, [tab], `${kind}: the title's ${tab} opens alone`);
+        await page.screenshot({ path: join(SHOTS, `${kind}-title-${tab}.png`) });
+      }
+      const bootSeen = async (/** @type {string} */ tab) => page.$$eval(`${boot} .ws-gmenu-svpane[data-sv-pane="${tab}"] [data-setting], ${boot} .ws-gmenu-svpane[data-sv-pane="${tab}"] [data-gfx]`,
+        els => els.map(e => { const d = /** @type {HTMLElement} */ (e).dataset; return d['gfx'] === undefined ? String(d['setting']) : `gfx:${d['gfx']}`; }));
+      for (const key of ['volume', 'music', 'musicStyle']) assert.ok((await bootSeen('sound')).includes(key), `${kind}: the title's Sound has ${key}`);
+      for (const key of ['look', 'lockCam', 'autoLock', 'aimAssist']) assert.ok((await bootSeen('controls')).includes(key), `${kind}: the title's Controls has ${key}`);
+      assert.ok((await bootSeen('graphics')).includes('gfx:tier'), `${kind}: the title's Graphics has Quality`);
+      if (phone) assert.ok((await bootSeen('graphics')).includes('gfx:mode'), `${kind}: the title's Graphics has Low · High`);
+      assert.equal(await page.locator(`${boot} .ws-gmenu-review`).count(), 0, `${kind}: no Review on the title`);
+      assert.equal(await page.locator(`${boot} [data-proof="saveCards"]`).count(), 0, `${kind}: no shard save cards on the title`);
+      assert.equal(await page.locator(`${boot} [data-setting="swingLook"]`).isVisible(), false, `${kind}: no weapon rows on the title`);
+      await page.locator(`${boot} .ws-gmenu-close`).click();
       assert.deepEqual(errors, [], `${kind}: no page errors`);
       await context.close();
     }

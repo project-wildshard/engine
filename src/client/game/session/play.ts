@@ -286,7 +286,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   menu.onOpen = () => { if (document.pointerLockElement) document.exitPointerLock(); }; // the map wants a cursor; the lock comes back on close (onResume)
 
   // ── the review inbox (project/archive/2026-09-22-feedback-inbox.md): unlocked in Settings → REVIEW, then F8 (desktop), the ✎ disc under
-  // PAUSE (touch) and the menu's FEEDBACK tab. The composer (src/client/engine/ui/Feedback.ts) loads on first use; while its overlay is up
+  // PAUSE (touch) and Settings ▸ System ▸ Feedback (SR13). The composer (src/client/engine/ui/Feedback.ts) loads on first use; while its overlay is up
   // the world is frozen on the captured frame (frameGate) and the weapons / pointer lock are released.
   let feedbackHeld = false;
   let feedback: Promise<Feedback> | null = null;

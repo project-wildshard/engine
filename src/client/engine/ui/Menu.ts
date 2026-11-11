@@ -27,8 +27,7 @@ export type MenuTab = string;
  *  every shard (FINDS only where the shard has finds: Driftwood today; `inventory` is PACK, `achievements` FEATS) */
 const TABS: { id: MenuTab; label: string; icon?: IconId }[] = [
   { id: 'map', label: engineString('s_be176b0015c4'), icon: 'map' }, { id: 'settings', label: engineString('s_74a883a037bc') },
-  { id: 'feedback', label: engineString('s_aac77df34720') }, // only while the review inbox is unlocked (syncReview)
-];
+]; // SR13: Feedback has no tab of its own; System ▸ Feedback opens its panel while the review inbox is unlocked
 /** the two menus (E124): 'pause' holds the engine's own tabs (Settings, Feedback); 'play' the map and every tab the game
  *  registers (its Bag; the game names it: s_b053c961f2ac) — E405: the engine names none of the game's tabs */
 export type MenuGroup = 'pause' | 'play';
@@ -97,6 +96,8 @@ export class GameMenu {
   /** The host owns exit: fresh-page hosts navigate; local/practice hosts close their menu. */
   onExit?: () => void;
   onFeedbackTab?: (panel: HTMLElement) => void;
+  /** where onFeedbackTab draws the composer: under the feedback panel's back bar (SR13) */
+  private readonly feedbackSlot: HTMLElement;
   /** may a key open the menu now — the HUD says: in the world, no composer up (`hud.menu = …` sets it); closed until then */
 
   /** the Settings rows that apply only sometimes (E130: hidden, not greyed, when they do not apply) — see `applies()` */
@@ -126,6 +127,12 @@ export class GameMenu {
     this.sheet.append(this.tabBar);
     const body = el('ws-gmenu-body');
     this.panels = { map: el('ws-gmenu-panel map'), settings: el('ws-gmenu-panel ws-gmenu-svpanel'), feedback: el('ws-gmenu-panel scroll') };
+    // SR13: the composer's panel opens from System ▸ Feedback; its back bar returns to System (the tabs keep their tab)
+    const feedbackBack = el('ws-gmenu-unlock ws-gmenu-fbback', '', 'button') as HTMLButtonElement; feedbackBack.type = 'button';
+    feedbackBack.textContent = engineString('s_st_feedback_back');
+    listenTap(this.scope, feedbackBack, () => { this.select('settings'); });
+    this.feedbackSlot = el('ws-gmenu-fbslot');
+    this.panels.feedback.append(feedbackBack, this.feedbackSlot);
     for (const p of Object.values(this.panels)) { if (p === undefined) continue; if (p.classList.contains('scroll')) p.dataset['scroll'] = ''; body.append(p); } // index.html swallows touchmove outside [data-scroll]
     this.sheet.append(body);
     this.hint = el('ws-gmenu-hint');
@@ -185,21 +192,21 @@ export class GameMenu {
     installKeyHelp(this.scope); // F1 or / during play: the live key bindings (E419), on every level
   }
 
-  /** the FEEDBACK tab exists only while the review inbox is unlocked */
+  /** the feedback panel opens only while the review inbox is unlocked (System ▸ Feedback, SR13) */
   private syncReview(): void {
     if (!reviewUnlocked() && this._tab === 'feedback') this.select('settings');
     else this.syncTabs();
   }
-  /** which tabs show: FEEDBACK only while the review inbox is unlocked; only the open group's (one tab = no bar) */
+  /** which tabs show: only the open group's (one tab = no bar: Settings, and its feedback panel, have none) */
   private syncTabs(): void {
-    const review = reviewUnlocked(), group = groupOf(this._tab);
+    const group = groupOf(this._tab);
     const playTabs = new Set(['map', ...this.tabsRegistry.registeredTabs.map((tab) => tab.id)]);
     let shown = 0;
     for (const b of this.tabBar.children) {
       const d = (b as HTMLElement).dataset, id = d['tab'];
       const g = d['group'] ?? (id === undefined ? 'play' : groupOf(id)); // an action tab carries its group
       const shownHere = id === undefined || groupOf(id) !== 'play' || playTabs.has(id);
-      const on = (id !== 'feedback' || review) && shownHere && g === group && !(id === 'map' && this.noMap);
+      const on = shownHere && g === group && !(id === 'map' && this.noMap);
       (b as HTMLElement).hidden = !on;
       if (on) shown++;
     }
@@ -273,7 +280,7 @@ export class GameMenu {
     this.refresh();
     this.applies();
     if (selected === 'map') { this.opts.fullMap.show(); this.renderQuest(); }
-    if (selected === 'feedback') this.onFeedbackTab?.(this.panels.feedback);
+    if (selected === 'feedback') this.onFeedbackTab?.(this.feedbackSlot);
     this.onOpen?.(selected);
   }
   /** `silent` = no onClose (exit to the main menu: the HUD handles the world itself) */
@@ -308,7 +315,7 @@ export class GameMenu {
       this.applies();
     }
     this.renderRegisteredTab(tab);
-    if (tab === 'feedback' && this._open) this.onFeedbackTab?.(this.panels.feedback);
+    if (tab === 'feedback' && this._open) this.onFeedbackTab?.(this.feedbackSlot);
   }
 
   /** re-render the data tabs */
@@ -372,7 +379,8 @@ export class GameMenu {
   private readonly pendingSettings = new Set<() => void>();
   private buildSettings(): void {
     if (this.scope.disposed) return;
-    withOwner(this.scope, () => buildMenuSettings({scope:this.scope,panel:this.panels.settings,hint:this.hint,tab:()=>this._tab},this.settingsView));
+    withOwner(this.scope, () => buildMenuSettings({ scope: this.scope, panel: this.panels.settings, hint: this.hint, tab: () => this._tab,
+      openFeedback: () => { if (reviewUnlocked()) this.select('feedback'); } }, this.settingsView));
     for (const install of this.pendingSettings) install();
     this.applies();
   }

@@ -5,12 +5,12 @@ import { engineString } from '../../../shared/engine/strings';
 import { terrainDatum } from '../../../shared/engine/world/terrainHeight';
 /**
  * The review inbox's composer (project/archive/2026-09-22-feedback-inbox.md, mockups art/feedback/round-1-inbox/) — loaded lazily on the first
- * F8 / ✎ / FEEDBACK tab, so the boot bundle never carries it. Styled by src/client/engine/ui/styles/feedback.css (prefix ws-fb-).
+ * F8 / ✎ / System ▸ Feedback, so the boot bundle never carries it. Styled by src/client/engine/ui/styles/feedback.css (prefix ws-fb-).
  *
  *   const fb = new Feedback(host);
  *   await fb.openQuick()        // desktop F8: the frame is captured + frozen, a one-line bar under the crosshair; Tab → the sheet
  *   await fb.openSheet()        // the full sheet: right-docked on desktop, a bottom sheet on touch (the ✎ disc)
- *   await fb.mountTab(panel)    // the MENU's FEEDBACK tab: the same composer inside the panel (the world keeps running)
+ *   await fb.mountTab(panel)    // Settings ▸ System ▸ Feedback (SR13): the same composer inside the menu's panel (the world keeps running)
  *
  * A note = the words + a category chip + a JPEG of the frame (freehand pen strokes baked in) + the repro context
  * (host.context() + build / viewport / tier / the `?at=` URL that puts you back on the spot). Sending goes through
@@ -124,7 +124,7 @@ export class Feedback {
     this.render('sheet');
   }
 
-  /** the MENU's FEEDBACK tab: re-capture the frame (the world runs under the menu) and draw the composer into the panel */
+  /** Settings ▸ System ▸ Feedback (SR13): re-capture the frame (the world runs under the menu) and draw the composer into the panel */
   async mountTab(panel: HTMLElement): Promise<void> {
     if (this.isOpen) this.close();
     this.shot = await this.host.capture();

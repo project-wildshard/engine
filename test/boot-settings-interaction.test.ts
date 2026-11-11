@@ -4,7 +4,7 @@ import { installWorldFixture } from './fixtures/worldSetup';
 import { Scope } from '../src/shared/engine/app/scope';
 import { activeLevel, bindLevelSelection } from '../src/shared/engine/level/selection';
 import { openBootSettings } from '../src/client/engine/ui/BootSettings';
-import { savedSetting, setting } from '../src/client/engine/ui/Settings';
+import { savedSetting, saveSetting, setting } from '../src/client/engine/ui/Settings';
 import { authoredRows } from '../src/client/engine/ui/authoredDebugRows';
 import { buildDebugMenu } from '../src/client/engine/ui/DebugMenu';
 import { DEBUG_ROWS, type DebugRow } from '../src/client/engine/ui/debugOptions';
@@ -58,31 +58,35 @@ test('undoing a staged choice clears it and keyboard clicks remain available', (
 });
 
 
-test('the real title panel stages a quality pick and reloads only once on Apply', () => {
-  const reload = vi.fn<() => void>();
-  vi.stubGlobal('location', { href: 'https://example.invalid/', reload, replace: reload });
+test('SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics ▸ Reload now', async () => {
+  const replace = vi.fn<() => void>();
+  vi.stubGlobal('location', { href: 'https://example.invalid/', reload: replace, replace });
   const unbind = bindLevelSelection({ ...activeLevel(), mechanisms: [] }), original = savedSetting('tier'), running = setting('tier');
   try {
     openBootSettings();
     const root = document.querySelector('.ws-gmenu');
     if (root === null) throw new Error('missing title Settings');
-    const next = root.querySelector<HTMLButtonElement>(`button[data-v="${original === 'phone' ? 'desktop' : 'phone'}"]`);
-    if (next === null) throw new Error('missing quality choice');
-    const originalChoice = next.closest('.ws-gmenu-row')?.querySelector<HTMLButtonElement>(`button[data-v="${original}"]`);
-    if (originalChoice === null || originalChoice === undefined) throw new Error('missing original quality');
+    const tabs = [...root.querySelectorAll<HTMLElement>('.ws-gmenu-svtab')].filter(b => !b.hidden).map(b => b.dataset['svTab']);
+    expect(tabs).toEqual(['graphics', 'sound', 'controls', 'saves', 'system']);
+    expect(root.querySelector('[data-setting="volume"]')).not.toBeNull(); // Sound is the in-game Sound
+    expect(root.querySelector('.ws-gmenu-review')).toBeNull(); // Review is in-game only
+    const pane = root.querySelector<HTMLElement>('.ws-gmenu-svpane[data-sv-pane="graphics"]');
+    const tier = pane?.querySelector<HTMLElement>('[data-gfx="tier"]');
+    const next = tier?.querySelector<HTMLButtonElement>(`button[data-v="${original === 'phone' ? 'desktop' : 'phone'}"]`);
+    if (next === null || next === undefined) throw new Error('missing quality choice');
     tap(next);
     expect(setting('tier')).toBe(running); expect(savedSetting('tier')).not.toBe(original);
-    expect(reload).not.toHaveBeenCalled(); expect(document.querySelector('.ws-reload')).toBeNull();
-    const apply = root.querySelector<HTMLButtonElement>('.ws-gmenu-btn.resume');
-    if (apply === null) throw new Error('missing Apply');
-    expect(apply.closest('.ws-gmenu-panel')).toBeNull();
-    expect(apply.hidden).toBe(false); expect(apply.textContent).toMatch(/Apply.*reload.*1/i);
-    tap(apply); expect(reload).toHaveBeenCalledTimes(1);
-    tap(originalChoice); expect(apply.hidden).toBe(true);
+    expect(replace).not.toHaveBeenCalled(); expect(document.querySelector('.ws-reload')).toBeNull();
+    openBootSettings(); // the tab re-reads its pending count on open (and every 2 s)
+    const row = pane?.querySelector<HTMLElement>('[data-gfx="reload"]');
+    const now = row?.querySelector<HTMLButtonElement>('button');
+    if (row === null || row === undefined || now === null || now === undefined) throw new Error('missing Reload now');
+    expect(row.hidden).toBe(false);
+    tap(now); await new Promise(resolve => { setTimeout(resolve, 50); });
+    expect(replace).toHaveBeenCalledTimes(1);
     root.querySelector<HTMLButtonElement>('.ws-gmenu-close')?.click();
-  } finally { unbind(); }
+  } finally { saveSetting('tier', original); unbind(); }
 });
-
 
 test('retired diagnostics are absent while Clear downloads remains in Developer', () => {
   expect(DEBUG_ROWS.some(row => row.id === 'time' || row.id === 'weather' || row.id === 'game.template')).toBe(false);

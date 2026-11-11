@@ -59,6 +59,9 @@ export interface SettingsTabsView {
 export interface SettingsTabsOptions {
   /** stage the Debug cards' pending picks before a Graphics reload (it reloads the page) */
   readonly applyPending: () => void;
+  /** Graphics controls of this menu's own, over the built-ins and under the registry (SR11: the title's Settings passes
+   *  graphicsBlock.ts's list, which a level registers for the in-game menu) */
+  readonly graphics?: readonly GraphicsControl[];
 }
 
 function el(cls: string, tag = 'div'): HTMLElement { const e = document.createElement(tag); e.className = cls; return e; }
@@ -111,6 +114,7 @@ export function buildSettingsTabs(scope: Scope, opts: SettingsTabsOptions): Sett
   const built = new Map<string, { control: GraphicsControl; row: HTMLElement; owner: Scope }>();
   const layGraphics = (): void => {
     const merged = new Map<string, GraphicsControl>(builtins.controls.map((control) => [control.id, control]));
+    for (const control of opts.graphics ?? []) merged.set(control.id, control);
     for (const control of graphicsControls()) merged.set(control.id, control);
     for (const [id, { control, row, owner }] of built) if (merged.get(id) !== control) { row.remove(); owner.dispose(); built.delete(id); }
     const order = [...merged.values()].sort((a, b) => GRAPHICS_SECTIONS.indexOf(a.section) - GRAPHICS_SECTIONS.indexOf(b.section) || a.order - b.order);
@@ -142,6 +146,9 @@ export function buildSettingsTabs(scope: Scope, opts: SettingsTabsOptions): Sett
     paint();
   };
   scope.onDispose(onDev(() => { sync(); }));
+  // a registered control (graphicsBlock.ts's Quality) saves a reload pick itself: re-read the Reload now rows after any tap
+  // in the panes, not only on the next open. Taps stop propagation (listenTap), so listen in capture and paint after it
+  for (const type of ['pointerup', 'click'] as const) scope.listen(body, type, () => { queueMicrotask(() => { builtins.paint(); }); }, { capture: true });
   scope.listen(document, PIXELS_EVENT, () => { builtins.paint(); });
   paint();
   return {

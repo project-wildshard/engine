@@ -9,7 +9,7 @@ import {
   type FlagKnob,
 } from '../core/graphicsQuality';
 import { savedSetting, saveSetting } from './Settings';
-import { registerGraphicsControl } from './graphicsControls';
+import { registerGraphicsControl, type GraphicsControl } from './graphicsControls';
 /**
  * MOBILE-GRAPHICS MG8: the phone's Graphics controls. Jake, 2026-11-10 ~22:50 Cancún: "Everything needs to be in the graphic
  * settings"; ~23:05: Low · High · Custom; ~23:45: one "Pixel density" control, no "Auto" anywhere, anti-aliasing On / Off.
@@ -21,7 +21,8 @@ import { registerGraphicsControl } from './graphicsControls';
  *   world           In-world toggle On | Off (MG9's card on every entry)
  *
  * Each row is its own factory: layout A's Graphics tab takes them through its registry (registerGraphicsSettings, replacing
- * its built-in `mode`, `tier`, `scale` and `aa`), and the title's Settings stacks them (buildGraphicsBlock). Every control
+ * its built-in `mode`, `tier`, `scale` and `aa`), and the title's Settings, the same tabs (SR11), takes the same list
+ * (graphicsSettingsControls). Every control
  * always shows a real value and applies at once (core/graphicsQuality.ts, Game.applyQuality); Low Power Mode refuses High (MG3).
  */
 
@@ -106,15 +107,6 @@ export function graphicsRow(id: RowId, scope: Scope): Row {
   return { root, paint };
 }
 
-/** The title's Settings on a phone: every row stacked (null elsewhere: the desktop keeps its render scale and AA rows). */
-export function buildGraphicsBlock(scope: Scope): Row | null {
-  if (TIER !== 'phone') return null;
-  const rows = (['mode', 'density', 'shadows', 'bloom', 'rays', 'aa', 'readout', 'world'] as const).map((id) => graphicsRow(id, scope));
-  const root = el('ws-gmenu-gfx');
-  root.append(...rows.map((r) => r.root));
-  return { root, paint: () => { for (const r of rows) r.paint(); } };
-}
-
 /**
  * Layout A's Graphics tab (settingsTabs.ts, its registry graphicsControls.ts): the phone's rows, and the built-ins they replace.
  * `mode` becomes Low · High · Custom; `tier` shows Phone / Desktop with no Auto; on a phone `scale` and `aa` hide (Pixel density
@@ -122,6 +114,13 @@ export function buildGraphicsBlock(scope: Scope): Row | null {
  * disposer (each registration's).
  */
 export function registerGraphicsSettings(): () => void {
+  const offs = graphicsSettingsControls().map((control) => registerGraphicsControl(control));
+  return () => { for (const off of offs) off(); };
+}
+
+/** The controls registerGraphicsSettings registers, as a list: the title's Settings (SR11, BootSettings.ts) hands them to its
+ *  own tabs, since the registry belongs to the level and a level's disposer would take a shared id with it. */
+export function graphicsSettingsControls(): GraphicsControl[] {
   const phone = (): boolean => TIER === 'phone';
   const row = (id: RowId) => (scope: Scope): HTMLElement => graphicsRow(id, scope).root;
   const pick = (scope: Scope, label: string, options: readonly (readonly [string, string])[], get: () => string, set: (v: string) => void): HTMLElement => {
@@ -134,25 +133,24 @@ export function registerGraphicsSettings(): () => void {
     }
     scope.interval(1000, paint); paint(); r.append(box); return r;
   };
-  const offs = [
-    registerGraphicsControl({ id: 'mode', section: 'main', order: 0, when: phone, build: row('modeCards') }),
-    registerGraphicsControl({ id: 'gfxDensity', section: 'main', order: 10, when: phone, build: row('density') }),
-    registerGraphicsControl({ id: 'gfxReadout', section: 'main', order: 20, when: phone, build: row('readout') }),
-    registerGraphicsControl({ id: 'gfxShadows', section: 'effects', order: 10, when: phone, build: row('shadows') }),
-    registerGraphicsControl({ id: 'gfxBloom', section: 'effects', order: 20, when: phone, build: row('bloom') }),
-    registerGraphicsControl({ id: 'gfxRays', section: 'effects', order: 30, when: phone, build: row('rays') }),
-    registerGraphicsControl({ id: 'gfxAa', section: 'effects', order: 40, when: phone, build: row('aa') }),
-    registerGraphicsControl({ id: 'gfxWorld', section: 'setup', order: 10, when: phone, build: row('world') }),
+  return [
+    { id: 'mode', section: 'main', order: 0, when: phone, build: row('modeCards') },
+    { id: 'gfxDensity', section: 'main', order: 10, when: phone, build: row('density') },
+    { id: 'gfxReadout', section: 'main', order: 20, when: phone, build: row('readout') },
+    { id: 'gfxShadows', section: 'effects', order: 10, when: phone, build: row('shadows') },
+    { id: 'gfxBloom', section: 'effects', order: 20, when: phone, build: row('bloom') },
+    { id: 'gfxRays', section: 'effects', order: 30, when: phone, build: row('rays') },
+    { id: 'gfxAa', section: 'effects', order: 40, when: phone, build: row('aa') },
+    { id: 'gfxWorld', section: 'setup', order: 10, when: phone, build: row('world') },
     // "I don't like auto": Quality shows the tier this device runs
-    registerGraphicsControl({ id: 'tier', section: 'advanced', order: 10, build: (scope) => pick(scope, s('s_1b2c08a8733d'), [['phone', s('s_63dceb8800b2')], ['desktop', s('s_9bd88f2485ac')]],
-      () => { const saved = savedSetting('tier'); return saved === 'auto' ? automaticTier : saved; }, (v) => { if (v === 'phone' || v === 'desktop') saveSetting('tier', v); }) }),
+    { id: 'tier', section: 'advanced', order: 10, build: (scope) => pick(scope, s('s_1b2c08a8733d'), [['phone', s('s_63dceb8800b2')], ['desktop', s('s_9bd88f2485ac')]],
+      () => { const saved = savedSetting('tier'); return saved === 'auto' ? automaticTier : saved; }, (v) => { if (v === 'phone' || v === 'desktop') saveSetting('tier', v); }) },
     // a desktop's boot-time render scale and AA, as the built-ins had them; a phone has Pixel density and Anti-aliasing instead
-    registerGraphicsControl({ id: 'scale', section: 'advanced', order: 20, when: () => !phone(), build: (scope) => pick(scope, s('s_2dee7435d0fe'),
+    { id: 'scale', section: 'advanced', order: 20, when: () => !phone(), build: (scope) => pick(scope, s('s_2dee7435d0fe'),
       [['1', s('s_aa23e5562422')], ['1.25', s('s_dfbe15a4b4a5')], ['1.5', s('s_79105e58c657')], ['2', s('s_d1ce94426019')], ['native', s('s_d509e4938852')], ['auto', s('s_0286249762f7')]], () => gfxPrefs.dpr,
-      (v) => { if (v === 'auto' || v === '1' || v === '1.25' || v === '1.5' || v === '2' || v === 'native') { gfxPrefs.dpr = v; saveGfxPrefs(); } }) }),
-    registerGraphicsControl({ id: 'aa', section: 'advanced', order: 30, when: () => !phone(), build: (scope) => pick(scope, s('s_c77c3af22c64'),
+      (v) => { if (v === 'auto' || v === '1' || v === '1.25' || v === '1.5' || v === '2' || v === 'native') { gfxPrefs.dpr = v; saveGfxPrefs(); } }) },
+    { id: 'aa', section: 'advanced', order: 30, when: () => !phone(), build: (scope) => pick(scope, s('s_c77c3af22c64'),
       [['on', s('s_130011756125')], ['off', s('s_ca7981b46ecf')], ['auto', s('s_0286249762f7')]], () => gfxPrefs.aa,
-      (v) => { if (v === 'auto' || v === 'on' || v === 'off') { gfxPrefs.aa = v; saveGfxPrefs(); } }) }),
+      (v) => { if (v === 'auto' || v === 'on' || v === 'off') { gfxPrefs.aa = v; saveGfxPrefs(); } }) },
   ];
-  return () => { for (const off of offs) off(); };
 }

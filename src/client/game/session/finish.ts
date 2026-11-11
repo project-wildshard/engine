@@ -99,6 +99,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   if (ctx.gridLive !== null) {
     const grid = ctx.gridLive;
     // GPU/background own the same checkpoint port above; New game captured it before resetting and suppresses stale saves.
+    // An explicit reload and a Settings reload (SR12) capture a planned reload here; only `reload` then returns to the title.
     registerBeforeReload(game.levelScope, reason => {
       if (reason === 'new-game' || reason === 'gpu' || reason === 'background') return true;
       const saved = grid.prepareRecovery('reload');

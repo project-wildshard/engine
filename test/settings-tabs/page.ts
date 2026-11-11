@@ -16,6 +16,8 @@ import { gfxPrefs } from '../../src/client/engine/core/tier';
 import { graphicsMode } from '../../src/client/engine/core/graphicsMode';
 import { isDev } from '../../src/client/engine/core/devMode';
 import { registerGraphicsControl } from '../../src/client/engine/ui/graphicsControls';
+import { openBootSettings } from '../../src/client/engine/ui/BootSettings';
+import { reviewUnlocked } from '../../src/client/engine/ui/review';
 
 installAssetTables({ bytes: {}, versions: {}, music: {}, sfx: {}, packs: {} });
 const owner = new Scope('settings-proof');
@@ -26,5 +28,8 @@ const menu = withOwner(owner, () => new GameMenu({ levelName: 'Driftwood Isle', 
 // the game's own section (its shard save cards, G83), as savesSettings.ts adds it
 const cards = document.createElement('div'); cards.className = 'ws-gmenu-row'; cards.dataset['proof'] = 'saveCards'; cards.textContent = 'Shard save cards';
 menu.addSettingsSection('saves.game', [cards], { first: true });
-Object.assign(window, { __settings: { menu, held, getSetting, getNumber, savedSetting, getMusicStyle, gfxPrefs, graphicsMode, isDev, registerGraphicsControl } });
+// SR13: the composer System ▸ Feedback opens (the game's Feedback.mountTab draws into the slot it's handed)
+let composed = 0;
+menu.onFeedbackTab = (slot) => { composed++; const c = document.createElement('div'); c.dataset['proof'] = 'composer'; c.textContent = 'Composer'; slot.replaceChildren(c); };
+Object.assign(window, { __settings: { menu, held, getSetting, getNumber, savedSetting, getMusicStyle, gfxPrefs, graphicsMode, isDev, registerGraphicsControl, openBootSettings, reviewUnlocked, composed: () => composed } });
 (window as unknown as { settingsReady: boolean }).settingsReady = true;

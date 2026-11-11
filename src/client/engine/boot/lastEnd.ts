@@ -64,8 +64,9 @@ export interface LastEnd {
   /** Explicit RELOAD returns to the title; GPU/background recovery is separate. */
   reload?: true;
 }
-/** Content supplies persistence at explicit reload boundaries, never at ordinary navigation. */
-export type ReloadReason = 'reload' | 'gpu' | 'background' | 'new-game';
+/** Content supplies persistence at explicit reload boundaries, never at ordinary navigation. `settings`: a Settings pick
+ *  reloads back into the world where the player stands (SETTINGS-REDESIGN SR12); unlike `reload` it does not return to the title. */
+export type ReloadReason = 'reload' | 'settings' | 'gpu' | 'background' | 'new-game';
 
 /** `<sha>-<stamp>` → the sha, else the stamp (a Vercel CLI build has no commit): the build pill's short id (src/client/engine/ui/Update.ts) */
 const build = (): string => { try { const [sha = '', time = ''] = __BUILD_ID__.split('-'); return sha.length >= 7 ? sha : time; } catch { return ''; } };

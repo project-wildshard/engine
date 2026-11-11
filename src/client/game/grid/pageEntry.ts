@@ -140,7 +140,7 @@ export function bootPageMode(slug: string): PageMode {
     const road = recovery?.road ?? safeGridRecovery(assembly, Date.now()).road;
     // The live session replaces this initial capture once it owns real position/save state.
     // A stale product or module can request a planned reload before that session exists.
-    registerBeforeReload(pageScope, reason => gridRecovery(saves).write(assembly, home, road, reason));
+    registerBeforeReload(pageScope, reason => gridRecovery(saves).write(assembly, home, road, reason === 'settings' ? 'reload' : reason)); // SR12: a Settings reload continues play
   }
   if (mode === 'grid' && typeof history !== 'undefined') {
     try { history.replaceState(history.state, '', new URL(location.pathname, location.origin)); } catch { /* a sandboxed frame: the URL stays */ }

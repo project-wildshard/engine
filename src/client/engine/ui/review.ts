@@ -7,7 +7,7 @@ import { apiUrl } from '../core/apiOrigin';
 // src/client/engine/ui/Feedback.ts; the server is api/inbox.ts; notes come down with `pnpm inbox:pull`.
 //
 //   await unlockReview(pw)   → 'ok' | 'bad' | 'offline'    (POST { check: true }; a good password is remembered)
-//   reviewUnlocked() / lockReview() / quickNote() / setQuickNote(on) / onReview(fn)   → the Settings REVIEW row + FEEDBACK tab
+//   reviewUnlocked() / lockReview() / quickNote() / setQuickNote(on) / onReview(fn)   → Settings ▸ System ▸ Review and its Feedback row (SR13)
 //   await sendNote({ note, category, context, screenshot })   → { id } | 'queued' | 'locked'
 //   queuedCount() / flushQueue()   → a failed send waits in localStorage and retries on `online` and on the next send
 //

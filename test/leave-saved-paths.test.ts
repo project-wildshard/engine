@@ -52,7 +52,7 @@ const paths: readonly (readonly [string, (at: ReturnType<typeof page>) => () => 
     return () => { reload(null); };
   }],
   ['the reload prompt', at => {
-    const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [] });
+    const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [], currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', setTitleArrival: () => undefined });
     return () => { reload(); };
   }],
   ['the error modal\'s reload here', at => {
@@ -77,16 +77,40 @@ test.each(paths)('%s leaves only once the save lands', async (_name, make) => {
   expect(at.went).not.toEqual([]);
 });
 
-test('the menu\'s apply and reload leaves only once the save lands', async () => {
-  const source = readFileSync('src/client/engine/ui/BootSettings.ts', 'utf8'), start = source.indexOf('listenTap(scope, apply, () => {'), end = source.indexOf('\n  const closeBtn', start);
-  if (start === -1 || end < start) throw new Error('Missing the apply tap');
-  const at = page(), session = held();
-  const ports = { ...marks, ...cover, leaveSaved, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [], scope: null, apply: null, debug: null, developerTools: null, listenTap: (_scope: unknown, _button: unknown, run: () => void) => { run(); } };
-  runInNewContext(stripTypeScriptTypes(source.slice(start, end)), ports);
-  await settle();
-  expect(session.asked()).toBe(1); expect(at.went).toEqual([]);
-  session.land(); await settle();
-  expect(at.went).toEqual(['reload']);
+test('SR12: Settings ▸ Reload now from a world comes back in the same shard where the player stands', async () => {
+  const at = page(), session = held(), arrivals: unknown[] = [], reasons: string[] = [];
+  const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href,
+    TITLE_SKIPPERS: [], currentPose: () => ({ x: 12.345, y: 7, z: -3, yaw: 1.5, pitch: 0.25 }), terrainDatum: () => 2, RELOAD_PARAM: 'glreload',
+    setTitleArrival: (arrival: unknown, options: unknown) => { arrivals.push([arrival, options]); }, __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
+  reload(); await settle(); session.land(); await settle();
+  expect(at.went).toHaveLength(1);
+  const went = new URL(at.went[0] ?? '');
+  expect(went.searchParams.get('chunk')).toBe('fixture');
+  expect(went.searchParams.get('at')).toBe('12.35,5,-3,1.5,0.25'); // y in the level's authored frame (less the datum)
+  expect(went.searchParams.get('glreload')).toBe('1'); expect(went.searchParams.has('v')).toBe(false);
+  expect(reasons, 'a settings reload, not an explicit RELOAD (which returns to the title)').toEqual(['settings']);
+  expect(arrivals, 'an online build carries the tap that seated it (QA row 16)').toEqual([[{ slug: 'fixture', mode: 'enter' }, { tab: true }]]);
+});
+
+test('SR12: a grid page (no ?chunk=) reloads on its bare address and resumes from its planned-reload record', async () => {
+  const at = page(), session = held(), reasons: string[] = [];
+  const location = { ...at.location, href: 'https://example.test/' };
+  const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location, settingsReloadUrl: (href: string) => href,
+    TITLE_SKIPPERS: [], currentPose: () => ({ x: 1, y: 2, z: 3, yaw: 0, pitch: 0 }), terrainDatum: () => 0, RELOAD_PARAM: 'glreload',
+    setTitleArrival: () => { throw new Error('a grid page hands no shard tap'); }, __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
+  reload(); await settle(); session.land(); await settle();
+  expect(at.went).toEqual(['https://example.test/']); expect(reasons).toEqual(['settings']);
+});
+
+test('a reload from the title (no world, no pose) lands on the title', async () => {
+  const at = page(), session = held(), reasons: string[] = [];
+  const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href,
+    TITLE_SKIPPERS: [], currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', setTitleArrival: () => undefined,
+    markReload: (_: string, reason: string) => { reasons.push(reason); } });
+  reload(); await settle(); session.land(); await settle();
+  expect(reasons).toEqual(['reload']);
+  const went = new URL(at.went[0] ?? '');
+  expect(went.searchParams.has('at')).toBe(false); expect(went.searchParams.has('glreload')).toBe(false);
 });
 
 test('a second way out goes the same way, and a save that never lands holds nobody past the wait', async () => {

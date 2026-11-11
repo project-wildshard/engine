@@ -24,8 +24,9 @@ const button = (scope: Scope, text: string, run: () => void): HTMLButtonElement 
 };
 /** The progress file (export / import, the corrupt copies) for Settings ▸ Saves; `system` holds the rows Settings ▸ System
  *  shows (J245): Check connection, the build, and Offline play when the game installed its download. */
-export function buildSavePanel(): HTMLDivElement & { refresh: () => void; system: readonly HTMLElement[] } {
-  const scope = (app.levelScope ?? currentOwner() ?? app.engineScope).child('save-panel');
+export function buildSavePanel(owner?: Scope): HTMLDivElement & { refresh: () => void; system: readonly HTMLElement[] } {
+  // `owner`: the title's Settings (SR11) outlives any level, so its rows belong to its own page scope
+  const scope = (owner ?? app.levelScope ?? currentOwner() ?? app.engineScope).child('save-panel');
   const card = document.createElement('div'); card.className = 'ws-gmenu-card';
   const title = document.createElement('div'); title.className = 'ws-gmenu-cardtitle'; title.textContent = strings.title;
   const note = document.createElement('div'); note.className = 'ws-gmenu-note'; note.textContent = strings.note;

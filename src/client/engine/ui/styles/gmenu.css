@@ -402,3 +402,5 @@
 .ws-gmenu .ws-gmenu-segbtn.indicator.active { opacity: 1; color: #ffc56b; border-color: #ffc56b; background: rgba(255, 197, 107, 0.12); }
 .ws-gmenu .ws-gmenu-svreload { border-color: rgba(255, 196, 120, 0.45); }
 .ws-gmenu.ws-gmenu-svmenu .ws-gmenu-bar .ws-gmenu-title { letter-spacing: 0.1em; }
+/* SR13: the feedback composer opens from System ▸ Feedback; its back bar returns there */
+.ws-gmenu .ws-gmenu-fbback { display: block; margin: 0 0 12px; }

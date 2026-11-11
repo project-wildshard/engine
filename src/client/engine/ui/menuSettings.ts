@@ -16,9 +16,11 @@ import { foldCard } from './cards';
 import { buildDebugMenu, type DebugMenu } from './DebugMenu';
 import { buildMusicStyleRow } from './musicStyleRow';
 import { buildSettingsTabs, touchRows, type SettingsGroup, type SettingsTabsView } from './settingsTabs';
+import type { GraphicsControl } from './graphicsControls';
 
 export interface SettingsCtx { weapons: ReadonlySet<string>; melee: boolean; tracers: boolean; huntersEye: boolean; chunk: LevelSpec }
-type When = (context: SettingsCtx) => boolean;
+/** a gated row's test: what you hold (no row reads the shard, so the title can ask it too) */
+type When = (context: Omit<SettingsCtx, 'chunk'>) => boolean;
 export interface MenuSettingsState {
   tabs: SettingsTabsView | undefined;
   gated: {el: HTMLElement; when: When}[];
@@ -33,6 +35,12 @@ export interface MenuSettingsHost {
   readonly panel: HTMLElement;
   readonly hint: HTMLElement;
   readonly tab: () => string;
+  /** SR13: System ▸ Feedback opens the composer (the menu's feedback panel); absent, no Feedback row */
+  readonly openFeedback?: () => void;
+  /** SR11: the title's Settings: the same tabs, without the in-game-only rows (Review; the weapon rows stay gated off) */
+  readonly title?: boolean;
+  /** Graphics controls of this menu's own (settingsTabs.ts SettingsTabsOptions.graphics) */
+  readonly graphics?: readonly GraphicsControl[];
 }
 
 const el = (cls: string, html = '', tag = 'div'): HTMLElement => { const e = document.createElement(tag); e.className = cls; if (html) e.innerHTML = html; return e; };
@@ -41,7 +49,7 @@ const el = (cls: string, html = '', tag = 'div'): HTMLElement => { const e = doc
  *  you hold, Android's vibration) are gated: hidden, not greyed, re-read on every open (Menu.applies). */
 export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsState): void {
     const applyPending = (): void => { state.debug?.applyPending(); state.developerTools?.applyPending(); };
-    const tabs = buildSettingsTabs(host.scope, { applyPending }); state.tabs = tabs;
+    const tabs = buildSettingsTabs(host.scope, { applyPending, ...(host.graphics === undefined ? {} : { graphics: host.graphics }) }); state.tabs = tabs;
     host.panel.append(tabs.root);
     const put = (group: SettingsGroup, ...rows: (HTMLElement | [When, HTMLElement])[]): void => {
       tabs.put(group, rows.map((r) => { if (Array.isArray(r)) { state.gated.push({ el: r[1], when: r[0] }); return r[1]; } return r; }));
@@ -94,15 +102,16 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     put('controls.aim', sw('aimAssist', engineString('s_714896153134')), [(c) => c.huntersEye, sw('huntersEye', engineString('s_80f6259cced8'))],
       [(c) => c.tracers, sw('tracers', engineString('s_702cb41e280a'))]); // NALATI-MERGE F7: the bow draws no tracers
     put('controls.touch', ...touchRows(host.scope, applyPending), [() => CAN_VIBRATE, sw('haptics', engineString('s_59e1fd02f6c2'))]); // vibrate: Android only
-    state.controlsPanel = buildControlsPanel(app.levelScope ?? app.engineScope); put('controls.keys', state.controlsPanel);
+    // the title's panel outlives a level, so it owns its key bindings
+    state.controlsPanel = buildControlsPanel(host.title === true ? host.scope : (app.levelScope ?? app.engineScope)); put('controls.keys', state.controlsPanel);
 
     // ── SAVES: the game's shard cards (addSettingsSection('saves.game')), then the progress file ──
-    state.savePanel = buildSavePanel(); put('saves.file', state.savePanel);
+    state.savePanel = buildSavePanel(host.title === true ? host.scope : undefined); put('saves.file', state.savePanel);
 
     // ── SYSTEM: the link, the build, offline play; Review (E140: not debug, playtesters unlock notes with it); the Developer
     //    switch; the model credit ──
     put('system.link', ...state.savePanel.system);
-    put('system.review', buildReview(host.scope));
+    if (host.title !== true) put('system.review', buildReview(host.scope, host.openFeedback));
     put('system.developer', ...devSwitchRows());
     put('system.credits', el('ws-gmenu-note', MODEL_CREDIT));
 
@@ -125,7 +134,8 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     tabs.sync();
   }
 
-function buildReview(scope: Scope): HTMLElement {
+/** Settings ▸ System ▸ Review: the password, or (unlocked) Quick note, LOCK and, SR13, the Feedback row that opens the composer */
+function buildReview(scope: Scope, openFeedback?: () => void): HTMLElement {
     const box = el('ws-gmenu-review');
     const render = (): void => {
       box.replaceChildren(el('ws-gmenu-label', engineString('s_aff0766a5290')));
@@ -157,6 +167,14 @@ function buildReview(scope: Scope): HTMLElement {
       const row = el('ws-gmenu-row', engineString('s_b39f8f67f676'));
       row.append(lock);
       box.append(sw, row, el('ws-gmenu-note', engineString('s_806c6e56a7d8')));
+      if (openFeedback !== undefined) {
+        // SR13: Feedback is a System row while the inbox is unlocked, not a second tab bar over the five tabs
+        const feedback = el('ws-gmenu-row'); feedback.dataset['setting'] = 'feedback';
+        const label = el('ws-gmenu-swlabel', '', 'span'); label.textContent = engineString('s_st_feedback');
+        const open = el('ws-gmenu-unlock', '', 'button') as HTMLButtonElement; open.type = 'button'; open.textContent = engineString('s_st_feedback_open');
+        listenTap(scope, open, openFeedback);
+        feedback.append(label, open); box.append(feedback);
+      }
     };
     render(); onReview(render);
     return box;
