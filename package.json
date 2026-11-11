@@ -538,6 +538,7 @@
     "./net/measurements": "./src/shared/engine/net/measurements.ts",
     "./net/messages": "./src/shared/engine/net/messages.ts",
     "./net/netPlayer": "./src/client/engine/net/netPlayer.ts",
+    "./net/voiceNear": "./src/client/engine/net/voiceNear.ts",
     "./net/predictionWorld": "./src/client/engine/net/predictionWorld.ts",
     "./net/netSchemas": "./src/shared/engine/net/netSchemas.ts",
     "./net/acts": "./src/shared/engine/net/acts.ts",

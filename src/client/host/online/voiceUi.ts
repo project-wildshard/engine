@@ -42,6 +42,8 @@ const CSS = `
 #ws-voice-peers button[data-muted=true] span{color:#7d8d9c;text-decoration:line-through}
 #ws-voice-peers button[data-muted=true] em{color:${RED};border-color:rgba(255,122,122,.5)}
 #ws-voice-peers button[data-linked=false]{opacity:.6}
+#ws-voice-peers button[data-far=true]{opacity:.6}
+#ws-voice-peers button[data-far=true] span::after{content:' · too far';color:#7d8d9c;font-weight:500}
 #ws-voice-tip[hidden],#ws-voice-peers[hidden]{display:none}
 `;
 const MIC = '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
@@ -118,7 +120,7 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
       held = { chip, label, action }; chips.set(peer.id, held);
     }
     const { chip, label, action } = held;
-    chip.dataset['speaking'] = String(peer.speaking); chip.dataset['muted'] = String(peer.muted); chip.dataset['linked'] = String(peer.linked);
+    chip.dataset['speaking'] = String(peer.speaking); chip.dataset['muted'] = String(peer.muted); chip.dataset['linked'] = String(peer.linked); chip.dataset['far'] = String(peer.far);
     chip.title = peer.muted ? `Unmute ${peer.name}` : `Mute ${peer.name}`;
     label.textContent = peer.name; action.textContent = peer.muted ? 'Muted' : 'Mute';
     chip.setAttribute('aria-pressed', String(peer.muted));

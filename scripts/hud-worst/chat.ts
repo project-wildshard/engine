@@ -18,7 +18,7 @@ function mount(lines: readonly (readonly [string, string])[], state: VoiceChat['
     onChat: (fn: Say): (() => void) => { heard.push(fn); return () => undefined; },
     say: (): void => undefined, report: (): void => undefined,
   } as unknown as NetClient;
-  const roster = new Map<string, VoicePeer>(peers.map((name, i) => [`p${String(i)}`, { id: `p${String(i)}`, name, speaking: i === 0, muted: i === 2, linked: true }]));
+  const roster = new Map<string, VoicePeer>(peers.map((name, i) => [`p${String(i)}`, { id: `p${String(i)}`, name, speaking: i === 0, muted: i === 2, linked: true, far: false }]));
   const voice = {
     state, speaking: true, level: 0.6, roster,
     onChange: (): (() => void) => () => undefined,

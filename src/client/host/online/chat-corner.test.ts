@@ -107,7 +107,7 @@ test('QA row 43: the open chat sends and stays open; an empty Enter closes it; k
 });
 
 test('QA row 43: the players on voice are a list in the open chat with mute and the speaking glow; Report works there', () => {
-  const peers: VoicePeer[] = [{ id: 'p0', name: 'Maren', speaking: true, muted: false, linked: true }, { id: 'p1', name: 'Kai', speaking: false, muted: true, linked: true }];
+  const peers: VoicePeer[] = [{ id: 'p0', name: 'Maren', speaking: true, muted: false, linked: true, far: false }, { id: 'p1', name: 'Kai', speaking: false, muted: true, linked: true, far: false }];
   const { box, field, say, reported, muted } = corner(peers);
   const list = box.querySelector<HTMLElement>('#ws-voice-peers');
   expect(list?.hidden).toBe(false);
