@@ -14,7 +14,7 @@
 //   8. Delete origin's plan branch and remove this worktree (--keep skips it).
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
-import {appendFileSync,existsSync,linkSync,mkdirSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -69,11 +69,11 @@ export function parseArgs(argv){
  * @param {unknown} data @param {string} sha */
 export function shaVerdict(data,sha){
  const runs=data!==null&&typeof data==='object'&&'workflow_runs'in data&&Array.isArray(data.workflow_runs)?data.workflow_runs:[];
- /** @type {Record<string,{id:number,status:string,conclusion:string|null,branch:string,url:string}>} */const latest={};
+ /** @type {Record<string,{id:number,status:string,conclusion:string|null,branch:string,url:string,attempt:number}>} */const latest={};
  for(const run of runs){
   if(run===null||typeof run!=='object'||run.head_sha!==sha||run.event!=='push'||typeof run.id!=='number'||!LAND_WORKFLOWS.includes(run.name))continue;
   const current=latest[run.name];
-  if(current===undefined||run.id>current.id)latest[run.name]={id:run.id,status:String(run.status),conclusion:run.conclusion===null||run.conclusion===undefined?null:String(run.conclusion),branch:String(run.head_branch??''),url:String(run.html_url??'')};
+  if(current===undefined||run.id>current.id)latest[run.name]={id:run.id,status:String(run.status),conclusion:run.conclusion===null||run.conclusion===undefined?null:String(run.conclusion),branch:String(run.head_branch??''),url:String(run.html_url??''),attempt:Number.isSafeInteger(run.run_attempt)?Number(run.run_attempt):1};
  }
  const rows=LAND_WORKFLOWS.map(name=>({name,run:latest[name]}));
  const state=rows.some(row=>row.run===undefined||row.run.status!=='completed')?'pending':rows.every(row=>row.run?.conclusion==='success')?'green':'red';
@@ -114,11 +114,70 @@ function runFailures(repo,id){
 
 const sleep=(/** @type {number} */ ms)=>new Promise(_resolve=>{setTimeout(_resolve,ms);});
 
+// TEST-SPEED TS10 (J255): a hosted red whose only failures are test files gets one re-run of its failed jobs. If the
+// re-run is green, each of those files takes a strike in the machine's strike book; a file with strikes from two
+// different plans within 24 h is quarantined under J200 (two days, owned by the standing TEST-SPEED lane) by a
+// commit land adds to the plan before its main push. A red re-run stops land as before: it blocks only its plan.
+const STRIKE_WINDOW_MS=24*60*60*1000,QUARANTINE_MS=48*60*60*1000;
+/** The test files a packed ci run's shard reports name as failed or over the 60 s file budget, from its
+ * downloaded `engine-ci-*` artifacts. Empty when a failure was not a test file (lint, a unit, a shard wall).
+ * @param {string} directory @returns {string[]} */
+export function flakyFiles(directory){
+ /** @type {Set<string>} */const files=new Set();
+ /** @param {string} at */
+ const walk=at=>{
+  /** @type {import('node:fs').Dirent[]} */let rows=[];
+  try{rows=readdirSync(at,{withFileTypes:true});}catch{return;}
+  for(const row of rows){
+   const path=join(at,row.name);
+   if(row.isDirectory()){walk(path);continue;}
+   if(!/^shard-\d+-(?:native|ordinary)\.json$/u.test(row.name))continue;
+   try{
+    const report=/** @type {unknown} */(JSON.parse(readFileSync(path,'utf8')));
+    const list=report!==null&&typeof report==='object'&&'files'in report&&Array.isArray(report.files)?report.files:[];
+    for(const file of list){
+     if(file===null||typeof file!=='object'||typeof file.file!=='string')continue;
+     if(file.state==='failed'||(typeof file.durationMs==='number'&&file.durationMs>60_000))files.add(file.file);
+    }
+   }catch{/* An unreadable report names nothing. */}
+  }
+ };
+ walk(directory);
+ return [...files].sort();
+}
+/** The plans with a strike on `file` in the 24 h before `now`, from strike-book rows (one JSON object per line).
+ * @param {string} book @param {string} file @param {number} now @returns {string[]} */
+export function strikePlans(book,file,now){
+ /** @type {Set<string>} */const plans=new Set();
+ for(const line of book.split('\n')){
+  if(line.trim()==='')continue;
+  try{
+   const row=/** @type {unknown} */(JSON.parse(line));
+   if(row===null||typeof row!=='object'||!('file'in row)||row.file!==file||!('plan'in row)||typeof row.plan!=='string'||!('at'in row)||typeof row.at!=='string')continue;
+   const at=Date.parse(row.at);
+   if(Number.isFinite(at)&&at<=now&&now-at<STRIKE_WINDOW_MS)plans.add(row.plan);
+  }catch{/* A torn line is skipped. */}
+ }
+ return [...plans].sort();
+}
+/** Add a J200 quarantine entry for `file` unless one is already there; false when it was.
+ * @param {string} path test/quarantine.json @param {string} file @param {string} owner @param {string} reason @param {number} now */
+export function quarantineFile(path,file,owner,reason,now){
+ const data=/** @type {{entries:{file:string}[]}} */(JSON.parse(readFileSync(path,'utf8')));
+ if(!Array.isArray(data.entries))throw new Error('test/quarantine.json has no entries list');
+ if(data.entries.some(entry=>entry.file===file))return false;
+ data.entries.push({file,owner,addedAt:new Date(now).toISOString(),deadline:new Date(now+QUARANTINE_MS).toISOString(),reason});
+ writeFileSync(path,`${JSON.stringify(data,null,2)}\n`);
+ return true;
+}
+
 /** One landing, start to finish, for the worktree at `cwd`. */
 class Landing{
  /** @param {string} cwd @param {ReturnType<typeof parseArgs>} options @param {NodeJS.ProcessEnv} env */
  constructor(cwd,options,env){
   this.options=options;this.env=env;this.started=Date.now();
+  /** @type {{file:string,plans:string[],run:number}[]} */this.pendingQuarantine=[];
+  /** @type {string[]} */this.quarantined=[];
   this.lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'land';
   const inside=tryGit(cwd,['rev-parse','--show-toplevel']);
   if(inside.status!==0)throw new StopError('not inside a git checkout');
@@ -242,7 +301,8 @@ class Landing{
  verifyReplay(main,tested){
   const merged=tryGit(this.root,['merge-tree','--write-tree','--name-only','--no-messages',main,tested]);
   const [tree='',...conflicted]=merged.stdout.split('\n').map(line=>line.trim()).filter(Boolean);
-  const same=SHA.test(tree)&&merged.status===0&&conflicted.length===0&&tryGit(this.root,['diff','--quiet',tree,'HEAD']).status===0;
+  const excluded=this.quarantined.length===0?[]:[':(exclude)test/quarantine.json'];
+  const same=SHA.test(tree)&&merged.status===0&&conflicted.length===0&&tryGit(this.root,['diff','--quiet',tree,'HEAD','--','.',...excluded]).status===0;
   if(same)return;
   this.receipt(`STOP rebased ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)}`);
   throw new StopError(`after the rebase, ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)}: a commit or edit came in during the land. Check git log, keep what you meant, and run land again; a new commit gets its own branch CI.`);
@@ -281,6 +341,55 @@ class Landing{
 
  /** The local branch reached `tip`: some reflog entry of it is `tip` or a descendant (the newest 200).
   * @param {string} tip */
+ /** TS10: re-run a red ci run's failed jobs once when every failure is a test file; on a green re-run, give each
+  * file a strike and queue a quarantine for one with strikes from two plans in 24 h.
+  * @param {string} sha @param {Awaited<ReturnType<Landing['waitCI']>>} verdict @returns {Promise<Awaited<ReturnType<Landing['waitCI']>>|null>} */
+ async retryFlaky(sha,verdict){
+  const run=verdict.runs['ci'];
+  if(run===undefined||run.conclusion!=='failure'||run.attempt>1)return null;
+  mkdirSync(join(this.root,'tmp'),{recursive:true});
+  const scratch=mkdtempSync(join(this.root,'tmp','land-flaky-'));
+  let files=[];
+  try{
+   const fetched=spawnSync('gh',['run','download',String(run.id),'-R',this.repo,'-p','engine-ci-*','-D',scratch],{encoding:'utf8',timeout:120_000});
+   if(fetched.status===0)files=flakyFiles(scratch);
+  }finally{rmSync(scratch,{recursive:true,force:true});}
+  if(files.length===0)return null;
+  this.say('flaky',`ci run ${run.id} red on ${files.join(', ')}; re-running its failed jobs once (TS10)`);
+  const rerun=spawnSync('gh',['run','rerun',String(run.id),'-R',this.repo,'--failed'],{encoding:'utf8',timeout:60_000});
+  if(rerun.status!==0){this.say('flaky',`re-run refused (${`${rerun.stderr}`.trim().split('\n').at(-1)??''}); stopping as red`);return null;}
+  await sleep(this.options.pollSeconds*1000);
+  const again=await this.waitCI(sha,`${this.branch} re-run`);
+  if(again.state!=='green'){this.receipt(`TS10 re-run of ci ${run.id} red again on ${files.join(', ')}: not flaky; blocks only ${this.branch}`);return again;}
+  const book=resolve(this.env.WS_FLAKE_STRIKES??join(homedir(),'.cache/wildshard/flake-strikes.jsonl')),now=Date.now();
+  mkdirSync(dirname(book),{recursive:true});
+  for(const file of files){
+   appendFileSync(book,`${JSON.stringify({at:new Date(now).toISOString(),file,plan:this.branch,sha,run:run.id,lane:this.lane})}\n`);
+   const plans=strikePlans(readFileSync(book,'utf8'),file,now);
+   this.receipt(`TS10 strike: ${file} flaky on ci ${run.id} (red, then green on its re-run); plans with a strike in 24 h: ${plans.join(', ')}`);
+   if(plans.length>=2)this.pendingQuarantine.push({file,plans,run:run.id});
+  }
+  return again;
+ }
+
+ /** TS10: commit the queued quarantine entries on this plan branch; true when a commit was made. */
+ quarantineCommit(){
+  if(this.pendingQuarantine.length===0)return false;
+  const path=join(this.root,'test/quarantine.json'),added=[],now=Date.now();
+  for(const {file,plans,run} of this.pendingQuarantine.splice(0)){
+   const reason=`TS10 (J255): flaky on hosted CI, red then green on its re-run, with strikes from ${plans.join(' and ')} within 24 h (last: ci run ${run}); J200 deadline`;
+   if(quarantineFile(path,file,this.env.WS_QUARANTINE_OWNER??'opus-testspeed-lane',reason,now))added.push(file);
+  }
+  if(added.length===0)return false;
+  const message=`test: quarantine ${added.length===1?added[0]?.replace(/^.*\//u,'').replace(/\.test\.[cm]?[jt]s$/u,''):`${added.length} flaky files`}\n\nTEST-SPEED TS10 (J255): strikes from two plans within 24 h. Land added\nthis entry; it expires in 48 h (J200) and the TEST-SPEED lane owns it.\n\nAssisted-by: land:ts10-strikes`;
+  const committed=tryGit(this.root,['commit','--quiet','-m',message,'--','test/quarantine.json']);
+  if(committed.status!==0)throw new StopError(`TS10 quarantine commit failed: ${committed.stderr.trim()}`);
+  this.expected=this.head();this.quarantined.push(...added);
+  this.say('quarantine',`${added.join(', ')} quarantined for 48 h on ${this.branch} ${short(this.expected)} (TS10: two plans' strikes in 24 h)`);
+  this.receipt(`TS10 quarantined ${added.join(', ')} (commit ${short(this.expected)})`);
+  return true;
+ }
+
  reached(tip){
   const entries=tryGit(this.root,['reflog','show','--format=%H','-n','200',`refs/heads/${this.branch}`]).stdout.split('\n').filter(line=>SHA.test(line));
   return [...new Set(entries)].some(entry=>entry===tip||isAncestor(this.root,tip,entry));
@@ -347,8 +456,12 @@ class Landing{
    if(needHosted){
     const sha=this.holds('before the branch push');
     this.pushPlan(sha);
-    const verdict=await this.waitCI(sha,this.branch);
+    let verdict=await this.waitCI(sha,this.branch);
     this.holds('while hosted CI ran');
+    if(verdict.state==='red'){
+     const retried=await this.retryFlaky(sha,verdict);
+     if(retried!==null){verdict=retried;this.holds('while the re-run ran');}
+    }
     if(verdict.state!=='green'){
      const failed='failed'in verdict?verdict.failed:[];
      this.receipt(`STOP hosted CI red for ${short(sha)}: ${failed.join(' | ')}`);
@@ -356,6 +469,7 @@ class Landing{
     }
     tested={sha,base:git(this.root,['merge-base',sha,'refs/remotes/origin/main'])};
     needHosted=false;rule='exact';why='main had not moved since the hosted run';
+    if(this.quarantineCommit()){rule='carried';why=`TS10 quarantine on top of the branch's green run ${short(sha)}: it only adds test/quarantine.json entries`;}
    }
    if(tested===null)throw new Error('unreachable: no hosted-tested SHA');
    main=this.fetchMain();
