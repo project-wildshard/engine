@@ -167,10 +167,13 @@ make_caddy() {
   local policy=/usr/sbin/policy-rc.d saved=/usr/sbin/policy-rc.d.wildshard-saved status=0
   apt_update
   if [ -e "$policy" ] || [ -L "$policy" ]; then mv -f -- "$policy" "$saved"; fi
+  # Put the box's policy back however this ends, an interrupt included.
+  trap 'rm -f -- /usr/sbin/policy-rc.d; if [ -e /usr/sbin/policy-rc.d.wildshard-saved ] || [ -L /usr/sbin/policy-rc.d.wildshard-saved ]; then mv -f -- /usr/sbin/policy-rc.d.wildshard-saved /usr/sbin/policy-rc.d; fi' EXIT INT TERM
   printf '#!/bin/sh\nexit 101\n' > "$policy"; chmod 755 "$policy"
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy || status=$?
   rm -f -- "$policy"
   if [ -e "$saved" ] || [ -L "$saved" ]; then mv -f -- "$saved" "$policy"; fi
+  trap - EXIT INT TERM
   if [ "$status" != 0 ]; then say stop 'Cannot install caddy'; exit 1; fi
 }
 step 'caddy, installed and not started' have_caddy make_caddy

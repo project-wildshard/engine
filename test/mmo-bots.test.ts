@@ -78,5 +78,14 @@ test('every bot leaves with the leave flag, so no held body keeps a staging seat
 test('the replica is stopped on every way out: the end, an error, or a signal', () => {
   expect(driver).toMatch(/\} finally \{\n {2}await stopRoom\(\);/u);
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) expect(driver).toContain(`'${signal}'`);
-  expect(driver).toContain("process.once('exit', () => { room?.kill('SIGKILL'); });");
+  expect(driver).toContain("process.once('exit', () => { for (const child of [botsChild, room]) if (child !== null && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); });");
+  // One stop that every caller waits on, and `room` is never cleared before its process has gone.
+  expect(driver).toContain('stopping ??= (async () => {');
+  // The bots go first, and leave their seats when told to stop.
+  expect(driver.indexOf('players.kill(\'SIGTERM\')')).toBeLessThan(driver.indexOf('running.kill(\'SIGTERM\')'));
+  expect(driver).toContain('botsChild = child;');
+  expect(entry).toContain('process.once(signal, () => {');
+  expect(entry.split("walker.bot.transport.control('ready', new Uint8Array([LEAVE_FLAG]).buffer)").length - 1).toBe(2);
+  expect(driver).not.toMatch(/(?<!let )room = null;/u);
+  expect(driver).toContain("[['SIGINT', 130], ['SIGHUP', 129], ['SIGTERM', 143]]");
 });

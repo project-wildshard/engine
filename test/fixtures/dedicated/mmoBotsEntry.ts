@@ -47,6 +47,13 @@ function withAddress<T>(index: number, make: () => T): T {
   try { return make(); } finally { globalThis.WebSocket = Native; }
 }
 const walkers: Walker[] = [], started = performance.now();
+// Told to stop (the driver's Ctrl-C, or a kill): every bot leaves its seat at once, then the process goes.
+for (const [signal, code] of [['SIGINT', 130], ['SIGHUP', 129], ['SIGTERM', 143]] as const) {
+  process.once(signal, () => {
+    for (const walker of walkers) { walker.bot.stop(); if (walker.bot.closed === null) walker.bot.transport.control('ready', new Uint8Array([LEAVE_FLAG]).buffer); }
+    void Promise.all(walkers.map(async walker => walker.bot.ended(5_000))).finally(() => { process.exit(code); });
+  });
+}
 for (let index = 0; index < bots; index++) {
   const bot = withAddress(index, () => new RoomBot(url, build, `device:${tag}-${String(index)}`, `Bot ${tag} ${String(index)}`)), walker: Walker = { bot, index, cursor: null, last: null, frames: 0, moved: 0, laps: 0, visitedBefore: 0, seenMax: 0, seenSamples: 0, samples: 0, stuck: 0, joinedMs: null, reason: null };
   bot.client.onFrame(() => { walker.frames++; if (walker.joinedMs === null) walker.joinedMs = Math.round(performance.now() - started); });

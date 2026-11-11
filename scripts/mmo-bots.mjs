@@ -2,7 +2,7 @@
 // MMO-PLAN MP0.4: real-socket bots from this Mac (J202), against an isolated production-shaped replica or the staging socket.
 // Never production (J205): there is no flag for it, and the bots refuse any socket but loopback and staging.
 //   node scripts/mmo-bots.mjs replica [--bots 32] [--seconds 120] [--seats 32] [--workers 4] [--cells driftwood-isle] [--database <url>]
-//   node scripts/mmo-bots.mjs staging [--bots 4] [--seconds 60]
+//   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
 // release's own commit (its tree, an offline install, build-server's `--entry`), so their build and wire are the server's.
 // `replica` runs that release's exact server bundle (downloaded, SHA-256 checked) on loopback, with production's shape: its
@@ -72,17 +72,33 @@ note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), f
 // --- The replica: the release's server bundle on loopback, production's shape, its own key and file.
 /** @type {import('node:child_process').ChildProcess | null} */
 let room = null;
-/** The replica never outlives this script: an error, Ctrl-C or a kill takes it down too. */
+/** @type {import('node:child_process').ChildProcess | null} */
+let botsChild = null;
+/** @type {Promise<void> | null} */
+let stopping = null;
+/** The replica never outlives this script: an error, Ctrl-C or a kill takes it down too. Every caller waits on the one stop,
+ * and `room` stays set until the process has gone, so the exit hook can still kill it. */
 const stopRoom = async () => {
-  const running = room; room = null;
-  if (running === null || running.exitCode !== null || running.signalCode !== null) return;
-  const gone = new Promise(done => { running.once('exit', done); });
-  running.kill('SIGTERM');
-  const force = setTimeout(() => { running.kill('SIGKILL'); }, 10_000);
-  await gone; clearTimeout(force);
+  stopping ??= (async () => {
+    // The bots first: told to stop, they leave their seats (the leave flag) before the replica goes.
+    const players = botsChild;
+    if (players !== null && players.exitCode === null && players.signalCode === null) {
+      const left = new Promise(done => { players.once('exit', done); });
+      players.kill('SIGTERM');
+      const force = setTimeout(() => { players.kill('SIGKILL'); }, 15_000);
+      await left; clearTimeout(force);
+    }
+    const running = room;
+    if (running === null || running.exitCode !== null || running.signalCode !== null) return;
+    const gone = new Promise(done => { running.once('exit', done); });
+    running.kill('SIGTERM');
+    const force = setTimeout(() => { running.kill('SIGKILL'); }, 10_000);
+    await gone; clearTimeout(force);
+  })();
+  await stopping;
 };
-for (const signal of /** @type {const} */ (['SIGINT', 'SIGTERM', 'SIGHUP'])) process.once(signal, () => { void stopRoom().finally(() => { process.exit(130); }); });
-process.once('exit', () => { room?.kill('SIGKILL'); });
+for (const [signal, code] of /** @type {const} */ ([['SIGINT', 130], ['SIGHUP', 129], ['SIGTERM', 143]])) process.once(signal, () => { void stopRoom().finally(() => { process.exit(code); }); });
+process.once('exit', () => { for (const child of [botsChild, room]) if (child !== null && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); });
 try {
 /** @type {{ players: number, p95: number, max: number, drops: number, ticksPerSecond: number, rss: number }[]} */
 const readings = [];
@@ -122,6 +138,7 @@ if (mode === 'staging') await stagingRoom('before the first hello');
 const result = join(work, 'bots.json'), playing = readings.length;
 const code = await new Promise(done => {
   const child = spawn(process.execPath, [join(out, 'mmoBots.mjs'), url, release.engineBuild, String(bots), String(seconds), tag, result, mode === 'replica' ? 'forwarded' : 'own'], { stdio: ['ignore', 'pipe', 'inherit'] });
+  botsChild = child;
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   child.on('exit', done);
 });
