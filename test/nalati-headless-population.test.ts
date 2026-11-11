@@ -109,20 +109,34 @@ test('Nalati runs its whole population headless from the product: roster, wolves
 }, 180_000);
 
 test('Nalati\'s worker runs the product\'s world: a route and its checkpoint match a resident exactly', async ({signal}) => {
-  const { directory, product, assets, resident } = await shipped();
+  // FAST-SLOW-TESTS FS1: the compiler, the worker and the resident are independent, so they run side by side rather
+  // than one after another. Every world and every check below is unchanged.
+  const compiling = compileProductWorker(undefined, signal);
+  const [loaded, compiled] = await Promise.allSettled([shipped(), compiling]);
+  if (loaded.status === 'rejected' || compiled.status === 'rejected') {
+    if (compiled.status === 'fulfilled') compiled.value.dispose();
+    throw loaded.status === 'rejected' ? loaded.reason : compiled.status === 'rejected' ? compiled.reason : new Error('unreachable');
+  }
+  const { directory, product, assets, resident } = loaded.value, prepared = compiled.value;
   const shard = product.shardfile, sections = productHeadlessSections(product), plan = { ticks: 240, points: [{ x: 0, z: 232 }, { x: 40, z: 180 }] };
   const options = { deadline: 'advisory' as const, product: directory, sections };
   // Fresh fixed code only: both workers still admit every original byte and own
   // independent worlds. Compilation and startup remain inside this case clock.
-  const prepared = await compileProductWorker(undefined, signal);
   let worker: Awaited<ReturnType<typeof prepared.create>> | undefined;
   let second: Awaited<ReturnType<typeof prepared.create>> | undefined;
   let live: TrustedHeadlessResident | undefined;
   try {
-    worker = await prepared.create(shard, assets, undefined, options);
-    live = await resident();
-    const current = live;
-    const walked = await worker.walkLeg(plan), expected = runHeadlessJourney(current.host, input => { current.step(input); }, plan);
+    const [started, opened] = await Promise.allSettled([prepared.create(shard, assets, undefined, options), resident()]);
+    if (started.status === 'fulfilled') worker = started.value;
+    if (opened.status === 'fulfilled') live = opened.value;
+    if (started.status === 'rejected') throw started.reason;
+    if (opened.status === 'rejected') throw opened.reason;
+    if (worker === undefined || live === undefined) throw new Error('unreachable');
+    const current = live, walking = worker.walkLeg(plan);
+    walking.catch(() => undefined);
+    // let the worker take its walk before this thread runs the resident's
+    await new Promise(resolve => { setImmediate(resolve); });
+    const expected = runHeadlessJourney(current.host, input => { current.step(input); }, plan), walked = await walking;
     expect(walked.final).toEqual(expected.final);
     const saved = worker.checkpoint;
     if (saved === undefined) throw new Error('The worker kept no checkpoint');
