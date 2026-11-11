@@ -8,7 +8,7 @@ import { spawnColumns } from '@wildshard/wire/spawnColumns';
 import { expect, test } from 'vitest';
 import { BitWriter } from '../src/shared/engine/net/bits';
 import type { NetRoomAct } from '../src/shared/engine/net/acts';
-import { decodeCommands, encodeCommands } from '../src/shared/engine/net/command';
+import { decodeCommands, encodeCommands, quantiseCommand } from '../src/shared/engine/net/command';
 import { decodeAct, decodeEvents, encodeAct, encodeEvents, type InitialBits, type NetEvent } from '../src/shared/engine/net/messages';
 import { fromWireAct, fromWireCommand, fromWireEvent, toWireAct, toWireCommand, toWireEvent } from '../src/shared/engine/net/wireValues';
 
@@ -106,5 +106,28 @@ test('every act form reads back through wire v1 as it does through v0', () => {
     const [record] = readMessage(bytes).records;
     if (record === undefined) throw new Error('no act record');
     expect(near(fromWireAct(decodeBody(server, { bytes, start: record.start, end: record.end }))), act.kind).toEqual(near(v0));
+  }
+});
+
+test('quantiseCommand steps exactly what the wire v1 command codec delivers: every axis word, and pitch and yaw swept', () => {
+  const local = localCodecs(), server = commandsCodec(clientTables().commandTable);
+  const through = (command: NetCommand): NetCommand => {
+    const bytes = encodeBody(local.commands, TAG_CMDS, { ackFrame: 0, commands: [toWireCommand(command, refs)] });
+    const [record] = readMessage(bytes).records;
+    if (record === undefined) throw new Error('no cmds record');
+    const [read] = decodeBody(server, { bytes, start: record.start, end: record.end })['commands'] as readonly Record<string, never>[];
+    if (read === undefined) throw new Error('no command');
+    return fromWireCommand(read, ids);
+  };
+  // Words 1 to 255 are the axis domain, -1 to 1; word 0 (-128/127) is outside it, and admission refuses it.
+  for (let word = 1; word < 256; word++) {
+    const axis = (word - 128) / 127, steer = { keyX: axis, keyY: -axis, stickX: axis / 2, stickY: 0 };
+    const command = { seq: 1, viewTick: 1, steer, yaw: word * 0.0245, pitch: (word / 255 - 0.5) * Math.PI * 0.999, buttons: 0, launcher: { slot: word % 32, ads: (word * 1.37 % 256) / 255 } };
+    const wire = through(command), local = quantiseCommand(command);
+    const v0 = decodeCommands(new Uint8Array(encodeCommands(new BitWriter(), { ackFrame: 0, commands: [command] }, refs)), ids)?.commands[0];
+    expect(Math.abs((wire.launcher?.ads ?? -1) - (v0?.launcher?.ads ?? -2)), `ads ${String(word)}`).toBeLessThan(1e-12);
+    expect(wire.steer, `axis word ${String(word)}`).toEqual(local.steer);
+    expect(Math.abs(wire.pitch - local.pitch), `pitch ${String(word)}`).toBeLessThan(1e-12);
+    expect(Math.abs(Math.cos(wire.yaw) - Math.cos(local.yaw)) + Math.abs(Math.sin(wire.yaw) - Math.sin(local.yaw)), `yaw ${String(word)}`).toBeLessThan(1e-12);
   }
 });

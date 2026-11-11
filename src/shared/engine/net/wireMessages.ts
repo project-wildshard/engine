@@ -38,8 +38,8 @@ export function helloMessage(hello: Pick<Hello, 'build' | 'player' | 'name' | 'l
 }
 
 /** The server's welcome; `tables` false on a travel to a socket that already holds this hash (5.3). */
-export function welcomeMessage(welcome: Omit<NetWelcome, 'schemaHash'>, build: string, tables = true): Uint8Array<ArrayBuffer> {
-  const out: Welcome = { ...welcome, minor: WIRE_MINOR, build, capabilities: [], requiredCapabilities: [], tableHash: SERVER_TABLES.hash, ...(tables ? { tables: SERVER_TABLES.tables } : {}) };
+export function welcomeMessage(welcome: Omit<NetWelcome, 'schemaHash'>, build: string, required: readonly number[] = [], tables = true): Uint8Array<ArrayBuffer> {
+  const out: Welcome = { ...welcome, minor: WIRE_MINOR, build, capabilities: [], requiredCapabilities: required, tableHash: SERVER_TABLES.hash, ...(tables ? { tables: SERVER_TABLES.tables } : {}) };
   return encodeWelcome(out);
 }
 

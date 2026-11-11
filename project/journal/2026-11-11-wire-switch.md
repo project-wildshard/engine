@@ -37,3 +37,12 @@
   read a v1 hello): the link keeps dialling as Server updating, and the
   page reloads only when version.json names another build. After the first
   frame, `reload` still ends the link as before.
+- The WR3 and WR4 review items carried here: quantiseCommand steps exactly
+  what the v1 command codec delivers (every axis word in the domain, pitch,
+  yaw and launcher ads swept against the codec and v0); a sender with an
+  extra owner field before px projects px..vz bit for bit through
+  WireFrameReader (J140); and a room with required capabilities refuses a
+  hello lacking one before play, with `reload`. The server compiles one
+  client's codecs per hello and caches none across clients, so the LRU cap
+  the review asked for has nothing to bound yet; a shared cache would need
+  one.
