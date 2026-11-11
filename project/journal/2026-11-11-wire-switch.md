@@ -31,3 +31,9 @@
   major or a minor two ahead gets `retry`, another build of this wire plays.
   Tests that spoke v0 bytes to a room now speak v1; the stale-build tests
   became refusal-policy tests.
+- The refusal policy as a client sees it (5.5): `retry` from an older
+  server shows "Server updating" and dials again, never reloading. A
+  `reload` or `refused` before any frame is the cut (a v0.1.x server can't
+  read a v1 hello): the link keeps dialling as Server updating, and the
+  page reloads only when version.json names another build. After the first
+  frame, `reload` still ends the link as before.
