@@ -166,33 +166,43 @@ it('only files over the budget are logged for VITEST-BENCH', () => {
   expect(rows.map(row => [row.file, row.sha, row.lane])).toEqual([['test/b.test.ts', a, 'opus-x']]);
 });
 
-it('a landing reuses only an exact SHA whose ci and ring-1 are both green', () => {
+it('a landing reuses only an exact SHA whose ci is green (CI-JOB-PACKING: ring-1 is part of ci)', () => {
   const run = (id: number, name: string, conclusion: string | null, status = 'completed', sha = a, event = 'push') => ({id, name, path: `.github/workflows/${name}.yml`, event, head_sha: sha, status, conclusion});
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', 'success')]}, a).state).toBe('green');
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success')]}, a).state).toBe('pending');
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', null, 'in_progress')]}, a).state).toBe('pending');
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure'), run(2, 'ring-1', 'success')]}, a).state).toBe('red');
-  // The newest run of each workflow decides: a re-run green replaces an older red.
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure'), run(3, 'ci', 'success'), run(2, 'ring-1', 'success')]}, a).state).toBe('green');
-  expect(landingVerdict({workflow_runs: [run(3, 'ci', 'cancelled'), run(1, 'ci', 'success'), run(2, 'ring-1', 'success')]}, a).state).toBe('red');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success')]}, a).state).toBe('green');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', null, 'in_progress')]}, a).state).toBe('pending');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure')]}, a).state).toBe('red');
+  // An old ring-1 run of the same SHA neither blocks nor stands in.
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', 'failure')]}, a).state).toBe('green');
+  expect(landingVerdict({workflow_runs: [run(2, 'ring-1', 'success')]}, a).state).toBe('pending');
+  // The newest run decides: a re-run green replaces an older red.
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure'), run(3, 'ci', 'success')]}, a).state).toBe('green');
+  expect(landingVerdict({workflow_runs: [run(3, 'ci', 'cancelled'), run(1, 'ci', 'success')]}, a).state).toBe('red');
   // Another SHA's runs and other workflows prove nothing.
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', b), run(2, 'ring-1', 'success'), run(4, 'deploy', 'success')]}, a).state).toBe('pending');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', b), run(4, 'deploy', 'success')]}, a).state).toBe('pending');
   expect(landingVerdict(null, a).state).toBe('pending');
-  // A pull-request run or a Ring 1 recording dispatch of the same SHA proves nothing here.
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', a, 'pull_request'), run(2, 'ring-1', 'success')]}, a).state).toBe('pending');
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', 'success', 'completed', a, 'workflow_dispatch')]}, a).state).toBe('pending');
+  // A pull-request run or a recording dispatch of the same SHA proves nothing here.
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', a, 'pull_request')]}, a).state).toBe('pending');
+  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', a, 'workflow_dispatch')]}, a).state).toBe('pending');
   const job = (name: string, conclusion = 'success') => ({name, status: 'completed', conclusion});
   const code = {jobs: [job('changes'), job('static'), job('plan'), job('e2e'), job('tests (1)'), job('tests (2)')]};
   expect(codeProvingJobs(code)).toBe(true);
   // A docs-only run skips plan, tests and e2e: not a code proof.
   expect(codeProvingJobs({jobs: [job('changes'), job('static'), job('plan', 'skipped'), job('e2e', 'skipped')]})).toBe(false);
   expect(codeProvingJobs({jobs: [job('changes'), job('static'), job('plan'), job('e2e'), job('tests (1)'), job('tests (2)', 'failure')]})).toBe(false);
+  // CI-JOB-PACKING (J244): a packed ci run is its `tests (N)` shares, each of which ran its packed step.
+  const share = (name: string, step = 'success', conclusion = 'success') => ({...job(name, conclusion), steps: [{name: "Run this job's packed share", status: 'completed', conclusion: step}]});
+  expect(codeProvingJobs({jobs: [share('tests (1)'), share('tests (2)'), share('tests (3)'), job('quarantine', 'failure')]})).toBe(true);
+  // A reused or docs-only run is green with the packed step skipped: never a code proof.
+  expect(codeProvingJobs({jobs: [share('tests (1)', 'skipped'), share('tests (2)', 'skipped'), job('quarantine')]})).toBe(false);
+  expect(codeProvingJobs({jobs: [share('tests (1)'), share('tests (2)', 'skipped')]})).toBe(false);
+  expect(codeProvingJobs({jobs: [job('tests (1)'), job('tests (2)')]})).toBe(false);
+  expect(codeProvingJobs({jobs: [job('quarantine')]})).toBe(false);
   expect(githubSlug('git@github.com:project-wildshard/engine.git')).toBe('project-wildshard/engine');
   expect(githubSlug('https://github.com/project-wildshard/engine')).toBe('project-wildshard/engine');
   expect(githubSlug('/local/path/engine.git')).toBeNull();
   const paths: string[] = [];
-  const green = (path: string) => {paths.push(path); return path.includes('/jobs') ? code : {workflow_runs: [run(7, 'ci', 'success'), run(8, 'ring-1', 'success')]};};
-  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', green)).toEqual({ci: {id: 7, status: 'completed', conclusion: 'success'}, 'ring-1': {id: 8, status: 'completed', conclusion: 'success'}});
+  const green = (path: string) => {paths.push(path); return path.includes('/jobs') ? code : {workflow_runs: [run(7, 'ci', 'success')]};};
+  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', green)).toEqual({ci: {id: 7, status: 'completed', conclusion: 'success'}});
   expect(paths).toEqual([`repos/project-wildshard/engine/actions/runs?head_sha=${a}&event=push&per_page=100`, 'repos/project-wildshard/engine/actions/runs/7/jobs?filter=latest&per_page=100']);
   expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', path => path.includes('/jobs') ? {jobs: [job('changes'), job('static')]} : green(path))).toBeNull();
   expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', () => {throw new Error('offline');})).toBeNull();

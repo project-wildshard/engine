@@ -7,11 +7,10 @@ import {execFileSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {readLiftPending} from './lift-pending.mjs';
+import {provesCode} from './ci-proof-jobs.mjs';
 
 /** The hosted workflows a landing needs green, by workflow file. */
-export const LANDING_WORKFLOWS=Object.freeze({ci:'.github/workflows/ci.yml','ring-1':'.github/workflows/ring-1.yml'});
-/** A `ci` run proves code only when these jobs and every `tests` shard passed (as scripts/ci-selection.mjs). */
-const CODE_JOBS=Object.freeze(['changes','static','plan','e2e']);
+export const LANDING_WORKFLOWS=Object.freeze({ci:'.github/workflows/ci.yml'});
 
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -45,10 +44,7 @@ export function landingVerdict(data,sha){
 /** A docs-only `ci` run (static only) is not a code proof for skipping the local gate.
  * @param {unknown} data the Actions `runs/<id>/jobs` response */
 export function codeProvingJobs(data){
- const jobs=record(data)&&Array.isArray(data.jobs)?data.jobs.filter(record):[];
- const passed=(/** @type {string} */name)=>jobs.some(job=>job.name===name&&job.status==='completed'&&job.conclusion==='success');
- const tests=jobs.filter(job=>typeof job.name==='string'&&/^tests(?: \(.+\))?$/u.test(job.name));
- return CODE_JOBS.every(passed)&&tests.length>0&&tests.every(job=>job.status==='completed'&&job.conclusion==='success');
+ return provesCode('ci.yml',record(data)&&Array.isArray(data.jobs)?data.jobs:[]);
 }
 
 /** An expired lift-pending exclusion means newly blocking tests an older green never ran.

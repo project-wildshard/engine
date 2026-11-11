@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Ring 1, what a push must pass, as one command: `bash scripts/ring1.sh [static|tests|cook-step|build-boot|build|boot|products|all]`. ring-1.yml runs each step as
-# its own job, so a local run is the same work. Each stage prints its seconds, and a red one doesn't hide the rest. It needs no shard
+# Ring 1, what a push must pass, as one command: `bash scripts/ring1.sh [static|tests|cook-step|build-boot|build|boot|products|all]`. ci.yml runs cook-step, build and boot as one
+# products unit (scripts/ci-pack.mjs), so a local run of those is the same work. Each stage prints its seconds, and a red one doesn't hide the rest. It needs no shard
 # repo and no secret.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1

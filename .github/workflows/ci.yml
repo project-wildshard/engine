@@ -1,5 +1,10 @@
 name: ci
 
+# CI-JOB-PACKING (J244, Jake 2026-11-10): one workflow for a push. It was ci (21 jobs), ring-1 (16) and
+# engine-boundaries (1): 38 jobs, a third of their runner time the same work twice, on an org that runs 20 at
+# once. Now every unit of work runs once, packed longest-first into the `tests` matrix by scripts/ci-pack.mjs:
+# ci's static checks, the planner's proofs, e2e, every planned test shard, Ring 1's products (cook, build, boot)
+# and the engine-boundaries cook-to-play report. Quarantine keeps its own non-blocking job (J193).
 on:
   # J240: a plan worktree pushes plan/<slug>; scripts/land.mjs waits for this
   # exact SHA to go green here, then fast-forwards main to it. Main's run of
@@ -8,6 +13,12 @@ on:
     branches: [main, 'plan/**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      record:
+        description: Record Ring 1's platform digest baseline and upload it, instead of comparing
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -21,13 +32,23 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/plan/') }}
 
 jobs:
-  changes:
+  # Every job gates itself, so no job waits on another before it can start: a main push of a SHA its plan
+  # branch already proved green reuses that run (J240), and a docs-only push runs only job 1's docs checks.
+  # A job that runs its packed share says so in its step "Run this job's packed share"; scripts/ci-proof-jobs.mjs
+  # counts a run as a code proof only when every share ran that step green.
+  tests:
     runs-on: ubuntu-latest
-    outputs:
-      docs: ${{ steps.reuse.outputs.reused == 'true' && 'true' || steps.paths.outputs.docs }}
-      code_base: ${{ steps.reuse.outputs.reused == 'true' && github.sha || steps.paths.outputs.code_base }}
-      reused: ${{ steps.reuse.outputs.reused }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [1, 2, 3, 4, 5]
+    env:
+      WS_TEST_QUARANTINE: blocking
+      WS_CI_PLAN: tmp/engine-ci/plan.json
     steps:
+      - name: Start the job clock (each shard's five-minute budget includes this job's set-up, J193)
+        run: echo "WS_CI_SHARD_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
@@ -41,10 +62,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-exact-reuse.mjs ci.yml
       - name: Enforce quarantine admission dates and the 48-hour cap
+        if: matrix.job == 1
         run: node scripts/test-quarantine.mjs --check-history
       - name: Report every inherited migration owner and fixed deadline
+        if: matrix.job == 1
         run: node scripts/lift-pending.mjs
       - name: Scan the complete incoming history
+        if: matrix.job == 1
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
         # A plan branch is new or rebased, so its `before` is zero or off-history: scan from main.
@@ -53,6 +77,7 @@ jobs:
           case "$GITHUB_REF" in refs/heads/plan/*) base="$(git merge-base origin/main "$GITHUB_SHA")" ;; esac
           printf 'refs/heads/main %s refs/heads/main %s\n' "$GITHUB_SHA" "$base" | node .githooks/check-push.mjs
       - name: Require this version's changelog section (Jake, 2026-11-10)
+        if: matrix.job == 1
         run: node scripts/changelog.mjs check --at="$GITHUB_SHA"
       - name: Classify from an actually green code-proving ancestor
         if: steps.reuse.outputs.reused != 'true'
@@ -61,244 +86,110 @@ jobs:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-selection.mjs
-
-  static:
-    needs: changes
-    if: needs.changes.outputs.reused != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: ./.github/actions/ring-setup
+      # A docs-only push still runs lint, format and the committed asks, once.
+      - if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs == 'true' && matrix.job == 1
+        uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - if: needs.changes.outputs.docs != 'true'
-        run: pnpm typecheck
-      - run: pnpm lint
-      - run: pnpm format:check
-      - name: Prove exact compressed model admission and scope lifetime
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/entry-model-values.proof.mjs
-      - name: Prove grid-owned quest dialogue lifetime
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/quest-home-lifetime.proof.mjs
-      - name: Prove hover boost through real player and server motors
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hover-boost.proof.mjs
-      - name: Prove earned coin and barter transactions
-        if: needs.changes.outputs.docs != 'true'
-        run: |
-          node scripts/pins.ts install driftwood-isle pine-hollow
-          node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/net-exchange.proof.mjs
-      - name: Prove earned loadout and author publication contracts
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-loadout.proof.mjs
-      - name: Prove keyed sky clock and data admission contracts
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/keyed-sky-clock.proof.mjs
-      - name: Prove actual quest progress and native placement floors
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/interaction-placement.proof.mjs
-      - name: Prove shipped weather continuation and native storm decisions
-        if: needs.changes.outputs.docs != 'true'
-        run: |
-          node scripts/pins.ts install pine-hollow nalati-grasslands
-          node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs
-      - name: Prove actual admitted entry render fences and refusal drain
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hybrid-render-preparation.proof.mjs
-      - name: Prove actual climate acts and page rows through local rooms
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/net-climate.proof.mjs
-      - name: Prove independent native quest seats and saved cable rides
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/quest-seats.proof.mjs
-      - name: Prove actual native item frame continuation and reaction order
-        if: needs.changes.outputs.docs != 'true'
-        run: node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-item-frame.proof.mjs
-      - name: Prove declared input and persisted cosmetic migration
-        if: needs.changes.outputs.docs != 'true'
-        run: |
-          node scripts/pins.ts install nine-dragon-stack
-          node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs
-      - name: Validate committed asks even on documentation pushes
-        run: node src/scripts/asks.mjs check --all
-      - if: needs.changes.outputs.docs != 'true'
-        run: pnpm check:sides && pnpm check:asks && pnpm check:page-events && pnpm test:kit && pnpm test:hooks
-
-  plan:
-    needs: changes
-    if: needs.changes.outputs.docs != 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: ./.github/actions/ring-setup
+      - if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs == 'true' && matrix.job == 1
+        run: bash scripts/ci-static.sh docs
+      - id: code
+        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        run: echo "run=true" >> "$GITHUB_OUTPUT"
+      - if: steps.code.outputs.run == 'true'
+        uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - name: Plan the smallest useful matrix from actual discovery
-        id: plan
-        run: node scripts/engine-ci-plan.ts
-      - name: Prove actual phase discovery and hostile-plan refusal
-        run: node scripts/engine-ci-membership-proof.ts
-      - name: Prove actual planned dispatch and unplanned-file refusal
-        run: node scripts/engine-order-proof.mjs
-      - name: Prove cached public imports follow a package retag
-        run: node scripts/module-cache-proof.mjs
-      - name: Calibrate real CPU observations and report surviving writers
-        run: python3 scripts/cpu-census-proof.py
-      - name: Prove an actual over-budget file refuses
-        run: node scripts/engine-ci-proof.mjs && node scripts/engine-ci-proof.mjs tmp/engine-ci-budget-proof --import
-      - name: Prove a named shard deadline drains descendants
-        run: node scripts/ci-shard-wall-proof.mjs
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: engine-ci-plan
-          path: tmp/engine-ci/plan.json
-          retention-days: 7
-
-  tests:
-    needs: plan
-    runs-on: ubuntu-latest
-    # The explicit wall gate still fails at five minutes; reserve diagnostic time.
-    timeout-minutes: 7
-    strategy:
-      fail-fast: false
-      max-parallel: 12
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    env:
-      WS_TEST_QUARANTINE: blocking
-      WS_CI_PLAN: tmp/engine-ci/plan.json
-      WS_CI_SHARD: ${{ matrix.shard }}
-    steps:
-      - name: Start the fixed five-minute shard wall budget
-        run: echo "WS_CI_SHARD_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: ./.github/actions/ring-setup
-        with:
-          pins-cache-scope: full
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: engine-ci-plan
-          path: tmp/engine-ci
-      - run: pnpm pins && pnpm gen:inputs
-      - name: Run the shard within its remaining five-minute budget
-        run: node scripts/ci-shard-wall.mjs -- node scripts/engine-ci-shard.mjs
-      - name: Retain actual membership, budget and timing evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: engine-ci-${{ matrix.shard }}
-          path: tmp/engine-ci
-          retention-days: 7
-
-      - name: Record the named shard wall-budget verdict
-        if: always()
-        run: node scripts/ci-shard-wall.mjs --check
-
-  e2e:
-    needs: changes
-    if: needs.changes.outputs.docs != 'true'
-    # Pinned: Playwright 1.60 can't install Chromium on ubuntu-latest (26.04).
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          package_json_file: package.json
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-      # Org git dependencies are public (J160, J163). pnpm-lock.yaml can record
-      # them as git@github.com:..., so every URL form goes to plain HTTPS.
-      - name: Read org repos over HTTPS
-        run: |
-          base="https://github.com/project-wildshard/"
-          git config --global url."$base".insteadOf "git@github.com:project-wildshard/"
-          git config --global --add url."$base".insteadOf "ssh://git@github.com/project-wildshard/"
-      - run: pnpm install --frozen-lockfile
-      # BROWSER-TESTS-BENCH BB2/BB5 (J231): both specs launch chromium-headless-shell, so only it is installed, from a
-      # cache keyed on the Playwright version; a warm run downloads nothing.
+      # BROWSER-TESTS-BENCH BB2/BB5 (J231): e2e's headless shell and products' Chromium, cached by Playwright version.
       - id: playwright
+        if: steps.code.outputs.run == 'true'
         run: echo "version=$(node -p "require('./package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - if: steps.code.outputs.run == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
-          key: ms-playwright-headless-shell-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - run: pnpm exec playwright install --with-deps --only-shell chromium
-      - run: pnpm test:e2e
-      # Jake 2026-11-10: the title's hero stays big and its build label short and clear of the logo
-      - run: node --test test/title-layout-browser.proof.mjs
-      # J245 (Jake 2026-11-10, layout A): every Settings tab opens and every setting in it works, phone and desktop
-      - run: node --test test/settings-tabs-browser.proof.mjs
-      - if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+          key: ms-playwright-pack-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          restore-keys: ms-playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # Spawn parts' q11 Brotli bodies, kept by content (DL15); each one is checked against its body before use.
+      - if: steps.code.outputs.run == 'true'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          name: playwright-traces
-          path: src/e2e/test-results/
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ring1-spawn-parts-br-${{ github.sha }}
+          restore-keys: ring1-spawn-parts-br-
+      # Every share plans the same suite: same tree, and quarantine and lift-pending judged at the run's own start,
+      # not at whenever each job got a runner, so no file can fall between two shares' plans.
+      - name: Judge exclusions at the run's start
+        if: steps.code.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "WS_CI_EXCLUSION_AT=$(node -e "console.log(Date.parse(process.argv[1]))" "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .created_at)")" >> "$GITHUB_ENV"
+      - name: Plan the smallest useful shards from actual discovery
+        if: steps.code.outputs.run == 'true'
+        run: node scripts/engine-ci-plan.ts
+      - name: Run this job's packed share
+        id: pack
+        if: steps.code.outputs.run == 'true'
+        env:
+          RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
+        run: node scripts/ci-pack.mjs --jobs=${{ strategy.job-total }} --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products,boundaries
+      - name: Retain actual membership, budget and timing evidence
+        if: always() && steps.code.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: engine-ci-${{ matrix.job }}
+          path: |
+            tmp/engine-ci
+            tmp/ci-pack/*.json
+            tmp/ring-cook/step.json
+            tmp/engine-boundaries
           retention-days: 7
-
-  quarantine:
-    needs: changes
-    if: needs.changes.outputs.docs != 'true'
-    # J193: run every active quarantined proof with its ordinary exit code,
-    # separately from the blocking verdict and its covered-commit summary.
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: ./.github/actions/ring-setup
-        with:
-          pins-cache-scope: full
-      - run: pnpm pins
-      - run: pnpm gen:inputs
-      - run: node scripts/test-quarantine.mjs --shard=${{ matrix.shard }}/3
-      - name: Keep the original quarantine results
-        if: always()
+          if-no-files-found: ignore
+      - name: Keep the recorded Ring 1 baseline
+        if: inputs.record && steps.pack.outputs.products == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ci-quarantine-results-${{ matrix.shard }}
-          path: tmp/quarantine
+          name: ring-digests
+          path: test/pins/ring-digests.json
           retention-days: 7
-
-  verdict-coverage:
-    needs: [changes, static, plan, tests, e2e]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    steps:
-      # One run stands for every commit since the last finished run.
+      - name: Keep only this build's spawn-part encodings in the cache
+        if: steps.pack.outputs.products == 'true'
+        run: |
+          cache=~/.cache/wildshard/gen/spawn-parts-br/1
+          shopt -s nullglob
+          for file in "$cache"/*.br; do
+            name=$(basename "$file")
+            [ -f "dist/assets/spawn/parts/${name:0:16}.pack.br" ] || rm -f "$file"
+          done
+          du -sh "$cache" 2>/dev/null || true
+      - if: steps.pack.outputs.products == 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ring1-spawn-parts-br-${{ github.sha }}
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: playwright-traces-${{ matrix.job }}
+          path: src/e2e/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Record every shard's wall-budget verdict, artifact upload included (J193)
+        if: always() && steps.code.outputs.run == 'true'
+        run: node scripts/ci-pack.mjs --check-walls --job=${{ matrix.job }}
+      # One run stands for every commit since the last finished run (was the verdict-coverage job; each share now
+      # names the range and flags its own red, so a main push needs no extra job).
       - name: Name the commits this verdict covers
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          RESULTS: ${{ join(needs.*.result, ' ') }}
-          DOCS_ONLY: ${{ needs.changes.outputs.docs }}
-          CODE_BASE: ${{ needs.changes.outputs.code_base }}
+          RESULT: ${{ job.status }}
+          REUSED: ${{ steps.reuse.outputs.reused }}
+          DOCS_ONLY: ${{ steps.paths.outputs.docs }}
+          CODE_BASE: ${{ steps.paths.outputs.code_base }}
         run: |
+          if test "$REUSED" = true; then echo "### Reused this SHA's green plan-branch run (J240)." >> "$GITHUB_STEP_SUMMARY"; fi
           if test "$DOCS_ONLY" = true; then
             echo "### Tests skipped (docs-only); code unchanged since proved $CODE_BASE." >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -308,6 +199,52 @@ jobs:
           commits=$(gh api "repos/$GITHUB_REPOSITORY/compare/$previous...$GITHUB_SHA" --jq '.commits[]|"\(.sha[0:10]) \(.commit.message|split("\n")[0])"')
           range="${previous:0:10}..${GITHUB_SHA:0:10}"
           { echo "### Commits since the last finished run: $range"; echo '```'; echo "$commits"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          case " $RESULTS " in
-            *' failure '*) echo "::error title=Red run covers $range::$(printf '%s\n' "$commits" | sed '/^$/d' | wc -l | tr -d ' ') commits after the last finished run; see this job's summary" ;;
-          esac
+          if test "$RESULT" = failure; then
+            echo "::error title=Red run covers $range::$(printf '%s\n' "$commits" | sed '/^$/d' | wc -l | tr -d ' ') commits after the last finished run; see this job's summary"
+          fi
+
+  quarantine:
+    # J193: run every active quarantined proof with its ordinary exit code,
+    # separately from the blocking verdict and its covered-commit summary.
+    # One job, one file at a time (it was three in ci, and ring-1 ran the same three again).
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - name: Reuse this exact SHA's green plan-branch run (J240)
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-exact-reuse.mjs ci.yml
+      - name: Classify from an actually green code-proving ancestor
+        if: steps.reuse.outputs.reused != 'true'
+        id: paths
+        env:
+          BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-selection.mjs
+      - id: code
+        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        run: echo "run=true" >> "$GITHUB_OUTPUT"
+      - if: steps.code.outputs.run == 'true'
+        uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - if: steps.code.outputs.run == 'true'
+        run: pnpm pins && pnpm gen:inputs
+      - if: steps.code.outputs.run == 'true'
+        run: node scripts/test-quarantine.mjs --shard=1/1
+      - name: Keep the original quarantine results
+        if: always() && steps.code.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-quarantine-results
+          path: tmp/quarantine
+          retention-days: 7

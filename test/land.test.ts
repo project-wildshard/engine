@@ -254,12 +254,11 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const wt = f.worktree('bar');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     const before = f.remoteMain();
-    f.state({ red: { 'plan/bar': { ci: 'quarantine (1)', 'ring-1': 'tests (3)' } } });
+    f.state({ red: { 'plan/bar': { ci: 'quarantine' } } });
     const stopped = f.land(wt);
     expect(stopped.status).toBe(1);
-    expect(stopped.stdout).toMatch(/ring-1 run \d+ failure: tests \(3\) \(failure\)/u);
     // The run conclusion still decides: a red run whose only listed failure is a quarantine job stops too.
-    expect(stopped.stdout).toMatch(/ci run \d+ failure: no blocking failed job listed \(non-blocking: quarantine \(1\) \(failure\)\)/u);
+    expect(stopped.stdout).toMatch(/ci run \d+ failure: no blocking failed job listed \(non-blocking: quarantine \(failure\)\)/u);
     expect(f.remoteMain()).toBe(before);
   }, 60_000);
 
@@ -581,17 +580,19 @@ describe('failedJobs', () => {
 describe('shaVerdict', () => {
   const sha = 'a'.repeat(40);
   const run = (name: string, id: number, status: string, conclusion: string | null) => ({ id, name, event: 'push', head_sha: sha, head_branch: 'plan/x', status, conclusion });
-  test('needs both workflows complete; the newest run of each decides', () => {
-    expect(shaVerdict({ workflow_runs: [run('ci', 1, 'completed', 'success')] }, sha).state).toBe('pending');
-    expect(shaVerdict({ workflow_runs: [run('ci', 1, 'completed', 'failure'), run('ci', 2, 'completed', 'success'), run('ring-1', 3, 'completed', 'success')] }, sha).state).toBe('green');
-    expect(shaVerdict({ workflow_runs: [run('ci', 2, 'completed', 'success'), run('ring-1', 3, 'completed', 'cancelled')] }, sha).state).toBe('red');
-    expect(shaVerdict({ workflow_runs: [run('ci', 2, 'completed', 'success'), { ...run('ring-1', 3, 'completed', 'success'), event: 'pull_request' }] }, sha).state).toBe('pending');
+  test('needs the one ci workflow complete; its newest run decides (CI-JOB-PACKING: ring-1 is part of ci)', () => {
+    expect(shaVerdict({ workflow_runs: [run('ci', 1, 'completed', 'success')] }, sha).state).toBe('green');
+    expect(shaVerdict({ workflow_runs: [run('ci', 1, 'in_progress', null)] }, sha).state).toBe('pending');
+    expect(shaVerdict({ workflow_runs: [run('ci', 1, 'completed', 'failure'), run('ci', 2, 'completed', 'success')] }, sha).state).toBe('green');
+    expect(shaVerdict({ workflow_runs: [run('ci', 2, 'completed', 'cancelled'), run('ring-1', 3, 'completed', 'success')] }, sha).state).toBe('red');
+    expect(shaVerdict({ workflow_runs: [{ ...run('ci', 2, 'completed', 'success'), event: 'pull_request' }] }, sha).state).toBe('pending');
   });
 });
 
 describe('main reuses the exact SHA\'s green plan-branch run (no double run)', () => {
   const sha = 'b'.repeat(40);
   const ciJobs = ['changes', 'static', 'plan', 'e2e', 'tests (1)', 'tests (2)'].map(name => ({ name, status: 'completed', conclusion: 'success' }));
+  const packedStep = (conclusion = 'success') => [{ name: "Run this job's packed share", status: 'completed', conclusion }];
   const withApi = async (runs: unknown[], jobs: unknown[], check: (api: string) => Promise<void>) => {
     const server = createServer((request, response) => {
       response.setHeader('content-type', 'application/json');
@@ -612,6 +613,15 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
   };
   test('a complete green plan/<slug> push run of this exact SHA is reused on main', async () => {
     expect(await reused([run()], ciJobs)).toMatchObject({ reused: true, run: 5 });
+    // CI-JOB-PACKING: a packed run is its `tests (N)` shares; static, plan, e2e and Ring 1's products run inside them.
+    const packed = ['tests (1)', 'tests (2)', 'tests (3)'].map(name => ({ name, status: 'completed', conclusion: 'success', steps: packedStep() }));
+    expect(await reused([run()], packed)).toMatchObject({ reused: true, run: 5 });
+    // A share that reused or skipped its packed step proves nothing, even when the job is green.
+    expect((await reused([run()], packed.map(job => (job.name === 'tests (2)' ? { ...job, steps: packedStep('skipped') } : job)))).reused).toBe(false);
+    expect((await reused([run()], packed.map(job => (job.name === 'tests (2)' ? { ...job, conclusion: 'skipped' } : job)))).reused).toBe(false);
+    expect((await reused([run()], [{ name: 'quarantine', status: 'completed', conclusion: 'success' }])).reused).toBe(false);
+    // A legacy job in the list makes it the older shape, which needs all of them.
+    expect((await reused([run()], [...packed, { name: 'static', status: 'completed', conclusion: 'success' }])).reused).toBe(false);
   });
   test('anything less runs main in full', async () => {
     for (const extra of [{ head_branch: 'main' }, { head_branch: 'feature/x' }, { conclusion: 'failure' }, { head_sha: 'c'.repeat(40) }, { head_repository: { full_name: 'fork/engine' } }, { id: 9 }, { run_started_at: 'never' }]) expect((await reused([run(extra)], ciJobs)).reused, JSON.stringify(extra)).toBe(false);
@@ -624,21 +634,27 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect((await reused([run()], ciJobs, {}, { scope: (at: number) => String(at > Date.parse('2026-11-10T20:10:00Z')), now: steady.now })).reason).toMatch(/predates a quarantine or lift-pending change/u);
     expect((await exactBranchProof('ci.yml', env('http://127.0.0.1:9'), steady)).reused).toBe(false);
   });
-  test('ci and ring-1 run on plan/** pushes and gate every main job on the reuse check', () => {
-    for (const file of ['ci.yml', 'ring-1.yml']) {
-      const text = readFileSync(`.github/workflows/${file}`, 'utf8');
-      expect(text).toMatch(/push:\n {4}branches: \[main, 'plan\/\*\*'\]/u);
-      expect(text).toContain(`node scripts/ci-exact-reuse.mjs ${file}`);
-      expect(text).toContain("startsWith(github.ref, 'refs/heads/plan/')");
+  test('ci runs on plan/** pushes; every job gates itself on the reuse check, and ring-1 is gone (CI-JOB-PACKING)', () => {
+    const text = readFileSync('.github/workflows/ci.yml', 'utf8');
+    expect(text).toMatch(/push:\n {4}branches: \[main, 'plan\/\*\*'\]/u);
+    expect(text).toContain("startsWith(github.ref, 'refs/heads/plan/')");
+    expect(existsSync('.github/workflows/ring-1.yml')).toBe(false);
+    expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {2}push:/mu);
+    const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
+    expect([...jobs.keys()]).toEqual(['tests', 'quarantine']);
+    for (const [name, body] of jobs) {
+      // No job waits on another, and none is skipped wholesale: a failed reuse check is a red job, never a false green.
+      expect(body, name).not.toMatch(/^ {4}(?:if|needs):/mu);
+      const steps = body.slice(body.indexOf('    steps:\n')).split(/^ {6}- /mu).slice(1);
+      const reuse = steps.findIndex(step => step.includes('node scripts/ci-exact-reuse.mjs ci.yml'));
+      expect(reuse, name).toBeGreaterThan(0);
+      const work = steps.filter(step => /scripts\/(?:ci-pack|test-quarantine)\.mjs --(?:jobs|shard)/u.test(step));
+      expect(work.length, name).toBe(1);
+      expect(work[0], name).toMatch(/if: steps\.code\.outputs\.run == 'true'/u);
+      const code = steps.find(step => step.startsWith('id: code')) ?? '';
+      expect(code, name).toContain("steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'");
     }
-    const ring = readFileSync('.github/workflows/ring-1.yml', 'utf8');
-    const jobs = new Map([...ring.slice(ring.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    // The reuse job always runs, so no job downstream inherits a skip and loses its tests.
-    expect(jobs.get('reuse')).not.toMatch(/^ {4}if:/mu);
-    expect(jobs.get('reuse')).toContain('actions: read');
-    expect(jobs.get('tests')).toMatch(/^ {4}needs: plan$/mu);
-    expect(jobs.get('tests')).not.toMatch(/^ {4}if:/mu);
-    for (const [name, body] of jobs) if (name !== 'reuse' && name !== 'tests') expect(body, name).toMatch(/^ {4}needs: reuse\n {4}if: needs\.reuse\.outputs\.reused != 'true'$/mu);
-    expect(jobs.size).toBeGreaterThan(5);
+    expect(jobs.get('tests')).toContain("name: Run this job's packed share");
+    expect(jobs.get('tests')).toContain('--units=static,e2e,plan-proofs,tests,products,boundaries');
   });
 });

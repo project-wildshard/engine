@@ -1,6 +1,6 @@
 // J240 (Jake, 2026-11-10): land a plan worktree on main by fast-forward only.
 // From a linked worktree on plan/<slug>: push the branch, wait until the exact
-// SHA is green in hosted `ci` and `ring-1`, rebase onto origin/main, and push
+// SHA is green in hosted `ci` (one workflow since CI-JOB-PACKING), rebase onto origin/main, and push
 // that SHA to main as a fast-forward. Never a forced main push; if main moved,
 // rebase and retry. Each worktree lands on its own: there is no lock between
 // worktrees except git's own fast-forward check (and GitHub's protect-main rule).
@@ -23,7 +23,8 @@ import {pathToFileURL} from 'node:url';
 import {canonicalRoot,followMain} from './worktree.mjs';
 
 /** The hosted workflows a landing needs green, by workflow name (J195, J240). */
-export const LAND_WORKFLOWS=Object.freeze(['ci','ring-1']);
+// CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
+export const LAND_WORKFLOWS=Object.freeze(['ci']);
 const PLAN_BRANCH=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
 /** Generated stamps: a rebase conflict in them alone is resolved by regenerating, never by a person. */
 export const STAMPS=Object.freeze(['scripts/renderer-revision.json','scripts/validation-revision.json']);
@@ -358,7 +359,7 @@ class Landing{
     const failed=reds.map(({name,run,jobs})=>`${name} run ${run.id} ${run.conclusion}: ${jobs.blocking.join('; ')||'no blocking failed job listed'}${jobs.nonblocking.length===0?'':` (non-blocking: ${jobs.nonblocking.join('; ')})`}${run.url===''?'':` ${run.url}`}`);
     return {...verdict,failed};
    }
-   if(Object.keys(verdict.runs).length===0&&Date.now()>appear)throw new StopError(`no hosted ci/ring-1 run for ${short(sha)} after ${this.options.appearMinutes} min; are ci.yml and ring-1.yml triggered on plan/** pushes?`);
+   if(Object.keys(verdict.runs).length===0&&Date.now()>appear)throw new StopError(`no hosted ci run for ${short(sha)} after ${this.options.appearMinutes} min; is ci.yml triggered on plan/** pushes?`);
    if(Date.now()>deadline)throw new StopError(`hosted CI for ${short(sha)} not finished after ${this.options.timeoutMinutes} min (${verdict.summary}); run land again to keep waiting`);
    await sleep(this.options.pollSeconds*1000);
   }

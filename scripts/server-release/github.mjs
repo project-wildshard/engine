@@ -58,7 +58,7 @@ function candidate() {
  * @param {string} sha @returns {Promise<'green' | 'pending' | 'red'>} */
 async function checks(sha) {
   let pending = false;
-  for (const workflow of ['ci.yml', 'ring-1.yml']) {
+  for (const workflow of ['ci.yml']) {
     const value = await api(`actions/workflows/${workflow}/runs?head_sha=${sha}&event=push&branch=main&per_page=100`);
     const rows = v.parse(v.object({ workflow_runs: v.array(Run) }), value).workflow_runs
       .filter(run => run.head_sha === sha && run.head_branch === 'main' && run.event === 'push').sort((a, b) => b.id - a.id);

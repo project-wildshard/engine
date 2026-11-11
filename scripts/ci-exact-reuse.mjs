@@ -10,10 +10,11 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {readLiftPending} from './lift-pending.mjs';
 import {activeQuarantineFiles} from './test-quarantine.mjs';
+import {PROOF_SHAPES,provesCode} from './ci-proof-jobs.mjs';
 
 const shaPattern=/^[a-f0-9]{40}$/u,planBranch=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
-/** The jobs a branch run must have actually passed, beyond its `tests (N)` matrix. */
-export const REQUIRED_JOBS=Object.freeze(/** @type {Record<string,readonly string[]>} */({'ci.yml':['changes','static','plan','e2e'],'ring-1.yml':['static','plan','cook-step','build-boot']}));
+/** The jobs a branch run must have actually passed, by shape (CI-JOB-PACKING, scripts/ci-proof-jobs.mjs). */
+export {PROOF_SHAPES as REQUIRED_JOBS} from './ci-proof-jobs.mjs';
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 
@@ -33,7 +34,7 @@ export async function exactBranchProof(workflow,env=process.env,options={}){
  const scope=options.scope??(at=>exclusionScope(at)),now=options.now??Date.now();
  /** @param {string} reason */
  const full=reason=>({reused:false,run:null,reason});
- const required=REQUIRED_JOBS[workflow];
+ const required=PROOF_SHAPES[workflow];
  if(env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!=='refs/heads/main')return full('Not a main push; run in full');
  if(!shaPattern.test(sha)||!token||!/^[-\w.]+\/[-\w.]+$/u.test(repo)||required===undefined)return full('No exact proof inputs; run in full');
  const origin=env.GITHUB_API_URL??'https://api.github.com';
@@ -54,10 +55,7 @@ export async function exactBranchProof(workflow,env=process.env,options={}){
    // or skip-propagated run is green too. Require each one, latest attempt.
    const raw=await api(`actions/runs/${run.id}/jobs?filter=latest&per_page=100`);
    if(!record(raw)||!Array.isArray(raw.jobs)||raw.jobs.length>=100)continue;
-   const jobs=raw.jobs.filter(record);
-   const passed=(/** @type {string} */ name)=>jobs.some(job=>job.name===name&&job.status==='completed'&&job.conclusion==='success');
-   const tests=jobs.filter(job=>typeof job.name==='string'&&/^tests(?: \(.+\))?$/u.test(job.name));
-   if(!required.every(passed)||tests.length===0||tests.some(job=>job.status!=='completed'||job.conclusion!=='success'))continue;
+   if(!provesCode(workflow,raw.jobs))continue;
    const stamp=typeof run.run_started_at==='string'?run.run_started_at:typeof run.created_at==='string'?run.created_at:'',started=Date.parse(stamp);
    if(!Number.isFinite(started))continue;
    if(scope(started)!==scope(now))return full(`${workflow} run ${run.id} predates a quarantine or lift-pending change in what the suite excludes; run in full`);

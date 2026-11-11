@@ -5,6 +5,7 @@ import {resolve} from 'node:path';
 import {readLiftPending} from './lift-pending.mjs';
 import {pathToFileURL} from 'node:url';
 import {pushSelection} from './push-selection.mjs';
+import {provesCode} from './ci-proof-jobs.mjs';
 
 const shaPattern=/^[a-f0-9]{40}$/u;
 /** @param {unknown} value @returns {value is Record<string,unknown>} */
@@ -39,10 +40,7 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
     if(raw.jobs.length<100)break;
     if(page===20)throw new Error('Incomplete code-proof job inventory');
    }
-   /** @param {string} name */
-   const passed=name=>jobs.some(job=>record(job)&&job.name===name&&job.status==='completed'&&job.conclusion==='success');
-   const tests=jobs.filter(job=>record(job)&&typeof job.name==='string'&&/^tests(?: \(.+\))?$/u.test(job.name));
-   if(!['changes','static','plan','e2e'].every(passed)||tests.length===0||tests.some(job=>!record(job)||job.status!=='completed'||job.conclusion!=='success'))continue;
+   if(!provesCode('ci.yml',jobs))continue;
    const selected=pushSelection(`refs/heads/main ${sha} refs/heads/main ${run.head_sha}`,cwd,{hosted:true});
    // Unchanged source is insufficient after a time-based discovery exclusion
    // expires. Stay full until the inherited inventory is actually disposed;

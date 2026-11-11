@@ -1,9 +1,10 @@
 # J186: report-only soak through 2026-11-15; no new release or hook gate.
 # Cold q11 cooking plus a clean build exceeds ten seconds: Ring 2.
+# CI-JOB-PACKING (J244): a push no longer starts this workflow. Its push half, cook-to-play on Ring 1's products,
+# is ci's non-blocking `boundaries` unit (scripts/ci-pack.mjs); its six Vitest files already run in ci's shards.
+# The daily schedule and a dispatch still run the whole report, Ring 2 steps included.
 name: engine-boundaries
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
   schedule:
     - cron: '43 5 * * *'

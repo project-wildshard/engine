@@ -2,7 +2,7 @@ name: server-release
 
 on:
   workflow_run:
-    workflows: [ci, ring-1]
+    workflows: [ci]
     branches: [main]
     types: [completed]
   push:
