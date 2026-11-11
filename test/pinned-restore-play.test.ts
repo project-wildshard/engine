@@ -20,6 +20,11 @@ interface World {step:(command:HeadlessCommand)=>Promise<void>;save:()=>string;c
 // TEST-SPEED TS11: one Rapier module for the file, as every room shares one; each world still gets its own physics.
 let rapierModule:ReturnType<typeof loadRapier>|undefined;
 const rapier=():ReturnType<typeof loadRapier>=>rapierModule??=loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+// TEST-SPEED TS11: an honest budget per product, not one 10 s for all. Measured 2026-11-11 on the Mac under a load
+// of 60 (72 busy workers on 18 cores): template 12.8-14.0 s (the file's first case also pays its warm-up), Nalati
+// 14.6-14.9, Blender Template 9.5-9.9, Pine 4.8-10.0, Driftwood 3.6-4.8, the rest under 3 s. Each budget is about
+// 1.5x its worst; alone they take 0.1-3.3 s.
+const budgets:Readonly<Record<string,number>>={template:25_000,'nalati-grasslands':25_000,'blender-template':15_000,'pine-hollow':15_000};
 for(const slug of [...ring['1'].products,...ring['1'].slices])test(`a saved ${slug} continues the same real walk`,async()=>{
   const directory=builtProduct(slug==='template'?'_template':slug),product=await loadHeadlessProduct(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('No admitted product');
@@ -44,4 +49,4 @@ for(const slug of [...ring['1'].products,...ring['1'].slices])test(`a saved ${sl
     restored=await open(saved);for(let tick=8;tick<16;tick++)await restored.step(command(tick));
     expect(digest(restored.save())).toBe(expected);
   } finally {await restored?.close();await straight?.close();}
-},10_000);
+},budgets[slug]??10_000);
