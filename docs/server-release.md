@@ -143,6 +143,14 @@ when invoking `scripts/build-app.mjs`; use the identical SHA with
 the server bundle and the signed release then name one build. Without
 an explicit value, page builds retain their short-SHA plus timestamp ID.
 
+Before stripping the page's source maps for the deploy, run
+`node scripts/sentry-maps.mjs dist --environment staging` (or
+`production`) from the same checkout: it creates the Sentry release
+`wildshard@<version>`, uploads the hidden maps under the build id as
+dist, and records the deploy (SENTRY-TRIAGE S5). It reads
+`SENTRY_AUTH_TOKEN`, else `~/.config/wildshard/sentry-auth-token`, and
+uploads nothing without one. `preview.yml` runs it for every preview.
+
 ## Local proof
 
 `node scripts/vitest-tmp.ts run test/server-release-ci.test.ts` generates

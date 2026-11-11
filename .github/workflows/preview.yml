@@ -80,10 +80,20 @@ jobs:
           node scripts/gen.mjs --inputs-only
           python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs
           node scripts/check-devserver.mjs dist
+      # SENTRY-TRIAGE S5: the hidden maps go to Sentry (release wildshard@<version>, dist the build), never to the CDN;
+      # the next step strips them. A Sentry outage or a missing token never stops the preview.
+      - name: Upload the source maps to Sentry
+        if: steps.changed.outputs.deploy == 'true'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: node scripts/sentry-maps.mjs dist --environment preview
       - name: Prepare the prebuilt folder
         if: steps.changed.outputs.deploy == 'true'
         run: |
-          find dist/assets dist/b -maxdepth 2 -name '*.map' -print0 2>/dev/null | xargs -0 rm -f
+          find dist/assets dist/b -name '*.map' -print0 2>/dev/null | xargs -0 rm -f
+          if find dist/assets dist/b -name '*.map' 2>/dev/null | grep -q .; then echo '::error::source maps left in the deploy'; exit 1; fi
           # vercel.json's headers and redirects (?doctor) stay; the folder is already built
           node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('vercel.json','utf8')); c.buildCommand=''; c.framework=null; c.outputDirectory='.'; fs.writeFileSync('dist/vercel.json', JSON.stringify(c, null, 2))"
           mkdir -p dist/.vercel
