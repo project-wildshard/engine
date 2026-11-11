@@ -66,21 +66,23 @@ function installedVirtualStoreTarget(from, target, name) {
   } catch { return undefined; } // Missing/corrupt metadata is not authority to lend outside source.
 }
 
-/** The checkout's own manifest names `name` as an alias of `real` (GVS G9): a store slot holds an aliased package under
- * its real name (`@wildshard/wire-released` is `links/…/node_modules/@wildshard/wire`). A classic install never gets
- * here, its alias lives inside the repo. Only a non-registry spec, or an `npm:` spec of exactly `real`, lends the slot.
+/** The checkout's lockfile resolves its root dependency `name` to the package `real` (GVS G9): a store slot holds an
+ * aliased package under its real name (`@wildshard/wire-released` is `links/…/node_modules/@wildshard/wire`). A classic
+ * install never gets here, its alias lives inside the repo. The lockfile's resolved identity, not the spec's shape, is
+ * the authority: an alias lends only the one package it resolves to.
  * @param {string} repo @param {string} name @param {string} real @param {string} installed */
 function declaredAlias(repo, name, real, installed) {
   if (!installed.endsWith(`${sep}node_modules${sep}${real.split('/').join(sep)}`)) return false;
   try {
-    /** @type {Record<string, Record<string, unknown> | undefined>} */
-    const manifest = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'));
-    const spec = [manifest.dependencies, manifest.devDependencies, manifest.optionalDependencies]
-      .map(deps => deps !== undefined && Object.hasOwn(deps, name) ? deps[name] : undefined).find(value => typeof value === 'string');
-    if (typeof spec !== 'string') return false;
-    if (spec.startsWith('npm:')) return spec.slice(4).replace(/(?<=.)@[^@]*$/u, '') === real;
-    return /^(?:github:|git\+|git:|https?:|file:|link:)/u.test(spec);
-  } catch { return false; } // No readable manifest declares the alias.
+    const lock = readFileSync(join(repo, 'pnpm-lock.yaml'), 'utf8');
+    // importers' root `.:` block only: its entries sit at six spaces, their fields at eight
+    const start = lock.search(/^ {2}\.:$/mu);
+    if (start === -1) return false;
+    const rest = lock.slice(start + '  .:\n'.length), stop = rest.search(/^ {0,2}\S/mu), root = stop === -1 ? rest : rest.slice(0, stop);
+    const escaped = name.replaceAll(/[.*+?^${}()|[\]\\/]/gu, String.raw`\$&`);
+    const entry = new RegExp(String.raw`^ {6}'?${escaped}'?:\n {8}specifier: [^\n]*\n {8}version: '?([^'\n]+)'?$`, 'mu').exec(root);
+    return entry !== null && entry[1].startsWith(`${real}@`);
+  } catch { return false; } // No readable lockfile resolves the alias.
 }
 
 /** Classify canonical destinations on every path, including retried exports.
