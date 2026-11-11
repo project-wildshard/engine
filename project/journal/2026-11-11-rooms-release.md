@@ -17,3 +17,6 @@
   names once it is on that list, so the switch is the release variable alone. The Doctor hint stops naming Funnel.
 - Review fold (Codex): the bots send the staging page Origin off loopback, since Caddy refuses a socket without an allowed
   Origin (checked: Node with no Origin is refused, with it 101). The Doctor hint names the host it tried.
+- The Doctor server row on rooms: `/health` is private there (D7), so the row says `<host> reachable · health is private`.
+  The strict staging proof accepts exactly that on rooms-staging; the build match is still proven by its tailnet `/health`
+  reads before and after the run. Elsewhere it still needs the build in the row.

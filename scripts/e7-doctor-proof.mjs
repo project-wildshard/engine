@@ -42,7 +42,10 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
    await page.locator('#ws-doctor:not([data-running])[data-verdict]').waitFor({timeout:120000});
    const rows=await page.locator('.ws-doc-row').evaluateAll(nodes=>nodes.map(node=>{if(!(node instanceof HTMLElement))throw new Error('Doctor row must be an HTML element');return{id:node.dataset.check,state:node.dataset.state,value:node.querySelector('.ws-doc-value')?.textContent,ms:node.querySelector('.ws-doc-ms')?.textContent};}));
    assert.deepEqual(rows.map(row=>row.id),['page','release','packs','server','join','latency','browser']);assert.ok(rows.every(row=>row.state==='pass'),JSON.stringify(rows));
-   assert.ok(rows.find(row=>row.id==='server')?.value?.includes(build.slice(0,7)),'Opaque reachability cannot replace a matching server');
+   const serverRow=rows.find(row=>row.id==='server')?.value??'';
+   // D7: on rooms-staging the page can't read /health, so the row says reachable; the tailnet health reads before and after prove the build.
+   if(new URL(socket).host==='rooms-staging.wildshard.io')assert.equal(serverRow,'rooms-staging.wildshard.io reachable · health is private',serverRow);
+   else assert.ok(serverRow.includes(build.slice(0,7)),'Opaque reachability cannot replace a matching server');
    await page.getByRole('button',{name:'Copy report',exact:true}).click();await page.getByRole('button',{name:'Copied',exact:true}).waitFor({timeout:5000});
    const copied=await page.evaluate(()=>navigator.clipboard.readText());const reportAt=Date.parse(/^Wildshard connection doctor · ([^\n]+)/u.exec(copied)?.[1]??'');assert.ok(reportAt>=started&&reportAt<=Date.now(),'Clipboard must contain this run’s fresh native report');assert.ok(copied.includes(`build ${build}`));assert.ok(copied.includes('result all pass'));for(const row of rows)assert.ok(copied.includes(`${row.id} · pass`));
    assert.equal(prefixes.filter(prefix=>prefix===SOCKET_RELIABLE).length,1);assert.equal(prefixes.includes(SOCKET_READY),false);assert.ok(prefixes.some(prefix=>prefix===SOCKET_PING));assert.ok(prefixes.every(prefix=>prefix===SOCKET_RELIABLE||prefix===SOCKET_PING));

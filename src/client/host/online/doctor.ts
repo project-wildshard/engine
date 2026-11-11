@@ -170,7 +170,8 @@ async function checkServer(learned: Learned, ms: number): Promise<Outcome> {
     // A server from before the doctor sends no CORS header: an opaque answer still proves the tunnel and TLS are up.
     try {
       await limited(learned.scope, ms, signal => fetch(url, { mode: 'no-cors', cache: 'no-store', signal }));
-      return pass(`${new URL(url).host} reachable (details need a newer server)`);
+      // D7: behind Cloudflare the rooms address keeps /health private (404, no CORS), so the opaque answer is all a page gets.
+      return pass(`${new URL(url).host} reachable · health is private`);
     } catch {
       return fail(`${new URL(url).host}: no answer`, `Server unreachable: ${new URL(url).host} is down, its TLS is failing, or the server is stopped. Tell Jake.`);
     }
