@@ -65,13 +65,13 @@ export interface HeadlessCommandPorts {
   readonly melee: () => NativeSweptMeleeInput;
   readonly walk: (speed: number) => { x: number; z: number };
 }
+/** Each of a body's feet coordinates is a finite number. */
+function finitePoint(point: { readonly x: number; readonly y: number; readonly z: number }): boolean { return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z); }
+
 /** Bind existing tick commands and ledger effects once at installation. Shots keep every attack; heavy picks the first
  * held command; melee/walk take the last player command, including an empty release. Script values use the last match.
  * Readers resample the current tape on every call, refuse overflow, and preserve tape order. Filtered lists and melee
  * input are borrowed scratch values, consumed immediately by the native owner rather than saved between ticks. */
-/** Each of a body's feet coordinates is a finite number. */
-function finitePoint(point: { readonly x: number; readonly y: number; readonly z: number }): boolean { return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z); }
-
 export function bindHeadlessCommands(context: Pick<HeadlessRuntimeInstallation, 'commands' | 'emit'>, host?: SimHost): HeadlessCommandPorts {
   const commands = (): readonly HeadlessCommand[] => {
     const tape = context.commands();

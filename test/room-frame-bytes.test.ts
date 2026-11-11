@@ -1,7 +1,7 @@
 // MMO-PLAN MP1.2: the room's tick got cheaper (each frame's row places read once for every client's view, the row sample
 // loop without a closure, the trusted step's finite check without arrays, one wind schema for every seat). Speed only: the
 // same wire bytes and the same bodies. This pins a digest of every byte a Nalati room sends to each of 12 clients spread
-// across its distance tiers, and every body's feet, over 6 seconds, taken from the code before the change.
+// across its distance tiers, and every body's feet after every tick, over 6 seconds, taken from the code before the change.
 // oxlint-disable-next-line import/no-nodejs-modules -- Hash the bytes the room sends.
 import { createHash } from 'node:crypto';
 import { expect, test } from 'vitest';
@@ -43,12 +43,12 @@ test('a Nalati room sends the same bytes and moves the same bodies', async () =>
       bots.forEach((bot, index) => { bot.client.command(input(index, tick, target)); bot.client.flush(); bot.pump(); });
       room.tick();
       for (const bot of bots) bot.pump();
+      for (const [id, body] of [...host.players, ...host.entities]) digest.update(`${id}:${String(body.position.x)},${String(body.position.y)},${String(body.position.z)};`);
     }
-    for (const [id, body] of [...host.players, ...host.entities]) digest.update(`${id}:${String(body.position.x)},${String(body.position.y)},${String(body.position.z)};`);
     expect(room.stats.tierSkips, 'far rows skip frames').toBeGreaterThan(0);
     expect(digest.digest('hex')).toBe(EXPECTED);
   } finally { live.dispose(); }
 }, 120_000);
 
 /** Taken on engine main 2887bd63, before the change. */
-const EXPECTED = '6125baedd18af4ca840a688693521ab33077cf5cd57072fcd74bef8c858a88a1';
+const EXPECTED = '1c8a02607a75ce36d93b687de9c546d42501bd8c753073c3914bfd2ed72a7057';

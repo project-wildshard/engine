@@ -17,8 +17,9 @@
 // when the run ends. It never touches the host's servers, units, env files or databases. Its ssh link keeps itself alive
 // (keepalives), so a quiet half hour doesn't end the run early with every bot 'lost'.
 // `--server-from <commit>` (MP1.2: measure a speed-up before a staging release carries it): the replica runs that commit's server
-// code, built here under the release's build name, so the release's packs and bots still match it. It must descend from the
-// release's build, and the report names it (`serverFrom`). The wire is the release's: a commit that changes it is refused at hello.
+// code, built here under the release's build name, so the release's packs still match it. The bots are built from the same
+// commit, so their code and wire are the server's exactly. It must descend from the release's build; the report names it
+// (`serverFrom`). Every value that reaches the host's shell is a checked slug, number, hex or fixed path.
 // Everything goes in tmp/mmo-bots/<stamp>/, and the release tree is removed after the run; the report stays.
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
@@ -41,6 +42,8 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' } } });
 const serverFrom = values['server-from'];
 if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
+// These reach the host's shell inside the replica's env line: only slugs and whole numbers.
+if (!/^[a-z0-9-]+(?:,[a-z0-9-]+)*$/u.test(values.cells) || !/^\d{1,3}$/u.test(values.workers) || !/^\d{1,3}$/u.test(values.seats)) throw new Error('--cells is a slug list; --workers and --seats are whole numbers');
 const remote = values.remote;
 if (remote !== undefined && (mode !== 'replica' || !/^[\w.@-]+$/u.test(remote) || values.database !== 'memory:')) throw new Error('--remote is a replica on memory saves, named by an ssh host');
 if (!/^[\d,-]+$/u.test(values.cpus)) throw new Error('--cpus is a taskset list');
@@ -81,24 +84,20 @@ const tree = join(work, 'src'), out = join(work, 'build');
 const git = (/** @type {string[]} */ args) => execFileSync('git', args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
 try { git(['cat-file', '-e', `${release.engineBuild}^{commit}`]); } catch { git(['fetch', '--quiet', 'origin', release.engineBuild]); }
 mkdirSync(tree, { recursive: true });
-execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', release.engineBuild]) });
+const source = serverFrom ?? release.engineBuild;
+if (serverFrom !== undefined) try { git(['merge-base', '--is-ancestor', release.engineBuild, serverFrom]); } catch { throw new Error(`--server-from ${serverFrom} does not descend from the release's ${release.engineBuild}`); }
+execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', source]) });
 for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts']) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
 // CI=1 keeps the install non-interactive; --config.ci=false keeps the global store on, which pnpm drops under ci (GVS G9)
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
 execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', 'mmoBots=test/fixtures/dedicated/mmoBotsEntry.ts'], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
-note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), from: release.engineBuild });
-/** `--server-from`: that commit's server, under the release's build name, packed as a release bundle is. */
+note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), from: source });
+/** `--server-from`: that commit's server from the bots' own tree, under the release's build name, packed as a release bundle is. */
 let serverBundle = null;
 if (serverFrom !== undefined) {
-  try { git(['merge-base', '--is-ancestor', release.engineBuild, serverFrom]); } catch { throw new Error(`--server-from ${serverFrom} does not descend from the release's ${release.engineBuild}`); }
-  const fromTree = join(work, 'server-src');
-  mkdirSync(fromTree, { recursive: true });
-  execFileSync('tar', ['-x', '-C', fromTree], { input: git(['archive', serverFrom]) });
-  execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent'], { cwd: fromTree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
   serverBundle = join(work, 'server-from.tar.gz');
-  execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', join(work, 'server-from'), '--tar', serverBundle], { cwd: fromTree, stdio: ['ignore', 'ignore', 'inherit'] });
-  rmSync(fromTree, { recursive: true, force: true });
+  execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', join(work, 'server-from'), '--tar', serverBundle], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
   note({ step: 'server-from', commit: serverFrom, as: release.engineBuild });
 }
 
@@ -209,6 +208,6 @@ note({ step: 'done', exit: code, seated: report.seated, steady: report.steady, w
 process.exitCode = Number(code);
 } finally {
   await stopRoom();
-  if (!values.keep) for (const path of [tree, out, join(work, 'server'), join(work, 'server.tar.gz'), join(work, 'packs'), join(work, 'server-src'), join(work, 'server-from'), join(work, 'server-from.tar.gz')]) rmSync(path, { recursive: true, force: true });
+  if (!values.keep) for (const path of [tree, out, join(work, 'server'), join(work, 'server.tar.gz'), join(work, 'packs'), join(work, 'server-from'), join(work, 'server-from.tar.gz')]) rmSync(path, { recursive: true, force: true });
 }
 process.exit(process.exitCode ?? 1);
