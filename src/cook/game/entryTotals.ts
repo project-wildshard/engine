@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import * as v from 'valibot';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {existsSync, readFileSync, mkdirSync, writeFileSync, readdirSync} from 'node:fs';
+import {existsSync, readFileSync, mkdirSync, readdirSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {join, relative, resolve, sep} from 'node:path';
 import {PickupCatalogueSchema} from '@wildshard/format/specimenCatalogue';
@@ -10,7 +10,7 @@ import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {createHash} from 'node:crypto';
 import {readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnManifestAddress} from '../../shared/game/shardfile/spawnManifest';
 import {assetIdentities, audioTableRefs, bundlerSources as manifestSources, identityFiles, joinRefs, standInRefs, packMembers, readFenceReads, resolveFenceReads, sectionRefs, type PackPart} from './fenceReads';
-import {createPartEncoder, writeSpawnParts, type CookedMember, type SpawnPartEncoding} from './spawnParts';
+import {createPartEncoder, writeSpawnManifestFiles, writeSpawnParts, type CookedMember, type SpawnPartEncoding} from './spawnParts';
 import {cookParts, cookShardServerPack, openShardfile, servedAsIs, shardHalf} from './shardCook';
 import type {ServerPack} from '../../shared/game/shardfile/serverPack';
 import {contentNamed} from './contentNamed';
@@ -280,10 +280,8 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
   const written: SpawnManifestAddress[] = [];
   for (const [index, {manifest: base}] of pending.entries()) {
     const at = packed.indexOf(index);
-    const manifest = readSpawnManifest(at === -1 ? base : {...base, parts: packedTables[at] ?? []});
-    const text = JSON.stringify(manifest), hash = createHash('sha256').update(text).digest('hex'), name = `assets/spawn/${base.shard}-${base.flow}-${base.tier}-${hash.slice(0, 16)}.json`;
-    writeFileSync(join(output, name), text);
-    written.push({url: `/${name}`, bytes: Buffer.byteLength(text), totalBytes: base.totalBytes, files: base.files.length, ...(base.wireBytes === undefined ? {} : {wireBytes: base.wireBytes})});
+    // OVERNIGHT 6e: the code rows go in a list of their own, so a code change renames that list and no manifest.
+    written.push(writeSpawnManifestFiles(output, readSpawnManifest(at === -1 ? base : {...base, parts: packedTables[at] ?? []})));
   }
   const at = (index: number): SpawnManifestAddress => { const address = written[index]; if (address === undefined) throw new Error('Missing spawn manifest'); return address; };
   for (const [directory, pair] of Object.entries(clientAt)) client[directory] = {phone: at(pair.phone), desktop: at(pair.desktop)};

@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {join} from 'node:path';
-import {readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnManifestAddress} from '../../shared/game/shardfile/spawnManifest';
+import {joinSpawnManifest, readSpawnCodeList, readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnManifestAddress} from '../../shared/game/shardfile/spawnManifest';
 import type {SpawnManifestBook} from './entryTotals';
 
 export interface EngineHalfBook {
@@ -14,6 +14,12 @@ export interface EngineHalfBook {
   readonly grid: Readonly<Record<'phone' | 'desktop', SpawnManifestAddress>>;
 }
 export const engineHalfBookPath = (build: string): string => `assets/spawn/engine-${build}.json`;
+
+/** A built manifest, whole: its content and its code list (OVERNIGHT 6e), as a page reads them. */
+export function readBuiltSpawnManifest(outDir: string, address: SpawnManifestAddress): SpawnManifest {
+  const json = (url: string): unknown => JSON.parse(readFileSync(join(outDir, url.slice(1)), 'utf8'));
+  return joinSpawnManifest(readSpawnManifest(json(address.url)), address.code === undefined ? undefined : readSpawnCodeList(json(address.code.url)));
+}
 
 /** What every shard's manifest of a tier and flow lists: the build's half, which no shard owns. */
 export function sharedRows(manifests: readonly Pick<SpawnManifest, 'files'>[]): readonly SpawnFile[] {
@@ -27,7 +33,7 @@ export function sharedRows(manifests: readonly Pick<SpawnManifest, 'files'>[]): 
  *  own half, and a page that boots a cooked shard takes this one for the rest (C3). It is a file of its own, so today's
  *  manifests and every byte a phone downloads stay as they are. */
 export function writeEngineHalves(outDir: string, book: Pick<SpawnManifestBook, 'client' | 'grid'>, build: string): EngineHalfBook {
-  const read = (address: SpawnManifestAddress): SpawnManifest => readSpawnManifest(JSON.parse(readFileSync(join(outDir, address.url.slice(1)), 'utf8')));
+  const read = (address: SpawnManifestAddress): SpawnManifest => readBuiltSpawnManifest(outDir, address);
   const half = (flow: 'client' | 'grid', tier: 'phone' | 'desktop', addresses: readonly SpawnManifestAddress[]): SpawnManifestAddress => {
     const files = sharedRows(addresses.map(read)), totalBytes = files.reduce((sum, row) => sum + row.bytes, 0), wireBytes = files.reduce((sum, row) => sum + (row.wireBytes ?? 0), 0);
     const text = JSON.stringify(readSpawnManifest({version: 1, shard: 'engine', tier, flow, files, totalBytes, wireBytes}));
