@@ -155,3 +155,9 @@ export function decodePhysicsReferences(bytes: Uint8Array, length: number, basis
   references(bytes, length, basis?.length, result, basis);
   return result;
 }
+/** The reference encoder's own pieces, for snapshotReferenceMemo.ts only (TEST-SPEED TS4a): one definition each, so the
+ * memo's re-encoding can never drift from encodePhysicsReferences. */
+export const physicsEncoderParts: {
+  readonly hash: typeof hash; readonly hashWords: typeof hashWords; readonly indexMatch: typeof indexMatch;
+  readonly matchedBytes: typeof matchedBytes; readonly matchMinimum: number; readonly literalLimit: number;
+} = { hash, hashWords, indexMatch, matchedBytes, matchMinimum, literalLimit };

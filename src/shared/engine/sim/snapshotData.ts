@@ -2,6 +2,7 @@ import { unpackSnapshotBase64 as unpack } from './snapshotBase64';
 import * as v from 'valibot';
 import { deflateSync, inflateSync } from 'fflate';
 import { MAX_PHYSICS_BYTES, MAX_REFERENCE_BYTES, byteArray, encodePhysicsReferences, decodePhysicsReferences, validatePhysicsReferences } from './snapshotPhysics';
+import { encodePhysicsReferencesMemo, type PhysicsReferenceMemo } from './snapshotReferenceMemo';
 import type { SimValue } from '../../../server/engine/sim';
 import type { SimSnapshot, SimSnapshotBytes } from './snapshot';
 import { DAY_CLOCK_PHASES } from './dayClock';
@@ -212,6 +213,8 @@ class ScopedPhysicsPacker {
   private readonly compress = deflateSync;
   private retainedBytes = 0;
   private closed = false;
+  // TEST-SPEED TS4a: this world's previous basis-free references, so the next checkpoint re-encodes only what changed.
+  private memo: PhysicsReferenceMemo | undefined;
   private check(): void { if (this.closed) throw new Error('Snapshot serializer is disposed'); }
   trim(count: number): void {
     this.check();
@@ -240,10 +243,17 @@ class ScopedPhysicsPacker {
     }
     return encoded;
   }
-  dispose(): void { this.closed = true; this.blocks.length = 0; this.retainedBytes = 0; }
+  /** Exactly encodePhysicsReferences(raw), from this world's previous encoding. */
+  references(raw: Uint8Array): Uint8Array {
+    this.check();
+    const next = encodePhysicsReferencesMemo(raw, this.memo);
+    this.memo = next.memo;
+    return next.encoded;
+  }
+  dispose(): void { this.closed = true; this.blocks.length = 0; this.retainedBytes = 0; this.memo = undefined; }
 }
 function* packedPhysics(raw: Uint8Array, basis?: Uint8Array, packer?: ScopedPhysicsPacker): Generator<undefined, v.InferOutput<typeof packedSnapshot>['physics']> {
-  const references = encodePhysicsReferences(raw, basis), chunks: string[] = [];
+  const references = packer !== undefined && basis === undefined ? packer.references(raw) : encodePhysicsReferences(raw, basis), chunks: string[] = [];
   packer?.trim(Math.ceil(references.length / physicsBlockBytes));
   yield;
   for (let offset = 0; offset < references.length; offset += physicsBlockBytes) {

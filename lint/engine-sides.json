@@ -1498,6 +1498,7 @@
     "src/shared/engine/sim/snapshotBase64.ts": "shared",
     "src/shared/engine/sim/snapshotData.ts": "shared",
     "src/shared/engine/sim/snapshotPhysics.ts": "shared",
+    "src/shared/engine/sim/snapshotReferenceMemo.ts": "shared",
     "src/shared/engine/sim/strips.ts": "shared",
     "src/shared/engine/strings.ts": "shared",
     "src/shared/engine/world/BakedTerrain.ts": "shared",
