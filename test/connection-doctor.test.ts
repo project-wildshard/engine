@@ -78,13 +78,14 @@ test('a server that is down fails health and the socket, with the tunnel hint', 
   expect(rows['latency']?.state).toBe('skip');
 });
 
-test('the door says why it refuses: a full world, and another build', { timeout: 30_000 }, async () => {
+test('the door says why it refuses a full world; another build of this wire joins', { timeout: 30_000 }, async () => {
   bench = await roomBench({ seats: 0 }); answerHealth(bench);
   const page = await serveOrigin(signed(releaseFor(bench.url)));
   expect((await run(config(page)))['join']).toMatchObject({ state: 'fail', value: 'World is full' });
   const stale = await run(config(page, { build: 'an-old-build' }));
   expect(stale['release']?.state, 'the world names another build').toBe('warn');
-  expect(stale['join']).toMatchObject({ state: 'fail', value: 'refused: another build' });
+  // WR5 (5.5): the door no longer refuses another build: this page meets the full world, as the right build does.
+  expect(stale['join']).toMatchObject({ state: 'fail', value: 'World is full' });
 });
 
 test('a missing pack part and a missing book are the packs origin, not the server', { timeout: 30_000 }, async () => {

@@ -8,9 +8,7 @@ import { WebSocket } from 'ws';
 import { World, type WorldOptions, type WorkerLink } from '../../../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../../../src/server/host/dedicated/playerSaves';
 import type { CellOrder, WorkerNews } from '../../../src/server/host/dedicated/cellProtocol';
-import { BitWriter } from '../../../src/shared/engine/net/bits';
-import { encodeHello } from '../../../src/shared/engine/net/messages';
-import { NET_SCHEMA_HASH } from '../../../src/shared/engine/net/netSchemas';
+import { helloMessage } from '../../../src/shared/engine/net/wireMessages';
 import { framed, SOCKET_RELIABLE } from '../../../src/shared/engine/net/socketFrames';
 
 /** The header a loopback proxy of this kind sets for a client (VH10). */
@@ -38,7 +36,7 @@ export async function gatewayDoor(options: Partial<WorldOptions> = {}) {
     arrivals.set(device, () => { arrivals.delete(device); resolve(true); });
     socket.on('error', () => { arrivals.delete(device); resolve(false); });
     socket.on('close', code => { closes.push(code); arrivals.delete(device); resolve(false); });
-    socket.once('open', () => { socket.send(framed(SOCKET_RELIABLE, encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build: 'bench', player: device, name: 'Guest', ledger: 0 }))); });
+    socket.once('open', () => { socket.send(framed(SOCKET_RELIABLE, helloMessage({ build: 'bench', player: device, name: 'Guest', ledger: 0 }).buffer)); });
     socket.once('message', () => { socket.send(Buffer.from([5])); });
   });
   return { world, seats, closes, upgrade, admit, close: async (): Promise<void> => { for (const socket of sockets) socket.terminate(); world.dispose(); for (const seat of seats) seat.port.close(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); } };
