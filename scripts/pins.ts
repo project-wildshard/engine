@@ -36,6 +36,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 import { excludePublished } from './pins-exclude.mjs';
+import { dropManifest, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 
@@ -173,6 +174,26 @@ function tracked(): ReadonlySet<string> {
 }
 
 async function install(only: readonly string[], fromFormat = false): Promise<void> {
+  // DS12: a full install whose pins match this tree's last one, or another worktree's, clones and verifies (pins-reuse.mjs).
+  const full = only.length === 0 && !fromFormat, root = process.cwd();
+  const key = full ? pinsKey(root, shardfileValidationRevision(root)) : '';
+  if (full && process.env.WILDSHARD_PINS_REUSE !== '0') {
+    const reused = await reusePins(root, key, { log: line => { console.log(line); } });
+    if (reused !== undefined) {
+      const paths = [...reused.published].sort((a, b) => a.localeCompare(b));
+      writeFileSync(LEDGER, json({ revision: shardfileValidationRevision(root), published: paths } satisfies Ledger));
+      excludePublished(paths);
+      await installSaves((readJson(PINS) as PinFile).shards.map(row => row.slug));
+      const source = reused.source === root ? 'this tree, unchanged' : `${reused.mode} of ${reused.source}`;
+      console.log(`pins reused: ${source}; ${reused.files} files, ${(reused.bytes / 2 ** 20).toFixed(0)} MiB verified by sha256 (clone ${reused.seconds.clone.toFixed(1)}s, verify ${reused.seconds.verify.toFixed(1)}s), ${paths.length} mounts published`);
+      return;
+    }
+  }
+  dropManifest(root);
+  const productHashes: Record<string, Record<string, string>> = {}, mountHashes: Record<string, string> = {};
+  // The validator hashes most members already; the manifest reuses those digests rather than hashing twice.
+  const digests = new WeakMap<Uint8Array, string>();
+  const digest = (bytes: Uint8Array): string => { let held = digests.get(bytes); if (held === undefined) { held = sha256(bytes); digests.set(bytes, held); } return held; };
   const { prepareAssetDecoders } = await import('@wildshard/format/product');
   const { validateShardfileProduct } = await import('@wildshard/format/productValidation');
   const { readTar } = await import('@wildshard/format/tar');
@@ -190,7 +211,8 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
   for (const path of existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : []) rmSync(path, { force: true });
   const shared = tracked(), published = new Map<string, string>();
   const publish = (url: string, body: Uint8Array): void => {
-    const hash = sha256(body), held = published.get(url);
+    const hash = digest(body), held = published.get(url);
+    mountHashes[url] = hash;
     if (held !== undefined && held !== hash) throw new Error(`Two pins publish different ${url}`);
     if (shared.has(url)) {
       if (sha256(readFileSync(url)) !== hash) throw new Error(`${url} differs from engine's tracked file`);
@@ -208,7 +230,7 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
     try {
       validateShardfileProduct(
         { read: (path, maximum) => { const body = fileNamed(path); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => files.keys() },
-        { hash: sha256 },
+        { hash: digest },
       );
     } catch (error) {
       failed++;
@@ -221,6 +243,7 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
     if (folder === undefined) { failed++; console.error(`refused ${pin.slug}: no discovery document`); continue; }
     const target = resolve('out', folder);
     rmSync(target, { recursive: true, force: true });
+    const written: Record<string, string> = productHashes[folder] = {};
     let mounts = 0;
     const beforeMounts = published.size;
     for (const [path, body] of files) {
@@ -228,6 +251,7 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
       const out = join(target, path);
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, body);
+      written[path] = digest(body);
       const mounted = /^mounts\/((?:assets|programs)\/.+)$/u.exec(path)?.[1];
       if (mounted !== undefined) publish(`public/${mounted}`, body);
     }
@@ -238,9 +262,12 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
     for (const [path, body] of restorePacks(index, files)) {
       mkdirSync(dirname(join(target, path)), { recursive: true });
       writeFileSync(join(target, path), body);
+      written[path] = digest(body);
     }
     mounts = published.size - beforeMounts;
-    writeFileSync(join(target, 'validation.json'), `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision }, ...(dependency === undefined ? {} : {source: dependency.source}) })}\n`);
+    const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision }, ...(dependency === undefined ? {} : {source: dependency.source}) })}\n`;
+    writeFileSync(join(target, 'validation.json'), validation);
+    written['validation.json'] = sha256(Buffer.from(validation));
     console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${mounts} mounts published`);
   }
   for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
@@ -251,6 +278,7 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
   // The shared exclude file is the canonical checkout's alone; a plan worktree leaves it untouched (pins-exclude.mjs).
   excludePublished(paths);
   if (dependency === undefined) await installSaves(pins.map(row => row.slug));
+  if (full && failed === 0) writeManifest(root, key, productHashes, mountHashes);
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
 }
 

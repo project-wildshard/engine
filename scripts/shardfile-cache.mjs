@@ -12,10 +12,11 @@
 // areas are excluded, while generated source bytes remain conservative inputs.
 // Products are shared across mirror slots in ~/.cache/wildshard/shardfiles.
 import { createHash, randomBytes } from 'node:crypto';
-import { constants, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { WORKTREES } from './worktree-ignore.mjs';
+import { clonePaths } from './apfs-clone.mjs';
 
 const KEY_VERSION = 'shardfile-key/2';
 export const KEY_FILE = '.build-key';
@@ -100,7 +101,8 @@ export function publishProduct(from, to) {
   mkdirSync(dirname(to),{recursive:true});
   const temporary=join(dirname(to),`.publish-${basename(to)}-${randomBytes(5).toString('hex')}`),previous=`${temporary}-old`;
   try {
-    cpSync(from,temporary,{recursive:true,mode:constants.COPYFILE_FICLONE});
+    // A real APFS clone: Node's COPYFILE_FICLONE copied every byte on macOS (DS12).
+    clonePaths([[from,temporary]]);
     let index;
     try{index=JSON.parse(readFileSync(join(temporary,'shard.json'),'utf8'));}catch{ /* Legacy cache fixtures may contain plain text. */ }
     if(index?.format==='wildshard.shardfile'&&index.formatVersion===2&&existsSync(join(temporary,KEY_FILE))){
