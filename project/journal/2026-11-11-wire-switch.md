@@ -57,3 +57,7 @@
   `reload` instead of leaving the client unwelcomed. SHOULD: a room checks
   its required capabilities on a traveller too. NIT: the doctor says an
   accepted hello proves wire compatibility, not the same build.
+- Hosted CI caught the door tests: the dedicated gateway fixture still said
+  hello the v0 way, and four tests expected a wrong build to reload. They
+  now hold 5.5: a v0.1.x hello reloads, another build of this wire plays
+  (or meets a full world, as the right build would).

@@ -39,11 +39,13 @@ test('a browser with no Ed25519 tells the player what to do', async () => {
   await expect(readSignedRelease(text, publicKey)).rejects.toThrow('Update it to Chrome 137');
 });
 
-test('the door seats a loaded page, a countdown reaches it, and a stale page hears `reload`', { timeout: 30_000 }, async () => {
+test('the door seats a loaded page, a countdown reaches it, and another build of this wire is not refused', { timeout: 30_000 }, async () => {
   bench = await roomBench({ graceMs: 60_000 });
   const stale: { state: LinkState; reason?: string }[] = [];
   const old = connectOnline({ socket: bench.url, build: 'an-old-build', loaded: SHARD, identity: { player: 'device:old', name: 'Old' } }, { link: (state, reason) => { stale.push({ state, ...reason === undefined ? {} : { reason } }); }, countdown: () => undefined, elsewhere: () => undefined });
-  await vi.waitFor(() => { expect(stale).toEqual([{ state: 'ended', reason: 'reload' }]); }, { timeout: 5000 });
+  // WR5 (5.5, J54 replaced): builds need not match; the wire's bootstrap and minor window decide.
+  await new Promise(resolve => { setTimeout(resolve, 1500); });
+  expect(stale).toEqual([]);
   old.dispose();
   const countdowns: string[] = [], places: string[] = [];
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: said => { countdowns.push(said.build); }, elsewhere: shard => { places.push(shard); } });

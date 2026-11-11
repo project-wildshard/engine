@@ -1,5 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { decodeCountdown } from '../src/shared/engine/net/socketFrames';
+import { WebSocket } from 'ws';
+import { BitWriter } from '../src/shared/engine/net/bits';
+import { encodeHello } from '../src/shared/engine/net/messages';
+import { NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
+import { closeReason, decodeCountdown, framed, SOCKET_RELIABLE } from '../src/shared/engine/net/socketFrames';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -11,10 +15,12 @@ const bots: RoomBot[] = [];
 const bot = (...args: ConstructorParameters<typeof RoomBot>): RoomBot => { const made = new RoomBot(...args); bots.push(made); return made; };
 afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await bench?.close(); bench = undefined; });
 
-test('a wrong build hears `reload`, and no seat is made', { timeout: 60_000 }, async () => {
+test('a v0.1.x hello hears `reload`, and no seat is made', { timeout: 60_000 }, async () => {
+  // WR5 (5.5, J54 replaced): another build of this wire plays; a hello from before the wire cut reloads.
   bench = await roomBench();
-  const stale = bot(bench.url, 'an-old-build', 'device:stale');
-  expect(await stale.ended()).toBe('reload');
+  const socket = new WebSocket(bench.url), closed = new Promise<number>(resolve => { socket.on('close', code => { resolve(code); }); });
+  socket.once('open', () => { socket.send(framed(SOCKET_RELIABLE, encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build: 'an-old-build', player: 'device:stale', name: 'Old', ledger: 0 }))); });
+  expect(closeReason(await closed)).toBe('reload');
   expect(bench.world.health()).toEqual({ build: 'bench', cells: 1, workers: 1, awake: 0, players: 0, table: { [SHARD]: 0 } });
   expect(bench.world.refusals).toEqual({ 'stale-build': 1 });
 });
