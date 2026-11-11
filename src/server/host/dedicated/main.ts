@@ -25,6 +25,7 @@ import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
+import { doorTrust } from './doorTrust';
 import { cellShard, worldCells } from './gridCells';
 
 declare const __BUILD_ID__: string;
@@ -86,7 +87,9 @@ let ending = false;
 /** One failure can arrive twice: a worker that fails at boot also rejects the wait for it. */
 const failed = (error: unknown): void => { if (ending) return; ending = true; log({ at: 'server.crashed', error: String(error) }); reports.error(error); stop(1); };
 process.on('uncaughtException', failed);
-const world: World = await World.open({ build, cells, ...worldSettings(release.channel, process.env), secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
+// VH10: which forwarded header the door believes, and which pages may open a socket. A word it doesn't know stops here.
+const trust = doorTrust(process.env);
+const world: World = await World.open({ build, cells, ...worldSettings(release.channel, process.env), ...trust, secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); },
   ...(playtest===undefined?{}:{playtest:row=>{playtest.append(row);}}),
@@ -108,7 +111,7 @@ stop = (code): void => { void (async (): Promise<void> => {
   process.exit(written ? code : 1);
 })(); };
 await new Promise<void>(resolve => { server.listen(port, host, resolve); });
-log({ at: 'server.listening', host, port, build, cells, serial: release.serial, epoch: release.saveEpoch, node: process.version });
+log({ at: 'server.listening', host, port, build, cells, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
 // The door keeps Rapier only to read a new build's packs, so this costs no worker a tick.
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, wasm = new URL('rapier.wasm', import.meta.url), rapier = async (): Promise<Awaited<ReturnType<typeof loadRapier>>> => loadRapier(await readFile(wasm));
 // The bundle and its packs reach disk before anyone hears a countdown, so the move costs a restart and no download. A bad hash stops here, with

@@ -28,6 +28,7 @@ import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/
 import { workerTable } from './workerTable';
 import { cellName, cellShard } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
+import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAddress, type TrustProxy } from './doorTrust';
 
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
@@ -102,6 +103,10 @@ export interface WorldOptions {
   readonly playtest?:(row:PlaytestRow)=>void;
   /** J218: the ICE servers voice chat hands a player who joins; public STUN when absent. */
   readonly voiceIce?: () => Promise<readonly VoiceIceServer[]>;
+  /** VH10: which forwarded header a loopback proxy may set (`doorTrust`); `caddy` when absent. */
+  readonly trustProxy?: TrustProxy;
+  /** VH10: the pages a browser may open a socket from; `null` is any. The game's own hosts when absent. */
+  readonly allowedOrigins?: readonly string[] | null;
   /** A proof's overrides. */
   readonly helloMs?: number; readonly readyMs?: number; readonly connectsPerMinute?: number; readonly socketsPerIp?: number; readonly graceMs?: number;
   /** Monotonic connection-budget clock, overridable by local boundary tests. */
@@ -180,18 +185,14 @@ export class World {
   upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
     socket.on('error', () => { socket.destroy(); });
     if (!WORLD_PATH.test(request.url ?? '')) { this.refuse('wrong-address'); socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
+    if (!originAllowed(request.headers.origin, this.options.allowedOrigins === undefined ? DEFAULT_ALLOWED_ORIGINS : this.options.allowedOrigins)) {
+      this.refuse('origin'); socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return;
+    }
     if (this.draining) { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
-    const ip = World.address(request);
+    const ip = connectionKey(trustedAddress(request.socket.remoteAddress ?? '', request.headers, this.options.trustProxy ?? DEFAULT_TRUST_PROXY));
     const attempt = this.attempt(ip);
     if (attempt === null) { this.refuse('connections'); socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
     this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, ip, attempt); });
-  }
-  /** The address behind the tunnel or the proxy, which alone may say who it is forwarding. */
-  private static address(request: IncomingMessage): string {
-    const peer = request.socket.remoteAddress ?? '', { 'cf-connecting-ip': tunnel, 'x-forwarded-for': forwarded } = request.headers;
-    if (peer !== '127.0.0.1' && peer !== '::1' && peer !== '::ffff:127.0.0.1') return connectionKey(peer);
-    if (typeof tunnel === 'string') return connectionKey(tunnel);
-    return connectionKey((typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : undefined) ?? peer);
   }
   /** Actual retained limiter state, also recorded in the worker operational log. */
   get connectionStats(): { readonly addresses: number; readonly attempts: number } {

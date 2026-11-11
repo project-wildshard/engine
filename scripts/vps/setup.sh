@@ -210,6 +210,10 @@ Environment=WILDSHARD_HOME=$HOME_DIR/%i
 Environment=RELEASE_CHANNEL=%i
 Environment=PULL_SCRIPT=$LIB/pull.mjs
 Environment=PLAYTEST_DIR=$LOGS
+# VH10: Funnel (and later Caddy) set one X-Forwarded-For hop and pass CF-Connecting-IP through, so trust only the last XFF hop.
+# Only a browser on these pages may open a socket. An env-file line overrides either.
+Environment=TRUST_PROXY=caddy
+Environment="ALLOWED_ORIGINS=https://play.wildshard.io https://staging.wildshard.io https://preview.wildshard.io https://wildshard-singleplayer.vercel.app"
 EnvironmentFile=$ETC/%i.env
 # It exits 0 on a bad hash, so the old bundle comes back up (E7.2c).
 ExecStartPre=$NODE $LIB/pull.mjs

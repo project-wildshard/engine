@@ -76,7 +76,7 @@ test('voice signalling joins, relays inside one cell and says leave on close', a
   type Word = { readonly k: string; readonly id?: string; readonly ice?: unknown; readonly peers?: unknown[]; readonly m?: number };
   const sockets: WebSocket[] = [];
   const join = async (device: string, name: string): Promise<{ socket: WebSocket; words: Word[]; next: (k: string) => Promise<Word>; say: (word: object) => void }> => {
-    const socket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`, { headers: { 'cf-connecting-ip': `10.0.0.${String(sockets.length + 1)}` } }); sockets.push(socket);
+    const socket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`, { headers: { 'x-forwarded-for': `10.0.0.${String(sockets.length + 1)}` } }); sockets.push(socket);
     const words: Word[] = [], waiting: { k: string; resolve: (word: Word) => void }[] = [];
     socket.on('message', (data: Buffer) => {
       if (data[0] === 4) { socket.send(Buffer.from([5])); return; }

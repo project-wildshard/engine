@@ -13,7 +13,11 @@ import { encodeHello } from '../../../src/shared/engine/net/messages';
 import { NET_SCHEMA_HASH } from '../../../src/shared/engine/net/netSchemas';
 import { framed, SOCKET_RELIABLE } from '../../../src/shared/engine/net/socketFrames';
 
+/** The header a loopback proxy of this kind sets for a client (VH10). */
+const PROXY_HEADER = { caddy: 'x-forwarded-for', cloudflare: 'cf-connecting-ip', none: 'x-forwarded-for' } as const;
+
 export async function gatewayDoor(options: Partial<WorldOptions> = {}) {
+  const proxyHeader = PROXY_HEADER[options.trustProxy ?? 'caddy'];
   let news: (row: WorkerNews) => void = () => undefined;
   const seats: Extract<CellOrder, { kind: 'seat' }>[] = [], sockets: WebSocket[] = [], arrivals = new Map<string, () => void>(), closes: number[] = [];
   const boot = (): WorkerLink => ({ listen: heard => { news = heard; queueMicrotask(() => { news({ kind: 'booted', ms: 0 }); }); }, stop: () => undefined,
@@ -26,11 +30,11 @@ export async function gatewayDoor(options: Partial<WorldOptions> = {}) {
   const upgrade = (ip: string, extra: Readonly<Record<string, string>> = {}): Promise<string> => new Promise(resolve => {
     const socket = connect(address.port, '127.0.0.1');
     socket.on('error', () => { resolve('error'); });
-    socket.once('connect', () => { const headers = Object.entries({ 'cf-connecting-ip': ip, ...extra }).map(([key, value]) => `${key}: ${value}\r\n`).join(''); socket.write(`GET / HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString('base64')}\r\n${headers}\r\n`); });
+    socket.once('connect', () => { const headers = Object.entries({ [proxyHeader]: ip, ...extra }).map(([key, value]) => `${key}: ${value}\r\n`).join(''); socket.write(`GET / HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString('base64')}\r\n${headers}\r\n`); });
     socket.once('data', bytes => { socket.destroy(); resolve(bytes.toString().split('\r\n')[0] ?? ''); });
   });
-  const admit = (ip: string, device: string): Promise<boolean> => new Promise(resolve => {
-    const socket = new WebSocket(`ws://127.0.0.1:${String(address.port)}/`, { headers: { 'cf-connecting-ip': ip } }); sockets.push(socket);
+  const admit = (ip: string, device: string, extra: Readonly<Record<string, string>> = {}): Promise<boolean> => new Promise(resolve => {
+    const socket = new WebSocket(`ws://127.0.0.1:${String(address.port)}/`, { headers: { [proxyHeader]: ip, ...extra } }); sockets.push(socket);
     arrivals.set(device, () => { arrivals.delete(device); resolve(true); });
     socket.on('error', () => { arrivals.delete(device); resolve(false); });
     socket.on('close', code => { closes.push(code); arrivals.delete(device); resolve(false); });

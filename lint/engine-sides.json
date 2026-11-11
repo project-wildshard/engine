@@ -1252,6 +1252,7 @@
     "src/server/host/dedicated/cellProtocol.ts": "server",
     "src/server/host/dedicated/cellWorker.ts": "server",
     "src/server/host/dedicated/dedicatedRoom.ts": "server",
+    "src/server/host/dedicated/doorTrust.ts": "server",
     "src/server/host/dedicated/main.ts": "server",
     "src/server/host/dedicated/playtest.ts": "server",
     "src/server/host/dedicated/packReader.ts": "server",

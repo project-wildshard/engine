@@ -41,8 +41,8 @@ test('a worker lookup that never answers closes as a retry within its budget', {
   finally { await door.close(); }
 });
 
-test('the trusted tunnel address beats a changing forwarded-for chain', async () => {
-  const door = await gatewayDoor({ connectsPerMinute: 1 });
+test('in cloudflare mode the tunnel address beats a changing forwarded-for chain', async () => {
+  const door = await gatewayDoor({ connectsPerMinute: 1, trustProxy: 'cloudflare' });
   try {
     expect(await door.upgrade('203.0.113.10', { 'x-forwarded-for': '198.51.100.1, 127.0.0.1' })).toContain('101');
     expect(await door.upgrade('203.0.113.10', { 'x-forwarded-for': '198.51.100.2, 127.0.0.1' })).toContain('429');

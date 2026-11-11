@@ -5,6 +5,7 @@ import { resolve, join } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Isolated checks use fake commands and never need root.
 import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
+import { DEFAULT_ALLOWED_ORIGINS, doorTrust } from '../src/server/host/dedicated/doorTrust';
 
 const source = readFileSync(process.env['WS_SETUP_SCRIPT'] ?? 'scripts/vps/setup.sh', 'utf8');
 function definition(name: string): string {
@@ -86,4 +87,13 @@ test('service units and health stub execute the exact checked runtime', () => {
   expect(checked.stdout).toContain('Environment=PLAYTEST_DIR=/data/logs');
   expect(checked.stdout).toContain('ReadWritePaths=/data /data/logs');
   expect(checked.stdout).not.toContain('/usr/bin/node'); expect(checked.stdout).toContain('ExecStart=/proof/checked-node /lib/health-stub.mjs %i');
+});
+
+test('VH10: the server unit names its proxy trust and origins, and the server accepts both', () => {
+  const units = source.slice(source.indexOf('# --- Units'), source.indexOf('# --- Bring up only'));
+  const server = units.slice(units.indexOf('unit wildshard-server@.service'), units.indexOf('\nEOF', units.indexOf('unit wildshard-server@.service')));
+  expect(server).toContain('Environment=TRUST_PROXY=caddy\n');
+  const origins = /^Environment="ALLOWED_ORIGINS=([^"]*)"$/mu.exec(server)?.[1];
+  expect(doorTrust({ TRUST_PROXY: 'caddy', ALLOWED_ORIGINS: origins })).toEqual({ trustProxy: 'caddy', allowedOrigins: DEFAULT_ALLOWED_ORIGINS });
+  expect(server.indexOf('TRUST_PROXY')).toBeLessThan(server.indexOf('EnvironmentFile='));
 });
