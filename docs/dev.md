@@ -8,7 +8,7 @@ here; what the repo does is `docs/prd.md`, how it is built `docs/design.md`.
 Run from the repo root.
 
 - `pnpm install`: installs deps and points `core.hooksPath` at `.githooks/`,
-  through `pnpm:devPreinstall`. Never use `prepare` here (`../leftover/docs/repo-kit.md`).
+  through `pnpm:devPreinstall`. Never use `prepare` here (`../repo-kit/docs/repo-kit.md`).
 - `pnpm tools:install`: installs TypeScript7 and oxfmt from the committed
   `.bin-deps` lock into npr's shared cache, with `--frozen`. CI runs this
   after dependencies install. Typecheck/format commands use these pins;

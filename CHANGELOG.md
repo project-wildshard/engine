@@ -4,7 +4,7 @@ Every engine version, patch releases included, has a section here before it is t
 five bullets in plain language, written for players and Jake, never commit subjects. The title screen's WHAT'S NEW
 box shows the section for `package.json`'s version, beside the build's short commit.
 
-To release: add the next version's section at the top, commit and push it, then run `release.sh vX.Y.Z --prepare`
+To release: add the next version's section at the top, commit and push it, then run `../repo-kit/release.sh vX.Y.Z --prepare`
 and `--finish` as before. `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose
 `package.json` version has no valid section, and a `vX.Y.Z` tag whose commit has none.
 
