@@ -158,6 +158,14 @@ function rowPosition(frame: WorldFrame, at: number, cls: NetClass<never>): { x: 
   return { x: read(cls.position[0]), y: read(cls.position[1]), z: read(cls.position[2]) };
 }
 
+/** One frame's rows as every client's `view` reads them (`NetRoom.placesOf`). */
+interface FramePlaces {
+  frame: WorldFrame | null; tick: number; serial: number;
+  readonly handles: number[]; readonly classes: NetClass<never>[]; readonly index: Map<number, number>;
+  /** 1 where the row has a position, then its x, y, z at `slot * 3`. */
+  has: Uint8Array; xyz: Float64Array;
+}
+
 /** The server's end of the wire. */
 export class NetRoom {
   readonly stats: RoomStats = { frames: 0, frameBytes: 0, eventBytes: 0, refused: 0, tierSkips: 0, dropped: 0 };
@@ -166,6 +174,7 @@ export class NetRoom {
   private readonly ring = new WorldFrameRing();
   private readonly rideOut = new Float64Array(RIDE_WORDS);
   private readonly held = new Map<string, number>();
+  private readonly places: FramePlaces = { frame: null, tick: -1, serial: -1, handles: [], classes: [], index: new Map(), has: new Uint8Array(0), xyz: new Float64Array(0) };
   private readonly calls: FightViewCall[] = [];
   private readonly world: NetWorld;
   private readonly step: NetRoomOptions['step'];
@@ -381,8 +390,8 @@ export class NetRoom {
   private snapshot(tick: number): void {
     const frame = this.ring.claim(tick), serial = ++this.serial, { handles } = this;
     this.world.visit({ entity: (id, cls, view) => {
-      const row = handles.touch(id, cls, view, serial), at = frame.claim(row.handle, cls.row.length);
-      cls.row.forEach((column, index) => { frame.data[at + index] = column.sample(view, handles.refs); });
+      const row = handles.touch(id, cls, view, serial), at = frame.claim(row.handle, cls.row.length), columns = cls.row, { data } = frame;
+      for (let index = 0; index < columns.length; index++) data[at + index] = (columns[index] as (typeof columns)[number]).sample(view, handles.refs);
     } });
     const retired = handles.sweep(serial), combat = freshViews(this.combat.splice(0)), lines = this.chat.drain(), riders = new Map<number, number>();
     for (const [rider, mount] of this.world.riders?.() ?? []) riders.set(handles.refs(rider), handles.refs(mount));
@@ -395,18 +404,40 @@ export class NetRoom {
     if (view === undefined) throw new Error('Empty client view ring');
     client.nextView = (client.nextView + 1) % FRAME_RING;
     view.tick = frame.tick; view.visible.clear(); view.due.clear();
-    const ownClass = this.handles.row(own)?.cls, ownAt = frame.offset(own);
-    const origin = ownClass === undefined || ownAt === undefined ? null : rowPosition(frame, ownAt, ownClass);
-    for (const handle of frame.handles()) {
-      const cls = this.handles.row(handle)?.cls, at = frame.offset(handle);
-      if (handle === own || cls === undefined || at === undefined) continue;
-      const position = origin === null ? null : rowPosition(frame, at, cls);
-      const away = position === null || origin === null ? 0 : (position.x - origin.x) ** 2 + (position.y - origin.y) ** 2 + (position.z - origin.z) ** 2;
+    const places = this.placesOf(frame), { handles, classes, xyz, has } = places, ownAt = places.index.get(own);
+    const origin = ownAt === undefined || has[ownAt] === 0 ? -1 : ownAt * 3, frameAt = Math.floor(frame.tick / TICKS_PER_FRAME);
+    for (let slot = 0; slot < handles.length; slot++) {
+      const handle = handles[slot] as number, cls = classes[slot] as NetClass<never>;
+      if (handle === own) continue;
+      const at = slot * 3, away = origin < 0 || has[slot] === 0 ? 0 : ((xyz[at] as number) - (xyz[origin] as number)) ** 2 + ((xyz[at + 1] as number) - (xyz[origin + 1] as number)) ** 2 + ((xyz[at + 2] as number) - (xyz[origin + 2] as number)) ** 2;
       if (cls.radius !== null && away > cls.radius ** 2) continue;
       view.visible.add(handle);
-      if (rowDue(Math.floor(frame.tick / TICKS_PER_FRAME), handle, framesBetween(away))) view.due.add(handle);
+      if (rowDue(frameAt, handle, framesBetween(away))) view.due.add(handle);
     }
     return view;
+  }
+  /**
+   * MMO-PLAN MP1.2: each row of `frame` with its class and position, read once per frame for every client's `view` rather
+   * than once per client per row. The same rows in the same order with the same numbers, so every view is unchanged; it is
+   * read again when the frame or the handle serial moves (a welcome between sends touches handles).
+   */
+  private placesOf(frame: WorldFrame): FramePlaces {
+    const places = this.places;
+    if (places.frame === frame && places.tick === frame.tick && places.serial === this.serial) return places;
+    places.frame = frame; places.tick = frame.tick; places.serial = this.serial;
+    places.handles.length = 0; places.classes.length = 0; places.index.clear();
+    let count = 0;
+    for (const handle of frame.handles()) {
+      const cls = this.handles.row(handle)?.cls, at = frame.offset(handle);
+      if (cls === undefined || at === undefined) continue;
+      if (places.has.length <= count) { const has = new Uint8Array(count * 2 + 64), xyz = new Float64Array(has.length * 3); has.set(places.has); xyz.set(places.xyz); places.has = has; places.xyz = xyz; }
+      const position = rowPosition(frame, at, cls);
+      places.handles.push(handle); places.classes.push(cls); places.index.set(handle, count);
+      places.has[count] = position === null ? 0 : 1;
+      places.xyz[count * 3] = position?.x ?? 0; places.xyz[count * 3 + 1] = position?.y ?? 0; places.xyz[count * 3 + 2] = position?.z ?? 0;
+      count++;
+    }
+    return places;
   }
   /**
    * Which world frame each row this client ends up holding came from. A row left out stays what its baseline had, so the

@@ -46,6 +46,8 @@ const SwingSaved=v.strictObject({move:v.nullable(count),swingT:finite,comboIdx:c
   charging:v.boolean(),chargeT:finite,releaseQueued:v.boolean(),chargePending:v.boolean(),heldPrev:v.boolean(),time:finite});
 const DrawSaved=v.strictObject({drawT:finite,holdT:finite,renockT:finite,tiredT:finite,wasHeld:v.boolean(),needLift:v.boolean(),reachedFull:v.boolean()});
 const poseVector=v.tuple([finite,finite,finite,finite,finite,finite,finite]);
+/** The weather owner's wind, as each seat copies it every tick (MMO-PLAN MP1.2: one schema, not one a seat a tick). */
+const OWNER_WIND=v.object({wind:WindStateSchema});
 const BladeSaved=v.strictObject({pose:v.strictObject({from:poseVector,base:poseVector,chargeBlend:finite,sprintBlend:finite}),
   grip:vector,tip:vector,have:v.boolean(),struck:v.array(v.string()),contacts:count});
 const Saved=v.strictObject({version:v.literal(1),enabled:v.optional(v.boolean(),true),slot:v.string(),queued:v.boolean(),aim:finite,pitch:finite,ammo:count,
@@ -242,7 +244,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
       aimOn=bowAimOn({asked:aim>0,enabled:enabled&&slot===bowSlot.id,running:blocked.running,swimming:player.swim.on});
       aimBlend+=((aimOn?1:0)-aimBlend)*Math.min(1,dt*bow.base.aimIn);if(Math.abs(aimBlend-(aimOn?1:0))<.002)aimBlend=aimOn?1:0;
       const weatherOwner=host.adapters.get(weather.step);if(weatherOwner===undefined)throw new Error('Missing actual native wind owner');
-      wind.restore(v.parse(v.object({wind:WindStateSchema}),weatherOwner.snapshot()).wind);arrows.update(dt);
+      wind.restore(v.parse(OWNER_WIND,weatherOwner.snapshot()).wind);arrows.update(dt);
       if(slot===bladeSlot.id&&enabled){
         if(pressed){pressing=true;if(mounted===null)clock.tryFire();else pass.attack();pressing=false;}
         const strike=pass.decide(dt,{player,mount:mounted,charging:clock.chargingHeavy,baseDamage:melee.damage,rows:mountedRows,targets:targets()});

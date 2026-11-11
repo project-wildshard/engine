@@ -3,6 +3,7 @@
 // Never production (J205): there is no flag for it, and the bots refuse any socket but loopback and staging.
 //   node scripts/mmo-bots.mjs replica [--bots 32] [--seconds 120] [--seats 32] [--workers 4] [--cells driftwood-isle] [--database <url>]
 //   node scripts/mmo-bots.mjs replica --remote wildshard [--cpus 9-13] ...   (MP1.2: the replica on the box's cores, bots on this Mac)
+//   node scripts/mmo-bots.mjs replica [--remote wildshard] --server-from <main commit> ...   (MP1.2: that commit's server code)
 //   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
 // release's own commit (its tree, an offline install, build-server's `--entry`), so their build and wire are the server's.
@@ -13,7 +14,11 @@
 // `--remote <ssh host>` (MMO-PLAN MP1.2, "bots on VPS cores", J202 "bots from this MacBook"): the same replica runs on that host as the
 // ssh user, pinned to `--cpus` (staging's, so production's players keep theirs), on its loopback only, and an ssh tunnel brings its
 // port to this Mac's loopback, so the bots and their forwarded addresses are exactly as on a local replica. The host's directory goes
-// when the run ends. It never touches the host's servers, units, env files or databases.
+// when the run ends. It never touches the host's servers, units, env files or databases. Its ssh link keeps itself alive
+// (keepalives), so a quiet half hour doesn't end the run early with every bot 'lost'.
+// `--server-from <commit>` (MP1.2: measure a speed-up before a staging release carries it): the replica runs that commit's server
+// code, built here under the release's build name, so the release's packs and bots still match it. It must descend from the
+// release's build, and the report names it (`serverFrom`). The wire is the release's: a commit that changes it is refused at hello.
 // Everything goes in tmp/mmo-bots/<stamp>/, and the release tree is removed after the run; the report stays.
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
@@ -33,7 +38,9 @@ const PER_ADDRESS = 4;
 const [mode = '', ...rest] = process.argv.slice(2);
 const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, seconds: { type: 'string' }, seats: { type: 'string', default: '32' }, workers: { type: 'string', default: '4' },
   cells: { type: 'string', default: 'driftwood-isle' }, database: { type: 'string', default: 'memory:' }, keep: { type: 'boolean', default: false },
-  remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' } } });
+  remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' } } });
+const serverFrom = values['server-from'];
+if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
 const remote = values.remote;
 if (remote !== undefined && (mode !== 'replica' || !/^[\w.@-]+$/u.test(remote) || values.database !== 'memory:')) throw new Error('--remote is a replica on memory saves, named by an ssh host');
 if (!/^[\d,-]+$/u.test(values.cpus)) throw new Error('--cpus is a taskset list');
@@ -81,6 +88,19 @@ let begun = performance.now();
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
 execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', 'mmoBots=test/fixtures/dedicated/mmoBotsEntry.ts'], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
 note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), from: release.engineBuild });
+/** `--server-from`: that commit's server, under the release's build name, packed as a release bundle is. */
+let serverBundle = null;
+if (serverFrom !== undefined) {
+  try { git(['merge-base', '--is-ancestor', release.engineBuild, serverFrom]); } catch { throw new Error(`--server-from ${serverFrom} does not descend from the release's ${release.engineBuild}`); }
+  const fromTree = join(work, 'server-src');
+  mkdirSync(fromTree, { recursive: true });
+  execFileSync('tar', ['-x', '-C', fromTree], { input: git(['archive', serverFrom]) });
+  execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent'], { cwd: fromTree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
+  serverBundle = join(work, 'server-from.tar.gz');
+  execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', join(work, 'server-from'), '--tar', serverBundle], { cwd: fromTree, stdio: ['ignore', 'ignore', 'inherit'] });
+  rmSync(fromTree, { recursive: true, force: true });
+  note({ step: 'server-from', commit: serverFrom, as: release.engineBuild });
+}
 
 // --- The replica: the release's server bundle on loopback, production's shape, its own key and file.
 /** @type {import('node:child_process').ChildProcess | null} */
@@ -121,8 +141,8 @@ const readings = [];
 let url = release.socket.replace(/\/$/u, '');
 if (mode === 'replica') {
   const tarball = join(work, 'server.tar.gz'), served = join(work, 'server');
-  const bytes = Buffer.from(await (await fetch(`${BUNDLES}/${release.bundle.name}`, { signal: AbortSignal.timeout(300_000) })).arrayBuffer());
-  if (createHash('sha256').update(bytes).digest('hex') !== release.bundle.sha256) throw new Error('The release bundle differs from its SHA-256');
+  const bytes = serverBundle !== null ? readFileSync(serverBundle) : Buffer.from(await (await fetch(`${BUNDLES}/${release.bundle.name}`, { signal: AbortSignal.timeout(300_000) })).arrayBuffer());
+  if (serverBundle === null && createHash('sha256').update(bytes).digest('hex') !== release.bundle.sha256) throw new Error('The release bundle differs from its SHA-256');
   writeFileSync(tarball, bytes); mkdirSync(served, { recursive: true }); execFileSync('tar', ['-xzf', tarball, '-C', served]);
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const body = JSON.stringify({ channel: 'production', serial: 1, engineBuild: release.engineBuild, saveEpoch: release.saveEpoch, shards: release.shards });
@@ -136,12 +156,18 @@ if (mode === 'replica') {
   else {
     // The same bundle on the host: it fetches it itself and checks the same SHA-256, and the release file goes over ssh.
     const away = `mmo-bench/${stamp}`;
-    const ssh = (/** @type {string} */ command, /** @type {Buffer | string} */ input = '') => execFileSync('ssh', ['-o', 'BatchMode=yes', remote, command], { input, stdio: ['pipe', 'pipe', 'inherit'] });
-    ssh(`mkdir -p ${away}/server && cat > ${away}/release.json && cd ${away} && curl -fsSL -o server.tar.gz ${BUNDLES}/${release.bundle.name} && echo '${release.bundle.sha256}  server.tar.gz' | sha256sum -c --quiet && tar -xzf server.tar.gz -C server && rm server.tar.gz`, readFileSync(join(work, 'release.json')));
+    const alive = ['-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8', '-o', 'TCPKeepAlive=yes'];
+    const ssh = (/** @type {string} */ command, /** @type {Buffer | string} */ input = '') => execFileSync('ssh', ['-o', 'BatchMode=yes', ...alive, remote, command], { input, stdio: ['pipe', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
+    ssh(`mkdir -p ${away}/server && cat > ${away}/release.json`, readFileSync(join(work, 'release.json')));
+    // `--server-from` sends its own bundle and its SHA-256; a release's is fetched there and checked against the release.
+    const sha = serverBundle === null ? release.bundle.sha256 : createHash('sha256').update(bytes).digest('hex');
+    if (serverBundle === null) ssh(`cd ${away} && curl -fsSL -o server.tar.gz ${BUNDLES}/${release.bundle.name}`);
+    else ssh(`cat > ${away}/server.tar.gz`, bytes);
+    ssh(`cd ${away} && echo '${sha}  server.tar.gz' | sha256sum -c --quiet && tar -xzf server.tar.gz -C server && rm server.tar.gz`);
     const there = { ...env, PACK_CACHE: `$HOME/${away}/packs`, RELEASE_URL: `file://$HOME/${away}/release.json` };
     const words = Object.entries(there).filter(([name]) => name !== 'PATH' && name !== 'HOME').map(([name, value]) => `${name}="${value}"`).join(' ');
     remoteStop = () => { try { ssh(`pkill -TERM -f '[/]${away}/server/main.mjs'; sleep 2; pkill -KILL -f '[/]${away}/server/main.mjs'; rm -rf ${away}`); } catch { /* the host already cleaned it */ } };
-    room = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-L', `${String(REPLICA_PORT)}:127.0.0.1:${String(REPLICA_PORT)}`, remote,
+    room = spawn('ssh', ['-o', 'BatchMode=yes', ...alive, '-o', 'ExitOnForwardFailure=yes', '-L', `${String(REPLICA_PORT)}:127.0.0.1:${String(REPLICA_PORT)}`, remote,
       `cd ${away}/server && exec env ${words} taskset -c ${values.cpus} node "$HOME/${away}/server/main.mjs"`], { stdio: ['ignore', 'pipe', 'pipe'] });
     note({ step: 'remote', host: remote, cpus: values.cpus, dir: `~/${away}` });
   }
@@ -174,7 +200,7 @@ const code = await new Promise(resolve => {
 const after = mode === 'staging' ? await health() : null;
 await stopRoom();
 const full = readings.slice(playing).filter(row => row.players === bots);
-const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code,
+const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code, ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
@@ -183,6 +209,6 @@ note({ step: 'done', exit: code, seated: report.seated, steady: report.steady, w
 process.exitCode = Number(code);
 } finally {
   await stopRoom();
-  if (!values.keep) for (const path of [tree, out, join(work, 'server'), join(work, 'server.tar.gz'), join(work, 'packs')]) rmSync(path, { recursive: true, force: true });
+  if (!values.keep) for (const path of [tree, out, join(work, 'server'), join(work, 'server.tar.gz'), join(work, 'packs'), join(work, 'server-src'), join(work, 'server-from'), join(work, 'server-from.tar.gz')]) rmSync(path, { recursive: true, force: true });
 }
 process.exit(process.exitCode ?? 1);

@@ -69,6 +69,9 @@ export interface HeadlessCommandPorts {
  * held command; melee/walk take the last player command, including an empty release. Script values use the last match.
  * Readers resample the current tape on every call, refuse overflow, and preserve tape order. Filtered lists and melee
  * input are borrowed scratch values, consumed immediately by the native owner rather than saved between ticks. */
+/** Each of a body's feet coordinates is a finite number. */
+function finitePoint(point: { readonly x: number; readonly y: number; readonly z: number }): boolean { return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z); }
+
 export function bindHeadlessCommands(context: Pick<HeadlessRuntimeInstallation, 'commands' | 'emit'>, host?: SimHost): HeadlessCommandPorts {
   const commands = (): readonly HeadlessCommand[] => {
     const tape = context.commands();
@@ -266,7 +269,9 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
       const tick = new Map<string, SimTickCommand>(others);
       for (const command of input) if (command.kind === 'player') tick.set(lead.id, simPlayerCommand(command));
       host.step(tick);
-      if (![...[...host.players.values()].map(player => player.position), ...[...host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite trusted simulation state');
+      // MMO-PLAN MP1.2: the same check every tick, without building arrays for it.
+      for (const body of host.players.values()) if (!finitePoint(body.position)) throw new Error('Nonfinite trusted simulation state');
+      for (const body of host.entities.values()) if (!finitePoint(body.position)) throw new Error('Nonfinite trusted simulation state');
     },
     proveEntries: () => {
       if (plan.proveEntries === undefined) throw new Error('Trusted runtime has no entry proof');
