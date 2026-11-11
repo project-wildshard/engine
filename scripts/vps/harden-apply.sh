@@ -60,7 +60,9 @@ arm_deadman() {
 # It reads each rule's port and source, never its comment, so a wide rule cannot pass by its label, and an all-port or
 # port-range rule that covers 443 is drift too.
 drift_rules() {
-  ufw status numbered | python3 -I -c '
+  local status
+  status=$(ufw status numbered) || { say stop VH4 'ufw status did not answer; no rule changed' >&2; exit 1; }
+  printf '%s\n' "$status" | python3 -I -c '
 import re, sys
 keep443, cloudflare, drift = sys.argv[1] == "443", set(sys.argv[2:]), []
 for line in sys.stdin:
@@ -78,7 +80,8 @@ print(" ".join(str(number) for number in sorted(drift, reverse=True)))
 # --- 443 alone: open or close, then stop.
 if [ "$MODE" = close ]; then
   # Every rule that is not ours goes, Cloudflare's 443 included, and so does an all-port or port-range rule that covers 443.
-  for number in $(drift_rules shut); do
+  drift=$(drift_rules shut) || exit 1
+  for number in $drift; do
     arm_deadman
     say doing VH4 "delete ufw rule $number: $(ufw status numbered | grep -E "^\[ *$number\]" | sed 's/  */ /g')"; ufw --force delete "$number" >/dev/null
   done
@@ -87,7 +90,8 @@ fi
 if [ "$MODE" = open ]; then
   # Every rule that is not ours goes first, so "nothing else" is true: a 443 rule from outside Cloudflare, an all-port or
   # port-range rule that covers 443, an old 22. A deletion can cut SSH, so the dead-man is armed before any.
-  for number in $(drift_rules 443); do
+  drift=$(drift_rules 443) || exit 1
+  for number in $drift; do
     arm_deadman
     say doing VH4 "delete ufw rule $number: $(ufw status numbered | grep -E "^\[ *$number\]" | sed 's/  */ /g')"; ufw --force delete "$number" >/dev/null
   done
@@ -136,7 +140,8 @@ else
   ufw --force enable >/dev/null
 fi
 # Anything else ufw lets in is drift: an old 22, a stray port, a 443 rule from outside Cloudflare. --open-443's rules stay.
-for rule in $(drift_rules 443); do
+drift=$(drift_rules 443) || exit 1
+for rule in $drift; do
   arm_deadman
   say doing VH4 "delete ufw rule $rule: $(ufw status numbered | grep -E "^\[ *$rule\]" | sed 's/  */ /g')"; ufw --force delete "$rule" >/dev/null
 done

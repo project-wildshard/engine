@@ -184,7 +184,8 @@ systemctl enable --quiet wildshard-nft.service
 # The file swaps the table in one nft transaction (table, delete table, table { ... }), so a reload never leaves 443 without
 # its floors. The live rules are compared too, by a stamp of their stateless listing taken at the last load: a rerun with
 # the same file and the same live rules leaves the table, and its connection counts, alone.
-nft_live() { nft -s list chain inet wildshard input 2>/dev/null | sha256sum | cut -d' ' -f1; }
+# The stamp binds the rules file to the live chain it loaded, so a new file left half-applied is loaded again on the next run.
+nft_live() { printf '%s %s\n' "$(sha256sum < "$nft_file" | cut -d' ' -f1)" "$(nft -s list chain inet wildshard input 2>/dev/null | sha256sum | cut -d' ' -f1)"; }
 nft_stamp=/etc/wildshard/.nft-443.loaded
 if ! systemctl is-active --quiet wildshard-nft.service; then
   systemctl start wildshard-nft.service; say doing VH9 'load the 443 floors'; (umask 077; nft_live > "$nft_stamp")
