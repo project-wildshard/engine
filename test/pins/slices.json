@@ -2,15 +2,15 @@
   "slices": [
     {
       "slug": "far-reach",
-      "from": "addddbafa683e38cb39bc4a127c07aed413f002ebf76f8cc807b3dd8e2b2d94e",
-      "hash": "de8556a82a9031b757eb714be8a3dcc4a8af110ab944df0f36d6d2809d8a2159",
+      "from": "ab7b1d4e1d2ddd29771d6964e470244f3b0ffe6af108bb6196b5071ba18a4e9d",
+      "hash": "1986c2a8bb3be2e93cc0993b850504821fbbc98915ee1bb19b7d9caa7397df33",
       "bytes": 3902464,
       "files": 118
     },
     {
       "slug": "driftwood-isle",
-      "from": "6cbfc1a34dfa1144f80dccace72f36435e623598f783da7aee73ccd6ba68c3c6",
-      "hash": "f45cfe78d64c3a4d6b61d0bdfb9678a15a59a76589c2abfe7d0212694393fc9c",
+      "from": "d2897d6d86dd49013d71452012f6afd533b87362e27200257f3856370a1b2036",
+      "hash": "9d34c3274cdec9fb995d1a26abaa33d7b5e754bad4a6ff07d880b108a29107f3",
       "bytes": 15304192,
       "files": 165
     },
@@ -30,8 +30,8 @@
     },
     {
       "slug": "nine-dragon-stack",
-      "from": "16db3356bcadf94f8f709c3d15c9f7f3cc39ec77f3988dce85505ca8ff151275",
-      "hash": "0c76069dc06ecadba4fe785889be597ac479d152b2336b40b48d88018c35dc8e",
+      "from": "ea45516a999bd33b7bea1cfca79c018503d6b51163fbeaeee6760709fc2c551b",
+      "hash": "963cc08cde4e2102ecd9006a50250239b724904e05f3cdb6f968a2b6cea65d9d",
       "bytes": 12923392,
       "files": 153
     }
