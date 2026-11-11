@@ -72,11 +72,10 @@ When land stops (each seen on 2026-11-10/11):
  - `push of plan/<slug> … failed` (pre-push red): the failing check is printed above it. Seen: lint, a stale
    stamp, timing records, an HTTPS remote using another GitHub login (403: use the SSH remote), a fresh clone with
    no pins exclude block (run `pnpm pins` in the canonical checkout). Fix forward, commit, run land again.
- - `origin plan/<slug> is at X, which this worktree did not push last`: someone else pushed your branch, or the
-   worktree predates the push record (`03b3ad22`). Either fetch their commits, rebase yours on top, and publish
-   that as a plain fast-forward (`git push origin HEAD:plan/<slug>`, no force) before running land; or start a
-   new worktree with a new slug and cherry-pick your commits into it (a worktree's branch must match its folder,
-   so don't just rename the branch). Never force over it.
+ - `origin plan/<slug> holds commits this worktree never had, so git refused the lease`: someone else pushed your
+   branch (LS4: land pushes under `--force-with-lease --force-if-includes`, no records of its own). Fetch, rebase
+   your commits onto `origin/plan/<slug>` and run land again; or start a new worktree with a new slug and
+   cherry-pick your commits. Never force over it.
  - `rebase onto main … conflicts in: <paths>`: `git rebase origin/main`, fix those paths, `git rebase --continue`,
    run land again. A plain both-sides edit of only `renderer-revision.json`/`validation-revision.json` land fixes
    itself; a delete or rename conflict there still stops.

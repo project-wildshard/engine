@@ -144,8 +144,6 @@ class Landing{
   /** @type {number[]} */this.runs=[];
   /** @type {string|null} */this.planTip=null;
   this.expected='';
-  this.tipFile=resolve(this.root,git(this.root,['rev-parse','--git-path','wildshard-land-tip']));
-  this.attemptFile=resolve(this.root,git(this.root,['rev-parse','--git-path','wildshard-plan-pushes']));
   this.reruns=0;
  }
 
@@ -305,47 +303,42 @@ class Landing{
   throw new StopError(`after the rebase, ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)} (stamps aside): a commit or edit came in during the land. Check git log, keep what you meant, and run land again; a new commit gets its own branch CI.`);
  }
 
- /** Push the exact SHA to this worktree's own plan branch. After a rebase the
-  * branch is rewritten under a lease on the tip land last saw; main never is.
+ /** Push the exact SHA to this worktree's own plan branch (LAND-SIMPLIFY LS4, J258). Land reads origin's real tip
+  * (refreshing the remote-tracking ref, which a hand push by URL leaves stale) and rewrites it only when the local
+  * branch's reflog reached it: a tip this worktree pushed, by land or by hand, or once held. Anything else is
+  * someone else's push and stops land before any push. The push itself carries an explicit lease on that tip, so a
+  * push landing in between is refused by git. This is `--force-if-includes`'s rule without its timestamp window,
+  * which made git refuse a fresh fetch of the worktree's own tip (J206 review). No record files.
   * @param {string} sha */
  pushPlan(sha){
-  const listed=git(this.root,['ls-remote','origin',`refs/heads/${this.branch}`]).split(/\s+/u)[0]??'';
-  const tip=SHA.test(listed)?listed:null;
+  const ref=`refs/heads/${this.branch}`,tracking=`refs/remotes/origin/${this.branch}`;
+  if(git(this.root,['rev-parse',ref])!==sha)throw new StopError(`${this.branch} is not at ${short(sha)}; run land again`);
+  if(tryGit(this.root,['fetch','--quiet','origin',`+${ref}:${tracking}`]).status!==0)tryGit(this.root,['update-ref','-d',tracking]);
+  const tip=tryGit(this.root,['rev-parse','--verify','--quiet',`${tracking}^{commit}`]).stdout.trim()||null;
   if(tip===sha){this.say('pushed',`${this.branch} already at ${short(sha)}`);this.planTip=sha;return;}
   const rewrite=tip!==null&&!isAncestor(this.root,tip,sha);
-  // Rewrite only a tip this worktree made itself; anyone else's commits stop it.
-  if(rewrite&&!this.ownsTip(tip)){
-   const mine=this.shas(this.tipFile).at(-1)??null;
-   this.receipt(`STOP origin ${this.branch} is at ${short(tip)}, not this worktree's last push`);
-   throw new StopError(`origin ${this.branch} is at ${short(tip)}, which this worktree did not push last (${mine===null?'no record':short(mine)}). Someone else pushed it: fetch and integrate their commits, or rename this plan's branch.`);
+  if(rewrite&&!this.reached(tip)){
+   this.receipt(`STOP plan push ${short(sha)} refused (origin has commits this worktree never had)`);
+   throw new StopError(`origin ${this.branch} is at ${short(tip)}, which this worktree's branch never reached: someone else pushed it. Fetch and integrate their commits (git rebase origin/${this.branch}), then run land again; or start a new worktree with a new slug. Never force over it.`);
   }
-  if(rewrite&&tryGit(this.root,['cat-file','-e',`${tip}^{commit}`]).status!==0)tryGit(this.root,['fetch','--quiet','origin',tip]);
-  const args=['push','--porcelain',...rewrite?[`--force-with-lease=refs/heads/${this.branch}:${tip}`]:[],'origin',`${sha}:refs/heads/${this.branch}`];
+  const args=['push','--porcelain',`--force-with-lease=${ref}:${tip??''}`,'origin',`${ref}:${ref}`];
   this.say('pushing',`${this.branch} ${short(sha)}${rewrite?` (rebased; replaces its own ${short(tip)} under a lease)`:''}; the pre-push runs`);
   const result=spawnSync('git',args,{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','inherit']});
   if(result.status!==0){
-   this.receipt(`STOP plan push ${short(sha)} refused (pre-push red or lease lost)`);
-   throw new StopError(`push of ${this.branch} ${short(sha)} failed: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
+   const leased=/\[rejected\].*\((?:stale info|fetch first)\)/u.test(result.stdout);
+   this.receipt(`STOP plan push ${short(sha)} refused (${leased?'origin moved during the push':'pre-push red'})`);
+   throw new StopError(leased
+    ?`origin ${this.branch} moved while land pushed, so git refused the lease: someone else pushed it. Fetch and integrate their commits, then run land again. Never force over it.`
+    :`push of ${this.branch} ${short(sha)} failed: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
   }
-  this.planTip=sha;appendFileSync(this.tipFile,`${sha}\n`);
+  this.planTip=sha;
  }
 
- /** SHAs from one of this worktree's records, oldest first. @param {string} file @returns {string[]} */
- shas(file){
-  return [...new Set(existsSync(file)?readFileSync(file,'utf8').split('\n').map(line=>line.trim()).filter(line=>SHA.test(line)):[])];
- }
-
- /** The origin tip is this worktree's own when land itself pushed it, or pushed a descendant of it (a confirmed push:
-  * land records only after git reports success), or when this worktree attempted to push exactly that SHA (the
-  * pre-push hook records every plan/* push, hand pushes included, before the gate decides:
-  * .githooks/record-plan-push.mjs). An attempt never vouches for ancestors: a refused push of a descendant of
-  * someone else's commit must not make theirs ours. Reflogs prove nothing about who pushed, so they don't count.
+ /** The local branch reached `tip`: some reflog entry of it is `tip` or a descendant (the newest 200).
   * @param {string} tip */
- ownsTip(tip){
-  const confirmed=this.shas(this.tipFile);
-  if(confirmed.includes(tip)||this.shas(this.attemptFile).includes(tip))return true;
-  if(tryGit(this.root,['cat-file','-e',`${tip}^{commit}`]).status!==0)return false;
-  return confirmed.slice(-50).some(sha=>tryGit(this.root,['cat-file','-e',`${sha}^{commit}`]).status===0&&isAncestor(this.root,tip,sha));
+ reached(tip){
+  const entries=tryGit(this.root,['reflog','show','--format=%H','-n','200',`refs/heads/${this.branch}`]).stdout.split('\n').filter(line=>SHA.test(line));
+  return [...new Set(entries)].some(entry=>entry===tip||isAncestor(this.root,tip,entry));
  }
 
  /** Poll the exact SHA until both landing workflows are complete.

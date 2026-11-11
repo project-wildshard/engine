@@ -75,7 +75,6 @@ while read old new ref; do echo "$ref $new" >> "$PUSHED_LOG"; done
 const PRE_PUSH = `#!/bin/sh
 refs=$(cat)
 echo "land=\${WS_LAND_MAIN_PUSH:-0} $refs" >> "$PREPUSH_LOG"
-printf '%s\\n' "$refs" | node "$RECORD_PLAN_PUSH"
 [ -f "$PREPUSH_FAIL" ] && { echo "pre-push: planted red check"; exit 1; }
 case "$refs" in *refs/heads/main*) if [ -f "$PREPUSH_RACE" ]; then rm "$PREPUSH_RACE"; sh "$RACE_SCRIPT"; fi ;; esac
 exit 0
@@ -92,7 +91,7 @@ function fixture() {
   const env: NodeJS.ProcessEnv = {
     ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Land', GIT_AUTHOR_EMAIL: 'land@example.test', GIT_COMMITTER_NAME: 'Land', GIT_COMMITTER_EMAIL: 'land@example.test',
-    PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush, RECORD_PLAN_PUSH: resolve('.githooks/record-plan-push.mjs'),
+    PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush,
     PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript,
     WS_LAND_REPO: 'project-wildshard/fixture', WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
   };
@@ -461,79 +460,82 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.remoteMain()).toBe(before);
   }, 60_000);
 
-  test('a plan branch someone else pushed is never rewritten', () => {
+  // LAND-SIMPLIFY LS4 (J258): the local branch's reflog decides who may rewrite the plan branch, and the push
+  // carries an explicit lease. No record of land's own is read or written.
+  test('a plan branch someone else pushed is refused by git, fetched or not', () => {
+    for (const fetched of [false, true]) {
+      const f = fixture();
+      const wt = f.worktree('foo');
+      f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+      f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
+      f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
+      const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
+      if (fetched) f.git(wt, ['fetch', '--quiet', 'origin']);
+      const result = f.land(wt);
+      expect(result.status, `fetched=${fetched}: ${result.stdout}`).toBe(1);
+      expect(result.stdout).toContain("which this worktree's branch never reached");
+      expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
+      expect(f.read(f.files.receipts)).toMatch(/STOP plan push [0-9a-f]{10} refused \(origin has commits this worktree never had\)/u);
+    }
+  }, 90_000);
+
+  test('the worktree\'s own hand push, then a local rebase, rewrites cleanly and lands', () => {
     const f = fixture();
     const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
+    f.git(wt, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
+    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: add feature, amended']);
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/replaces its own [0-9a-f]{10} under a lease/u);
+    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature, amended');
+    expect(existsSync(join(f.git(wt, ['rev-parse', '--path-format=absolute', '--git-dir']), 'wildshard-land-tip'))).toBe(false);
+  }, 60_000);
+
+  test('a hand push by URL leaves the tracking ref stale; land refreshes it and still lands its own rewrite', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
+    f.git(wt, ['push', '--quiet', f.remote, 'HEAD:refs/heads/plan/foo']);
+    // Some git versions update the tracking ref for a URL that matches origin's; drop it so the stale case is real.
+    spawnSync('git', ['update-ref', '-d', 'refs/remotes/origin/plan/foo'], { cwd: wt, env: f.env });
+    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: add feature, amended']);
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature, amended');
+  }, 60_000);
+
+  test('a foreign push fetched from a sibling worktree (shared refs) is still refused', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const sibling = f.worktree('bar');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
     f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
     const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
+    f.git(sibling, ['fetch', '--quiet', 'origin']);
     const result = f.land(wt);
-    expect(result.status).toBe(1);
-    expect(result.stdout).toContain('which this worktree did not push last');
+    expect(result.status, result.stdout).toBe(1);
+    expect(result.stdout).toContain("which this worktree's branch never reached");
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
   }, 60_000);
 
-  test('a tip this worktree pushed by hand after its own rebase is its own; land rewrites it and lands', () => {
+  test('land\'s own earlier push, then a rebase after a red, rewrites under the lease', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
-    // land pushed once (recorded), then stopped; the agent amended and pushed the branch by hand under a lease.
     f.state({ red: { 'plan/foo': { ci: 'tests (1)' } } });
     expect(f.land(wt).status).toBe(1);
     f.state({});
-    f.edit(wt, 'src/feature.ts', 'feature = 1', 'feature = 2', 'feat: tune feature');
-    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: tune feature, amended']);
-    const hand = f.git(wt, ['rev-parse', 'HEAD']);
-    f.git(wt, ['push', '--quiet', '--force', 'origin', `${hand}:refs/heads/plan/foo`]);
-    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: tune feature, amended again']);
+    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: add feature, fixed']);
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/replaces its own [0-9a-f]{10} under a lease/u);
-    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: tune feature, amended again');
+    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature, fixed');
   }, 60_000);
 
-  test('an origin tip that is an ancestor of this worktree\'s own push counts as its own', () => {
-    const f = fixture();
-    const wt = f.worktree('foo');
-    const base = f.git(wt, ['rev-parse', 'HEAD']);
-    const first = f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
-    f.git(wt, ['push', '--quiet', 'origin', `${first}:refs/heads/plan/foo`]);
-    const second = f.commit(wt, 'src/feature.ts', 'export const feature = 2;', 'feat: tune');
-    // Only the record of the later own push survives (no reflog), and origin still holds the older first push.
-    f.git(wt, ['reflog', 'expire', '--expire=now', '--all']);
-    writeFileSync(join(f.git(wt, ['rev-parse', '--path-format=absolute', '--git-dir']), 'wildshard-land-tip'), `${second}\n`);
-    // The plan is rewritten so origin's tip is no longer in its history: land must replace it.
-    f.git(wt, ['reset', '--quiet', '--hard', base]);
-    f.commit(wt, 'src/feature.ts', 'export const feature = 3;', 'feat: rewritten');
-    f.git(wt, ['reflog', 'expire', '--expire=now', '--all']);
-    const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(new RegExp(`replaces its own ${first.slice(0, 10)} under a lease`, 'u'));
-  }, 60_000);
-
-  test('a foreign tip the local branch once pointed at or merged is still foreign', () => {
-    for (const how of ['reset', 'merge']) {
-      const f = fixture();
-      const wt = f.worktree('foo');
-      const base = f.git(wt, ['rev-parse', 'HEAD']);
-      f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
-      f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
-      const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
-      f.git(wt, ['fetch', '--quiet', 'origin']);
-      // The local branch points at, or merges, their commit for a while: it lands in the reflog, not in a push.
-      if (how === 'reset') f.git(wt, ['reset', '--quiet', '--hard', theirs]);
-      else f.git(wt, ['merge', '--quiet', '--no-edit', theirs]);
-      f.git(wt, ['reset', '--quiet', '--hard', base]);
-      f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-      const result = f.land(wt);
-      expect(result.status, `${how}: ${result.stdout}`).toBe(1);
-      expect(result.stdout).toContain('which this worktree did not push last');
-      expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
-    }
-  }, 90_000);
-
-  test('a refused push of a descendant never makes someone else\'s ancestor tip ours', () => {
+  test('the reflog rule: a foreign tip the local branch once held counts as seen, so land may replace it', () => {
+    // As with --force-if-includes, a tip reachable from the local branch's reflog was seen: the agent reset onto their
+    // commit, so discarding it is the agent's call. Recorded here so the rule is deliberate (LS4 swapped records for it).
     const f = fixture();
     const wt = f.worktree('foo');
     const base = f.git(wt, ['rev-parse', 'HEAD']);
@@ -542,16 +544,11 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
     f.git(wt, ['fetch', '--quiet', 'origin']);
     f.git(wt, ['reset', '--quiet', '--hard', theirs]);
-    f.commit(wt, 'src/d.ts', 'export const d = 1;', 'feat: on top of theirs');
-    writeFileSync(f.files.fail, '');
-    expect(spawnSync('git', ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo'], { cwd: wt, env: f.env, encoding: 'utf8' }).status).not.toBe(0);
-    rmSync(f.files.fail);
     f.git(wt, ['reset', '--quiet', '--hard', base]);
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     const result = f.land(wt);
-    expect(result.status, result.stdout).toBe(1);
-    expect(result.stdout).toContain('which this worktree did not push last');
-    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
+    expect(result.status, result.stdout).toBe(0);
+    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).not.toBe(theirs);
   }, 60_000);
 
   test('J206 review: a commit that slips in during the rebase or the stamp regeneration never rides to main', () => {
