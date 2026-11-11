@@ -64,6 +64,7 @@ while read old new ref; do echo "$ref $new" >> "$PUSHED_LOG"; done
 const PRE_PUSH = `#!/bin/sh
 refs=$(cat)
 echo "post_ci=\${WS_PUSH_POST_CI:-0} $refs" >> "$PREPUSH_LOG"
+printf '%s\\n' "$refs" | node "$RECORD_PLAN_PUSH"
 [ -f "$PREPUSH_FAIL" ] && { echo "pre-push: planted red check"; exit 1; }
 case "$refs" in *refs/heads/main*) if [ -f "$PREPUSH_RACE" ]; then rm "$PREPUSH_RACE"; sh "$RACE_SCRIPT"; fi ;; esac
 exit 0
@@ -80,7 +81,7 @@ function fixture() {
   const env: NodeJS.ProcessEnv = {
     ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Land', GIT_AUTHOR_EMAIL: 'land@example.test', GIT_COMMITTER_NAME: 'Land', GIT_COMMITTER_EMAIL: 'land@example.test',
-    PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush,
+    PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush, RECORD_PLAN_PUSH: resolve('.githooks/record-plan-push.mjs'),
     PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript,
     WS_LAND_REPO: 'project-wildshard/fixture', WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane',
   };
@@ -424,6 +425,27 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(new RegExp(`replaces its own ${first.slice(0, 10)} under a lease`, 'u'));
   }, 60_000);
+
+  test('a foreign tip the local branch once pointed at or merged is still foreign', () => {
+    for (const how of ['reset', 'merge']) {
+      const f = fixture();
+      const wt = f.worktree('foo');
+      const base = f.git(wt, ['rev-parse', 'HEAD']);
+      f.git(f.peer, ['commit', '--quiet', '--allow-empty', '-m', 'someone else']);
+      f.git(f.peer, ['push', '--quiet', 'origin', 'HEAD:refs/heads/plan/foo']);
+      const theirs = f.git(f.remote, ['rev-parse', 'plan/foo']);
+      f.git(wt, ['fetch', '--quiet', 'origin']);
+      // The local branch points at, or merges, their commit for a while: it lands in the reflog, not in a push.
+      if (how === 'reset') f.git(wt, ['reset', '--quiet', '--hard', theirs]);
+      else f.git(wt, ['merge', '--quiet', '--no-edit', theirs]);
+      f.git(wt, ['reset', '--quiet', '--hard', base]);
+      f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+      const result = f.land(wt);
+      expect(result.status, `${how}: ${result.stdout}`).toBe(1);
+      expect(result.stdout).toContain('which this worktree did not push last');
+      expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
+    }
+  }, 90_000);
 
   test('a plan that changes hosted CI reruns it after any rebase', () => {
     const f = fixture();

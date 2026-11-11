@@ -322,17 +322,15 @@ class Landing{
   this.planTip=sha;appendFileSync(this.tipFile,`${sha}\n`);
  }
 
- /** Every tip this worktree made: land's own pushes (appended per push; the file used to hold only the last) and
-  * every commit the local plan branch ever pointed at (its reflog), which covers a hand push after a hand rebase.
-  * @returns {string[]} oldest first */
+ /** Every commit this worktree pushed to its plan branch, oldest first: land appends its own pushes, and the
+  * pre-push hook appends every plan/* push, hand pushes included (.githooks/record-plan-push.mjs). A commit's mere
+  * presence in a reflog proves nothing about who pushed it, so reflogs don't count. @returns {string[]} */
  ownTips(){
-  const pushed=existsSync(this.tipFile)?readFileSync(this.tipFile,'utf8').split('\n').map(line=>line.trim()).filter(line=>SHA.test(line)):[];
-  const logged=tryGit(this.root,['reflog','--format=%H',`refs/heads/${this.branch}`]).stdout.split('\n').filter(line=>SHA.test(line)).reverse();
-  return [...new Set([...logged,...pushed])];
+  return [...new Set(existsSync(this.tipFile)?readFileSync(this.tipFile,'utf8').split('\n').map(line=>line.trim()).filter(line=>SHA.test(line)):[])];
  }
 
- /** The origin tip is this worktree's own: one of its tips, or an ancestor of one (origin still holds an older push
-  * of ours). A commit this worktree never had is someone else's. @param {string} tip */
+ /** The origin tip is this worktree's own: one of its pushes, or an ancestor of one (origin still holds an older
+  * push of ours). Anything else is someone else's. @param {string} tip */
  ownsTip(tip){
   const own=this.ownTips();
   if(own.includes(tip))return true;

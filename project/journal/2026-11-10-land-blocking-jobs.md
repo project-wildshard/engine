@@ -44,3 +44,10 @@ appends every branch push it makes and also counts the local plan branch's
 reflog as its own; an origin tip that is one of those, or an ancestor of one,
 is this worktree's. A commit the worktree never had still stops it (the
 existing foreign-push test). Both new cases fail on the old check.
+
+J206 Codex review (two MUSTs): a reflog proves the branch pointed at a commit,
+not who pushed it, so a fetched or merged foreign tip would have passed. The
+reflog no longer counts. Instead the pre-push hook records every plan/* push
+from the worktree, hand pushes included (`.githooks/record-plan-push.mjs`), and
+ownership is "one of those pushes or an ancestor of one". New test: a foreign
+tip the branch was reset to or merged, then left, still stops.
