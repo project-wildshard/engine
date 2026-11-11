@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // MOBILE-GRAPHICS MG8 / MG9 (meta docs/plans/MOBILE-GRAPHICS-PLAN.md): every Settings ▸ Graphics control, step by step, on the
-// same Driftwood views, driven through the real menu (layout A's Graphics tab, the way a thumb does it).
+// same Driftwood views, driven through the real menu (layout A's Graphics tab, J245, the way a thumb does it).
 //
 // Headless Chromium (ANGLE Metal), an iPhone 16 Pro viewport (402×874 at 3×), the phone tier, Driftwood entered straight. Per
 // step: open the menu, press High (the baseline), set the one control, resume, then at each view a full shot (HUD hidden), a 3×
@@ -43,7 +43,6 @@ const context = await browser.newContext({ ...devices['iPhone 16 Pro'], viewport
 await developerSettings(context, { tier: 'phone', volume: 0 });
 await saveFixture(context, { scope: 'device', key: 'devMode', data: false });
 await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
-await saveFixture(context, { scope: 'device', key: 'debug.settingsLayout', data: 'a' });
 await saveFixture(context, { scope: 'device', key: 'gfx.worldToggle', data: true });
 await context.addInitScript(hideDeveloperOverlays);
 const page = await context.newPage();
@@ -59,7 +58,7 @@ const resume = async () => { await press(`[...document.querySelectorAll('.ws-gme
 const preset = mode => press(`document.querySelector('.ws-gmenu-svmodecard[data-mode="${mode}"]')`);
 /** @param {string} row @param {string} button */
 const control = (row, button) => press(`(() => {
-  const r = [...document.querySelectorAll('.ws-gmenu-gfx .ws-gmenu-row')].find(x => x.querySelector('.ws-gmenu-swlabel')?.textContent.trim() === ${JSON.stringify(row)});
+  const r = [...document.querySelectorAll('.ws-gmenu .ws-gmenu-row')].find(x => x.querySelector('.ws-gmenu-swlabel')?.textContent.trim() === ${JSON.stringify(row)});
   return r === undefined ? null : [...r.querySelectorAll('.ws-gmenu-segbtn')].find(x => x.textContent.trim() === ${JSON.stringify(button)}) ?? null; })()`);
 /** @param {{ yaw: number | null, pitch: number }} view */
 async function pose(view) {
