@@ -39,6 +39,16 @@ function lap(name: string): void {
   mark = now
 }
 
+// Hosted Linux boots on SwiftShader: title to play took 104 s and the reload's boot 132 s (ci run 42955861032), so the
+// whole smoke ran 301 s, a slow hosted test. It runs on the Mac (pre-push, T2E-3) and hosted only when asked, until
+// TB-3 brings a hosted boot under 20 s.
+test.skip(
+  process.env['CI'] !== undefined &&
+    process.platform !== 'darwin' &&
+    process.env['E2E_HOSTED_SMOKE'] !== '1',
+  'hosted SwiftShader boots take 100+ s; set E2E_HOSTED_SMOKE=1 to run (TEMPLATE-E2E TB-3)',
+)
+
 test.afterAll((): void => {
   // A hosted job ends here: its watcher would hold a build lease until it idles out.
   if (process.env['CI'] !== undefined) {
