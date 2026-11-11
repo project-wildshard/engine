@@ -16,8 +16,9 @@ Git hygiene
 
  - Small Commit early & often.
  - Plan work goes in its own worktree, never on main (J240): `.worktrees/<slug>` on branch `plan/<slug>`.
-   Until DS12's `worktree new` lands: `git worktree add -b plan/<slug> .worktrees/<slug> origin/main`, then a frozen
-   offline install (`pnpm install --frozen-lockfile --offline`), then `pnpm pins`.
+   Make it from the canonical checkout with `node scripts/worktree.mjs new <slug>`: it branches from origin/main,
+   installs offline and clones identical pins in seconds. Run `node scripts/worktree.mjs reap` to remove worktrees
+   whose branch has landed (it never touches unlanded, dirty or busy ones).
  - Pushing `plan/<slug>` runs the split pre-push: static checks and the related Vitest files locally; the full suite,
    browser and timing tests run in hosted CI.
  - Land from the worktree with `WS_LANE_NAME=<lane> node scripts/land.mjs`: it pushes the branch, waits for that exact

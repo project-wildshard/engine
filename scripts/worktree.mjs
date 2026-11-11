@@ -12,7 +12,8 @@
 //
 // Never copied: .env*, tmp/, .review/, .cache/, browser profiles, leases, ports, push proofs; the worktree gets
 // only tracked files and its own install. Each step's seconds go to <worktree>/tmp/worktree-setup.json and, with
-// WS_LANE_NAME set, one line in ~/.cache/wildshard/lane-receipts.log. Removal is DS13's reaper, never this script.
+// WS_LANE_NAME set, one line in ~/.cache/wildshard/lane-receipts.log. Removal is DS13's reaper: `reap`
+// (scripts/worktree-reap.mjs) removes landed, clean, idle worktrees with their branches, local and on origin.
 import {execFileSync,spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
@@ -20,6 +21,7 @@ import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
+import {parseReapArgs,reap} from './worktree-reap.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REGULAR=/^100(?:644|755)$/u;
@@ -45,7 +47,7 @@ for source, target in zip(parts[0::2], parts[1::2]):
             sys.exit(f'{target.decode()}: {os.strerror(ctypes.get_errno())}')
     finally:
         os.close(fd)`;
-const USAGE='usage: node scripts/worktree.mjs new <slug> [--no-install] [--no-pins] [--no-herdr] [--no-clone]';
+const USAGE='usage: node scripts/worktree.mjs new <slug> [--no-install] [--no-pins] [--no-herdr] [--no-clone]\n       node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--no-remote]';
 
 class StopError extends Error{name='StopError';}
 
@@ -262,7 +264,15 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
 }
 
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
- try{process.exitCode=worktreeNew(process.argv.slice(2));}
+ const argv=process.argv.slice(2);
+ try{
+  if(argv[0]==='reap'){
+   let options;
+   try{options=parseReapArgs(argv.slice(1));}catch(error){throw new StopError(error instanceof Error?error.message:String(error));}
+   process.exitCode=reap(canonicalRoot(process.cwd()),options,process.env,line=>{process.stdout.write(`${line}\n`);});
+  }
+  else process.exitCode=worktreeNew(argv);
+ }
  catch(error){
   if(!(error instanceof StopError))throw error;
   process.stderr.write(`worktree STOP ${error.message}\n`);

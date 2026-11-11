@@ -1,0 +1,141 @@
+// DEV-SPEED DS13: `node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--no-remote]` removes the plan
+// worktrees whose work is on main, and nothing else. Safe to run any time, from any checkout of the repo.
+//
+// A worktree at <canonical>/.worktrees/<slug> on plan/<slug> is reaped only when all of these hold:
+//   - landed: `git cherry origin/main plan/<slug>` lists nothing (every commit's change is on main), after a fetch;
+//   - clean: `git status --porcelain` is empty (tracked edits and untracked files; ignored build output doesn't count);
+//   - idle: no process has its working directory inside it, no `land` holds its lock, no `worktree new` is running,
+//     and nothing in it (index, HEAD, reflog, tip commit) changed for --grace hours (default 24: a lane between
+//     landings keeps its worktree).
+// Then: `git worktree remove` (never --force), the local branch deleted only while it still points at the checked
+// commit, and `origin plan/<slug>` deleted (`git push --delete`, which the pre-push lets through without a gate)
+// only if the remote branch is landed too, under a lease on the SHA it had. A worktree that fails any check is kept
+// and named with the reason; an unlanded branch, local or remote, is never touched. Every run appends one receipt.
+import {execFileSync,spawnSync} from 'node:child_process';
+import {appendFileSync,existsSync,mkdirSync,readdirSync,readlinkSync,realpathSync,statSync} from 'node:fs';
+import {homedir} from 'node:os';
+import {basename,dirname,join,resolve,sep} from 'node:path';
+import {WORKTREES} from './worktree-ignore.mjs';
+
+const REAP_USAGE='usage: node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--no-remote]';
+
+/** @param {string[]} argv the arguments after `reap` @returns {{dryRun:boolean,graceHours:number,remote:boolean}} */
+export function parseReapArgs(argv){
+ const options={dryRun:false,graceHours:24,remote:true};
+ for(const arg of argv){
+  const [name,value]=arg.split('=',2);
+  if(arg==='--dry-run')options.dryRun=true;
+  else if(arg==='--no-remote')options.remote=false;
+  else if(name==='--grace'&&value!==undefined&&/^\d+(?:\.\d+)?$/u.test(value))options.graceHours=Number(value);
+  else throw new Error(`unknown option ${arg}\n${REAP_USAGE}`);
+ }
+ return options;
+}
+
+/** @param {string} cwd @param {string[]} args */
+const git=(cwd,args)=>execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:64<<20});
+/** @param {string} cwd @param {string[]} args */
+const tryGit=(cwd,args)=>spawnSync('git',args,{cwd,encoding:'utf8',maxBuffer:64<<20});
+
+/** The working directory of every process this user can see, by pid; undefined when they can't be listed (then
+ * every worktree counts as busy). Linux reads /proc; elsewhere `lsof -d cwd`.
+ * @returns {Map<number,string>|undefined} */
+export function processDirectories(){
+ /** @type {Map<number,string>} */const found=new Map();
+ if(existsSync('/proc/self/cwd')){
+  for(const name of readdirSync('/proc')){
+   if(!/^\d+$/u.test(name))continue;
+   try{found.set(Number(name),readlinkSync(`/proc/${name}/cwd`));}catch{/* Gone, or another user's. */}
+  }
+  return found;
+ }
+ const listed=spawnSync('lsof',['-a','-d','cwd','-F','pn'],{encoding:'utf8',maxBuffer:64<<20});
+ if(listed.error!==undefined||listed.stdout==='')return undefined;
+ let pid=0;
+ for(const line of listed.stdout.split('\n')){
+  if(line.startsWith('p'))pid=Number(line.slice(1));
+  else if(line.startsWith('n')&&pid>0)found.set(pid,line.slice(1));
+ }
+ return found;
+}
+
+/** Newest change in the worktree's own Git state, in ms. @param {string} tree @param {string} gitDir */
+function lastActivity(tree,gitDir){
+ let newest=Number(git(tree,['log','-1','--format=%ct','HEAD']).trim())*1000;
+ for(const file of ['index','HEAD','logs/HEAD'])try{newest=Math.max(newest,statSync(join(gitDir,file)).mtimeMs);}catch{/* Not there. */}
+ return newest;
+}
+
+/** @typedef {{path:string,head:string,branch:string}} Worktree */
+
+/** Linked worktrees of the repo from `git worktree list --porcelain -z`. @param {string} canonical @returns {Worktree[]} */
+function linkedWorktrees(canonical){
+ /** @type {Worktree[]} */const trees=[];
+ /** @type {Partial<Worktree>} */let current={};
+ for(const field of [...git(canonical,['worktree','list','--porcelain','-z']).split('\0'),'']){
+  if(field===''){if(current.path!==undefined)trees.push({path:current.path,head:current.head??'',branch:current.branch??''});current={};continue;}
+  const [key,...rest]=field.split(' '),value=rest.join(' ');
+  if(key==='worktree')current.path=value;
+  else if(key==='HEAD')current.head=value;
+  else if(key==='branch')current.branch=value;
+ }
+ return trees.slice(1);
+}
+
+/**
+ * Reap every landed, clean, idle plan worktree of the repo `cwd` is in. Returns the exit code.
+ * @param {string} canonical the canonical checkout @param {ReturnType<typeof parseReapArgs>} options
+ * @param {NodeJS.ProcessEnv} env @param {(line:string)=>void} say
+ */
+export function reap(canonical,options,env,say){
+ const common=join(canonical,'.git');
+ if(existsSync(join(common,'wildshard-worktree-setup.lock'))){say('reap STOP a worktree setup is running; retry when it finishes');return 1;}
+ const fetched=tryGit(canonical,['fetch','--quiet','origin','+refs/heads/main:refs/remotes/origin/main']);
+ if(fetched.status!==0){say(`reap STOP cannot fetch origin main: ${fetched.stderr.trim()}`);return 1;}
+ const directories=processDirectories();
+ const realRoot=realpathSync(canonical),now=Date.now();
+ /** @type {string[]} */const reaped=[];
+ /** @type {string[]} */const kept=[];
+ /** @type {string[]} */const remotes=[];
+ for(const tree of linkedWorktrees(canonical)){
+  const slug=basename(tree.path),branch=`refs/heads/plan/${slug}`;
+  const keep=(/** @type {string} */ why)=>{kept.push(`${slug} (${why})`);say(`kept     ${slug}: ${why}`);};
+  if(resolve(tree.path)!==join(canonical,WORKTREES,slug)&&resolve(tree.path)!==join(realRoot,WORKTREES,slug)){say(`skipped  ${tree.path}: not a plan worktree of this checkout`);continue;}
+  if(tree.branch!==branch){keep(`on ${tree.branch===''?'a detached HEAD':tree.branch}, not plan/${slug}`);continue;}
+  if(!existsSync(tree.path)){keep('its folder is gone; `git worktree prune` clears it');continue;}
+  const unlanded=git(canonical,['cherry','origin/main',branch]).split('\n').filter(line=>line.startsWith('+')).length;
+  if(unlanded>0){keep(`${String(unlanded)} commit(s) not on main`);continue;}
+  const dirty=git(tree.path,['status','--porcelain','--untracked-files=all']).split('\n').filter(Boolean);
+  if(dirty.length>0){keep(`${String(dirty.length)} uncommitted path(s), first ${dirty[0]?.slice(3)}`);continue;}
+  const gitDir=git(tree.path,['rev-parse','--absolute-git-dir']).trim();
+  if(existsSync(join(gitDir,'wildshard-land.lock'))){keep('land is running there');continue;}
+  if(directories===undefined){keep('cannot list process working directories');continue;}
+  const real=realpathSync(tree.path),inside=[...directories].filter(([,path])=>path===real||path.startsWith(`${real}${sep}`)||path===tree.path||path.startsWith(`${tree.path}${sep}`));
+  if(inside.length>0){keep(`in use by pid ${inside.map(([pid])=>String(pid)).join(', ')}`);continue;}
+  const idleHours=Math.max(0,(now-lastActivity(tree.path,gitDir))/3_600_000);
+  if(options.graceHours>0&&idleHours<options.graceHours){keep(`active ${idleHours.toFixed(1)} h ago, under the ${String(options.graceHours)} h grace`);continue;}
+  if(options.dryRun){say(`would reap ${slug}: landed, clean, idle ${idleHours.toFixed(1)} h`);reaped.push(slug);continue;}
+  const removed=tryGit(canonical,['worktree','remove',tree.path]);
+  if(removed.status!==0){keep(`git worktree remove refused: ${removed.stderr.trim()}`);continue;}
+  // Only while the branch is still the commit checked above; anything newer is somebody's work.
+  const deleted=tryGit(canonical,['update-ref','-d',branch,tree.head]);
+  say(`reaped   ${slug}: worktree removed${deleted.status===0?', branch deleted':`, branch kept (${deleted.stderr.trim()})`}`);
+  reaped.push(slug);
+  if(!options.remote)continue;
+  const listed=tryGit(canonical,['ls-remote','--heads','origin',branch]);
+  const sha=listed.status===0?listed.stdout.trim().split(/\s+/u)[0]??'':'';
+  if(sha===''){if(listed.status!==0)say(`         ${slug}: origin not reachable; its remote branch is left`);continue;}
+  // The remote branch goes only if it is landed too: its commit must be here and add nothing main lacks.
+  if(tryGit(canonical,['cat-file','-e',`${sha}^{commit}`]).status!==0){remotes.push(`${slug} kept (origin has ${sha.slice(0,10)}, unknown here)`);say(`         ${slug}: origin plan/${slug} is ${sha.slice(0,10)}, not fetched here; left`);continue;}
+  if(git(canonical,['cherry','origin/main',sha]).split('\n').some(line=>line.startsWith('+'))){remotes.push(`${slug} kept (origin has unlanded commits)`);say(`         ${slug}: origin plan/${slug} holds commits not on main; left`);continue;}
+  const pushed=tryGit(canonical,['push','--quiet',`--force-with-lease=${branch}:${sha}`,'origin','--delete',branch]);
+  if(pushed.status===0){remotes.push(`${slug} deleted`);say(`         ${slug}: origin plan/${slug} deleted`);}
+  else{remotes.push(`${slug} delete failed`);say(`         ${slug}: origin plan/${slug} not deleted: ${pushed.stderr.trim()}`);}
+ }
+ if(!options.dryRun)tryGit(canonical,['worktree','prune']);
+ const lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'reaper';
+ const line=`${new Date().toISOString().slice(11,16)} UTC ${lane} worktree reap ${basename(canonical)}${options.dryRun?' (dry run)':''}: ${reaped.length===0?'none':`${options.dryRun?'would reap':'reaped'} ${reaped.join(', ')}`}; kept ${kept.length===0?'none':kept.join(', ')}${remotes.length===0?'':`; origin ${remotes.join(', ')}`}`;
+ const file=resolve(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
+ try{mkdirSync(dirname(file),{recursive:true});appendFileSync(file,`${line}\n`);}catch(error){say(`reap receipt unavailable: ${String(error)}`);}
+ return 0;
+}
