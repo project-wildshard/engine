@@ -6,7 +6,7 @@ import {homedir,hostname} from 'node:os';
 import * as v from 'valibot';
 import {readLiftPending} from './lift-pending.mjs';
 import {pushDependencyIdentity} from './push-dependencies.mjs';
-import {pinsOutputs} from './pins-exclude.mjs';
+import {verifiedPinsOutputs} from './pins-reuse.mjs';
 
 /** The scope is the actual publishing repository, never a caller's cache key.
  * @param {string} root @param {NodeJS.ProcessEnv} env @param {string} tree @param {string} runtime */
@@ -59,9 +59,10 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   }
   if(env.CI||env.GITHUB_ACTIONS)return null;
   // Pins outputs this tree's own install published are build output, like out/: a worktree whose canonical checkout
-  // never wrote the exclude block lists them untracked, and they never make the tree dirty (pins-exclude.mjs).
-  const pinned=pinsOutputs(cwd);
-  const dirty=git(['status','--porcelain','-z','--untracked-files=all']).split('\0').filter(Boolean).filter(line=>!(line.startsWith('?? ')&&pinned.has(line.slice(3))));
+  // never wrote the exclude block lists them untracked. Only mounts that hash to this tree's current pins manifest are
+  // passed over, and that manifest's key joins the proof identity below (pins-reuse.mjs verifiedPinsOutputs).
+  const pinned=verifiedPinsOutputs(cwd);
+  const dirty=git(['status','--porcelain','-z','--untracked-files=all']).split('\0').filter(Boolean).filter(line=>!(line.startsWith('?? ')&&pinned.paths.has(line.slice(3))));
   if(dirty.length>0){
     if(publishes)throw new Error('Push target requires a clean checked tree; enqueue a committed immutable checkout');
     return null;
@@ -74,7 +75,7 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   const environment=Object.entries(env).filter(([key])=>!excluded.test(key)).sort(([a],[b])=>a.localeCompare(b));
   const exclusions=exclusionScope(cwd);
   const dependencies=pushDependencyIdentity(cwd,env);
-  const runtime=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,dependencies})).digest('hex');
+  const runtime=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,dependencies,pins:pinned.key})).digest('hex');
   return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
 

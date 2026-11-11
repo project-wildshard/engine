@@ -6,7 +6,10 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {excludePublished, excludeText, excludedPaths, pinsOutputs} from '../../scripts/pins-exclude.mjs';
+import {excludePublished, excludeText, excludedPaths} from '../../scripts/pins-exclude.mjs';
+import {pinsKey, verifiedPinsOutputs, writeManifest} from '../../scripts/pins-reuse.mjs';
+import {shardfileValidationRevision} from '../../scripts/shardfile-validation-revision.mjs';
+import {createHash} from 'node:crypto';
 import {capturePushTree} from '../../scripts/push-proof-cache.mjs';
 
 /** @type {string[]} */
@@ -75,10 +78,21 @@ describe('pins exclude block', () => {
     publish(root, 'public/assets/a/m.bin');
     mkdirSync(join(root, 'out'), {recursive: true});
     writeFileSync(join(root, 'out/.pins.json'), JSON.stringify({revision: 'r', published: ['public/assets/a/m.bin', '../escape', 'public/../x']}));
-    expect([...pinsOutputs(root)]).toEqual(['public/assets/a/m.bin']);
+    const hash = createHash('sha256').update('mount\n').digest('hex');
+    // No manifest, or one for other pins: nothing is passed over.
+    expect([...verifiedPinsOutputs(root).paths]).toEqual([]);
+    writeManifest(root, 'f'.repeat(64), {}, {'public/assets/a/m.bin': hash});
+    expect([...verifiedPinsOutputs(root).paths]).toEqual([]);
+    const key = pinsKey(root, shardfileValidationRevision(root));
+    writeManifest(root, key, {}, {'public/assets/a/m.bin': hash});
+    expect(verifiedPinsOutputs(root)).toEqual({paths: new Set(['public/assets/a/m.bin']), key});
     const capture = () => capturePushTree('p', {WS_PUSH_REFS: `refs/heads/main ${head} refs/heads/main ${'0'.repeat(40)}`}, root);
     const clean = (() => { try { capture(); return ''; } catch (error) { return error instanceof Error ? error.message : String(error); } })();
     expect(clean).not.toMatch(/clean checked tree/u);
+    // A mount whose bytes changed is no pins output any more, and neither is a stray file.
+    writeFileSync(join(root, 'public/assets/a/m.bin'), 'edited\n');
+    expect(capture).toThrow(/requires a clean checked tree/u);
+    writeFileSync(join(root, 'public/assets/a/m.bin'), 'mount\n');
     publish(root, 'public/assets/a/stray.bin');
     expect(capture).toThrow(/requires a clean checked tree/u);
   });

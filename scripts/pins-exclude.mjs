@@ -7,7 +7,7 @@
 // `land` and `worktree new` check tracked files only).
 import {execFileSync} from 'node:child_process';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
-import {dirname,join} from 'node:path';
+import {dirname} from 'node:path';
 
 const BEGIN='# pins: mounts published under public/, begin',END='# pins: mounts published under public/, end';
 
@@ -28,17 +28,6 @@ export function excludeText(text,paths){
 export function excludedPaths(text){
  const lines=text.split(/\r?\n/u),start=lines.indexOf(BEGIN),end=start===-1?-1:lines.indexOf(END,start);
  return new Set(start===-1||end===-1?[]:lines.slice(start+1,end).map(line=>line.replace(/^\//u,'')));
-}
-
-/** The mounts this tree's own last `pins.ts install` published (its ledger, out/.pins.json): pins outputs, like out/.
- * A worktree whose canonical checkout never wrote the exclude block sees them as untracked; checks that want a clean
- * tree (push-proof-cache.mjs) ignore exactly these, never anything else untracked. Only plain public/ paths count.
- * @param {string} [cwd] @returns {Set<string>} */
-export function pinsOutputs(cwd=process.cwd()){
- try{
-  const {published}=/** @type {{published?:unknown}} */(JSON.parse(readFileSync(join(cwd,'out/.pins.json'),'utf8')));
-  return new Set((Array.isArray(published)?published:[]).filter(path=>typeof path==='string'&&path.startsWith('public/')&&path.split('/').every(part=>part!==''&&part!=='.'&&part!=='..')));
- }catch{return new Set();}
 }
 
 /** Write the canonical checkout's block of published paths; in a linked worktree, leave the shared file alone.

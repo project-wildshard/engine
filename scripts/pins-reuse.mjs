@@ -30,6 +30,7 @@ import {dirname,join,relative,resolve,sep} from 'node:path';
 import {Worker} from 'node:worker_threads';
 import {clonePaths} from './apfs-clone.mjs';
 import {pidLock} from './pid-lock.mjs';
+import {shardfileValidationRevision} from './shardfile-validation-revision.mjs';
 
 export const MANIFEST='out/.pins-manifest.json';
 const VERSION=2,KEY_VERSION='pins-reuse/2',LEDGER='out/.pins.json',LOCK='out/.pins.lock',PINS='test/pins/shardfiles.json';
@@ -79,6 +80,31 @@ function readManifest(root){
  }
  for(const [path,hash] of Object.entries(value.mounts))if(!mountPath(path)||typeof hash!=='string'||!HEX.test(hash))return undefined;
  return /** @type {Manifest} */(value);
+}
+
+/**
+ * The untracked mounts under public/ that are provably this tree's pins outputs, for checks that want a clean tree
+ * (push-proof-cache.mjs): listed in this tree's ledger and manifest, the manifest's key still this tree's committed
+ * pins and installer, inside the tree, and hashing to the manifest now. `key` is that manifest key ('' when there is
+ * none), so a proof binds the pins its outputs came from. A worktree whose canonical checkout never wrote the exclude
+ * block sees these as untracked (pins-exclude.mjs); anything else untracked still counts.
+ * @param {string} root @returns {{paths:Set<string>,key:string}}
+ */
+export function verifiedPinsOutputs(root){
+ /** @type {Set<string>} */const paths=new Set();
+ const manifest=readManifest(root);
+ if(manifest===undefined||manifest.key!==pinsKey(root,shardfileValidationRevision(root)))return {paths,key:''};
+ /** @type {unknown} */let ledger;
+ try{ledger=JSON.parse(readFileSync(join(root,LEDGER),'utf8')).published;}catch{return {paths,key:''};}
+ for(const path of Array.isArray(ledger)?ledger:[]){
+  if(typeof path!=='string'||!mountPath(path)||!Object.hasOwn(manifest.mounts,path))continue;
+  try{
+   insideTree(root,dirname(path));
+   if(!lstatSync(join(root,path)).isFile())continue;
+   if(createHash('sha256').update(readFileSync(join(root,path))).digest('hex')===manifest.mounts[path])paths.add(path);
+  }catch{/* Missing or outside: it stays untracked dirt. */}
+ }
+ return {paths,key:manifest.key};
 }
 
 /** Forget the last full install: out/ is about to change. @param {string} root */
