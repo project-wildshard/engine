@@ -33,3 +33,7 @@ so Codex loads `.codex/hooks.json` here. A pathspec commit cannot turn
 a tracked skill directory into a link, so the swap is staged in the
 index and amended in whole.
 The journal entry rides in that amend too, so D25's check sees it.
+
+Then repo-kit `fb771f0`: agent-parity compares settings by meaning,
+reads Codex hooks from .codex/config.toml and keeps TOML array
+elements apart (MA10), so engine takes the kit's parity again.
