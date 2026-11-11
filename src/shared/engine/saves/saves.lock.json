@@ -58,7 +58,7 @@
     },
     "device/gridIntent.once": {
       "version": 1,
-      "shape": "048e5228c21903ad",
+      "shape": "1cd3a34ea807cff8",
       "migrations": []
     },
     "device/ktx2set": {
@@ -235,7 +235,7 @@
     },
     "session/gridIntent": {
       "version": 1,
-      "shape": "048e5228c21903ad",
+      "shape": "1cd3a34ea807cff8",
       "migrations": []
     },
     "session/life.alive": {
