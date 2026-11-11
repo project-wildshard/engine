@@ -236,6 +236,10 @@ test('Jake, 2026-11-10: a keyboard page puts the chat bottom left too, over what
   at(alert, 12, innerHeight - 260, 420, 130);
   vi.advanceTimersByTime(500);
   expect(box.style.getPropertyValue('--ws-chat-lift')).toBe('270px');
+  // one taller than half the window still counts: it stands on the bottom half
+  at(alert, 12, innerHeight - 440, 420, 310);
+  vi.advanceTimersByTime(500);
+  expect(box.style.getPropertyValue('--ws-chat-lift')).toBe('450px');
   // Settings' Touch controls on a mouse: the touch HUD is up, so the corner takes its place over MOVE
   hud.classList.add('touch');
   vi.advanceTimersByTime(500);

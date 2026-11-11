@@ -54,6 +54,8 @@ const CSS = `
 const UNDER = '#hud > .ws-loot-chip, #hud .ws-ride-steed.show, #hud .ws-game-health, .ws-perf-panel';
 /** The gap over them, and how often the corner looks again. */
 const UNDER_GAP = 10, PLACE_EVERY_MS = 500;
+/** The input row's height and its margin to the top edge: the most the corner may be lifted leaves this much. */
+const CHAT_ROW_PX = 64;
 /** The touch HUD's place (over MOVE) wherever the touch HUD is up, a phone's or one Settings turned on; a keyboard page's over
  *  whatever stands at its bottom left. */
 function place(box: HTMLElement): void {
@@ -64,9 +66,11 @@ function place(box: HTMLElement): void {
   let lift = 0;
   for (const under of document.querySelectorAll(UNDER)) {
     const r = under.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0 && r.top > floor && r.left < right) lift = Math.max(lift, innerHeight - r.top + UNDER_GAP);
+    // a box standing on the bottom half, however tall (a many-line Developer alert can reach past the middle)
+    if (r.width > 0 && r.height > 0 && r.bottom > floor && r.left < right) lift = Math.max(lift, innerHeight - r.top + UNDER_GAP);
   }
-  const value = `${String(Math.round(Math.max(lift, UNDER_GAP)))}px`;
+  // the input and mic always keep a row on screen, even over an alert taller than the window allows
+  const value = `${String(Math.round(Math.min(Math.max(lift, UNDER_GAP), innerHeight - CHAT_ROW_PX)))}px`;
   if (box.style.getPropertyValue('--ws-chat-lift') !== value) box.style.setProperty('--ws-chat-lift', value);
 }
 const REPORT = 'flex:none;margin-left:auto;padding:0 6px;border:0;background:none;color:#8fe3ff;font:inherit;font-size:11px;cursor:pointer';

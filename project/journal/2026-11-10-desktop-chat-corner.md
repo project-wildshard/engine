@@ -30,3 +30,7 @@ follows the touch HUD itself (`#hud.touch`, or a coarse pointer) through a
 `data-touch` mark, not only `@media (pointer: coarse)`. Measured again: the
 phone's boxes are the same as before; the forced touch HUD at 1440x900 puts
 the chat over MOVE; `hud-worst.mjs --check` passes in Chromium and WebKit.
+
+Second J206 pass, one MUST, fixed: an obstacle counted only if its top was
+in the bottom half, so an alert taller than that was skipped. It now counts
+by its bottom edge, and the lift is capped so the input row stays on screen.
