@@ -4,10 +4,11 @@
 # (Authenticated Origin Pulls, zone-level). That proves the caller is Cloudflare's network, not that it is this zone: another
 # Cloudflare customer could point a proxied name here. A per-zone client certificate closes that, later, if it matters.
 #   rooms.wildshard.io          WebSocket upgrade on / to production 127.0.0.1:8790; /up is 200 while production's /health is
-#   rooms-staging.wildshard.io  the same to staging 127.0.0.1:8791 (D2)
+#   rooms-staging.wildshard.io  the same to staging 127.0.0.1:8791 (D2), /up included, so Sentry can watch staging from outside
 # Everything else is 404, /health included (it stays tailnet-only); a page outside the game's own hosts gets 403.
 # The client address is Cloudflare's CF-Connecting-IP, believed only from Cloudflare's ranges, and handed on as the one
 # X-Forwarded-For hop, which the server's TRUST_PROXY=caddy reads (VH10); CF-Connecting-IP itself never reaches the server.
+#   harden-caddy.sh --print <addresses>   print the Caddyfile for those bind addresses and stop (the engine's test reads it)
 # Run by harden-apply.sh as root. The certificate and key come from the lane that minted them (J264, opus-dns), copied to
 # /etc/caddy/origin/ by hand; until both are there, the file is written and Caddy stays off.
 set -euo pipefail
@@ -20,26 +21,8 @@ PULL_CA_SHA256=c14fed0ce5210db0719fea11d1f10b33750dc17d609aeaf47c75e9eff0d7b843
 CF_RANGES='173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32'
 # The server unit's ALLOWED_ORIGINS (setup.sh), as one anchored pattern.
 ORIGINS='^https://(play|staging|preview)\.wildshard\.io$|^https://wildshard-singleplayer\.vercel\.app$'
-if ! dpkg-query -W -f='${Status}' caddy 2>/dev/null | grep -q 'ok installed'; then say stop VH9 'Caddy is not installed (rebuild.sh Phase 1)'; exit 1; fi
-
-install -d -m 750 -o root -g caddy "$ORIGIN"
-if [ -f "$PULL_CA" ] && [ "$(sha256sum < "$PULL_CA" | cut -d' ' -f1)" = "$PULL_CA_SHA256" ]; then say ok VH9 "$PULL_CA"
-else
-  temporary=$(mktemp)
-  curl -fsSL "$PULL_CA_URL" -o "$temporary"
-  if [ "$(sha256sum < "$temporary" | cut -d' ' -f1)" != "$PULL_CA_SHA256" ]; then rm -f "$temporary"; say stop VH9 'Cloudflare origin-pull CA does not match its pinned hash'; exit 1; fi
-  install -m 644 -o root -g caddy "$temporary" "$PULL_CA"; rm -f "$temporary"; say doing VH9 "write $PULL_CA"
-fi
-for file in "$CERT" "$KEY"; do if [ -f "$file" ]; then chown root:caddy "$file"; chmod 640 "$file"; fi; done
-install -d -m 750 -o caddy -g caddy /var/log/caddy
-# A log a root run of `caddy validate` opened would shut Caddy out of its own file.
-find /var/log/caddy -maxdepth 1 -type f ! -user caddy -exec chown caddy:caddy {} +
-# Bind the box's public addresses only: tailscaled holds 443 on the tailnet address while the Funnel lives (until MS8.3).
-PUBLIC=$(ip -o addr show scope global | awk '$2 !~ /^tailscale/ {sub(/\/.*/, "", $4); print $4}' | tr '\n' ' ' | sed 's/ $//')
-if [ -z "$PUBLIC" ]; then say stop VH9 'cannot read the public addresses'; exit 1; fi
-
 site() {
-  local host=$1 port=$2 up=$3
+  local host=$1 port=$2
   cat <<EOF
 https://$host {
 	tls $CERT $KEY {
@@ -56,10 +39,7 @@ https://$host {
 		}
 		format json
 	}
-EOF
-  if [ "$up" = 1 ]; then
-    cat <<EOF
-	# D7: the outside check reads a bare 200 while production's /health answers 200; no body, nothing about the server.
+	# D7: the outside check reads a bare 200 while this channel's /health answers 200; no body, nothing about the server.
 	handle /up {
 		rewrite * /health
 		reverse_proxy 127.0.0.1:$port {
@@ -72,9 +52,6 @@ EOF
 			}
 		}
 	}
-EOF
-  fi
-  cat <<EOF
 	@socket {
 		path /
 		header Connection *Upgrade*
@@ -101,12 +78,13 @@ EOF
 }
 EOF
 }
-caddyfile=$(cat <<EOF
+render() {
+  cat <<EOF
 # VPS-HARDENING VH9 (J264), written by harden.sh. Behind Cloudflare: Origin CA certificate, origin-pull mTLS, 443 only.
 {
 	admin off
 	auto_https off
-	default_bind $PUBLIC
+	default_bind $1
 	servers {
 		protocols h1 h2
 		trusted_proxies static $CF_RANGES
@@ -118,11 +96,34 @@ caddyfile=$(cat <<EOF
 	}
 }
 
-$(site rooms.wildshard.io 8790 1)
+$(site rooms.wildshard.io 8790)
 
-$(site rooms-staging.wildshard.io 8791 0)
+$(site rooms-staging.wildshard.io 8791)
 EOF
-)
+}
+if [ "${1:-}" = --print ]; then
+  if [ -z "${2:-}" ]; then say stop VH9 'usage: harden-caddy.sh --print <addresses>'; exit 1; fi
+  render "$2"; exit 0
+fi
+if ! dpkg-query -W -f='${Status}' caddy 2>/dev/null | grep -q 'ok installed'; then say stop VH9 'Caddy is not installed (rebuild.sh Phase 1)'; exit 1; fi
+
+install -d -m 750 -o root -g caddy "$ORIGIN"
+if [ -f "$PULL_CA" ] && [ "$(sha256sum < "$PULL_CA" | cut -d' ' -f1)" = "$PULL_CA_SHA256" ]; then say ok VH9 "$PULL_CA"
+else
+  temporary=$(mktemp)
+  curl -fsSL "$PULL_CA_URL" -o "$temporary"
+  if [ "$(sha256sum < "$temporary" | cut -d' ' -f1)" != "$PULL_CA_SHA256" ]; then rm -f "$temporary"; say stop VH9 'Cloudflare origin-pull CA does not match its pinned hash'; exit 1; fi
+  install -m 644 -o root -g caddy "$temporary" "$PULL_CA"; rm -f "$temporary"; say doing VH9 "write $PULL_CA"
+fi
+for file in "$CERT" "$KEY"; do if [ -f "$file" ]; then chown root:caddy "$file"; chmod 640 "$file"; fi; done
+install -d -m 750 -o caddy -g caddy /var/log/caddy
+# A log a root run of `caddy validate` opened would shut Caddy out of its own file.
+find /var/log/caddy -maxdepth 1 -type f ! -user caddy -exec chown caddy:caddy {} +
+# Bind the box's public addresses only: tailscaled holds 443 on the tailnet address while the Funnel lives (until MS8.3).
+PUBLIC=$(ip -o addr show scope global | awk '$2 !~ /^tailscale/ {sub(/\/.*/, "", $4); print $4}' | tr '\n' ' ' | sed 's/ $//')
+if [ -z "$PUBLIC" ]; then say stop VH9 'cannot read the public addresses'; exit 1; fi
+
+caddyfile=$(render "$PUBLIC")
 changed=0
 if [ -r /etc/caddy/Caddyfile ] && [ "$(cat /etc/caddy/Caddyfile)" = "$caddyfile" ]; then say ok VH9 /etc/caddy/Caddyfile
 else

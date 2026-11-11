@@ -146,8 +146,9 @@ before Phase 2, and a rerun changes nothing. What it does:
   staging `6G`), the cook (`4G`, keeps user and network namespaces) and
   Caddy. They take effect at each unit's next restart.
 - **VH9 (J264):** `harden-caddy.sh` writes Caddy for
-  `rooms.wildshard.io` (8790, plus `/up`, a bare 200 while production's
-  `/health` is) and `rooms-staging.wildshard.io` (8791): a Cloudflare
+  `rooms.wildshard.io` (8790) and `rooms-staging.wildshard.io` (8791),
+  each with `/up`, a bare 200 while that channel's `/health` is (Sentry
+  watches both; `test/vps-caddy.test.ts` pins them alike): a Cloudflare
   Origin CA certificate at `/etc/caddy/origin/rooms-origin.{pem,key}`,
   Authenticated Origin Pulls (client certificate required, CA pinned),
   `CF-Connecting-IP` believed only from Cloudflare's ranges and passed on
