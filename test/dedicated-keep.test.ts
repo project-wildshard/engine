@@ -9,6 +9,7 @@ import type { Database, Sql } from '../src/server/host/dedicated/saves/database'
 import type { SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import type { SavedPlayer } from '../src/server/host/dedicated/world';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
+import { isOwnedId } from '../src/shared/game/loot/Owned';
 import { Rng } from '../src/shared/engine/core/rng';
 import { personalCoinTable, personalItemTable } from '../src/server/game/loot/personal';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
@@ -19,6 +20,8 @@ import { openPglite } from './fixtures/pgliteDatabase';
 // What a player keeps on the one world (MMO-PLAN MP3.1, MP3.3, and J202's world-state rule), through the paths a restart really takes:
 // the room's drain, the write queue, Postgres, and `saves.read()` with its recovery receipts. A restart gives a fresh world and keeps
 // progress; the ledger pays every entitlement exactly once, however kills, crashes and replays fall; a bag is one player's in one shard.
+/** A kill falls between ticks; its grant is filed on the next one. */
+const FILED_AFTER = 1;
 const DRIFTWOOD = 'driftwood-isle', NALATI = 'nalati-grasslands', EPOCH = 1;
 const closers: (() => Promise<void> | void)[] = [];
 afterEach(async () => { for (const close of closers.splice(0).reverse()) await close(); });
@@ -198,10 +201,12 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
     const copy = new Rng(0); copy.restore(at.room.host.rng.stream('loot').snapshot());
     const next = (): number => copy.next(), mine = owned.get(at.bootId) ?? new Set<string>(); owned.set(at.bootId, mine);
     const amount = coinRoll(creature.kind, next), items = itemRoll?.({ kind: creature.kind, variant: creature.variant, owned: item => mine.has(item) }, next) ?? [];
+    // A death is its boot and the tick it fell in: the grant's id is filed on the tick after.
+    const death = `${at.bootId}|${String(at.room.host.state.tick + FILED_AFTER)}`;
     if (!kill(at, 'a', creature)) return false;
     if (amount > 0 || items.length > 0) {
-      if (amount > 0) pending.push(`${at.bootId}|coins|${String(amount)}`);
-      for (const { item } of items) { mine.add(item); pending.push(`${at.bootId}|item|${item}`); }
+      if (amount > 0) pending.push(`${death}|coins|coins|${String(amount)}`);
+      for (const { item, count } of items) { mine.add(item); pending.push(`${death}|item|${item}|${String(count)}`); }
       entitled++;
     }
     return true;
@@ -268,7 +273,7 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
   expect(receipts.filter(row => row.grant_kind === 'coins').length, 'kills paid coins: the property has something to hold').toBeGreaterThan(10);
   expect(new Set(receipts.map(row => row.fact_id)).size, 'one row a fact').toBe(receipts.length);
   // Exactly once against what the game granted: every committed reward has its one receipt, and nothing else does.
-  const booked = receipts.filter(row => row.grant_kind !== 'fact').map(row => `${row.fact_id.split('.')[0] ?? ''}|${row.grant_kind}|${row.grant_kind === 'coins' ? String(Number(row.amount)) : row.name}`);
+  const booked = receipts.filter(row => row.grant_kind !== 'fact').map(row => { const [bootId = '', tick = ''] = row.fact_id.split('.'); return `${bootId}|${tick}|${row.grant_kind}|${row.name}|${String(Number(row.amount))}`; });
   expect(sorted(booked), 'the receipts are exactly the committed entitlements').toEqual(sorted(durable));
   // A durable fact (a kill counter) is entitled once per count: each name's counts run 1..n, none missing and none twice.
   const counts = new Map<string, number[]>();
@@ -277,6 +282,15 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
   for (const [name, seen] of counts) expect([...seen].sort((x, y) => x - y), `${name} counts once each`).toEqual(seen.map((_, index) => index + 1));
   expect(lost.length, 'a crash lost a live grant, so the oracle has a gap to check').toBeGreaterThan(0);
   expect(purse, 'the purse is exactly what the ledger paid').toBe(paid(receipts));
-  const saved = await savesOf(db).read('a', DRIFTWOOD);
+  const saved = await savesOf(db).read('a', DRIFTWOOD), last = await boot(DRIFTWOOD, 'restored', null), restored = seat(last, 'a', saved);
+  run(last, restored, 3);
+  // What is restored from Postgres holds every item the ledger paid: gear it owns, and the pack in the counts it was paid.
+  const bag = last.room.cell.owned.of(last.room.bodyOf('a')?.id ?? ''), items = receipts.filter(row => row.grant_kind === 'item'), packed = new Map<string, number>();
+  for (const row of items.filter(row => !isOwnedId(row.name))) packed.set(row.name, (packed.get(row.name) ?? 0) + Number(row.amount));
+  const gear = new Set(items.filter(row => isOwnedId(row.name)).map(row => row.name));
+  expect(gear.size, 'kills paid gear').toBeGreaterThan(0);
+  for (const item of gear) expect(bag.owned.has(item), `${item} is owned`).toBe(true);
+  for (const [item, count] of packed) expect(bag.count(item), `${item} in the pack`).toBe(count);
+  expect(bag.purse.coins, 'and the purse').toBe(purse);
   expect(saved.doc?.ledger.serial, 'and the last doc saw every receipt').toBe(receipts.length);
 });
