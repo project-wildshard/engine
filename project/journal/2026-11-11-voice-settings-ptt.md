@@ -15,3 +15,8 @@ mode is a keyboard thing, so a phone's Settings shows only the microphone and th
 
 A new microphone picked mid-call is swapped into every link's sender with `replaceTrack`, no renegotiation; a saved mic
 that is gone falls back to the default rather than failing the join. Volume multiplies V7's distance fade.
+
+The first proof caught the online shell's own bundle again: `online.js` carries its own copies of the saves, the input
+service and this module, so voice read the default settings and the default key. `voiceSettings.ts` now keeps a page-wide
+hub (`Symbol.for('wildshard.voiceSettings')`): each copy lends a reader, a writer and a key lookup, in load order, and a
+read takes the first that answers, so the game's saves and bindings speak for the voice shell.
