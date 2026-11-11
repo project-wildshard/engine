@@ -193,6 +193,9 @@ print(json.dumps(True))
   expect(JSON.parse(result)).toBe(true);
 });
 
+// The two G10 cases never sample a moment: the guarded command touches a marker when it runs, so "it did not run
+// while the prune held the store" is checked by the marker's absence, and the hold is released explicitly. A lease
+// or grant that is written and then given back in between can't make them flaky (main run 43079645530).
 test('GVS G10: a store-prune reservation keeps leases queued, outlives a killed prune owner, and ends with its last child', () => {
   const result = execFileSync('python3', ['-c', `
 import json, os, pathlib, subprocess, sys, tempfile, time
@@ -203,22 +206,28 @@ with tempfile.TemporaryDirectory(prefix='store-reservation-test-', dir=repo/'tmp
  env['WS_HEAVY_ROOT'] = str(root/'leases')
  lock = root/'store-maintenance.lock'
  env['WS_STORE_RESERVATION'] = str(lock)
+ marker = root/'ran'
  # A prune owner takes the lock, starts its long child with the lock inherited, then is killed.
  owner = subprocess.Popen([sys.executable,'-c',
-  "import fcntl,subprocess,sys,time\\nf=open(sys.argv[1],'a+')\\nfcntl.flock(f,fcntl.LOCK_EX)\\nc=subprocess.Popen(['sleep','30'],pass_fds=(f.fileno(),))\\nprint(c.pid,flush=True)\\ntime.sleep(30)",
+  "import fcntl,subprocess,sys,time\\nf=open(sys.argv[1],'a+')\\nfcntl.flock(f,fcntl.LOCK_EX)\\nc=subprocess.Popen(['sleep','60'],pass_fds=(f.fileno(),))\\nprint(c.pid,flush=True)\\ntime.sleep(60)",
   str(lock)], stdout=subprocess.PIPE, text=True)
  child = int(owner.stdout.readline())
  owner.kill(); owner.wait()
- build = subprocess.Popen([sys.executable,str(repo/'scripts/heavy-lane.py'),'build','--',sys.executable,'-c',"print('ran')"],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
- time.sleep(1.5)
- waited = build.poll() is None and not list((root/'leases').glob('build*.active.json'))
- queued = any(row['token'] for row in json.loads((root/'leases'/'queue.json').read_text()).get('queue', []))
+ build = subprocess.Popen([sys.executable,str(repo/'scripts/heavy-lane.py'),'build','--',sys.executable,'-c',"import pathlib,sys; pathlib.Path(sys.argv[1]).touch()",str(marker)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+ queue = root/'leases'/'queue.json'
+ def queued():
+  try: return any(row.get('pid') == build.pid for row in json.loads(queue.read_text()).get('queue', []))
+  except (OSError, ValueError): return False
+ deadline = time.monotonic() + 30
+ while not queued() and build.poll() is None and time.monotonic() < deadline: time.sleep(0.05)
+ time.sleep(1)  # many admission attempts, all against the held lock
+ waited = queued() and build.poll() is None and not marker.exists()
  os.kill(child, 9)
- out, err = build.communicate(timeout=20)
- print(json.dumps({'waited': waited, 'stillQueued': queued, 'ran': build.returncode == 0 and out.strip() == 'ran'}))
+ out, err = build.communicate(timeout=60)
+ print(json.dumps({'waited': waited, 'ran': build.returncode == 0 and marker.exists()}))
 `], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-  expect(JSON.parse(result)).toEqual({ waited: true, stillQueued: true, ran: true });
-});
+  expect(JSON.parse(result)).toEqual({ waited: true, ran: true });
+}, 120_000);
 
 test('GVS G10: CPU admission gives its grant back and waits while a store prune holds the store', () => {
   const result = execFileSync('python3', ['-c', `
@@ -230,14 +239,22 @@ with tempfile.TemporaryDirectory(prefix='cpu-reservation-test-', dir=repo/'tmp')
  env['WS_CPU_ROOT'] = str(root/'cpu')
  lock = root/'store-maintenance.lock'
  env['WS_STORE_RESERVATION'] = str(lock)
+ marker = root/'ran'
  held = open(lock, 'a+'); fcntl.flock(held, fcntl.LOCK_EX)
- run = subprocess.Popen([sys.executable,str(repo/'scripts/cpu-admission.py'),'run','--slots','1','--capacity','1','--',sys.executable,'-c',"print('ran')"],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
- time.sleep(1.5)
- state = json.loads((root/'cpu'/'queue.json').read_text())
- waited = run.poll() is None and state.get('cpuActive', []) == []
+ run = subprocess.Popen([sys.executable,str(repo/'scripts/cpu-admission.py'),'run','--slots','1','--capacity','1','--',sys.executable,'-c',"import pathlib,sys; pathlib.Path(sys.argv[1]).touch()",str(marker)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+ queue = root/'cpu'/'queue.json'
+ def seen():
+  try:
+   state = json.loads(queue.read_text())
+   return any(row.get('pid') == run.pid for row in [*state.get('cpuQueue', []), *state.get('cpuActive', [])]) or state.get('cpuNext', 0) > 0
+  except (OSError, ValueError): return False
+ deadline = time.monotonic() + 30
+ while not seen() and run.poll() is None and time.monotonic() < deadline: time.sleep(0.05)
+ time.sleep(1)  # many admission attempts, all against the held lock
+ waited = seen() and run.poll() is None and not marker.exists()
  fcntl.flock(held, fcntl.LOCK_UN); held.close()
- out, err = run.communicate(timeout=20)
- print(json.dumps({'waited': waited, 'ran': run.returncode == 0 and 'ran' in out}))
+ out, err = run.communicate(timeout=60)
+ print(json.dumps({'waited': waited, 'ran': run.returncode == 0 and marker.exists()}))
 `], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   expect(JSON.parse(result)).toEqual({ waited: true, ran: true });
-});
+}, 120_000);
