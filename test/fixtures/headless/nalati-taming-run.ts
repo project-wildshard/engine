@@ -34,6 +34,10 @@ interface TamingProofOptions {
   readonly postBondCommands?:readonly (readonly HeadlessCommand[])[];
   /** Detached observations only; the verifier cannot mutate either resident. */
   readonly verifyBonded?:(first:BondedObservation,restored:BondedObservation)=>void;
+  /** FAST-SLOW-TESTS FS4: after the walk, stand at this offset from the grazing stallion instead of chasing it. */
+  readonly approach?:{readonly x:number;readonly z:number};
+  /** The breaking tick of the earned checkpoint (250 when absent); the restored world runs in step from there. */
+  readonly checkpointAt?:number;
 }
 
 /** The real entry, physical approach and every bucking round. A checkpoint
@@ -58,13 +62,20 @@ export async function runNalatiFieldTaming(options:TamingProofOptions={}):Promis
       assert.deepEqual(first.effects,[],'walking or taming cannot mint quest completion facts');
     };
     walkNalatiHorsePlains(first.host,step);const approachTicks=first.host.state.tick;
+    if(options.approach!==undefined){
+      // A position set, as a player would stand there: the stallion is still wild, unbroken and untrusting, and the
+      // prompt is still earned below by the real approach law with no trust grant or forced break.
+      const player=leadPlayer(first.host),x=original.position.x+options.approach.x,z=original.position.z+options.approach.z;
+      assert.equal(taming.phase,'wild');assert.equal(taming.interactable.radius,0);
+      player.position.set(x,first.host.groundHeightAt(x,z)+.05,z);player.motor.resetAt(player.position);
+    }
     const pilot=createNalatiTamingPilot();let prompt=false,breakingTicks=0,checkpointTick=0,rounds=0;
     for(let tick=0;tick<40000&&taming.phase!=='bonded';tick++){
       const commands=pilot(first.host,original.entityId);
       prompt ||= taming.interactable.radius>0;
       if(taming.phase==='breaking'){breakingTicks++;rounds=Math.max(rounds,taming.view.round??0);}
       step(commands);restored?.step(commands);
-      if(restored===undefined&&taming.phase==='breaking'&&breakingTicks===250){
+      if(restored===undefined&&taming.phase==='breaking'&&breakingTicks===(options.checkpointAt??250)){
         const saved=snapshotSimHostBytes(first.host);checkpointTick=first.host.state.tick;
         restored=await createNativeProofResident(preparation,prepare,serializeSimSnapshot(saved));
         assert.equal(canonicalSimDigest(snapshotSimHostBytes(restored.host)),canonicalSimDigest(saved),'the earned mid-round checkpoint restores quietly');

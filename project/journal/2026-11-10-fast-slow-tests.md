@@ -35,3 +35,13 @@ slow. Each now skips the idle part and keeps its assertions.
   so the worker case moves verbatim into `nalati-headless-worker.test.ts`
   (same native group) and the population story runs on its own.
   Its first clock (10.0 s locally) is recorded by push-preflight timings.
+- FS4 field taming: after the real walk, 5,900 ticks went on chasing a
+  stallion that shied from an upright stranger. The player now stands
+  6 m west of it (a position set, as the bot story already does); the
+  stallion still shies, then the prompt is earned by the real law with
+  no grant or forced break. Other spots lost rounds and re-chased for
+  20,000-43,000 ticks, and stronger lean gains changed nothing, so this
+  one is pinned. The earned checkpoint moves from breaking tick 250 to
+  735 (mid-round 4), so the restored world still rides a round and a
+  half and adopts. A taming restore that drops the law fails both
+  versions on "the earned mid-round checkpoint restores quietly".
