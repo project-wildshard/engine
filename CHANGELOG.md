@@ -8,6 +8,14 @@ To release: add the next version's section at the top, commit and push it, then 
 and `--finish` as before. `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose
 `package.json` version has no valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.8 (2026-11-11)
+
+- Settings has tabs like the Bag, with graphics controls for pixel density, shadows, glow, sun rays and anti-aliasing.
+- Graphics has Low, High and Custom presets. Low runs at 60 fps when Low Power Mode is off.
+- On desktop, chat and the mic sit bottom left. Pressing B to talk now says what it did, and single player stays quiet.
+- Loading after an update is faster, since most world files no longer download again. Nalati saves load nearly twice as fast.
+- All 28 shards are prepared and pinned, and the server only trusts its own proxy for each player's address.
+
 ## v0.1.7 (2026-11-10)
 
 - Tapping through the title quickly on iPhone no longer reports a loading error.
