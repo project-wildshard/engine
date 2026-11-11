@@ -280,6 +280,22 @@ class Landing{
   throw new StopError(`rebase onto main ${short(main)} conflicts in: ${paths}\nResolve: git rebase origin/main, fix those paths (stamp conflicts alone land regenerates itself), git rebase --continue, then run land again. HEAD is back at ${short(before)}.`);
  }
 
+ /** J249 provenance: what goes to main on the branch's green run must be exactly main plus that run's SHA, stamps
+  * aside. Git's own three-way merge of the two is computed apart from the rebase, and the rebased HEAD must match it
+  * file for file; a commit made during the rebase or the stamp regeneration, or anything else, stops land (J206
+  * review). The stamps are excluded because land regenerates them for the rebased tree.
+  * @param {string} main @param {string} tested */
+ verifyReplay(main,tested){
+  const merged=tryGit(this.root,['merge-tree','--write-tree','--name-only','--no-messages',main,tested]);
+  const [tree='',...conflicted]=merged.stdout.split('\n').map(line=>line.trim()).filter(Boolean);
+  const excluded=STAMPS.map(path=>`:(exclude)${path}`);
+  const same=SHA.test(tree)&&(merged.status===0||merged.status===1)&&conflicted.every(path=>STAMPS.includes(path))
+   &&tryGit(this.root,['diff','--quiet',tree,'HEAD','--','.',...excluded]).status===0;
+  if(same)return;
+  this.receipt(`STOP rebased ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)}`);
+  throw new StopError(`after the rebase, ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)} (stamps aside): a commit or edit came in during the land. Check git log, keep what you meant, and run land again; a new commit gets its own branch CI.`);
+ }
+
  /** Push the exact SHA to this worktree's own plan branch. After a rebase the
   * branch is rewritten under a lease on the tip land last saw; main never is.
   * @param {string} sha */
@@ -398,6 +414,7 @@ class Landing{
    if(!isAncestor(this.root,main,this.holds('before the rebase'))){
     this.say('moved',`main moved to ${short(main)}; rebasing (round ${round})`);
     this.rebase(main);
+    this.verifyReplay(main,tested.sha);
     rule='carried';why=`clean rebase onto ${short(main)}: the branch's green run ${short(tested.sha)} carries (J249)`;
     this.say('carried',why);
    }

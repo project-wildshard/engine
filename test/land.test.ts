@@ -515,6 +515,23 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
   }, 60_000);
 
 
+  test('J206 review: a commit that slips in during the rebase or the stamp regeneration never rides to main', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    // This plan's gen.mjs commits a file of its own when land regenerates the stamps after the rebase.
+    f.commit(wt, 'scripts/gen.mjs', "import {execSync} from 'node:child_process';import {writeFileSync} from 'node:fs';writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');", 'build: a generator');
+    const tested = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(1);
+    expect(result.stdout).toMatch(/is not main [0-9a-f]{10} plus the hosted-green [0-9a-f]{10} \(stamps aside\)/u);
+    // Main holds the peer's commit and nothing of this plan, the sneaked file least of all.
+    expect(f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/']).split('\n')).toEqual(expect.arrayContaining(['src/other.ts']));
+    expect(f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/'])).not.toMatch(/sneak|feature/u);
+    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
+    expect(f.read(f.files.receipts)).toMatch(/STOP rebased [0-9a-f]{10} is not main/u);
+  }, 60_000);
+
   test('a harness change beside clocks carries too: J249 has no harness rule, main\'s own run checks it', () => {
     const f = fixture();
     const wt = f.worktree('foo');

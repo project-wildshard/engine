@@ -16,3 +16,10 @@ landing, and land now prints the rule: if it goes red, the lane that
 landed last fixes it forward or reverts it, at once. AGENTS.md says the
 same. The classifier and the shard-planner check are gone with their tests;
 the same-file, harness and `.github` cases are now tested as carried.
+
+J206 Codex review: one MUST. Accepting whatever HEAD the rebase and stamp
+regeneration left would let a commit slip in under the earlier green run.
+land now computes git's own three-way merge of main and the hosted-green
+SHA (`git merge-tree --write-tree`) apart from the rebase, and the rebased
+HEAD must match it file for file, stamps aside; anything else stops. A
+test plants a generator that commits during the regeneration.

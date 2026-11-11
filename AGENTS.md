@@ -52,8 +52,8 @@ Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STAN
    in… they don't have to re-CI on rebase"): `exact` when main didn't move (main reuses the branch run); `carried`
    when main moved and the rebase was clean (a conflict only in the generated stamps counts as clean: land
    regenerates them): it goes to main on the branch's green run, after the split pre-push on the rebased tree. No
-   path or harness rule sends it back to branch CI, and there are no locks. A real conflict stops; the resolved
-   commit is new and gets its own branch CI.
+   path or harness rule sends it back to branch CI, and no lock is shared between worktrees (one land per
+   worktree). A real conflict stops; the resolved commit is new and gets its own branch CI.
  - Main's CI runs after every land. If it goes red, the lane that landed last fixes it forward or reverts it, at
    once (J249). Land prints this rule when it lands.
  - Clean up landed worktrees with `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an
