@@ -7,8 +7,9 @@ import { createRequire } from 'node:module';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
-// Reuse the SDK's pinned Node image decoder; root scripts have no separate Sharp dependency.
-const sharp = createRequire(new URL('../src/sharddev/package.json', import.meta.url))('sharp');
+// Sharp resolves from this file: engine's own devDependency here, the consumer's through the optional
+// `sharp` peer when a shard repo or sharddev runs this script from its install of engine.
+const sharp = createRequire(import.meta.url)('sharp');
 
 /** Hash decoded sRGB RGBA8 pixels and their dimensions, independent of image encoding and metadata.
  * This binds a stamp to its raster; world freshness still requires the official map bake.

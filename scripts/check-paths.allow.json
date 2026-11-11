@@ -470,31 +470,6 @@
     "why": "Left with sharddev or a shard at P3"
   },
   {
-    "path": "src/sdk",
-    "file": "scripts/game-plugins.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev",
-    "file": "scripts/game-plugins.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/shards",
-    "file": "scripts/game-plugins.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/game/package.json",
-    "file": "scripts/game-plugins.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/game",
-    "file": "scripts/game-plugins.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
     "path": "test/manifest-declarations.test.ts",
     "file": "scripts/gate-related-tests.mjs",
     "why": "Left with sharddev or a shard at P3"

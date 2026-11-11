@@ -1,5 +1,5 @@
-// oxlint-disable-next-line import/no-nodejs-modules -- Check the native tool producer/consumer wiring without starting CI.
-import { readFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Check workflow cache inputs without starting CI.
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { prepareTestBuildTools, selectTestBuildTools } from '../scripts/test-build-tools';
 import registry from './build-tools.json' with { type: 'json' };
@@ -43,25 +43,14 @@ test('a refused native installation remains a run failure without a cached-byte 
     .rejects.toThrow('Pinned Basis executable identity differs');
 });
 
-test('behaviour restores the exact native tool cache published before its matrix starts', () => {
-  const workflow = readFileSync('.github/workflows/deploy.yml', 'utf8');
-  const job = (name: string): string => workflow.split(`\n  ${name}:\n`)[1]?.split(/\n {2}[a-z][\w-]*:\n/u)[0] ?? '';
-  const step = (source: string, name: string): string => source.split(`      - name: ${name}\n`)[1]?.split(/\n {6}- /u)[0] ?? '';
-  const prepare = job('prepare'), behaviour = job('behaviour');
-  const producer = step(prepare, 'Cache the checked Basis compiler');
-  const consumer = step(behaviour, 'Restore the checked Basis compiler');
-  expect(producer).toMatch(/uses: actions\/cache@[0-9a-f]{40} # v4\./u); // public-ci.mjs pins every action to a commit.
-  expect(consumer).toMatch(/uses: actions\/cache\/restore@[0-9a-f]{40} # v4\./u);
-  const key = (source: string): string | undefined => /^ {10}key: (.+)$/mu.exec(source)?.[1];
-  expect(key(producer)).toBeDefined(); expect(key(consumer)).toBe(key(producer));
-  for (const source of [producer, consumer]) {
-    expect(source).toContain('path: ~/.cache/wildshard/basis');
-    expect(source).not.toContain('restore-keys:');
-    expect(source).not.toContain('continue-on-error:');
-    for (const input of ['runner.os', 'runner.arch', 'src/sharddev/bake/basisTool.ts', 'src/sharddev/bake/basisToolInputs.ts'])
-      expect(key(source)).toContain(input);
-  }
-  expect(prepare.indexOf('Cache the checked Basis compiler')).toBeLessThan(prepare.indexOf('node scripts/gen.mjs --reuse'));
-  expect(behaviour).toMatch(/^ {4}needs: .*prepare/mu);
-  expect(behaviour.indexOf('Restore the checked Basis compiler')).toBeLessThan(behaviour.indexOf('pnpm exec vitest run'));
+// The Basis tool moved to sharddev at P3 (ENGINE-MOVE-CLEANUP PG1). A cache keyed on a source file that isn't in the
+// tree hashes nothing, so its key never changes: every committed source a workflow hashes must exist.
+test('workflow cache keys hash only committed sources that exist', () => {
+  const workflows = readdirSync('.github/workflows').filter(file => file.endsWith('.yml'));
+  const sources = workflows.flatMap(file => [...readFileSync(`.github/workflows/${file}`, 'utf8').matchAll(/hashFiles\(([^)]*)\)/gu)]
+    .flatMap(call => [...(call[1] ?? '').matchAll(/'([^']+)'/gu)].map(arg => arg[1] ?? '')))
+    .filter(path => /^(?:src|scripts|test|lint)\//u.test(path));
+  expect(sources.length).toBeGreaterThan(0);
+  for (const path of sources) expect(existsSync(path), path).toBe(true);
+  expect(readFileSync('.github/workflows/deploy.yml', 'utf8')).not.toContain('checked Basis compiler');
 });
