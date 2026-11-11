@@ -8,6 +8,11 @@ const READ_MS = 3000;
 /** Durable data needs repair; retrying this admission cannot make it valid. */
 export class SaveQuarantinedError extends Error { override name = 'SaveQuarantinedError'; }
 
+/** MP3.2: where the platform files profile grants. No shard is called this, and a shard's save may never be (`grantProfile` files there). */
+export const PLATFORM_SHARD = '@platform';
+/** What a shard's save may file: never a profile kind, which only the platform grants. */
+const SHARD_GRANTS: ReadonlySet<string> = new Set(['fact', 'coins', 'item']);
+
 /** One receipt, as it goes in the same transaction as the doc that paid it. */
 export interface SaveReceipt { readonly serial: number; readonly factId: string; readonly grant: string; readonly name: string; readonly amount: number }
 /** One player's save on one shard. `seq` only ever rises for a player and a shard, and an older write never lands on a newer one. The epoch is the store's, from the release. */
@@ -56,6 +61,9 @@ const HEAL = 'update player_save set doc = previous, previous = doc where player
 function poseOf(doc: unknown): unknown { return typeof doc === 'object' && doc !== null && 'at' in doc ? doc.at ?? null : null; }
 /** Write a player's doc and its receipts in one transaction. Receipts stand even if an older doc doesn't land: they are facts. */
 export async function writeSave(db: Database, epoch: number, write: SaveWrite): Promise<void> {
+  if (write.shard === PLATFORM_SHARD) throw new Error(`A shard save can't be filed as ${PLATFORM_SHARD}`);
+  const minted = write.receipts.find(row => !SHARD_GRANTS.has(row.grant));
+  if (minted !== undefined) throw new Error(`A shard save can't file a ${minted.grant} grant`);
   await db.transaction(async (sql: Sql) => {
     await sql.query(WRITE_PLAYER, [write.player, write.name]);
     const landed = await sql.query(WRITE_SAVE, [write.player, epoch, write.shard, write.build, write.saveVersion, write.seq, write.reason, JSON.stringify(write.doc)]);

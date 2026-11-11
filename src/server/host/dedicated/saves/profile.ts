@@ -1,14 +1,12 @@
 import * as v from 'valibot';
 import type { Database, Sql } from './database';
-import { within } from './saveStore';
+import { PLATFORM_SHARD, within } from './saveStore';
 
 // MMO-PLAN MP3.2 (M4, M6, O9, G25): a player's profile is the one thing that travels above the shards. It holds only what the
 // platform controls: titles (M4's Title under the Name, O9's Founding Author), cosmetics and achievements. There is no global
 // coin (G25): coins and anything else a shard invents stay in that shard's save. Catalogue gear joins with MP3.4's catalogue.
 // Only a ledger grant changes it: the database itself refuses any other write (`0005-profile.sql`).
 
-/** Where platform grants are filed in the ledger: no shard is called this, and no shard may file a profile kind. */
-export const PLATFORM_SHARD = '@platform';
 /** What a profile grant adds. */
 export type ProfileKind = 'title' | 'cosmetic' | 'achievement';
 /** One player's profile. */

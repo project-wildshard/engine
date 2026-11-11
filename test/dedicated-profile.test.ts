@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from 'vitest';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
 import { claimName } from '../src/server/host/dedicated/saves/names';
-import { writeSave } from '../src/server/host/dedicated/saves/saveStore';
-import { EMPTY_PROFILE, grantProfile, PLATFORM_SHARD, readProfile } from '../src/server/host/dedicated/saves/profile';
+import { PLATFORM_SHARD, writeSave } from '../src/server/host/dedicated/saves/saveStore';
+import { EMPTY_PROFILE, grantProfile, readProfile } from '../src/server/host/dedicated/saves/profile';
 import type { Database } from '../src/server/host/dedicated/saves/database';
 import { openPglite } from './fixtures/pgliteDatabase';
 
@@ -49,6 +49,9 @@ test('nothing but a ledger grant changes the profile: no direct write, no save, 
     receipts: [{ serial: 1, factId: 'kill:1', grant: 'coins', name: 'coins', amount: 50 }, { serial: 2, factId: 'fact:1', grant: 'fact', name: 'Founding Author', amount: 1 }] });
   await expect(writeSave(db, EPOCH, { player: 'device:a', name: 'Ann', shard: 'driftwood-isle', build: 'b', saveVersion: 1, seq: 2, reason: 'test', doc: {},
     receipts: [{ serial: 3, factId: 'mint', grant: 'title', name: 'Shard King', amount: 1 }] }), 'a shard cannot mint a title').rejects.toThrow();
+  await expect(writeSave(db, EPOCH, { player: 'device:a', name: 'Ann', shard: PLATFORM_SHARD, build: 'b', saveVersion: 1, seq: 1, reason: 'test', doc: {},
+    receipts: [{ serial: 9, factId: 'mint', grant: 'title', name: 'Shard King', amount: 1 }] }), 'nor pass its save off as the platform').rejects.toThrow();
+  await expect(db.query(`insert into player_save (player_id, epoch, shard, revision, build, save_version, seq, reason, doc) values ('device:a', 1, '@platform', 1, 'b', 1, 1, 'test', '{}')`), 'the database refuses it too').rejects.toThrow(/player_save_not_platform/u);
   // A rename keeps it.
   await claimName(db, 'device:a', 'Bea');
   expect(await readProfile(db, 'device:a')).toEqual(held);
@@ -60,6 +63,7 @@ test('no global coin: with the guard switched off, the profile still holds no ke
   await claimName(db, 'device:a', 'Ann');
   await db.exec('alter table player disable trigger player_profile_guard');
   await expect(db.query(`update player set profile = profile || '{"coins":5}' where id = 'device:a'`)).rejects.toThrow(/player_profile_platform_only/u);
-  await expect(db.query(`update player set profile = '{"titles":"Cheater","cosmetics":[],"achievements":[]}' where id = 'device:a'`)).rejects.toThrow(/player_profile_platform_only/u);
+  for (const bad of ['{"titles":"Cheater","cosmetics":[],"achievements":[]}', '{}', '{"titles":[],"cosmetics":[]}', '{"titles":[{"coins":500}],"cosmetics":[],"achievements":[]}'])
+    await expect(db.query('update player set profile = $1::jsonb where id = $2', [bad, 'device:a']), bad).rejects.toThrow(/player_profile_platform_only/u);
   expect(await readProfile(db, 'device:a')).toEqual(EMPTY_PROFILE);
 });

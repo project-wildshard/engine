@@ -1,11 +1,15 @@
 -- MMO-PLAN MP3.2 (M4, M6, O9, G25): one profile document on `player`, the only thing that travels above the shards. It holds what
 -- the platform controls (titles, cosmetics, achievements) and never a coin: no other key fits. Additive: every player starts empty.
 alter table player add column profile jsonb not null default '{"titles":[],"cosmetics":[],"achievements":[]}'
-  constraint player_profile_platform_only check (jsonb_typeof(profile) = 'object' and profile - array['titles', 'cosmetics', 'achievements'] = '{}'::jsonb
-    and jsonb_typeof(profile -> 'titles') = 'array' and jsonb_typeof(profile -> 'cosmetics') = 'array' and jsonb_typeof(profile -> 'achievements') = 'array');
+  constraint player_profile_platform_only check (jsonb_typeof(profile) = 'object' and profile ?& array['titles', 'cosmetics', 'achievements']
+    and profile - array['titles', 'cosmetics', 'achievements'] = '{}'::jsonb
+    and jsonb_typeof(profile -> 'titles') = 'array' and jsonb_typeof(profile -> 'cosmetics') = 'array' and jsonb_typeof(profile -> 'achievements') = 'array'
+    and not jsonb_path_exists(profile, '$.*[*] ? (@.type() != "string")'));
 
 -- Profile grants are filed under `@platform`, and only there: a shard can't mint a title, and the platform files nothing else.
 alter table ledger_receipt add constraint ledger_receipt_profile_platform check ((grant_kind in ('title', 'cosmetic', 'achievement')) = (shard = '@platform'));
+-- And no shard's save is `@platform`: a save that claims it fails whole, receipts and all (`writeSave` refuses it first).
+alter table player_save add constraint player_save_not_platform check (shard <> '@platform');
 
 -- A profile receipt that lands adds its name to the profile, once. A replayed fact lands no receipt (`on conflict do nothing`),
 -- so it adds nothing.
