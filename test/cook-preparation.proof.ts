@@ -82,7 +82,10 @@ void test('capture-only opening ignores stored lists without relaxing the final 
   const opened = openShardfile(writeTar(modern('0'.repeat(64))), {preparationOnly: true});
   assert.equal(opened.preparationOnly, true);
   const half = shardHalf(opened, (_url, bytes) => bytes.length);
-  assert.ok(half.mountRows('phone', 'whole').some(row => row.url.startsWith('/assets/prep-proof.bin')));
+  // D5-4: a phone lists only the default set, so a capture records what the boot reads beyond it; a desktop stays whole.
+  assert.equal(half.mountRows('phone', 'whole').length, 0);
+  assert.deepEqual(half.productRows('phone', 'whole').map(row => row.url), half.productRows('phone', 'entry').map(row => row.url));
+  assert.ok(half.mountRows('desktop', 'whole').some(row => row.url.startsWith('/assets/prep-proof.bin')));
 });
 void test('missing preparation bytes name the regeneration command', (): void => {
   const files = modern(); files.delete('cook.json');

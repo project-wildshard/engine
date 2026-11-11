@@ -166,7 +166,9 @@ export interface ShardHalf {
  *  product is served; a catalogue names it by slug, and today's `_template` folder is the one that differs (`template`). */
 export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (line: string) => void = () => undefined, folder: string = shard.slug): ShardHalf {
   const prefix = `/shardfiles/${folder}/`, {index, source, sections} = shard, named = namedPlaces(sections);
-  const fence = fenceHints(shard, warn), fenceSet = shard.preparationOnly !== true && shard.cook?.packs === 'fence';
+  // D5-4: a preparation-only preview lists the default set alone (no stored fence), so `wildshard prepare` sees the boot's
+  // own reads beyond it. Listing the whole level there made every recorded fence the whole level (Pine, Nalati).
+  const fence = fenceHints(shard, warn), fenceSet = shard.preparationOnly === true || shard.cook?.packs === 'fence';
   // S3: a shard's `fence` set is a phone's recorded reads, so a desktop always lists its whole level.
   const wholeSet = (tier: CookTier, set: CookSet): boolean => set === 'whole' && (!fenceSet || tier === 'desktop');
   const sources = new Map<string, () => Uint8Array>(), stableKeys = new Map<string, string>(), rows = new Map<string, SpawnFile>();
