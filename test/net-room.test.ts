@@ -180,6 +180,9 @@ test('hello: v0.1.x and older reload, newer retries, another build of this wire 
   strict.join(lacking.server); lackingClient.hello('build-a'); lacking.pump();
   expect(lackingClient.closed, 'a client without a required capability is refused before play').toBe('reload');
   strict.dispose();
+  const ahead = directLoopback(), aheadClient = new NetClient(ahead.client);
+  room.join(ahead.server); ahead.client.send('reliable', encodeWireHello({ ...said, player: 'device:2', minor: WIRE_MINOR + 1, capabilities: [], ...clientTables() }).slice().buffer); room.open(); ahead.pump();
+  expect(aheadClient.closed, 'one minor ahead is inside the window (5.5)').toBeNull();
   const other = directLoopback(), otherClient = new NetClient(other.client);
   room.join(other.server); otherClient.hello('build-b'); room.open(); other.pump();
   expect(otherClient.welcome, 'another build of the same wire is welcomed').not.toBeNull();
