@@ -1406,6 +1406,7 @@
     "src/shared/engine/net/shardNet.ts": "shared",
     "src/shared/engine/net/socketFrames.ts": "shared",
     "src/shared/engine/net/transport.ts": "shared",
+    "src/shared/engine/net/wireFrames.ts": "shared",
     "src/shared/engine/net/wireValues.ts": "shared",
     "src/shared/engine/physics/bodies.ts": "shared",
     "src/shared/engine/physics/box.ts": "shared",
