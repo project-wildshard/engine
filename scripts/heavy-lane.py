@@ -94,8 +94,6 @@ def command_label(command):
 
 
 def owner_kind(entry):
-    if 'push-queue' in Path(entry['cwd']).parts:
-        return 'queue'
     refs = os.environ.get('WS_PUSH_REFS', '')
     if any(line.startswith('refs/tags/') for line in refs.splitlines()):
         return 'tag'
@@ -104,39 +102,6 @@ def owner_kind(entry):
     if any('release-check.mjs' in str(arg) or str(arg).endswith('/release.sh') for arg in entry['command']):
         return 'release'
     return 'manual'
-
-
-def queue_identity(cwd):
-    """Read report-only provenance from the queue's exact owned job record.
-
-    Batch result.json names the current candidate's carrying job, not every
-    original cohort member (which would misattribute a bisected subset).
-    """
-    view = Path(cwd).resolve()
-    if view.parent.name == 'snapshots' and re.fullmatch(r'\d{9,}-[a-f0-9]{8}', view.name):
-        scope = view.parent.parent
-        record = scope / (view.name + '.json')
-    elif view.parent.name.startswith('candidate-') and view.parent.parent.name.startswith('batch-') and view.parent.parent.parent.name == 'snapshots':
-        scope = view.parent.parent.parent.parent
-        record = view.parent / 'result.json'
-    else:
-        return {}
-    try:
-        job = json.loads(read_metadata(record))
-        if not isinstance(job, dict) or not re.fullmatch(r'\d{9,}-[a-f0-9]{8}', job.get('id', '')):
-            return {}
-        if record.name != 'result.json' and job['id'] != view.name:
-            return {}
-        if job.get('snapshot') != str(scope / 'snapshots' / job['id']):
-            return {}
-        lane, source = job.get('lane'), job.get('source')
-        if not isinstance(lane, str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,31}', lane):
-            return {}
-        if not isinstance(source, str) or not Path(source).is_absolute() or len(source) > 1024:
-            return {}
-        return {'lane': lane, 'queueJob': job['id'], 'ownerSource': source}
-    except (OSError, ValueError, TypeError, RuntimeError):
-        return {}
 
 
 def record_full_test(root, entry, event, **metrics):
@@ -154,7 +119,7 @@ def record_full_test(root, entry, event, **metrics):
                'childPid': entry.get('childPid'), 'lane': entry['lane'],
                'kind': owner_kind(entry), 'resources': list(entry['resources']),
                'cwd': entry['cwd'], 'command': command_label(entry['command']),
-               **identity(entry['cwd']), **queue_identity(entry['cwd']), **metrics}
+               **identity(entry['cwd']), **metrics}
         data = (json.dumps(row, separators=(',', ':')) + '\n').encode()
         path = root / 'full-test-day.log'
         fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
