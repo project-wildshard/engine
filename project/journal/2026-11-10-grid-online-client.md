@@ -47,3 +47,6 @@
   device (`grid.server-placed`); a solo hint boots home as before.
 - So v0.1.7 production (WORLD_CELLS unset) keeps the solo grid; staging goes
   online after Jake's one command opens the grid there.
+- J206 review of the gate: one 3 s deadline now covers the release read and
+  `/health` together (a stalled release file held the page); tests cover a
+  stalled release and a stalled `/health`.

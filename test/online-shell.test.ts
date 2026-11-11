@@ -187,5 +187,15 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
     expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid').toBe(false);
     expect(await asked([SHARD, 'template-2']), 'the world hosts the grid').toBe(true);
     expect(await worldHostsGrid({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'unreachable: solo').toBe(false);
-  } finally { for (const server of servers) server.close(); }
+    const stalled = createServer(() => undefined);
+    servers.push(stalled);
+    await new Promise<void>(resolve => { stalled.listen(0, '127.0.0.1', resolve); });
+    const begun = performance.now();
+    expect(await worldHostsGrid({ release: `http://127.0.0.1:${String((stalled.address() as AddressInfo).port)}/release.json`, key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'a stalled release file: solo').toBe(false);
+    expect(performance.now() - begun, 'within the one deadline').toBeLessThan(1500);
+    const { text, publicKey } = signedFile({ ...RELEASE, socket: `ws://127.0.0.1:${String((stalled.address() as AddressInfo).port)}/` }), origin = createServer((_request, response) => { response.end(text); });
+    servers.push(origin);
+    await new Promise<void>(resolve => { origin.listen(0, '127.0.0.1', resolve); });
+    expect(await worldHostsGrid({ release: `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}/release.json`, key: publicKey }, hostsGrid, 500), 'a stalled /health: solo').toBe(false);
+  } finally { for (const server of servers) { server.closeAllConnections(); server.close(); } }
 });

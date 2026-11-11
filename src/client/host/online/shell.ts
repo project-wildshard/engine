@@ -187,13 +187,15 @@ const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent(
 /** GO4 gate: whether the world this build names hosts the grid, read from its `/health` (the release names the address). Any failure
  *  answers false, and the grid page keeps today's solo grid. */
 export async function worldHostsGrid(config: { readonly release: string; readonly key: string }, hosts: (health: unknown) => boolean, waitMs = 3000): Promise<boolean> {
-  try {
+  // One deadline over both reads: a stalled release file must not hold the page either.
+  const scope = new Scope('online.grid-gate'), late = new Promise<false>(resolve => { scope.timeout(waitMs, () => { resolve(false); }); });
+  const read = (async (): Promise<boolean> => {
     const { socket } = await fetchSignedRelease(config.release, config.key);
     if (socket === undefined) return false;
-    const health = new URL('/health', socket.replace(/^ws/u, 'http'));
-    const answer = await fetch(health, { cache: 'no-store', signal: AbortSignal.timeout(waitMs) });
+    const answer = await fetch(new URL('/health', socket.replace(/^ws/u, 'http')), { cache: 'no-store', signal: AbortSignal.timeout(waitMs) });
     return answer.ok && hosts(await answer.json() as unknown);
-  } catch { return false; }
+  })().catch(() => false);
+  try { return await Promise.race([read, late]); } finally { scope.dispose(); }
 }
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
