@@ -37,6 +37,32 @@ put() {
   fi
 }
 unit() { if put "$SYSTEMD/$1" 644 root:root; then :; fi; }
+# Make or repair folders without following a link anywhere on their path: each step is opened from the one before with
+# O_NOFOLLOW, and the owner and mode are set on that open folder, so a channel that owns a parent cannot swap a child for a
+# link between a check and root's chown (VH11). A link anywhere stops the script.
+#   own_dir <mode> <user> <group> <path>...
+own_dir() {
+  python3 -I - "$@" <<'PY'
+import grp, os, pwd, stat, sys
+mode, uid, gid = int(sys.argv[1], 8), pwd.getpwnam(sys.argv[2]).pw_uid, grp.getgrnam(sys.argv[3]).gr_gid
+flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+for path in sys.argv[4:]:
+    parts = [part for part in path.split('/') if part]
+    fd = os.open('/', flags)
+    try:
+        for index, name in enumerate(parts):
+            if index == len(parts) - 1:
+                try: os.mkdir(name, 0o700, dir_fd=fd)
+                except FileExistsError: pass
+            try: child = os.open(name, flags, dir_fd=fd)
+            except OSError: print(f'stop   Refuse a link or non-folder at {path} ({name})'); sys.exit(1)
+            os.close(fd); fd = child
+        now = os.fstat(fd)
+        if (now.st_uid, now.st_gid) != (uid, gid): os.fchown(fd, uid, gid)
+        if stat.S_IMODE(now.st_mode) != mode: os.fchmod(fd, mode)
+    finally: os.close(fd)
+PY
+}
 # Copy a file from beside this script. Piped over ssh there is no folder beside it, and `--check` says so.
 install_beside() {
   local name=$1 mode=$2
@@ -106,7 +132,7 @@ check_postgres() {
 # --- Read every prerequisite before changing anything, including in --check.
 fail() { say stop "$1"; ERRORS=1; }
 if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then say stop 'Run with sudo, or pass --check'; exit 1; fi
-for command in tailscale ss getent systemctl pg_lsclusters runuser curl; do
+for command in tailscale ss getent systemctl pg_lsclusters runuser curl python3; do
   if ! command -v "$command" >/dev/null; then fail "Missing Phase 1 prerequisite: $command"; fi
 done
 if ! check_node; then fail 'The server needs Node 24 or newer at /usr/bin/node'; fi
@@ -160,16 +186,16 @@ if [ "$ERRORS" != 0 ]; then say stop 'Phase 2 preflight refused; no files or ser
 install -d -m 750 -o root -g wildshard "$ETC"
 # VH12: nothing in /etc/wildshard is world-readable; the channels reach lib through the wildshard group.
 install -d -m 750 -o root -g wildshard "$LIB"
-install -d -m 750 -o wildshard -g wildshard "$HOME_DIR" "$HOME_DIR/packs" "$LOGS"
+own_dir 750 wildshard wildshard "$HOME_DIR" "$HOME_DIR/packs" "$LOGS"
 # VH11: each channel's folder, its bundles, its pack cache and its logs are its own user's. A box from before VH11 has them
 # under wildshard, and they change hands once, with everything in them.
 for channel in production staging; do
-  if [ "$(stat -c %U "$HOME_DIR/$channel" 2>/dev/null)" = wildshard ]; then say doing "hand $HOME_DIR/$channel to wildshard-$channel"; chown -R "wildshard-$channel:wildshard-$channel" "$HOME_DIR/$channel"; fi
-  install -d -m 750 -o "wildshard-$channel" -g "wildshard-$channel" "$HOME_DIR/$channel" "$HOME_DIR/$channel/bundles" "$HOME_DIR/$channel/packs" "$HOME_DIR/$channel/logs"
+  if [ "$(stat -c %U "$HOME_DIR/$channel" 2>/dev/null)" = wildshard ]; then say doing "hand $HOME_DIR/$channel to wildshard-$channel"; chown -R -P "wildshard-$channel:wildshard-$channel" "$HOME_DIR/$channel"; fi
+  own_dir 750 "wildshard-$channel" "wildshard-$channel" "$HOME_DIR/$channel" "$HOME_DIR/$channel/bundles" "$HOME_DIR/$channel/packs" "$HOME_DIR/$channel/logs"
 done
 # The dump reads saves_production, so it runs as production's user and keeps its files.
-if [ "$(stat -c %U "$HOME_DIR/dumps" 2>/dev/null)" = wildshard ]; then chown -R wildshard-production:wildshard-production "$HOME_DIR/dumps"; fi
-install -d -m 750 -o wildshard-production -g wildshard-production "$HOME_DIR/dumps"
+if [ "$(stat -c %U "$HOME_DIR/dumps" 2>/dev/null)" = wildshard ]; then chown -R -P wildshard-production:wildshard-production "$HOME_DIR/dumps"; fi
+own_dir 750 wildshard-production wildshard-production "$HOME_DIR/dumps"
 for name in pull.mjs dump.sh restore-check.sh uptime.sh setup-state.mjs health-stub.mjs; do install_beside "$name" 750; done
 
 env_file() {

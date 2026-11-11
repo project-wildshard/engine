@@ -43,26 +43,6 @@ CF_V4=(173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.
   188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22)
 CF_V6=(2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32)
 
-# --- 443 alone: open or close, then stop.
-ufw_443_rules() { ufw status numbered 2>/dev/null | grep -E '^\[ *[0-9]+\] 443/tcp ' || true; }
-if [ "$MODE" = close ]; then
-  while numbered=$(ufw_443_rules | head -1) && [ -n "$numbered" ]; do
-    number=$(printf '%s\n' "$numbered" | sed -E 's/^\[ *([0-9]+)\].*/\1/')
-    ufw --force delete "$number" >/dev/null
-  done
-  say ok VH4 'ufw has no 443 rule: 443 is shut'; exit 0
-fi
-if [ "$MODE" = open ]; then
-  # Any 443 rule that is not one of these ranges goes first, so "nothing else" is true.
-  for number in $(ufw status numbered | grep -E '^\[ *[0-9]+\] 443/tcp ' | grep -v 'Cloudflare (J264)' | sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn); do
-    ufw --force delete "$number" >/dev/null
-  done
-  for range in "${CF_V4[@]}" "${CF_V6[@]}"; do ufw allow proto tcp from "$range" to any port 443 comment 'Cloudflare (J264)' >/dev/null; done
-  say ok VH4 "ufw lets ${#CF_V4[@]} IPv4 and ${#CF_V6[@]} IPv6 Cloudflare ranges reach 443, and nothing else"; exit 0
-fi
-
-need_packages ufw fail2ban nftables age unattended-upgrades python3 lynis
-
 # --- The dead-man, before anything that can cut the operator off.
 DEADMAN=wildshard-harden-deadman
 deadman_armed=0
@@ -74,6 +54,48 @@ arm_deadman() {
   deadman_armed=1
   say armed VH3 "dead-man: in 10 minutes ufw goes off, Tailscale SSH comes back and the sshd file goes, unless you run 'systemctl stop $DEADMAN.timer' from a new SSH session"
 }
+
+# The ufw rules that let anything in and are not ours, by number, highest first (deleting one never renumbers the next).
+# Ours: anything on tailscale0, 41641/udp from anywhere, and with `443` 443/tcp from exactly one of Cloudflare's ranges.
+# It reads each rule's port and source, never its comment, so a wide rule cannot pass by its label, and an all-port or
+# port-range rule that covers 443 is drift too.
+drift_rules() {
+  ufw status numbered | python3 -I -c '
+import re, sys
+keep443, cloudflare, drift = sys.argv[1] == "443", set(sys.argv[2:]), []
+for line in sys.stdin:
+    rule = re.match(r"^\[ *(\d+)\] (.+?) +(?:ALLOW|LIMIT) IN +(.+?)(?: +#.*)?\s*$", line)
+    if not rule: continue
+    number, to, source = int(rule.group(1)), rule.group(2).strip(), rule.group(3).strip()
+    if to in ("Anywhere on tailscale0", "Anywhere (v6) on tailscale0"): continue
+    if to in ("41641/udp", "41641/udp (v6)") and source in ("Anywhere", "Anywhere (v6)"): continue
+    if keep443 and to in ("443/tcp", "443/tcp (v6)") and source in cloudflare: continue
+    drift.append(number)
+print(" ".join(str(number) for number in sorted(drift, reverse=True)))
+' "$1" "${CF_V4[@]}" "${CF_V6[@]}"
+}
+
+# --- 443 alone: open or close, then stop.
+if [ "$MODE" = close ]; then
+  # Every rule that is not ours goes, Cloudflare's 443 included, and so does an all-port or port-range rule that covers 443.
+  for number in $(drift_rules shut); do
+    arm_deadman
+    say doing VH4 "delete ufw rule $number: $(ufw status numbered | grep -E "^\[ *$number\]" | sed 's/  */ /g')"; ufw --force delete "$number" >/dev/null
+  done
+  say ok VH4 'ufw has no rule that reaches 443: 443 is shut'; exit 0
+fi
+if [ "$MODE" = open ]; then
+  # Every rule that is not ours goes first, so "nothing else" is true: a 443 rule from outside Cloudflare, an all-port or
+  # port-range rule that covers 443, an old 22. A deletion can cut SSH, so the dead-man is armed before any.
+  for number in $(drift_rules 443); do
+    arm_deadman
+    say doing VH4 "delete ufw rule $number: $(ufw status numbered | grep -E "^\[ *$number\]" | sed 's/  */ /g')"; ufw --force delete "$number" >/dev/null
+  done
+  for range in "${CF_V4[@]}" "${CF_V6[@]}"; do ufw allow proto tcp from "$range" to any port 443 comment 'Cloudflare (J264)' >/dev/null; done
+  say ok VH4 "ufw lets ${#CF_V4[@]} IPv4 and ${#CF_V6[@]} IPv6 Cloudflare ranges reach 443, and nothing else"; exit 0
+fi
+
+need_packages ufw fail2ban nftables age unattended-upgrades python3 lynis
 
 # --- VH15: kernel and sysctl.
 if put /etc/sysctl.d/90-wildshard.conf 644 root:root VH15 <<'EOF'
@@ -113,9 +135,8 @@ else
   ufw allow 41641/udp comment 'Tailscale direct paths' >/dev/null
   ufw --force enable >/dev/null
 fi
-# Anything else ufw lets in is drift: an old 22, a stray port, a 443 rule that is not Cloudflare's. --open-443's rules stay.
-for rule in $(ufw status numbered | grep -E 'ALLOW IN' | grep -Ev '^\[ *[0-9]+\] (41641/udp|Anywhere( \(v6\))? on tailscale0)' \
-  | grep -Ev '^\[ *[0-9]+\] 443/tcp .*Cloudflare \(J264\)' | sed -E 's/^\[ *([0-9]+)\].*/\1/' | sort -rn); do
+# Anything else ufw lets in is drift: an old 22, a stray port, a 443 rule from outside Cloudflare. --open-443's rules stay.
+for rule in $(drift_rules 443); do
   arm_deadman
   say doing VH4 "delete ufw rule $rule: $(ufw status numbered | grep -E "^\[ *$rule\]" | sed 's/  */ /g')"; ufw --force delete "$rule" >/dev/null
 done

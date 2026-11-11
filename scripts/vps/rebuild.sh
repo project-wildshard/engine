@@ -222,13 +222,13 @@ make_channel_user() {
   else useradd --system --user-group --groups wildshard --home-dir "$HOME_DIR/$CHANNEL" --shell /usr/sbin/nologin "wildshard-$CHANNEL"; fi
 }
 for CHANNEL in production staging; do step "user wildshard-$CHANNEL" have_channel_user make_channel_user; done
-FOLDERS=("$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$HOME_DIR/logs")
+FOLDERS=("$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/staging" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$HOME_DIR/logs")
 have_folders() {
   local path
   for path in "${FOLDERS[@]}"; do [ -d "$path" ] || return 1; done
   metadata_ok "$HOME_DIR" 750 wildshard:wildshard && [ -d "$ETC" ] && metadata_ok "$ETC" 750 root:wildshard
 }
-# The channel folders' owners are Phase 2's (setup.sh, VH11); this only makes them.
+# The channel folders' owners, and everything inside them, are Phase 2's (setup.sh, VH11, no-follow); this only makes them.
 make_folders() {
   install -d -m 750 -o wildshard -g wildshard "$HOME_DIR"
   local path; for path in "${FOLDERS[@]}"; do [ -d "$path" ] || install -d -m 750 -o wildshard -g wildshard "$path"; done
@@ -277,6 +277,19 @@ EOF
       fi
       pg "revoke connect, temporary on database $DB from public"
     }
+    # A box from before VH11 hands its saves over with nothing using them: the servers, their pull timers (which would start
+    # them again) and the dump all stop before any ownership moves, and the hand-over waits until none is active. Phase 2
+    # (setup.sh) starts them again as their own users.
+    if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
+      QUIET=(wildshard-pull@production.timer wildshard-pull@staging.timer wildshard-dump.timer
+        wildshard-pull@production.service wildshard-pull@staging.service wildshard-dump.service
+        wildshard-server@production.service wildshard-server@staging.service)
+      say doing 'stop the servers, their pull timers and the dump for the VH11 hand-over'
+      systemctl stop "${QUIET[@]}" 2>/dev/null || true
+      for name in "${QUIET[@]}"; do
+        if systemctl is-active --quiet "$name"; then say stop "$name is still active; the VH11 hand-over did not start"; exit 1; fi
+      done
+    fi
     # The restore check's own role: it owns only the scratch database and is no superuser (restore-check.sh).
     ROLE=wildshard_restore
     step "postgres role $ROLE" have_role make_role
@@ -285,10 +298,8 @@ EOF
       step "postgres role $ROLE" have_role make_role
       step "database $DB, owned by $ROLE alone" have_channel_db make_channel_db
     done
-    # The shared role from before VH11 goes once it owns nothing. Its servers stop first, so no process keeps the old user,
-    # role or folders; setup.sh starts them again as their own users.
+    # The shared role from before VH11 goes once it owns nothing.
     if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
-      say doing 'stop both servers for the VH11 hand-over'; systemctl stop wildshard-server@production.service wildshard-server@staging.service || true
       say doing 'drop the shared role wildshard (VH11)'
       for DB in saves_production saves_staging; do runuser -u postgres -- psql --cluster "$PG_VERSION/main" -qtAc 'drop owned by wildshard' "$DB"; done
       pg 'drop role wildshard'

@@ -156,7 +156,13 @@ table inet wildshard {
 nft_file=/etc/wildshard/nft-443.nft
 nft_changed=0
 if [ -r "$nft_file" ] && [ "$(cat "$nft_file")" = "$nft_rules" ]; then say ok VH9 "$nft_file"
-else printf '%s\n' "$nft_rules" > "$nft_file"; chmod 640 "$nft_file"; chown root:root "$nft_file"; say doing VH9 "write $nft_file"; nft_changed=1; fi
+else
+  # Checked by nft before it replaces the file, so a bad rule set never reaches the load below.
+  temporary=$(umask 077; mktemp /etc/wildshard/.nft-443.XXXXXX)
+  printf '%s\n' "$nft_rules" > "$temporary"
+  if ! nft -c -f "$temporary"; then rm -f "$temporary"; say stop VH9 'the 443 floors do not parse; nothing written'; exit 1; fi
+  chmod 640 "$temporary"; chown root:root "$temporary"; mv -f "$temporary" "$nft_file"; say doing VH9 "write $nft_file"; nft_changed=1
+fi
 unit='[Unit]
 Description=Wildshard nftables floors on 443 (VPS-HARDENING VH9)
 After=network-pre.target
@@ -166,6 +172,7 @@ Before=caddy.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/nft -f /etc/wildshard/nft-443.nft
+ExecReload=/usr/sbin/nft -f /etc/wildshard/nft-443.nft
 ExecStop=/usr/sbin/nft delete table inet wildshard
 
 [Install]
@@ -174,8 +181,16 @@ if [ "$(cat /etc/systemd/system/wildshard-nft.service 2>/dev/null)" != "$unit" ]
   printf '%s\n' "$unit" > /etc/systemd/system/wildshard-nft.service; systemctl daemon-reload; say doing VH9 'write wildshard-nft.service'
 fi
 systemctl enable --quiet wildshard-nft.service
-# A rerun with the same rules leaves the live table, and its connection counts, alone.
-if [ "$nft_changed" = 1 ] || ! systemctl is-active --quiet wildshard-nft.service; then systemctl restart wildshard-nft.service; say doing VH9 'load the 443 floors'; fi
+# The file swaps the table in one nft transaction (table, delete table, table { ... }), so a reload never leaves 443 without
+# its floors. The live rules are compared too, by a stamp of their stateless listing taken at the last load: a rerun with
+# the same file and the same live rules leaves the table, and its connection counts, alone.
+nft_live() { nft -s list chain inet wildshard input 2>/dev/null | sha256sum | cut -d' ' -f1; }
+nft_stamp=/etc/wildshard/.nft-443.loaded
+if ! systemctl is-active --quiet wildshard-nft.service; then
+  systemctl start wildshard-nft.service; say doing VH9 'load the 443 floors'; (umask 077; nft_live > "$nft_stamp")
+elif [ "$nft_changed" = 1 ] || ! nft list table inet wildshard >/dev/null 2>&1 || [ "$(cat "$nft_stamp" 2>/dev/null)" != "$(nft_live)" ]; then
+  systemctl reload wildshard-nft.service; say doing VH9 'reload the 443 floors in one transaction'; (umask 077; nft_live > "$nft_stamp")
+else say ok VH9 'the 443 floors are live as written'; fi
 
 # Caddy starts only with its certificate. 443 is still shut by ufw until --open-443.
 # A new certificate or key restarts Caddy too: their hash is kept beside them.
@@ -184,6 +199,12 @@ if [ -f "$CERT" ] && [ -f "$KEY" ] && [ "$(cat "$stamp" 2>/dev/null)" != "$(cat 
 if [ -f "$CERT" ] && [ -f "$KEY" ]; then
   systemctl enable --quiet caddy.service
   if [ "$changed" = 1 ] || ! systemctl is-active --quiet caddy.service; then
+    # The whole configuration, certificate and key included, is validated before any restart, so a mismatched or half-copied
+    # pair leaves a running Caddy as it is.
+    if ! runuser -u caddy -- caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
+      runuser -u caddy -- caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile 2>&1 | tail -3
+      say stop VH9 'Caddy does not validate with this certificate and key; Caddy left as it is'; exit 1
+    fi
     systemctl restart caddy.service; say doing VH9 'restart caddy'
     (umask 077; cat "$CERT" "$KEY" "$PULL_CA" | sha256sum | cut -d' ' -f1 > "$stamp")
   else say ok VH9 'caddy running'; fi

@@ -231,13 +231,16 @@ if [ "$ROOT" = 1 ] && has runuser && id postgres >/dev/null 2>&1 && has psql; th
     supers=$(printf '%s' "$supers" | tr '\n' ' ' | sed 's/ $//')
     if [ "$supers" = postgres ]; then ok VH11 'postgres is the only superuser'; else bad VH11 "superusers: $supers"; fi
     roles=$(runuser -u postgres -- psql -XtAc "select rolname from pg_roles where rolname like 'wildshard%' order by 1" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
-    if [ "$roles" = 'wildshard_production wildshard_staging' ]; then ok VH11 'one role per channel'; else bad VH11 "game roles are '${roles}'; want wildshard_production and wildshard_staging"; fi
-    # Each channel's role reaches its own saves and not the other's: not by CONNECT, not by owning it, not by membership.
+    want_roles='wildshard_production wildshard_restore wildshard_staging'
+    if [ "$roles" = "$want_roles" ]; then ok VH11 'one role per channel, and the restore check'"'"'s own'
+    else bad VH11 "game roles are '${roles}'; want wildshard_production, wildshard_staging and wildshard_restore"; fi
+    # Each channel's role reaches its own saves and not the other's, and the restore check's role reaches neither: not by
+    # CONNECT, not by owning it, not by membership.
     cross=$(runuser -u postgres -- psql -XtAc "select r.rolname || '->' || d.datname from pg_roles r cross join pg_database d
-      where r.rolname in ('wildshard_production','wildshard_staging') and d.datname in ('saves_production','saves_staging')
+      where r.rolname in ('wildshard_production','wildshard_staging','wildshard_restore') and d.datname in ('saves_production','saves_staging')
       and d.datname <> ('saves_' || substr(r.rolname, 11))
       and (has_database_privilege(r.oid, d.oid, 'CONNECT') or pg_has_role(r.oid, d.datdba, 'USAGE')) order by 1" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
-    if [ "$roles" = 'wildshard_production wildshard_staging' ] && [ -z "$cross" ]; then ok VH11 'neither channel can open the other channel'"'"'s saves'
+    if [ "$roles" = "$want_roles" ] && [ -z "$cross" ]; then ok VH11 'neither channel can open the other channel'"'"'s saves, nor the restore check either'
     elif [ -n "$cross" ]; then bad VH11 "a channel can open the other's saves: $cross"; fi
   else unknown VH11 'PostgreSQL did not answer'; fi
 elif [ "$ROOT" = 1 ]; then bad VH11 'no PostgreSQL server: the per-channel roles do not exist'
