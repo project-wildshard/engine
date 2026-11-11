@@ -30,3 +30,19 @@ beside the others.
 Under `sandbox-exec` with outbound networking denied, a cold run passed
 in 31 s: Template 2 was installed from the dependency and `pins.ts
 status` named it as the source. `bash scripts/e2e-offline.sh` repeats that.
+
+Codex's review (J206) found four must-fixes, all fixed. Each finish now
+copies the bundle into its own generation folder and the preview server
+serves a link to the last one finished, so a newer bundle never rewrites
+a folder mid-finish. Source the bundle doesn't watch (the standalone
+shell, the doctor page) gets a fresh finish, and a changed build script
+restarts the watcher. One run at a time may start a watcher (a pid lock
+file), and a starter that times out kills its process group. The reload
+step asserts every quest flag came back, not only the last. Also: the
+watcher drops the release environment so a main-push CI build never
+fetches production chunks, the draft-thumbnail stub accepts only images
+under /draft/, a format install removes the Template 2 mounts it
+replaces, and each in-world wait fails on its own after 30 s.
+
+The fight (step 5) is blocked: on a draft Template 2 with the iron sword
+as its primary, the sword shows as equipped but F sends no attack.
