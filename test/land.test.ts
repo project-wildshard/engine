@@ -525,6 +525,22 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(main).not.toContain('src/sneak.ts');
   }, 60_000);
 
+  test('J206 review: a commit that slips in during the rebase never rides to main (verifyReplay)', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const tested = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    // git runs post-rewrite after land's rebase: this one commits a file of its own on top of the rebased plan.
+    writeFileSync(join(f.root, 'hooks/post-rewrite'), '#!/bin/sh\n[ "$1" = rebase ] || exit 0\nprintf "export {};\\n" > src/sneak.ts\ngit add src/sneak.ts\ngit commit -q -m sneak\n');
+    chmodSync(join(f.root, 'hooks/post-rewrite'), 0o755);
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(1);
+    expect(result.stdout).toMatch(/is not main [0-9a-f]{10} plus the hosted-green [0-9a-f]{10}: a commit or edit came in/u);
+    expect(f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/'])).not.toMatch(/sneak|feature/u);
+    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
+    expect(f.read(f.files.receipts)).toMatch(/STOP rebased [0-9a-f]{10} is not main/u);
+  }, 60_000);
+
   test('a harness change carries too: J249 has no harness rule, main\'s own run checks it', () => {
     const f = fixture();
     const wt = f.worktree('foo');

@@ -37,3 +37,14 @@ carried, with no stamp line and no `revision.json` on main. The J206 test now
 proves land runs no generator after the rebase.
 `test/renderer-revision.test.ts` copies the shipped sources into a folder with
 no git and no lockfile, and gets the same value.
+
+Codex review (J206): 1 MUST-FIX, fixed. The validation walk hashed
+native path separators, and its `localeCompare` order depends on the
+locale, so a Windows or other-locale install could disagree with the
+checkout. It now uses `/` and code-unit order (value `be033e04`). SHOULD,
+done: a `post-rewrite` hook commits during land's rebase, and verifyReplay
+stops it; a copied installed helper with no lockfile matches the checkout.
+SHOULD, open: dropping the lockfile means a transitive-only resolution
+change no longer moves the validation revision (the built-product key still
+hashes the lockfile). The one-time key move needs `pnpm pins` in old
+worktrees (AGENTS.md).
