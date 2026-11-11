@@ -14,6 +14,7 @@ const SHOWN = 6;
  *  the oldest lines clip first. Landscape steps it right of that column. A keyboard page puts it bottom left too (Jake, 2026-11-10
  *  ~23:15 Cancún: "fix the position of chat and microphones in desktop mode too"; it sat top left under the quest chip):
  *  over what stands there (the coins, a steed's row, the health readout, a desktop's Developer alerts), measured (`place`).
+ *  The open chat keeps at least 240 px: in a short window it drops over those, as an open chat does on a phone.
  *  The touch HUD's place follows the touch HUD itself (`#hud.touch`), so Settings' Touch controls on a mouse get it too. Any menu or panel over the world hides it all
  *  (`data-ws-menu` on the root, src/client/engine/ui/layers.ts); voice stays connected.
  *  QA row 43 (chatCorner.ts): the corner is calm. Only the input and the mic stay; a line shows as it is said and fades after
@@ -33,7 +34,7 @@ const CSS = `
 #ws-chat:not([data-open]) [data-lines]>[data-look=fading]{opacity:0;transition:opacity ${String(CHAT_FADE_MS)}ms ease-in}
 #ws-chat:not([data-open]) [data-lines]>[data-look=gone],#ws-chat:not([data-open]) [data-lines] button,#ws-chat:not([data-open])>#ws-voice-peers{display:none}
 :root[data-ws-menu] #ws-chat{display:none}
-#ws-chat[data-open]{z-index:950;pointer-events:auto;justify-content:flex-start;gap:8px;width:min(calc(100vw - 16px),440px);height:min(calc(100vh - var(--ws-chat-lift) - 24px - env(safe-area-inset-top,0px)),560px);max-height:none;padding:8px;box-sizing:border-box;border:1px solid rgba(143,227,255,.35);border-radius:12px;background:rgba(6,12,22,.92);box-shadow:0 10px 32px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#ws-chat[data-open]{--ws-chat-open-lift:min(var(--ws-chat-lift),calc(100vh - 264px - env(safe-area-inset-top,0px)));bottom:calc(env(safe-area-inset-bottom,0px) + max(8px,var(--ws-chat-open-lift)));z-index:950;pointer-events:auto;justify-content:flex-start;gap:8px;width:min(calc(100vw - 16px),440px);height:min(calc(100vh - max(8px,var(--ws-chat-open-lift)) - 24px - env(safe-area-inset-top,0px)),560px);max-height:none;padding:8px;box-sizing:border-box;border:1px solid rgba(143,227,255,.35);border-radius:12px;background:rgba(6,12,22,.92);box-shadow:0 10px 32px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 #ws-chat[data-open]>[data-head]{order:0;display:flex;align-items:center;gap:8px;flex:none;padding:0 2px 0 4px;color:#9fb3c8;font:700 11px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase}
 #ws-chat[data-open]>[data-head] button{margin-left:auto;width:32px;height:32px;border:1px solid rgba(143,227,255,.3);border-radius:8px;background:rgba(8,14,24,.7);color:#dff6ff;font:400 20px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}
 #ws-chat[data-open]>#ws-voice-peers{order:1;flex:none;max-height:40%;overflow-y:auto}

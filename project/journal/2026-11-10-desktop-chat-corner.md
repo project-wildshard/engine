@@ -34,3 +34,8 @@ the chat over MOVE; `hud-worst.mjs --check` passes in Chromium and WebKit.
 Second J206 pass, one MUST, fixed: an obstacle counted only if its top was
 in the bottom half, so an alert taller than that was skipped. It now counts
 by its bottom edge, and the lift is capped so the input row stays on screen.
+
+Third J206 pass, one MUST, fixed: in a very short window (400 px with a
+Developer alert) the measured lift left the open chat 76 px. The open chat
+now keeps 240 px, dropping over what is under it when it must, as an open
+chat does on a phone (bottom = min(lift, 100vh - 264 px)).
