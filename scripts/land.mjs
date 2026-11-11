@@ -305,9 +305,9 @@ class Landing{
   const tip=SHA.test(listed)?listed:null;
   if(tip===sha){this.say('pushed',`${this.branch} already at ${short(sha)}`);this.planTip=sha;return;}
   const rewrite=tip!==null&&!isAncestor(this.root,tip,sha);
-  // Rewrite only the tip this worktree itself pushed last; anyone else's commits stop it.
-  const mine=existsSync(this.tipFile)?readFileSync(this.tipFile,'utf8').trim():null;
-  if(rewrite&&tip!==mine){
+  // Rewrite only a tip this worktree made itself; anyone else's commits stop it.
+  if(rewrite&&!this.ownsTip(tip)){
+   const mine=this.ownTips().at(-1)??null;
    this.receipt(`STOP origin ${this.branch} is at ${short(tip)}, not this worktree's last push`);
    throw new StopError(`origin ${this.branch} is at ${short(tip)}, which this worktree did not push last (${mine===null?'no record':short(mine)}). Someone else pushed it: fetch and integrate their commits, or rename this plan's branch.`);
   }
@@ -319,7 +319,25 @@ class Landing{
    this.receipt(`STOP plan push ${short(sha)} refused (pre-push red or lease lost)`);
    throw new StopError(`push of ${this.branch} ${short(sha)} failed: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
   }
-  this.planTip=sha;writeFileSync(this.tipFile,`${sha}\n`);
+  this.planTip=sha;appendFileSync(this.tipFile,`${sha}\n`);
+ }
+
+ /** Every tip this worktree made: land's own pushes (appended per push; the file used to hold only the last) and
+  * every commit the local plan branch ever pointed at (its reflog), which covers a hand push after a hand rebase.
+  * @returns {string[]} oldest first */
+ ownTips(){
+  const pushed=existsSync(this.tipFile)?readFileSync(this.tipFile,'utf8').split('\n').map(line=>line.trim()).filter(line=>SHA.test(line)):[];
+  const logged=tryGit(this.root,['reflog','--format=%H',`refs/heads/${this.branch}`]).stdout.split('\n').filter(line=>SHA.test(line)).reverse();
+  return [...new Set([...logged,...pushed])];
+ }
+
+ /** The origin tip is this worktree's own: one of its tips, or an ancestor of one (origin still holds an older push
+  * of ours). A commit this worktree never had is someone else's. @param {string} tip */
+ ownsTip(tip){
+  const own=this.ownTips();
+  if(own.includes(tip))return true;
+  if(tryGit(this.root,['cat-file','-e',`${tip}^{commit}`]).status!==0)return false;
+  return own.slice(-50).some(sha=>tryGit(this.root,['cat-file','-e',`${sha}^{commit}`]).status===0&&isAncestor(this.root,tip,sha));
  }
 
  /** Poll the exact SHA until both landing workflows are complete.

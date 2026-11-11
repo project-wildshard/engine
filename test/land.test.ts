@@ -387,6 +387,44 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
   }, 60_000);
 
+  test('a tip this worktree pushed by hand after its own rebase is its own; land rewrites it and lands', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
+    // land pushed once (recorded), then stopped; the agent amended and pushed the branch by hand under a lease.
+    f.state({ red: { 'plan/foo': { ci: 'tests (1)' } } });
+    expect(f.land(wt).status).toBe(1);
+    f.state({});
+    f.edit(wt, 'src/feature.ts', 'feature = 1', 'feature = 2', 'feat: tune feature');
+    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: tune feature, amended']);
+    const hand = f.git(wt, ['rev-parse', 'HEAD']);
+    f.git(wt, ['push', '--quiet', '--force', 'origin', `${hand}:refs/heads/plan/foo`]);
+    f.git(wt, ['commit', '--quiet', '--amend', '-m', 'feat: tune feature, amended again']);
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/replaces its own [0-9a-f]{10} under a lease/u);
+    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: tune feature, amended again');
+  }, 60_000);
+
+  test('an origin tip that is an ancestor of this worktree\'s own push counts as its own', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const base = f.git(wt, ['rev-parse', 'HEAD']);
+    const first = f.commit(wt, 'src/feature.ts', 'export const feature = 1;', 'feat: add feature');
+    f.git(wt, ['push', '--quiet', 'origin', `${first}:refs/heads/plan/foo`]);
+    const second = f.commit(wt, 'src/feature.ts', 'export const feature = 2;', 'feat: tune');
+    // Only the record of the later own push survives (no reflog), and origin still holds the older first push.
+    f.git(wt, ['reflog', 'expire', '--expire=now', '--all']);
+    writeFileSync(join(f.git(wt, ['rev-parse', '--path-format=absolute', '--git-dir']), 'wildshard-land-tip'), `${second}\n`);
+    // The plan is rewritten so origin's tip is no longer in its history: land must replace it.
+    f.git(wt, ['reset', '--quiet', '--hard', base]);
+    f.commit(wt, 'src/feature.ts', 'export const feature = 3;', 'feat: rewritten');
+    f.git(wt, ['reflog', 'expire', '--expire=now', '--all']);
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(new RegExp(`replaces its own ${first.slice(0, 10)} under a lease`, 'u'));
+  }, 60_000);
+
   test('a plan that changes hosted CI reruns it after any rebase', () => {
     const f = fixture();
     const wt = f.worktree('foo');

@@ -34,3 +34,13 @@ J206 Codex review (two MUSTs, fixed): only a plain both-modified conflict on a
 stamp is resolved (a modify/delete still stops, else main's stamp would undo
 the plan's deletion), and only the stamps are amended: other files gen.mjs
 rewrites from local products go back to their committed bytes.
+
+## Own-tip check (coordinator, 2026-11-10)
+
+After a stamp-conflict stop, agents rebased and pushed `plan/<slug>` by hand;
+`land` then refused origin's tip as "not this worktree's last push" because
+it only remembered its own last push (opus-fasttests, opus-ld6b). `land` now
+appends every branch push it makes and also counts the local plan branch's
+reflog as its own; an origin tip that is one of those, or an ancestor of one,
+is this worktree's. A commit the worktree never had still stops it (the
+existing foreign-push test). Both new cases fail on the old check.
