@@ -32,14 +32,8 @@ Registries: the new net-bots file is a CPU-exclusive native unit, Ring 2
 lists the four new files whose parents it lists, and the quest-verbs
 products split with the file.
 
-The six new files carry their first local clocks from the push gate's timing
-reporter (two of them also run in Ring 1); the parents keep their old,
-larger weights until hosted runs re-time them.
-
-After the review dropped two unused imports, the refusals file was re-clocked
-for its new blob by the push gate.
-
-The nine parents (both batches) are re-clocked with the push gate's own
-recorder for their new blobs: their old weights (up to 48 s) described the
-unsplit files and pushed the full plan past 240 s a shard (ci 42972399841
-failed at planning). Now 229.8 s at 15 shards.
+Timings: LAND-SIMPLIFY LS2 (`1e469b9b`) moved test timings out of git into
+the Actions cache while this batch was in CI, so the local clocks this branch
+had committed for the new files and the re-clocked parents were dropped on
+the rebase. Main's ci measures the new files itself; until then the planner
+gives each the 0.3 s default.
