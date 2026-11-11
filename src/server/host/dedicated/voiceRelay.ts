@@ -33,7 +33,7 @@ export interface VoiceSocket {
   readonly onControl: (listener: (control: SocketControl, bytes: ArrayBuffer) => void) => () => void;
   readonly onClose: (listener: (reason: string) => void) => () => void;
 }
-interface Seat { readonly id: string; readonly cell: string; readonly name: string; readonly body: string | undefined; readonly end: VoiceSocket; joined: boolean; joining: boolean; joins: number }
+interface Seat { readonly id: string; readonly cell: string; readonly name: string; body: string | undefined; readonly end: VoiceSocket; joined: boolean; joining: boolean; joins: number }
 /** Public STUN only: two phones behind carrier NAT may not meet without TURN. */
 export const STUN_ONLY: readonly VoiceIceServer[] = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
 
@@ -49,14 +49,17 @@ export class VoiceRelay {
   private readonly ice: () => Promise<readonly VoiceIceServer[]>;
   constructor(ice: () => Promise<readonly VoiceIceServer[]> = () => Promise.resolve(STUN_ONLY)) { this.ice = ice; }
   /** A seated socket: it may join voice in `cell` until it closes. `body` is its player row's id, the one every page already
-   *  hears on the wire, so a page can put a voice to a body (VOICE-POLISH V7: proximity; V8: the ring over a head). */
-  attach(end: VoiceSocket, cell: string, name: string, body?: string): void {
+   *  hears on the wire, so a page can put a voice to a body (VOICE-POLISH V7: proximity; V8: the ring over a head). Returns how to
+   *  rename that body once the cell says which it seated: a room's first seat stands in its lead body (`actor.player`), not the
+   *  door's id, and a voice named for a body nobody draws reads as too far to every other page. */
+  attach(end: VoiceSocket, cell: string, name: string, body?: string): (seated: string) => void {
     const seat: Seat = { id: newId(), cell, name, body, end, joined: false, joining: false, joins: 0 };
     this.seats.set(seat.id, seat);
     const off = end.onControl((control, bytes) => { if (control === 'voice') this.heard(seat, bytes); });
     end.onClose(() => { off(); this.seats.delete(seat.id); if (seat.joined) { seat.joined = false; this.roster(cell); } });
     this.say(seat, { k: 'you', id: seat.id });
     this.say(seat, this.rosterOf(cell));
+    return seated => { if (seat.body === seated || !this.seats.has(seat.id)) return; seat.body = seated; if (seat.joined) this.roster(cell); };
   }
   /** Players on voice, in every cell. */
   get talking(): number { let count = 0; for (const seat of this.seats.values()) if (seat.joined) count++; return count; }

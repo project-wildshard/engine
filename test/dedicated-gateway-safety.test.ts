@@ -144,3 +144,25 @@ test('voice holds eight places in a cell even when nine join at once', async () 
   expect(heard.filter(words => words.some(word => word.includes('"k":"full"')))).toHaveLength(1);
   expect(relay.talking).toBe(8);
 });
+
+test('voice names the body the cell seated, so the lead seat is never too far', async () => {
+  const { VoiceRelay } = await import('../src/server/host/dedicated/voiceRelay');
+  const relay = new VoiceRelay(() => Promise.resolve([]));
+  const heard: string[][] = [], sends: ((bytes: ArrayBuffer) => void)[] = [];
+  const attach = (name: string, body: string): ((seated: string) => void) => {
+    const words: string[] = []; heard.push(words);
+    return relay.attach({ control: (_control, bytes) => { words.push(new TextDecoder().decode(bytes)); },
+      onControl: listener => { sends.push(bytes => { listener('voice', bytes); }); return () => undefined; }, onClose: () => () => undefined }, 'cell', name, body);
+  };
+  // The first player in a room stands in its lead body; the door named their seat by the device's own body id.
+  const lead = attach('A#4351', 'body-a'); attach('B#1234', 'body-b');
+  lead('actor.player');
+  for (const send of sends) send(new TextEncoder().encode('{"k":"join"}').buffer);
+  await new Promise(resolve => { setImmediate(resolve); });
+  const rosters = (heard[1] ?? []).filter(word => word.includes('"k":"roster"')), last = JSON.parse(rosters.at(-1) ?? '{}') as { peers?: { name: string; body?: string }[] };
+  expect(last.peers?.find(peer => peer.name === 'A#4351')?.body).toBe('actor.player');
+  // A rename after joining reaches everyone in the cell.
+  lead('actor.player.2');
+  const after = JSON.parse((heard[1] ?? []).filter(word => word.includes('"k":"roster"')).at(-1) ?? '{}') as { peers?: { name: string; body?: string }[] };
+  expect(after.peers?.find(peer => peer.name === 'A#4351')?.body).toBe('actor.player.2');
+});

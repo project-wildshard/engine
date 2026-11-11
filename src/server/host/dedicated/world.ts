@@ -146,6 +146,8 @@ export class World {
   private readonly seated = new Map<string, string>();
   /** MP2.4: the Name each body was seated with, which a held body keeps when its player comes back. */
   private readonly names = new Map<string, string>();
+  /** Each seated device's voice seat, renamed to the body its cell seated it in (`seated`). */
+  private readonly voiceBodies = new Map<string, (body: string) => void>();
   private readonly finds = new Map<number, (found: { held: boolean; spawn: ResumeAt }) => void>();
   private readonly drains = new Map<number, () => void>();
   private asked = 0;
@@ -178,6 +180,8 @@ export class World {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
     // GO7: a late `left` from the cell a goto moved them out of must not unseat them (or free their Name) in the new one.
     else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
+    // A voice is named for the body its cell seated (a room's first seat is its lead body), from the cell they now stand in.
+    else if (news.kind === 'seated') { const { device, body, slug: from } = news; if (this.seated.get(device) === from) this.voiceBodies.get(device)?.(body); }
     else if (news.kind === 'refused') this.refuse(news.reason);
     else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);
     else if (news.kind === 'save') this.options.saves.write(news.write);
@@ -339,7 +343,9 @@ export class World {
       end.onClose(off);end.control('playtest');
     }
     pumpSocket(end, port1);
-    this.voice.attach(end, slug, entry.name, entry.body);
+    const rebody = this.voice.attach(end, slug, entry.name, entry.body);
+    this.voiceBodies.set(entry.device, rebody);
+    end.onClose(() => { if (this.voiceBodies.get(entry.device) === rebody) this.voiceBodies.delete(entry.device); });
     this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
   }
   /** A held body whose player quit on the link that came back for it: the cell takes it as a seat whose link has already left. */
