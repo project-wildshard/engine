@@ -275,6 +275,39 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(wt, ['status', '--porcelain'])).toBe('');
   }, 90_000);
 
+  test('a modify/delete conflict on a stamp, or a stamp conflict beside a source conflict, still stops', () => {
+    const f = fixture();
+    mkdirSync(join(f.repo, 'scripts'), { recursive: true });
+    writeFileSync(join(f.repo, 'scripts/renderer-revision.json'), '{"revision":"a"}\n');
+    f.git(f.repo, ['add', 'scripts']);
+    f.git(f.repo, ['commit', '--quiet', '-m', 'chore: stamp']);
+    f.git(f.repo, ['push', '--quiet', 'origin', 'main']);
+    const wt = f.worktree('foo');
+    f.git(wt, ['rm', '--quiet', 'scripts/renderer-revision.json']);
+    f.git(wt, ['commit', '--quiet', '-m', 'chore: drop the stamp']);
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('scripts/renderer-revision.json', '"a"', '"b"')] } });
+    const deleted = f.land(wt);
+    expect(deleted.status, deleted.stdout).toBe(1);
+    expect(deleted.stdout).toMatch(/conflicts in: scripts\/renderer-revision\.json/u);
+    const g = fixture();
+    mkdirSync(join(g.repo, 'scripts'), { recursive: true });
+    writeFileSync(join(g.repo, 'scripts/renderer-revision.json'), '{"revision":"a"}\n');
+    g.git(g.repo, ['add', 'scripts']);
+    g.git(g.repo, ['commit', '--quiet', '-m', 'chore: stamp']);
+    g.git(g.repo, ['push', '--quiet', 'origin', 'main']);
+    const both = g.worktree('bar');
+    writeFileSync(join(both, 'scripts/renderer-revision.json'), '{"revision":"plan"}\n');
+    g.git(both, ['add', 'scripts/renderer-revision.json']);
+    g.edit(both, 'src/shared.ts', 'line5 = 5', 'line5 = 50', 'feat: plan line 5 and stamp');
+    const peer = join(g.root, 'peer-both.sh');
+    writeFileSync(peer, `set -e\nunset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR\ncd '${g.peer}'\ngit pull --quiet --ff-only origin main\nprintf '{"revision":"main"}\\n' > scripts/renderer-revision.json\nsed -i.bak 's/line5 = 5;/line5 = 55;/' src/shared.ts && rm src/shared.ts.bak\ngit add scripts/renderer-revision.json src/shared.ts\ngit commit --quiet -m 'peer lands'\ngit push --quiet origin HEAD:main\n`);
+    g.state({ once: { marker: join(g.root, 'once'), command: ['sh', peer] } });
+    const mixed = g.land(both);
+    expect(mixed.status, mixed.stdout).toBe(1);
+    expect(mixed.stdout).toMatch(/conflicts in: .*src\/shared\.ts/u);
+    expect(g.git(both, ['status', '--porcelain'])).toBe('');
+  }, 90_000);
+
   test('a rebase conflict stops with the conflicting paths and leaves the worktree as it was', () => {
     const f = fixture();
     const wt = f.worktree('foo');

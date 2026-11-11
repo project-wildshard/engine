@@ -226,12 +226,17 @@ class Landing{
   * @param {string} main */
  regenerateStamps(main){
   if(this.head()===main)return;
+  if(git(this.root,['status','--porcelain','--untracked-files=no'])!=='')throw new StopError('the worktree changed during the rebase; commit or drop those changes and run land again');
   const generated=spawnSync(process.execPath,['scripts/gen.mjs','--inputs-only'],{cwd:this.root,env:this.env,encoding:'utf8',maxBuffer:64<<20});
   if(generated.status!==0){
    this.receipt(`STOP stamp regeneration failed after rebase onto ${short(main)}`);
    throw new StopError(`gen.mjs --inputs-only failed after the rebase onto ${short(main)}: ${`${generated.stderr}${generated.stdout}`.trim().split('\n').slice(-3).join(' ')}\nRegenerate by hand, amend, and run land again.`);
   }
-  const rewritten=git(this.root,['diff','--name-only']).split('\n').filter(Boolean);
+  const changed=git(this.root,['diff','--name-only']).split('\n').filter(Boolean);
+  // Only the stamps are folded in. gen.mjs also rewrites tables built from local, untracked products; those are
+  // land's own side effect on a tree that was clean a moment ago, so they go back to the committed bytes.
+  const others=changed.filter(path=>!STAMPS.includes(path)),rewritten=changed.filter(path=>STAMPS.includes(path));
+  if(others.length>0&&tryGit(this.root,['checkout','--',...others]).status!==0)throw new StopError(`could not restore ${others.join(', ')} after regenerating stamps`);
   if(rewritten.length===0)return;
   const amended=tryGit(this.root,['add','--',...rewritten]).status===0?tryGit(this.root,['commit','--quiet','--amend','--no-edit','--',...rewritten]):undefined;
   if(amended===undefined||amended.status!==0){
@@ -239,6 +244,13 @@ class Landing{
    throw new StopError(`regenerated ${rewritten.join(', ')} but could not amend ${short(this.head())}: ${amended?.stderr.trim()??'git add failed'}\nCommit them by hand and run land again.`);
   }
   this.say('stamps',`regenerated ${rewritten.join(', ')} into ${short(this.head())}`);
+ }
+
+ /** A plain both-modified conflict: base, main and plan stages all present as regular files. A modify/delete or other
+  * structural conflict is not resolved by taking main's side. @param {string} path */
+ contentConflict(path){
+  const stages=git(this.root,['ls-files','-u','-z','--',path]).split('\0').filter(Boolean).map(row=>/^(\d{6}) [0-9a-f]+ (\d)\t/u.exec(row));
+  return stages.length===3&&stages.every(match=>match!==null&&/^100(?:644|755)$/u.test(match[1]??''))&&new Set(stages.map(match=>match?.[2])).size===3;
  }
 
  /** True while a rebase is in progress in this worktree. */
@@ -262,7 +274,7 @@ class Landing{
     result=tryGit(this.root,['-c','core.editor=true','rebase','--skip']);
     continue;
    }
-   if(conflicts.length===0||!conflicts.every(path=>STAMPS.includes(path))||!this.rebasing())break;
+   if(conflicts.length===0||!conflicts.every(path=>STAMPS.includes(path)&&this.contentConflict(path))||!this.rebasing())break;
    if(tryGit(this.root,['checkout','--ours','--',...conflicts]).status!==0||tryGit(this.root,['add','--',...conflicts]).status!==0)break;
    resolved++;
    this.say('stamps',`took main's ${conflicts.join(', ')} for a stamp-only conflict; regenerating after the rebase`);
