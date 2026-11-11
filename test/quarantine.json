@@ -43,19 +43,6 @@
       }
     },
     {
-      "file": "test/driftwood-long-session.test.ts",
-      "owner": "codex-pinefix2",
-      "addedAt": "2026-11-08T12:21:18.000Z",
-      "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 75238 ms, assertion passed; ci 42479173262 shard 4",
-      "extension": {
-        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module57.969s; streak1/10 after executed reset83.782s in CI42763893464. Preserve1,200 seconds at capacity, unique-ID/slot reuse and the300-second independent restored suffix. Numeric publication remains load-sensitive; no verified replacement covers the uninterrupted lifecycle. One48h extension; no second.",
-        "grantedAt": "2026-11-10T06:02:19.000Z",
-        "decidedBy": "codex-pinefix2",
-        "deadline": "2026-11-12T12:20:11.000Z"
-      }
-    },
-    {
       "file": "test/nalati-taming-verbs.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:21:18.000Z",

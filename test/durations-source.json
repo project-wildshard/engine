@@ -2435,6 +2435,19 @@
         "full"
       ],
       "basis": "Largest actual complete-module clock among the ten consecutive qualifying hosted runs of the split quarantined file (d0de4e3 onward; 25.7-38.5 s, 3/3 cases each), not the fastest or a local estimate. Replaces the stale pre-split 138.97 s weight. Same three case bodies and the 60 s budget; no planner/calibration/group/cap change. Ring 2 classification is unchanged, so no Ring 1 weight."
+    },
+    {
+      "file": "test/driftwood-long-session.test.ts",
+      "sha": "7d5d17f6c9a8a0e0503b22e30f91397d828dc983",
+      "run": "42955974181",
+      "artifact": 13827581370,
+      "zipSha256": "e8d2bbc9495eb6c1b6e20bb6193eb092fe384d4b1de20d1a24b1e77e40d96417",
+      "report": "results-1-of-3.json.timings.json",
+      "durationMs": 6880.193453000001,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Largest actual complete-module clock among the ten consecutive qualifying hosted runs per workflow (ci and ring-1) on main SHAs 059a029 through 3b78799 (a landed SHA's main run reuses its plan branch run of the same SHA, J240), each passed, under 60 s; not the fastest or a local estimate. Replaces the stale pre-rewrite weight. Same case bodies and the 60 s budget; no planner/calibration/group/cap change. Ring 2 classification is unchanged, so no Ring 1 weight."
     }
   ],
   "full": {

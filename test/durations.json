@@ -675,7 +675,7 @@
   "test/draw-census.test.ts": 0.11835807200000002,
   "test/driftwood-barrel-saves.test.ts": 1.691653944,
   "test/driftwood-headless-population.test.ts": 106.348,
-  "test/driftwood-long-session.test.ts": 76.512,
+  "test/driftwood-long-session.test.ts": 6.880193453,
   "test/effectPresentation.test.ts": 0.08474110300000001,
   "test/elite-drop-wire.test.ts": 0.168414923,
   "test/elite-encounters.test.ts": 10.275839567,
