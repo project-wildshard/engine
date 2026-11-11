@@ -4,45 +4,6 @@
   "createdAt": "2026-11-08T11:13:28.000Z",
   "entries": [
     {
-      "file": "test/nalati-headless-population.test.ts",
-      "owner": "codex-pinefix2",
-      "addedAt": "2026-11-08T12:05:02.000Z",
-      "deadline": "2026-11-10T12:04:31.000Z",
-      "reason": "CI4 60-second file budget overrun: 101959 ms, assertions passed; ci 42478017721 shard 3",
-      "extension": {
-        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 2 original cases passed, full module90.514s; streak0/10 after executed reset90.514s in CI42764703480. Preserve the complete roster, physical walk/night/raid and independent worker restore. The original file still overruns; measured array-copy cost cannot repair it. Profile native movement and the worker half without reducing ticks, actors or wire checks. One48h extension; no second.",
-        "grantedAt": "2026-11-10T06:02:19.000Z",
-        "decidedBy": "codex-pinefix2",
-        "deadline": "2026-11-12T12:04:31.000Z"
-      }
-    },
-    {
-      "file": "test/nalati-bot-taming.test.ts",
-      "owner": "codex-pinefix2",
-      "addedAt": "2026-11-08T12:21:18.000Z",
-      "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 69632 ms, assertion passed; ci 42479173262 shard 2",
-      "extension": {
-        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module38.484s; streak1/10 after executed reset77.880s in CI42763893464. Preserve18,694 real ticks and all five bot-only taming rounds, refill/save/near-player refusals. Safe layout/frame packing is still unproved; no complete successor permits deleting this edge. One48h extension; no second.",
-        "grantedAt": "2026-11-10T06:02:19.000Z",
-        "decidedBy": "codex-pinefix2",
-        "deadline": "2026-11-12T12:20:11.000Z"
-      }
-    },
-    {
-      "file": "test/nalati-discovery-verbs.test.ts",
-      "owner": "codex-pinefix2",
-      "addedAt": "2026-11-08T12:21:18.000Z",
-      "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 72816 ms, assertion passed; ci 42479173262 shard 1",
-      "extension": {
-        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module73.437s; streak0/10 after executed reset73.437s in CI42764703480. Preserve all7,618 real inputs,15 independent replay parts and17 discoveries/notices. Codec pilots gave no whole-case saving and were rejected. Fix measured replay/packing cost without replacing replay with recorder output. One48h extension; no second.",
-        "grantedAt": "2026-11-10T06:02:19.000Z",
-        "decidedBy": "codex-pinefix2",
-        "deadline": "2026-11-12T12:20:11.000Z"
-      }
-    },
-    {
       "file": "test/nalati-taming-verbs.test.ts",
       "owner": "codex-pinefix2",
       "addedAt": "2026-11-08T12:21:18.000Z",

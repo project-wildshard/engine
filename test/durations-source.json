@@ -2448,6 +2448,45 @@
         "full"
       ],
       "basis": "Largest actual complete-module clock among the ten consecutive qualifying hosted runs per workflow (ci and ring-1) on main SHAs 059a029 through 3b78799 (a landed SHA's main run reuses its plan branch run of the same SHA, J240), each passed, under 60 s; not the fastest or a local estimate. Replaces the stale pre-rewrite weight. Same case bodies and the 60 s budget; no planner/calibration/group/cap change. Ring 2 classification is unchanged, so no Ring 1 weight."
+    },
+    {
+      "file": "test/nalati-headless-population.test.ts",
+      "sha": "7d5d17f6c9a8a0e0503b22e30f91397d828dc983",
+      "run": "42955974181",
+      "artifact": 13827581370,
+      "zipSha256": "e8d2bbc9495eb6c1b6e20bb6193eb092fe384d4b1de20d1a24b1e77e40d96417",
+      "report": "results-1-of-3.json.timings.json",
+      "durationMs": 28645.522804999997,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Largest actual complete-module clock among the ten consecutive qualifying hosted runs per workflow (ci and ring-1) on main SHAs 059a029 through 3b78799 (a landed SHA's main run reuses its plan branch run of the same SHA, J240), each passed, under 60 s; not the fastest or a local estimate. Replaces the stale pre-rewrite weight. Same case bodies and the 60 s budget; no planner/calibration/group/cap change. Ring 2 classification is unchanged, so no Ring 1 weight."
+    },
+    {
+      "file": "test/nalati-bot-taming.test.ts",
+      "sha": "9aad2aa5878e9c78be3c4aeda931cc67e67c2833",
+      "run": "42953906762",
+      "artifact": 13826701196,
+      "zipSha256": "acd004820bd89f288573622e43e56dec7d83106fdf3b4ffdff07cd19add9db48",
+      "report": "results-2-of-3.json.timings.json",
+      "durationMs": 16392.541263,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Largest actual complete-module clock among the ten consecutive qualifying hosted runs per workflow (ci and ring-1) on main SHAs 059a029 through 3b78799 (a landed SHA's main run reuses its plan branch run of the same SHA, J240), each passed, under 60 s; not the fastest or a local estimate. Replaces the stale pre-rewrite weight. Same case bodies and the 60 s budget; no planner/calibration/group/cap change. Ring 2 classification is unchanged, so no Ring 1 weight."
+    },
+    {
+      "file": "test/nalati-discovery-verbs.test.ts",
+      "sha": "7d5d17f6c9a8a0e0503b22e30f91397d828dc983",
+      "run": "42955974150",
+      "artifact": 13826918017,
+      "zipSha256": "c5c61c573e500366ed6456b126937e93491637c1772c848fe8c000009fe64f6a",
+      "report": "results-3-of-3.json.timings.json",
+      "durationMs": 40657.793284,
+      "appliedTo": [
+        "full"
+      ],
+      "basis": "Largest actual complete-module clock among the ten consecutive qualifying hosted runs per workflow (ci and ring-1) on main SHAs 059a029 through 3b78799 (a landed SHA's main run reuses its plan branch run of the same SHA, J240), each passed, under 60 s; not the fastest or a local estimate. Replaces the stale pre-rewrite weight. Same case bodies and the 60 s budget; no planner/calibration/group/cap change. Ring 2 classification is unchanged, so no Ring 1 weight."
     }
   ],
   "full": {
