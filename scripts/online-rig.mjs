@@ -30,7 +30,7 @@ export async function enterPage(browser, device, url, name) {
   await page.goto(url, { waitUntil: 'load' });
   await page.locator('#ws-name-box input').waitFor({ timeout: 150_000 });
   await page.locator('#ws-name-box input').fill(name);
-  await page.locator('#ws-name-box button').click();
+  await page.locator('#ws-name-box button[type=submit]').click();
   return { page, context, errors };
 }
 /** A page that has its Name in, on to the world. @param {import('playwright').Page} page */
@@ -40,9 +40,11 @@ export async function intoWorld(page) {
   await page.waitForFunction(() => (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().frames > 30, undefined, { timeout: 60_000 });
 }
 
-/** @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin: string, pgData: string, shard?: string, seats?: number }} options */
+/** `pgBin` 'memory:' keeps the saves in the server's memory, for a proof that never reads them back (voice-proof.mjs): no Postgres.
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin: string, pgData: string, shard?: string, seats?: number }} options */
 export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgData, shard = 'driftwood-isle', seats }) {
-  const key = JSON.parse(readFileSync(keyFile, 'utf8')), build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = database('saves_online');
+  const memory = pgBin === 'memory:';
+  const key = JSON.parse(readFileSync(keyFile, 'utf8')), build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
   mkdirSync(work, { recursive: true });
   const folder = run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${shard}'))`], 'the product read').trim();
   const origin = join(work, 'origin'), server = join(work, 'server');
@@ -62,14 +64,16 @@ export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgDat
   await new Promise(resolve => { release.listen(RELEASE_PORT, '127.0.0.1', () => { resolve(null); }); });
 
   const pgCtl = join(pgBin, 'pg_ctl'), log = createWriteStream(join(work, 'server.log'));
-  spawnSync(pgCtl, ['-D', pgData, '-o', `-p ${String(PG_PORT)} -k /tmp -c listen_addresses=127.0.0.1`, '-w', '-l', join(work, 'pg.log'), 'start'], { stdio: 'inherit' });
-  const admin = new Client({ connectionString: database('postgres') });
-  await admin.connect();
-  await admin.query('drop database if exists saves_online'); await admin.query('create database saves_online'); await admin.end();
+  if (!memory) {
+    spawnSync(pgCtl, ['-D', pgData, '-o', `-p ${String(PG_PORT)} -k /tmp -c listen_addresses=127.0.0.1`, '-w', '-l', join(work, 'pg.log'), 'start'], { stdio: 'inherit' });
+    const admin = new Client({ connectionString: database('postgres') });
+    await admin.connect();
+    await admin.query('drop database if exists saves_online'); await admin.query('create database saves_online'); await admin.end();
+  }
 
   const world = (running = build) => {
     const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(WORLD_PORT), WILDSHARD_BUILD: running, WORLD_CELLS: shard, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) } } });
+      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(WORLD_PORT), ALLOWED_ORIGINS: `http://127.0.0.1:${String(PAGE_PORT)}`, WILDSHARD_BUILD: running, WORLD_CELLS: shard, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) } } });
     room.stdout.pipe(log, { end: false }); room.stderr.pipe(log, { end: false });
     return room;
   };
@@ -97,6 +101,6 @@ export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgDat
       pages.kill('SIGTERM');
       await stopped(main);
       release.close();
-      spawnSync(pgCtl, ['-D', pgData, '-m', 'fast', '-w', 'stop'], { stdio: 'ignore' });
+      if (!memory) spawnSync(pgCtl, ['-D', pgData, '-m', 'fast', '-w', 'stop'], { stdio: 'ignore' });
     } };
 }

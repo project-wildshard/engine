@@ -20,21 +20,29 @@ export interface VoiceBodies {
   readonly distanceTo: (name: string) => number | null;
 }
 
-let bodies: VoiceBodies | null = null;
-let talking: ReadonlySet<string> = new Set<string>();
+/** What both sides share. The online shell is its own bundle (`online.js`, loaded by clientWorker.ts) with its own copy of this
+ *  module, so the state lives on the page, under one key, not in a module variable. */
+interface Shared { bodies: VoiceBodies | null; talking: ReadonlySet<string> }
+const KEY = Symbol.for('wildshard.voiceNear');
+const shared = (): Shared => {
+  const page = globalThis as { [KEY]?: Shared };
+  page[KEY] ??= { bodies: null, talking: new Set<string>() };
+  return page[KEY];
+};
 
 export const voiceNear = {
   /** The page's bodies, while it has any: null on a page with no world (a harness, single player), where voice stays cell-wide. */
-  get bodies(): VoiceBodies | null { return bodies; },
+  get bodies(): VoiceBodies | null { return shared().bodies; },
   /** Set by the other players' bodies; the returned function takes it back. */
-  lend(source: VoiceBodies): () => void { bodies = source; return () => { if (bodies === source) bodies = null; }; },
+  lend(source: VoiceBodies): () => void { shared().bodies = source; return () => { if (shared().bodies === source) shared().bodies = null; }; },
   /** How loud a Name is here: 1 with no bodies to measure by, 0 for a Name with no body in view. */
   gain(name: string): number {
+    const { bodies } = shared();
     if (bodies === null) return 1;
     const metres = bodies.distanceTo(name);
     return metres === null ? 0 : voiceGain(metres);
   },
   /** The Names this player hears talking now (V8's ring over their heads). */
-  get talking(): ReadonlySet<string> { return talking; },
-  set talking(names: ReadonlySet<string>) { talking = names; },
+  get talking(): ReadonlySet<string> { return shared().talking; },
+  set talking(names: ReadonlySet<string>) { shared().talking = names; },
 };
