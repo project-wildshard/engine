@@ -106,4 +106,24 @@ describe('md-wrap CLI and hook', () => {
     assert.match(advised.stderr, /^ {2}new\.md:1: \d+ chars/mu);
     assert.doesNotMatch(advised.stderr, /\.worktrees/u);
   });
+  test('a path that only names a worktree lexically is resolved first (DS11, J206 review)', () => {
+    const box = sandbox();
+    box.commit({ 'old.md': 'short\n' }, ok('docs: add old'));
+    assert.equal(box.git(['worktree', 'add', '-q', '-b', 'plan/p', '.worktrees/p']).status, 0);
+    writeFileSync(join(box.root, 'top.md'), `${long(20)}\n`);
+    const advise = (path, project = box.root) => spawnSync('bash', [join(ROOT, '.claude/hooks/md-prose-width.sh')], {
+      cwd: box.root, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: project },
+      input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: path } }),
+    });
+    // .worktrees/p/../../top.md is the canonical top.md: checked there, never as the worktree's file.
+    const canonical = advise(join(box.root, '.worktrees', 'p', '..', '..', 'top.md'));
+    assert.equal(canonical.status, 2, canonical.stderr);
+    assert.match(canonical.stderr, /^ {2}top\.md:1: \d+ chars/mu);
+    // From a project at inner/, inner/.worktrees/../../top.md leaves the project: not this hook's file.
+    const inner = join(box.root, 'inner');
+    mkdirSync(join(inner, 'src', 'scripts'), { recursive: true });
+    copyFileSync(join(ROOT, 'src/scripts/md-wrap.mjs'), join(inner, 'src', 'scripts', 'md-wrap.mjs'));
+    const outside = advise(join(inner, '.worktrees', '..', '..', 'top.md'), inner);
+    assert.equal(outside.status, 0, outside.stderr);
+  });
 });

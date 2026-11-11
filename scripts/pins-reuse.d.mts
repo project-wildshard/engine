@@ -18,5 +18,6 @@ export interface Reused {
 export function pinsKey(root: string, revision: string): string;
 export function dropManifest(root: string): void;
 export function writeManifest(root: string, key: string, products: Manifest['products'], mounts: Manifest['mounts']): void;
+export function lockPins(root: string, options?: { wait?: boolean }): (() => void) | undefined;
 export function hashFiles(files: readonly { path: string; bytes: number }[]): Promise<string[]>;
 export function reusePins(root: string, key: string, options?: { sources?: readonly string[]; log?: (line: string) => void }): Promise<Reused | undefined>;

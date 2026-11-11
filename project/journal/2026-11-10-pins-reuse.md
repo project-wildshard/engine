@@ -26,3 +26,18 @@ tree tracks is never cloned, only checked, as the full install checks it.
 `scripts/apfs-clone.mjs` is the one clone helper. `shardfile-cache.mjs`'s
 `publishProduct` used Node's `COPYFILE_FICLONE`, a full copy on macOS; it
 clones for real now.
+
+J206 Codex review: seven MUSTs, all fixed. Nothing is deleted or written
+unless its directory resolves, links followed, to the same path in this
+tree, and ledger paths go through the same check as manifest paths. The
+folder walk refuses a link at any depth (the first version dropped a
+nested refusal), an executable file or an unwritable folder. The manifest
+is written only if the key recomputed after the install still matches.
+The products' receipts must name exactly this tree's pins. One install
+per tree at a time (`out/.pins.lock`), and a source that is installing is
+skipped. The clone opens each source without following a link and clones
+its descriptor (`fclonefileat`), so a swap between check and clone is
+refused. The manifest schema is checked in full.
+
+Same review for the markdown hook (sharddev's): it now resolves the path
+physically before it picks a worktree or tests containment.

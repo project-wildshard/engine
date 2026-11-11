@@ -4,35 +4,40 @@
 // every byte by hash before it uses them.
 //
 //   1. A full install that admits every pin records `out/.pins-manifest.json`: the key below, and the sha256 of every
-//      file it wrote under out/<folder>/ and of every mount it published (or found tracked) under public/. Any other
+//      file it wrote under out/<folder>/ and of every mount it published (or found tracked) under public/. It writes
+//      the manifest only if the key, recomputed after the install, still matches the one it started with. Any other
 //      install (some slugs, a ring, --from-format) deletes the manifest first, so a manifest only ever describes the
 //      exact result of the last full install.
 //   2. The key hashes everything that decides those bytes: the pins and asset pins, the installer's own source, and
 //      the shardfile validation revision (package.json, the lockfile, so `@wildshard/format`, and the admission code).
 //   3. `reusePins` tries this tree first (a rebuild with unchanged pins verifies in place and writes nothing), then
-//      every other worktree of the repo, the canonical checkout first, whose manifest carries the same key. From a
-//      source it clones each product folder and each untracked mount; a mount this tree tracks in Git is not
-//      cloned but must hash the same, as a full install requires.
-//   4. Every product folder must hold exactly the manifest's files, all regular, and every file must hash to the
-//      manifest. One mismatch and this tree's clones are removed: the caller runs the full install.
+//      every other worktree of the repo, the canonical checkout first, whose manifest carries the same key and whose
+//      install lock is free. From a source it clones each product folder and each untracked mount; a mount this tree
+//      tracks in Git is not cloned but must hash the same, as a full install requires.
+//   4. Every product folder must hold exactly the manifest's files, all regular, none executable, and every file must
+//      hash to the manifest; the products' receipts must name exactly this tree's pins. One mismatch and this tree's
+//      clones are removed: the caller runs the full install.
 //
-// So a worktree never holds a product its own pins would not have produced: the bytes are the source's, and their
-// hashes are what a full install of the same key wrote. WILDSHARD_PINS_REUSE=0 turns reuse off.
+// Paths: a manifest or ledger path is used only if it is a plain folder name under out/ or a plain path under public/,
+// and nothing is deleted or written unless its parent directory resolves, with every link followed, to the same path
+// inside this tree: a linked out/, public/ or ancestor is refused. Every install of a tree, full or reused, holds that
+// tree's lock (`out/.pins.lock`) from start to finish. WILDSHARD_PINS_REUSE=0 turns reuse off.
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {existsSync,lstatSync,mkdirSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {existsSync,lstatSync,mkdirSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,unlinkSync,writeFileSync} from 'node:fs';
 import {availableParallelism} from 'node:os';
-import {dirname,join,relative,resolve} from 'node:path';
+import {dirname,join,relative,resolve,sep} from 'node:path';
 import {Worker} from 'node:worker_threads';
 import {clonePaths} from './apfs-clone.mjs';
 
 export const MANIFEST='out/.pins-manifest.json';
-const VERSION=1,KEY_VERSION='pins-reuse/1',LEDGER='out/.pins.json';
+const VERSION=2,KEY_VERSION='pins-reuse/2',LEDGER='out/.pins.json',LOCK='out/.pins.lock',PINS='test/pins/shardfiles.json';
+const HEX=/^[a-f0-9]{64}$/u;
 /** Every tracked file whose bytes decide what a full install writes. A local module `pins.ts` or `bake-loader.mjs`
  * imports is here unless KEY_EXEMPT says why its bytes can't change out/ or public/ (pins-reuse.test.mjs checks). */
 export const KEY_SOURCES=Object.freeze(['scripts/pins.ts','scripts/pin-packs.ts','scripts/pin-assets.ts','scripts/pin-format.ts',
  'scripts/bake-loader.mjs','scripts/format-hook.mjs','scripts/shardfile-validation-revision.mjs','scripts/pins-reuse.mjs',
- 'test/pins/shardfiles.json','test/pins/assets.json']);
+ PINS,'test/pins/assets.json']);
 export const KEY_EXEMPT=Object.freeze({
  'scripts/pins-exclude.mjs':'writes Git\'s exclude file only',
  'scripts/apfs-clone.mjs':'clones bytes that are then hashed against the manifest',
@@ -52,26 +57,79 @@ export function pinsKey(root,revision){
  return hash.digest('hex');
 }
 
-/** @param {string} root @returns {Manifest|undefined} */
+/** A product folder name a full install could have made. @param {string} name */
+const folderName=name=>/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/u.test(name);
+/** A relative path with no way out of where it is joined. @param {string} path */
+const plainPath=path=>path!==''&&!path.startsWith('/')&&!path.includes('\\')&&!path.includes('\0')&&path.split('/').every(part=>part!==''&&part!=='.'&&part!=='..');
+/** A mount path: under public/, plain. @param {string} path */
+const mountPath=path=>path.startsWith('public/')&&plainPath(path);
+/** @param {unknown} value @returns {value is Record<string,unknown>} */
+const record=value=>typeof value==='object'&&value!==null&&!Array.isArray(value);
+
+/** The manifest of `root`, or undefined if it is missing or not exactly the shape a full install writes.
+ * @param {string} root @returns {Manifest|undefined} */
 function readManifest(root){
- try{
-  const value=JSON.parse(readFileSync(join(root,MANIFEST),'utf8'));
-  return value?.version===VERSION&&typeof value.key==='string'&&typeof value.products==='object'&&typeof value.mounts==='object'?value:undefined;
- }catch{return undefined;}
+ let value;
+ try{value=JSON.parse(readFileSync(join(root,MANIFEST),'utf8'));}catch{return undefined;}
+ if(!record(value)||value.version!==VERSION||typeof value.key!=='string'||!HEX.test(value.key)||!record(value.products)||!record(value.mounts))return undefined;
+ for(const [folder,files] of Object.entries(value.products)){
+  if(!folderName(folder)||!record(files)||Object.keys(files).length===0)return undefined;
+  for(const [path,hash] of Object.entries(files))if(!plainPath(path)||typeof hash!=='string'||!HEX.test(hash))return undefined;
+ }
+ for(const [path,hash] of Object.entries(value.mounts))if(!mountPath(path)||typeof hash!=='string'||!HEX.test(hash))return undefined;
+ return /** @type {Manifest} */(value);
 }
 
 /** Forget the last full install: out/ is about to change. @param {string} root */
 export function dropManifest(root){rmSync(join(root,MANIFEST),{force:true});}
 
-/** Record a complete full install. Paths are root-relative: products by folder then path inside it, mounts as
- * `public/...`. @param {string} root @param {string} key @param {Manifest['products']} products @param {Manifest['mounts']} mounts */
+/** Record a complete full install. Products by folder then path inside it, mounts as `public/...`.
+ * @param {string} root @param {string} key @param {Manifest['products']} products @param {Manifest['mounts']} mounts */
 export function writeManifest(root,key,products,mounts){
- mkdirSync(join(root,'out'),{recursive:true});
- const sorted=(/** @type {Record<string,string>} */ record)=>Object.fromEntries(Object.entries(record).sort(([a],[b])=>a<b?-1:1));
+ const sorted=(/** @type {Record<string,string>} */ files)=>Object.fromEntries(Object.entries(files).sort(([a],[b])=>a<b?-1:1));
  const value={version:VERSION,key,products:Object.fromEntries(Object.entries(products).sort(([a],[b])=>a<b?-1:1).map(([folder,files])=>[folder,sorted(files)])),mounts:sorted(mounts)};
- const part=join(root,`${MANIFEST}.${process.pid}`);
+ insideTree(root,'out',true);
+ const part=join(root,`${MANIFEST}.${String(process.pid)}`);
  writeFileSync(part,`${JSON.stringify(value)}\n`);
  renameSync(part,join(root,MANIFEST));
+}
+
+/**
+ * Throw unless directory `rel` of `root` resolves, every link followed, to `<real root>/<rel>`: no linked ancestor can
+ * send a delete or a write elsewhere. With `make`, the directory is created first.
+ * @param {string} root @param {string} rel @param {boolean} [make]
+ */
+function insideTree(root,rel,make=false){
+ if(make)mkdirSync(join(root,rel),{recursive:true});
+ const real=realpathSync(root),want=rel===''?real:join(real,rel);
+ let got='';
+ try{got=realpathSync(join(root,rel));}catch{if(!make)return;}
+ if(got!==want)throw new Error(`${rel} resolves outside the tree (${got})`);
+}
+
+const sleeper=new Int32Array(new SharedArrayBuffer(4));
+/**
+ * Take `root`'s install lock: a file created exclusively with the holder's pid. A lock whose holder is gone is taken
+ * over. With `wait`, a live holder is waited for (up to 15 minutes); without, undefined is returned at once.
+ * @param {string} root @param {{wait?:boolean}} [options] @returns {(() => void)|undefined} the release
+ */
+export function lockPins(root,{wait=true}={}){
+ insideTree(root,'out',true);
+ const path=join(root,LOCK),token=`${String(process.pid)} ${String(Date.now())} ${Math.random().toString(36).slice(2)}`;
+ for(const started=Date.now();;){
+  try{
+   writeFileSync(path,token,{flag:'wx'});
+   return ()=>{try{if(readFileSync(path,'utf8')===token)unlinkSync(path);}catch{/* Already gone. */}};
+  }catch(error){if(!(error instanceof Error)||!('code' in error)||error.code!=='EEXIST')throw error;}
+  let pid=0;
+  try{pid=Number(readFileSync(path,'utf8').split(' ')[0]);}catch{continue;}
+  let alive=false;
+  try{if(Number.isInteger(pid)&&pid>0){process.kill(pid,0);alive=true;}}catch(error){alive=error instanceof Error&&'code' in error&&error.code==='EPERM';}
+  if(!alive){try{unlinkSync(path);}catch{/* Someone else took it over. */}continue;}
+  if(!wait)return undefined;
+  if(Date.now()-started>15*60_000)throw new Error(`${path}: pid ${String(pid)} has held the pins lock for 15 minutes`);
+  Atomics.wait(sleeper,0,0,250);
+ }
 }
 
 const HASHER=`const {parentPort,workerData}=require('node:worker_threads');const {createHash}=require('node:crypto');const {readFileSync}=require('node:fs');
@@ -87,7 +145,7 @@ export async function hashFiles(files){
   bucket.indices.push(index);bucket.load+=(files[index]?.bytes??0)+4096;
  }
  const hashes=new Array(files.length).fill('');
- await Promise.all(buckets.map(bucket=>new Promise((done,fail)=>{
+ await Promise.all(buckets.filter(bucket=>bucket.indices.length>0).map(bucket=>new Promise((done,fail)=>{
   const worker=new Worker(HASHER,{eval:true,workerData:bucket.indices.map(index=>files[index]?.path)});
   worker.once('message',(/** @type {string[]} */ result)=>{result.forEach((hash,at)=>{hashes[bucket.indices[at]??-1]=hash;});done(undefined);});
   worker.once('error',fail);
@@ -110,20 +168,32 @@ function trackedPublic(root){
  catch{return new Set();}
 }
 
-/** Every entry under `directory` as a path relative to it, or undefined if any is neither a file nor a directory.
- * @param {string} directory @returns {Map<string,number>|undefined} path -> bytes */
+/** The pin hashes `root` names. @param {string} root @returns {string[]} */
+function pinHashes(root){
+ const {shards}=/** @type {{shards?:{hash?:unknown}[]}} */(JSON.parse(readFileSync(join(root,PINS),'utf8')));
+ return (shards??[]).map(row=>String(row.hash));
+}
+
+/** Every file under `directory` as a path relative to it with its size, or a refusal: an entry that is neither a
+ * directory nor a regular file, an executable file, or a directory the owner can't write and enter.
+ * @param {string} directory @returns {Map<string,number>|string} */
 function regularFiles(directory){
  /** @type {Map<string,number>} */const files=new Map();
- const walk=(/** @type {string} */ folder)=>{
+ /** @param {string} folder @returns {string} '' or the refusal */
+ const walk=folder=>{
+  const stat=lstatSync(folder);
+  if(!stat.isDirectory()||(stat.mode&0o300)!==0o300)return `${relative(directory,folder)||'.'} is not a writable directory`;
   for(const entry of readdirSync(folder,{withFileTypes:true})){
    const path=join(folder,entry.name);
-   if(entry.isDirectory()){walk(path);continue;}
-   if(!entry.isFile())return false;
-   files.set(relative(directory,path),lstatSync(path).size);
+   if(entry.isDirectory()){const refused=walk(path);if(refused!=='')return refused;continue;}
+   if(!entry.isFile())return `${relative(directory,path)} is not a regular file`;
+   const file=lstatSync(path);
+   if((file.mode&0o111)!==0||(file.mode&0o200)===0)return `${relative(directory,path)} has mode ${(file.mode&0o777).toString(8)}`;
+   files.set(relative(directory,path).split(sep).join('/'),file.size);
   }
-  return true;
+  return '';
  };
- try{return walk(directory)===false?undefined:files;}catch{return undefined;}
+ try{const refused=walk(directory);return refused===''?files:refused;}catch(error){return error instanceof Error?error.message:String(error);}
 }
 
 /** @typedef {{source:string,mode:'in place'|'clone'|'copy',files:number,bytes:number,published:string[],seconds:{clone:number,verify:number}}} Reused */
@@ -131,6 +201,7 @@ function regularFiles(directory){
 /**
  * Make `root`'s pinned products and mounts the manifest's, from this tree or another worktree with the same key, and
  * prove every byte. Undefined when no source matches or any byte differs: then the caller runs the full install.
+ * The caller holds `root`'s lock (lockPins).
  * @param {string} root @param {string} key @param {{sources?:readonly string[],log?:(line:string)=>void}} [options]
  * @returns {Promise<Reused|undefined>}
  */
@@ -140,9 +211,15 @@ export async function reusePins(root,key,{sources,log=()=>{}}={}){
  const tracked=trackedPublic(root);
  for(const source of candidates){
   const manifest=readManifest(source);
-  if(manifest===undefined||manifest.key!==key)continue;
-  const reused=await reuseFrom(root,source,manifest,tracked,log);
-  if(reused!==undefined)return reused;
+  if(manifest===undefined){if(existsSync(join(source,MANIFEST)))log(`pins reuse: ${source} has a malformed manifest; skipped`);continue;}
+  if(manifest.key!==key)continue;
+  // Another tree's install must not rewrite it under the clone; a busy source is skipped, not waited for.
+  const release=source===root?()=>{}:lockPins(source,{wait:false});
+  if(release===undefined){log(`pins reuse: ${source} is installing; skipped`);continue;}
+  try{
+   const reused=await reuseFrom(root,source,manifest,tracked,log);
+   if(reused!==undefined)return reused;
+  }finally{release();}
  }
  return undefined;
 }
@@ -151,62 +228,64 @@ export async function reusePins(root,key,{sources,log=()=>{}}={}){
  * @param {(line:string)=>void} log @returns {Promise<Reused|undefined>} */
 async function reuseFrom(root,source,manifest,tracked,log){
  const self=source===root,started=performance.now();
- const folders=Object.keys(manifest.products);
- const mounts=Object.keys(manifest.mounts);
- // Only names a full install could have written: a folder name, and public/ paths with no way out of it.
- if(folders.some(folder=>!/^[^/\\]+$/u.test(folder)||folder==='.'||folder==='..')
-  ||mounts.some(path=>!path.startsWith('public/')||path.split('/').some(part=>part===''||part==='.'||part==='..'))){
-  log(`pins reuse: ${source} has a malformed manifest; skipped`);return undefined;
- }
+ const folders=Object.keys(manifest.products),mounts=Object.keys(manifest.mounts);
  const published=mounts.filter(path=>!tracked.has(path));
  /** @type {string[]} */const placed=[];
- let mode=/** @type {Reused['mode']} */('in place');
- if(!self){
-  try{
+ let mode=/** @type {Reused['mode']} */('in place'),refusal='';
+ try{
+  insideTree(root,'out',true);
+  if(!self){
+   insideTree(source,'out');
    // The previous install's mounts go, as a full install removes them first; then this tree's copies of the folders.
-   try{for(const path of /** @type {{published?:string[]}} */(JSON.parse(readFileSync(join(root,LEDGER),'utf8'))).published??[])if(!tracked.has(path))rmSync(join(root,path),{force:true});}catch{/* No earlier install. */}
+   /** @type {unknown} */let ledger;
+   try{ledger=JSON.parse(readFileSync(join(root,LEDGER),'utf8')).published;}catch{/* No earlier install. */}
+   for(const path of Array.isArray(ledger)?ledger:[]){
+    if(typeof path!=='string'||!mountPath(path)||tracked.has(path))continue;
+    insideTree(root,dirname(path));
+    rmSync(join(root,path),{force:true});
+   }
    /** @type {[string,string][]} */const pairs=[];
    for(const folder of folders){
-    const target=join(root,'out',folder);
-    rmSync(target,{recursive:true,force:true});
-    pairs.push([join(source,'out',folder),target]);
+    rmSync(join(root,'out',folder),{recursive:true,force:true});
+    pairs.push([join(source,'out',folder),join(root,'out',folder)]);
    }
    for(const path of published){
+    insideTree(root,dirname(path),true);
+    insideTree(source,dirname(path));
     rmSync(join(root,path),{force:true});
-    mkdirSync(dirname(join(root,path)),{recursive:true});
     pairs.push([join(source,path),join(root,path)]);
    }
-   mkdirSync(join(root,'out'),{recursive:true});
    placed.push(...pairs.map(([,target])=>target));
    mode=clonePaths(pairs)==='copy'?'copy':'clone';
-  }catch(error){
-   for(const path of placed)rmSync(path,{recursive:true,force:true});
-   log(`pins reuse: cloning from ${source} failed (${error instanceof Error?error.message:String(error)})`);
-   return undefined;
   }
- }
+ }catch(error){refusal=`cloning failed (${error instanceof Error?error.message:String(error)})`;}
  const cloned=performance.now();
  /** @type {{path:string,bytes:number,hash:string}[]} */const files=[];
- let refusal='';
- for(const folder of folders){
+ if(refusal==='')for(const folder of folders){
   const want=manifest.products[folder]??{},have=regularFiles(join(root,'out',folder));
-  if(have===undefined){refusal=`out/${folder} holds an entry that is not a regular file`;break;}
+  if(typeof have==='string'){refusal=`out/${folder}: ${have}`;break;}
   const extra=[...have.keys()].find(path=>!Object.hasOwn(want,path)),missing=Object.keys(want).find(path=>!have.has(path));
   if(extra!==undefined||missing!==undefined){refusal=`out/${folder}/${extra??missing} is ${extra===undefined?'missing':'not in the manifest'}`;break;}
   for(const [path,bytes] of have)files.push({path:join(root,'out',folder,path),bytes,hash:want[path]??''});
  }
- if(refusal===''){
-  for(const path of mounts){
-   let bytes=-1;
-   try{const stat=lstatSync(join(root,path));if(stat.isFile())bytes=stat.size;}catch{/* Missing. */}
-   if(bytes<0){refusal=`${path} is missing or not a regular file`;break;}
-   files.push({path:join(root,path),bytes,hash:manifest.mounts[path]??''});
-  }
+ if(refusal==='')for(const path of mounts){
+  let bytes=-1;
+  try{insideTree(root,dirname(path));const stat=lstatSync(join(root,path));if(stat.isFile())bytes=stat.size;}catch{/* Missing or outside. */}
+  if(bytes<0){refusal=`${path} is missing or not a regular file`;break;}
+  files.push({path:join(root,path),bytes,hash:manifest.mounts[path]??''});
  }
  if(refusal===''){
   const hashes=await hashFiles(files);
   const wrong=files.findIndex((file,at)=>hashes[at]!==file.hash);
   if(wrong!==-1)refusal=`${relative(root,files[wrong]?.path??'')} does not hash to the manifest`;
+ }
+ if(refusal===''){
+  // The verified products are exactly this tree's pins: every receipt names a pin, and every pin has a product.
+  /** @type {string[]} */const named=[];
+  try{for(const folder of folders)named.push(String(JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')).pin?.hash));}
+  catch{refusal='a product has no readable receipt';}
+  const pins=refusal===''?pinHashes(root):[];
+  if(refusal===''&&(named.length!==pins.length||[...named].sort().join()!==[...pins].sort().join()))refusal='the products are not exactly the pins';
  }
  if(refusal!==''){
   for(const path of placed)rmSync(path,{recursive:true,force:true});

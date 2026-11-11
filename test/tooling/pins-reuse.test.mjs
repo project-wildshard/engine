@@ -3,12 +3,12 @@
 // canonical checkout and a linked plan worktree, as `worktree new` makes them.
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
 import {clonePaths} from '../../scripts/apfs-clone.mjs';
-import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, pinsKey, reusePins, writeManifest} from '../../scripts/pins-reuse.mjs';
+import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, lockPins, pinsKey, reusePins, writeManifest} from '../../scripts/pins-reuse.mjs';
 
 /** @type {string[]} */
 const roots = [];
@@ -23,8 +23,8 @@ const git = (cwd, args) => {
 /** @param {string} root @param {string} path @param {string} body */
 const put = (root, path, body) => { mkdirSync(dirname(join(root, path)), {recursive: true}); writeFileSync(join(root, path), body); };
 const sha = (/** @type {string|Buffer} */ body) => createHash('sha256').update(body).digest('hex');
-const KEY = 'k'.repeat(64);
-const PRODUCT = {'shard.json': '{"a":1}\n', 'blobs/x.bin': 'x'.repeat(5000), 'mounts/assets/a/m.bin': 'mount\n', 'validation.json': '{}\n'};
+const KEY = 'a'.repeat(64), PIN = 'b'.repeat(64);
+const PRODUCT = {'shard.json': '{"a":1}\n', 'blobs/x.bin': 'x'.repeat(5000), 'mounts/assets/a/m.bin': 'mount\n', 'validation.json': JSON.stringify({pin: {hash: PIN}})};
 const MOUNTS = {'public/assets/a/m.bin': 'mount\n', 'public/assets/a/tracked.bin': 'tracked\n'};
 
 /** A canonical checkout holding a full install of one product, and a fresh plan worktree. */
@@ -34,6 +34,7 @@ function repos() {
   git(root, ['init', '-q', '-b', 'main']);
   put(root, '.gitignore', '/out/\n/.worktrees/\n/public/assets/a/m.bin\n');
   put(root, 'public/assets/a/tracked.bin', MOUNTS['public/assets/a/tracked.bin']);
+  put(root, 'test/pins/shardfiles.json', JSON.stringify({shards: [{slug: 'dunes', hash: PIN}]}));
   git(root, ['add', '.']);
   git(root, ['-c', 'user.name=T', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'seed']);
   git(root, ['worktree', 'add', '-q', '-b', 'plan/p', '.worktrees/p', 'main']);
@@ -105,6 +106,73 @@ describe('pins reuse', () => {
     expect(lines).toEqual([expect.stringMatching(/malformed manifest/u), expect.stringMatching(/malformed manifest/u)]);
   });
 
+  test('J206 review: links, ledger paths, nested links, modes, missing pins and odd schemas all refuse', async () => {
+    const {root, tree} = repos();
+    /** @type {string[]} */
+    const lines = [];
+    const log = (/** @type {string} */ line) => { lines.push(line); };
+    const outside = mkdtempSync(join(tmpdir(), 'pins-victim-'));
+    roots.push(outside);
+    put(outside, 'dunes/keep.txt', 'keep\n');
+    put(outside, 'victim.txt', 'victim\n');
+
+    // A linked out/ in the target: nothing behind it is deleted.
+    symlinkSync(outside, join(tree, 'out'));
+    expect(await reusePins(tree, KEY, {log})).toBeUndefined();
+    expect(lines.at(-1)).toMatch(/resolves outside the tree/u);
+    expect(readFileSync(join(outside, 'dunes/keep.txt'), 'utf8')).toBe('keep\n');
+    rmSync(join(tree, 'out'));
+
+    // A ledger path out of public/ is never deleted.
+    put(tree, 'out/.pins.json', JSON.stringify({published: [`../../${join('..', outside, 'victim.txt')}`, 'public/../../victim.txt']}));
+    expect(await reusePins(tree, KEY, {log})).toMatchObject({mode: process.platform === 'darwin' ? 'clone' : 'copy'});
+    expect(readFileSync(join(outside, 'victim.txt'), 'utf8')).toBe('victim\n');
+
+    // A link two folders down in the source is refused, not trusted.
+    rmSync(join(tree, 'out'), {recursive: true});
+    symlinkSync('../shard.json', join(root, 'out/dunes/blobs/deep.json'));
+    expect(await reusePins(tree, KEY, {log})).toBeUndefined();
+    expect(lines.at(-1)).toMatch(/blobs\/deep\.json is not a regular file/u);
+    rmSync(join(root, 'out/dunes/blobs/deep.json'));
+
+    // An executable product file is not what a full install writes.
+    chmodSync(join(root, 'out/dunes/shard.json'), 0o755);
+    expect(await reusePins(tree, KEY, {log})).toBeUndefined();
+    expect(lines.at(-1)).toMatch(/shard\.json has mode 755/u);
+    chmodSync(join(root, 'out/dunes/shard.json'), 0o644);
+
+    // A manifest that drops a pinned product proves nothing about it.
+    put(tree, 'test/pins/shardfiles.json', JSON.stringify({shards: [{slug: 'dunes', hash: PIN}, {slug: 'other', hash: 'c'.repeat(64)}]}));
+    expect(await reusePins(tree, KEY, {log})).toBeUndefined();
+    expect(lines.at(-1)).toMatch(/not exactly the pins/u);
+    put(tree, 'test/pins/shardfiles.json', JSON.stringify({shards: [{slug: 'dunes', hash: PIN}]}));
+
+    for (const broken of [{version: 2, key: KEY, products: null, mounts: {}}, {version: 2, key: KEY, products: {dunes: {'a.json': 'nothex'}}, mounts: {}}, []]) {
+      writeFileSync(join(root, MANIFEST), JSON.stringify(broken));
+      expect(await reusePins(tree, KEY, {log})).toBeUndefined();
+      expect(lines.at(-1)).toMatch(/malformed manifest/u);
+    }
+  });
+
+  test('a tree installs one at a time, a busy source is skipped, and a dead holder\'s lock is taken over', async () => {
+    const {root, tree} = repos();
+    const release = lockPins(root);
+    expect(lockPins(root, {wait: false})).toBeUndefined();
+    /** @type {string[]} */
+    const lines = [];
+    expect(await reusePins(tree, KEY, {log: line => { lines.push(line); }})).toBeUndefined();
+    expect(lines).toEqual([expect.stringMatching(/is installing; skipped/u)]);
+    release?.();
+    const again = lockPins(root, {wait: false});
+    expect(again).toBeTypeOf('function');
+    again?.();
+    // pid 2^22+1 is past macOS's and Linux's default pid range: a gone holder.
+    writeFileSync(join(root, 'out/.pins.lock'), `${String(2 ** 22 + 1)} 0 x`);
+    const taken = lockPins(root, {wait: false});
+    expect(taken).toBeTypeOf('function');
+    taken?.();
+  });
+
   test('the key changes with the pins, the installer and the validation revision', () => {
     const {root} = repos();
     const base = pinsKey(root, 'r1');
@@ -148,7 +216,7 @@ describe('pins reuse', () => {
     // Writing the clone leaves its source alone.
     writeFileSync(join(root, 'two.txt'), 'changed\n');
     expect(readFileSync(join(root, 'one.txt'), 'utf8')).toBe('one\n');
-    expect(() => clonePaths([[join(root, 'link.txt'), join(root, 'three.txt')]])).toThrow(/not a regular file or directory/u);
+    expect(() => clonePaths([[join(root, 'link.txt'), join(root, 'three.txt')]])).toThrow(/not a regular file or directory|symbolic link/u);
     expect(() => clonePaths([[join(root, 'one.txt'), join(root, 'two.txt')]])).toThrow();
     expect(clonePaths([])).toBe('none');
   });

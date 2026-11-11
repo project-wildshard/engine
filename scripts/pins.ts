@@ -36,7 +36,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 import { excludePublished } from './pins-exclude.mjs';
-import { dropManifest, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
+import { dropManifest, lockPins, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 
@@ -173,7 +173,13 @@ function tracked(): ReadonlySet<string> {
   }
 }
 
+/** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
 async function install(only: readonly string[], fromFormat = false): Promise<void> {
+  const release = lockPins(process.cwd());
+  try { await installLocked(only, fromFormat); } finally { release?.(); }
+}
+
+async function installLocked(only: readonly string[], fromFormat: boolean): Promise<void> {
   // DS12: a full install whose pins match this tree's last one, or another worktree's, clones and verifies (pins-reuse.mjs).
   const full = only.length === 0 && !fromFormat, root = process.cwd();
   const key = full ? pinsKey(root, shardfileValidationRevision(root)) : '';
@@ -278,7 +284,8 @@ async function install(only: readonly string[], fromFormat = false): Promise<voi
   // The shared exclude file is the canonical checkout's alone; a plan worktree leaves it untouched (pins-exclude.mjs).
   excludePublished(paths);
   if (dependency === undefined) await installSaves(pins.map(row => row.slug));
-  if (full && failed === 0) writeManifest(root, key, productHashes, mountHashes);
+  // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
+  if (full && failed === 0 && pinsKey(root, shardfileValidationRevision(root)) === key) writeManifest(root, key, productHashes, mountHashes);
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
 }
 

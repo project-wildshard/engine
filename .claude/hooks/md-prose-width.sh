@@ -21,6 +21,11 @@ case "$file" in *.md) ;; *) exit 0 ;; esac
 # Only this repo's docs; not memory files, other repos or agent worktrees.
 root="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$root" ] || exit 0
+# Physical paths, every .. and link resolved, before any containment test:
+# a lexical .worktrees/p/../../x.md must not pick a worktree or leave the repo.
+root="$(cd "$root" 2>/dev/null && pwd -P)" || exit 0
+dir="$(cd "$(dirname "$file")" 2>/dev/null && pwd -P)" || exit 0
+file="$dir/$(basename "$file")"
 case "$file" in "$root"/*) ;; *) exit 0 ;; esac
 # Match the skipped folders against the repo-relative path: the absolute
 # path may itself sit under /tmp (Linux temp dirs, CI sandboxes).
