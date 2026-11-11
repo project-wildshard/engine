@@ -12,8 +12,6 @@ top="$(git rev-parse --show-toplevel)"
 hooks="$top/.githooks"
 refs="$(cat)"
 printf '%s\n' "$refs" | node "$hooks/check-push.mjs" "$2"
-# J240: remember this worktree's own plan/* pushes for land's ownership check.
-printf '%s\n' "$refs" | node "$hooks/record-plan-push.mjs"
 if [ -f "$top/scripts/changelog.mjs" ]; then printf '%s\n' "$refs" | node "$top/scripts/changelog.mjs" refs; fi
 printf '%s\n' "$refs" | node "$hooks/agents-md.mjs" push
 export WS_PUSH_REFS="$refs"
