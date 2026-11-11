@@ -23,7 +23,16 @@ Run from the repo root.
 - `pnpm test:hooks`: the `.githooks/` suite (CI, and pre-commit when hooks change).
 - `pnpm dev`: esbuild watch + the server on http://127.0.0.1:4402.
 - `pnpm build`: builds the web app into `src/dist/web`.
-- `pnpm test:e2e`: Playwright against a built app. CI only.
+- `pnpm test:e2e`: the `engine serve` status page, then the Template 2
+  smoke (TEMPLATE-E2E, J233): the real title, a walk, the door, the
+  guardian's quest and a reload, on one headless page. Template 2 comes
+  from `@wildshard/format` (`pins.ts install --from-format`, beside the
+  other pins), the client from a warm watcher (`scripts/e2e-watcher.mjs`,
+  one per worktree under a build lease; `node scripts/e2e-client.mjs
+  stop` frees it, and it idles out after 10 min). A one-line client edit
+  is ready again in about 12 s. Each run's split is in
+  `tmp/e2e/receipt.json`. `pnpm test:e2e:offline` runs it with outbound
+  networking denied by macOS.
 - `pnpm lint:fix` / `pnpm format`: the hooks only check; these fix.
 - `node src/cli/main.ts --help`: the CLI without installing it. `serve [--port n]` starts the server (default 4402).
 - `pnpm md:wrap`: rewraps Markdown prose to ~72 columns.
@@ -60,7 +69,7 @@ goes in `tmp/<task>/` and is deleted when done.
 - `src/shared/`: zod schemas used on both sides of the wire.
 - `src/client/`: the Preact web app, with its own `tsconfig.json` (DOM lib).
 - `src/tools/build-web.ts`: esbuild into `src/dist/web` (`--dev` watches and serves).
-- `src/e2e/`: Playwright smoke test (CI).
+- `src/e2e/`: Playwright: the status page, and `smoke/`, the Template 2 smoke.
 - `src/cook/`: shardfile to runtime packs.
 - `src/scripts/check-sides.mjs`: the side rule (`pnpm check:sides`).
 - `src/scripts/`: repo tooling (asks, md-wrap), plain JS.
