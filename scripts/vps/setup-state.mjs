@@ -65,7 +65,7 @@ function pin(path, expected, uid) {
  * @param {string} path @param {string} channel @param {string} key @param {boolean} check @param {number} uid @param {number} gid */
 function prefill(path, channel, key, check, uid, gid) {
   if (!['production', 'staging'].includes(channel)) throw new Error('Unknown release channel');
-  const values = { PACK_ORIGIN: 'https://wildshard-packs.wildshard.workers.dev', RELEASE_URL: `https://wildshard-packs.wildshard.workers.dev/releases/${channel}.json`, RELEASE_PUBLIC_KEY: key };
+  const values = { PACK_ORIGIN: 'https://packs.wildshard.io', RELEASE_URL: `https://packs.wildshard.io/releases/${channel}.json`, RELEASE_PUBLIC_KEY: key };
   let before, stat;
   try {
     const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);

@@ -29,7 +29,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..');
-const ORIGIN = 'https://wildshard-packs.wildshard.workers.dev', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
+const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
 // MS7: staging's socket is whichever of these its signed release names (rooms-staging, or the Funnel for the one release that moves
 // it); its /health stays tailnet-only (MMO-SERVER D7).
 const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';

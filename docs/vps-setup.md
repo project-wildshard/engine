@@ -35,7 +35,7 @@ in setup.sh and GitHub's `E7_RELEASE_PUBLIC_KEY`. An explicit
 settings survive. A different filled trust root refuses activation.
 Only exactly blank rows are filled, atomically as `640 root:wildshard`:
 
-- `PACK_ORIGIN=https://wildshard-packs.wildshard.workers.dev`.
+- `PACK_ORIGIN=https://packs.wildshard.io`.
 - `RELEASE_URL` is that origin's `releases/production.json` or
   `releases/staging.json`.
 - `RELEASE_PUBLIC_KEY` is the verified public pin.

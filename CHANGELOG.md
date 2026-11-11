@@ -8,6 +8,10 @@ To release: add the next version's section at the top, commit and push it, then 
 and `--finish` as before. `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose
 `package.json` version has no valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.10 (2026-11-11)
+
+- Game files now come straight from Cloudflare's CDN.
+
 ## v0.1.9 (2026-11-11)
 
 - The game connects to its new server address, rooms.wildshard.io, on the ordinary web port, so more networks let you in.

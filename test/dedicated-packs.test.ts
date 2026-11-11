@@ -54,3 +54,15 @@ test('eight concurrent cold-cache fills converge on one verified body', async ()
   expect(readFileSync(join(cache, HASH, 'body'))).toEqual(Buffer.from(BODY));
   expect(readdirSync(join(cache, HASH))).toEqual(['body']);
 });
+
+test('a room asks the origin for `br` only, so the CDN never caches a decoded copy for browsers (PACKS-CDN PC3)', async () => {
+  const asked: (string | undefined)[] = [];
+  const server = createServer((request, response) => { asked.push(request.headers['accept-encoding']); response.writeHead(200, { 'content-encoding': 'br' }).end(WIRE); });
+  await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
+  closers.push(() => { server.close(); });
+  const url = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/`, read = packRead({ origin: url, cache: scratch() }, fresh());
+  const part = new URL('/encoded.pack.br', url), book = new URL('/server-build.json', url);
+  expect(await read(part, part.pathname, HASH)).toEqual(BODY);
+  expect(await read(book, book.pathname, undefined)).toEqual(BODY);
+  expect(asked).toEqual(['br', 'br']);
+});

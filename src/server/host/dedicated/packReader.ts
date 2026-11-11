@@ -23,7 +23,10 @@ const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes)
 const originBytes = async (url: URL, path: string, origin: string): Promise<Uint8Array> => {
   // A book's paths start at its origin, and a `file:` URL's root is the disk's.
   if (url.protocol === 'file:') return new Uint8Array(await readFile(new URL(path.replace(/^\//u, ''), origin.endsWith('/') ? origin : `${origin}/`)));
-  const response = await fetch(url);
+  // PACKS-CDN PC3: ask for `br` only. The CDN's cache key ignores Accept-Encoding, so a request without `br` (Node's
+  // default over plain HTTP is `gzip, deflate`) would park a decoded copy at the edge that browsers then get
+  // re-compressed. Pinned here, not left to Node's default. `fetch` undoes `br` itself.
+  const response = await fetch(url, { headers: { 'accept-encoding': 'br' } });
   if (!response.ok) throw new Error(`Missing server input ${path}`);
   return new Uint8Array(await response.arrayBuffer());
 };

@@ -55,7 +55,7 @@ test('prefill changes only exact blank rows, is atomic, preserves filled values 
     expect(readFileSync(path, 'utf8')).toBe(original); expect(lstatSync(path).mode & 0o777).toBe(0o600);
     const inode = lstatSync(path).ino;
     args[4] = '--apply'; const applied = run(args); expect(applied.status, String(applied.stderr)).toBe(0);
-    const expected = original.replace('PACK_ORIGIN=\n', 'PACK_ORIGIN=https://wildshard-packs.wildshard.workers.dev\n').replace('RELEASE_PUBLIC_KEY=\n', `RELEASE_PUBLIC_KEY=${key}\n`);
+    const expected = original.replace('PACK_ORIGIN=\n', 'PACK_ORIGIN=https://packs.wildshard.io\n').replace('RELEASE_PUBLIC_KEY=\n', `RELEASE_PUBLIC_KEY=${key}\n`);
     expect(readFileSync(path, 'utf8')).toBe(expected); expect(lstatSync(path).ino).not.toBe(inode);
     expect(lstatSync(path).mode & 0o777).toBe(0o640);
     const appliedInode = lstatSync(path).ino;

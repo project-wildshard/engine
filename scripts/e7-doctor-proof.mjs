@@ -8,7 +8,7 @@ import {SOCKET_READY,SOCKET_RELIABLE,SOCKET_PING} from '../src/shared/engine/net
 
 const [base,build,key]=process.argv.slice(2),human=process.argv.includes('--human-static'),origin=new URL(base).origin;
 assert.equal(origin,human?'https://play.wildshard.io':'https://staging.wildshard.io');assert.match(build,/^[a-f0-9]{40}$/u);
-const channel=human?'production':'staging',releaseURL=`https://wildshard-packs.wildshard.workers.dev/releases/${channel}.json`;
+const channel=human?'production':'staging',releaseURL=`https://packs.wildshard.io/releases/${channel}.json`;
 /** @param {string|URL} url */
 async function read(url){const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,String(url));return response;}
 const version=await(await read(new URL('/version.json',base))).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,1);

@@ -130,12 +130,15 @@ client's `releasePublicKey` configuration. Key rotation requires a
 separate coordinated consumer change; replacing this secret alone fails
 when the stored object has the previous signature.
 
-Configure the existing public packs origin to serve these paths and
-allow the page's origin through CORS. ST27's page/pack producer must use
-the same full SHA as its `engineBuild` and supply the corresponding
-server pack book before a sitting can move. This CI job does not cook or
-publish packs, configure tunnels, change CORS, run setup, or prove the
-VPS transition. Those remain the E7 plan's external work.
+The public packs origin is `https://packs.wildshard.io`: the
+`wildshard-packs` R2 bucket on its custom domain, behind Cloudflare's
+CDN, with CORS for the page's origin set on the bucket. It serves these
+paths; the channel objects are `no-store` and never cached. ST27's
+page/pack producer must use the same full SHA as its `engineBuild` and
+supply the corresponding server pack book before a sitting can move.
+This CI job does not cook or publish packs, configure tunnels, change
+CORS, run setup, or prove the VPS transition. Those remain the E7
+plan's external work.
 
 For that coordinated page build, set `WS_BUILD_ID` to the full source SHA
 when invoking `scripts/build-app.mjs`; use the identical SHA with

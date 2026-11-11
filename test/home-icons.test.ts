@@ -30,8 +30,8 @@ const linkHref = (html: string, rel: string): string | undefined => new RegExp(`
 
 test('a world picks its channel: production release is production, any other world staging, none preview', () => {
   expect(homeIconChannel(undefined)).toBe('preview');
-  expect(homeIconChannel({ release: 'https://wildshard-packs.wildshard.workers.dev/releases/production.json' })).toBe('production');
-  expect(homeIconChannel({ release: 'https://wildshard-packs.wildshard.workers.dev/releases/staging.json' })).toBe('staging');
+  expect(homeIconChannel({ release: 'https://packs.wildshard.io/releases/production.json' })).toBe('production');
+  expect(homeIconChannel({ release: 'https://packs.wildshard.io/releases/staging.json' })).toBe('staging');
   expect(homeIconChannel({ release: 'http://127.0.0.1:18791/__release.json' })).toBe('staging');
   expect(homeIconChannel({ release: 'https://example.test/releases/production.json.bak' })).toBe('staging');
 });
