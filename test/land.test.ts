@@ -485,6 +485,26 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
   }, 60_000);
 
+  test('merged clocks carry only if hosted CI\'s shard planner still plans them, full and Ring 1 (J206 review)', () => {
+    for (const exit of [0, 1]) {
+      const f = fixture();
+      const wt = f.worktree('foo');
+      f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+      f.edit(wt, 'test/durations.json', '"test/t10.test.ts": 10', '"test/t10.test.ts": 100', 'test: record clocks');
+      // Main brings a planner (it only refuses when told to) with its own clocks.
+      const planner = f.peerScript('scripts/engine-ci-plan.ts', null, `process.exit(${String(exit)});`);
+      const clocks = f.peerScript('test/durations.json', ': 1,', ': 11,');
+      f.state({ once: { marker: join(f.root, 'once'), command: ['sh', '-c', `sh '${planner}' && sh '${clocks}'`] } });
+      const result = f.land(wt);
+      expect(result.status, result.stdout).toBe(0);
+      if (exit === 0) expect(result.stdout).toMatch(/carried\s+disjoint/u);
+      else {
+        expect(result.stdout).toContain("main and the plan both recorded clocks and the merged clocks don't plan (engine-ci-plan.ts exited 1)");
+        expect(f.read(f.files.receipts)).toMatch(/landed .*; exact; rounds 2; hosted reruns 1;/u);
+      }
+    }
+  }, 120_000);
+
   test('clocks beside a real harness change still rerun hosted CI after a rebase', () => {
     const f = fixture();
     const wt = f.worktree('foo');

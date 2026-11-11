@@ -65,6 +65,19 @@ export function parseArgs(argv){
  return options;
 }
 
+/** Run hosted CI's shard planners (full and Ring 1) on the rebased tree: '' when both plan, else why not.
+ * @param {string} cwd @returns {string} */
+export function planMergedClocks(cwd){
+ const planner=join(cwd,'scripts/engine-ci-plan.ts');
+ if(!existsSync(planner))return '';
+ const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GITHUB_')&&key!=='CI'));
+ for(const args of [[],['--ring=1']]){
+  const run=spawnSync(process.execPath,[planner,...args],{cwd,env,encoding:'utf8',timeout:120_000});
+  if(run.status!==0)return `the merged clocks don't plan (engine-ci-plan.ts${args.length===0?'':` ${args.join(' ')}`} exited ${String(run.status)})`;
+ }
+ return '';
+}
+
 /** Decide what a rebase must rerun. `tested` is the SHA hosted CI proved and `base`
  * the main commit it sat on; `head` is the rebased SHA on `main`.
  * @param {string} cwd @param {{tested:string,base:string,head:string,main:string}} range
@@ -79,6 +92,12 @@ export function classifyRebase(cwd,{tested,base,head,main}){
  // never forces a hosted rerun (coordinator, 2026-11-10: opus-ld6b's fa35c8b5 reran for clocks alone).
  const both=changedPaths(cwd,base,main).filter(path=>plan.has(path)&&!STAMPS.includes(path)&&!TIMING_RECORDS.includes(path));
  if(both.length>0)return {rule:'rerun',reason:`main and the plan both changed ${both.slice(0,5).join(', ')}${both.length>5?` and ${both.length-5} more`:''}`};
+ // Merged clocks change how hosted CI packs its shards, and its planner refuses a pack without headroom: each side can
+ // plan alone while the merge doesn't (J206 review). The planner is pure and takes a second, so it runs here.
+ if(changedPaths(cwd,base,main).some(path=>plan.has(path)&&TIMING_RECORDS.includes(path))){
+  const refused=planMergedClocks(cwd);
+  if(refused!=='')return {rule:'rerun',reason:`main and the plan both recorded clocks and ${refused}`};
+ }
  /** @type {ReturnType<typeof pushSelection>} */let selection;
  try{selection=pushSelection(`refs/heads/main ${head} refs/heads/main ${main}`,cwd,{timingRecords:true});}
  catch(error){return {rule:'rerun',reason:`cannot classify the rebased diff: ${error instanceof Error?error.message:String(error)}`};}

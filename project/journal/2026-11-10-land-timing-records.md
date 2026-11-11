@@ -13,3 +13,10 @@ and counts the records as data; the pre-push and CI selection are
 unchanged, so a push of new clocks still runs the full suite there. A real
 harness or config change beside the clocks still reruns hosted CI. Both
 sides have a real-git test in `test/land.test.ts`.
+
+J206 Codex review: merged clocks can change a verdict. Hosted CI's planner
+packs shards from the clocks and refuses a pack without headroom, so each
+side can plan alone while the merge doesn't. When main and the plan both
+recorded clocks, land now runs `engine-ci-plan.ts` (full and `--ring=1`,
+about a second each) on the rebased tree and reruns hosted CI if either
+refuses.
