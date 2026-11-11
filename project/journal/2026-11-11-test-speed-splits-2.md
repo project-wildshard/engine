@@ -31,3 +31,7 @@ ticks; none compares an absolute time.
 Registries: the new net-bots file is a CPU-exclusive native unit, Ring 2
 lists the four new files whose parents it lists, and the quest-verbs
 products split with the file.
+
+The six new files carry their first local clocks from the push gate's timing
+reporter (two of them also run in Ring 1); the parents keep their old,
+larger weights until hosted runs re-time them.
