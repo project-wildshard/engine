@@ -84,8 +84,11 @@ test('service units and health stub execute the exact checked runtime', () => {
   expect(checked.status).toBe(0);
   expect(checked.stdout).toContain('ExecStartPre=/proof/checked-node /lib/pull.mjs');
   expect(checked.stdout).toContain('ExecStart=/proof/checked-node /data/%i/current/main.mjs');
-  expect(checked.stdout).toContain('Environment=PLAYTEST_DIR=/data/logs');
-  expect(checked.stdout).toContain('ReadWritePaths=/data /data/logs');
+  expect(checked.stdout).toContain('Environment=PLAYTEST_DIR=/data/%i/logs');
+  expect(checked.stdout).toContain('ReadWritePaths=/data/%i\n');
+  // VH11: each channel runs as its own user and database role.
+  expect(checked.stdout).toContain('User=wildshard-%i'); expect(checked.stdout).toContain('Environment=PGUSER=wildshard_%i');
+  expect(checked.stdout).toContain('Environment=PACK_CACHE=/data/%i/packs');
   expect(checked.stdout).not.toContain('/usr/bin/node'); expect(checked.stdout).toContain('ExecStart=/proof/checked-node /lib/health-stub.mjs %i');
 });
 

@@ -44,9 +44,9 @@ install_beside() {
     if [ "$CHECK" = 1 ]; then say skip "$name: not beside this script"; return; fi
     say stop "$name must sit beside setup.sh"; exit 1
   fi
-  if cmp -s "$HERE/$name" "$LIB/$name"; then repair_metadata "$LIB/$name" "$mode" root:root; say ok "$LIB/$name"
+  if cmp -s "$HERE/$name" "$LIB/$name"; then repair_metadata "$LIB/$name" "$mode" root:wildshard; say ok "$LIB/$name"
   elif [ "$CHECK" = 1 ]; then say would "install $LIB/$name"
-  else say doing "install $LIB/$name"; install -D -m "$mode" -o root -g root "$HERE/$name" "$LIB/$name"; fi
+  else say doing "install $LIB/$name"; install -D -m "$mode" -o root -g wildshard "$HERE/$name" "$LIB/$name"; fi
 }
 pg() { runuser -u postgres -- psql --cluster "$PG_VERSION/main" -v ON_ERROR_STOP=1 -qtAc "$1"; }
 check_listeners() {
@@ -99,7 +99,7 @@ check_postgres() {
   if ! { [ "$(pg 'show server_version_num')" -ge 160000 ] && [ "$(pg 'show server_version_num')" -lt 170000 ] && [ "$(pg 'show config_file')" = "/etc/postgresql/$PG_VERSION/main/postgresql.conf" ] && [ -z "$(pg 'show listen_addresses')" ] && [ "$(pg 'select exists (select 1 from pg_settings where pending_restart)')" = f ]; }; then
     say stop 'PostgreSQL Phase 1 hardening is not active; nothing was restarted'; return 1
   fi
-  if [ "$(pg "select count(*) from pg_database where datname in ('saves_production','saves_staging')")" != 2 ] || [ "$(pg "select count(*) from pg_roles where rolname='wildshard'")" != 1 ]; then say stop 'Phase 1 role or saves databases missing'; return 1; fi
+  if [ "$(pg "select count(*) from pg_database where datname in ('saves_production','saves_staging')")" != 2 ] || [ "$(pg "select count(*) from pg_roles where rolname in ('wildshard_production','wildshard_staging')")" != 2 ]; then say stop 'Phase 1 channel roles or saves databases missing (VH11: rerun rebuild.sh)'; return 1; fi
   say ok 'PostgreSQL 16, local socket only, saves databases and role'
 }
 
@@ -111,6 +111,12 @@ for command in tailscale ss getent systemctl pg_lsclusters runuser curl; do
 done
 if ! check_node; then fail 'The server needs Node 24 or newer at /usr/bin/node'; fi
 if ! id wildshard >/dev/null 2>&1; then fail 'Phase 1 user wildshard is missing'; fi
+# VH11: each channel's own user, from Phase 1.
+declare -A CHANNEL_GID=()
+for channel in production staging; do
+  if ! id "wildshard-$channel" >/dev/null 2>&1; then fail "Phase 1 user wildshard-$channel is missing (VH11: rerun rebuild.sh)"; CHANNEL_GID[$channel]=-1
+  else CHANNEL_GID[$channel]=$(id -g "wildshard-$channel"); fi
+done
 RAYNOS_UID=$(id -u raynos 2>/dev/null) || { RAYNOS_UID=-1; fail 'Cannot identify the staged key owner raynos'; }
 WILDSHARD_GID=$(getent group wildshard | cut -d: -f3) || WILDSHARD_GID=
 if [ -z "$WILDSHARD_GID" ]; then fail 'Phase 1 group wildshard is missing'; fi
@@ -133,7 +139,7 @@ if ! "$NODE" "$HERE/setup-state.mjs" pin "$KEY_FILE" "$EXPECTED_RELEASE_PUBLIC_K
 
 for channel in production staging; do
   if [ -x "$ETC" ] && [ ! -e "$ETC/$channel.env" ] && [ ! -L "$ETC/$channel.env" ]; then say would "create $channel env with the verified pin and channel URLs"
-  elif ! "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --check 0 "$WILDSHARD_GID"; then fail "Cannot safely inspect $channel env"; fi
+  elif ! "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --check 0 "${CHANNEL_GID[$channel]}"; then fail "Cannot safely inspect $channel env"; fi
 done
 if [ -x "$ETC" ]; then
   if [ ! -f "$ETC/ops.env" ] || [ -L "$ETC/ops.env" ]; then fail 'Phase 1 regular ops.env missing'; fi
@@ -151,16 +157,26 @@ if [ "$ERRORS" != 0 ]; then say stop 'Phase 2 preflight refused; no files or ser
 
 # --- Only our roots and our units below this point. Phase 1 owns everything else.
 install -d -m 750 -o root -g wildshard "$ETC"
-install -d -m 755 -o root -g root "$LIB"
-install -d -m 750 -o wildshard -g wildshard "$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$LOGS"
-for name in pull.mjs dump.sh restore-check.sh uptime.sh setup-state.mjs health-stub.mjs; do install_beside "$name" 755; done
+# VH12: nothing in /etc/wildshard is world-readable; the channels reach lib through the wildshard group.
+install -d -m 750 -o root -g wildshard "$LIB"
+install -d -m 750 -o wildshard -g wildshard "$HOME_DIR" "$HOME_DIR/packs" "$LOGS"
+# VH11: each channel's folder, its bundles, its pack cache and its logs are its own user's. A box from before VH11 has them
+# under wildshard, and they change hands once, with everything in them.
+for channel in production staging; do
+  if [ "$(stat -c %U "$HOME_DIR/$channel" 2>/dev/null)" = wildshard ]; then say doing "hand $HOME_DIR/$channel to wildshard-$channel"; chown -R "wildshard-$channel:wildshard-$channel" "$HOME_DIR/$channel"; fi
+  install -d -m 750 -o "wildshard-$channel" -g "wildshard-$channel" "$HOME_DIR/$channel" "$HOME_DIR/$channel/bundles" "$HOME_DIR/$channel/packs" "$HOME_DIR/$channel/logs"
+done
+# The dump reads saves_production, so it runs as production's user and keeps its files.
+if [ "$(stat -c %U "$HOME_DIR/dumps" 2>/dev/null)" = wildshard ]; then chown -R wildshard-production:wildshard-production "$HOME_DIR/dumps"; fi
+install -d -m 750 -o wildshard-production -g wildshard-production "$HOME_DIR/dumps"
+for name in pull.mjs dump.sh restore-check.sh uptime.sh setup-state.mjs health-stub.mjs; do install_beside "$name" 750; done
 
 env_file() {
   local channel=$1 port=$2 workers=$3 seats=$4 path="$ETC/$1.env"
-  if [ -f "$path" ]; then repair_metadata "$path" 640 root:wildshard; say ok "$path"; return; fi
+  if [ -f "$path" ]; then repair_metadata "$path" 640 "root:wildshard-$channel"; say ok "$path"; return; fi
   if [ "$CHECK" = 1 ]; then say would "write $path"; return; fi
   say doing "write $path"
-  if put "$path" 640 root:wildshard <<EOF
+  if put "$path" 640 "root:wildshard-$channel" <<EOF
 # E7.2: the $channel server. Phase 2 fills only exact blank rows from verified defaults.
 # The R2 folder of \`assets/spawn/server-<build>.json\` (E7.3f)
 PACK_ORIGIN=
@@ -188,7 +204,7 @@ EOF
 env_file production "$PROD_PORT" 4 32
 env_file staging "$STAGING_PORT" 2 16
 for channel in production staging; do
-  "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --apply 0 "$WILDSHARD_GID"
+  "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --apply 0 "${CHANNEL_GID[$channel]}"
 done
 # The Phase 1 private backup credentials are left byte-for-byte alone.
 if [ ! -f "$ETC/ops.env" ]; then say stop 'Phase 1 ops.env missing'; exit 1; fi
@@ -204,12 +220,16 @@ Wants=network-online.target postgresql.service
 StartLimitIntervalSec=0
 
 [Service]
-User=wildshard
-Group=wildshard
+# VH11: its own user, mapped to its own database role; it cannot open the other channel's saves.
+User=wildshard-%i
+Group=wildshard-%i
+SupplementaryGroups=wildshard
+Environment=PGUSER=wildshard_%i
 Environment=WILDSHARD_HOME=$HOME_DIR/%i
+Environment=PACK_CACHE=$HOME_DIR/%i/packs
 Environment=RELEASE_CHANNEL=%i
 Environment=PULL_SCRIPT=$LIB/pull.mjs
-Environment=PLAYTEST_DIR=$LOGS
+Environment=PLAYTEST_DIR=$HOME_DIR/%i/logs
 # VH10: Funnel (and later Caddy) set one X-Forwarded-For hop and pass CF-Connecting-IP through, so trust only the last XFF hop.
 # Only a browser on these pages may open a socket. An env-file line overrides either.
 Environment=TRUST_PROXY=caddy
@@ -227,7 +247,7 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=$HOME_DIR $LOGS
+ReadWritePaths=$HOME_DIR/%i
 
 [Install]
 WantedBy=multi-user.target
@@ -247,9 +267,11 @@ After=postgresql.service
 
 [Service]
 Type=oneshot
-User=wildshard
-Group=wildshard
+User=wildshard-production
+Group=wildshard-production
+SupplementaryGroups=wildshard
 EnvironmentFile=$ETC/ops.env
+Environment=PGUSER=wildshard_production
 Environment=DUMP_DIR=$HOME_DIR/dumps
 ExecStart=$LIB/dump.sh
 AllowedCPUs=13-15
@@ -300,8 +322,9 @@ OnSuccess=wildshard-server@%i.service
 StartLimitIntervalSec=0
 [Service]
 Type=oneshot
-User=wildshard
-Group=wildshard
+User=wildshard-%i
+Group=wildshard-%i
+SupplementaryGroups=wildshard
 Environment=WILDSHARD_HOME=$HOME_DIR/%i
 Environment=RELEASE_CHANNEL=%i
 EnvironmentFile=$ETC/%i.env
@@ -311,7 +334,7 @@ TimeoutStartSec=300
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=$HOME_DIR
+ReadWritePaths=$HOME_DIR/%i
 EOF
 unit wildshard-pull@.timer <<'EOF'
 [Unit]
@@ -328,8 +351,9 @@ unit wildshard-health@.service <<EOF
 Description=Wildshard waiting health stub, %i
 After=network-online.target
 [Service]
-User=wildshard
-Group=wildshard
+User=wildshard-%i
+Group=wildshard-%i
+SupplementaryGroups=wildshard
 EnvironmentFile=$ETC/%i.env
 ExecStart=$NODE $LIB/health-stub.mjs %i
 NoNewPrivileges=yes

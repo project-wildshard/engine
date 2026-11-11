@@ -155,7 +155,7 @@ apt_source tailscale "https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg
 apt_source caddy https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
   'deb [signed-by=/usr/share/keyrings/caddy.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main'
 
-PACKAGES=(nodejs "postgresql-$PG_VERSION" "postgresql-client-$PG_VERSION" rclone tailscale)
+PACKAGES=(nodejs "postgresql-$PG_VERSION" "postgresql-client-$PG_VERSION" rclone tailscale age)
 have_packages() { [ -z "$(missing "${PACKAGES[@]}")" ]; }
 # shellcheck disable=SC2046 # One word a package.
 make_packages() { apt_update; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $(missing "${PACKAGES[@]}"); }
@@ -214,14 +214,24 @@ fi
 have_user() { id wildshard >/dev/null 2>&1 && getent group wildshard >/dev/null; }
 make_user() { useradd --system --user-group --home-dir "$HOME_DIR" --shell /usr/sbin/nologin wildshard; }
 step 'user wildshard' have_user make_user
+# VPS-HARDENING VH11: each channel runs as its own user, so a staging bug cannot reach production's saves. Both are in the
+# wildshard group, which only lets them into the shared roots.
+have_channel_user() { id "wildshard-$CHANNEL" >/dev/null 2>&1 && id -nG "wildshard-$CHANNEL" | tr ' ' '\n' | grep -qx wildshard; }
+make_channel_user() {
+  if id "wildshard-$CHANNEL" >/dev/null 2>&1; then usermod -aG wildshard "wildshard-$CHANNEL"
+  else useradd --system --user-group --groups wildshard --home-dir "$HOME_DIR/$CHANNEL" --shell /usr/sbin/nologin "wildshard-$CHANNEL"; fi
+}
+for CHANNEL in production staging; do step "user wildshard-$CHANNEL" have_channel_user make_channel_user; done
 FOLDERS=("$HOME_DIR" "$HOME_DIR/production" "$HOME_DIR/production/bundles" "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/packs" "$HOME_DIR/dumps" "$HOME_DIR/logs")
 have_folders() {
   local path
-  for path in "${FOLDERS[@]}"; do [ -d "$path" ] && metadata_ok "$path" 750 wildshard:wildshard || return 1; done
-  [ -d "$ETC" ] && metadata_ok "$ETC" 750 root:wildshard
+  for path in "${FOLDERS[@]}"; do [ -d "$path" ] || return 1; done
+  metadata_ok "$HOME_DIR" 750 wildshard:wildshard && [ -d "$ETC" ] && metadata_ok "$ETC" 750 root:wildshard
 }
+# The channel folders' owners are Phase 2's (setup.sh, VH11); this only makes them.
 make_folders() {
-  install -d -m 750 -o wildshard -g wildshard "${FOLDERS[@]}"
+  install -d -m 750 -o wildshard -g wildshard "$HOME_DIR"
+  local path; for path in "${FOLDERS[@]}"; do [ -d "$path" ] || install -d -m 750 -o wildshard -g wildshard "$path"; done
   install -d -m 750 -o root -g wildshard "$ETC"
 }
 step 'folders' have_folders make_folders
@@ -248,16 +258,53 @@ EOF
       say doing "restart postgresql@$PG_VERSION-main"; systemctl restart "postgresql@$PG_VERSION-main.service"
     fi
     systemctl enable --quiet postgresql.service
-    have_role() { [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; }
-    make_role() { pg 'create role wildshard login'; }
+    # VH11: one login role per channel, owning its one database; nobody else may connect to it. OS user wildshard-<channel>
+    # maps to role wildshard_<channel> by peer and pg_ident, over the local socket only.
     have_db() { [ "$(pg "select 1 from pg_database where datname = '$1'")" = 1 ]; }
-    have_production() { have_db saves_production; }
-    have_staging() { have_db saves_staging; }
-    make_production() { runuser -u postgres -- createdb --cluster "$PG_VERSION/main" -O wildshard saves_production; }
-    make_staging() { runuser -u postgres -- createdb --cluster "$PG_VERSION/main" -O wildshard saves_staging; }
-    step 'postgres role wildshard' have_role make_role
-    step 'database saves_production' have_production make_production
-    step 'database saves_staging' have_staging make_staging
+    # step() takes names, so these read the loop's CHANNEL, ROLE and DB.
+    have_role() { [ "$(pg "select 1 from pg_roles where rolname = '$ROLE'")" = 1 ]; }
+    make_role() { pg "create role $ROLE login"; }
+    have_channel_db() {
+      have_db "$DB" && [ "$(pg "select pg_get_userbyid(datdba) from pg_database where datname = '$DB'")" = "$ROLE" ] \
+        && [ "$(pg "select has_database_privilege('public', '$DB', 'CONNECT')")" = f ]
+    }
+    # A box from before VH11 has its database under the one shared role: hand it, and every object in it, to the channel's.
+    make_channel_db() {
+      if ! have_db "$DB"; then runuser -u postgres -- createdb --cluster "$PG_VERSION/main" -O "$ROLE" "$DB"; fi
+      pg "alter database $DB owner to $ROLE"
+      if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
+        runuser -u postgres -- psql --cluster "$PG_VERSION/main" -v ON_ERROR_STOP=1 -qtAc "reassign owned by wildshard to $ROLE" "$DB"
+      fi
+      pg "revoke connect, temporary on database $DB from public"
+    }
+    for CHANNEL in production staging; do
+      ROLE=wildshard_$CHANNEL DB=saves_$CHANNEL
+      step "postgres role $ROLE" have_role make_role
+      step "database $DB, owned by $ROLE alone" have_channel_db make_channel_db
+    done
+    # The shared role from before VH11 goes once it owns nothing.
+    if [ "$(pg "select 1 from pg_roles where rolname = 'wildshard'")" = 1 ]; then
+      say doing 'drop the shared role wildshard (VH11)'
+      for DB in saves_production saves_staging; do runuser -u postgres -- psql --cluster "$PG_VERSION/main" -qtAc 'drop owned by wildshard' "$DB"; done
+      pg 'drop role wildshard'
+    fi
+    if put "/etc/postgresql/$PG_VERSION/main/pg_ident.conf" 640 postgres:postgres <<'EOF'
+# VPS-HARDENING VH11: each channel's OS user is its database role.
+# MAPNAME   SYSTEM-USERNAME        PG-USERNAME
+wildshard   wildshard-production   wildshard_production
+wildshard   wildshard-staging      wildshard_staging
+EOF
+    then PG_RELOAD=1; fi
+    if put "/etc/postgresql/$PG_VERSION/main/pg_hba.conf" 640 postgres:postgres <<'EOF'
+# VPS-HARDENING VH11: the local socket only, by peer. postgres administers; each channel reaches its own saves; nothing else.
+# TYPE  DATABASE          USER                   METHOD
+local   all               postgres               peer
+local   saves_production  wildshard_production   peer map=wildshard
+local   saves_staging     wildshard_staging      peer map=wildshard
+local   all               all                    reject
+EOF
+    then PG_RELOAD=1; fi
+    if [ "${PG_RELOAD:-0}" = 1 ]; then say doing "reload postgresql@$PG_VERSION-main"; systemctl reload "postgresql@$PG_VERSION-main.service"; fi
   else say would 'check the role and both saves databases'; fi
 fi
 
@@ -269,6 +316,8 @@ elif put_once "$ETC/ops.env" 600 root:root <<'EOF'
 ALERT_URL=
 # J252: the wildshard-server project's Sentry DSN, so the dump checks in to the Crons monitor wildshard-dump. Blank skips it.
 SENTRY_CRON_DSN=
+# VH13: the age public key the dump is encrypted to. Its private half stays off the box. Blank leaves the dump unencrypted.
+AGE_RECIPIENT=
 # The private bucket, for example r2:wildshard-backups. Blank keeps dumps local.
 BACKUP_REMOTE=
 RCLONE_CONFIG_R2_TYPE=s3
@@ -317,7 +366,7 @@ have_cook_folders() { local path; for path in "${COOK_FOLDERS[@]}"; do [ -d "$pa
 make_cook_folders() { install -d -m 750 -o wildshard-cook -g wildshard-cook "${COOK_FOLDERS[@]}"; }
 step 'cook folders' have_cook_folders make_cook_folders
 if [ "$(id -u)" != 0 ] && [ -d "$ETC" ] && [ ! -x "$ETC" ]; then say 'cannot verify' "$COOK_ENV (needs sudo)"
-elif put_once "$COOK_ENV" 640 root:wildshard-cook <<'EOF'
+elif put_once "$COOK_ENV" 600 root:root <<'EOF'
 # C4: the cook worker. It starts once the rows below are filled; then run rebuild.sh again.
 # The engine tag it runs, and that build's id: the same build production serves (its version.json `build`).
 COOK_ENGINE_REF=

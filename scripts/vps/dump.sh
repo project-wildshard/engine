@@ -4,10 +4,13 @@
 # J252: it also checks in to the Sentry Crons monitor `wildshard-dump` (wildshard-server project), on start and on
 # finish, so a run that fails or never starts shows red to the agents' hourly read. SENTRY_CRON_DSN is that project's
 # DSN, from /etc/wildshard/ops.env; blank skips it. A check-in that fails never fails the dump.
-#   DUMP_DIR=... [DUMP_DATABASE=...] [BACKUP_REMOTE=r2:wildshard-backups] [ALERT_URL=...] [SENTRY_CRON_DSN=...] dump.sh
+# VPS-HARDENING VH13: with AGE_RECIPIENT set (ops.env), the dump is encrypted to that age public key before it touches disk,
+# and only the `.dump.age` file is kept and uploaded. The private key lives off the box (Jake's Mac); restore-check.sh takes it.
+#   DUMP_DIR=... [DUMP_DATABASE=...] [BACKUP_REMOTE=r2:wildshard-backups] [AGE_RECIPIENT=age1...] [SENTRY_CRON_DSN=...] dump.sh
 set -euo pipefail
 
 DIR=${DUMP_DIR:-/var/lib/wildshard/dumps} DATABASE=${DUMP_DATABASE:-saves_production} REMOTE=${BACKUP_REMOTE:-} ALERT_URL=${ALERT_URL:-}
+RECIPIENT=${AGE_RECIPIENT:-}
 KEEP_DAYS=7
 
 # https://<key>@<host>/<project> -> https://<host>/api/<project>/cron/wildshard-dump/<key>/
@@ -20,6 +23,7 @@ checkin() {
 
 umask 077
 NAME="$DATABASE-$(date -u +%Y-%m-%dT%H%M%SZ).dump" STARTED=$(date +%s)
+if [ -n "$RECIPIENT" ]; then NAME="$NAME.age"; fi
 failed() {
   echo 'dump: failed'
   rm -f "$DIR/$NAME.part"
@@ -29,9 +33,13 @@ failed() {
 trap failed ERR
 checkin in_progress
 
-pg_dump --format=custom --file="$DIR/$NAME.part" "$DATABASE"
+if [ -n "$RECIPIENT" ]; then
+  pg_dump --format=custom "$DATABASE" | age -r "$RECIPIENT" -o "$DIR/$NAME.part"
+else
+  pg_dump --format=custom --file="$DIR/$NAME.part" "$DATABASE"
+fi
 mv "$DIR/$NAME.part" "$DIR/$NAME"
-find "$DIR" -name "$DATABASE-*.dump" -mtime +$((KEEP_DAYS - 1)) -delete
+find "$DIR" \( -name "$DATABASE-*.dump" -o -name "$DATABASE-*.dump.age" \) -mtime +$((KEEP_DAYS - 1)) -delete
 if [ -n "$REMOTE" ]; then
   rclone copyto "$DIR/$NAME" "$REMOTE/$NAME"
   rclone delete --min-age "${KEEP_DAYS}d" "$REMOTE"
