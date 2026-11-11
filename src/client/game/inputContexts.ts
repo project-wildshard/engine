@@ -12,9 +12,11 @@ const slots = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 const slotKeys = Object.fromEntries(slots.map((slot) => [`swap.slot.${slot}`, [`Digit${slot}`]]));
 export const INPUT_CONTEXTS: readonly InputContextDef[] = [
   { id: 'onFoot', actions: [...movement, 'jump', 'sprint', 'dodge', 'use', 'swap', 'swap.next', 'swap.prev',
-      ...slots.map((slot): Action => `swap.slot.${slot}`), 'lock', 'pause', 'bag', 'map', 'journal', 'note', 'quickNote', 'hover', 'help'],
+      ...slots.map((slot): Action => `swap.slot.${slot}`), 'lock', 'pause', 'bag', 'map', 'journal', 'note', 'quickNote', 'hover', 'help', 'voice.talk'],
     keys: { ...footMoveKeys, ...slotKeys, jump: ['Space'], sprint: ['ShiftLeft', 'ShiftRight'],
-      dodge: ['KeyV', 'AltLeft'], use: ['KeyE'], swap: ['KeyQ'], lock: ['Mouse1', 'KeyZ'], pause: ['Escape'], bag: ['KeyI', 'Tab'], map: ['KeyM'], journal: ['KeyJ'], note: ['KeyN'], quickNote: ['F8'], hover: ['KeyH'], help: ['F1', 'Slash'] } },
+      dodge: ['KeyV', 'AltLeft'], use: ['KeyE'], swap: ['KeyQ'], lock: ['Mouse1', 'KeyZ'], pause: ['Escape'], bag: ['KeyI', 'Tab'], map: ['KeyM'], journal: ['KeyJ'], note: ['KeyN'], quickNote: ['F8'], hover: ['KeyH'], help: ['F1', 'Slash'],
+      // VOICE-POLISH V11: voice chat's talk key (src/client/host/online/voiceUi.ts reads it); nothing else binds B
+      'voice.talk': ['KeyB'] } },
   { id: 'weapon.melee', actions: ['attack', 'heavy', 'lock'], keys: { attack: ['Mouse0', 'KeyF'], heavy: ['Mouse2'] }, touch: { mode: 'melee', lockable: true, relabel: { r0: { label: engineString('s_852b889c1d23'), tone: 'rest' } } } },
   { id: 'weapon.ranged', actions: ['attack', 'aim', 'reload'], keys: { attack: ['Mouse0', 'KeyF'], aim: ['Mouse2'], reload: ['KeyR'] }, touch: { mode: 'ranged', lockable: false, relabel: { r0: { label: engineString('s_8c1280a20004'), tone: 'rest' }, aim: { label: engineString('s_3c421fac5f36'), tone: 'rest' } } } },
   { id: 'weapon.bow', actions: ['attack', 'aim'], keys: { attack: ['Mouse0'], aim: ['Mouse2'] }, touch: { mode: 'bow', lockable: false, relabel: { r0: { label: engineString('s_8c1280a20004'), tone: 'rest' }, aim: { label: engineString('s_3c421fac5f36'), tone: 'rest' } } } },
