@@ -1,9 +1,9 @@
 import type { ChatReport } from '@wildshard/engine/net/chat';
 import { migrate } from './saves/migrate';
 import { openPg } from './saves/pgDatabase';
-import { healSave, lastCell, placeOf, readSave, recoveryReceipts, SaveQuarantinedError, writeSave, type SaveWrite } from './saves/saveStore';
+import { healSave, lastCell, placeOf, readSave, recoveryReceipts, SaveQuarantinedError, within, writeSave, type SaveWrite } from './saves/saveStore';
 import { SaveWriteQueue } from './saves/writeQueue';
-import { claimName } from './saves/names';
+import { claimName, CLAIM_MS } from './saves/names';
 import { ReportWriteQueue, type ReportWrite } from './saves/reportQueue';
 import type { Database } from './saves/database';
 import type { PlayerSaves, SavedPlayer } from './world';
@@ -13,6 +13,19 @@ const WRITE_REPORT = 'insert into chat_report (reporter, speaker, name, channel,
 
 async function writeReport(db: Database, { id, report, shard }: ReportWrite): Promise<void> {
   await db.query(WRITE_REPORT, [report.reporter, report.speaker, report.name, report.channel, report.typed, report.shown, shard, report.tick, id]);
+}
+/**
+ * MP2.4: one device's claims run one after another, each waiting for the last to finish in the database even when the door stopped
+ * waiting for it, so a claim that timed out can never change the reservation under a later one.
+ */
+function namesOver(db: Database): (device: string, name: string) => Promise<string> {
+  const running = new Map<string, Promise<unknown>>();
+  return (device, name) => {
+    const work = (running.get(device) ?? Promise.resolve()).catch(() => undefined).then(() => claimName(db, device, name));
+    running.set(device, work);
+    void work.catch(() => undefined).finally(() => { if (running.get(device) === work) running.delete(device); });
+    return within(CLAIM_MS, () => work);
+  };
 }
 /** The world's saves over a database, in one save epoch. A read waits for a write on its way, so a quick rejoin never loads the save before last. */
 export function playerSavesOver(db: Database, epoch: number, log: (line: Record<string, unknown>) => void): PlayerSaves & { readonly queue: SaveWriteQueue; readonly reports: ReportWriteQueue } {
@@ -30,7 +43,7 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
       return { doc, seq: saved?.seq ?? 0, recovery, ...(previous === undefined ? {} : { previous: { doc: previous, recovery: receipts.filter(row => row.serial > previous.ledger.serial) } }) };
     },
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),
-    name: (device, name) => claimName(db, device, name),
+    name: namesOver(db),
     report: (report: ChatReport, shard: string) => { const accepted = reports.post(report, shard); if (!accepted) log({ at: 'report.refused', reason: 'backlog' }); return accepted; } };
 }
 /** The saves database at `url`, migrated. */

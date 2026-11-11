@@ -138,6 +138,8 @@ export class World {
   private readonly pending = new Map<string, PendingSeat>();
   /** Who has a body, by link or by hold, and in which cell. */
   private readonly seated = new Map<string, string>();
+  /** MP2.4: the Name each body was seated with, which a held body keeps when its player comes back. */
+  private readonly names = new Map<string, string>();
   private readonly finds = new Map<number, (found: { held: boolean; spawn: ResumeAt }) => void>();
   private readonly drains = new Map<number, () => void>();
   private asked = 0;
@@ -168,7 +170,7 @@ export class World {
   }
   private heard(index: number, news: WorkerNews): void {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
-    else if (news.kind === 'left') this.seated.delete(news.device);
+    else if (news.kind === 'left') { this.seated.delete(news.device); this.names.delete(news.device); }
     else if (news.kind === 'refused') this.refuse(news.reason);
     else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);
     else if (news.kind === 'save') this.options.saves.write(news.write);
@@ -265,13 +267,11 @@ export class World {
     if (hello.minor !== WIRE_MINOR && Math.abs(hello.minor - WIRE_MINOR) > 1) { this.refuse('stale-build'); end.close(hello.minor > WIRE_MINOR ? 'retry' : 'reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
-    const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options;
-    // MP2.4: the Name everyone reads is the claimed one, never the hello's, so a refused or duplicate Name reaches no client.
-    const name = saves.name === undefined ? typed : await saves.name(device, typed);
-    if (!end.isOpen || this.draining) return;
-    const holding = this.seated.get(device);
+    const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
     if (holding !== undefined) {
-      const found = await this.ask(holding, device, end);
+      // MP2.4: a body the room holds keeps the Name it was seated with; a new Name is claimed on the next fresh join, never here,
+      // so the reservation and what everyone reads can't part.
+      const found = await this.ask(holding, device, end), name = this.names.get(device) ?? typed;
       if (found.held && this.quits.has(end)) { this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
       if (!end.isOpen || this.draining) return;
       if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
@@ -281,6 +281,9 @@ export class World {
     if (this.taken >= this.options.seats) { this.refuse('full'); end.close('full'); return; }
     this.pending.set(device, { end });
     end.onClose(() => { if (this.pending.get(device)?.end === end) this.pending.delete(device); });
+    // MP2.4: the Name everyone reads is the claimed one, never the hello's, so a refused or duplicate Name reaches no client.
+    const name = saves.name === undefined ? typed : await saves.name(device, typed);
+    if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const last = await saves.where(device);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const slug = this.cellFor(last), saved = await saves.read(device, cellShard(slug));
@@ -308,7 +311,7 @@ export class World {
   private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer): void {
     if (!end.isOpen || this.draining) return;
     const { port1, port2 } = new MessageChannel();
-    this.seated.set(entry.device, slug);
+    this.seated.set(entry.device, slug); this.names.set(entry.device, entry.name);
     if(this.options.playtest!==undefined){
       const off=end.onControl((control,bytes)=>{
         if(control!=='playtest')return;

@@ -48,6 +48,26 @@ test('two claims at once never share a tag', async () => {
   expect(new Set(shown).size).toBe(12);
 });
 
+test('one device\'s claims run in turn: two at once agree, and a claim that timed out can\'t move the Name under the next', { timeout: 30_000 }, async () => {
+  const db = await fresh(), saves = playerSavesOver(db, 0, () => undefined), name = saves.name;
+  if (name === undefined) throw new Error('The database saves claim Names');
+  const [first, second] = await Promise.all([name('device:a', 'Ann'), name('device:a', 'Ann')]);
+  expect(second).toBe(first);
+  const row = async (device: string): Promise<unknown> => (await db.query('select name, tag from player where id = $1', [device])).rows[0];
+  expect(await row('device:a')).toEqual({ name: 'Ann', tag: tagOf(first) });
+  // A database that takes 3.5 s over one claim: the door stops waiting at 3 s, and the claim still lands after.
+  let slow = true;
+  const sluggish: Database = { ...db, query: async (text, params) => {
+    if (slow && text.startsWith('insert into player (id, name, tag)')) { slow = false; await new Promise(resolve => { setTimeout(resolve, 3500); }); }
+    return await db.query(text, params);
+  } };
+  const late = playerSavesOver(sluggish, 0, () => undefined).name;
+  if (late === undefined) throw new Error('The database saves claim Names');
+  await expect(late('device:b', 'Bea'), 'the door gives up').rejects.toThrow(/over 3000 ms/u);
+  const retried = await late('device:b', 'Bea');
+  expect(await row('device:b'), 'the retry waited for the claim it replaces, so the Name it shows is the one held').toEqual({ name: 'Bea', tag: tagOf(retried) });
+});
+
 test('a Name with a listed word is refused whole, never starred', () => {
   expect(cleanName('Sh1t Lord')).toBe('Guest');
   expect(cleanName('  Lord  of\u0007Ash ')).toBe('Lord of Ash');
@@ -76,4 +96,28 @@ test('on the one world, two players called Ann read as two, and a refused Name r
   const room = bench.room(SHARD);
   expect(room?.bodyOf('device:rude')?.netName, 'and so does its body').toMatch(/^Guest#\d{4}$/u);
   expect(new Set(['device:a', 'device:b', 'device:rude'].map(device => room?.bodyOf(device)?.netName)), 'bodies read as their lines do').toEqual(new Set(names));
+});
+
+test('a held body keeps the Name it was seated with; a new Name is claimed on the next fresh join', { timeout: 60_000 }, async () => {
+  const db = await fresh();
+  bench = await roomBench({ saves: playerSavesOver(db, 0, () => undefined), holdMs: 50 });
+  const heard: NetChat[] = [];
+  const join = async (device: string, name: string): Promise<RoomBot> => {
+    const bot = new RoomBot(bench?.url ?? '', 'bench', device, name); bots.push(bot);
+    expect(await bot.arrived()).toBe(true);
+    return bot;
+  };
+  const listener = await join('device:ear', 'Ear');
+  listener.client.onChat(line => { heard.push(line); });
+  const first = await join('device:a', 'Ann'), ann = bench.room(SHARD)?.bodyOf('device:a')?.netName ?? '';
+  expect(ann).toMatch(/^Ann#\d{4}$/u);
+  const again = await join('device:a', 'Bea');
+  expect(await first.ended(), 'the second tab takes the seat').toBe('replaced');
+  again.client.say('room', 'still me');
+  await vi.waitFor(() => { expect(heard.map(line => line.name)).toEqual([ann]); }, { timeout: 5000, interval: 20 });
+  expect((await db.query('select name, tag from player where id = $1', ['device:a'])).rows, 'the reservation stands while its body does').toEqual([{ name: 'Ann', tag: tagOf(ann) }]);
+  again.drop();
+  await vi.waitFor(() => { expect(bench?.world.health().players).toBe(1); }, { timeout: 10_000, interval: 20 });
+  await join('device:a', 'Bea');
+  expect(bench.room(SHARD)?.bodyOf('device:a')?.netName).toMatch(/^Bea#\d{4}$/u);
 });

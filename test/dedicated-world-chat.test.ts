@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { NetChat } from '../src/shared/engine/net/chatWire';
 import type { ChatReport } from '../src/server/engine/net/chat';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
+import { cellName } from '../src/server/host/dedicated/gridCells';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
@@ -12,13 +13,13 @@ let bench: RoomBench | undefined;
 const bots: RoomBot[] = [];
 afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await bench?.close(); bench = undefined; });
 
-async function world(workers: number): Promise<{ here: RoomBot; there: RoomBot; heardHere: NetChat[]; heardThere: NetChat[]; reports: ChatReport[] }> {
+async function world(workers: number, cells: readonly [string, string] = [SHARD, OTHER]): Promise<{ here: RoomBot; there: RoomBot; heardHere: NetChat[]; heardThere: NetChat[]; reports: ChatReport[] }> {
   const saves = memoryPlayerSaves(), reports: ChatReport[] = [];
-  saves.write({ player: 'device:there', name: 'There', shard: OTHER, build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
-  bench = await roomBench({ cells: [SHARD, OTHER], workers, saves: { ...saves, report: report => { reports.push(report); return true; } } });
+  saves.write({ player: 'device:there', name: 'There', shard: cells[1], cell: cells[1], build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells, workers, saves: { ...saves, report: report => { reports.push(report); return true; } } });
   const join = async (device: string, name: string): Promise<RoomBot> => { const made = new RoomBot(bench?.url ?? '', 'bench', device, name); bots.push(made); expect(await made.arrived()).toBe(true); return made; };
   const here = await join('device:here', 'Ann'), there = await join('device:there', 'Ben'), heardHere: NetChat[] = [], heardThere: NetChat[] = [];
-  expect(JSON.parse(there.resume ?? '{}')).toMatchObject({ shard: OTHER });
+  expect(JSON.parse(there.resume ?? '{}')).toMatchObject({ cell: cells[1] });
   here.client.onChat(line => { heardHere.push(line); }); there.client.onChat(line => { heardThere.push(line); });
   return { here, there, heardHere, heardThere, reports };
 }
@@ -36,6 +37,18 @@ test('a room line reaches the other cell within a second, across two workers, an
   await vi.waitFor(() => { expect(heardHere.map(line => line.text)).toEqual(['hello world', 'hi back']); }, { timeout: 1000, interval: 5 });
   await new Promise(resolve => { setTimeout(resolve, 200); });
   expect(heardHere.map(line => line.text), 'a proximity line never leaves its cell').toEqual(['hello world', 'hi back']);
+});
+
+test('two cells on one worker: the worker gives the line to its other cell, and not back to the one that said it', { timeout: 60_000 }, async () => {
+  // Open plots are named by no row of the table, so with one worker they share it.
+  const cells = [cellName('open-plot-night-market'), cellName('open-plot-thin-ice')] as const;
+  const { here, heardHere, heardThere } = await world(1, cells);
+  expect(bench?.world.health()).toMatchObject({ cells: 2, workers: 1, awake: 2, table: { [cells[0]]: 0, [cells[1]]: 0 } });
+  here.client.say('room', 'same thread');
+  await vi.waitFor(() => { expect(heardThere.map(line => [line.name, line.text])).toEqual([['Ann', 'same thread']]); }, { timeout: 1000, interval: 5 });
+  await vi.waitFor(() => { expect(heardHere.map(line => line.text)).toEqual(['same thread']); }, { timeout: 1000, interval: 5 });
+  await new Promise(resolve => { setTimeout(resolve, 200); });
+  expect(heardHere.map(line => line.text), 'once').toEqual(['same thread']);
 });
 
 test('a line from another cell can be reported, with what was typed, and the filter ran where it was said', { timeout: 60_000 }, async () => {
