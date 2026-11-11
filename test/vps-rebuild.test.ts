@@ -2,6 +2,8 @@
 // throwaway box (scripts/vps-rebuild-proof.sh), never here and never on the VPS.
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the script without invoking its root entry.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- The md5 dpkg records for a conffile.
+import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Checkout-relative test files, never privileged paths.
 import { join, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Isolated checks run bash functions with fake paths.
@@ -95,16 +97,32 @@ test('the cook worker keeps off the game ports and runs each job without a netwo
   expect(readFileSync('scripts/cook-worker.mjs', 'utf8')).toContain('env.COOK_PORT ?? 8792');
 });
 
-test('Caddy is never started by the rebuild, and a VH9 file is left alone', () => {
-  const root = scratch(), caddyfile = join(root, 'Caddyfile');
+test('Caddy is never started by the rebuild, and only the package file or its own placeholder is replaced', () => {
+  const root = scratch(), caddyfile = join(root, 'Caddyfile'), shipped = ':80 {\n\troot * /usr/share/caddy\n\tfile_server\n}\n';
+  const md5 = createHash('md5').update(shipped).digest('hex');
+  const placeholder = /^CADDY_PLACEHOLDER="([^"]+)"$/mu.exec(source)?.[1];
+  expect(placeholder).toContain('port 443 opens by Jake');
   const isDefault = (text: string | undefined): number | null => {
     if (text === undefined) rmSync(caddyfile, { force: true }); else writeFileSync(caddyfile, text);
-    return spawnSync('bash', ['-c', definition('caddy_default').replaceAll('/etc/caddy/Caddyfile', caddyfile) + '\ncaddy_default']).status;
+    // dpkg's own record of the shipped conffile: its path and md5.
+    const dpkg = `dpkg-query() { printf ' /etc/caddy/Caddyfile ${md5}\\n'; }; md5sum() { command md5 -q 2>/dev/null || command md5sum; }`;
+    const script = `${dpkg}\nCADDY_PLACEHOLDER="${placeholder ?? ''}"\n${definition('caddy_default').replaceAll('local file=/etc/caddy/Caddyfile', `local file=${caddyfile}`).replace('$1 == f', '$1 == "/etc/caddy/Caddyfile"')}\ncaddy_default`;
+    return spawnSync('bash', ['-c', script]).status;
   };
-  expect(isDefault(':80 {\n\troot * /usr/share/caddy\n\tfile_server\n}\n')).toBe(0);
+  expect(isDefault(shipped)).toBe(0);
   expect(isDefault(undefined)).toBe(0);
+  expect(isDefault(`${placeholder ?? ''}\n`)).toBe(0);
+  // VH9's file, even one that names the default page in a comment, is never the package's.
   expect(isDefault('rooms.wildshard.io {\n\treverse_proxy 127.0.0.1:8790\n}\n')).not.toBe(0);
-  expect(source).toContain("printf '#!/bin/sh\\nexit 101\\n' > /usr/sbin/policy-rc.d");
+  expect(isDefault(`# was root * /usr/share/caddy\n${shipped}`)).not.toBe(0);
+  expect(source).toContain("printf '#!/bin/sh\\nexit 101\\n' > \"$policy\"");
+  expect(source).toContain('mv -f -- "$saved" "$policy"');
   expect(source).toContain('systemctl disable --now --quiet caddy.service');
   expect(source).not.toMatch(/systemctl (enable|start|restart)[^\n]*caddy/u);
+});
+
+test('a blank COOK_STORE_DIR means R2, and the template leaves it commented', () => {
+  expect(readFileSync('scripts/cook-worker.mjs', 'utf8')).toContain("env.COOK_STORE_DIR === undefined || env.COOK_STORE_DIR === ''");
+  expect(source).toMatch(/^# COOK_STORE_DIR=\/var\/lib\/wildshard-cook\/store$/mu);
+  expect(source).not.toMatch(/^COOK_STORE_DIR=$/mu);
 });

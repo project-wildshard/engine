@@ -127,7 +127,7 @@ UNIT
 systemctl daemon-reload && systemctl start proof-api.service"
 box sh -c "sed -i -e 's|^COOK_ENGINE_REF=\$|COOK_ENGINE_REF=$COOK_REF|' -e 's|^WILDSHARD_BUILD=\$|WILDSHARD_BUILD=proof-$COOK_REF|' \
   -e 's|^WILDSHARD_API_URL=.*|WILDSHARD_API_URL=http://127.0.0.1:8793|' -e \"s|^COOK_NOTIFY_TOKEN=\$|COOK_NOTIFY_TOKEN=\$(openssl rand -hex 24)|\" \
-  -e 's|^COOK_STORE_DIR=\$|COOK_STORE_DIR=/var/lib/wildshard-cook/store|' /etc/wildshard/cook.env"
+  -e 's|^# COOK_STORE_DIR=.*|COOK_STORE_DIR=/var/lib/wildshard-cook/store|' /etc/wildshard/cook.env"
 run 3-cook
 expect_exit 3-cook 0
 run 4-again

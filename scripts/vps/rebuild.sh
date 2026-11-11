@@ -83,8 +83,17 @@ cook_env_complete() {
   if [ -n "$(env_value "$file" COOK_STORE_DIR)" ]; then return 0; fi
   for name in R2_ACCOUNT_ID R2_BUCKET_PACKS R2_PACKS_ACCESS_KEY_ID R2_PACKS_SECRET_ACCESS_KEY; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
 }
-# Caddy's package ships a page on port 80. Only that default is replaced; VH9's file is never touched.
-caddy_default() { [ ! -f /etc/caddy/Caddyfile ] || grep -q '/usr/share/caddy' /etc/caddy/Caddyfile; }
+# Caddy's package ships a page on port 80. Only that file, byte for byte as dpkg recorded it, or this script's own
+# placeholder is replaced; any other file is VH9's and is never touched.
+CADDY_PLACEHOLDER="# MMO-PLAN MP0.1: Caddy is installed and off. VPS-HARDENING VH9 writes this file, and port 443 opens by Jake's hand
+# after VH16's pre-open gate (J179). Until then nothing is served."
+caddy_default() {
+  local file=/etc/caddy/Caddyfile shipped
+  [ -f "$file" ] || return 0
+  [ "$(cat "$file")" = "$CADDY_PLACEHOLDER" ] && return 0
+  shipped=$(dpkg-query -W -f='${Conffiles}\n' caddy 2>/dev/null | awk -v f="$file" '$1 == f { print $2 }')
+  [ -n "$shipped" ] && [ "$(md5sum < "$file" | cut -d' ' -f1)" = "$shipped" ]
+}
 wait_http() {
   local url=$1 attempt
   for ((attempt=1; attempt<=60; attempt++)); do
@@ -153,11 +162,16 @@ make_packages() { apt_update; DEBIAN_FRONTEND=noninteractive apt-get install -y 
 step "packages: ${PACKAGES[*]}" have_packages make_packages
 # Caddy installs with its starts refused, so its default page never listens on port 80.
 have_caddy() { installed caddy; }
+# A policy-rc.d already there is the box's, and goes back afterwards.
 make_caddy() {
+  local policy=/usr/sbin/policy-rc.d saved=/usr/sbin/policy-rc.d.wildshard-saved status=0
   apt_update
-  printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d; chmod 755 /usr/sbin/policy-rc.d
-  if ! DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy; then rm -f /usr/sbin/policy-rc.d; say stop 'Cannot install caddy'; exit 1; fi
-  rm -f /usr/sbin/policy-rc.d
+  if [ -e "$policy" ] || [ -L "$policy" ]; then mv -f -- "$policy" "$saved"; fi
+  printf '#!/bin/sh\nexit 101\n' > "$policy"; chmod 755 "$policy"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy || status=$?
+  rm -f -- "$policy"
+  if [ -e "$saved" ] || [ -L "$saved" ]; then mv -f -- "$saved" "$policy"; fi
+  if [ "$status" != 0 ]; then say stop 'Cannot install caddy'; exit 1; fi
 }
 step 'caddy, installed and not started' have_caddy make_caddy
 if [ "$CHECK" = 0 ] || [ -x "$NODE" ]; then
@@ -167,11 +181,7 @@ fi
 
 # Caddy stays off until VH9 writes its file and VH16 passes; port 443 is opened by Jake's hand (J179).
 if installed caddy && caddy_default; then
-  if put /etc/caddy/Caddyfile 644 root:root <<'EOF'
-# MMO-PLAN MP0.1: Caddy is installed and off. VPS-HARDENING VH9 writes this file, and port 443 opens by Jake's hand
-# after VH16's pre-open gate (J179). Until then nothing is served.
-EOF
-  then :; fi
+  if put /etc/caddy/Caddyfile 644 root:root <<<"$CADDY_PLACEHOLDER"; then :; fi
   if systemctl is-enabled --quiet caddy.service 2>/dev/null || systemctl is-active --quiet caddy.service; then
     if [ "$CHECK" = 1 ]; then say would 'stop and disable caddy until VH9'
     else say doing 'stop and disable caddy until VH9'; systemctl disable --now --quiet caddy.service; fi
@@ -311,12 +321,12 @@ WILDSHARD_BUILD=
 WILDSHARD_API_URL=https://api.wildshard.io
 # The bearer token api-server's notify call sends (J30). The same value goes in api-server's settings.
 COOK_NOTIFY_TOKEN=
-# Where packs go: the four R2 rows, or COOK_STORE_DIR (a folder under /var/lib/wildshard-cook) on a scratch box.
+# Where packs go: the four R2 rows, or, on a scratch box only, COOK_STORE_DIR (a folder under /var/lib/wildshard-cook).
 R2_ACCOUNT_ID=
 R2_BUCKET_PACKS=wildshard-packs
 R2_PACKS_ACCESS_KEY_ID=
 R2_PACKS_SECRET_ACCESS_KEY=
-COOK_STORE_DIR=
+# COOK_STORE_DIR=/var/lib/wildshard-cook/store
 EOF
 then :; fi
 
@@ -372,7 +382,13 @@ make_cook_source() {
   printf '%s %s\n' "$COOK_REF" "$(cook_commit)" > "$COOK_SRC/.wildshard-installed"
   chmod -R go-w "$COOK_SRC"
 }
-if [ "$COOK_READY" = 1 ]; then step "cook source $COOK_SRC at $COOK_REF" have_cook_source make_cook_source; fi
+COOK_SOURCE_CHANGED=0
+if [ "$COOK_READY" = 1 ]; then
+  if [ "$CHECK" = 0 ] && ! have_cook_source; then COOK_SOURCE_CHANGED=1; fi
+  step "cook source $COOK_SRC at $COOK_REF" have_cook_source make_cook_source
+fi
+# What the running worker last read of cook.env, as a hash in its root-owned checkout: a changed file restarts it.
+cook_env_hash() { sha256sum < "$COOK_ENV" | cut -d' ' -f1; }
 
 if put "$SYSTEMD/wildshard-cook.service" 644 root:root <<EOF
 [Unit]
@@ -419,8 +435,12 @@ then COOK_UNIT_CHANGED=1; else COOK_UNIT_CHANGED=0; fi
 if [ "$CHECK" = 0 ]; then
   systemctl daemon-reload
   if [ "$COOK_READY" = 1 ]; then
-    if systemctl is-active --quiet wildshard-cook.service && [ "$COOK_UNIT_CHANGED" = 0 ]; then say ok 'cook worker running'
-    else say doing 'start the cook worker'; systemctl enable --quiet wildshard-cook.service; systemctl restart wildshard-cook.service; fi
+    if systemctl is-active --quiet wildshard-cook.service && [ "$COOK_UNIT_CHANGED" = 0 ] && [ "$COOK_SOURCE_CHANGED" = 0 ] \
+      && [ "$(cat "$COOK_SRC/.wildshard-env" 2>/dev/null)" = "$(cook_env_hash)" ]; then say ok 'cook worker running'
+    else
+      say doing 'start the cook worker'; systemctl enable --quiet wildshard-cook.service; systemctl restart wildshard-cook.service
+      (umask 077; cook_env_hash > "$COOK_SRC/.wildshard-env")
+    fi
     if wait_http "http://127.0.0.1:$COOK_PORT/health"; then say ok "cook worker answers on 127.0.0.1:$COOK_PORT"
     else say stop 'The cook worker is not answering /health; see journalctl -u wildshard-cook'; exit 1; fi
   fi

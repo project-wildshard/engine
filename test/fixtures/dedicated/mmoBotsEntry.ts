@@ -12,16 +12,12 @@ import { writeFileSync } from 'node:fs';
 import { NET_BUTTONS } from '../../../src/shared/engine/input/netButtons';
 import { PLAYER_CLASS } from '../../../src/shared/engine/net/netSchemas';
 import { PhysicsRouteCursor, type WalkPoint } from '../../../src/shared/host/headlessJourney';
+import { botTarget } from './mmoBotsGuard';
 import { RoomBot } from './roomBot';
 
-const STAGING = 'wss://wildshard.tailb41b20.ts.net:8443';
 const [url = '', build = '', botsArg = '0', secondsArg = '0', tag = 'mp0', result = '', addresses = 'own'] = process.argv.slice(2);
-const bots = Number(botsArg), seconds = Number(secondsArg), parsed = new URL(url);
-const loopback = parsed.protocol === 'ws:' && ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname);
-assert.ok(loopback || parsed.origin === STAGING, `J205: bots join loopback or staging only, never ${url}`);
-assert.ok(addresses === 'own' || (addresses === 'forwarded' && loopback), 'Forwarded addresses are for a loopback replica only');
-assert.ok(addresses === 'forwarded' || bots <= 4, 'The door seats at most 4 sockets from one address');
-assert.ok(Number.isInteger(bots) && bots >= 1 && bots <= 64 && seconds >= 5 && seconds <= 3600 && /^[a-z0-9-]{1,16}$/u.test(tag) && result !== '');
+const bots = Number(botsArg), seconds = Number(secondsArg), { url: parsed } = botTarget(url, addresses, bots);
+assert.ok(seconds >= 5 && seconds <= 3600 && /^[a-z0-9-]{1,16}$/u.test(tag) && result !== '');
 /** The door's leave: `ready` with this flag lets a seat go now rather than holding the body 30 s (J114). */
 const LEAVE_FLAG = 1;
 const sleep = async (ms: number): Promise<void> => { await new Promise(resolve => { setTimeout(resolve, ms); }); };

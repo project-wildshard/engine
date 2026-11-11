@@ -45,15 +45,17 @@ note({ step: 'release', channel: release.channel, serial: release.serial, build:
 
 // --- Staging's seats, before a single hello: people first.
 const health = async () => /** @type {{ build: string, players: number, cells: number, workers: number }} */ (await (await fetch(`${STAGING.replace('wss:', 'https:')}/health`, { signal: AbortSignal.timeout(15_000) })).json());
-if (mode === 'staging') {
+// Checked before the build, so a full staging fails fast, and again just before the first hello, since the build takes a while.
+const stagingRoom = async (/** @type {string} */ when) => {
   if (release.socket.replace(/\/$/u, '') !== STAGING) throw new Error(`The staging release names ${release.socket}, not ${STAGING}`);
   const before = await health();
-  note({ step: 'staging-health', ...before });
+  note({ step: 'staging-health', when, ...before });
   if (before.build !== release.engineBuild) throw new Error(`Staging serves ${before.build}, and its release names ${release.engineBuild}: wait for the pull`);
   if (bots > PER_ADDRESS) throw new Error(`The door seats ${String(PER_ADDRESS)} sockets per address, and every staging bot is this Mac's: --bots ${String(PER_ADDRESS)} at most`);
   const free = STAGING_SEATS - before.players - STAGING_HEADROOM;
   if (bots > free) throw new Error(`Staging has ${String(before.players)} of ${String(STAGING_SEATS)} seats taken; at most ${String(Math.max(0, free))} bots leave ${String(STAGING_HEADROOM)} for people`);
-}
+};
+if (mode === 'staging') await stagingRoom('before the build');
 
 // --- The bots, built from the release's own tree with this checkout's entry.
 const tree = join(work, 'src'), out = join(work, 'build');
@@ -61,7 +63,7 @@ const git = (/** @type {string[]} */ args) => execFileSync('git', args, { cwd: R
 try { git(['cat-file', '-e', `${release.engineBuild}^{commit}`]); } catch { git(['fetch', '--quiet', 'origin', release.engineBuild]); }
 mkdirSync(tree, { recursive: true });
 execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', release.engineBuild]) });
-copyFileSync(join(ROOT, 'test/fixtures/dedicated/mmoBotsEntry.ts'), join(tree, 'test/fixtures/dedicated/mmoBotsEntry.ts'));
+for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts']) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
 execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', 'mmoBots=test/fixtures/dedicated/mmoBotsEntry.ts'], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
@@ -70,6 +72,18 @@ note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), f
 // --- The replica: the release's server bundle on loopback, production's shape, its own key and file.
 /** @type {import('node:child_process').ChildProcess | null} */
 let room = null;
+/** The replica never outlives this script: an error, Ctrl-C or a kill takes it down too. */
+const stopRoom = async () => {
+  const running = room; room = null;
+  if (running === null || running.exitCode !== null || running.signalCode !== null) return;
+  const gone = new Promise(done => { running.once('exit', done); });
+  running.kill('SIGTERM');
+  const force = setTimeout(() => { running.kill('SIGKILL'); }, 10_000);
+  await gone; clearTimeout(force);
+};
+for (const signal of /** @type {const} */ (['SIGINT', 'SIGTERM', 'SIGHUP'])) process.once(signal, () => { void stopRoom().finally(() => { process.exit(130); }); });
+process.once('exit', () => { room?.kill('SIGKILL'); });
+try {
 /** @type {{ players: number, p95: number, max: number, drops: number, ticksPerSecond: number, rss: number }[]} */
 const readings = [];
 let url = STAGING;
@@ -104,6 +118,7 @@ if (mode === 'replica') {
 }
 
 // --- The bots
+if (mode === 'staging') await stagingRoom('before the first hello');
 const result = join(work, 'bots.json'), playing = readings.length;
 const code = await new Promise(done => {
   const child = spawn(process.execPath, [join(out, 'mmoBots.mjs'), url, release.engineBuild, String(bots), String(seconds), tag, result, mode === 'replica' ? 'forwarded' : 'own'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -111,10 +126,7 @@ const code = await new Promise(done => {
   child.on('exit', done);
 });
 const after = mode === 'staging' ? await health() : null;
-if (room !== null) {
-  const gone = new Promise(done => { room?.once('exit', done); });
-  room.kill('SIGTERM'); await gone;
-}
+await stopRoom();
 const full = readings.slice(playing).filter(row => row.players === bots);
 const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code,
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
@@ -122,5 +134,9 @@ const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code,
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
 writeFileSync(join(work, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 note({ step: 'done', exit: code, seated: report.seated, steady: report.steady, walked: report.walked, sawEveryone: report.sawEveryone, server: report.server ?? null, report: join(work, 'report.json') });
-if (!values.keep) for (const path of [tree, out, join(work, 'server'), join(work, 'server.tar.gz'), join(work, 'packs')]) rmSync(path, { recursive: true, force: true });
-process.exit(Number(code));
+process.exitCode = Number(code);
+} finally {
+  await stopRoom();
+  if (!values.keep) for (const path of [tree, out, join(work, 'server'), join(work, 'server.tar.gz'), join(work, 'packs')]) rmSync(path, { recursive: true, force: true });
+}
+process.exit(process.exitCode ?? 1);
