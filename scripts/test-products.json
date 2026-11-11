@@ -204,9 +204,12 @@
   ],
   "test/physics-headless.test.ts": ["driftwood-isle"],
   "test/motion-replay.test.ts": ["driftwood-isle"],
-  "test/physics-shards-headless.test.ts": ["pine-hollow", "nine-dragon-stack", "sunscar-dunes", "far-reach", "blender-template"],
+  "test/physics-shards-headless.test.ts": ["pine-hollow", "nine-dragon-stack", "sunscar-dunes", "far-reach"],
+  "test/physics-blender-template-headless.test.ts": ["blender-template"],
   "test/physics-nalati-headless.test.ts": ["nalati-grasslands"],
-  "test/physics-open-plots-headless.test.ts": ["open-plot-frostline-peaks", "open-plot-lantern-bayou", "open-plot-ember-forge", "open-plot-mosslight-ruins", "open-plot-coral-drift"],
+  "test/physics-open-plots-headless.test.ts": ["open-plot-frostline-peaks", "open-plot-lantern-bayou", "open-plot-ember-forge", "open-plot-mosslight-ruins", "open-plot-coral-drift", "open-plot-fossil-badlands"],
+  "test/physics-open-plots-headless-2.test.ts": ["open-plot-patchwork-fairground", "open-plot-desert-ruin", "open-plot-sky-harbor", "open-plot-starfall-observatory", "open-plot-thin-ice", "open-plot-clockwork-canyon"],
+  "test/physics-open-plots-headless-3.test.ts": ["open-plot-saltwind-lighthouse", "open-plot-jungle-ziggurat", "open-plot-sky-race", "open-plot-alien-plain", "open-plot-showcase-template"],
   "test/shard-headless.test.ts": [
     "_template",
     "pastel-plain",
@@ -333,7 +336,9 @@
     "sunscar-dunes"
   ],
   "test/native-runtime-observation.test.ts": [
-    "far-reach",
+    "far-reach"
+  ],
+  "test/native-runtime-observation-sunscar.test.ts": [
     "sunscar-dunes"
   ],
   "test/sampled-ambience.test.ts": [],

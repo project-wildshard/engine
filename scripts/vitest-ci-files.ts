@@ -43,7 +43,13 @@ export const CI_NATIVE_GROUPS = {
   // FAST-SLOW-TESTS FS6: the entry leg leaves quarantine; in the routes group it would set the planner's floor (263 s).
   'nalati-discovery-entry': ['test/nalati-discovery-verbs.test.ts'],
   'driftwood-long-session': ['test/driftwood-long-session.test.ts'],
+  // TEST-SPEED TS5: the open plots run in three files and the Blender Template routes and Sunscar's observation in their
+  // own, each its own unit, so no file passes 30 s hosted and the planner can spread them.
   'open-plots-headless': ['test/physics-open-plots-headless.test.ts'],
+  'open-plots-headless-2': ['test/physics-open-plots-headless-2.test.ts'],
+  'open-plots-headless-3': ['test/physics-open-plots-headless-3.test.ts'],
+  'blender-template-routes': ['test/physics-blender-template-headless.test.ts'],
+  'native-observation-sunscar': ['test/native-runtime-observation-sunscar.test.ts'],
   'standalone-grid': ['test/standalone-grid.test.ts', 'test/standalone-grid-lone.test.ts', 'test/standalone-grid-restore.test.ts'],
   'native-routes': [
     'test/driftwood-optional-verbs.test.ts',

@@ -2,6 +2,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdirSync,readFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {assertBuiltTestProducts} from './built-product.mjs';
+import {OPEN_PLOTS_2,OPEN_PLOTS_3} from '../test/fixtures/openPlotGroups.ts';
 
 /** @param {readonly string[]} args @param {string} name @param {string} fallback */
 const flag=(args,name,fallback)=>args.find(arg=>arg.startsWith(`--${name}=`))?.slice(name.length+3)??fallback;
@@ -37,8 +38,12 @@ export function assertNativeWalkResult(report,expected){
 /** Select each resident test module once; keep all routes of a shard together.
  * @param {readonly string[]} slugs */
 export function nativeWalkTestFiles(slugs){
+  // TEST-SPEED TS5: the open plots run in three files and Blender Template in its own (test/fixtures/openPlotGroups.ts).
   return [...new Set(slugs.map(slug=>slug==='driftwood-isle'?'test/physics-headless.test.ts'
+    :OPEN_PLOTS_2.has(slug)?'test/physics-open-plots-headless-2.test.ts'
+    :OPEN_PLOTS_3.has(slug)?'test/physics-open-plots-headless-3.test.ts'
     :slug.startsWith('open-plot-')?'test/physics-open-plots-headless.test.ts'
+    :slug==='blender-template'?'test/physics-blender-template-headless.test.ts'
     :slug==='nalati-grasslands'?'test/physics-nalati-headless.test.ts':'test/physics-shards-headless.test.ts'))];
 }
 

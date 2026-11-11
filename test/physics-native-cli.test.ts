@@ -32,13 +32,18 @@ test('a native proof cannot silently claim a remote preview or browser variant',
 test('CLI route selections use each complete resident module once after the physics split',()=>{
   const others=['pine-hollow','nine-dragon-stack','sunscar-dunes','far-reach','blender-template'];
   expect(nativeWalkTestFiles(['nalati-grasslands'])).toEqual(['test/physics-nalati-headless.test.ts']);
-  expect(nativeWalkTestFiles(others)).toEqual(['test/physics-shards-headless.test.ts']);
+  // TEST-SPEED TS5: Blender Template's routes have their own module.
+  expect(nativeWalkTestFiles(others)).toEqual(['test/physics-shards-headless.test.ts','test/physics-blender-template-headless.test.ts']);
   expect(nativeWalkTestFiles(['driftwood-isle','nalati-grasslands',...others])).toEqual([
-    'test/physics-headless.test.ts','test/physics-nalati-headless.test.ts','test/physics-shards-headless.test.ts',
+    'test/physics-headless.test.ts','test/physics-nalati-headless.test.ts','test/physics-shards-headless.test.ts','test/physics-blender-template-headless.test.ts',
   ]);
-  expect(nativeWalkTestFiles(['nalati-grasslands','nalati-grasslands',...others,...others])).toHaveLength(2);
+  expect(nativeWalkTestFiles(['nalati-grasslands','nalati-grasslands',...others,...others])).toHaveLength(3);
 });
 
 test('open plots select their own admitted resident suite',()=>{
   expect(nativeWalkTestFiles(['open-plot-frostline-peaks','open-plot-coral-drift'])).toEqual(['test/physics-open-plots-headless.test.ts']);
+  // TEST-SPEED TS5: the open plots run in three modules (test/fixtures/openPlotGroups.ts).
+  expect(nativeWalkTestFiles(['open-plot-thin-ice','open-plot-sky-race','open-plot-frostline-peaks'])).toEqual([
+    'test/physics-open-plots-headless-2.test.ts','test/physics-open-plots-headless-3.test.ts','test/physics-open-plots-headless.test.ts',
+  ]);
 });
