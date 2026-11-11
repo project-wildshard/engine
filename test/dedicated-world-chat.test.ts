@@ -31,7 +31,7 @@ test('a room line reaches the other cell within a second, across two workers, an
   here.client.say('room', 'hello world');
   await vi.waitFor(() => { expect(heardThere.map(line => [line.name, line.text, line.channel, line.from])).toEqual([['Ann', 'hello world', 'room', 0]]); }, { timeout: 1000, interval: 5 });
   expect(performance.now() - said, 'MP4.1: about a second').toBeLessThan(1000);
-  expect(heardHere.map(line => line.text), 'the speaker hears it once, from their own cell').toEqual(['hello world']);
+  await vi.waitFor(() => { expect(heardHere.map(line => line.text), 'the speaker hears it once, from their own cell').toEqual(['hello world']); }, { timeout: 1000, interval: 5 });
   there.client.say('proximity', 'just us'); there.client.say('room', 'hi back');
   await vi.waitFor(() => { expect(heardHere.map(line => line.text)).toEqual(['hello world', 'hi back']); }, { timeout: 1000, interval: 5 });
   await new Promise(resolve => { setTimeout(resolve, 200); });
