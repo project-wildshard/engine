@@ -20,3 +20,11 @@ and this command's own shell don't count). Git has no lock that
 serializes a commit started in the same instant with the fast-forward;
 the process check is what stands in for it, so an agent working in the
 canonical checkout always blocks the follow.
+
+land does the same after every landing (Jake, 2026-11-10 ~23:50 Cancún:
+"go to the main checkout, pull main, make sure it's up to date, and then
+merge fast forward only in the main checkout"). The main push comes first,
+so the canonical checkout is never ahead of GitHub; then land fetches in
+the canonical checkout and runs the same guarded fast-forward. Dirty,
+diverged, on another branch or busy: a WARNING line and a receipt, never a
+reset or a stash, and the landing stands. Tests in `test/land.test.ts`.

@@ -157,6 +157,35 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.read(f.files.receipts)).toMatch(new RegExp(`^\\d\\d:\\d\\d UTC fixture-lane land plan/foo landed ${tip.slice(0, 10)} on main .*; exact; rounds 1; hosted reruns 0;`, 'mu'));
   }, 60_000);
 
+  test('after the main push, the canonical checkout fast-forwards to it (Jake: land into the main checkout)', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const tip = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/canonical +canonical main fast-forwarded 1 commit\(s\)/u);
+    expect(f.git(f.repo, ['rev-parse', 'HEAD'])).toBe(tip);
+    expect(f.git(f.repo, ['rev-parse', 'HEAD'])).toBe(f.remoteMain());
+  }, 60_000);
+
+  test('a dirty or diverged canonical checkout is never moved: land warns and leaves a receipt', () => {
+    for (const kind of ['dirty', 'diverged'] as const) {
+      const f = fixture();
+      const wt = f.worktree('foo');
+      f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+      if (kind === 'dirty') writeFileSync(join(f.repo, 'src/a.ts'), 'export const a = 2;\n');
+      else f.commit(f.repo, 'src/local.ts', 'export const local = 1;', 'chore: a local commit');
+      const before = f.git(f.repo, ['rev-parse', 'HEAD']);
+      const result = f.land(wt);
+      expect(result.status, `${kind}\n${result.stdout}`).toBe(0);
+      expect(result.stdout, kind).toMatch(kind === 'dirty' ? /canonical +WARNING canonical main 1 behind; tracked edits; left alone/u : /canonical +WARNING CANONICAL MAIN DIVERGED: 1 ahead, 1 behind/u);
+      expect(f.git(f.repo, ['rev-parse', 'HEAD']), kind).toBe(before);
+      if (kind === 'dirty') expect(readFileSync(join(f.repo, 'src/a.ts'), 'utf8')).toBe('export const a = 2;\n');
+      expect(f.read(f.files.receipts), kind).toMatch(/land plan\/foo canonical checkout not fast-forwarded after landing: /u);
+      expect(f.read(f.files.receipts), kind).toMatch(/land plan\/foo landed /u);
+    }
+  }, 120_000);
+
   test('main moved to disjoint paths: rebase, carry the hosted proof, split pre-push, then watch main', () => {
     const f = fixture();
     const wt = f.worktree('foo');

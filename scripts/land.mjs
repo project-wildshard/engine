@@ -20,6 +20,7 @@ import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {TIMING_RECORDS,pushSelection} from './push-selection.mjs';
+import {canonicalRoot,followMain} from './worktree.mjs';
 
 /** The hosted workflows a landing needs green, by workflow name (J195, J240). */
 export const LAND_WORKFLOWS=Object.freeze(['ci','ring-1']);
@@ -454,10 +455,28 @@ class Landing{
   throw new StopError(`main kept moving for ${this.options.rounds} rounds; run land again`);
  }
 
+ /** After GitHub's main moved, bring the canonical checkout's main along (Jake, 2026-11-10 ~23:50 Cancún: "go to
+  * the main checkout, pull main, make sure it's up to date, and then merge fast forward only in the main checkout").
+  * The push came first, so the canonical checkout is never ahead of GitHub. Only a fast-forward, under worktree.mjs's
+  * followMain guards (on main, clean, not diverged, no git operation or other process in it); anything else is a
+  * warning and a receipt, never a reset or a stash. The landing stands either way. */
+ followCanonical(){
+  let canonical='',outcome='';
+  try{
+   canonical=canonicalRoot(this.root);
+   git(canonical,['fetch','--quiet','origin','main']);
+   outcome=followMain(canonical,git(canonical,['rev-parse','origin/main']).trim());
+  }catch(error){outcome=`could not check it (${error instanceof Error?error.message.split('\n')[0]:String(error)})`;}
+  if(/fast-forwarded|current$/u.test(outcome)){this.say('canonical',outcome);return;}
+  this.say('canonical',`WARNING ${outcome}; canonical ${canonical||'checkout'} was not updated`);
+  this.receipt(`canonical checkout not fast-forwarded after landing: ${outcome}`);
+ }
+
  /** @param {string} rule @param {string} why @param {number} round @param {string} before */
  async landed(rule,why,round,before){
   const head=this.head();
   this.say('landed',`main ${short(before)} -> ${short(head)} (${rule}: ${why})`);
+  this.followCanonical();
   // origin plan/<slug> stays: the next land rewrites it under a lease, and the
   // DS13 reaper deletes it with the worktree (a delete push would run the pre-push).
   let code=0,mainCI='reuses the branch run';
