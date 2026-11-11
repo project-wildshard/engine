@@ -33,8 +33,8 @@ importers:
         specifier: github:project-wildshard/shardfile#4f8280c58ab6e527aa9735eaa80fccf1f34ab6d3
         version: https://codeload.github.com/project-wildshard/shardfile/tar.gz/4f8280c58ab6e527aa9735eaa80fccf1f34ab6d3(typescript@6.0.3)
       '@wildshard/wire':
-        specifier: github:project-wildshard/shardfile#bdb6d9b063f36803085192d0d8ac82784c4a9e10&path:/packages/wire
-        version: https://codeload.github.com/project-wildshard/shardfile/tar.gz/bdb6d9b063f36803085192d0d8ac82784c4a9e10#path:/packages/wire(typescript@6.0.3)
+        specifier: github:project-wildshard/shardfile#a51f56fbe54197b879fa309a1b1946df7384d576&path:/packages/wire
+        version: https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576#path:/packages/wire(typescript@6.0.3)
       ajv:
         specifier: 6.15.0
         version: 6.15.0
@@ -697,8 +697,8 @@ packages:
     engines: {node: '>=24.18.0'}
     hasBin: true
 
-  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/bdb6d9b063f36803085192d0d8ac82784c4a9e10#path:/packages/wire':
-    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/bdb6d9b063f36803085192d0d8ac82784c4a9e10}
+  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576#path:/packages/wire':
+    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576}
     version: 0.0.0
     hasBin: true
 
@@ -1802,7 +1802,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/bdb6d9b063f36803085192d0d8ac82784c4a9e10#path:/packages/wire(typescript@6.0.3)':
+  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576#path:/packages/wire(typescript@6.0.3)':
     dependencies:
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
