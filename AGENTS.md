@@ -40,17 +40,22 @@ Landing from a worktree (J240; full rules in meta `docs/plans/WORKTREE-LAND-STAN
  - Land: `WS_LANE_NAME=<lane> node scripts/land.mjs` from the worktree. Options: `--timeout=MIN` (CI wait, 60),
    `--rounds=N` (main-moved retries, 6), `--poll=S` (30), `--no-watch-main`. Don't commit while it runs.
  - What it prints, one line per change: `land HH:MM:SS <state> <detail>`. States in order: `start`, `rebased`,
-   `stamps`, `pushing`, `ci` (`ci success, ring-1 in_progress`…), `moved`, `carried` or `rerun` (with the reason),
-   `merging`, `landed`, `canonical` (the canonical checkout's main fast-forwarded to it, or a WARNING and a receipt
-   when that checkout is dirty, diverged or busy: it is never reset). A stop is one `land STOP <why and what to do>` line. Exit 0: landed or nothing to land.
+   `stamps`, `pushing`, `ci` (`ci success, ring-1 in_progress`…), `moved`, `carried` (with the reason), `merging`,
+   `landed`, `canonical` (the canonical checkout's main fast-forwarded to it, or a WARNING and a receipt
+   when that checkout is dirty, diverged or busy: it is never reset), `rule` (main's CI and who fixes it). A stop is one `land STOP <why and what to do>` line. Exit 0: landed or nothing to land.
    Exit 3: landed, but main's own run went red (carried case): fix forward now. Exit 1: stopped. If a `landed`
    line came before the stop, main already moved and only the watch of main's run failed: check main's Actions
    runs by hand; running land again just says `nothing`.
  - Landings, reds, refusals, conflicts and give-ups append a line to `~/.cache/wildshard/lane-receipts.log`
    (`grep ' land '`). Other stops write none, so no receipt doesn't prove land never ran.
- - After the rebase land picks a rule: `exact` (main didn't move; main reuses the branch run), `carried` (main
-   moved, no shared path, DS1 selects related or docs: split pre-push on the rebased tree, then land watches main's
-   run), `rerun` (anything else: push the rebased SHA to the branch and wait for hosted CI again).
+ - J249 (Jake: "if CI passes on the branch/worktree and the merge/rebase is clean with no conflicts then it goes
+   in… they don't have to re-CI on rebase"): `exact` when main didn't move (main reuses the branch run); `carried`
+   when main moved and the rebase was clean (a conflict only in the generated stamps counts as clean: land
+   regenerates them): it goes to main on the branch's green run, after the split pre-push on the rebased tree. No
+   path or harness rule sends it back to branch CI, and there are no locks. A real conflict stops; the resolved
+   commit is new and gets its own branch CI.
+ - Main's CI runs after every land. If it goes red, the lane that landed last fixes it forward or reverts it, at
+   once (J249). Land prints this rule when it lands.
  - Clean up landed worktrees with `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an
    unlanded, dirty or busy one.
 
@@ -85,11 +90,7 @@ When land stops (each seen on 2026-11-10/11):
    CI). Then check GitHub Actions: `ci.yml`/`ring-1.yml` must run on `plan/**`.
  - `hosted CI … not finished after 60 min`: run land again; it picks up the same SHA's runs.
  - `HEAD moved …`: you committed while land waited. Run land again to land the new HEAD.
- - `main kept moving for 6 rounds`: a round is spent by a hosted `rerun` or a lost race on the main push (the
-   `rerun`/`moved` lines say which). Repeated `rerun` means your diff touches a path that forces a full
-   hosted run (`.github/`, package.json, lockfiles, `.githooks/`, `tsconfig*`, test and `vitest` harness files, any
-   Markdown a script reads, AGENTS.md among them), so a moved main means a new hosted run each time. Run land
-   again; keep such paths out of feature plans, or land them on their own.
+ - `main kept moving for 6 rounds`: each round is a lost race on the main push (the `moved` lines). Run land again.
  - Exit 3 (`main's hosted run is red`): main is red for everyone. Fix forward in the same worktree at once.
 
 Never:

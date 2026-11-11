@@ -196,7 +196,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const landed = f.remoteMain();
     expect(landed).not.toBe(tested);
     expect(f.git(f.remote, ['log', '--format=%s', '-3', 'main']).split('\n')).toEqual(['feat: add feature', 'peer lands', 'seed']);
-    expect(result.stdout).toMatch(/carried\s+disjoint/u);
+    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
     // The rebased SHA reached main only, under the split gate; plan/foo still holds the tested SHA.
     expect(prepushLines(f).at(-1)).toMatch(new RegExp(`^post_ci=1 ${landed} ${landed} refs/heads/main [a-f0-9]{40}$`, 'u'));
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
@@ -204,7 +204,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0; .*main ci green/u);
   }, 60_000);
 
-  test('main moved over the same file: the rebased SHA reruns hosted CI on the branch before main', () => {
+  test('main moved over the same file: a clean rebase lands on the branch run, no second branch CI (J249)', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     const tested = f.edit(wt, 'src/shared.ts', 'line10 = 10', 'line10 = 100', 'feat: tune line 10');
@@ -213,13 +213,13 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(result.status, result.stdout).toBe(0);
     const landed = f.remoteMain();
     expect(landed).not.toBe(tested);
-    expect(result.stdout).toContain('main and the plan both changed src/shared.ts');
-    // The rewrite of the plan's own branch went through, and that exact SHA then fast-forwarded main.
-    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(landed);
-    expect(f.read(f.files.gh)).toContain(`head_sha=${landed}`);
-    expect(prepushLines(f).filter(line => line.includes('refs/heads/plan/foo'))).toHaveLength(2);
-    expect(prepushLines(f).at(-1)).toMatch(new RegExp(`^post_ci=0 ${landed} ${landed} refs/heads/main [a-f0-9]{40}$`, 'u'));
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; exact; rounds 2; hosted reruns 1;/u);
+    expect(result.stdout).toMatch(/carried\s+clean rebase onto [0-9a-f]{10}: the branch's green run [0-9a-f]{10} carries \(J249\)/u);
+    expect(f.git(f.remote, ['show', 'main:src/shared.ts'])).toMatch(/line1 = 11;[\s\S]*line10 = 100;/u);
+    // The plan branch keeps the tested SHA: nothing went back to branch CI.
+    expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
+    expect(prepushLines(f).filter(line => line.includes('refs/heads/plan/foo'))).toHaveLength(1);
+    expect(result.stdout).toMatch(/rule +main's own CI runs on [0-9a-f]{10} now\. If it goes red, the lane that landed last fixes it forward or reverts it/u);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
   }, 60_000);
 
   test('main moves during the merge itself: the push loses the race, land rebases and retries', () => {
@@ -297,7 +297,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toContain("took main's scripts/renderer-revision.json for a stamp-only conflict");
     expect(result.stdout).toMatch(/stamps\s+regenerated scripts\/renderer-revision\.json into [0-9a-f]{10}/u);
-    expect(result.stdout).toMatch(/carried\s+disjoint/u);
+    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
     expect(f.git(f.remote, ['log', '--format=%s', '-4', 'main']).split('\n')).toEqual(['feat: add feature', 'peer stamp', 'peer lands', 'chore: stamp']);
     // The stamp-only plan commit emptied out under main's stamp and was dropped; the regenerated stamp joined the tip.
     // The landed stamp is exactly the one gen.mjs makes for the landed tree.
@@ -507,34 +507,15 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('test/durations.json', ': 1,', ': 11,')] } });
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/carried\s+disjoint/u);
+    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
     // The carried pre-push selects as land did: timing records as data, so the plan's related tests run.
     expect(f.read(`${f.files.prepush}.timing`).trim().split('\n').at(-1)).toBe('timing=1 1');
     expect(f.git(f.remote, ['show', 'main:test/durations.json'])).toMatch(/"test\/t1\.test\.ts": 11,[\s\S]*"test\/t10\.test\.ts": 100/u);
     expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
   }, 60_000);
 
-  test('merged clocks carry only if hosted CI\'s shard planner still plans them, full and Ring 1 (J206 review)', () => {
-    for (const exit of [0, 1]) {
-      const f = fixture();
-      const wt = f.worktree('foo');
-      f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-      f.edit(wt, 'test/durations.json', '"test/t10.test.ts": 10', '"test/t10.test.ts": 100', 'test: record clocks');
-      // Main brings a planner (it only refuses when told to) with its own clocks.
-      const planner = f.peerScript('scripts/engine-ci-plan.ts', null, `process.exit(${String(exit)});`);
-      const clocks = f.peerScript('test/durations.json', ': 1,', ': 11,');
-      f.state({ once: { marker: join(f.root, 'once'), command: ['sh', '-c', `sh '${planner}' && sh '${clocks}'`] } });
-      const result = f.land(wt);
-      expect(result.status, result.stdout).toBe(0);
-      if (exit === 0) expect(result.stdout).toMatch(/carried\s+disjoint/u);
-      else {
-        expect(result.stdout).toContain("main and the plan both recorded clocks and the merged clocks don't plan (engine-ci-plan.ts exited 1)");
-        expect(f.read(f.files.receipts)).toMatch(/landed .*; exact; rounds 2; hosted reruns 1;/u);
-      }
-    }
-  }, 120_000);
 
-  test('clocks beside a real harness change still rerun hosted CI after a rebase', () => {
+  test('a harness change beside clocks carries too: J249 has no harness rule, main\'s own run checks it', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, 'vitest.config.ts', 'export default {};', 'test: add a vitest config');
@@ -542,19 +523,19 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('test/durations.json', ': 1,', ': 11,')] } });
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toContain('test/config/dependency harness: vitest.config.ts');
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; exact; rounds 2; hosted reruns 1;/u);
+    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
   }, 60_000);
 
-  test('a plan that changes hosted CI reruns it after any rebase', () => {
+  test('a plan that changes hosted CI carries after a clean rebase too (J249)', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, '.github/workflows/x.yml', 'name: x', 'ci: add x');
     f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toContain('the plan changes hosted CI itself (.github/workflows/x.yml)');
-    expect(f.read(f.files.receipts)).toMatch(/landed .*; exact; rounds 2; hosted reruns 1;/u);
+    expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
   }, 60_000);
 
   test('two worktrees land at once with no shared lock; both reach main', async () => {
