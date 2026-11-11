@@ -8,6 +8,14 @@ To release: add the next version's section at the top, commit and push it, then 
 and `--finish` as before. `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose
 `package.json` version has no valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.9 (2026-11-11)
+
+- The game connects to its new server address, rooms.wildshard.io, on the ordinary web port, so more networks let you in.
+- Voice fades with distance, a ring shows who is talking, and Settings has a Voice panel with hold to talk.
+- Everyone gets a unique Name, and global chat reaches every player in the world.
+- Picking a shard on the title takes you into the shared world at that shard, and the Template's spot in the world opens again.
+- Nalati's herds no longer stall the shard, and a stuck start now reports why.
+
 ## v0.1.8 (2026-11-11)
 
 - Settings has tabs like the Bag, with graphics controls for pixel density, shadows, glow, sun rays and anti-aliasing.
