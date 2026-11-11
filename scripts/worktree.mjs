@@ -17,12 +17,12 @@
 // (scripts/worktree-reap.mjs) removes landed, clean, idle worktrees with their branches, local and on origin.
 import {execFileSync,spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,realpathSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
-import {parseReapArgs,reap} from './worktree-reap.mjs';
+import {parseReapArgs,processDirectories,reap} from './worktree-reap.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REGULAR=/^100(?:644|755)$/u;
@@ -147,11 +147,29 @@ function cloneTrackedFiles(canonical,tree){
  return kept;
 }
 
+/** Git states in which moving HEAD would break an operation someone is part way through. */
+const BUSY_GIT=['index.lock','MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','BISECT_LOG','rebase-merge','rebase-apply','sequencer'];
+
+/** This process and its ancestors: the shell that ran `worktree new` sits in the canonical checkout. @returns {Set<number>} */
+function selfAndAncestors(){
+ const own=new Set([process.pid]);
+ let pid=process.ppid;
+ for(let depth=0;depth<32&&pid>1&&!own.has(pid);depth++){
+  own.add(pid);
+  const parent=spawnSync('ps',['-o','ppid=','-p',String(pid)],{encoding:'utf8'});
+  pid=Number(parent.stdout.trim());
+  if(parent.status!==0||!Number.isSafeInteger(pid))break;
+ }
+ return own;
+}
+
 /** Keep the canonical checkout on origin/main (Jake, 2026-11-10: "If the main checkout of the engine is stale, we
- * definitely need to get it up to date"). Only a fast-forward, and only when it is on main, has no tracked edit and
- * no commit origin/main lacks: anything else is named and left alone, never reset. Git itself refuses a fast-forward
- * that would overwrite an untracked file. Returns what it did, for the step line.
- * @param {string} canonical @param {string} base origin/main @returns {string} */
+ * definitely need to get it up to date"). Only a fast-forward, and only when nobody can be mid-change there: it is on
+ * main with no tracked edit, nothing staged and no commit origin/main lacks; no merge, rebase, am, cherry-pick,
+ * revert, bisect or index lock is in progress; and no other process has its working directory in the checkout itself
+ * (worktrees under .worktrees/ don't count; this command's own shell doesn't either). The merge never overwrites an
+ * ignored or untracked file and never autostashes. Anything else is named and left alone, never reset.
+ * @param {string} canonical @param {string} base origin/main @returns {string} what it did, for the step line */
 export function followMain(canonical,base){
  const branch=tryGit(canonical,['symbolic-ref','--quiet','HEAD']).stdout.trim();
  if(branch!=='refs/heads/main')return `canonical not on main (${branch===''?'detached':branch}); left alone`;
@@ -159,9 +177,17 @@ export function followMain(canonical,base){
  if(head===base)return 'canonical main current';
  const [ahead='0',behind='0']=git(canonical,['rev-list','--left-right','--count',`${head}...${base}`]).trim().split(/\s+/u);
  if(ahead!=='0')return `CANONICAL MAIN DIVERGED: ${ahead} ahead, ${behind} behind origin/main; left alone, tell the coordinator`;
- if(git(canonical,['status','--porcelain','--untracked-files=no']).trim()!=='')return `canonical main ${behind} behind with tracked edits; left alone`;
- const merged=tryGit(canonical,['merge','--ff-only','--quiet',base]);
- return merged.status===0?`canonical main fast-forwarded ${behind} commit(s)`:`canonical main ${behind} behind; fast-forward refused (${merged.stderr.trim().split('\n')[0]})`;
+ const leave=(/** @type {string} */ why)=>`canonical main ${behind} behind; ${why}; left alone`;
+ if(git(canonical,['status','--porcelain','--untracked-files=no']).trim()!=='')return leave('tracked edits');
+ const busy=BUSY_GIT.find(name=>existsSync(resolve(canonical,git(canonical,['rev-parse','--git-path',name]).trim())));
+ if(busy!==undefined)return leave(`git ${busy} in progress`);
+ const directories=processDirectories();
+ if(directories===undefined)return leave('cannot list process working directories');
+ const real=realpathSync(canonical),trees=join(real,WORKTREES),own=selfAndAncestors();
+ const inside=[...directories].filter(([pid,path])=>!own.has(pid)&&(path===real||path.startsWith(`${real}/`))&&path!==trees&&!path.startsWith(`${trees}/`));
+ if(inside.length>0)return leave(`pid ${inside.map(([pid])=>String(pid)).join(', ')} working in it`);
+ const merged=tryGit(canonical,['merge','--ff-only','--no-autostash','--no-overwrite-ignore','--quiet',base]);
+ return merged.status===0?`canonical main fast-forwarded ${behind} commit(s)`:leave(`fast-forward refused (${merged.stderr.trim().split('\n')[0]})`);
 }
 
 /** The repo's hooks must be live in the worktree: core.hooksPath inside it, and each tracked hook executable there.

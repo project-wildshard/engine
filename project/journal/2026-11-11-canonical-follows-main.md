@@ -11,3 +11,12 @@ checkout is on main, has no tracked edit and no commit origin/main lacks;
 git refuses a fast-forward that would overwrite an untracked file. A
 diverged canonical main is named loudly in the fetch step and left alone:
 it is never reset. Test: `test/tooling/worktree.test.mjs`.
+
+J206 Codex review: three MUSTs. The merge now passes `--no-overwrite-ignore`
+and `--no-autostash`; a merge, rebase, am, cherry-pick, revert, bisect or
+index lock in progress leaves it alone; so does any other process whose
+working directory is the checkout itself (worktrees under `.worktrees/`
+and this command's own shell don't count). Git has no lock that
+serializes a commit started in the same instant with the fast-forward;
+the process check is what stands in for it, so an agent working in the
+canonical checkout always blocks the follow.

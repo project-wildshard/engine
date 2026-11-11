@@ -52,7 +52,8 @@ export function processDirectories(){
   }
   return found;
  }
- const listed=spawnSync('lsof',['-a','-d','cwd','-F','pn'],{encoding:'utf8',maxBuffer:64<<20});
+ // From /, so lsof itself never shows up in the folder being checked.
+ const listed=spawnSync('lsof',['-a','-d','cwd','-F','pn'],{cwd:'/',encoding:'utf8',maxBuffer:64<<20});
  if(listed.error!==undefined||listed.stdout==='')return undefined;
  let pid=0;
  for(const line of listed.stdout.split('\n')){

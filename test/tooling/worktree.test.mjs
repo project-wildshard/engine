@@ -1,6 +1,6 @@
 // DEV-SPEED DS12: scripts/worktree.mjs against real git. A bare repo stands in for GitHub; the canonical checkout is a
 // clone of it with local edits and a local commit, so the tests can tell a cloned file from the origin/main blob.
-import {spawnSync} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
@@ -115,7 +115,44 @@ describe('worktree new', () => {
     git(pusher, ['push', '-q', 'origin', 'main']);
     put(clean, 'src/same.ts', 'export const same = 2;\n');
     const edited = worktree(clean, ['new', 'c', '--no-install']);
-    expect(edited.stdout).toMatch(/canonical main 1 behind with tracked edits; left alone/u);
+    expect(edited.stdout).toMatch(/canonical main 1 behind; tracked edits; left alone/u);
+  });
+
+  test('J206 review: never fast-forwards over an ignored file, a git operation in progress or another process inside', async () => {
+    const {origin, base} = repos();
+    const clean = join(base, 'clean'), pusher = join(base, 'pusher');
+    git(base, ['clone', '-q', origin, clean]);
+    git(base, ['clone', '-q', origin, pusher]);
+    const move = (/** @type {string} */ path, /** @type {string} */ body) => {
+      put(pusher, path, body);
+      git(pusher, ['add', '-f', path]);
+      git(pusher, ['commit', '-q', '-m', `track ${path}`]);
+      git(pusher, ['push', '-q', 'origin', 'main']);
+    };
+    // Upstream starts tracking tmp/keep.txt, which the clone holds as an ignored file of its own.
+    move('tmp/keep.txt', 'upstream\n');
+    put(clean, 'tmp/keep.txt', 'mine\n');
+    const ignored = worktree(clean, ['new', 'a', '--no-install']);
+    expect(ignored.stdout).toMatch(/fast-forward refused/u);
+    expect(readFileSync(join(clean, 'tmp/keep.txt'), 'utf8')).toBe('mine\n');
+    rmSync(join(clean, 'tmp/keep.txt'));
+    // A failed `git am` leaves main clean with rebase-apply/ present.
+    mkdirSync(join(clean, '.git/rebase-apply'));
+    const busy = worktree(clean, ['new', 'b', '--no-install']);
+    expect(busy.stdout).toMatch(/git rebase-apply in progress; left alone/u);
+    rmSync(join(clean, '.git/rebase-apply'), {recursive: true});
+    // Another process working in the checkout itself.
+    const sleeper = spawn('sleep', ['30'], {cwd: clean, stdio: 'ignore'});
+    try {
+      await new Promise(done => setTimeout(done, 200));
+      const used = worktree(clean, ['new', 'c', '--no-install']);
+      expect(used.stdout).toMatch(new RegExp(`pid [\\d, ]*${String(sleeper.pid)}[\\d, ]* working in it; left alone`, 'u'));
+    } finally { sleeper.kill(); }
+    await new Promise(done => setTimeout(done, 200));
+    const head = git(clean, ['rev-parse', 'HEAD']);
+    const free = worktree(clean, ['new', 'd', '--no-install']);
+    expect(free.stdout).toMatch(/canonical main fast-forwarded 1 commit\(s\)/u);
+    expect(git(clean, ['rev-parse', 'HEAD'])).not.toBe(head);
   });
 
   test('from inside a linked worktree it still makes the new one under the canonical checkout', () => {
