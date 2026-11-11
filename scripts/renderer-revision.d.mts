@@ -1,4 +1,6 @@
 export const RENDER_ROOT: string;
+export const GRAPH_ROOT: string;
+export const MATERIAL: RegExp;
 export const SOURCE_ROOTS: readonly string[];
 export const SHADER_TEXT: RegExp;
 export const RENDERER_PACKAGES: readonly string[];

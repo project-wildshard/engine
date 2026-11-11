@@ -32,6 +32,14 @@ describe('narrowed renderer fingerprint (J259)', () => {
     expect(disk('src/client/engine/world/pointLightSkip.ts').toString('utf8')).toMatch(SHADER_TEXT);
     expect(edited('src/client/engine/world/pointLightSkip.ts', text => `${text}\n// one line\n`)).not.toBe(base);
   });
+  // Codex J206 MUST-FIX: shader text with none of the first keywords, constants the GLSL emitter bakes in from
+  // src/shared, and a material flag that picks a program variant.
+  it.each([
+    'src/client/engine/world/painterly.ts', 'src/client/engine/world/backdropLayer.ts',
+    'src/shared/engine/world/windField.ts', 'src/shared/engine/world/waves.ts', 'src/client/game/shardfile/bakedKinds.ts',
+  ])('moves on a one-line edit to %s', path => {
+    expect(edited(path, text => `${text}\n// one line\n`)).not.toBe(base);
+  });
   it.each(['three', 'postprocessing', 'n8ao', '@wildshard/format'])('moves on a %s version change', name => {
     expect(bump(name)).not.toBe(base);
   });
