@@ -2,7 +2,7 @@
 # MMO-PLAN MP0.1: a blank Ubuntu 24.04 box to a serving Wildshard host, and safe to run again. In order:
 #   1. Phase 1: packages (Node 24, apt PostgreSQL 16 (J180), rclone, Tailscale, Caddy left off), the users, PostgreSQL's
 #      local-socket settings, role and saves databases, ops.env and the staged release public key.
-#   2. harden.sh, when it sits beside this file (VPS-HARDENING-PLAN; not written yet).
+#   2. harden.sh (VPS-HARDENING-PLAN). Its --check reads every row (VH1); its apply step comes with VH3 to VH15, so today it skips.
 #   3. setup.sh, Phase 2: env files, units, health stubs and the Funnel routes. It needs the box on the tailnet.
 #   4. The cook worker (C4): an engine checkout at a tag, its user, its AppArmor allowance and its unit. It needs cook.env.
 #      sudo bash rebuild.sh        do what is missing. Exit 0 is done; exit 2 is waiting for one of Jake's inputs

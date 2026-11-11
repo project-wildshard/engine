@@ -59,7 +59,8 @@ host: Phase 1 (Node 24 from NodeSource, apt PostgreSQL 16, rclone,
 Tailscale, Caddy installed and off; the `raynos`, `wildshard` and
 `wildshard-cook` users; PostgreSQL's local-socket settings, role and both
 saves databases; a blank `ops.env`; the staged release public key), then
-`harden.sh` when VPS-HARDENING has written it, then `setup.sh` (Phase 2),
+`harden.sh` (VPS-HARDENING; today only its read-only `--check`, VH1, does
+anything), then `setup.sh` (Phase 2),
 then the cook worker. Every step checks first and does only what is
 missing, so a rerun is safe and a finished box reruns with no change.
 
@@ -111,6 +112,30 @@ both loopback ports answer from real servers that pulled the signed
 releases, the cook worker has written the shard's index, and nothing
 listens on 80 or 443. The stubbed parts are the tailnet (Jake's) and
 api-server; `api.wildshard.io` resolves to nothing inside the box.
+
+## Hardening report (VPS-HARDENING VH1)
+
+`scripts/vps/harden.sh --check` reads what an unprivileged audit cannot
+(ufw rules, `sudoers.d`, `sshd -T`, fail2ban, auth.log, PostgreSQL roles,
+`/etc/wildshard` modes, sysctl, the Hetzner firewall when `hcloud` is set
+up) and prints one `ok`, `fail`, `unknown` or `info` line per finding,
+tagged with its VPS-HARDENING row. It changes nothing. Exit 0 is clean, 1
+is any failure, 2 is something unreadable. Without root, root-only reads
+say `unknown`. Jake runs it on the box, from an engine checkout:
+
+    scp scripts/vps/harden.sh wildshard:harden.sh && ssh -t wildshard sudo bash harden.sh --check
+
+`bash scripts/vps-harden-proof.sh` proves it in a throwaway container
+dressed as the audited box; `test/vps-harden.test.ts` pins its parsing.
+
+**Proxy trust (VH10).** The server reads a forwarded address only from a
+loopback peer, and only the header `TRUST_PROXY` names: `caddy` (the
+default) takes the last `X-Forwarded-For` hop, which Tailscale Funnel and
+Caddy both write themselves; `cloudflare` takes `CF-Connecting-IP`; `none`
+reads no header. A browser's `Origin` must be in `ALLOWED_ORIGINS` (the
+game's own hosts by default; `*` allows any) or the upgrade gets 403.
+`setup.sh` sets both in `wildshard-server@.service`; an env-file line
+overrides them.
 
 ## J205: live agent traffic is staging only
 

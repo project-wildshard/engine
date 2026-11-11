@@ -11,3 +11,17 @@
   `ALLOWED_ORIGINS` gates a browser `Origin` with 403. `setup.sh` sets
   both in the server unit. Test fixtures now send `X-Forwarded-For`,
   as production does.
+- VH1: `scripts/vps/harden.sh --check`, read-only, one tagged line per
+  finding for VH1 to VH15 (sudoers.d, auth.log, `sshd -T`, ufw,
+  fail2ban, `systemd-analyze security`, Caddyfile and nftables,
+  the units' TRUST_PROXY, PostgreSQL roles, `/etc/wildshard` modes,
+  age dumps, alert hooks, sysctl, hcloud when set up). Without
+  `--check` it applies nothing yet, so `rebuild.sh`'s call is a skip.
+  A secret search prints a count, never a name or value. An old root
+  login in auth.log is a loud `info`, not a fail: it is history, and
+  VH16 needs a clean report. Proof: `scripts/vps-harden-proof.sh`
+  (systemd container dressed as the audited box, real sshd, ufw and
+  fail2ban; nothing under /etc /home /root /usr /opt /var/lib changes;
+  hand fixes turn VH2 and VH3 clean). The first proof run caught a
+  container-only `sshd -T` failure (no /run/sshd), so the unknown line
+  now carries sshd's own error.
