@@ -176,7 +176,8 @@ export class World {
   }
   private heard(index: number, news: WorkerNews): void {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
-    else if (news.kind === 'left') { this.seated.delete(news.device); this.names.delete(news.device); }
+    // GO7: a late `left` from the cell a goto moved them out of must not unseat them (or free their Name) in the new one.
+    else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
     else if (news.kind === 'refused') this.refuse(news.reason);
     else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);
     else if (news.kind === 'save') this.options.saves.write(news.write);
@@ -281,7 +282,11 @@ export class World {
       const found = await this.ask(holding, device, end), name = this.names.get(device) ?? typed;
       if (found.held && this.quits.has(end)) { this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
       if (!end.isOpen || this.draining) return;
-      if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
+      // GO7: Shard select chose another cell this world opens. The held body leaves cleanly (saved), and the door admits them there.
+      const moving = goto !== null && cellName(goto) !== holding && this.links.has(cellName(goto));
+      // `leaveHeld` transfers the hello it is given, and this hello still seats them in the new cell: it gets a copy.
+      if (found.held && moving) this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes.slice(0));
+      else if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
     }
     if (!end.isOpen || this.draining) return;
     this.pending.get(device)?.end.close('replaced');

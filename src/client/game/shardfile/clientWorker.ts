@@ -2,7 +2,7 @@
 // reconciles, and every creature is an interpolated row drawn by the real views.
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { LiveGridWire } from '../grid/liveSession';
-import { pageGoto } from '../../../shared/game/grid/pageMode';
+import { gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
 import { Vector3, type Object3D } from 'three';
@@ -316,7 +316,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   // GO4 gate: a grid page joins the world only once the world hosts the grid; until then, today's solo grid.
-  const hosted = world !== undefined && page !== null && ports.grid !== null && await bootTask('server:grid-hosted', async () => (await onlineModule()).worldHostsGrid(world, hostsGrid));
+  const hosted = world !== undefined && page !== null && ports.grid !== null && (gotoHosted() || await bootTask('server:grid-hosted', async () => (await onlineModule()).worldHostsGrid(world, hostsGrid)));
   const shell = await (world !== undefined && page !== null && serverRoute(world, page, { page: ports.grid !== null, hosted }) === 'online' ? online(world, page) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
   // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held

@@ -24,6 +24,8 @@ export interface GridIntents {
   pending: (slug: string) => boolean;
   /** the boot's one read: the intent for this page's shard (fresh at document arrival, at most 60 s old) or null; both copies are removed */
   consume: (slug: string) => GridIntent | null;
+  /** GO7: this document turned its own `?chunk=` page into a grid page. Held in the document, so a slow boot can't age it out. */
+  admit: (target: { readonly instance: string; readonly slug: string; readonly goto?: boolean }) => void;
 }
 
 /** The injectable store and clock let a Node test run the real write / consume / expiry round trip. */
@@ -36,8 +38,11 @@ export function gridIntents(store: Store, now: () => number = Date.now): GridInt
     if (intent === null || ![slug].includes(intent.slug)) return null; // the same page's shard only
     return freshPageArrival(intent.at, now()) ? intent : null;
   };
+  let admitted: GridIntent | null = null;
+  const held = (slug: string): GridIntent | null => admitted !== null && [slug].includes(admitted.slug) ? admitted : null;
   return {
-    pending: slug => fresh(session.read(), slug) !== null || fresh(device.read(), slug) !== null,
+    pending: slug => held(slug) !== null || fresh(session.read(), slug) !== null || fresh(device.read(), slug) !== null,
+    admit: (target) => { admitted = { instance: target.instance, slug: target.slug, at: now(), ...(target.goto === true ? { goto: true } : {}) }; },
     set: (target) => {
       const intent: GridIntent = { instance: target.instance, slug: target.slug, at: now(), ...(target.goto === true ? { goto: true } : {}) };
       const inSession = session.write(intent), onDevice = device.write(intent);
@@ -45,8 +50,9 @@ export function gridIntents(store: Store, now: () => number = Date.now): GridInt
     },
     consume: (slug) => {
       const fromSession = session.read(), fromDevice = device.read();
-      session.reset(); device.reset();
-      return fresh(fromSession, slug) ?? fresh(fromDevice, slug);
+      const local = held(slug);
+      session.reset(); device.reset(); admitted = null;
+      return local ?? fresh(fromSession, slug) ?? fresh(fromDevice, slug);
     },
   };
 }

@@ -131,7 +131,10 @@ export function bootPageMode(slug: string): PageMode {
   if (recovery !== null && [slug].includes(recovery.slug)) intent = { instance: recovery.instance, slug: recovery.slug, at: recovery.at };
   const mode: PageMode = intent === null ? 'shard' : 'grid';
   setPageMode(mode);
-  setPageGoto(intent !== null && 'goto' in intent && intent.goto ? intent.instance : null);
+  // GO7: a goto, or a recovery reload (the cell this page stood in, the goto's cell if it reloaded before the door placed it), asks the
+  // world for that cell; a title tap's PLAY takes the seat the world keeps (GO5).
+  const chosen = intent !== null && recovery === null && 'goto' in intent && intent.goto;
+  setPageGoto(intent !== null && (recovery !== null || chosen) ? intent.instance : null, chosen);
   if (intent !== null) gridCells.enter({ instance: intent.instance, slug: intent.slug }); // the home cell: the page starts inside it
   if (intent !== null) {
     const target = intent;

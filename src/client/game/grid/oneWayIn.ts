@@ -2,6 +2,7 @@
 // hosts the grid (GO4's gate), Shard select → a grid shard enters the grid at that shard's cell, so Shard select and Infinite Wildshard
 // land in the same online world, and no online page boots a bordered `'shard'` page for a grid shard. A shard the grid doesn't place,
 // a build with no world (preview, sharddev), and a world that hosts only its home cell keep today's one-shard page.
+import { pageScope } from '@wildshard/engine/app/resources';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
 import { hostsGrid } from '../shardfile/serverRoute';
 import { pageGridIntents } from './intent';
@@ -33,8 +34,15 @@ export function oneWayIn(page: OneWayIn, assembly?: GridAssembly): GridCell | nu
 /** The online module's gate, as `clientWorker.ts` reads it; a page with no world never asks. */
 interface OnlineGate { readonly worldHostsGrid: (world: { readonly release: string; readonly key: string }, hosts: (health: unknown) => boolean) => Promise<boolean> }
 
-/** Whether this build's world hosts the grid. Any failure, and a build with no world, answer false: today's one-shard page. */
-export async function worldHosted(world: unknown): Promise<boolean> {
+/** One deadline over the whole read, the online module's import included (GO4's 3 s). */
+const HOSTED_MS = 3000;
+/** Whether this build's world hosts the grid, within `HOSTED_MS`. Any failure or a late answer, and a build with no world, answer false:
+ *  today's one-shard page. */
+export async function worldHosted(world: unknown, waitMs: number = HOSTED_MS): Promise<boolean> {
+  const scope = pageScope.child('grid.hosted'), late = new Promise<false>(resolve => { scope.timeout(waitMs, () => { resolve(false); }); });
+  try { return await Promise.race([readHosted(world), late]); } finally { scope.dispose(); }
+}
+async function readHosted(world: unknown): Promise<boolean> {
   if (typeof world !== 'object' || world === null || !('release' in world) || !('key' in world)) return false;
   const { release, key } = world;
   if (typeof release !== 'string' || typeof key !== 'string') return false;
@@ -55,5 +63,6 @@ export async function enterByShard(page: Omit<OneWayIn, 'hosted'>, world: unknow
   if (oneWayIn({ ...page, hosted: true }) === null) return null;
   const cell = oneWayIn({ ...page, hosted: await hosted(world) });
   if (cell === null) return null;
-  return pageGridIntents().set({ instance: cell.instance, slug: cell.slug, goto: true }) ? cell.instance : null;
+  pageGridIntents().admit({ instance: cell.instance, slug: cell.slug, goto: true });
+  return cell.instance;
 }

@@ -3,9 +3,10 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { catalogueDocument } from '../src/shared/game/grid/catalogueDocument';
-import { currentPageMode, pageGoto, setPageGoto, setPageMode } from '../src/shared/game/grid/pageMode';
-import { enterByShard, oneWayIn, shardCell } from '../src/client/game/grid/oneWayIn';
-import { pageGridIntents } from '../src/client/game/grid/intent';
+import { currentPageMode, gotoHosted, pageGoto, setPageGoto, setPageMode } from '../src/shared/game/grid/pageMode';
+import { enterByShard, oneWayIn, shardCell, worldHosted } from '../src/client/game/grid/oneWayIn';
+import { gridIntents, pageGridIntents } from '../src/client/game/grid/intent';
+import { SaveStore } from '../src/shared/engine/saves/store';
 import { bootPageMode } from '../src/client/game/grid/pageEntry';
 import { gridEntryShown } from '../src/client/game/grid/menu';
 import { gotoSocket } from '../src/client/host/online/shell';
@@ -32,6 +33,7 @@ test('an online build whose world hosts the grid: Shard select → Driftwood boo
   expect(hosted).toHaveBeenCalledWith(WORLD);
   expect(bootPageMode('driftwood-isle'), 'the same page boots as a grid page').toBe('grid');
   expect([currentPageMode(), pageGoto()], 'and asks the world to seat it in Driftwood\'s cell').toEqual(['grid', 'driftwood-isle']);
+  expect(gotoHosted(), 'the worker client takes this read, never a second one that could disagree').toBe(true);
   expect(shardCell('driftwood-isle', assembly)?.cell, 'the grid\'s home cell').toEqual([0, 0]);
   // A plot and a cell whose instance isn't its shard's slug go to their own cells too.
   expect(oneWayIn({ online: true, hosted: true, slug: 'nalati-grasslands', kept: false }, assembly)?.instance).toBe('nalati-grasslands');
@@ -88,5 +90,39 @@ test('the door seats a goto in the cell it names, over the player\'s last place;
   const back = bot(`${bench.url}?chunk=nalati-grasslands`, 'bench', 'device:goer');
   expect(await back.arrived()).toBe(true);
   expect(JSON.parse(back.resume ?? '{}'), 'a cell this world does not open: the last place').toMatchObject({ cell: 'driftwood-isle' });
+  expect(bench.crashes).toEqual([]);
+});
+
+test('a slow boot keeps the page\'s own goto: it is held in the document, never aged out like a tap from another page', () => {
+  let now = 10_000;
+  const intents = gridIntents(new SaveStore({ local: null, session: null }), () => now);
+  intents.admit({ instance: 'driftwood-isle', slug: 'driftwood-isle', goto: true });
+  now += 120_000;
+  expect(intents.pending('driftwood-isle')).toBe(true);
+  expect(intents.consume('driftwood-isle')).toMatchObject({ instance: 'driftwood-isle', goto: true });
+  expect(intents.consume('driftwood-isle'), 'consumed once').toBeNull();
+});
+
+test('the hosting read answers within its deadline, the module import included', async () => {
+  const started = Date.now();
+  expect(await worldHosted(WORLD, 50)).toBe(false);
+  expect(Date.now() - started).toBeLessThan(2000);
+  expect(await worldHosted(undefined)).toBe(false);
+});
+
+test('a seat held in another cell lets go on a goto, and the late leave never unseats the new one', { timeout: 120_000 }, async () => {
+  bench = await roomBench({ cells: ['driftwood-isle', 'template-2'], saves: memoryPlayerSaves(), workers: 1 });
+  const first = bot(`${bench.url}?chunk=driftwood-isle`, 'bench', 'device:mover');
+  expect(await first.arrived()).toBe(true);
+  await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(true); }, { timeout: 10_000 });
+  first.drop();
+  await new Promise(resolve => { setTimeout(resolve, 300); });
+  expect(bench.room('driftwood-isle')?.holds('device:mover'), 'the dropped link\'s body is held').toBe(true);
+  const moved = bot(`${bench.url}?chunk=template-2`, 'bench', 'device:mover');
+  expect(await moved.arrived(), JSON.stringify(bench.lines.slice(-4))).toBe(true);
+  expect(JSON.parse(moved.resume ?? '{}'), 'Shard select → the template plot, over the held Driftwood body').toMatchObject({ cell: 'template-2' });
+  await vi.waitFor(() => { expect(bench?.room('driftwood-isle')?.holds('device:mover')).toBe(false); }, { timeout: 10_000 });
+  await new Promise(resolve => { setTimeout(resolve, 500); });
+  expect(bench.world.health(), 'one seat, in the new cell').toMatchObject({ players: 1 });
   expect(bench.crashes).toEqual([]);
 });
