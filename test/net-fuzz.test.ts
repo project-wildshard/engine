@@ -40,8 +40,13 @@ const CLOCK = (): number => 0;
 
 let rapier: Rapier;
 const products = new Map<string, HeadlessRuntimeInput>();
+// TS11 / FL20: each fuzzed product is read once, before the cases, as every later case already shares it. The cases'
+// 10 s then time the room, the hostile ticks, the save and the restore, not a cold product read (0.35 s of the Nalati
+// case's ~3 CPU-s, three times that at load 50).
+const FUZZED = ['pine-hollow', 'nalati-grasslands', 'sunscar-dunes', 'driftwood-isle', 'nine-dragon-stack'] as const;
 beforeAll(async () => {
   rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  for (const slug of FUZZED) await product(slug);
 });
 // Immutable products may be shared; each case retires its own native worlds,
 // including a construction that settles after the case has already failed.
@@ -76,7 +81,7 @@ async function roomOn(slug: string): Promise<{ live: TrustedHeadlessResident; ro
 }
 const spots = (live: TrustedHeadlessResident): readonly { readonly x: number; readonly z: number }[] => [...live.host.entities.values()].map(body => body.position).filter(at => Number.isFinite(at.x) && Number.isFinite(at.z));
 
-test.each(['pine-hollow', 'nalati-grasslands', 'sunscar-dunes', 'driftwood-isle', 'nine-dragon-stack'].flatMap(slug => SEEDS.map(seed => [slug, seed] as const)))('hostile clients on %s (seed %d) end nothing', { timeout: 10_000 }, async (slug, seed) => {
+test.each(FUZZED.flatMap(slug => SEEDS.map(seed => [slug, seed] as const)))('hostile clients on %s (seed %d) end nothing', { timeout: 10_000 }, async (slug, seed) => {
   const rewinds = vi.spyOn(HitHistory.prototype, 'at');
   const { live, room, book, seat } = await roomOn(slug), { host } = live, fuzz = new Fuzz(seed), lead = leadPlayer(host), interactions = [...actRoutes(host).interactions.keys()];
   const first = seat(), second = seat('bot:rival', 'Rival'), clean = seat('bot:clean', 'Clean'), rival = host.players.get('bot:rival'), honest = host.players.get('bot:clean');

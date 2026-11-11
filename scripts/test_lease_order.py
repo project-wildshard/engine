@@ -49,9 +49,13 @@ class LeaseOrderTests(unittest.TestCase):
         self.processes.append(process)
         return process
 
-    def wait_for(self, predicate):
+    def wait_for(self, predicate, *watched):
         until = time.monotonic() + 10
         while not predicate():
+            for process in watched:
+                if process.poll() is not None:
+                    out, err = process.communicate()
+                    self.fail('fixture exited %s before it was ready: %s' % (process.returncode, (out + err)[-2000:]))
             if time.monotonic() > until:
                 self.fail('fixture synchronization timed out')
             time.sleep(0.01)
@@ -62,11 +66,11 @@ class LeaseOrderTests(unittest.TestCase):
     def test_two_checks_wait_on_full_pool_without_taking_heavy_capacity(self):
         holders = [self.start(self.mirror_command([sys.executable, '-c', 'pass']),
                               ROLE='pool') for _ in range(5)]
-        self.wait_for(lambda: len(list(self.root.glob('pool-*.locked'))) == 5)
+        self.wait_for(lambda: len(list(self.root.glob('pool-*.locked'))) == 5, *holders)
         checks = [self.start([sys.executable, HEAVY, 'build', '--',
             *self.mirror_command([sys.executable, str(self.worker), name])]) for name in ('check-a', 'check-b')]
         queue = self.root / 'mirrors/checks.queue'
-        self.wait_for(lambda: queue.exists() and len(list(queue.iterdir())) == 2)
+        self.wait_for(lambda: queue.exists() and len(list(queue.iterdir())) == 2, *holders, *checks)
         state = json.loads(subprocess.check_output([sys.executable, HEAVY, 'status'], env=self.env))
         self.assertEqual(state['active'], [])
         (self.root / 'pool.go').touch()
@@ -81,7 +85,7 @@ class LeaseOrderTests(unittest.TestCase):
     def test_unknown_shell_wrapper_refuses_before_waiting_with_a_lease(self):
         preview = self.start(self.mirror_command([sys.executable, HEAVY, 'build', '--',
             sys.executable, str(self.worker), 'preview']), ROLE='preview')
-        self.wait_for(lambda: (self.root / 'preview.locked').exists())
+        self.wait_for(lambda: (self.root / 'preview.locked').exists(), preview)
         blocked = self.start([sys.executable, HEAVY, 'build', '--', '/bin/bash', '-c',
             'exec "$@"', 'fixture', *self.mirror_command([sys.executable, str(self.worker), 'bad'])])
         out, err = blocked.communicate(timeout=5)
@@ -95,7 +99,7 @@ class LeaseOrderTests(unittest.TestCase):
     def test_five_parallel_check_requests_spread_and_sixth_fails_naming_every_holder(self):
         commands = [self.start(self.mirror_command([sys.executable, '-c', 'pass']),
                                ROLE='pool', FIXTURE_SLOT='check5') for _ in range(5)]
-        self.wait_for(lambda: len(list(self.root.glob('pool-*.locked'))) == 5)
+        self.wait_for(lambda: len(list(self.root.glob('pool-*.locked'))) == 5, *commands)
         self.assertEqual({Path(path.read_text()).parent.name for path in self.root.glob('pool-*.locked')},
                          {'check', 'check2', 'check3', 'check4', 'check5'})
         # Simulate five elapsed minutes in the actual sixth process. It must

@@ -86,15 +86,21 @@ test('Driftwood spawns, moves, kills and returns its mixed population headless, 
 
 test('the worker runs Driftwood from its built product, tick for tick with the resident', async () => {
   const { directory, shard, assets, resident } = await shipped();
-  const sim = await HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', product: directory }), live = await resident();
+  // TS11 / FL23: the worker's start (its own thread loading ~700 source modules) is most of this case. The resident is
+  // built and stepped on this thread meanwhile, instead of after it: the same two owners, inputs and ticks.
+  const starting = HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', product: directory });
+  let live: TrustedHeadlessResident | undefined;
   try {
-    const commands = [{ kind: 'player' as const, moveX: 0.6, moveZ: 0.8, yaw: 0 }];
-    const result = await sim.verbTapePart({ version: 1, observe: [], segments: [{ id: 'same-300-inputs', ticks: 300, commands }] });
+    live = await resident();
+    const sim = await starting, commands = [{ kind: 'player' as const, moveX: 0.6, moveZ: 0.8, yaw: 0 }];
+    const part = sim.verbTapePart({ version: 1, observe: [], segments: [{ id: 'same-300-inputs', ticks: 300, commands }] });
+    part.catch(() => undefined); // awaited below; a throw on this thread first must not leave it unhandled
     for (let tick = 0; tick < 300; tick++) live.step(commands);
+    const result = await part;
     expect(result.commit.tick).toBe(300);
     expect(result.commit.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
     expect(live.host.entities.size).toBe(34);
-  } finally { await sim.dispose(); live.dispose(); }
+  } finally { await (await starting.catch(() => undefined))?.dispose(); live?.dispose(); }
 }, 10_000); // Both owners still run every tick; only the final full continuation is asserted and published.
 
 test("Driftwood's server files stay off every client path", async () => {
