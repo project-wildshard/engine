@@ -81,7 +81,7 @@ function commandOf(unit,charged){
     return {command:['bash','-c','node scripts/ci-shard-wall.mjs -- node scripts/engine-ci-shard.mjs; code=$?; node scripts/ci-shard-wall.mjs --check || code=1; exit $code'],env};
   }
   if(unit.name==='static')return {command:['bash','scripts/ci-static.sh',process.env.CI_STATIC_MODE??'code'],env};
-  if(unit.name==='e2e')return {command:['bash','-c','pnpm exec playwright install --with-deps --only-shell chromium && pnpm test:e2e && node --test test/title-layout-browser.proof.mjs test/settings-tabs-browser.proof.mjs'],env};
+  if(unit.name==='e2e')return {command:['bash','-c','bash scripts/ci-playwright-install.sh --only-shell chromium && pnpm test:e2e && node --test test/title-layout-browser.proof.mjs test/settings-tabs-browser.proof.mjs'],env};
   if(unit.name==='plan-proofs')return {command:['bash','-c',['node scripts/engine-ci-membership-proof.ts','node scripts/engine-order-proof.mjs','node scripts/module-cache-proof.mjs',
     'python3 scripts/cpu-census-proof.py','node scripts/engine-ci-proof.mjs','node scripts/engine-ci-proof.mjs tmp/engine-ci-budget-proof --import','node scripts/ci-shard-wall-proof.mjs'].join(' && ')],env};
   if(unit.name==='quarantine')return {command:['node','scripts/test-quarantine.mjs','--shard=1/1'],env};

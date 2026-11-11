@@ -38,7 +38,7 @@ jobs:
           WS_VITEST_MAX_WORKERS: '2'
           NET_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
           COOK_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: bash scripts/ci-playwright-install.sh chromium
       - name: Cook, attach, and play the same bytes
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
       # Ring 2: all 28 real products and a clean build exceed ten seconds.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # BROWSER-TESTS-BENCH BB2 (J231): a hosted job installs Playwright's Chromium beside its build, off the job's path.
-#   bash scripts/ci-browser.sh start   begin `playwright install --with-deps` in the background (logs in tmp/ci-browser/)
+#   bash scripts/ci-browser.sh start   begin `playwright install --with-deps` in the background (logs in tmp/ci-browser/);
+#                                      scripts/ci-playwright-install.sh falls back to no --with-deps when apt fails
 #   bash scripts/ci-browser.sh wait    block until it ends, print its log and seconds, and fail when it failed
 # It installs only the full Chromium that scripts/parity/lane-browser.mjs launches (`channel: 'chromium'`), not the
 # headless shell: on the 4-vCPU runner the shell missed boot-smoke's title and capture deadlines (bench run 42913701526).
@@ -15,7 +16,7 @@ case "${1:-}" in
     # Detached, so the next step's build runs while this downloads; the status file is written last, by rename.
     nohup bash -c '
       dir=$1 started=$(date +%s)
-      pnpm exec playwright install --with-deps --no-shell chromium >"$dir/install.log" 2>&1
+      bash scripts/ci-playwright-install.sh --no-shell chromium >"$dir/install.log" 2>&1
       code=$?
       echo "$code $(( $(date +%s) - started ))" >"$dir/status.tmp" && mv "$dir/status.tmp" "$dir/status"
     ' ci-browser "$dir" >/dev/null 2>&1 &

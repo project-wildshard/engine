@@ -86,7 +86,7 @@ jobs:
         with:
           path: ~/.cache/wildshard/pins
           key: ${{ steps.pins.outputs.cache-primary-key }}
-      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: bash scripts/ci-playwright-install.sh ${{ matrix.browser }}
       - run: pnpm build:game
         env:
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}

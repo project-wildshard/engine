@@ -36,7 +36,7 @@ jobs:
         with:
           pins-cache-scope: full
       - run: node scripts/pins.ts install
-      - run: pnpm exec playwright install --with-deps "$PROOF_BROWSER"
+      - run: bash scripts/ci-playwright-install.sh "$PROOF_BROWSER"
       - run: pnpm build:game
         env:
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}

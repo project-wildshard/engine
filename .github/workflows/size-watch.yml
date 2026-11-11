@@ -28,7 +28,7 @@ jobs:
         with: {node-version: 24, cache: pnpm}
       - uses: ./.github/actions/org-deps
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: bash scripts/ci-playwright-install.sh chromium
       - name: Measure production
         id: watch
         run: node scripts/shard-size-watch.mjs --upstream https://wildshard-singleplayer.vercel.app/ --out size-watch
