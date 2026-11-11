@@ -61,7 +61,7 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     p.append(...video); cats.tag('video', ...video);
 
     const sw = (key: SettingKey, label: string) => {
-      const b = el('ws-gmenu-switch', engineString('s_d652c0be6be8', [label]), 'button') as HTMLButtonElement; b.type = 'button'; b.setAttribute('role', 'switch');
+      const b = el('ws-gmenu-switch', engineString('s_d652c0be6be8', [label]), 'button') as HTMLButtonElement; b.type = 'button'; b.setAttribute('role', 'switch'); b.dataset['sv'] = key; // QA 49: the tabbed layouts find each row by key
       const sync = (v: boolean) => { b.classList.toggle('on', v); b.setAttribute('aria-checked', String(v)); };
       sync(getSetting(key)); onSetting(key, sync);
       listenTap(host.scope, b, () => setSetting(key, !getSetting(key)));
@@ -86,7 +86,7 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     // controls: the 0.5–2× look multipliers (Settings 'look' / 'swingLook') — read live by TouchControls + Player's mouse look
     const mult = (key: NumberKey, label: string) => {
       const [lo, hi] = NUM_RANGE[key];
-      const row = el('ws-gmenu-row', engineString('s_b756f4e0f8ff', [label]));
+      const row = el('ws-gmenu-row', engineString('s_b756f4e0f8ff', [label])); row.dataset['sv'] = key;
       const val = row.querySelector<HTMLElement>('.ws-gmenu-val');
       const s = document.createElement('input'); s.type = 'range'; s.className = 'ws-gmenu-slider';
       s.min = String(lo * 100); s.max = String(hi * 100); s.step = '5'; s.value = String(Math.round(getNumber(key) * 100));
@@ -98,14 +98,14 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     section(p, 'controls', engineString('s_799c26913574'), mult('look', engineString('s_64e57bf9ef8a')), [(c) => c.melee, mult('swingLook', engineString('s_e532946ea0dd'))]); // a swing's turn: the blades
 
     // audio: master volume (Settings 'volume', 0..1) — main.ts drives the AudioContext gain from it
-    const vol = el('ws-gmenu-row', engineString('s_31a1802e19b8'));
+    const vol = el('ws-gmenu-row', engineString('s_31a1802e19b8')); vol.dataset['sv'] = 'volume';
     const slider = document.createElement('input'); slider.type = 'range'; slider.min = '0'; slider.max = '100'; slider.className = 'ws-gmenu-slider';
     slider.value = String(Math.round(getNumber('volume') * 100));
     host.scope.listen(slider, 'input', () => setNumber('volume', Number(slider.value) / 100));
     host.scope.listen(slider, 'pointerdown', (e) => e.stopPropagation());
     vol.append(slider);
     // music volume (Settings 'music', 0..1) — src/client/engine/audio/Music.ts drives its bus from it
-    const mus = el('ws-gmenu-row', engineString('s_4db5c63706fd'));
+    const mus = el('ws-gmenu-row', engineString('s_4db5c63706fd')); mus.dataset['sv'] = 'music';
     const mslider = document.createElement('input'); mslider.type = 'range'; mslider.min = '0'; mslider.max = '100'; mslider.className = 'ws-gmenu-slider';
     mslider.value = String(Math.round(getNumber('music') * 100));
     host.scope.listen(mslider, 'input', () => setNumber('music', Number(mslider.value) / 100));
@@ -129,13 +129,16 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     const sfxNote = el('ws-gmenu-note');
     const paintCredit = () => { const c = sfxCredit(getSfxSet()); sfxNote.textContent = c; sfxNote.hidden = c === ''; };
     paintCredit(); onSfxCredit(paintCredit);
-    const audio = [cats.head(el('ws-gmenu-label', engineString('s_bc1b88907d3b'))), vol, mus, buildMusicStyleRow(host.scope), el('ws-gmenu-note', MUSIC_CREDIT), sfxNote, el('ws-gmenu-note', MODEL_CREDIT)];
+    const styleRow = buildMusicStyleRow(host.scope), musicCredit = el('ws-gmenu-note', MUSIC_CREDIT), modelCredit = el('ws-gmenu-note', MODEL_CREDIT);
+    styleRow.dataset['sv'] = 'musicStyle'; musicCredit.dataset['sv'] = 'creditMusic'; sfxNote.dataset['sv'] = 'creditSfx'; modelCredit.dataset['sv'] = 'creditModel';
+    const audio = [cats.head(el('ws-gmenu-label', engineString('s_bc1b88907d3b'))), vol, mus, styleRow, musicCredit, sfxNote, modelCredit];
     p.append(...audio); cats.tag('audio', ...audio);
     // lock-on (E50, src/client/engine/player/LockOnTarget.ts): how hard the view follows a locked enemy (Gentle = Jake's pick; Off keeps the
     // lock — the reticle, orbit strafing, the lunge, switching — but never turns the view: the motion-sickness escape)
     const lockCams: { v: '1' | '0.5' | '0'; text: string }[] = [{ v: '1', text: engineString('s_641d1ef657bd') }, { v: '0.5', text: engineString('s_96124817c810') }, { v: '0', text: engineString('s_ca7981b46ecf') }];
     const lockCam = picker(engineString('s_21ed7056ff10'), lockCams, () => (getNumber('lockCam') >= 0.75 ? '1' : getNumber('lockCam') > 0.1 ? '0.5' : '0'), (v) => setNumber('lockCam', Number(v)), () => undefined);
-    const lockOn = [el('ws-gmenu-label', engineString('s_fcc34c9149ac')), lockCam, sw('autoLock', engineString('s_c436a89a4252')), el('ws-gmenu-note', engineString('s_c12db72ef23e'))];
+    const lockNote = el('ws-gmenu-note', engineString('s_c12db72ef23e')); lockCam.dataset['sv'] = 'lockCam'; lockNote.dataset['sv'] = 'lockNote';
+    const lockOn = [el('ws-gmenu-label', engineString('s_fcc34c9149ac')), lockCam, sw('autoLock', engineString('s_c436a89a4252')), lockNote];
     p.append(...lockOn); cats.tag('gameplay', ...lockOn);
 
     // DEBUG (E162): every variant, taste toggle and developer aid, grouped — declared once in src/client/engine/ui/debugOptions.ts and
@@ -153,10 +156,13 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     state.paintPendingReload = paintPending;
     paintPending(); actions.append(apply); host.hint.before(actions);
     // Review is not debug (E140): playtesters unlock notes with it, so it stays in Settings, with the Developer switch
-    const review = [buildReview(host.scope), ...devSwitchRows()];
+    const reviewBox = buildReview(host.scope), devRows = devSwitchRows();
+    reviewBox.dataset['sv'] = 'review'; for (const row of devRows) row.dataset['sv'] = 'devSwitch';
+    dbg.dataset['sv'] = 'debug'; tools.dataset['sv'] = 'devtools';
+    const review = [reviewBox, ...devRows];
     p.append(...review); cats.tag('review', ...review);
-    state.savePanel = buildSavePanel(); cats.pane.append(state.savePanel); cats.tag('save', state.savePanel);
-    state.controlsPanel = buildControlsPanel(app.levelScope ?? app.engineScope); cats.pane.append(state.controlsPanel); cats.tag('keys', state.controlsPanel);
+    state.savePanel = buildSavePanel(); state.savePanel.dataset['sv'] = 'saveFile'; cats.pane.append(state.savePanel); cats.tag('save', state.savePanel);
+    state.controlsPanel = buildControlsPanel(app.levelScope ?? app.engineScope); state.controlsPanel.dataset['sv'] = 'keys'; cats.pane.append(state.controlsPanel); cats.tag('keys', state.controlsPanel);
     cats.sync();
   }
 

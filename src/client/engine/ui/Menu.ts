@@ -17,8 +17,10 @@ import { activeLevel } from '../../../shared/engine/level/selection';
 import type { FullMap } from './Map';
 import { icon, type IconId } from './icons';
 import { onReview, reviewUnlocked } from './review';
-import { settingsHint, type SettingsCat } from './settingsCats';
+import { SETTINGS_DESK_QUERY, settingsHint, type SettingsCat } from './settingsCats';
 import { buildMenuSettings, type MenuSettingsState, type SettingsCtx } from './menuSettings';
+import { mountSettingsTabs, type SettingsTabsView } from './settingsTabs';
+import { LAYOUT_EVENT, paintSettingsButton, settingsLayout } from './settingsLayout';
 import { withOwner } from '../../../shared/engine/app/ownership';
 
 type BuiltInTab = 'map' | 'settings' | 'feedback';
@@ -102,6 +104,9 @@ export class GameMenu {
   /** pause ▸ Settings's categories: a rail + one pane on a desktop (J10 layout A), one column on a phone */
   /** the Settings card (its title, then every section) and the sections the game added to it (`addSettingsSection`) */
   private readonly sectionRefresh = new Set<() => void>();
+  /** QA 49: the tabbed Settings prototype picked in Debug (settingsLayout.ts), null for today's column */
+  private layoutView: SettingsTabsView | null = null;
+  private wideLayout = false;
 
   private opts: GameMenuOptions;
   constructor(opts: GameMenuOptions) {
@@ -182,6 +187,9 @@ export class GameMenu {
     this.select('settings');
     this.syncReview(); onReview(() => this.syncReview());
     installKeyHelp(this.scope); // F1 or / during play: the live key bindings (E419), on every level
+    // QA 49: a Settings layout picked in Debug re-lays the built Settings live and renames PAUSE
+    this.scope.listen(document, LAYOUT_EVENT, () => { if (this.settingsView.cats !== undefined) { this.mountLayout(); this.applies(); } this.syncTabs(); });
+    paintSettingsButton();
   }
 
   /** the FEEDBACK tab exists only while the review inbox is unlocked */
@@ -206,13 +214,14 @@ export class GameMenu {
     this.tabBar.classList.toggle('four', shown === 4); // a BAG without FINDS (Nalati, Nine Dragon): ACHIEVEMENTS must fit a phone
     this.tabBar.hidden = shown <= 1;
     this.tabBar.classList.toggle('icons', group === 'play');
-    this.title.textContent = this.practice && group === 'pause' ? engineString('s_d3857b12b4ce') : TITLE[group];
+    this.title.textContent = this.practice && group === 'pause' ? engineString('s_d3857b12b4ce') : group === 'pause' && settingsLayout() !== 'today' ? engineString('s_74a883a037bc') : TITLE[group];
     // E178: the PAUSE menu leaves to the title from its header; the BAG only closes
     const pause = group === 'pause';
     this.closeBtn.textContent = pause ? engineString('s_d640c7421da0') : engineString('s_7d9eb7acb13e');
     this.exitBtn.hidden = !pause;
     // E176: the build pill shows over the PAUSE menu (not the BAG), so the root says which one is up
     this.root.classList.toggle('pause', pause);
+    this.root.classList.toggle('ws-gmenu-svmenu', pause && settingsLayout() !== 'today'); // QA 49: SETTINGS is wider than PAUSED
     window.dispatchEvent(new Event('ws-menu'));
   }
 
@@ -376,7 +385,16 @@ export class GameMenu {
     withOwner(this.scope, () => buildMenuSettings({scope:this.scope,panel:this.panels.settings,hint:this.hint,
       syncCats:()=>{this.syncCats();},tab:()=>this._tab},this.settingsView));
     for (const install of this.pendingSettings) install();
+    this.mountLayout();
     this.syncCats();this.applies();
+  }
+  /** QA 49: (re)mount the picked tabbed layout over the built rows; 'today' leaves the shipped column */
+  private mountLayout(): void {
+    this.layoutView?.dispose(); this.layoutView = null; this.wideLayout = false;
+    const layout = settingsLayout();
+    if (layout === 'today' || this.settingsView.cats === undefined) { this.syncCats(); return; }
+    this.layoutView = mountSettingsTabs({ scope: this.scope, panel: this.panels.settings, desk: () => window.matchMedia(SETTINGS_DESK_QUERY).matches,
+      wide: (on) => { if (on !== this.wideLayout) { this.wideLayout = on; this.syncCats(); } } }, layout);
   }
   private prepareSettings(): void {
     if (this.settingsView.cats !== undefined) return;
@@ -419,7 +437,7 @@ export class GameMenu {
   }
   /** layout A on a desktop: the sheet goes wide for Settings, and the footer says click (J10) */
   private syncCats(): void {
-    const wide = this.settingsView.cats?.desk === true && this._tab === 'settings';
+    const wide = (this.layoutView === null ? this.settingsView.cats?.desk === true : this.wideLayout) && this._tab === 'settings';
     this.root.classList.toggle('wide', wide);
     this.hint.textContent = wide ? settingsHint() : this.hintFor(this._tab);
   }
@@ -433,6 +451,7 @@ export class GameMenu {
     this.settingsView.cats?.sync();
     this.settingsView.debug?.applies(c);
     this.settingsView.developerTools?.applies(c);
+    this.layoutView?.sync();
   }
   /** Settings → REVIEW: a password unlocks the review inbox (src/client/engine/ui/review.ts); unlocked, the Quick note switch + LOCK */
 

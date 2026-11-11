@@ -53,7 +53,8 @@ export function buildSavePanel(): HTMLDivElement & { refresh: () => void } {
   });
   card.append(title, note, row, picker, status, reload, aside);
   const offline = buildOfflineRow(scope);
-  if (offline !== null) card.append(offline);
-  card.append(buildConnectionRow(scope), buildBuildRow(scope)); // E7.5 prep: the Connection doctor, beside Offline play; R9: Build beside it
+  if (offline !== null) { offline.dataset['sv'] = 'offline'; card.append(offline); }
+  const connection = buildConnectionRow(scope), build = buildBuildRow(scope); connection.dataset['sv'] = 'connection'; build.dataset['sv'] = 'build'; // QA 49
+  card.append(connection, build); // E7.5 prep: the Connection doctor, beside Offline play; R9: Build beside it
   renderAside(); return Object.assign(card, { refresh: renderAside });
 }

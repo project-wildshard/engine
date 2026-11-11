@@ -469,6 +469,8 @@
     "src/client/engine/ui/saveStrings.ts": "client",
     "src/client/engine/ui/Settings.ts": "client",
     "src/client/engine/ui/settingsCats.ts": "client",
+    "src/client/engine/ui/settingsLayout.ts": "client",
+    "src/client/engine/ui/settingsTabs.ts": "client",
     "src/client/engine/ui/SpeedLines.ts": "client",
     "src/client/engine/ui/StartTitle.ts": "client",
     "src/client/engine/ui/tabs.ts": "client",

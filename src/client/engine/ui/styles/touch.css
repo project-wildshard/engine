@@ -296,3 +296,7 @@
 /* QA row 42: no BOOST button. A double tap of HOVER latches Developer boost; the tab burns amber while it moves the board
    (ui/hoverBoost.ts `.boost`), as do the board's repulsors. */
 #hud .ws-touch .ws-touch-hover.on.boost { color: #2a1600; border-color: var(--ws-amber); background: var(--ws-amber); box-shadow: 0 0 0 2px rgba(255, 181, 71, 0.35), 0 0 18px rgba(255, 181, 71, 0.75); text-shadow: none; font-weight: 700; }
+/* QA 49: under a Settings layout prototype (settingsLayout.ts) the button is a cog and SETTINGS */
+.ws-touch-pause.ws-touch-gear { display: flex; align-items: center; gap: 7px; }
+.ws-touch-pause.ws-touch-gear::before { content: none; }
+.ws-touch-pause.ws-touch-gear svg { display: block; width: 12px; height: 12px; color: var(--ws-cyan); }

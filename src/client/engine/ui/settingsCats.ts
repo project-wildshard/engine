@@ -39,6 +39,8 @@ export function settingsCategories(panel: HTMLElement, scope: Scope, labels: Rec
     head: (el) => { el.classList.add('catdup'); return el; },
     select: (cat) => { selected = cat; api.sync(); },
     sync: () => {
+      // QA 49: a tabbed Settings layout (settingsTabs.ts) has taken the rows: no rail, nothing folded away by category
+      if (panel.classList.contains('ws-gmenu-svon')) { panel.classList.remove('cats'); for (const { el } of tagged) el.classList.remove('catoff'); changed(); return; }
       const desk = media.matches;
       if (desk && !shows(selected)) selected = SETTINGS_CATS.find(shows) ?? selected;
       panel.classList.toggle('cats', desk);
