@@ -9,7 +9,7 @@
 // Signed files come from each channel's RELEASE_URL, and from the ones the box keeps beside each bundle it has served.
 import { spawnSync } from 'node:child_process';
 import { createPublicKey, verify } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Public SPKI DER, equal to setup.sh's EXPECTED_RELEASE_PUBLIC_KEY (the engine's test holds them equal). Never a signing key.
@@ -63,7 +63,13 @@ async function signedFiles() {
     const bundles = `/var/lib/wildshard/${channel}/bundles`;
     if (existsSync(bundles)) {
       for (const name of readdirSync(bundles)) {
-        try { texts.push(readFileSync(join(bundles, name, 'release.json'), 'utf8')); } catch { /* not a kept release */ }
+        // The channel's user owns these folders: never follow a link, never block on a FIFO, never read a big file.
+        let fd;
+        try {
+          fd = openSync(join(bundles, name, 'release.json'), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+          const stat = fstatSync(fd);
+          if (stat.isFile() && stat.size <= 65_536) texts.push(readFileSync(fd, 'utf8'));
+        } catch { /* not a kept release */ } finally { if (fd !== undefined) closeSync(fd); }
       }
     }
   }
