@@ -96,9 +96,9 @@ test('without root, what root alone reads is unknown, never a pass', () => {
 
 /** A box with VH2 to VH4, VH6 to VH8, VH10 and VH15 done. */
 const HARDENED: Readonly<Record<string, string>> = { ...TODAY,
-    getent: `case "$1 \${2:-}" in 'group sudo') echo 'sudo:x:27:raynos' ;; 'group docker') exit 2 ;; 'passwd ') echo 'raynos:x:1000:1000::/home/raynos:/bin/bash' ;; esac`,
+    getent: `case "$1 \${2:-}" in 'group sudo') echo 'sudo:x:27:raynos' ;; 'group docker') exit 2 ;; 'passwd ') printf 'raynos:x:1000:1000::/home/raynos:/bin/bash\\nwildshard-agent:x:1001:1001::/home/wildshard-agent:/bin/bash\\n' ;; esac`,
     snap: 'exit 1', ss: `printf 'LISTEN 0 4096 100.64.0.9:22 0.0.0.0:*\\nLISTEN 0 511 127.0.0.1:8790 0.0.0.0:*\\n'`,
-    sshd: `printf 'passwordauthentication no\\npermitrootlogin no\\nkbdinteractiveauthentication no\\nx11forwarding no\\nmaxauthtries 3\\nallowusers raynos\\n'`,
+    sshd: `printf 'passwordauthentication no\\npermitrootlogin no\\nkbdinteractiveauthentication no\\nx11forwarding no\\nmaxauthtries 3\\nallowtcpforwarding no\\nallowagentforwarding no\\nloglevel VERBOSE\\nmaxsessions 2\\nallowusers raynos\\nallowusers wildshard-agent\\n'`,
     ufw: `printf 'Status: active\\nDefault: deny (incoming), allow (outgoing)\\n\\nTo   Action   From\\n443/tcp                    ALLOW IN    173.245.48.0/20\\n41641/udp                  ALLOW IN    Anywhere\\nAnywhere on tailscale0     ALLOW IN    Anywhere\\n'`,
     'fail2ban-client': `printf 'Status\\n\`- Jail list:\\tcaddy, sshd\\n'`,
     systemctl: `case "$1" in cat) exit 0 ;; show) echo 'Environment=TRUST_PROXY=caddy "ALLOWED_ORIGINS=https://play.wildshard.io"' ;; esac`,

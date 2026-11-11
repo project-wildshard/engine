@@ -108,7 +108,7 @@ has 3-apply 'Run with sudo'
 # --- A few of VH2's and VH3's fixes by hand: the rows they belong to must read clean.
 box sh -c "gpasswd -d matt sudo >/dev/null && groupdel docker && userdel -r clawdbot 2>/dev/null; usermod -s /usr/sbin/nologin matt \
   && rm /home/raynos/.config/systemd/user/openclaw-gateway.service \
-  && printf 'PasswordAuthentication no\nPermitRootLogin no\nKbdInteractiveAuthentication no\nX11Forwarding no\nAllowUsers raynos\nMaxAuthTries 3\n' > /etc/ssh/sshd_config.d/10-wildshard.conf"
+  && printf 'PasswordAuthentication no\nPermitRootLogin no\nKbdInteractiveAuthentication no\nX11Forwarding no\nAllowUsers raynos wildshard-agent\nMaxAuthTries 3\n' > /etc/ssh/sshd_config.d/10-wildshard.conf"
 box sh -c 'sleep 1; touch /root/marker; sleep 1'
 run 4-fixed bash /root/wildshard/scripts/vps/harden.sh --check
 for row in VH2 VH3; do row_clean 4-fixed "$row"; done

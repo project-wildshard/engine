@@ -151,7 +151,7 @@ for path in "$LIB" "$LOGS" "$HOME_DIR/production" "$HOME_DIR/production/bundles"
   "$HOME_DIR/staging" "$HOME_DIR/staging/bundles" "$HOME_DIR/staging/packs" "$HOME_DIR/staging/logs" "$HOME_DIR/packs" "$HOME_DIR/dumps"; do
   if [ -L "$path" ]; then fail "Refuse symlinked owned folder: $path"; fi
 done
-for name in setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs; do
+for name in setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs wildshard-config; do
   if [ ! -f "$HERE/$name" ]; then fail "$name must sit beside setup.sh"; fi
 done
 if check_listeners; then say ok 'no public game or database TCP listener'
@@ -233,6 +233,8 @@ env_file staging "$STAGING_PORT" 2 16
 for channel in production staging; do
   "$NODE" "$HERE/setup-state.mjs" prefill "$ETC/$channel.env" "$channel" "$EXPECTED_RELEASE_PUBLIC_KEY" --apply 0 "${CHANNEL_GID[$channel]}"
 done
+# J266 (MS3.5): the settings an agent may change move out of the secrets file into <channel>.settings, once.
+for channel in production staging; do python3 -I "$HERE/wildshard-config" split "$channel"; done
 # The Phase 1 private backup credentials are left byte-for-byte alone.
 if [ ! -f "$ETC/ops.env" ]; then say stop 'Phase 1 ops.env missing'; exit 1; fi
 repair_metadata "$ETC/ops.env" 600 root:root
@@ -262,6 +264,8 @@ Environment=PLAYTEST_DIR=$HOME_DIR/%i/logs
 Environment=TRUST_PROXY=caddy
 Environment="ALLOWED_ORIGINS=https://play.wildshard.io https://staging.wildshard.io https://preview.wildshard.io https://wildshard-singleplayer.vercel.app"
 EnvironmentFile=$ETC/%i.env
+# J266 (MS3.5): the non-secret settings, read after the secrets so they win; `wildshard-config set` writes them.
+EnvironmentFile=-$ETC/%i.settings
 # It exits 0 on a bad hash, so the old bundle comes back up (E7.2c).
 ExecStartPre=$NODE $LIB/pull.mjs
 ExecStart=$NODE $HOME_DIR/%i/current/main.mjs
@@ -355,6 +359,8 @@ SupplementaryGroups=wildshard
 Environment=WILDSHARD_HOME=$HOME_DIR/%i
 Environment=RELEASE_CHANNEL=%i
 EnvironmentFile=$ETC/%i.env
+# J266 (MS3.5): the non-secret settings, read after the secrets so they win; `wildshard-config set` writes them.
+EnvironmentFile=-$ETC/%i.settings
 ExecCondition=/bin/sh -c '! systemctl is-active --quiet wildshard-server@%i.service'
 ExecStart=$NODE $LIB/pull.mjs --fetch
 TimeoutStartSec=300
@@ -382,6 +388,8 @@ User=wildshard-%i
 Group=wildshard-%i
 SupplementaryGroups=wildshard
 EnvironmentFile=$ETC/%i.env
+# J266 (MS3.5): the non-secret settings, read after the secrets so they win; `wildshard-config set` writes them.
+EnvironmentFile=-$ETC/%i.settings
 ExecStart=$NODE $LIB/health-stub.mjs %i
 NoNewPrivileges=yes
 ProtectSystem=strict

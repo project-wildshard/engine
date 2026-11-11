@@ -99,7 +99,54 @@ if [ "$MODE" = open ]; then
   say ok VH4 "ufw lets ${#CF_V4[@]} IPv4 and ${#CF_V6[@]} IPv6 Cloudflare ranges reach 443, and nothing else"; exit 0
 fi
 
-need_packages ufw fail2ban nftables age unattended-upgrades python3 lynis
+need_packages ufw fail2ban nftables age unattended-upgrades python3 lynis auditd acct sysstat debsums apt-show-versions
+
+# --- VH16's lynis floor (80, MS5.2): accounting, audit, a banner, password ages, a tighter umask, no rare protocols.
+if [ "$(sed -n 's/^ENABLED="\(.*\)"$/\1/p' /etc/default/sysstat 2>/dev/null)" != true ]; then
+  sed -i 's/^ENABLED=.*/ENABLED="true"/' /etc/default/sysstat; say doing VH16 'sysstat collects'
+fi
+for service in auditd acct sysstat; do
+  if ! systemctl is-enabled --quiet "$service" 2>/dev/null || ! systemctl is-active --quiet "$service"; then systemctl enable --now --quiet "$service"; say doing VH16 "$service on"; fi
+done
+if put /etc/audit/rules.d/90-wildshard.rules 640 root:root VH16 <<'EOF'
+## VPS-HARDENING VH16: who changed who may log in, who may be root, and the game's secrets.
+-w /etc/passwd -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/sudoers -p wa -k sudoers
+-w /etc/sudoers.d/ -p wa -k sudoers
+-w /etc/ssh/sshd_config -p wa -k sshd
+-w /etc/ssh/sshd_config.d/ -p wa -k sshd
+-w /etc/wildshard/ -p wa -k wildshard
+-w /opt/wildshard-vps/ -p wa -k wildshard
+-w /usr/local/sbin/ -p wa -k wildshard
+EOF
+then augenrules --load >/dev/null 2>&1 || say warn VH16 'augenrules did not load the rules; auditd keeps its old ones until a restart'; fi
+banner='Authorized access only. Every session and command on this system is logged and monitored.
+Disconnect now if you are not an authorized user.'
+for file in /etc/issue /etc/issue.net; do if put "$file" 644 root:root VH16 <<<"$banner"; then :; fi; done
+for pair in PASS_MAX_DAYS:365 PASS_MIN_DAYS:1 PASS_WARN_AGE:14 UMASK:027; do
+  name=${pair%%:*} value=${pair#*:}
+  if ! grep -Eq "^$name[[:space:]]+$value\$" /etc/login.defs; then
+    if grep -Eq "^$name[[:space:]]" /etc/login.defs; then sed -i -E "s/^$name[[:space:]].*/$name\t$value/" /etc/login.defs
+    else printf '%s\t%s\n' "$name" "$value" >> /etc/login.defs; fi
+    say doing VH16 "login.defs $name $value"
+  fi
+done
+if put /etc/modprobe.d/90-wildshard.conf 644 root:root VH16 <<'EOF'
+# VPS-HARDENING VH16: protocols and storage this box never uses, never loaded.
+install dccp /bin/false
+install sctp /bin/false
+install rds /bin/false
+install tipc /bin/false
+install usb-storage /bin/false
+blacklist dccp
+blacklist sctp
+blacklist rds
+blacklist tipc
+blacklist usb-storage
+EOF
+then :; fi
 
 # --- VH15: kernel and sysctl.
 if put /etc/sysctl.d/90-wildshard.conf 644 root:root VH15 <<'EOF'
@@ -120,6 +167,16 @@ kernel.unprivileged_bpf_disabled = 1
 kernel.yama.ptrace_scope = 1
 EOF
 then sysctl -q -p /etc/sysctl.d/90-wildshard.conf; fi
+
+# --- J266 (MS3.5): the agents' own account. No password, key only, its key from the Mac's ~/.ssh/wildshard_agent_ed25519.
+# Its key file and folder are root's, so the account cannot add a key of its own. sudo and SSH sessions report to Sentry
+# through the same PAM lines as raynos's (VH14). Off in one command: usermod --expiredate 1 wildshard-agent.
+AGENT=wildshard-agent
+if ! id "$AGENT" >/dev/null 2>&1; then useradd --create-home --shell /bin/bash "$AGENT"; say doing J266 "create $AGENT"; fi
+if [ "$(passwd -S "$AGENT" | awk '{print $2}')" != L ]; then passwd -l "$AGENT" >/dev/null; say doing J266 "$AGENT has no password"; fi
+install -d -m 755 -o root -g root "/home/$AGENT/.ssh"
+if put "/home/$AGENT/.ssh/authorized_keys" 644 root:root J266 < "$HERE/wildshard-agent.pub"; then :; fi
+if ! id -nG "$AGENT" | tr ' ' '\n' | grep -qx systemd-journal; then usermod -aG systemd-journal "$AGENT"; say doing J266 "$AGENT reads the journal by group"; fi
 
 # Shutting public SSH before the box is on the tailnet would lock everyone out of a fresh Rebuild, so VH3 and VH4 wait for it.
 tailnet_up() { tailscale status --json 2>/dev/null | python3 -I -c 'import json, sys; j = json.load(sys.stdin); sys.exit(0 if j.get("BackendState") == "Running" else 1)'; }
@@ -148,13 +205,19 @@ done
 
 # --- VH3: sshd, and SSH over the tailnet to that sshd (D1). Tailscale SSH would bypass sshd's rules, root included.
 if put /etc/ssh/sshd_config.d/10-wildshard.conf 644 root:root VH3 <<'EOF'
-# VPS-HARDENING VH3: keys only, raynos only, over the tailnet only (ufw and the Hetzner firewall shut public 22; D1).
+# VPS-HARDENING VH3: keys only, raynos and the agents' account (J266) only, over the tailnet only (ufw and the Hetzner
+# firewall shut public 22; D1).
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
 X11Forwarding no
-AllowUsers raynos
+AllowUsers raynos wildshard-agent
 MaxAuthTries 3
+# VH16's lynis floor: no tunnels or agent forwarding through the box, each key fingerprint logged, two sessions a connection.
+AllowTcpForwarding no
+AllowAgentForwarding no
+LogLevel VERBOSE
+MaxSessions 2
 EOF
 then
   arm_deadman
@@ -175,6 +238,20 @@ if grep -Eq '^net/ipv4/conf/(all|default)/log_martians=0' /etc/ufw/sysctl.conf 2
   sed -i -E 's#^(net/ipv4/conf/(all|default)/log_martians)=0#\1=1#' /etc/ufw/sysctl.conf; say doing VH15 '/etc/ufw/sysctl.conf logs martians'
 fi
 sysctl -q -p /etc/sysctl.d/90-wildshard.conf
+
+# --- J266: the root-owned copy of these scripts the agents' allowlist runs, refreshed from wherever this runs (Jake's sudo,
+# or wildshard-apply's verified copy of a signed tag). Run from that copy, it is already current.
+OPT=/opt/wildshard-vps
+if [ "$HERE" != "$OPT" ] && ! diff -rq "$HERE" "$OPT" >/dev/null 2>&1; then
+  rm -rf /opt/wildshard-vps.new; cp -R "$HERE" /opt/wildshard-vps.new; chown -R root:root /opt/wildshard-vps.new; chmod -R go-w /opt/wildshard-vps.new
+  rm -rf /opt/wildshard-vps; mv /opt/wildshard-vps.new /opt/wildshard-vps; say doing J266 "refresh $OPT from $HERE"
+else say ok J266 "$OPT"; fi
+# The two helpers (MS3.5): settings without secrets, and a signed tag's scripts.
+for pair in wildshard-config:wildshard-config wildshard-apply.mjs:wildshard-apply; do
+  if ! cmp -s "$HERE/${pair%%:*}" "/usr/local/sbin/${pair#*:}"; then
+    install -m 755 -o root -g root "$HERE/${pair%%:*}" "/usr/local/sbin/${pair#*:}"; say doing J266 "install /usr/local/sbin/${pair#*:}"
+  fi
+done
 
 # --- MS3.3 (VH8, VH12): raynos's narrow allowlist. Exact commands, exact arguments, no pager, no wildcard.
 # Root-owned copies, so the allowlist names files raynos cannot change. wildshard-harden's apply half is only reachable
@@ -217,6 +294,15 @@ if visudo -cqf "$sudoers"; then
   if cmp -s "$sudoers" /etc/sudoers.d/20-wildshard-agents; then rm -f "$sudoers"; say ok VH8 '/etc/sudoers.d/20-wildshard-agents'
   else chmod 440 "$sudoers"; chown root:root "$sudoers"; mv -f "$sudoers" /etc/sudoers.d/20-wildshard-agents; say doing VH8 'write /etc/sudoers.d/20-wildshard-agents'; fi
 else rm -f "$sudoers"; say stop VH8 'the allowlist does not parse; nothing written'; exit 1; fi
+# J266: the agents' account gets the same list, the two helpers, and the root-owned scripts. raynos keeps its own password
+# for everything else.
+agent_rules="$rules, /usr/local/sbin/wildshard-config, /usr/local/sbin/wildshard-apply, /usr/bin/bash $OPT/rebuild.sh, /usr/bin/bash $OPT/harden.sh"
+sudoers=$(umask 077; mktemp)
+printf '# MMO-SERVER-PLAN MS3.5 (J266): what the agents'"'"' account may run as root with no password; sudo reports each to Sentry.\n%s ALL=(root) NOPASSWD: %s\n' "$AGENT" "${agent_rules#, }" > "$sudoers"
+if visudo -cqf "$sudoers"; then
+  if cmp -s "$sudoers" /etc/sudoers.d/21-wildshard-agent; then rm -f "$sudoers"; say ok J266 '/etc/sudoers.d/21-wildshard-agent'
+  else chmod 440 "$sudoers"; chown root:root "$sudoers"; mv -f "$sudoers" /etc/sudoers.d/21-wildshard-agent; say doing J266 'write /etc/sudoers.d/21-wildshard-agent'; fi
+else rm -f "$sudoers"; say stop J266 'the agent allowlist does not parse; nothing written'; exit 1; fi
 if ! id -nG raynos | tr ' ' '\n' | grep -qx systemd-journal; then usermod -aG systemd-journal raynos; say doing VH8 'raynos reads the journal by group, not sudo'; fi
 
 # --- VH5: updates and reboots. D6: no Ubuntu Pro.

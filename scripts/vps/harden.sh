@@ -63,7 +63,8 @@ if has getent; then
   if getent group docker >/dev/null; then bad VH2 "a docker group exists (members '$(getent group docker | cut -d: -f4)'): docker is root without a password"
   else ok VH2 'no docker group'; fi
   shells=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(nologin|false|sync)$/ {print $1}' | sort | tr '\n' ' ' | sed 's/ $//')
-  if [ "$shells" = raynos ]; then ok VH2 'raynos is the only login user'; else bad VH2 "login users: '${shells}'; want raynos alone"; fi
+  # J266: the agents' own account is the one other login.
+  if [ "$shells" = 'raynos wildshard-agent' ]; then ok VH2 'raynos and wildshard-agent are the only login users'; else bad VH2 "login users: '${shells}'; want raynos and wildshard-agent"; fi
 else unknown VH2 'getent is missing'; fi
 if has snap && snap list ollama >/dev/null 2>&1; then bad VH2 'the third-party ollama snap is installed'; else ok VH2 'no ollama snap'; fi
 if [ "$LISTENERS_OK" = 1 ]; then
@@ -79,11 +80,36 @@ if [ "$ROOT" = 1 ] && has sshd; then
   if config=$(sshd -T 2>&1); then
     want() { if printf '%s\n' "$config" | grep -qix "$1 $2"; then ok VH3 "sshd $1 $2"; else bad VH3 "sshd $1 is '$(printf '%s\n' "$config" | awk -v k="$1" 'tolower($1)==k {$1=""; sub(/^ /,""); print}')'; want $2"; fi; }
     want passwordauthentication no; want permitrootlogin no; want kbdinteractiveauthentication no; want x11forwarding no
-    want maxauthtries 3; want allowusers raynos
+    want maxauthtries 3; want allowtcpforwarding no; want allowagentforwarding no; want loglevel VERBOSE; want maxsessions 2
+    # sshd -T writes one `allowusers` line per name; the set must be exactly raynos and the agents' account (J266).
+    allowed=$(printf '%s\n' "$config" | awk 'tolower($1)=="allowusers" {print $2}' | sort | tr '\n' ' ' | sed 's/ $//')
+    if [ "$allowed" = 'raynos wildshard-agent' ]; then ok VH3 'sshd allowusers raynos wildshard-agent'; else bad VH3 "sshd allowusers is '${allowed}'; want raynos wildshard-agent"; fi
   else unknown VH3 "sshd -T failed: $(printf '%s\n' "$config" | head -1)"; fi
 elif [ "$ROOT" = 1 ]; then info VH3 'no sshd installed'
 else unknown VH3 "sshd -T: $NEEDS_ROOT"; fi
 if [ "$LISTENERS_OK" = 1 ] && wildcard_on 22; then info VH3 'sshd listens on every address; ufw and the Hetzner firewall decide who reaches it'; fi
+
+# --- J266 (MS3.5): the agents' account. Key only, root's key file, the root-owned scripts its allowlist runs.
+if id wildshard-agent >/dev/null 2>&1; then
+  keys="$R/home/wildshard-agent/.ssh/authorized_keys"
+  if [ "$(stat -c '%U %a' "$keys" 2>/dev/null)" = 'root 644' ]; then ok J266 'wildshard-agent keys are root'"'"'s'; else bad J266 'wildshard-agent authorized_keys is not root'"'"'s 644: the account could add a key'; fi
+  if [ -d "$R/opt/wildshard-vps" ] && [ -z "$(find "$R/opt/wildshard-vps" \( ! -user root -o -perm /go=w \) 2>/dev/null | head -1)" ]; then ok J266 '/opt/wildshard-vps is root'"'"'s and nobody else writes it'
+  else bad J266 '/opt/wildshard-vps is missing, or someone besides root can write it'; fi
+  if [ "$ROOT" = 1 ]; then
+    if [ -f "$R/etc/sudoers.d/21-wildshard-agent" ]; then ok J266 'sudoers.d/21-wildshard-agent'; else bad J266 'no sudoers.d/21-wildshard-agent'; fi
+  fi
+else bad J266 'no wildshard-agent account'; fi
+
+# --- VH16's lynis floor: audit, accounting, the banner, the umask, the protocols never loaded.
+if has systemctl; then
+  for service in auditd acct sysstat; do
+    if systemctl is-active --quiet "$service" 2>/dev/null; then ok VH16 "$service runs"; else bad VH16 "$service is not running"; fi
+  done
+fi
+if grep -qi 'authorized' "$R/etc/issue" 2>/dev/null && grep -qi 'authorized' "$R/etc/issue.net" 2>/dev/null; then ok VH16 'legal banner'; else bad VH16 'no legal banner in /etc/issue and /etc/issue.net'; fi
+if grep -Eq '^UMASK[[:space:]]+027$' "$R/etc/login.defs" 2>/dev/null; then ok VH16 'login.defs UMASK 027'; else bad VH16 'login.defs UMASK is not 027'; fi
+if [ "$(grep -Ec '^install (dccp|sctp|rds|tipc|usb-storage) /bin/false$' "$R/etc/modprobe.d/90-wildshard.conf" 2>/dev/null)" = 5 ]; then ok VH16 'dccp, sctp, rds, tipc and usb-storage never load'
+else bad VH16 'dccp, sctp, rds, tipc or usb-storage can load'; fi
 
 # --- VH4: firewall, two layers.
 CF_RANGES_RE='173\.245\.48\.0/20|103\.21\.244\.0/22|103\.22\.200\.0/22|103\.31\.4\.0/22|141\.101\.64\.0/18|108\.162\.192\.0/18|190\.93\.240\.0/20|188\.114\.96\.0/20|197\.234\.240\.0/22|198\.41\.128\.0/17|162\.158\.0\.0/15|104\.16\.0\.0/13|104\.24\.0\.0/14|172\.64\.0\.0/13|131\.0\.72\.0/22|2400:cb00::/32|2606:4700::/32|2803:f800::/32|2405:b500::/32|2405:8100::/32|2a06:98c0::/29|2c0f:f248::/32'

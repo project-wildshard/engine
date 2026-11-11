@@ -1,0 +1,179 @@
+#!/usr/bin/python3 -I
+# MMO-SERVER-PLAN MS3.5 (J266): the agents' one way to change a game server's settings, through sudo with no password.
+#   wildshard-config show <channel>                                 print the channel's settings file
+#   wildshard-config set <channel> <KEY> <value> [--production]     write one setting, restart the channel, roll back if it
+#                                                                   does not come up healthy
+#   wildshard-config split <channel>                                setup.sh's: move the settings out of <channel>.env, once
+# Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
+# Secrets stay in the root-only .env, and this never reads one out or writes one: only the keys in SETTINGS below, each
+# checked by its own rule. A production change needs --production, so no one changes the live world by a slip.
+# Installed root-owned as /usr/local/sbin/wildshard-config by harden.sh; the sudo allowlist names that path only.
+import os, re, subprocess, sys, tempfile, time, urllib.request
+
+CHANNELS = {'production': {'port': 8790, 'cpus': 9}, 'staging': {'port': 8791, 'cpus': 4}}
+CELL = r'[a-z0-9][a-z0-9-]{0,63}'
+# Each allowed key and its rule. Anything else is refused: secrets (SEAT_SECRET, SENTRY_DSN, DATABASE_URL), the trust roots
+# (RELEASE_URL, RELEASE_PUBLIC_KEY, BUNDLE_ORIGIN, PACK_ORIGIN, TELEMETRY_URL, ERRORS_URL) and exposure (HOST, PORT,
+# TRUST_PROXY, ALLOWED_ORIGINS) are root's, by hand or by a reviewed script.
+SETTINGS = {
+    'WORLD_CELLS': lambda value, channel: value == 'grid' or (re.fullmatch(f'{CELL}(,{CELL}){{0,63}}', value) is not None
+                                                             and len(set(value.split(','))) == len(value.split(','))),
+    'WORLD_WORKERS': lambda value, channel: re.fullmatch(r'[1-9][0-9]?', value) is not None and int(value) <= CHANNELS[channel]['cpus'],
+    'WORLD_SEATS': lambda value, channel: re.fullmatch(r'[1-9][0-9]{0,3}', value) is not None and int(value) <= 2000,
+    'RECORD_TAG': lambda value, channel: re.fullmatch(r'[A-Za-z0-9._-]{0,64}', value) is not None,
+}
+RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), none twice",
+         'WORLD_WORKERS': 'a whole number from 1 to the channel\'s pinned CPUs (production 9, staging 4)',
+         'WORLD_SEATS': 'a whole number from 1 to 2000', 'RECORD_TAG': 'up to 64 of A-Z a-z 0-9 . _ -'}
+
+# The engine's tests hand it a made-up /etc and no systemctl; never as root, so sudo (which drops the environment anyway) cannot.
+TEST = os.geteuid() != 0 and os.environ.get('WILDSHARD_CONFIG_TEST_ROOT')
+ETC = (TEST or '') + '/etc/wildshard'
+
+
+def stop(message, code=1):
+    print(f'stop    {message}', file=sys.stderr)
+    sys.exit(code)
+
+
+def read_rows(path):
+    """KEY=value rows in file order, comments and blanks kept as they are."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return []
+    except OSError:
+        stop(f'{path} is a link or unreadable')
+    with os.fdopen(fd, encoding='utf-8') as handle:
+        return handle.read().splitlines()
+
+
+def key_of(row):
+    match = re.match(r'^([A-Z_][A-Z0-9_]*)=', row)
+    return match.group(1) if match else None
+
+
+def write_rows(path, rows, channel):
+    """Atomic, never through a link, 640 root:wildshard-<channel>."""
+    folder = os.path.dirname(path)
+    fd, temporary = tempfile.mkstemp(dir=folder, prefix='.wildshard-config.')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write('\n'.join(rows) + '\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o640)
+        if not TEST:
+            import grp
+            os.chown(temporary, 0, grp.getgrnam(f'wildshard-{channel}').gr_gid)
+        os.replace(temporary, path)
+    except BaseException:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+        raise
+
+
+HEADER = ['# MMO-SERVER-PLAN MS3.5 (J266): this channel\'s non-secret settings, read after its .env. Change them with',
+          '# `sudo wildshard-config set <channel> <KEY> <value>`; secrets stay in the .env.']
+
+
+def healthy(channel):
+    """The channel's server is active and answers /health on loopback, within two minutes (a first pull can take a while)."""
+    port = CHANNELS[channel]['port']
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        active = subprocess.run(['/usr/bin/systemctl', 'is-active', '--quiet', f'wildshard-server@{channel}.service']).returncode == 0
+        if active:
+            try:
+                with urllib.request.urlopen(f'http://127.0.0.1:{port}/health', timeout=2) as answer:
+                    if answer.status == 200:
+                        return True
+            except OSError:
+                pass
+        time.sleep(2)
+    return False
+
+
+def restart(channel):
+    """Restart the server only if it runs: a channel still waiting for its first release keeps its health stub."""
+    unit = f'wildshard-server@{channel}.service'
+    if TEST:
+        print(f'would   restart {unit}')
+        return True
+    if subprocess.run(['/usr/bin/systemctl', 'is-active', '--quiet', unit]).returncode != 0:
+        print(f'skip    {unit} is not running; the setting takes effect when it starts')
+        return True
+    print(f'doing   restart {unit}')
+    subprocess.run(['/usr/bin/systemctl', 'restart', unit])
+    return healthy(channel)
+
+
+def main(argv):
+    production = '--production' in argv
+    args = [arg for arg in argv if arg != '--production']
+    if not args or args[0] not in ('show', 'set', 'split'):
+        stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [--production] | split <channel>')
+    verb = args[0]
+    if len(args) < 2 or args[1] not in CHANNELS:
+        stop('the channel is production or staging')
+    channel = args[1]
+    settings_path, env_path = f'{ETC}/{channel}.settings', f'{ETC}/{channel}.env'
+
+    if verb == 'show':
+        if len(args) != 2:
+            stop('usage: wildshard-config show <channel>')
+        for row in read_rows(settings_path):
+            if key_of(row) in SETTINGS:
+                print(row)
+        return 0
+
+    if verb == 'split':
+        # Once: the allowed keys move from the .env (where setup.sh first wrote them) to the settings file. Secrets never move.
+        if len(args) != 2:
+            stop('usage: wildshard-config split <channel>')
+        env_rows = read_rows(env_path)
+        moving = [row for row in env_rows if key_of(row) in SETTINGS]
+        if not moving:
+            print(f'ok      {env_path} holds no settings')
+            return 0
+        settings_rows = read_rows(settings_path) or list(HEADER)
+        have = {key_of(row) for row in settings_rows}
+        # A value already in the settings file wins: it is read last, so it is the one the server runs with today.
+        settings_rows += [row for row in moving if key_of(row) not in have and SETTINGS[key_of(row)](row.split('=', 1)[1], channel)]
+        write_rows(settings_path, settings_rows, channel)
+        write_rows(env_path, [row for row in env_rows if key_of(row) not in SETTINGS], channel)
+        print(f'doing   move {", ".join(key_of(row) for row in moving)} from {channel}.env to {channel}.settings')
+        return 0
+
+    if len(args) != 4:
+        stop('usage: wildshard-config set <channel> <KEY> <value> [--production]')
+    key, value = args[2], args[3]
+    if key not in SETTINGS:
+        stop(f'{key} is not a setting an agent may change; allowed: {", ".join(SETTINGS)}')
+    if not SETTINGS[key](value, channel):
+        stop(f'{key} must be {RULES[key]}')
+    if channel == 'production' and not production:
+        stop('a production change needs --production')
+    before = read_rows(settings_path)
+    rows = list(before) or list(HEADER)
+    rows = [row for row in rows if key_of(row) != key] + [f'{key}={value}']
+    if rows == before:
+        print(f'ok      {channel} {key} is already {value}')
+        return 0
+    write_rows(settings_path, rows, channel)
+    print(f'doing   {channel} {key}={value}')
+    if restart(channel):
+        print(f'ok      {channel} is healthy with {key}={value}')
+        return 0
+    # It did not come back: put the old file back and start the old settings, so a bad value never leaves a channel down.
+    if before:
+        write_rows(settings_path, before, channel)
+    else:
+        os.unlink(settings_path)
+    print(f'undo    {channel} was not healthy in two minutes; the old settings are back', file=sys.stderr)
+    restart(channel)
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

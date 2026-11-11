@@ -105,7 +105,7 @@ wait_http() {
 
 # --- Before anything
 if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then say stop 'Run with sudo, or pass --check'; exit 1; fi
-for name in setup.sh setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs; do
+for name in setup.sh setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs wildshard-config wildshard-apply.mjs wildshard-agent.pub; do
   if [ ! -f "$HERE/$name" ]; then say stop "$name must sit beside rebuild.sh"; exit 1; fi
 done
 # The one trusted public key lives in setup.sh; this stages a copy of it, never another.
