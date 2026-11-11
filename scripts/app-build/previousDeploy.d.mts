@@ -6,4 +6,6 @@ export function carryPreviousDeploy(directory: string, options?: {
   readonly live?: readonly string[];
   /** whether a build is this repository's (default: its commit is in this checkout's history) */
   readonly ours?: (build: string) => boolean;
+  /** a CI test build: a 5xx or network failure fetching the origin's manifest warns and carries nothing (a release refuses) */
+  readonly optional?: boolean;
 }): Promise<{current: number; builds: number; carried: number; bytes: number}>;

@@ -251,11 +251,16 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   const previousOrigin =
     process.env.WS_PREVIOUS_DEPLOY_ORIGIN ??
     (release ? "https://wildshard-singleplayer.vercel.app" : undefined);
+  // ci.yml's test build opts in: an unreachable production (a 5xx, a network error) is no previous deploy there.
+  // A Vercel production build never does, so a release still refuses rather than ship without the kept graphs.
+  const optional =
+    process.env.WS_PREVIOUS_DEPLOY_OPTIONAL === "1" && process.env.VERCEL_ENV !== "production";
   console.log(
     "Previous deploy chunks:",
     await carryPreviousDeploy(outDir, {
       ...(previousDirectory === undefined ? {} : { previousDirectory }),
       ...(previousOrigin === undefined ? {} : { previousOrigin }),
+      optional,
     }),
   );
 }

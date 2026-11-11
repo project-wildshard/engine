@@ -166,3 +166,31 @@ test('a clash with the deploy live right now, when it is ours, fails the build a
     await expect(carryPreviousDeploy(next, {previousDirectory: live, ours: () => false})).resolves.toMatchObject({carried: 0});
   } finally {rmSync(root, {recursive: true, force: true});}
 });
+
+test('a paused production origin (503) stops a release build, but a CI test build warns once and carries nothing', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-paused-'));
+  // Vercel's spend cap answers every path 503 DEPLOYMENT_PAUSED (main ci 43111080979)
+  const server = createServer((_request, response) => {response.writeHead(503, {'x-vercel-error': 'DEPLOYMENT_PAUSED'}); response.end();});
+  await new Promise<void>(resolve => {server.listen(0, '127.0.0.1', resolve);});
+  const warned: string[] = [], warn = console.warn;
+  console.warn = (...args: unknown[]): void => {warned.push(args.join(' '));};
+  try {
+    const address = server.address(); if (address === null || typeof address === 'string') throw new Error('No fixture port');
+    const previousOrigin = `http://127.0.0.1:${address.port}`;
+    writeFileSync(join(root, 'version.json'), '{"build":"new"}');
+    await expect(carryPreviousDeploy(root, {previousOrigin})).rejects.toThrow('Previous deploy manifest returned 503');
+    expect(existsSync(join(root, 'deploy-chunks.json'))).toBe(false);
+    expect(warned).toEqual([]);
+    expect(await carryPreviousDeploy(root, {previousOrigin, optional: true})).toMatchObject({builds: 1, carried: 0});
+    expect(warned).toEqual([`Previous deploy manifest unavailable (503 from ${previousOrigin}), so this test build carries no previous builds`]);
+    // a refused origin (no server at all) is a network error: the same warning in a test build, a refusal in a release
+    const closed = `http://127.0.0.1:1`;
+    await expect(carryPreviousDeploy(root, {previousOrigin: closed})).rejects.toThrow();
+    expect(await carryPreviousDeploy(root, {previousOrigin: closed, optional: true})).toMatchObject({builds: 1, carried: 0});
+    expect(warned[1]).toMatch(/^Previous deploy manifest unavailable \(fetch failed from http:\/\/127\.0\.0\.1:1\)/u);
+  } finally {
+    console.warn = warn;
+    await new Promise<void>((resolve, reject) => {server.close(error => {if (error === undefined) resolve(); else reject(error);});});
+    rmSync(root, {recursive: true, force: true});
+  }
+});

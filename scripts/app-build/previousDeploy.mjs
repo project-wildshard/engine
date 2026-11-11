@@ -107,7 +107,8 @@ function ownBuild(build) {
  * naming the file and the deploy. A live build from another repository (the singleplayer shell that J210 retires) is the
  * one this deploy replaces, so its clash is a warning.
  * @param {string} directory
- * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean}} [options]
+ * A test build (`optional`) treats a 5xx or network failure fetching the origin's manifest as no previous builds.
+ * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean, optional?: boolean}} [options]
  */
 export async function carryPreviousDeploy(directory, options = {}) {
   const current = currentManifest(directory);
@@ -119,10 +120,23 @@ export async function carryPreviousDeploy(directory, options = {}) {
   if (options.previousDirectory !== undefined) {
     previous = readManifest(JSON.parse(readFileSync(join(options.previousDirectory, MANIFEST), 'utf8')));
   } else if (options.previousOrigin !== undefined) {
-    const response = await fetch(new URL(`/${MANIFEST}`, options.previousOrigin), {cache: 'no-store', signal: AbortSignal.timeout(30000)});
+    /** @type {Response | undefined} */
+    let response;
+    try {
+      response = await fetch(new URL(`/${MANIFEST}`, options.previousOrigin), {cache: 'no-store', signal: AbortSignal.timeout(30000)});
+    } catch (error) {
+      if (options.optional !== true) throw error;
+      console.warn(`Previous deploy manifest unavailable (${error instanceof Error ? error.message : String(error)} from ${options.previousOrigin}), so this test build carries no previous builds`);
+    }
+    // A test build may meet a paused or failing production (Vercel's spend cap answers 503 DEPLOYMENT_PAUSED, main ci
+    // 43111080979): it warns and carries nothing. A release still refuses, so it never ships without the kept graphs.
+    if (response !== undefined && options.optional === true && response.status >= 500) {
+      console.warn(`Previous deploy manifest unavailable (${response.status} from ${options.previousOrigin}), so this test build carries no previous builds`);
+      response = undefined;
+    }
     // The first release of this output format has no predecessor manifest.
-    if (!response.ok && response.status !== 404) throw new Error(`Previous deploy manifest returned ${response.status}`);
-    if (response.status !== 404 && !response.headers.get('content-type')?.includes('text/html')) previous = readManifest(await response.json());
+    if (response !== undefined && !response.ok && response.status !== 404) throw new Error(`Previous deploy manifest returned ${response.status}`);
+    if (response !== undefined && response.status !== 404 && !response.headers.get('content-type')?.includes('text/html')) previous = readManifest(await response.json());
   }
   const held = new Map(current.files.map(row => [row.path, row.bytes])), kept = [current];
   let carried = 0, bytes = 0;
