@@ -45,3 +45,12 @@ slow. Each now skips the idle part and keeps its assertions.
   735 (mid-round 4), so the restored world still rides a round and a
   half and adopts. A taming restore that drops the law fails both
   versions on "the earned mid-round checkpoint restores quietly".
+- FS5 again: hosted, the recorder alone took 18-34 s for 7,618 ticks,
+  so fewer checkpoints could not bring the file under 60 s. The tour is
+  now two legs in two files, each with its own independent replay: the
+  entry leg (camp road, board, eight places to the snow leopard cave,
+  4,436 ticks) keeps the quarantined name; the cave leg starts from a
+  save with the player placed where the entry leg leaves the cave and
+  boards on to the other nine places (3,248 ticks), in the same native
+  group. Both legs assert the entry list names real places, and a
+  dropped replay input fails both.

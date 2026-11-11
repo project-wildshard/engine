@@ -13,7 +13,8 @@ import { canonicalSimDigest } from './fake/simState';
 import { builtProduct } from './fixtures/builtProduct';
 
 // P1-E3.1b: Nalati Grasslands' worker runs the same world as a resident, from its built product alone. FAST-SLOW-TESTS
-// FS1: this case moved verbatim out of nalati-headless-population.test.ts, whose population story runs on its own.
+// FS1: this case moved here unchanged from nalati-headless-population.test.ts as it stood before FAST-SLOW-TESTS (the
+// sequential original, not the overlapped interim); the population story runs on its own.
 
 const SLUG = 'nalati-grasslands';
 

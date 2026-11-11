@@ -6,9 +6,10 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
+// FAST-SLOW-TESTS FS5: the entry leg of the tour; nalati-discovery-verbs-cave.test.ts runs the rest, from the snow leopard cave.
 test('Nalati places require real native arrival and survive independent input replay',()=>{
   const child=spawnSync(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
-    resolve('test/fixtures/headless/nalati-discovery-run.ts')],{encoding:'utf8',timeout:150_000});
+    resolve('test/fixtures/headless/nalati-discovery-run.ts'),'entry'],{encoding:'utf8',timeout:150_000});
   expect(child.status,child.stdout+child.stderr+String(child.error??'')+(child.signal??'')).toBe(0);
   expect(child.stdout).toContain('"story":"nalati-discoveries"');
   console.info(child.stdout.trim());

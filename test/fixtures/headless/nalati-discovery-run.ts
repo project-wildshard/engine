@@ -14,20 +14,46 @@ import type {HeadlessTapeObservation} from '../../../src/shared/host/headlessTap
 import {PhysicsRouteCursor} from '../../../src/shared/host/headlessJourney';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
+import {builtProduct} from '../builtProduct';
+import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {serializeSimSnapshot,snapshotSimHostBytes} from '../../../src/shared/engine/sim/snapshot';
+import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 // FAST-SLOW-TESTS FS5: each replay part costs a full ~13 MB worker checkpoint, so the independent replay checks its
-// state every 2,048 recorded ticks (four parts) instead of every 512 (fifteen). Every input is still replayed and the
+// state every 2,048 recorded ticks instead of every 512 (five parts over both legs, not fifteen). Every input is still replayed and the
 // final feet, flags and owner state still match exactly.
 const PART=2048;
-const session=await beginProductSession('nalati-grasslands','nalati-world');
+// FAST-SLOW-TESTS FS5: the tour runs as two legs in two files, each with its own independent replay. The entry leg walks
+// the camp road from the entry, boards and discovers these places in the original order; the cave leg stands where the
+// entry leg leaves the snow leopard cave, boards, and discovers the rest. Every place is still reached on the board.
+const leg=process.argv[2]??'all';
+if(leg!=='all'&&leg!=='entry'&&leg!=='cave')throw new Error(`Unknown discovery leg ${leg}`);
+const ENTRY_LEG=['nomad-camp','sheep-pasture','bridge','sky-road','horse-plains','kunes-river','eagle-rock','snow-leopard-cave'];
+const CAVE_START={x:141.67510716876185,y:37.026160557768485,z:-36.54738863838429};
+let start:string|undefined;
+if(leg==='cave'){
+  // A position set at tick zero on a fresh world, saved; the recorder and the replay worker both start from that save.
+  const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+  const descriptor=outputDescriptor(shard);assert.ok(descriptor);
+  const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
+  const placed=await createNativeProofResident({shard,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm')),product},prepareHeadlessRuntime);
+  try{
+    const player=leadPlayer(placed.host);assert.equal(placed.host.state.tick,0);
+    player.position.set(CAVE_START.x,CAVE_START.y,CAVE_START.z);player.velocity.set(0,0,0);player.motor.resetAt(player.position);
+    start=serializeSimSnapshot(snapshotSimHostBytes(placed.host));
+  }finally{placed.dispose();}
+}
+const session=await beginProductSession('nalati-grasslands','nalati-world',start);
 let first:Awaited<ReturnType<typeof createNativeProofResident>>|undefined;
 let stopReplay:(()=>Promise<void>)|undefined;
 try{
   const product=session.product,shard=product.shardfile;
   const rows=v.parse(ChapterViewSchema,await product.json('quests/content.json')).places;
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  first=await createNativeProofResident({shard,assets:session.assets,rapier,product},prepareHeadlessRuntime);
+  const ids=new Set(rows.map(row=>row.id));assert.ok(ENTRY_LEG.every(id=>ids.has(id)),'the entry leg names real places');
+  const target=leg==='all'?rows:leg==='entry'?rows.filter(row=>ENTRY_LEG.includes(row.id)):rows.filter(row=>!ENTRY_LEG.includes(row.id));
+  first=await createNativeProofResident({shard,assets:session.assets,rapier,product},prepareHeadlessRuntime,start);
   const active=first,{host}=active,frames:HeadlessCommand[][]=[];
   const replay=await session.ready(),recordStarted=performance.now(),replayStarted=performance.now();
   let alignmentTicks=0;
@@ -88,6 +114,7 @@ try{
     if(frames.length%PART===0)await mark();
   };
   await step([]);
+  if(leg!=='cave'){
   assert.equal(arrived.size,0,'the entry cannot pre-discover distant places');
   // First walk the real camp road, then use the player's own hover toggle.
   // The board's motor still resolves every wall, trunk and jump. Discovery
@@ -102,6 +129,7 @@ try{
   }
   if(!camp.complete){const p=leadPlayer(host).position;camp.command([p.x,p.y,p.z],3600);}
   assert.equal(camp.complete,true,'the original 3600-tick camp route must complete');
+  }
   await step([{kind:'player',moveX:0,moveZ:0,yaw:0,commandVersion:1,hover:true,
     steer:{keyX:0,keyY:0,stickX:0,stickY:0}}]);
   for(let tick=0;tick<30;tick++)await step([]);
@@ -141,13 +169,14 @@ try{
     console.error(JSON.stringify({place:place.id,tick:frames.length,at:leadPlayer(host).position}));
   }
   // Visit the pasture along the north bank before touring the plateau.
-  const pasture=rows.find(row=>row.id==='sheep-pasture');assert.ok(pasture);await discover(pasture);
-  while(arrived.size<rows.length){
-    const pending=rows.filter(row=>!arrived.has(row.id)).sort((a,b)=>
+  const pasture=rows.find(row=>row.id==='sheep-pasture');assert.ok(pasture);if(leg!=='cave')await discover(pasture);
+  while(target.some(row=>!arrived.has(row.id))){
+    const pending=target.filter(row=>!arrived.has(row.id)).sort((a,b)=>
       Math.hypot(a.x-leadPlayer(host).position.x,a.z-leadPlayer(host).position.z)-Math.hypot(b.x-leadPlayer(host).position.x,b.z-leadPlayer(host).position.z));
     const place=pending[0];assert.ok(place);await discover(place);
   }
-  for(const row of rows)assert.equal(notices.get(`Discovered · ${row.label}`)??0,row.quiet===true?0:1,`one original notice for ${row.id}`);
+  for(const row of rows)assert.equal(notices.get(`Discovered · ${row.label}`)??0,row.quiet===true||!arrived.has(row.id)?0:1,`one original notice for ${row.id}`);
+  for(const row of target)assert.ok(arrived.has(row.id),`the ${leg} leg discovers ${row.id}`);
   assert.equal(host.quests.some(quest=>quest.isComplete),false);
   await mark();
   const captureWallMs=performance.now()-recordStarted,recordMs=captureWallMs-backpressureMs;

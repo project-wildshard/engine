@@ -46,6 +46,7 @@ export const CI_NATIVE_GROUPS = {
     'test/physics-nalati-headless.test.ts',
     'test/nalati-chapter-binding.test.ts',
     'test/nalati-discovery-verbs.test.ts',
+    'test/nalati-discovery-verbs-cave.test.ts',
     'test/native-runtime-observation.test.ts',
     'test/physics-headless.test.ts',
     'test/physics-shards-headless.test.ts',
