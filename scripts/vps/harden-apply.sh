@@ -212,6 +212,8 @@ if put /usr/local/sbin/wildshard-alert 755 root:root VH14 <<'EOF'
 # VPS-HARDENING VH14 (J252): one Sentry event (wildshard-server project, DSN from ops.env) per SSH or console login, sudo
 # session or fail2ban ban, for the agents' hourly read. It never fails, and never delays, its caller.
 #   wildshard-alert [<line>]   from PAM (pam_exec) it builds the line from PAM_* itself
+# sudo runs PAM with an empty environment, so the path is its own.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
 [ "${PAM_TYPE:-open_session}" = open_session ] || exit 0
 dsn=$(sed -n 's/^SENTRY_CRON_DSN=//p' /etc/wildshard/ops.env 2>/dev/null | tail -n 1)
 [ -n "$dsn" ] || exit 0
