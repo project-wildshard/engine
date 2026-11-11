@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { posix, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, posix, relative, resolve } from 'node:path';
 import { parseSync } from 'vite';
 
 /** J217 (LD6b): page chunks name each other through the document's import map (Vite's `build.chunkImportMap`), by keys
@@ -7,14 +7,24 @@ import { parseSync } from 'vite';
  * A one-line change kept 28.6 % of code bytes at the same URL before, 98.7 % with the map. The map is one inline script
  * in each document. A browser without import maps (Safari before 16.4) can't boot this build. */
 
+/** @type {Readonly<Record<string, string>>} */
+const NONE = Object.freeze({});
 const MAP = /<script type="importmap">([\s\S]*?)<\/script>/gu;
 /** Vite's preload helper's dependency table: keys too, resolved through the map by `import.meta.resolve`. */
 const DEPS = /m\.f\|\|\(m\.f=\[([^\]]*)\]\)/gu;
 
-/** @param {string} code @param {number} start @param {number} end */
+/** A dynamic import's argument as the parser decodes it, when it is a string or a template with no substitutions.
+ * @param {string} code @param {number} start @param {number} end @returns {string | undefined} */
 function literal(code, start, end) {
   const text = code.slice(start, end).trim();
-  return /^(["'`])([^"'`$\\]*)\1$/u.exec(text)?.[2];
+  if (!/^["'`]/u.test(text)) return undefined;
+  const parsed = parseSync('argument.js', `(${text});`, { lang: 'js', sourceType: 'module' });
+  const [statement] = parsed.program.body;
+  if (parsed.errors.length > 0 || statement?.type !== 'ExpressionStatement') return undefined;
+  const expression = statement.expression.type === 'ParenthesizedExpression' ? statement.expression.expression : statement.expression;
+  if (expression.type === 'Literal' && typeof expression.value === 'string') return expression.value;
+  if (expression.type === 'TemplateLiteral' && expression.expressions.length === 0) return expression.quasis[0]?.value.cooked ?? undefined;
+  return undefined;
 }
 
 /** Every module request a chunk makes by a literal: static imports, re-exports, dynamic imports and preload deps.
@@ -53,8 +63,8 @@ export function documentImportMap(name, html) {
 
 /** After the documents are final: every document that loads page chunks holds one import map first; every row names a
  * file this build wrote, and no key shadows a different written file; every literal request in every page chunk
- * reaches a written file, directly or through that map. A worker or shell bundle has no map: its own requests must
- * reach files directly.
+ * reaches a written file, directly or through that map. A worker or shell bundle under /b/ has no map: its own requests
+ * must reach files directly. Run it after every document and bundle is written, before the service worker reads them.
  * @param {string} outDir @returns {{documents: number, rows: number, chunks: number, mapped: number}} */
 export function checkImportMaps(outDir) {
   const root = resolve(outDir), file = (/** @type {string} */ path) => existsSync(`${root}${path}`);
@@ -74,18 +84,18 @@ export function checkImportMaps(outDir) {
     if (shared !== undefined && JSON.stringify(shared) !== JSON.stringify(map)) throw new Error(`${name}'s import map differs from ${documents[0]}'s; shared chunks would resolve differently`);
     shared = map;
   }
-  const map = shared ?? {};
+  const map = shared ?? {}, page = new Set(Object.values(manifest).map(row => row.file).filter(name => name.endsWith('.js')));
   let chunks = 0, mapped = 0;
-  for (const row of Object.values(manifest)) {
-    if (!row.file.endsWith('.js')) continue;
-    const url = `/${row.file}`;
+  // Page chunks resolve through the map; a worker or shell bundle under /b/ runs without one, so only direct files count.
+  for (const entry of readdirSync(resolve(root, 'b'), { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const name = relative(root, join(entry.parentPath, entry.name)).replaceAll('\\', '/'), url = `/${name}`, own = page.has(name) ? map : NONE;
     chunks++;
-    for (const request of chunkRequests(row.file, readFileSync(resolve(root, row.file), 'utf8'))) {
-      if (!request.startsWith('/') && !request.startsWith('./') && !request.startsWith('../')) throw new Error(`${row.file} requests bare ${request}`);
+    for (const request of chunkRequests(name, readFileSync(resolve(root, name), 'utf8'))) {
+      if (!request.startsWith('/') && !request.startsWith('./') && !request.startsWith('../')) throw new Error(`${name} requests bare ${request}`);
       const target = request.startsWith('/') ? request : posix.join(posix.dirname(url), request);
-      const value = map[target];
-      if (value !== undefined) { mapped++; continue; }
-      if (!file(target)) throw new Error(`${row.file} requests ${request}, which is neither a written file nor in the import map`);
+      if (own[target] !== undefined) { mapped++; continue; }
+      if (!file(target)) throw new Error(`${name} requests ${request}, which is neither a written file nor in ${page.has(name) ? 'the import map' : 'its bundle (no import map outside a page)'}`);
     }
   }
   return { documents: documents.length, rows: Object.keys(map).length, chunks, mapped };

@@ -49,6 +49,7 @@ test('the import map comes once and first, and names only written files', () => 
   expect(() => documentImportMap('index.html', page('<script type="importmap">{"imports":{},"scopes":{}}</script>'))).toThrow('only an imports table');
   expect(chunkRequests('b/c/a.js', 'import{x}from"./b-key.js";export{y}from"/b/c/c-key.js";import("../d.js");import(v);const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["b/c/e-key.js","b/c/f.css"])))=>i;'))
     .toEqual(['./b-key.js', '/b/c/c-key.js', '../d.js', '/b/c/e-key.js']);
+  expect(chunkRequests('b/c/a.js', 'import("./a$b.js");import(\'./c\\u0064.js\');import(`./e.js`);import(`./${f}.js`);')).toEqual(['./a$b.js', './cd.js', './e.js']);
 
   mkdirSync('tmp', { recursive: true }); const root = mkdtempSync(resolve('tmp/chunk-import-map-check-'));
   const put = (file: string, text: string): void => { const target = join(root, file); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, text); };
@@ -58,10 +59,14 @@ test('the import map comes once and first, and names only written files', () => 
     put('b/c/a-real.js', 'import "./worker.js";');
     put('b/c/worker.js', '');
     put('index.html', page('<script type="importmap">{"imports":{"/b/c/a-key.js":"/b/c/a-real.js"}}</script>'));
-    expect(checkImportMaps(root)).toEqual({ documents: 1, rows: 1, chunks: 2, mapped: 1 });
+    expect(checkImportMaps(root)).toEqual({ documents: 1, rows: 1, chunks: 3, mapped: 1 });
     put('b/c/a-real.js', 'import "./gone.js";');
     expect(() => checkImportMaps(root)).toThrow('neither a written file nor in the import map');
     put('b/c/a-real.js', '');
+    // a worker bundle has no map: a key it requests resolves nowhere
+    put('b/c/worker.js', 'import "./a-key.js";');
+    expect(() => checkImportMaps(root)).toThrow('b/c/worker.js requests ./a-key.js');
+    put('b/c/worker.js', '');
     put('b/c/a-key.js', 'stale');
     expect(() => checkImportMaps(root)).toThrow('shadows a written file');
     rmSync(join(root, 'b/c/a-key.js'));

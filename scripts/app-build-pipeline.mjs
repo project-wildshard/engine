@@ -180,8 +180,6 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   });
   // J236: production plain, staging the S, the solo build the P; before the worker reads the final document.
   writeHomeIcons(outDir, homeIconChannel(world));
-  // J217 (LD6b): chunks name each other through each document's import map; refuse a document or chunk it can't resolve
-  checkImportMaps(outDir);
 
   writeTitleAssets(process.cwd(), outDir);
 
@@ -199,6 +197,9 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     "(await import('./scripts/app-build/crossroadsRig.ts')).writeCrossroadsRig(process.argv[1], process.cwd(), (await import('./scripts/api-origin.mjs')).apiOriginSet());",
     outDir,
   ]);
+  // J217 (LD6b): chunks name each other through each document's import map; with every document and bundle written,
+  // refuse a document without its map, or a request that resolves nowhere
+  checkImportMaps(outDir);
   // the service worker over the bundle as written (was vite/pwa-plugin.ts): sw.js and its content-named core
   step([
     "--import",
