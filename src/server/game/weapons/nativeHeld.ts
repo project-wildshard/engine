@@ -46,7 +46,7 @@ const SwingSaved=v.strictObject({move:v.nullable(count),swingT:finite,comboIdx:c
   charging:v.boolean(),chargeT:finite,releaseQueued:v.boolean(),chargePending:v.boolean(),heldPrev:v.boolean(),time:finite});
 const DrawSaved=v.strictObject({drawT:finite,holdT:finite,renockT:finite,tiredT:finite,wasHeld:v.boolean(),needLift:v.boolean(),reachedFull:v.boolean()});
 const poseVector=v.tuple([finite,finite,finite,finite,finite,finite,finite]);
-/** The weather owner's wind, as each seat copies it every tick (MMO-PLAN MP1.2: one schema, not one a seat a tick). */
+/** The weather owner's wind, as every seat copies it each tick (MMO-PLAN MP1.2: one schema, read once a step). */
 const OWNER_WIND=v.object({wind:WindStateSchema});
 const BladeSaved=v.strictObject({pose:v.strictObject({from:poseVector,base:poseVector,chargeBlend:finite,sprintBlend:finite}),
   grip:vector,tip:vector,have:v.boolean(),struck:v.array(v.string()),contacts:count});
@@ -109,6 +109,15 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
     if (owners.has(host)) throw new Error('Native held equipment already has an owner');
     // A held arsenal has no launcher to own a slot: the wire's launcher is its aim, on whichever weapon is in hand.
     if (room) { const routes = actRoutes(host); routes.equip = arms.input.swap; routes.launcher = (index, reload) => index < order.length && !reload; }
+    // MMO-PLAN MP1.2: the weather owner's wind, read and checked once per held step for every seat (it was a whole weather
+    // snapshot and a parse per seat per tick). Only the weather's own step moves it, never a seat's, so every seat in one
+    // step copies the same numbers; outside a step (none today) it is read fresh.
+    let stepWind:v.InferOutput<typeof WindStateSchema>|null=null;
+    const readWind=():v.InferOutput<typeof WindStateSchema>=>{
+      const weatherOwner=host.adapters.get(weather.step);if(weatherOwner===undefined)throw new Error('Missing actual native wind owner');
+      return v.parse(OWNER_WIND,weatherOwner.snapshot()).wind;
+    };
+    const ownerWind=():v.InferOutput<typeof WindStateSchema>=>stepWind??readWind();
     const seats = playerSeats<HeldSeat>(host, (player: PlayerSim, first: boolean) => {
     const mount = mountedPlayerOf(host, first ? undefined : player.id), frame = first ? combat : otherCombatFrame(combat, player.id), striker = room ? player.health : 'env';
     if (mount === undefined) throw new Error('Weapons require actual native riding');
@@ -243,8 +252,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
       }
       aimOn=bowAimOn({asked:aim>0,enabled:enabled&&slot===bowSlot.id,running:blocked.running,swimming:player.swim.on});
       aimBlend+=((aimOn?1:0)-aimBlend)*Math.min(1,dt*bow.base.aimIn);if(Math.abs(aimBlend-(aimOn?1:0))<.002)aimBlend=aimOn?1:0;
-      const weatherOwner=host.adapters.get(weather.step);if(weatherOwner===undefined)throw new Error('Missing actual native wind owner');
-      wind.restore(v.parse(OWNER_WIND,weatherOwner.snapshot()).wind);arrows.update(dt);
+      wind.restore(ownerWind());arrows.update(dt);
       if(slot===bladeSlot.id&&enabled){
         if(pressed){pressing=true;if(mounted===null)clock.tryFire();else pass.attack();pressing=false;}
         const strike=pass.decide(dt,{player,mount:mounted,charging:clock.chargingHeavy,baseDamage:melee.damage,rows:mountedRows,targets:targets()});
@@ -316,6 +324,6 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
       publishOwned(host, 'held.arrows', (id, out) => { const player = host.players.get(id); if (player !== undefined) out.set(OWNED_ROW.arrows, seats.of(player).arrows() + 1); });
       host.events.on('player.respawned', ({ player: id }) => { const player = id === undefined ? undefined : host.players.get(id); if (player !== undefined) seats.of(player).refill(); }, host.scope);
     }
-    host.onStep(arms.step, seats.step, seats.adapter, 'afterBodies');
+    host.onStep(arms.step, dt => { stepWind = readWind(); try { seats.step(dt); } finally { stepWind = null; } }, seats.adapter, 'afterBodies');
   };
 }

@@ -25,11 +25,12 @@ export const PLAYERS = 32, WARM = 300, TICKS = 1800, TICK_BUDGET_MS = 1000 / 60;
 export let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
-export async function resident(slug: string): Promise<TrustedHeadlessResident> {
+/** `world` as a cell's room opens it (MP1.2: `{ room: true, near }` runs the seats' held arms, as the box does). */
+export async function resident(slug: string, world?: Parameters<typeof createTrustedHeadlessResident>[2]): Promise<TrustedHeadlessResident> {
   const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
+  return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, world);
 }
 export interface Bot { readonly id: string; readonly client: NetClient; readonly link: DirectLoopback }
 /** A wandering, jumping, dodging, occasionally swinging thumb, from a fixed sequence so a run repeats. */

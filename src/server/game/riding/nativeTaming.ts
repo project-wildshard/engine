@@ -17,6 +17,13 @@ import { publishOwned } from '@wildshard/engine/sim/shardRows';
 import { advanceCompanionCall } from '../../../shared/game/riding/companions';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 
+/** A riding row's owned name, made once per key (MMO-PLAN MP1.2: every client's owned rows joined these every tick). */
+const ridingRows = new Map<string, string>();
+function ridingRow(key: string): string {
+  let name = ridingRows.get(key);
+  if (name === undefined) { name = `${RIDING_ROW}${key}`; if (ridingRows.size < 4096) ridingRows.set(key, name); }
+  return name;
+}
 /** Engine-owned tick input, shared by native modes; authors supply only rows. */
 export interface NativeTamingContext {
   commands: () => readonly ({ kind: 'player'; steer?: { keyX: number } | undefined; seq?: number | undefined; pitch?: number | undefined } | { kind: 'script'; actorId: string; value: number } | { kind: 'action' })[];
@@ -265,7 +272,7 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   publishOwned(host, rows.step, (id, out) => {
     const seat = sessions.get(id); if (seat === undefined) return;
     const { law: owner } = seat, { view, interactable } = owner;
-    const put = (key: string, value: number): void => { out.set(`${RIDING_ROW}${key}`, value); };
+    const put = (key: string, value: number): void => { out.set(ridingRow(key), value); };
     put('phase', ['wild', 'breaking', 'bonded'].indexOf(owner.phase) + 1);
     put('trust', view.trust === null ? 0 : view.trust + 1); put('alert', view.alert); put('round', view.round ?? 0);
     put('balance', view.balance); put('danger', Number(view.danger)); put('offer', Number(view.offer));
