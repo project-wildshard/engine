@@ -22,7 +22,7 @@ const cell = async (db: Database, text: string): Promise<unknown> => { const { r
 test('migrations apply once, in order', async () => {
   const db = await openPglite();
   closers.push(db.close);
-  expect([await migrate(db), await migrate(db)]).toEqual([['0001-saves.sql', '0002-report-delivery.sql', '0003-place.sql', '0004-names.sql'], []]);
+  expect([await migrate(db), await migrate(db)]).toEqual([['0001-saves.sql', '0002-report-delivery.sql', '0003-place.sql', '0004-names.sql', '0005-profile.sql'], []]);
   const { rows } = await db.query('select table_name from information_schema.tables where table_schema = \'public\' order by table_name');
   expect(rows).toEqual(['chat_report', 'ledger_receipt', 'player', 'player_place', 'player_save', 'schema_migrations'].map(table_name => ({ table_name })));
 });
@@ -160,7 +160,7 @@ test('the shipped `pg` driver over TCP: migrations, writes, a corrupt doc, and a
   url.username = 'postgres'; url.searchParams.set('sslmode', 'disable');
   const db = openPg(url.href);
   closers.push(async () => { await db.close(); await server.stop(); await held.close(); });
-  expect(await migrate(db)).toEqual(['0001-saves.sql', '0002-report-delivery.sql', '0003-place.sql', '0004-names.sql']);
+  expect(await migrate(db)).toEqual(['0001-saves.sql', '0002-report-delivery.sql', '0003-place.sql', '0004-names.sql', '0005-profile.sql']);
   await writeSave(db, 0, write(1, 10, { receipts: [{ serial: 1, factId: 'a', grant: 'coins', name: 'coins', amount: 2.5 }] }));
   await writeSave(db, 0, write(2, 20));
   expect(await readSave(db, 0, 'device:a', 'driftwood-isle', parse), '`pg` reads a bigint as a string').toEqual({ doc: { coins: 20 }, previous: { coins: 10 }, source: 'doc', seq: 2, revision: 2 });
