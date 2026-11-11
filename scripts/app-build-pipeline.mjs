@@ -10,6 +10,7 @@ import { bakeAssetTables, writeAssetTables } from "./app-build/assetTables.mjs";
 import { writeChunkReport } from "./app-build/chunkReport.mjs";
 import { bakeGridSeams, writeGridSeams } from "./app-build/gridSeams.mjs";
 import { checkNoTopLevelAwait } from "./app-build/noTopLevelAwait.mjs";
+import { checkImportMaps } from "./app-build/importMap.mjs";
 import { writeTitleAssets } from "./title-assets.mjs";
 import {
   copyOutputProducts,
@@ -179,6 +180,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   });
   // J236: production plain, staging the S, the solo build the P; before the worker reads the final document.
   writeHomeIcons(outDir, homeIconChannel(world));
+  // J217 (LD6b): chunks name each other through each document's import map; refuse a document or chunk it can't resolve
+  checkImportMaps(outDir);
 
   writeTitleAssets(process.cwd(), outDir);
 

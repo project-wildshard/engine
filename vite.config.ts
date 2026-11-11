@@ -40,6 +40,9 @@ export default defineConfig(({ mode, command }) => {
       copyPublicDir: process.env['WS_APP_DEFER_PUBLIC_COPY'] !== '1',
       // The mandatory chunk report measures and gates gzip bytes after this web build.
       assetsDir: code, target: 'es2022', reportCompressedSize: false, chunkSizeWarningLimit: 4000, sourcemap: 'hidden' as const, cssCodeSplit: false, manifest: true,
+      // J217 (LD6b): a chunk names its imports by stable import-map keys, not their hashes, so one changed module renames
+      // only its own chunk (scripts/app-build/importMap.mjs checks the map)
+      chunkImportMap: true,
       // G221: standalone CLI calibration, never a game-entry or Developer switch.
       rolldownOptions: {
         input: { main: join(process.cwd(), 'index.html'), calibration: join(process.cwd(), 'calibration/index.html') },
