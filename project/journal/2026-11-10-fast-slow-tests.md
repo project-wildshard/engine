@@ -34,3 +34,4 @@ slow. Each now skips the idle part and keeps its assertions.
   resident). Overlapping those steps saved nothing on a 4-vCPU runner,
   so the worker case moves verbatim into `nalati-headless-worker.test.ts`
   (same native group) and the population story runs on its own.
+  Its first clock (10.0 s locally) is recorded by push-preflight timings.

@@ -875,6 +875,7 @@
   "test/nalati-encounter-loans.test.ts": 0.11865385599999996,
   "test/nalati-entry-prerequisites.test.ts": 0.7790210890000001,
   "test/nalati-headless-population.test.ts": 107.925,
+  "test/nalati-headless-worker.test.ts": 13.031859251000002,
   "test/nalati-held-room.test.ts": 6.264172875,
   "test/nalati-king-room.test.ts": 16.737975268000003,
   "test/nalati-name-verbs.test.ts": 9.417867342000001,
