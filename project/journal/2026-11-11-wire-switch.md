@@ -17,3 +17,8 @@
   interpolator already read. A sequence with a whole frame, a delta, a held
   row, a gone row, the owner block and a ride decodes to exactly what v0
   decodes, owner f64 bytes included.
+- `net/wireMessages.ts`: the game's messages on wire v1 in its own values
+  (hello with the client's tables, welcome with the server's and their
+  hash, events, commands, acts), plus `WireClientReader`, a client's
+  command and act codecs compiled once from its hello, and the client's
+  events reader over the server's event tables and spawn columns.
