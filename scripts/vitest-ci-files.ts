@@ -36,6 +36,8 @@ export const CI_NATIVE_GROUPS = {
   'nalati-bot-taming': ['test/nalati-bot-taming.test.ts'],
   'nalati-taming': ['test/nalati-taming-verbs.test.ts'],
   'nalati-awareness': ['test/nalati-awareness-verbs.test.ts'],
+  // FAST-SLOW-TESTS FS5: the discovery tour's second leg, its own unit so the routes group keeps its size.
+  'nalati-discovery-cave': ['test/nalati-discovery-verbs-cave.test.ts'],
   'driftwood-long-session': ['test/driftwood-long-session.test.ts'],
   'open-plots-headless': ['test/physics-open-plots-headless.test.ts'],
   'standalone-grid': ['test/standalone-grid.test.ts', 'test/standalone-grid-lone.test.ts', 'test/standalone-grid-restore.test.ts'],
@@ -46,7 +48,6 @@ export const CI_NATIVE_GROUPS = {
     'test/physics-nalati-headless.test.ts',
     'test/nalati-chapter-binding.test.ts',
     'test/nalati-discovery-verbs.test.ts',
-    'test/nalati-discovery-verbs-cave.test.ts',
     'test/native-runtime-observation.test.ts',
     'test/physics-headless.test.ts',
     'test/physics-shards-headless.test.ts',
