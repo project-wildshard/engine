@@ -65,6 +65,8 @@ export interface WorkerClientGrid {
   readonly serverPlace?: (instance: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void;
   /** GO4: the seat is in another cell than this page booted: enter the grid again there (a grid entry, never a `?chunk=` page). */
   readonly reenter?: (instance: string) => void;
+  /** The cell (instance) this page booted in. */
+  readonly booted?: string;
 }
 /** The part of an item row that says where the server holds it. */
 export interface WorkerItemRow { readonly id: string; readonly kind?: string; readonly family?: string; readonly ranged?: { readonly slot: number } | undefined }
@@ -102,7 +104,7 @@ interface ShellModule { readonly startStandalone: (config: { slug: string; base:
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void } }) => Promise<Shell> }
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void } }) => Promise<Shell> }
 interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
@@ -305,9 +307,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // page whose seat is in another cell enters the grid again there, never a `?chunk=` page; GO5's hint makes that rare.
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { startOnline } = await bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as OnlineModule;
-    const { grid } = ports, booted = grid === null ? undefined : new Map(grid.cells.map(cell => [cell.slug, cell.instance])).get(slug);
+    const { grid } = ports, booted = grid?.booted;
     return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
-      ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); } } }) });
+      ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, cells: grid.cells.map(cell => cell.instance), placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); } } }) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   const shell = await (world !== undefined && page !== null && serverRoute(world, page) === 'online' ? online(world, page) : standalone()), { client } = shell;

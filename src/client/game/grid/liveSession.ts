@@ -497,9 +497,14 @@ export class LiveGridSession {
   serverPlace(instance: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }): boolean {
     const cell = this.ports.assembly.cells.find(row => row.instance === instance);
     if (cell === undefined) return false;
-    const road = { x: cell.origin.x + this.ports.assembly.pitch / 2 + 3.6, z: cell.origin.z, yaw: at.yaw };
-    return gridRecovery(this.page.saves).save(this.ports.assembly, cell, road, { kind: 'cell', x: at.x, y: at.y, z: at.z, yaw: at.yaw });
+    const road = { x: cell.origin.x + this.ports.assembly.pitch / 2 + 3.6, z: cell.origin.z, yaw: at.yaw }, recovery = gridRecovery(this.page.saves);
+    // A stand past the cell's interior (a rim the walls hold) still names the cell: the hint keeps the cell, with the road beside it.
+    try { return recovery.save(this.ports.assembly, cell, road, { kind: 'cell', x: at.x, y: at.y, z: at.z, yaw: at.yaw }); }
+    catch { try { return recovery.save(this.ports.assembly, cell, road, { kind: 'road' }); } catch { return false; } }
   }
+
+  /** The cell (instance) this page booted in. */
+  get booted(): string { return this.ports.home.instance; }
 
   /** Last grounded road lane; before the first road visit use the admitted home's adjacent lane. */
   recoveryRoad(): RoadPoint {

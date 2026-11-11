@@ -39,6 +39,8 @@ export interface OnlineConfig {
   readonly identity: NetIdentity;
   /** GO4: a grid page, and the grid cell (instance) it booted in. A seat elsewhere re-enters the grid there, never a `?chunk=` page. */
   readonly gridCell?: string;
+  /** The grid's cells by instance, in frame order (a frame's cell number less one): what a held seat's first frame names. */
+  readonly gridCells?: readonly string[];
   /** Optional anonymous measurements; the page supplies the existing API sink. */
   readonly record?:{readonly install:string;readonly session:string;readonly tag?:string;readonly send:(record:NetRecord)=>void};
 }
@@ -109,7 +111,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       const resume = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))), seat = resume.shard;
       if (config.gridCell !== undefined) {
         const cell = resume.cell ?? seat;
-        view.placed?.(cell, resume.at);
+        // The hint is a hint: a write that fails must not hold the seat.
+        try { view.placed?.(cell, resume.at); } catch { /* the next resume writes it */ }
         if (cell !== config.gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
       } else if (seat !== config.loaded) { view.elsewhere(seat); return; }
       arrive({ tick: 0, restored: false });
@@ -122,7 +125,13 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
   const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(config.socket));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); } });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
-  const offFirst = client.onFrame(() => { offFirst(); arrive({ tick: client.latest?.tick ?? 0, restored: true }); });
+  // GO4: on a grid page, a held seat in another cell than the page booted re-enters the grid there, as a `resume` would say.
+  const offFirst = client.onFrame(() => {
+    offFirst();
+    const frame = client.latest?.cell, cell = frame === undefined || frame === 0 ? undefined : config.gridCells?.[frame - 1];
+    if (config.gridCell !== undefined && cell !== undefined && cell !== config.gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
+    arrive({ tick: client.latest?.tick ?? 0, restored: true });
+  });
   client.hello(config.build, config.identity);
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
   return { client, voice, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
@@ -166,7 +175,7 @@ export interface StartOnline {
   /** Who this device is. A Name given here is kept with its id, and asked only once. */
   readonly identity: (name?: string) => NetIdentity;
   /** GO4: a grid page: the cell it booted in, where its seat stands, and how it enters the grid again in another cell. */
-  readonly grid?: { readonly cell: string; readonly placed: (cell: string, at: SeatPlace) => void; readonly reenter: (cell: string) => void };
+  readonly grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: SeatPlace) => void; readonly reenter: (cell: string) => void };
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
   readonly recordTag?:string;
@@ -197,7 +206,7 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
-  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell }), socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
+  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
     countdown: said => { screens.countdown(said); preload(); },
     placed: (cell, stand) => { if (stand !== undefined) grid?.placed(cell, stand); },

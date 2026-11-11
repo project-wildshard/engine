@@ -4,7 +4,8 @@ import { registerBeforeReload, type LastEnd } from '@wildshard/engine/boot/lastE
 import { arrivalArt, freshPageArrival, pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { saves } from '@wildshard/engine/saves/runtime';
-import type { SaveStore } from '@wildshard/engine/saves/store';
+import type { SaveKeyDef, SaveStore } from '@wildshard/engine/saves/store';
+import * as v from 'valibot';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
 import { pageGridIntents } from './intent';
 import { DEVSERVER, gridMode, type MenuMode } from './menu';
@@ -67,11 +68,22 @@ export function showGridDestination(slug: string): void {
   document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
 }
 
+/** At most this many re-entries a minute in one tab; the next goes to the title. */
+const REENTRIES = 3, REENTRY_MS = 60_000;
+const reentries: SaveKeyDef<number[]> = { key: 'grid.reentries', scope: 'session', version: 1, schema: v.array(v.pipe(v.number(), v.finite())), initial: () => [] };
+function reentryAllowed(now: number): boolean {
+  const slot = saves.define(reentries), kept = (slot.peek() ?? []).filter(at => now - at < REENTRY_MS);
+  if (kept.length >= REENTRIES) return false;
+  slot.write([...kept, now]);
+  return true;
+}
+
 /** GO4: the world seats this player in another cell than the page booted. Enter the grid again in that cell, as a title tap enters it:
  *  the intent names the cell, and the page that boots is a grid page with a bare URL, never a `?chunk=` page. */
 export function reenterGrid(instance: string): void {
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
-  if (cell === undefined || target === undefined) throw new Error(`The world seats this player in ${instance}, which this build's grid has no page for`);
+  // A cell this build has no page for, or a seat that keeps moving: the title, never a loop of entries.
+  if (cell === undefined || target === undefined || !reentryAllowed(Date.now())) { location.replace(new URL(location.pathname, location.origin)); return; }
   pageGridIntents().set({ instance: cell.instance, slug: target.slug });
   travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
 }

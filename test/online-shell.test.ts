@@ -8,6 +8,7 @@ import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { World } from '../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { cellFrame } from '../src/server/host/dedicated/gridCells';
+import { GridAssembly } from '../src/shared/game/grid/assembly';
 
 // E7.2d: the page's half of the one world, on the real door and a real socket, as a page calls it. Only the strips are left out.
 const SHARD = 'driftwood-isle', IDENTITY = { player: 'device:online', name: 'Jake' };
@@ -80,6 +81,20 @@ test('GO4: a grid page in its seat\'s cell takes its body there; a seat in anoth
   await vi.waitFor(() => { expect(bench?.room('template-2')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
   await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('template-2')); }, { timeout: 5000 });
   expect({ regrids, reloads }).toEqual({ regrids: ['template-2'], reloads: [] });
+});
+
+test('GO4: a held seat in another cell (no `resume`, only frames) re-enters the grid there too', { timeout: 60_000 }, async () => {
+  const saves = memoryPlayerSaves(), cells = new GridAssembly({ developer: false, devserver: false }).cells.map(cell => cell.instance);
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: '_template', cell: 'template-2', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'template-2'], workers: 2, saves, holdMs: 30_000 });
+  const regrids: string[] = [], view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (): void => undefined, regrid: (cell: string): void => { regrids.push(cell); } };
+  const first = connectOnline({ socket: bench.url, build: 'bench', loaded: '_template', identity: IDENTITY, gridCell: 'template-2', gridCells: cells }, view);
+  pump = setInterval(() => { first.client.present(); first.client.flush(); }, 16);
+  await first.booted; first.ready();
+  await vi.waitFor(() => { expect(bench?.room('template-2')?.holds(IDENTITY.player)).toBe(true); expect(first.client.latest).not.toBeNull(); }, { timeout: 5000 });
+  clearInterval(pump); first.dispose();
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, gridCell: SHARD, gridCells: cells }, view);
+  await vi.waitFor(() => { expect(regrids).toEqual(['template-2']); }, { timeout: 5000 });
 });
 
 test('a seated page that leaves takes its body with it at once', { timeout: 30_000 }, async () => {

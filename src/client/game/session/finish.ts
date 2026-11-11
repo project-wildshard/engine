@@ -45,7 +45,7 @@ function workerGrid({ grid, gridLive }: Pick<Awaited<ReturnType<typeof playStage
   return grid === null || gridLive === null ? null : { cells: grid.assembly.cells, bindWire: wire => { gridLive.bindWire(wire); }, frame: () => gridLive.frame(), animals: () => gridLive.enteredAnimals(), items: () => gridLive.enteredItems(), saveLocation: () => { gridLive.saveLocation(); },
     // GO5: the server's place is the save; the hint and the loading card follow it.
     serverPlace: (instance, at) => { gridLive.serverPlace(instance, at); const cell = grid.assembly.cells.find(row => row.instance === instance); if (cell !== undefined) showGridDestination(cell.slug); },
-    reenter: instance => { reenterGrid(instance); } };
+    reenter: instance => { reenterGrid(instance); }, booted: gridLive.booted };
 }
 
 /** how often the in-play warm-up asks whether an arrival's Explorer has closed, and how long it waits for one to open */

@@ -29,3 +29,11 @@
   device boots Driftwood, re-enters Nalati, stands where the server says;
   Play again boots Nalati straight away.
 - Recorded `test/server-route.test.ts` clocks.
+- The local proof script is kept outside the repo for GO8
+  (`~/.cache/wildshard/session-keep/gridonline/grid-online-proof.mjs`); green
+  on headless Chromium and WebKit, both cases.
+- J206 Codex review, 3 MUST fixed: the booted cell comes from the live session
+  (not a slug lookup); a held seat's first frame in another cell re-enters
+  the grid too; a hint write that fails (a stand past the interior) falls back
+  to the road beside the cell and never holds the seat. SHOULDs taken: at most
+  3 re-entries a minute a tab, and an unknown cell goes to the title.
