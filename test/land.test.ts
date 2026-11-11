@@ -129,6 +129,9 @@ function fixture() {
   write(join(remote, 'hooks/update'), PROTECT_MAIN, 0o755);
   write(join(remote, 'hooks/post-receive'), POST_RECEIVE, 0o755);
   write(join(bin, 'gh'), FAKE_GH, 0o755);
+  // A fixture never runs the real pnpm: from ./tmp it walks up to this checkout's workspace, and on CI (ci=true turns the
+  // global store off) its install purged and relaid the live node_modules under the running suite (GVS G9).
+  write(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', 0o755);
   write(join(hooks, 'pre-push'), PRE_PUSH, 0o755);
   writeFileSync(files.state, JSON.stringify({ log: files.gh, pushed: files.pushed }));
 
@@ -566,6 +569,12 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
     expect(f.read(f.files.receipts)).toMatch(/STOP rebased [0-9a-f]{10} is not main/u);
   }, 60_000);
+
+  test('GVS G9: a fixture resolves pnpm to its own fake, never the real one that would reinstall this checkout', () => {
+    const f = fixture();
+    const found = execFileSync('sh', ['-c', 'command -v pnpm'], { cwd: f.repo, env: f.env, encoding: 'utf8' }).trim();
+    expect(found).toBe(join(f.root, 'bin/pnpm'));
+  });
 
   test('a rebase that brings in a lockfile change installs before the pushes; one that does not, does not', () => {
     const f = fixture();
