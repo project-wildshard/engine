@@ -325,17 +325,17 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
   test('a rebase conflict only in a generated stamp is regenerated for the landed tree, not a stop', () => {
     const f = fixture();
     // gen.mjs here writes the real renderer stamp of the checkout (engine's rendererRevision over committed inputs),
-    // so DS1's stamp check after the rebase judges it exactly as in engine.
+    // so DS1's stamp check after the rebase judges it exactly as in engine. Its inputs are render files (J259).
     const GEN = `import {writeFileSync} from 'node:fs';import {rendererRevision} from '${resolve('scripts/renderer-revision.mjs')}';\n`
       + "writeFileSync('scripts/renderer-revision.json',JSON.stringify({revision:rendererRevision(process.cwd())})+'\\n');\n";
     mkdirSync(join(f.repo, 'scripts'), { recursive: true });
-    mkdirSync(join(f.repo, 'src/shared'), { recursive: true });
+    mkdirSync(join(f.repo, 'src/client/engine/render'), { recursive: true });
     writeFileSync(join(f.repo, 'scripts/gen.mjs'), GEN);
     writeFileSync(join(f.repo, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'\n");
     writeFileSync(join(f.repo, 'package.json'), '{"name":"fixture","private":true}\n');
-    writeFileSync(join(f.repo, 'src/shared/base.ts'), 'export const base = 1;\n');
+    writeFileSync(join(f.repo, 'src/client/engine/render/base.ts'), 'export const base = 1;\n');
     writeFileSync(join(f.repo, 'scripts/renderer-revision.json'), '{}\n');
-    f.git(f.repo, ['add', 'scripts', 'pnpm-lock.yaml', 'package.json', 'src/shared']);
+    f.git(f.repo, ['add', 'scripts', 'pnpm-lock.yaml', 'package.json', 'src/client']);
     f.git(f.repo, ['commit', '--quiet', '-m', 'chore: stamps']);
     const gen = (cwd: string) => execFileSync(process.execPath, ['scripts/gen.mjs', '--inputs-only'], { cwd, env: f.env });
     gen(f.repo);
@@ -343,14 +343,14 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     f.git(f.repo, ['push', '--quiet', 'origin', 'main']);
     const wt = f.worktree('foo');
     // The plan adds a new input file: mid-rebase, HEAD's file list would not have it yet.
-    writeFileSync(join(wt, 'src/shared/feature.ts'), 'export const feature = true;\n');
-    f.git(wt, ['add', 'src/shared/feature.ts']);
+    writeFileSync(join(wt, 'src/client/engine/render/feature.ts'), 'export const feature = true;\n');
+    f.git(wt, ['add', 'src/client/engine/render/feature.ts']);
     f.git(wt, ['commit', '--quiet', '-m', 'feat: add feature']);
     gen(wt);
     f.git(wt, ['commit', '--quiet', '-m', 'feat: stamp feature', '--', 'scripts/renderer-revision.json']);
     // Main moves mid-landing with its own input and its own regenerated stamp: the stamp line conflicts.
     const peer = join(f.root, 'peer-stamp.sh');
-    writeFileSync(peer, `set -e\nunset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR\ncd '${f.peer}'\ngit pull --quiet --ff-only origin main\nprintf 'export const other = 2;\\n' > src/shared/other.ts\ngit add src/shared/other.ts\ngit commit --quiet -m 'peer lands'\n'${process.execPath}' scripts/gen.mjs --inputs-only\ngit commit --quiet -m 'peer stamp' -- scripts/renderer-revision.json\ngit push --quiet origin HEAD:main\n`);
+    writeFileSync(peer, `set -e\nunset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR\ncd '${f.peer}'\ngit pull --quiet --ff-only origin main\nprintf 'export const other = 2;\\n' > src/client/engine/render/other.ts\ngit add src/client/engine/render/other.ts\ngit commit --quiet -m 'peer lands'\n'${process.execPath}' scripts/gen.mjs --inputs-only\ngit commit --quiet -m 'peer stamp' -- scripts/renderer-revision.json\ngit push --quiet origin HEAD:main\n`);
     f.state({ once: { marker: join(f.root, 'once'), command: ['sh', peer] } });
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
