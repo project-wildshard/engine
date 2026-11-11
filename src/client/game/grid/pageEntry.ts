@@ -74,8 +74,8 @@ const reentries: SaveKeyDef<number[]> = { key: 'grid.reentries', scope: 'session
 function reentryAllowed(now: number): boolean {
   const slot = saves.define(reentries), kept = (slot.peek() ?? []).filter(at => now - at < REENTRY_MS);
   if (kept.length >= REENTRIES) return false;
-  slot.write([...kept, now]);
-  return true;
+  // A count that can't be kept can't bound anything: no re-entry, the title.
+  return slot.write([...kept, now]);
 }
 
 /** GO4: the world seats this player in another cell than the page booted. Enter the grid again in that cell, as a title tap enters it:
