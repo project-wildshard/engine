@@ -22,7 +22,8 @@ const scripts=[...document.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map(matc
 const signed=await(await read(releaseURL)).json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
 const release=JSON.parse(signed.body);assert.equal(release.channel,channel);assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,1);
 if(human){console.log('PASS human Doctor static publication',JSON.stringify({build,epoch:1,doctorEntry:true,signedProduction:true,productionSockets:0}));}else{
- const socket='wss://wildshard.tailb41b20.ts.net:8443';assert.equal(release.socket.replace(/\/$/u,''),socket);
+ // MS7: rooms-staging, or the Funnel for the one release that moves it; staging's /health stays tailnet-only (D7).
+ const socket=release.socket.replace(/\/$/u,'');assert.ok(['wss://rooms-staging.wildshard.io','wss://wildshard.tailb41b20.ts.net:8443'].includes(socket),socket);
  const healthURL='https://wildshard.tailb41b20.ts.net:8443/health';
  const response=await fetch(healthURL,{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});assert.equal(response.status,200);assert.ok([origin,'*'].includes(response.headers.get('access-control-allow-origin')??''));
  const before=await response.json();assert.equal(before.build,build);assert.equal(before.serial,release.serial);assert.equal(typeof before.now,'number');

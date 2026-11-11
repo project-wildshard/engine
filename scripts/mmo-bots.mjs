@@ -24,7 +24,10 @@ import { parseArgs } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..');
 const ORIGIN = 'https://wildshard-packs.wildshard.workers.dev', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
-const STAGING = 'wss://wildshard.tailb41b20.ts.net:8443', STAGING_SEATS = 16, STAGING_HEADROOM = 4, REPLICA_PORT = 18796;
+// MS7: staging's socket is whichever of these its signed release names (rooms-staging, or the Funnel for the one release that moves
+// it); its /health stays tailnet-only (MMO-SERVER D7).
+const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
+const STAGING_SEATS = 16, STAGING_HEADROOM = 4, REPLICA_PORT = 18796;
 // The door's SOCKETS_PER_IP: through Funnel every bot is this Mac's one address, and no header pretends otherwise.
 const PER_ADDRESS = 4;
 const [mode = '', ...rest] = process.argv.slice(2);
@@ -53,10 +56,10 @@ if (release.channel !== 'staging' || !/^[0-9a-f]{40}$/u.test(release.engineBuild
 note({ step: 'release', channel: release.channel, serial: release.serial, build: release.engineBuild, socket: release.socket });
 
 // --- Staging's seats, before a single hello: people first.
-const health = async () => /** @type {{ build: string, players: number, cells: number, workers: number }} */ (await (await fetch(`${STAGING.replace('wss:', 'https:')}/health`, { signal: AbortSignal.timeout(15_000) })).json());
+const health = async () => /** @type {{ build: string, players: number, cells: number, workers: number }} */ (await (await fetch(STAGING_HEALTH, { signal: AbortSignal.timeout(15_000) })).json());
 // Checked before the build, so a full staging fails fast, and again just before the first hello, since the build takes a while.
 const stagingRoom = async (/** @type {string} */ when) => {
-  if (release.socket.replace(/\/$/u, '') !== STAGING) throw new Error(`The staging release names ${release.socket}, not ${STAGING}`);
+  if (!STAGING_SOCKETS.includes(release.socket.replace(/\/$/u, ''))) throw new Error(`The staging release names ${release.socket}, not one of ${STAGING_SOCKETS.join(', ')}`);
   const before = await health();
   note({ step: 'staging-health', when, ...before });
   if (before.build !== release.engineBuild) throw new Error(`Staging serves ${before.build}, and its release names ${release.engineBuild}: wait for the pull`);
@@ -114,7 +117,7 @@ process.once('exit', () => { for (const child of [botsChild, room]) if (child !=
 try {
 /** @type {{ players: number, p95: number, max: number, drops: number, ticksPerSecond: number, rss: number }[]} */
 const readings = [];
-let url = STAGING;
+let url = release.socket.replace(/\/$/u, '');
 if (mode === 'replica') {
   const tarball = join(work, 'server.tar.gz'), served = join(work, 'server');
   const bytes = Buffer.from(await (await fetch(`${BUNDLES}/${release.bundle.name}`, { signal: AbortSignal.timeout(300_000) })).arrayBuffer());

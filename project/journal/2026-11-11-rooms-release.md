@@ -13,3 +13,5 @@
 - Open: the Doctor's server row reads `/health` beside the socket. On rooms that is a 404 (D7), so the row falls
   back to "reachable", and the strict staging proof refuses opaque reachability. Either the public address
   serves a small CORS `/health`, or the Doctor learns the server build another way. That's Jake's D7 call.
+- Second commit: the bots guard keeps one list, `STAGING_SOCKETS`; `mmo-bots.mjs` dials the socket its signed release
+  names once it is on that list, so the switch is the release variable alone. The Doctor hint stops naming Funnel.

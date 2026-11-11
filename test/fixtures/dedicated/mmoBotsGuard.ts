@@ -3,8 +3,10 @@
 // loopback: the door trusts that header from its local proxy, so through Funnel it would be a spoof. From one address the door
 // seats 4 sockets.
 
-/** The staging channel's socket, as its signed release names it. */
-export const STAGING_SOCKET = 'wss://wildshard.tailb41b20.ts.net:8443';
+/** The staging channel's socket, as its signed release names it: `rooms-staging` on 443 through Cloudflare (MMO-SERVER MS7). */
+export const STAGING_SOCKET = 'wss://rooms-staging.wildshard.io';
+/** MS7.3: the Funnel's staging socket stays staging for the one release that moves the address; MS8 retires it. */
+export const STAGING_SOCKETS: readonly string[] = [STAGING_SOCKET, 'wss://wildshard.tailb41b20.ts.net:8443'];
 /** The door's SOCKETS_PER_IP (src/server/host/dedicated/world.ts). */
 export const SOCKETS_PER_ADDRESS = 4;
 
@@ -14,7 +16,7 @@ export interface BotTarget { readonly url: URL; readonly loopback: boolean }
 export function botTarget(url: string, addresses: string, bots: number): BotTarget {
   const parsed = new URL(url);
   const loopback = parsed.protocol === 'ws:' && ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname);
-  const staging = parsed.origin === STAGING_SOCKET && (parsed.pathname === '/' || parsed.pathname === '') && parsed.search === '' && parsed.hash === '';
+  const staging = STAGING_SOCKETS.includes(parsed.origin) && (parsed.pathname === '/' || parsed.pathname === '') && parsed.search === '' && parsed.hash === '';
   if (!loopback && !staging) throw new Error(`J205: bots join loopback or staging only, never ${url}`);
   if (addresses !== 'own' && addresses !== 'forwarded') throw new Error(`Unknown address mode ${addresses}`);
   if (addresses === 'forwarded' && !loopback) throw new Error('Forwarded addresses are for a loopback replica only');

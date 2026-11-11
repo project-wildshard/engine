@@ -5,17 +5,20 @@ import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the driver's argument check only.
 import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
-import { botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET } from './fixtures/dedicated/mmoBotsGuard';
+import { botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS } from './fixtures/dedicated/mmoBotsGuard';
 
 const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('scripts/mmo-bots.mjs', 'utf8');
 
 test('the bots accept loopback and the staging socket only', () => {
-  expect(STAGING_SOCKET).toBe('wss://wildshard.tailb41b20.ts.net:8443');
-  for (const url of ['ws://127.0.0.1:18796/', 'ws://localhost:18796/', 'ws://[::1]:18796/', 'wss://wildshard.tailb41b20.ts.net:8443', 'wss://wildshard.tailb41b20.ts.net:8443/']) {
+  expect(STAGING_SOCKET).toBe('wss://rooms-staging.wildshard.io');
+  expect(STAGING_SOCKETS).toEqual(['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443']);
+  for (const url of ['ws://127.0.0.1:18796/', 'ws://localhost:18796/', 'ws://[::1]:18796/', 'wss://rooms-staging.wildshard.io', 'wss://rooms-staging.wildshard.io/',
+    'wss://wildshard.tailb41b20.ts.net:8443', 'wss://wildshard.tailb41b20.ts.net:8443/']) {
     expect(() => botTarget(url, 'own', 2), url).not.toThrow();
   }
   // Production's Funnel (443, with or without the port), the future address, other paths and hosts, plain ws to the tailnet.
-  for (const url of ['wss://wildshard.tailb41b20.ts.net', 'wss://wildshard.tailb41b20.ts.net:443/', 'wss://rooms.wildshard.io/', 'ws://wildshard.tailb41b20.ts.net:8443/',
+  for (const url of ['wss://wildshard.tailb41b20.ts.net', 'wss://wildshard.tailb41b20.ts.net:443/', 'wss://rooms.wildshard.io/', 'wss://rooms.wildshard.io',
+    'ws://rooms-staging.wildshard.io/', 'wss://rooms-staging.wildshard.io:8443/', 'wss://rooms-staging.wildshard.io/other', 'ws://wildshard.tailb41b20.ts.net:8443/',
     'wss://wildshard.tailb41b20.ts.net:8443/other', 'wss://wildshard.tailb41b20.ts.net:8443/?x=1', 'ws://10.0.0.5:18796/', 'wss://127.0.0.1:18796/', 'ws://127.0.0.1.example.com/']) {
     expect(() => botTarget(url, 'own', 1), url).toThrow(/J205/u);
   }

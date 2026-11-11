@@ -9,10 +9,11 @@ const [base,build,key,engine]=process.argv.slice(2);
 assert.equal(new URL(base).origin,'https://staging.wildshard.io','J205 requires the isolated staging page');
 assert.match(build,/^[a-f0-9]{40}$/u);assert.match(key,/^[a-f0-9]+$/u);
 assert.ok(engine==='chromium'||engine==='webkit');
-const releaseURL='https://wildshard-packs.wildshard.workers.dev/releases/staging.json',socket='wss://wildshard.tailb41b20.ts.net:8443';
+// MS7: rooms-staging, or the Funnel for the one release that moves it; staging's /health stays tailnet-only (D7).
+const releaseURL='https://wildshard-packs.wildshard.workers.dev/releases/staging.json',sockets=['wss://rooms-staging.wildshard.io','wss://wildshard.tailb41b20.ts.net:8443'];
 const response=await fetch(releaseURL,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});assert.equal(response.status,200);
 const signed=await response.json();assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
-const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,1);assert.equal(release.socket.replace(/\/$/u,''),socket);
+const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');assert.equal(release.engineBuild,build);assert.equal(release.saveEpoch,1);const socket=release.socket.replace(/\/$/u,'');assert.ok(sockets.includes(socket),socket);
 const health=await(await fetch('https://wildshard.tailb41b20.ts.net:8443/health',{signal:AbortSignal.timeout(15000)})).json();assert.equal(health.build,build);assert.equal(health.serial,release.serial);
 const version=await(await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(30000)})).json();assert.equal(version.build,build);assert.equal(version.saveEpoch,1);
 const html=await(await fetch(base,{signal:AbortSignal.timeout(30000)})).text();assert.ok(html.includes(releaseURL));assert.ok(!html.includes('/releases/production.json'));
