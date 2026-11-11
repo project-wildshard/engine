@@ -175,6 +175,11 @@ test('hello: v0.1.x and older reload, newer retries, another build of this wire 
   expect(refusal(newer), 'a newer major').toBe('retry');
   expect(refusal(encodeWireHello({ ...said, minor: WIRE_MINOR + 2, capabilities: [], ...clientTables() })), 'two minors ahead').toBe('retry');
   expect(refusal(Uint8Array.of(87, WIRE_MAJOR, 1, 3, 9, 9, 9)), 'a hello this build cannot read').toBe('refused');
+  const strict = new NetRoom({ world: new SimNetWorld(resident.host), build: 'build-a', requiredCapabilities: [3], step: () => undefined });
+  const lacking = directLoopback(), lackingClient = new NetClient(lacking.client);
+  strict.join(lacking.server); lackingClient.hello('build-a'); lacking.pump();
+  expect(lackingClient.closed, 'a client without a required capability is refused before play').toBe('reload');
+  strict.dispose();
   const other = directLoopback(), otherClient = new NetClient(other.client);
   room.join(other.server); otherClient.hello('build-b'); room.open(); other.pump();
   expect(otherClient.welcome, 'another build of the same wire is welcomed').not.toBeNull();

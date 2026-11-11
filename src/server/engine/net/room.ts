@@ -91,6 +91,8 @@ export interface NetRoomOptions {
   readonly world: NetWorld;
   /** Advance the world one fixed tick. */
   readonly step: (inputs: readonly NetTickInput[]) => void;
+  /** Capabilities a client must hold to play here (5.3); a hello without one is refused before play. None today. */
+  readonly requiredCapabilities?: readonly number[];
   /** This engine build's id; empty where builds are not stamped (tests, dev servers), which skips its check. */
   readonly build?: string;
   /** The players' receipts, where something outlives the room: a save, or rooms that share a player. */
@@ -162,6 +164,7 @@ export class NetRoom {
   private readonly world: NetWorld;
   private readonly step: NetRoomOptions['step'];
   private readonly build: string;
+  private readonly required: readonly number[];
   private readonly inputs: NetTickInput[] = [];
   private readonly combat: RoomCombat[] = [];
   private readonly book: LedgerBook;
@@ -169,7 +172,7 @@ export class NetRoom {
   private opened = false;
   private serial = 0;
   private clientIds = 0;
-  constructor(options: NetRoomOptions) { installPortableMath(); this.world = options.world; this.step = options.step; this.build = options.build ?? ''; this.book = options.book ?? new LedgerBook(); this.chat = new RoomChat(options.reports); }
+  constructor(options: NetRoomOptions) { installPortableMath(); this.world = options.world; this.step = options.step; this.build = options.build ?? ''; this.required = options.requiredCapabilities ?? []; this.book = options.book ?? new LedgerBook(); this.chat = new RoomChat(options.reports); }
   /** Who a client said it is, its Name cleaned. */
   identityOf(client: number): NetIdentity | null { return this.clients.find(entry => entry.id === client)?.identity ?? null; }
   /** The last command `seq` applied for a client, or 0. */
@@ -310,6 +313,8 @@ export class NetRoom {
     const { hello } = first;
     if (hello.minor > WIRE_MINOR + 1) { this.stats.refused++; client.transport.close('retry'); return; }
     if (hello.minor < WIRE_MINOR - 1) { this.stats.refused++; client.transport.close('reload'); return; }
+    // A client without a capability this room requires can't play it right: it reloads into a build that has it (5.3).
+    if (this.required.some(id => !hello.capabilities.includes(id))) { this.stats.refused++; client.transport.close('reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.stats.refused++; client.transport.close('refused'); return; }
     const identity = { player: said.output.player, name: cleanName(said.output.name) };
@@ -361,7 +366,7 @@ export class NetRoom {
     const { handles } = this, serial = ++this.serial;
     this.world.visit({ entity: (id, cls, view) => { handles.touch(id, cls, view, serial); } });
     const handle = handles.refs(client.player.id);
-    client.transport.send('reliable', welcomeMessage({ handle, player: client.player.id, tick: this.world.tick(), cell: this.world.cell(), simHz: SIM_HZ, frameHz: FRAME_HZ }, this.build).buffer);
+    client.transport.send('reliable', welcomeMessage({ handle, player: client.player.id, tick: this.world.tick(), cell: this.world.cell(), simHz: SIM_HZ, frameHz: FRAME_HZ }, this.build, this.required).buffer);
   }
   private snapshot(tick: number): void {
     const frame = this.ring.claim(tick), serial = ++this.serial, { handles } = this;

@@ -2,6 +2,7 @@
 // deltas against a baseline, held rows, freshness, the owner block's f64 bits (J140) and the ride words.
 import { encodeClassTables } from '@wildshard/wire/classTables';
 import { WIRE_CLASSES } from '@wildshard/wire/classes';
+import { classColumns } from '@wildshard/wire/columns';
 import { encodeFrame as encodeWire } from '@wildshard/wire/frameRecord';
 import { encodeRideLawTables } from '@wildshard/wire/rideTables';
 import { RIDE_LAWS } from '@wildshard/wire/rides';
@@ -55,4 +56,28 @@ test('a frame against a baseline the client never held cannot apply yet', () => 
   const [, second] = inputs();
   if (second === undefined) throw new Error('no second frame');
   expect(new WireFrameReader(TABLES, () => ANIMAL, OWNER).read(encodeWire(snapshotOf(second)))).toBeNull();
+});
+
+// The WR4 review, carried to WR5: a prediction correction through a skewed table keeps px..vz bit for bit (J140). The sender's
+// player has an extra owner field before px, so every owner column sits one slot later on the wire than in this build.
+test('a sender with an extra owner field before px projects px..vz bit for bit', () => {
+  const player = WIRE_CLASSES.find(entry => entry.name === 'player');
+  if (player === undefined) throw new Error('no player class');
+  const skewed = { ...player, fields: [{ id: 200, name: 'extra', node: { kind: 'f32' as const }, send: 'owner' as const }, ...player.fields] };
+  const classes = WIRE_CLASSES.map(entry => (entry === player ? skewed : entry));
+  const local = classColumns(player).owner, sender = classColumns(skewed).owner;
+  const exact = [123.45678901234567, -0.000123456789012345, 9_876.54321098765, 1.1, -2.2e-7, 3.3333333333333335];
+  const value = (id: number, at: number): number => (id === 200 ? 7.25 : id >= 11 && id <= 16 ? exact[id - 11] ?? 0 : at % 2);
+  const [first] = inputs();
+  if (first === undefined) throw new Error('no frame');
+  const columns = new Map(classes.map(entry => [entry.name, classColumns(entry)]));
+  const input = { ...snapshotOf(first), ownerClass: classColumns(skewed), owner: Float64Array.from(sender.map((column, at) => value(column.id, at))),
+    classOf: (handle: number) => (handle > 0 ? columns.get('animal') : undefined) };
+  const reader = new WireFrameReader({ classTables: encodeClassTables(classes), rideLawTables: TABLES.rideLawTables }, () => ANIMAL, OWNER);
+  const decoded = reader.read(encodeWire(input));
+  if (decoded === null) throw new Error('frame did not decode');
+  for (const id of [11, 12, 13, 14, 15, 16]) {
+    const at = local.findIndex(column => column.id === id), want = new Float64Array([exact[id - 11] ?? 0]), got = new Float64Array([decoded.owner[at] ?? Number.NaN]);
+    expect(new Uint8Array(got.buffer), `field ${String(id)}`).toEqual(new Uint8Array(want.buffer));
+  }
 });
