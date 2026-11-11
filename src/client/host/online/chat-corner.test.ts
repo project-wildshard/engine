@@ -217,3 +217,14 @@ test('QA row 6: the real voice through asking, joining and on; B off says so, an
     expect(tip()).toBe('Voice is full here: 8 players are on it already.');
   } finally { vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
 });
+
+test('a keyboard page keeps the chat bottom left like a phone, lifted over a steed row or a desktop Developer alert', () => {
+  corner();
+  const css = document.head.textContent;
+  // the base (keyboard) corner is anchored to the bottom, never the top left under the quest chip
+  expect(css).toContain('top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + var(--ws-chat-lift))');
+  expect(css).not.toContain('top:calc(env(safe-area-inset-top,0px) + 92px)');
+  expect(css).toContain(':root:has(#hud .ws-ride-steed.show) #ws-chat{--ws-chat-lift:156px}');
+  // touch keeps its own place over MOVE, which drops the keyboard's bottom anchor
+  expect(css).toMatch(/@media \(pointer:coarse\)\{\n#ws-chat\{top:calc\(var\(--ws-vh,100vh\) - var\(--ws-chat-bar\) - var\(--ws-chat-gap\)\);bottom:auto;/u);
+});

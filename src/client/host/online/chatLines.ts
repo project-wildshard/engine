@@ -11,14 +11,16 @@ const SHOWN = 6;
  *  stick's SPRINT tag and first hint, with the voice tip and the lines over it (voiceUi.ts appends the mic and the tip; `order`
  *  places them). A disc in MOVE's corner of the thumb row (Sky Reach's GUST, a ride's lean) lifts it over that row, and the USE
  *  band yields MOVE's column to it (touch.css). It is never taller than the room under the left edge's HOVER / SWAP column, so
- *  the oldest lines clip first. Landscape steps it right of that column. Any menu or panel over the world hides it all
+ *  the oldest lines clip first. Landscape steps it right of that column. A keyboard page puts it bottom left too (Jake, 2026-11-10
+ *  ~23:15 Cancún: "fix the position of chat and microphones in desktop mode too"; it sat top left under the quest chip):
+ *  over the coins and the health readout, higher while a steed's row shows or, on a desktop, a Developer alert does (perf.css). Any menu or panel over the world hides it all
  *  (`data-ws-menu` on the root, src/client/engine/ui/layers.ts); voice stays connected.
  *  QA row 43 (chatCorner.ts): the corner is calm. Only the input and the mic stay; a line shows as it is said and fades after
  *  5 s, and lets taps through to the game. Focusing the input opens the chat (`data-open`): a larger panel with the history,
  *  each line's Report, and the players on voice with their mute (voiceUi.ts). A tap outside it, its ×, Escape or an empty
  *  Enter closes it. It is not a modal: the game runs on, and a tap outside reaches the game as well as closing the chat. */
 const CSS = `
-#ws-chat{--ws-chat-bar:calc(max(15vh,104px) + max(env(safe-area-inset-bottom,0px),var(--ws-home,0px)) * .5);--ws-chat-gap:46px;position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 92px);z-index:900;width:min(56vw,260px);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;font:500 13px/1.3 system-ui,sans-serif;color:#fff;pointer-events:none}
+#ws-chat{--ws-chat-bar:calc(max(15vh,104px) + max(env(safe-area-inset-bottom,0px),var(--ws-home,0px)) * .5);--ws-chat-gap:46px;--ws-chat-lift:132px;position:fixed;left:8px;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + var(--ws-chat-lift));max-height:calc(100vh - var(--ws-chat-lift) - 120px);z-index:900;width:min(56vw,260px);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;font:500 13px/1.3 system-ui,sans-serif;color:#fff;pointer-events:none}
 #ws-chat>[data-head]{display:none}
 #ws-chat>[data-lines]{order:1;flex-shrink:100;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;min-height:0;overflow:hidden}
 #ws-chat>#ws-voice-peers{order:2;min-height:0;overflow:hidden}
@@ -30,7 +32,9 @@ const CSS = `
 #ws-chat:not([data-open]) [data-lines]>[data-look=fading]{opacity:0;transition:opacity ${String(CHAT_FADE_MS)}ms ease-in}
 #ws-chat:not([data-open]) [data-lines]>[data-look=gone],#ws-chat:not([data-open]) [data-lines] button,#ws-chat:not([data-open])>#ws-voice-peers{display:none}
 :root[data-ws-menu] #ws-chat{display:none}
-#ws-chat[data-open]{z-index:950;pointer-events:auto;justify-content:flex-start;gap:8px;width:min(calc(100vw - 16px),440px);height:min(calc(100vh - 120px),560px);max-height:none;padding:8px;box-sizing:border-box;border:1px solid rgba(143,227,255,.35);border-radius:12px;background:rgba(6,12,22,.92);box-shadow:0 10px 32px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+:root:has(#hud .ws-ride-steed.show) #ws-chat{--ws-chat-lift:156px}
+@media (min-width:701px) and (pointer:fine){:root:has(.ws-perf-panel .ws-perf-section:not([hidden]):not(.ws-perf-net)) #ws-chat{--ws-chat-lift:210px}}
+#ws-chat[data-open]{z-index:950;pointer-events:auto;justify-content:flex-start;gap:8px;width:min(calc(100vw - 16px),440px);height:min(calc(100vh - var(--ws-chat-lift) - 24px - env(safe-area-inset-top,0px)),560px);max-height:none;padding:8px;box-sizing:border-box;border:1px solid rgba(143,227,255,.35);border-radius:12px;background:rgba(6,12,22,.92);box-shadow:0 10px 32px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 #ws-chat[data-open]>[data-head]{order:0;display:flex;align-items:center;gap:8px;flex:none;padding:0 2px 0 4px;color:#9fb3c8;font:700 11px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase}
 #ws-chat[data-open]>[data-head] button{margin-left:auto;width:32px;height:32px;border:1px solid rgba(143,227,255,.3);border-radius:8px;background:rgba(8,14,24,.7);color:#dff6ff;font:400 20px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}
 #ws-chat[data-open]>#ws-voice-peers{order:1;flex:none;max-height:40%;overflow-y:auto}
@@ -39,9 +43,9 @@ const CSS = `
 #ws-chat[data-open] [data-lines]>*{pointer-events:auto;animation:none}
 #ws-chat[data-open] [data-lines]:empty::before{content:'No messages yet. Say hello.';margin-top:auto;color:#7d8d9c;font-size:12px;padding:2px 6px}
 @media (pointer:coarse){
-#ws-chat{top:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap));transform:translateY(-100%);left:calc(env(safe-area-inset-left,0px) + 8px);width:calc(45vw - 16px);max-height:calc(var(--ws-vh,100vh) * .54 - var(--ws-chat-bar) - var(--ws-chat-gap) - 103px)}
+#ws-chat{top:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap));bottom:auto;transform:translateY(-100%);left:calc(env(safe-area-inset-left,0px) + 8px);width:calc(45vw - 16px);max-height:calc(var(--ws-vh,100vh) * .54 - var(--ws-chat-bar) - var(--ws-chat-gap) - 103px)}
 :root:has(.ws-touch .ws-touch-disc.at-lean-l.show) #ws-chat{--ws-chat-gap:calc(min(15vw,84px) + 18px)}
-#ws-chat[data-open]{top:calc(env(safe-area-inset-top,0px) + 56px);transform:none;width:calc(100vw - 16px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:min(calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px),calc(var(--ws-vh,100vh) * .52))}
+#ws-chat[data-open]{top:calc(env(safe-area-inset-top,0px) + 56px);bottom:auto;transform:none;width:calc(100vw - 16px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:min(calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px),calc(var(--ws-vh,100vh) * .52))}
 }
 @media (pointer:coarse) and (orientation:landscape){
 #ws-chat{left:calc(env(safe-area-inset-left,0px) + 68px);width:min(calc(45vw - 76px),300px);max-height:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap) - 190px)}
