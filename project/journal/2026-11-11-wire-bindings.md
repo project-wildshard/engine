@@ -28,3 +28,14 @@ accessor returning the wrong kind fails the typecheck.
   the game listener, byte for byte; ready, playtest, voice (8), resume and
   countdown reach only the control listener; ping and pong (2, 3) are the
   wrapper's own. The v1 codec itself is shardfile 918ec19.
+
+## CI caught a pnpm bug: subdirectory deps from an empty store
+
+- The first land's hosted CI failed: every shard's `@wildshard/wire` was
+  `@wildshard/format`. pnpm 10.34.9 writes a git subdirectory dependency's
+  lockfile entry without its `path`, and a frozen install from an empty
+  store (CI's) then installs the repo root under the wire's name. 10.21 and
+  11.25 write `path`, and 10.34.9's frozen install honours it. The lockfile
+  now carries `resolution: {path: /packages/wire, tarball: …}`, proved by a
+  frozen install into a fresh store, and `test/wire-lockfile.test.ts` fails
+  if a plain install rewrites it.
