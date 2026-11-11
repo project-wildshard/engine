@@ -43,6 +43,8 @@
   ],
   "exclude": [
     "ci-native-fixtures.mjs",
+    "agent-parity.mjs",
+    "agent-sync.mjs",
     "../test/actor-projection-v2.test.ts",
     "../test/animal-model-preparation.test.ts",
     "../test/animal-retained-physics.test.ts",

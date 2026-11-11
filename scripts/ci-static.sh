@@ -43,5 +43,9 @@ if [ "$mode" = code ]; then
   check page-events pnpm check:page-events
   check kit pnpm test:kit
   check hooks pnpm test:hooks
+  # MULTI-AGENT-TOOLING MA6: one agent layout for Claude Code and Codex (repo-kit agent-sync).
+  check agent-sync pnpm check:agent-sync
+  check agent-hooks pnpm test:agent-hooks
+  check parity pnpm check:parity
 fi
 exit "$red"

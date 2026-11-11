@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
-# SessionStart brief: a fast, read-only orientation printed into the
-# session's context (wired in .claude/settings.json; ported from
-# rockhop). Never fails the session. Run by hand any time:
-#   bash .claude/hooks/session-brief.sh
+# SessionStart brief, for Claude Code and Codex alike: a fast, read-only
+# orientation printed into the session's context (wired from
+# .agents/hooks.json; ported from rockhop). Never fails the session.
+# Every repo carries the same bytes: the repo name is read at run time.
+# Run by hand any time:
+#   bash .agents/hooks/session-brief.sh
 set -uo pipefail
-cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)" || exit 0
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root="$(git -C "$here" rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$root" || exit 0
+# The clone's folder name, as the kit names repos; a plan worktree
+# (.worktrees/<plan>) reports its canonical checkout's name.
+common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+repo="$(basename "$(dirname "${common:-$root/.git}")")"
 
 # SessionStart passes its JSON on stdin; its session_id lets the herdr
 # section leave this session out. Run by hand, stdin is a terminal.
 session="${CLAUDE_CODE_SESSION_ID:-}"
-if [ -z "$session" ] && [ ! -t 0 ] && command -v jq >/dev/null 2>&1; then
-  session="$(jq -r '.session_id // empty' 2>/dev/null)"
+if [ -z "$session" ] && [ ! -t 0 ]; then
+  session="$(node "$here/lib/payload.mjs" session 2>/dev/null)"
 fi
 
-echo "== engine session brief (.claude/hooks/session-brief.sh) =="
+echo "== $repo session brief (.agents/hooks/session-brief.sh) =="
 if [ "$(git config core.hooksPath 2>/dev/null)" != ".githooks" ]; then
   echo "!! git hooks are OFF in this clone. Run: git config core.hooksPath .githooks"
 fi
@@ -23,7 +31,7 @@ echo "-- other agents in this repo (herdr) --"
 if [ "${HERDR_ENV:-}" != 1 ]; then
   echo "  (not running inside herdr)"
 else
-  peers="$(bash .claude/hooks/herdr-peers.sh "" "$session")"
+  peers="$(bash "$here/herdr-peers.sh" "" "$session")"  # "": the canonical checkout
   if [ -n "$peers" ]; then
     printf '%s\n' "$peers" | while IFS="$(printf '\t')" read -r pane status goal where; do
       [ "$goal" = "-" ] && goal="(no goal set)"
@@ -60,6 +68,8 @@ echo "-- latest journal --"
 # The journal file the newest commit touched (per-topic names don't sort
 # by recency; 2026-11-04.md sorts after every 2026-11-04-<topic>.md).
 latest="$(git log -1 --format= --name-only --diff-filter=AM -- 'project/journal/[0-9]*.md' 2>/dev/null | head -1)"
+# Journal names are dated (YYYY-MM-DD[-topic].md): ls -t is safe here.
+# shellcheck disable=SC2012
 [ -n "$latest" ] && [ -f "$latest" ] || latest="$(ls -t project/journal/[0-9]*.md 2>/dev/null | head -1)"
 if [ -n "$latest" ]; then
   echo "  $latest (last lines):"
@@ -69,13 +79,24 @@ else
 fi
 
 echo
-echo "-- main only, plus plan worktrees: .worktrees/<slug> on plan/<slug> (D27, J221, J240) --"
-plans="$(git worktree list 2>/dev/null | tail -n +2 | grep -E '/\.worktrees/[a-z0-9][a-z0-9._-]* +[0-9a-f]+ \[plan/' || true)"
-if [ -n "$plans" ]; then printf '%s\n' "$plans" | sed 's/^/  plan worktree /'; fi
+# A repo with the plan-worktree tool (scripts/worktree.mjs; engine since
+# J240, the rest at WORKTREE-LAND-STANDARD WL4) also allows
+# .worktrees/<slug> on plan/<slug>; any other repo stays main only.
+plan_wt='/\.worktrees/[a-z0-9][a-z0-9._-]* +[0-9a-f]+ \[plan/'
+plan_branch='^branch plan/[a-z0-9][a-z0-9._-]*$'
+plan_remote='^remote [^/]+/plan/[a-z0-9][a-z0-9._-]*$'
+if [ -f scripts/worktree.mjs ]; then
+  echo "-- main only, plus plan worktrees: .worktrees/<slug> on plan/<slug> (D27, J221, J240) --"
+  plans="$(git worktree list 2>/dev/null | tail -n +2 | grep -E "$plan_wt" || true)"
+  if [ -n "$plans" ]; then printf '%s\n' "$plans" | sed 's/^/  plan worktree /'; fi
+else
+  echo "-- main only: no branches, no worktrees (D27) --"
+  plan_wt='^$'; plan_branch='^$'; plan_remote='^$'
+fi
 strays="$(
-  git worktree list 2>/dev/null | tail -n +2 | grep -vE '/\.worktrees/[a-z0-9][a-z0-9._-]* +[0-9a-f]+ \[plan/' | sed 's/^/worktree /'
-  git for-each-ref --format='branch %(refname:short)' refs/heads 2>/dev/null | grep -vx 'branch main' | grep -vE '^branch plan/[a-z0-9][a-z0-9._-]*$'
-  git for-each-ref --format='remote %(refname:short)' refs/remotes 2>/dev/null | grep -vxE 'remote [^/]+(/HEAD|/main)?' | grep -vE '^remote [^/]+/plan/[a-z0-9][a-z0-9._-]*$'
+  git worktree list 2>/dev/null | tail -n +2 | grep -vE "$plan_wt" | sed 's/^/worktree /'
+  git for-each-ref --format='branch %(refname:short)' refs/heads 2>/dev/null | grep -vx 'branch main' | grep -vE "$plan_branch"
+  git for-each-ref --format='remote %(refname:short)' refs/remotes 2>/dev/null | grep -vxE 'remote [^/]+(/HEAD|/main)?' | grep -vE "$plan_remote"
 )"
 if [ -n "$strays" ]; then
   printf '%s\n' "$strays" | sed 's/^/  !! /'

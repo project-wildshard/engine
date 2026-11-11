@@ -1,9 +1,10 @@
-// Tests for src/scripts/md-wrap.mjs (72-column markdown prose) and the
-// PostToolUse advisory hook .claude/hooks/md-prose-width.sh.
+// Tests for src/scripts/md-wrap.mjs (72-column markdown prose). Its
+// PostToolUse hook is tested in md-prose-width.test.mjs (.claude/hooks/)
+// or, on the agent layout, .agents/hooks/test/hooks.test.mjs.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WIDTH, breakable, findLong, reflow, width } from '../src/scripts/md-wrap.mjs';
@@ -63,7 +64,7 @@ describe('md-wrap reflow', () => {
   });
 });
 
-describe('md-wrap CLI and hook', () => {
+describe('md-wrap CLI', () => {
   test('--check --new-only reports only lines added since HEAD', () => {
     const box = sandbox();
     box.commit({ 'doc.md': `${long(20)}\n` }, ok('docs: add doc'));
@@ -72,58 +73,5 @@ describe('md-wrap CLI and hook', () => {
     assert.equal(run.status, 1);
     assert.match(run.stdout, /doc\.md:3:/);
     assert.doesNotMatch(run.stdout, /doc\.md:1:/);
-  });
-  test('the PostToolUse hook advises on new long lines and ignores other files', () => {
-    const box = sandbox();
-    mkdirSync(join(box.root, 'src', 'scripts'), { recursive: true });
-    const hook = (file) => spawnSync('bash', [join(ROOT, '.claude/hooks/md-prose-width.sh')], {
-      cwd: box.root, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: box.root },
-      input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(box.root, file) } }),
-    });
-    writeFileSync(join(box.root, 'new.md'), `${long(20)}\n`);
-    const advised = hook('new.md');
-    assert.equal(advised.status, 2);
-    assert.match(advised.stderr, /new\.md:1: \d+ chars[\s\S]*node src\/scripts\/md-wrap\.mjs/);
-    writeFileSync(join(box.root, 'fine.md'), 'short\n');
-    assert.equal(hook('fine.md').status, 0);
-    writeFileSync(join(box.root, 'code.ts'), `// ${long(30)}\n`);
-    assert.equal(hook('code.ts').status, 0);
-  });
-  test('a plan worktree file is checked against that worktree, not the canonical checkout (DS11)', () => {
-    const box = sandbox();
-    box.commit({ 'old.md': 'short\n' }, ok('docs: add old'));
-    assert.equal(box.git(['worktree', 'add', '-q', '-b', 'plan/p', '.worktrees/p']).status, 0);
-    const tree = join(box.root, '.worktrees', 'p');
-    mkdirSync(join(tree, 'src', 'scripts'), { recursive: true });
-    copyFileSync(join(ROOT, 'src/scripts/md-wrap.mjs'), join(tree, 'src', 'scripts', 'md-wrap.mjs'));
-    writeFileSync(join(tree, 'new.md'), `${long(20)}\n`);
-    // The worktree's own md-wrap runs in the worktree on its worktree-relative path, against the worktree's HEAD.
-    const advised = spawnSync('bash', [join(ROOT, '.claude/hooks/md-prose-width.sh')], {
-      cwd: box.root, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: box.root },
-      input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: join(tree, 'new.md') } }),
-    });
-    assert.equal(advised.status, 2, advised.stderr);
-    assert.match(advised.stderr, /^ {2}new\.md:1: \d+ chars/mu);
-    assert.doesNotMatch(advised.stderr, /\.worktrees/u);
-  });
-  test('a path that only names a worktree lexically is resolved first (DS11, J206 review)', () => {
-    const box = sandbox();
-    box.commit({ 'old.md': 'short\n' }, ok('docs: add old'));
-    assert.equal(box.git(['worktree', 'add', '-q', '-b', 'plan/p', '.worktrees/p']).status, 0);
-    writeFileSync(join(box.root, 'top.md'), `${long(20)}\n`);
-    const advise = (path, project = box.root) => spawnSync('bash', [join(ROOT, '.claude/hooks/md-prose-width.sh')], {
-      cwd: box.root, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: project },
-      input: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: path } }),
-    });
-    // .worktrees/p/../../top.md is the canonical top.md: checked there, never as the worktree's file.
-    const canonical = advise(join(box.root, '.worktrees', 'p', '..', '..', 'top.md'));
-    assert.equal(canonical.status, 2, canonical.stderr);
-    assert.match(canonical.stderr, /^ {2}top\.md:1: \d+ chars/mu);
-    // From a project at inner/, inner/.worktrees/../../top.md leaves the project: not this hook's file.
-    const inner = join(box.root, 'inner');
-    mkdirSync(join(inner, 'src', 'scripts'), { recursive: true });
-    copyFileSync(join(ROOT, 'src/scripts/md-wrap.mjs'), join(inner, 'src', 'scripts', 'md-wrap.mjs'));
-    const outside = advise(join(inner, '.worktrees', '..', '..', 'top.md'), inner);
-    assert.equal(outside.status, 0, outside.stderr);
   });
 });
