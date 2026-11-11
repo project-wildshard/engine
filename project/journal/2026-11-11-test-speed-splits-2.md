@@ -35,3 +35,6 @@ products split with the file.
 The six new files carry their first local clocks from the push gate's timing
 reporter (two of them also run in Ring 1); the parents keep their old,
 larger weights until hosted runs re-time them.
+
+After the review dropped two unused imports, the refusals file was re-clocked
+for its new blob by the push gate.
