@@ -2,10 +2,8 @@ import { expect, test, vi } from 'vitest';
 import { WebSocket as RawSocket } from 'ws';
 import { NetClient } from '../src/client/engine/net/client';
 import { WebSocketTransport } from '../src/client/engine/net/webSocketTransport';
-import { BitWriter } from '../src/shared/engine/net/bits';
 import { GUEST } from '../src/shared/engine/net/identity';
-import { encodeHello } from '../src/shared/engine/net/messages';
-import { NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
+import { helloMessage } from '../src/shared/engine/net/wireMessages';
 import { closeReason, encodePing, framed, SOCKET_RELIABLE, STALL_CLOSE_BYTES, FRAME_SKIP_BYTES } from '../src/shared/engine/net/socketFrames';
 import { NetRoom, MAX_CLIENT_MESSAGE_BYTES } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
@@ -20,13 +18,13 @@ import { rapier } from './fixtures/netSocketRoom';
 // TEST-SPEED TS5 (J255): net-socket-room was 22-31 s hosted. Split from net-socket-room.test.ts by case; bodies unchanged.
 test('a client that stops reading is closed at 256 KB and the room keeps ticking', async () => {
   const bench = await socketBench(), host = createSimHost(SIM_LEVEL, { rapier }), lead = leadPlayer(host), bot = host.addPlayer('bot:1', { x: 3, y: 0, z: 0 }), deaf = host.addPlayer('bot:2', { x: 4, y: 0, z: 0 });
-  const world = new SimNetWorld(host), room = new NetRoom({ world, step: () => { host.step(); } }), writer = new BitWriter(1024);
+  const world = new SimNetWorld(host), room = new NetRoom({ world, step: () => { host.step(); } });
   /** A client that will stop reading: it says hello, hears its first message, and from then on only says it is alive, as a wedged phone does. */
   const wedged = async (id: string): Promise<{ raw: RawSocket; end: SocketTransport }> => {
     const raw = new RawSocket(bench.url, { perMessageDeflate: false }), end = await bench.accepted();
     await new Promise(resolve => { raw.once('open', resolve); });
     room.join(end, world.playerOf(id));
-    raw.send(framed(SOCKET_RELIABLE, encodeHello(writer, { schemaHash: NET_SCHEMA_HASH, build: '', ...GUEST, ledger: 0 })));
+    raw.send(framed(SOCKET_RELIABLE, helloMessage({ build: '', ...GUEST, ledger: 0 }).buffer));
     return { raw, end };
   };
   try {

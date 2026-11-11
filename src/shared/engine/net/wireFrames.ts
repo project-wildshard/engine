@@ -65,6 +65,15 @@ export class WireFrameReader {
     this.laws = new Map(laws.map(law => [law.id, { id: law.id, words: law.fields.length }]));
   }
 
+  /** The sender's columns of a class, by its id: what its spawns are written in. */
+  senderColumns(id: number): ClassColumns | undefined { return this.sender.get(id); }
+
+  /** A spawn's initial words, sent in the sender's layout, in this build's. */
+  initial(cls: NetClass<never>, words: readonly number[]): number[] {
+    const slots = this.projected.get(IDS.get(cls.cls) ?? 0);
+    return slots === undefined ? [...words] : [...projectRow(slots.initial, words)];
+  }
+
   private senderOf(cls: NetClass<never> | undefined): ClassColumns | undefined {
     const id = cls === undefined ? undefined : IDS.get(cls.cls);
     return id === undefined ? undefined : this.sender.get(id);

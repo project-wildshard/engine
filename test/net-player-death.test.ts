@@ -10,8 +10,9 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { PlayerHealth } from '../src/shared/engine/combat/health';
 import type { DeathCause } from '../src/shared/engine/combat/pipeline';
 import { Events } from '../src/shared/engine/events/events';
-import { decodeEvents, messageId, MSG_EVENTS, type NetPlayerDied } from '../src/shared/engine/net/messages';
-import { initialBitsOf } from '../src/shared/engine/net/netSchemas';
+import type { NetPlayerDied } from '../src/shared/engine/net/messages';
+import { localEvents, recordTags } from '../src/shared/engine/net/wireMessages';
+import { TAG_EVENTS } from '@wildshard/wire/game';
 import type { Rapier } from '../src/shared/engine/physics/rapier';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { installRoomRespawn } from '../src/server/game/roomRespawn';
@@ -36,12 +37,12 @@ test.each([false, true, undefined])('the server death reaches only its owner onc
   room.join(link.server); room.join(otherLink.server, world.playerOf(peer.id)); client.hello(); other.hello(); link.pump(); otherLink.pump(); room.open(); link.pump(); otherLink.pump();
   const net = new NetPlayer(client, page.player, page.physics), received: NetPlayerDied[] = [], shown: { cause: DeathCause | undefined; checkpoint: boolean }[] = [], packets: ArrayBuffer[] = [], foreign: NetPlayerDied[] = [], foreignWire: NetPlayerDied[] = [];
   page.player.link = net;
-  scope.onDispose(link.client.onMessage((_channel, bytes) => { if (messageId(new Uint8Array(bytes)) === MSG_EVENTS) packets.push(bytes.slice(0)); }));
+  scope.onDispose(link.client.onMessage((_channel, bytes) => { if (recordTags(new Uint8Array(bytes)).includes(TAG_EVENTS)) packets.push(bytes.slice(0)); }));
   scope.onDispose(client.onPlayerDied(event => { received.push(event); net.holdRespawn(); events.emit('player.died', { actor: health, checkpoint: event.checkpoint, ...(event.cause === undefined ? {} : { cause: event.cause }) }); }));
   scope.onDispose(other.onPlayerDied(event => { foreign.push(event); }));
   scope.onDispose(otherLink.client.onMessage((_channel, bytes) => {
-    if (messageId(new Uint8Array(bytes)) !== MSG_EVENTS) return;
-    const decoded = decodeEvents(new Uint8Array(bytes), initialBitsOf);
+    if (!recordTags(new Uint8Array(bytes)).includes(TAG_EVENTS)) return;
+    const decoded = localEvents(new Uint8Array(bytes));
     for (const event of decoded?.events ?? []) if (event.kind === 'player-died') foreignWire.push(event);
   }));
   installPlayerDeath(events, scope, health, { position: () => page.player.position, died: (cause, taken) => { shown.push({ cause, checkpoint: taken }); } });

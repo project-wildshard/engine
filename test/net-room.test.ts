@@ -5,8 +5,11 @@ import { beforeAll, expect, test } from 'vitest';
 import { BitWriter } from '../src/shared/engine/net/bits';
 import { NetClient } from '../src/client/engine/net/client';
 import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
-import { encodeCommands } from '../src/shared/engine/net/command';
 import { encodeHello } from '../src/shared/engine/net/messages';
+import { commandsMessage, helloMessage, SERVER_TABLES } from '../src/shared/engine/net/wireMessages';
+import { clientTables } from '@wildshard/wire/game';
+import { encodeHello as encodeWireHello } from '@wildshard/wire/handshake';
+import { WIRE_MAJOR, WIRE_MINOR } from '@wildshard/wire/major';
 import { ANIMAL_CLASS, NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
 import { NetRoom, type NetVisitor, type NetWorld } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
@@ -75,7 +78,7 @@ test('frames carry every creature within one quantisation step, and the owner bl
   client.hello(); link.pump();
   expect(client.welcome).toBeNull(); // the sim stays paused until the client says ready (§6.3.1)
   room.open(); link.pump();
-  expect(client.welcome).toMatchObject({ schemaHash: NET_SCHEMA_HASH, simHz: 60, frameHz: 30 });
+  expect(client.welcome).toMatchObject({ schemaHash: SERVER_TABLES.hash, simHz: 60, frameHz: 30 });
   expect(client.latest?.baselineTick).toBe(0xffffffff);
   expect(creatureCount(client)).toBe(resident.host.entities.size);
   let frames = 0, seq = 0, before = positions(resident);
@@ -158,26 +161,31 @@ test('a bad link heals: loss, jitter and reordering never corrupt a row', async 
   resident.dispose();
 });
 
-test('hello refuses a stale schema or build with `reload`, and garbage never reaches the tick', async () => {
+test('hello: v0.1.x and older reload, newer retries, another build of this wire plays, garbage never reaches the tick', async () => {
+  // WR5 (5.5, J54 replaced): builds need not match; the bootstrap and the minor window decide.
   const resident = await sunscar(), room = new NetRoom({ world: new SimNetWorld(resident.host), build: 'build-a', step: () => { resident.step([]); } });
-  const wrong = directLoopback(), stale = new NetClient(wrong.client), writer = new BitWriter();
-  room.join(wrong.server);
-  wrong.client.send('reliable', encodeHello(writer, { schemaHash: NET_SCHEMA_HASH ^ 1, build: 'build-a', player: 'device:1', name: 'Ann', ledger: 0 })); wrong.pump();
-  expect(stale.closed).toBe('reload');
-  const old = directLoopback(), oldClient = new NetClient(old.client);
-  room.join(old.server); oldClient.hello('build-b'); old.pump();
-  expect(oldClient.closed).toBe('reload');
-  const garbled = directLoopback(), garbledClient = new NetClient(garbled.client);
-  room.join(garbled.server); garbled.client.send('reliable', Uint8Array.of(1, 0, 0).buffer); garbled.pump();
-  expect(garbledClient.closed, 'a hello this build cannot read is a stale tab too').toBe('reload');
+  const refusal = (bytes: Uint8Array): string | null => {
+    const link = directLoopback(), client = new NetClient(link.client);
+    room.join(link.server); link.client.send('reliable', bytes.slice().buffer); link.pump();
+    return client.closed;
+  };
+  const said = { build: 'build-a', player: 'device:1', name: 'Ann', ledger: 0 };
+  expect(refusal(new Uint8Array(encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, ...said }))), 'a v0.1.x hello').toBe('reload');
+  const newer = helloMessage(said); newer[1] = WIRE_MAJOR + 1;
+  expect(refusal(newer), 'a newer major').toBe('retry');
+  expect(refusal(encodeWireHello({ ...said, minor: WIRE_MINOR + 2, capabilities: [], ...clientTables() })), 'two minors ahead').toBe('retry');
+  expect(refusal(Uint8Array.of(87, WIRE_MAJOR, 1, 3, 9, 9, 9)), 'a hello this build cannot read').toBe('refused');
+  const other = directLoopback(), otherClient = new NetClient(other.client);
+  room.join(other.server); otherClient.hello('build-b'); room.open(); other.pump();
+  expect(otherClient.welcome, 'another build of the same wire is welcomed').not.toBeNull();
   const good = directLoopback(), client = new NetClient(good.client);
   room.join(good.server); client.hello('build-a'); room.open(); good.pump();
   expect(client.welcome).not.toBeNull();
   good.client.send('unreliable', Uint8Array.of(99, 1, 2, 3).buffer);
   good.client.send('unreliable', Uint8Array.of(2, 1).buffer);
-  good.client.send('reliable', encodeCommands(writer, { ackFrame: 0xfffffff0, commands: [] }, () => 0)); // an ack from the future is refused
+  good.client.send('reliable', commandsMessage(0xfffffff0, [], () => 0).buffer); // an ack from the future is refused
   good.pump();
-  expect(room.stats.refused).toBe(6); // three hellos, two bad messages, and that ack
+  expect(room.stats.refused).toBe(7); // four hellos, two bad messages, and that ack
   room.tick(); room.tick(); good.pump();
   expect(client.latest?.baselineTick).toBe(0xffffffff);
   resident.dispose();

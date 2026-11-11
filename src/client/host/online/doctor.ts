@@ -4,10 +4,7 @@
 // device that never sends `ready`, so it learns whether the door would seat this page and takes no seat and writes no save.
 import type { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
-// oxlint-disable-next-line wildshard/public-index -- BitWriter has no public entry, and adding one re-stamps every product's validation revision
-import { BitWriter } from '../../../shared/engine/net/bits';
-import { encodeHello } from '@wildshard/engine/net/messages';
-import { NET_SCHEMA_HASH } from '@wildshard/engine/net/netSchemas';
+import { helloMessage } from '@wildshard/engine/net/wireMessages';
 import { closeReason, decodePong, encodePing, framed, SOCKET_COUNTDOWN, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME } from '@wildshard/engine/net/socketFrames';
 import { readSignedRelease } from './release';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
@@ -212,7 +209,7 @@ function checkJoin(config: DoctorConfig, learned: Learned, ms: number): Promise<
     scope.listen(ws, 'open', () => {
       opened = true;
       // The game's own hello (J197), as a device that exists only for this check. No `ready` follows, so no body is seated.
-      ws.send(framed(SOCKET_RELIABLE, encodeHello(new BitWriter(), { schemaHash: NET_SCHEMA_HASH, build, player: `doctor:${crypto.randomUUID()}`, name: 'Doctor', ledger: 0 })));
+      ws.send(framed(SOCKET_RELIABLE, helloMessage({ build, player: `doctor:${crypto.randomUUID()}`, name: 'Doctor', ledger: 0 }).buffer));
       ping();
     });
     scope.listen(ws, 'message', (event: MessageEvent<unknown>) => {

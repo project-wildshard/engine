@@ -5,17 +5,21 @@ import * as v from 'valibot';
 import { installPortableMath } from '../../../shared/engine/core/portableMath';
 import { NetRoomActSchema, type NetChatReport, type NetChatSay, type NetTickAct } from '../../../shared/engine/net/acts';
 import { CHAT_RADIUS, RoomChat, type ChatLine, type ChatReports } from './chat';
-import { BitWriter } from '../../../shared/engine/net/bits';
 import { cleanName } from './chatFilter';
 import type { CombatEvent } from './combatWire';
 import type { QuestProgress } from '../../../shared/engine/quest/progress';
-import { decodeCommands, seqAfter } from '../../../shared/engine/net/command';
+import { seqAfter } from '../../../shared/engine/net/command';
 import { CommandQueue, type CommandTurn } from './commandQueue';
-import { encodeFrame, FRAME_RING, WorldFrameRing, type WorldFrame } from '../../../shared/engine/net/frame';
+import { FRAME_RING, WorldFrameRing, type WorldFrame } from '../../../shared/engine/net/frame';
+import { encodeFrame } from '@wildshard/wire/frameRecord';
+import { readMessage, TAG_ACT, TAG_CMDS } from '@wildshard/wire/game';
+import { decodeFirstMessage } from '@wildshard/wire/handshake';
+import { WIRE_MINOR } from '@wildshard/wire/major';
+import { snapshotOf } from '../../../shared/engine/net/wireFrames';
+import { eventsMessage, welcomeMessage, WireClientReader, type Span } from '../../../shared/engine/net/wireMessages';
 import { NetHandles } from './handles';
 import { GUEST, NetIdentitySchema, type NetIdentity } from '../../../shared/engine/net/identity';
-import { decodeAct, decodeHello, encodeEvents, encodeWelcome, messageId, MSG_ACT, MSG_CMDS, MSG_HELLO, type InitialBits, type NetDied, type NetPlayerDied, type NetView, type NetEvent, type NetHit, type NetReward } from '../../../shared/engine/net/messages';
-import { initialBitsOf, NET_SCHEMA_HASH } from '../../../shared/engine/net/netSchemas';
+import type { NetDied, NetPlayerDied, NetView, NetEvent, NetHit, NetReward } from '../../../shared/engine/net/messages';
 import type { NetClass, NetRefs } from '../../../shared/engine/net/schema';
 import type { FightViewCall } from '../../../shared/engine/sim/shardRows';
 import { LedgerBook, type LedgerFiling } from './ledgerBook';
@@ -119,6 +123,8 @@ interface RoomClient {
   ledgerSeen: number;
   /** waiting: said hello before the room opened. live: welcomed. */
   state: 'new' | 'waiting' | 'live';
+  /** Its command and act codecs, compiled from the tables its hello carried (5.3); absent before hello. */
+  reader?: WireClientReader;
   ack: number; readonly acts: HeldAct[]; readonly known: Set<number>;
   /** Bodies this client has heard spawn and not yet been told what it missed of; each is sent a frame at a time. */
   readonly owed: number[];
@@ -137,7 +143,6 @@ interface RoomClient {
   readonly owner: Float64Array; dispose: () => void;
 }
 
-const initialBits: InitialBits = initialBitsOf;
 
 function rowPosition(frame: WorldFrame, at: number, cls: NetClass<never>): { x: number; y: number; z: number } | null {
   if (cls.position === null) return null;
@@ -151,7 +156,6 @@ export class NetRoom {
   private readonly clients: RoomClient[] = [];
   private readonly handles = new NetHandles();
   private readonly ring = new WorldFrameRing();
-  private readonly writer = new BitWriter(4096);
   private readonly rideOut = new Float64Array(RIDE_WORDS);
   private readonly held = new Map<string, number>();
   private readonly calls: FightViewCall[] = [];
@@ -196,7 +200,7 @@ export class NetRoom {
     if (client === undefined) return null;
     if (client.state !== 'live' || !to.opened) { this.drop(client); return null; }
     const tick = this.world.tick(), travel: NetEvent = { kind: 'travel', tick, from: this.world.cell(), to: to.world.cell() };
-    client.transport.send('reliable', encodeEvents(this.writer, tick, [travel], initialBits));
+    client.transport.send('reliable', eventsMessage(tick, [travel]).buffer);
     this.remove(client);
     return to.adopt(client.transport, player, client.queue, client.identity);
   }
@@ -277,11 +281,15 @@ export class NetRoom {
     }
     const view = new Uint8Array(bytes);
     try {
-      switch (messageId(view)) {
-        case MSG_HELLO: this.hello(client, view); break;
-        case MSG_CMDS: this.commands(client, view); break;
-        case MSG_ACT: this.act(client, view); break;
-        default: this.stats.refused++;
+      // A client's first message is the bootstrap and its hello (5.1); every later one is plain records.
+      if (client.state === 'new') { this.hello(client, view); return; }
+      const records = this.records(view);
+      if (records === null) { this.stats.refused++; return; }
+      for (const record of records) {
+        const span = { bytes: view, start: record.start, end: record.end };
+        if (record.tag === TAG_CMDS) this.commands(client, span);
+        else if (record.tag === TAG_ACT) this.act(client, span);
+        else this.stats.refused++;
       }
     } catch (error) {
       console.error('A client message threw past its decoder; dropping the client', error);
@@ -289,31 +297,42 @@ export class NetRoom {
       this.drop(client);
     }
   }
+  /** A message's records, or null when its framing is malformed (a duplicate singleton included). */
+  private records(view: Uint8Array): ReturnType<typeof readMessage>['records'] | null {
+    try { return readMessage(view).records; } catch (error) { if (error instanceof Error && error.name === 'WireDecodeError') return null; throw error; }
+  }
   private hello(client: RoomClient, view: Uint8Array): void {
-    const hello = decodeHello(view);
-    if (client.state !== 'new') { this.stats.refused++; return; }
-    // A hello this build cannot read is a stale tab as surely as a wrong hash: it must reload, not wait for ever (§4.4).
-    if (hello === null) { this.stats.refused++; client.transport.close('reload'); return; }
-    // J54: exact match only. Refused with `reload`, so a stale tab picks up the new build (§4.4).
-    if (hello.schemaHash !== NET_SCHEMA_HASH || (this.build !== '' && hello.build !== this.build)) { this.stats.refused++; client.transport.close('reload'); return; }
+    // WR5 (5.5, J54 replaced): a v0.1.x hello or an older major reloads; a newer major retries; within the major, the
+    // minor window is one either way. Builds no longer have to match: each side's tables say its layout.
+    const first = decodeFirstMessage(view);
+    if (first.kind !== 'hello') { this.stats.refused++; client.transport.close(first.kind === 'refuse' ? 'refused' : first.kind); return; }
+    const { hello } = first;
+    if (hello.minor > WIRE_MINOR + 1) { this.stats.refused++; client.transport.close('retry'); return; }
+    if (hello.minor < WIRE_MINOR - 1) { this.stats.refused++; client.transport.close('reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.stats.refused++; client.transport.close('refused'); return; }
     const identity = { player: said.output.player, name: cleanName(said.output.name) };
     if (this.world.identified?.(client.player.id, identity) === false) { this.stats.refused++; this.drop(client); return; }
     client.identity = identity;
     client.ledgerSeen = hello.ledger;
+    client.reader = new WireClientReader(hello);
     client.state = 'waiting';
     if (this.opened) this.welcome(client);
   }
-  private commands(client: RoomClient, view: Uint8Array): void {
-    const bundle = client.state === 'live' ? decodeCommands(view, this.handles.idOf) : null;
+  /** A cmds record; one a client's tables can't read, or that names an unknown handle, is refused like v0's. */
+  private commands(client: RoomClient, span: Span): void {
+    const { reader } = client;
+    let bundle: ReturnType<WireClientReader['commandsOf']> | null = null;
+    if (client.state === 'live' && reader !== undefined) try { bundle = reader.commandsOf(span, this.handles.idOf); } catch (error) { if (!(error instanceof RangeError) && !(error instanceof Error && error.name === 'WireDecodeError')) throw error; }
     if (bundle === null) { this.stats.refused++; return; }
     if (bundle.ackFrame > this.world.tick()) this.stats.refused++; // a frame that never was: its commands may still stand
     else if (bundle.ackFrame > client.ack) client.ack = bundle.ackFrame;
     client.queue.admit(bundle.commands);
   }
-  private act(client: RoomClient, view: Uint8Array): void {
-    const decoded = decodeAct(view), parsed = v.safeParse(NetRoomActSchema, decoded);
+  private act(client: RoomClient, span: Span): void {
+    let decoded: unknown = null;
+    try { decoded = client.reader?.actOf(span) ?? null; } catch (error) { if (!(error instanceof Error && error.name === 'WireDecodeError')) throw error; }
+    const parsed = v.safeParse(NetRoomActSchema, decoded);
     if (!parsed.success || client.state !== 'live') { this.stats.refused++; return; }
     const act = parsed.output;
     if (act.kind === 'chat' || act.kind === 'report') { if (!this.chatAct(client, act)) this.stats.refused++; return; }
@@ -341,7 +360,7 @@ export class NetRoom {
     const { handles } = this, serial = ++this.serial;
     this.world.visit({ entity: (id, cls, view) => { handles.touch(id, cls, view, serial); } });
     const handle = handles.refs(client.player.id);
-    client.transport.send('reliable', encodeWelcome(this.writer, { handle, player: client.player.id, tick: this.world.tick(), cell: this.world.cell(), schemaHash: NET_SCHEMA_HASH, simHz: SIM_HZ, frameHz: FRAME_HZ }));
+    client.transport.send('reliable', welcomeMessage({ handle, player: client.player.id, tick: this.world.tick(), cell: this.world.cell(), simHz: SIM_HZ, frameHz: FRAME_HZ }, this.build).buffer);
   }
   private snapshot(tick: number): void {
     const frame = this.ring.claim(tick), serial = ++this.serial, { handles } = this;
@@ -418,7 +437,7 @@ export class NetRoom {
     if (owed.length === 0) said.clear();
   }
   private send(client: RoomClient, frame: WorldFrame, retired: readonly number[], combat: readonly RoomCombat[], lines: readonly ChatLine[], riders: ReadonlyMap<number, number>): void {
-    const { handles, writer, world } = this, own = handles.refs(client.player.id), view = this.view(client, frame, own), events: NetEvent[] = [];
+    const { handles, world } = this, own = handles.refs(client.player.id), view = this.view(client, frame, own), events: NetEvent[] = [];
     for (const handle of view.visible) {
       if (client.known.has(handle)) continue;
       const row = handles.row(handle);
@@ -459,7 +478,7 @@ export class NetRoom {
     for (const receipt of this.book.since(client.player.id, client.ledgerSeen)) { events.push({ ...receipt, tick: frame.tick }); client.ledgerSeen = receipt.serial; }
     for (const handle of retired) if (client.known.delete(handle)) events.push({ kind: 'despawn', handle });
     if (events.length > 0) {
-      const bytes = encodeEvents(writer, frame.tick, events, initialBits);
+      const bytes = eventsMessage(frame.tick, events).buffer;
       this.stats.eventBytes += bytes.byteLength;
       client.transport.send('reliable', bytes);
     }
@@ -468,9 +487,9 @@ export class NetRoom {
     this.heldRows(view, frame, base === null ? null : seen ?? null);
     client.player.sample(client.owner, handles.refs);
     const { rideOut } = this, rideWords = client.player.ride?.(rideOut) ?? 0;
-    const bytes = encodeFrame(writer, { frame, cell: world.cell(), lastSeq: client.queue.lastSeq, ownerClass: client.player.cls, owner: client.owner, ride: rideOut, rideWords,
+    const bytes = encodeFrame(snapshotOf({ frame, cell: world.cell(), lastSeq: client.queue.lastSeq, ownerClass: client.player.cls, owner: client.owner, ride: rideOut, rideWords,
       visible: view.visible, baseline: base === null || seen === undefined ? null : { frame: base, visible: seen.visible, rowFrom: handle => this.ring.at(seen.rows.get(handle) ?? -1) },
-      due: handle => view.rows.get(handle) === frame.tick, classOf: handle => handles.row(handle)?.cls });
+      due: handle => view.rows.get(handle) === frame.tick, classOf: handle => handles.row(handle)?.cls })).buffer;
     this.stats.frames++; this.stats.frameBytes += bytes.byteLength;
     client.transport.send('unreliable', bytes);
   }

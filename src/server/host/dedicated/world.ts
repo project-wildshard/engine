@@ -13,8 +13,8 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { cleanName } from '@wildshard/engine/net/chatFilter';
 import { NetIdentitySchema } from '@wildshard/engine/net/identity';
-import { decodeHello, messageId, MSG_HELLO } from '@wildshard/engine/net/messages';
-import { NET_SCHEMA_HASH } from '@wildshard/engine/net/netSchemas';
+import { decodeFirstMessage } from '@wildshard/wire/handshake';
+import { WIRE_MINOR } from '@wildshard/wire/major';
 import { encodeCountdown } from '@wildshard/engine/net/socketFrames';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
@@ -253,9 +253,13 @@ export class World {
   /** The join: check, find where they stand, let them load, seat them. */
   private async hello(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
     const view = new Uint8Array(bytes);
-    if (messageId(view) !== MSG_HELLO) { this.refuse('not-hello'); end.close('refused'); return; }
-    const hello = decodeHello(view);
-    if (hello === null || hello.schemaHash !== NET_SCHEMA_HASH || hello.build !== this.options.build) { this.refuse('stale-build'); end.close('reload'); return; }
+    // WR5 (5.5, J54 replaced): the door reads the v1 bootstrap. A v0.1.x hello or an older major reloads, a newer major
+    // retries, and the minor window is one either way; builds no longer have to match.
+    const first = decodeFirstMessage(view);
+    if (first.kind === 'refuse') { this.refuse('not-hello'); end.close('refused'); return; }
+    if (first.kind !== 'hello') { this.refuse('stale-build'); end.close(first.kind); return; }
+    const { hello } = first;
+    if (hello.minor !== WIRE_MINOR && Math.abs(hello.minor - WIRE_MINOR) > 1) { this.refuse('stale-build'); end.close(hello.minor > WIRE_MINOR ? 'retry' : 'reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
     const device = said.output.player, name = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
