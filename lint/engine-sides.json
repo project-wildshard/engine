@@ -1469,6 +1469,7 @@
     "src/shared/engine/saves/environment.ts": "shared",
     "src/shared/engine/saves/legacy.ts": "shared",
     "src/shared/engine/saves/runtime.ts": "shared",
+    "src/shared/engine/saves/shape.ts": "shared",
     "src/shared/engine/saves/store.ts": "shared",
     "src/shared/engine/script/checkpointBytes.ts": "shared",
     "src/shared/engine/script/decisionModule.ts": "shared",

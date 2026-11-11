@@ -32,11 +32,12 @@ const RowSchema = v.array(v.object({ doc: v.unknown(), previous: v.unknown(), se
 // MP2.4: a save never renames a player. The Name and its tag are the door's claim (`names.ts`), and a save only says they were here.
 const WRITE_PLAYER = 'insert into player (id, name) values ($1, $2) on conflict (id) do update set seen_at = now()';
 // A write moves `doc` to `previous`, which is J102's last-good copy on the server, and `seq` keeps an older write from landing.
+// WR7: nor does an older server's doc land on a newer server's (`save_version`).
 const WRITE_SAVE = `insert into player_save (player_id, epoch, shard, revision, build, save_version, seq, reason, doc)
   values ($1, $2, $3, 1, $4, $5, $6, $7, $8::jsonb)
   on conflict (player_id, epoch, shard) do update set revision = player_save.revision + 1, build = excluded.build, save_version = excluded.save_version,
     seq = excluded.seq, reason = excluded.reason, doc = excluded.doc, previous = player_save.doc, updated_at = now()
-  where player_save.seq < excluded.seq
+  where player_save.seq < excluded.seq and player_save.save_version <= excluded.save_version
   returning seq`;
 // ZS7 (GO3, MP1.4's `player.at`): one place a player and epoch, moved by every doc that lands. `pose` is that doc's own stand.
 const WRITE_PLACE = `insert into player_place (player_id, epoch, cell, pose, reason) values ($1, $2, $3, $4::jsonb, $5)

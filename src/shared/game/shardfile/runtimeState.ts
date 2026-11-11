@@ -1,18 +1,18 @@
 import * as v from 'valibot';
-import type { SaveStore } from '@wildshard/engine/saves/store';
+import type { SaveKeyDef, SaveStore } from '@wildshard/engine/saves/store';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { LogicalStateSchema, migrateLogicalState } from '@wildshard/format/migrations';
 
-const schema = v.strictObject({ state: LogicalStateSchema, initialized: v.array(v.pipe(v.number(), v.integer(), v.minValue(1))) });
-const definition = { key: 'platform.runtime-state', scope: 'shard' as const, version: 1,
+const schema = v.looseObject({ state: LogicalStateSchema, initialized: v.array(v.pipe(v.number(), v.integer(), v.minValue(1))) });
+const runtimeStateSave = { key: 'platform.runtime-state', scope: 'shard' as const, version: 1,
   schema: v.nullable(schema), initial: (): v.InferOutput<typeof schema> | null => null };
 /** The same bounded scalar values as declared simulation state; JSON continuations use a declared string field. */
 export type RuntimeStateValue = number | boolean | string;
 
 /** A world's first boot: the fields a page's save held, by name. A server's fights keep their records in the world, so they start from these. */
 export function pageRuntimeState(store: SaveStore, instance: string): ReadonlyMap<string, RuntimeStateValue> {
-  return new Map((store.define(definition).read(instance)?.state.shared ?? []).map(row => [row.name, row.value]));
+  return new Map((store.define(runtimeStateSave).read(instance)?.state.shared ?? []).map(row => [row.name, row.value]));
 }
 const heldPageState = new WeakMap<object, ReadonlyMap<string, RuntimeStateValue>>();
 /** Lend a world what its page saved, before its fights install. */
@@ -35,7 +35,7 @@ export function installRuntimeState(store: SaveStore, scope: Scope, source: Pick
   if (field?.privacy !== 'host') throw new Error(`Runtime state needs a declared host-owned shared field: ${key}`);
   const live = (): void => { if (scope.disposed) throw new Error('Runtime state owner is disposed'); };
   live();
-  const slot = store.define(definition);
+  const slot = store.define(runtimeStateSave);
   let cached: v.InferOutput<typeof schema> | undefined, cachedRevision: number | undefined;
   const current = (): v.InferOutput<typeof schema> => {
     live();
@@ -65,3 +65,5 @@ export function installRuntimeState(store: SaveStore, scope: Scope, source: Pick
     return row.value;
   }, write: (value) => change(value, true) };
 }
+/** WIRE-STABILITY WR7: this file's save keys, for saves.lock.json (test/saves-lock.test.ts). */
+export const runtimeStateSaves: readonly SaveKeyDef<unknown>[] = [runtimeStateSave];

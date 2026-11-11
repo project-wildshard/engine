@@ -15,7 +15,7 @@ export function titlePrefetchChoice(store: Pick<SaveStore, 'define'>): TitlePref
   const previous = choices.get(store);
   if (previous !== undefined) return previous;
   const slug = v.pipe(v.string(), v.maxLength(120), v.regex(/^[a-z0-9_-]+$/u));
-  const schema = v.nullable(v.strictObject({slug, flow: v.picklist(['client', 'grid'])}));
+  const schema = v.nullable(v.looseObject({slug, flow: v.picklist(['client', 'grid'])}));
   const slot = store.define({key: 'titlePrefetch', scope: 'device', version: 2, schema, initial: () => null,
     migrate: {1: (old: unknown) => typeof old === 'string' ? {slug: old, flow: 'client'} : null}});
   const choice: TitlePrefetchChoice = {read: () => slot.read()?.slug ?? null, flow: () => slot.read()?.flow ?? 'client',

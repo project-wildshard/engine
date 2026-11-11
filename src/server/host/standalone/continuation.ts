@@ -7,12 +7,12 @@ import { MAX_TICK_SNAPSHOT_CHARS } from '../../../shared/host/tickProtocol';
 export interface SavedContinuation { readonly tick: number; readonly snapshot: string; readonly ledger?: LedgerBookSave }
 /** The continuation's save key. */
 export const CONTINUATION: SaveKeyDef<SavedContinuation | null> = { key: 'continuation', scope: 'shard', version: 1, initial: () => null,
-  schema: v.nullable(v.strictObject({ tick: v.pipe(v.number(), v.integer(), v.minValue(0)), snapshot: v.pipe(v.string(), v.maxLength(MAX_TICK_SNAPSHOT_CHARS)), ledger: v.exactOptional(LedgerBookSchema) })) };
+  schema: v.nullable(v.looseObject({ tick: v.pipe(v.number(), v.integer(), v.minValue(0)), snapshot: v.pipe(v.string(), v.maxLength(MAX_TICK_SNAPSHOT_CHARS)), ledger: v.exactOptional(LedgerBookSchema) })) };
 /** Where a session stands: its cell, or the road's own continuation and the receipts that go with it. `tick` counts this session's saves: each world keeps its own clock, so a world's tick can't say which save is newer. */
 export interface SavedSite { readonly tick: number; readonly site: string | null; readonly road?: string; readonly ledger?: LedgerBookSave }
 /** The site's save key. */
 export const SITE: SaveKeyDef<SavedSite | null> = { key: 'continuationSite', scope: 'shard', version: 1, initial: () => null,
-  schema: v.nullable(v.strictObject({ tick: v.pipe(v.number(), v.integer(), v.minValue(0)), site: v.nullable(v.string()), road: v.exactOptional(v.pipe(v.string(), v.maxLength(MAX_TICK_SNAPSHOT_CHARS))), ledger: v.exactOptional(LedgerBookSchema) })) };
+  schema: v.nullable(v.looseObject({ tick: v.pipe(v.number(), v.integer(), v.minValue(0)), site: v.nullable(v.string()), road: v.exactOptional(v.pipe(v.string(), v.maxLength(MAX_TICK_SNAPSHOT_CHARS))), ledger: v.exactOptional(LedgerBookSchema) })) };
 /** A cell's documents. A continuation gets its own: it is megabytes, and every other save write would rewrite it. Two, for the fallback. */
 export const cellDocuments = (instance: string): readonly [string, string] => [`standalone-${instance}`, `standalonealt-${instance}`];
 /** The documents saying where a session stands. A grid has one session, whichever cell a page boots into; a lone cell has its own. */

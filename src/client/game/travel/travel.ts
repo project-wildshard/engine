@@ -95,3 +95,5 @@ export function applyTravelCarry(handoff: TravelHandoff | null, inventory: Inven
   if (handoff?.to !== inventory.chunkId) return;
   for (const line of handoff.carry) inventory.add(line.id, line.count);
 }
+/** WIRE-STABILITY WR7: this file's save keys, for saves.lock.json (test/saves-lock.test.ts). */
+export const travelSaves: readonly SaveKeyDef<unknown>[] = [handoffDefinition];

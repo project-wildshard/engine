@@ -16,7 +16,7 @@ import type { FallFloor } from '../standalone/fallFloor';
 import { ledgerFilings } from '../standalone/ledgerFilings';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
-import { exportPlayer, importPlayer, parseDoc, PLAYER_DOC_VERSION, type PlayerDoc } from './playerDoc';
+import { carryDoc, exportPlayer, importPlayer, parseDoc, PLAYER_DOC_VERSION, type PlayerDoc } from './playerDoc';
 import { PlayerStore, recoverPlayer } from './playerStore';
 import { ShopGate } from './shopGate';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
@@ -40,6 +40,8 @@ interface Seat {
   holdEnds: number | null;
   /** The last `seq` written: a read seeds it, so a restart's writes land on what is there (E7.4). */
   seq: number;
+  /** WR7: the doc this seat was read from, whose fields this server does not know go back out with every write. */
+  readonly read: PlayerDoc | null;
   /** The last receipt in a write. */
   receipted: number;
   /** When a change first waited for a checkpoint, and when one last went. */
@@ -171,7 +173,7 @@ export class DedicatedRoom {
     } }
     catch (error) { this.refused(entry, transport, hello, `recovery: ${String(error)}`); return; }
     const store = new PlayerStore(doc?.store ?? {}, () => { const own = this.seats.get(entry.device); if (own !== undefined) this.dirty(own); });
-    const seat: Seat = { device: entry.device, name: entry.name, body, store, fall: this.cell.fallFloor(), transport, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
+    const seat: Seat = { device: entry.device, name: entry.name, read: entry.doc, body, store, fall: this.cell.fallFloor(), transport, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
     this.seats.set(entry.device, seat); this.bodies.set(body, seat);
     if (lead) this.unparkLead();
     // Two who join together would otherwise stand inside each other.
@@ -215,7 +217,7 @@ export class DedicatedRoom {
     if (player === undefined) return;
     const ledger = book.rowOf(seat.body), receipts = ledger.rows.filter(row => row.serial > seat.receipted).map(row => ({ serial: row.serial, factId: row.id, grant: row.grant, name: row.name, amount: row.amount }));
     seat.receipted = ledger.serial; seat.seq++; seat.dirtyAt = null; seat.savedAt = options.now();
-    options.post({ kind: 'save', write: { player: seat.device, name: seat.name, shard: options.slug, cell: this.name, build: options.build, saveVersion: PLAYER_DOC_VERSION, seq: seat.seq, reason, receipts, doc: exportPlayer(this.host, player, { store: seat.store.documents(), ledger }) } });
+    options.post({ kind: 'save', write: { player: seat.device, name: seat.name, shard: options.slug, cell: this.name, build: options.build, saveVersion: PLAYER_DOC_VERSION, seq: seat.seq, reason, receipts, doc: carryDoc(seat.read, exportPlayer(this.host, player, { store: seat.store.documents(), ledger })) } });
   }
   private rejoin(seat: Seat, transport: Transport, hello: () => void): void {
     const old = seat.transport;

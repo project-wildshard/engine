@@ -57,12 +57,12 @@ const release = await installedRelease();
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
 // the release names, home first. A cell runs its shard's pack, and the release must name that shard.
 const cells = worldCells(process.env['WORLD_CELLS'] ?? 'driftwood-isle', release.shards.map(shard => shard.slug)), shards = [...new Set(cells.map(cellShard))];
-const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: PlayerSaves = url === 'memory:' ? memoryPlayerSaves() : await openPlayerSaves(url, new URL('migrations/', import.meta.url), release.saveEpoch, log);
 const hold = process.env['HOLD_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
 const sentry = serverSentry({ dsn: setting('SENTRY_DSN'), version: engineVersion, build, channel: release.channel });
 const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, sentry, ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
+const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: PlayerSaves = url === 'memory:' ? memoryPlayerSaves() : await openPlayerSaves(url, new URL('migrations/', import.meta.url), release.saveEpoch, log, issue => { reports.contract(issue); });
 const recordTag=setting('RECORD_TAG');
 const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;

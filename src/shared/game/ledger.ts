@@ -1,15 +1,15 @@
 import * as v from 'valibot';
-import type { SaveStore, SaveSlot } from '@wildshard/engine/saves/store';
+import type { SaveKeyDef, SaveStore, SaveSlot } from '@wildshard/engine/saves/store';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import { LedgerFactSchema, parseLedgerRules, type LedgerFact, type LedgerRule } from '@wildshard/format/ledger';
 
 const natural = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER));
-const schema: v.GenericSchema<BoundedLedgerSaveInput, BoundedLedgerSave> = v.strictObject({ facts: v.record(v.string(), LedgerFactSchema),
-  entitlements: v.optional(v.record(v.string(), v.strictObject({ grants: natural, lastTick: natural })), {}),
-  items: v.record(v.string(), v.strictObject({ item: v.string(), tier: natural, quantity: natural })),
-  achievements: v.record(v.string(), v.strictObject({ shard: v.string(), id: v.string(), title: v.string(), count: natural, threshold: natural, earned: v.boolean() })) });
+const schema: v.GenericSchema<BoundedLedgerSaveInput, BoundedLedgerSave> = v.looseObject({ facts: v.record(v.string(), LedgerFactSchema),
+  entitlements: v.optional(v.record(v.string(), v.looseObject({ grants: natural, lastTick: natural })), {}),
+  items: v.record(v.string(), v.looseObject({ item: v.string(), tier: natural, quantity: natural })),
+  achievements: v.record(v.string(), v.looseObject({ shard: v.string(), id: v.string(), title: v.string(), count: natural, threshold: natural, earned: v.boolean() })) });
 type LedgerState = v.InferOutput<typeof schema>;
-const definition = { key: 'platform.ledger', scope: 'profile' as const, version: 1, schema, initial: (): LedgerState => ({ facts: {}, entitlements: {}, items: {}, achievements: {} }) };
+const ledgerSave = { key: 'platform.ledger', scope: 'profile' as const, version: 1, schema, initial: (): LedgerState => ({ facts: {}, entitlements: {}, items: {}, achievements: {} }) };
 
 /** A placement identity remains stable when its cell changes; several instances may use one package. */
 export interface LedgerInstance { id: string; shard: string; cell?: readonly [number, number] }
@@ -54,7 +54,7 @@ export class Ledger {
         this.rules.set(key, { revision: mapping.revision, rule });
       }
     }
-    this.slot = store.define(definition);
+    this.slot = store.define(ledgerSave);
   }
   /** Includes pending in-memory saves, following SaveStore's offline fallback; receipts distinguish durability. */
   state(): LedgerState { return this.slot.read(); }
@@ -184,3 +184,5 @@ interface BoundedLedgerSaveFields {
         }>;
 }
 type BoundedLedgerSave = { [Key in keyof BoundedLedgerSaveFields]: BoundedLedgerSaveFields[Key] };
+/** WIRE-STABILITY WR7: this file's save keys, for saves.lock.json (test/saves-lock.test.ts). */
+export const ledgerSaves: readonly SaveKeyDef<unknown>[] = [ledgerSave];

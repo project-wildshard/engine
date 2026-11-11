@@ -21,7 +21,7 @@ import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
 import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading } from './cellProtocol';
 import { bodyId } from './seats';
-import type { PlayerDoc } from './playerDoc';
+import { SaveNewerError, type PlayerDoc } from './playerDoc';
 import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
@@ -241,7 +241,7 @@ export class World {
   }
   private async joining(end: SocketTransport, bytes: ArrayBuffer, goto: string | null): Promise<void> {
     try { await this.hello(end, bytes, goto); }
-    catch (error) { if (!end.isOpen) return; this.options.log({ at: 'world.join', error: String(error) }); this.refuse('join-failed'); end.close(error instanceof SaveQuarantinedError ? 'refused' : 'retry'); }
+    catch (error) { if (!end.isOpen) return; this.options.log({ at: 'world.join', error: String(error) }); this.refuse(error instanceof SaveNewerError ? 'save-newer' : 'join-failed'); end.close(error instanceof SaveQuarantinedError ? 'refused' : 'retry'); }
   }
   /** Everyone in the grid or on their way: the cap counts all of them, whichever cell they stand in (J182). */
   private get taken(): number { return this.seated.size + this.pending.size; }

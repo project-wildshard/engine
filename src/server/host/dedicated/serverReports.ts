@@ -45,6 +45,12 @@ export class ServerReports {
     this.players = Math.max(this.players, total(now, row => row.players)); this.held = Math.max(this.held, total(now, row => row.held));
   }
   /** Something uncaught, or a worker that failed. */
+  /** WR7: a save at this server's own version that does not parse: the save contract broke. Not fatal: the player boots from `previous`. */
+  contract(issue: string): void {
+    const { build, errorsUrl } = this.options;
+    if (errorsUrl !== undefined) this.post(errorsUrl, { message: `save contract failure: ${issue}`, stack: '', fatal: false, system: 'save-contract', context: { build } });
+    this.options.sentry?.capture(new Error(`save contract failure: ${issue}`), { system: 'save-contract', fatal: false });
+  }
   error(error: unknown): void {
     const { build, errorsUrl } = this.options, stack = error instanceof Error ? error.stack ?? '' : '';
     if (errorsUrl !== undefined) this.post(errorsUrl, { message: String(error), stack, fatal: true, system: 'server', context: { build } });

@@ -6,12 +6,12 @@ import { instanceSave, instanceSaveIdentity, type LocalSaveInstance } from '../i
 
 const finite = v.pipe(v.number(), v.finite());
 const identity = v.pipe(v.string(), v.regex(/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u));
-const roadSchema = v.strictObject({ x: finite, z: finite, yaw: finite });
+const roadSchema = v.looseObject({ x: finite, z: finite, yaw: finite });
 const locationSchema: v.GenericSchema<BoundedGridLocationInput, BoundedGridLocation> = v.variant('kind', [
-  v.strictObject({ kind: v.literal('road') }),
-  v.strictObject({ kind: v.literal('cell'), x: finite, y: finite, z: finite, yaw: finite }),
+  v.looseObject({ kind: v.literal('road') }),
+  v.looseObject({ kind: v.literal('cell'), x: finite, y: finite, z: finite, yaw: finite }),
 ]);
-const savedSchema = v.strictObject({ instance: identity, slug: identity,
+const savedSchema = v.looseObject({ instance: identity, slug: identity,
   catalogue: v.pipe(v.string(), v.maxLength(4096)), at: finite, road: roadSchema, location: locationSchema });
 /** A durable location references the instance's real continuation; it carries no progress or native bytes. */
 export type GridSavedLocation = v.InferOutput<typeof locationSchema>;
@@ -27,12 +27,12 @@ export function placeSite(place: Pick<GridSavedPlace, 'instance' | 'location'>):
 const lastDefinition = { key: 'grid.last-played', scope: 'device' as const, version: 1, schema: v.nullable(savedSchema), initial: () => null };
 const localDefinition = { ...lastDefinition, key: 'platform.grid-position', scope: 'shard' as const };
 const guardDefinition = { key: 'grid.recovery.guard', scope: 'device' as const, version: 1,
-  schema: v.nullable(v.strictObject({ at: finite })), initial: () => null };
+  schema: v.nullable(v.looseObject({ at: finite })), initial: () => null };
 const resetDefinition = { key: 'grid.reset.pending', scope: 'device' as const, version: 1,
-  schema: v.nullable(v.strictObject({ instance: identity, slug: identity, catalogue: v.pipe(v.string(), v.maxLength(4096)),
-    at: finite, road: roadSchema, target: v.strictObject({ id: identity, shard: identity }),
+  schema: v.nullable(v.looseObject({ instance: identity, slug: identity, catalogue: v.pipe(v.string(), v.maxLength(4096)),
+    at: finite, road: roadSchema, target: v.looseObject({ id: identity, shard: identity }),
     generation: v.pipe(v.number(), v.safeInteger(), v.minValue(0)) })), initial: () => null };
-const schema: v.GenericSchema<BoundedGridRecoveryInput, BoundedGridRecovery> = v.nullable(v.strictObject({ instance: identity, slug: identity,
+const schema: v.GenericSchema<BoundedGridRecoveryInput, BoundedGridRecovery> = v.nullable(v.looseObject({ instance: identity, slug: identity,
   catalogue: v.pipe(v.string(), v.maxLength(4096)), at: finite,
   reason: v.picklist(['gpu', 'background', 'new-game', 'reload']),
   road: roadSchema,
@@ -217,3 +217,5 @@ type BoundedGridLocation = {
     z: number;
     yaw: number;
 };
+/** WIRE-STABILITY WR7: this file's save keys, for saves.lock.json (test/saves-lock.test.ts). */
+export const recoverySaves: readonly SaveKeyDef<unknown>[] = [lastDefinition, localDefinition, guardDefinition, resetDefinition, definition, backup];

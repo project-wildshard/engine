@@ -231,7 +231,7 @@ export function safeUrl(href: string): string {
 /** `capture`: where the error goes besides the queue (the browser error tracker by default; a test observes its own) */
 export function reportError(failure: LoadFailure | SchemaFailure, capture: (error: Error, tags: BrowserErrorTags) => void = captureBrowserError): Promise<ReportOutcome> {
   if ('issue' in failure) {
-    return reportError({ kind: failure.kind, context: { scope: failure.scope, key: failure.key, version: failure.version, issue: failure.issue }, tags: { system: failure.kind, build: '', shard: failure.scope, bootStage: 'save', fatal: false }, name: failure.key, build: '', stage: 'save', message: `${failure.scope}/${failure.key} v${failure.version}: ${failure.issue}`, stack: '' }, capture);
+    return reportError({ kind: failure.kind, context: { scope: failure.scope, key: failure.key, version: failure.version, issue: failure.issue, contract: failure.contract === true }, tags: { system: failure.kind, build: '', shard: failure.scope, bootStage: 'save', fatal: false }, name: failure.key, build: '', stage: 'save', message: `${failure.contract === true ? 'save contract failure: ' : ''}${failure.scope}/${failure.key} v${failure.version}: ${failure.issue}`, stack: '' }, capture);
   }
   const error = new Error(failure.message);
   error.stack = failure.stack;

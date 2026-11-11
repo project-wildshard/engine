@@ -224,3 +224,5 @@ export function clearGridRecovery(): void { selected = null; refused = false; lo
 export function gridRecoveryRefused(): boolean { return refused; }
 /** A repeated failing recovery opens the existing shard picker, never another automatic boot. */
 export function gridRecoveryLoop(): boolean { return loop; }
+/** WIRE-STABILITY WR7: this file's save keys, for saves.lock.json (test/saves-lock.test.ts). */
+export const pageEntrySaves: readonly SaveKeyDef<unknown>[] = [reentries];

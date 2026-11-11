@@ -48,7 +48,7 @@ export interface PagePersistenceRows {
 /** One read-only legacy reward slot per save store and key. Re-entering a
  * retired region reuses the definition; the save store refuses duplicate ids. */
 const legacyRewardSlots = new WeakMap<SaveStore, Map<string, SaveSlot<boolean>>>();
-function legacyRewardSlot(saves: SaveStore, key: string): SaveSlot<boolean> {
+export function legacyRewardSlot(saves: SaveStore, key: string): SaveSlot<boolean> {
   let slots = legacyRewardSlots.get(saves);
   if (slots === undefined) { slots = new Map(); legacyRewardSlots.set(saves, slots); }
   let slot = slots.get(key);

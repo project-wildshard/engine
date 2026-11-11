@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import type { SaveStore, InstanceSaveSlot } from '@wildshard/engine/saves/store';
+import type { SaveKeyDef, SaveStore, InstanceSaveSlot } from '@wildshard/engine/saves/store';
 import type { SimHost } from '@wildshard/engine/sim';
 import { fnv1a32 } from '@wildshard/engine/core/rng';
 import { serializeSimSnapshotSteps, finishSimSteps, decodeSimSnapshotBytes, SnapshotBasisMismatchError, SIM_REGION_SNAPSHOT_CHAR_BUDGET, type SimSnapshot, type SimSnapshotBytes } from '@wildshard/engine/sim/snapshot';
@@ -12,7 +12,7 @@ import { clientStateFromRegion, clientStateSave, restoreClientState } from '../.
 import { ClientCheckpointSchema, type ClientCheckpoint } from '@wildshard/format/clientState';
 import type { ShardfileSimulation } from '../plugin/simulation';
 
-const schema = v.nullable(v.strictObject({ revision: v.pipe(v.number(), v.integer(), v.minValue(1)),
+const schema = v.nullable(v.looseObject({ revision: v.pipe(v.number(), v.integer(), v.minValue(1)),
   snapshot: v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(128 * 1024 * 1024))), logical: v.optional(v.nullable(ClientCheckpointSchema), null),
   mode: v.optional(v.picklist(['exact', 'logical']), 'exact'),
   integrity: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(0xffffffff))) }));
@@ -162,3 +162,5 @@ export class GridRegionDurability {
     return durable;
   }
 }
+/** WIRE-STABILITY WR7: this file's save keys, for saves.lock.json (test/saves-lock.test.ts). */
+export const regionSaves: readonly SaveKeyDef<unknown>[] = [continuation];

@@ -12,10 +12,14 @@ import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import { exportSeats, importSeats } from '@wildshard/engine/game/plugin/playerSeats';
 import type { RespawnRowFields } from '@wildshard/engine/sim/respawn';
+import { keepUnknown, known } from '@wildshard/engine/saves/shape';
 import { validPlayerStore } from './playerStore';
 
-/** Bumped only with a migration: a doc that does not parse boots from `previous`, then fresh. */
+/** Bumped only with a migration. A doc at this version that does not parse boots from `previous`, then fresh, and is reported
+ *  as a contract failure; a doc from a newer server is never loaded, migrated or overwritten here (WIRE-STABILITY WR7). */
 export const PLAYER_DOC_VERSION = 1;
+/** A newer server wrote this player's save: the door answers `retry` ("Server updating") and writes nothing. */
+export class SaveNewerError extends Error { override name = 'SaveNewerError'; }
 /** Where a player stands in a doc. */
 export interface DocPlace { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }
 /** One player's whole save on one shard. */
@@ -32,22 +36,34 @@ export interface PlayerDoc {
 const finite = v.pipe(v.number(), v.finite()), natural = v.pipe(finite, v.integer(), v.minValue(0));
 // A defensive numeric envelope before a room checks its own authored extent.
 const coordinate = v.pipe(finite, v.minValue(-1_000_000), v.maxValue(1_000_000));
-const PlayerLedger: v.GenericSchema<unknown, PlayerDoc['ledger']> = v.pipe(v.strictObject({ serial: natural, rows: v.array(LedgerRowSchema) }), v.check(ledger => ledger.rows.every((row, index) => row.serial > 0 && row.serial <= ledger.serial && (index === 0 || row.serial > (ledger.rows[index - 1]?.serial ?? 0))) && new Set(ledger.rows.map(row => row.id)).size === ledger.rows.length, 'Invalid player ledger order'));
-export const PlayerDocSchema: v.GenericSchema<unknown, PlayerDoc> = v.pipe(v.strictObject({
-  at: v.strictObject({ x: coordinate, y: coordinate, z: coordinate, yaw: finite }),
-  health: v.strictObject({ state: v.looseObject({ version: v.literal(1), attributes: v.record(v.string(), finite) }), sinceHurt: finite }),
-  book: v.strictObject({ player: v.string(), flags: v.array(v.string()), quests: v.array(v.unknown()), parts: v.record(v.string(), v.string()) }),
+const PlayerLedger: v.GenericSchema<unknown, PlayerDoc['ledger']> = v.pipe(v.looseObject({ serial: natural, rows: v.array(LedgerRowSchema) }), v.check(ledger => ledger.rows.every((row, index) => row.serial > 0 && row.serial <= ledger.serial && (index === 0 || row.serial > (ledger.rows[index - 1]?.serial ?? 0))) && new Set(ledger.rows.map(row => row.id)).size === ledger.rows.length, 'Invalid player ledger order'));
+// WR7: loose, so a field a newer server adds at the same version is kept rather than refused.
+export const PlayerDocSchema: v.GenericSchema<unknown, PlayerDoc> = v.pipe(v.looseObject({
+  at: v.looseObject({ x: coordinate, y: coordinate, z: coordinate, yaw: finite }),
+  health: v.looseObject({ state: v.looseObject({ version: v.literal(1), attributes: v.record(v.string(), finite) }), sinceHurt: finite }),
+  book: v.looseObject({ player: v.string(), flags: v.array(v.string()), quests: v.array(v.unknown()), parts: v.record(v.string(), v.string()) }),
   respawn: v.nullable(v.looseObject({ fade: finite, falls: natural })),
   seats: v.array(v.unknown()),
   store: v.record(v.string(), v.string()),
   ledger: PlayerLedger,
 }), v.transform(doc => doc as unknown as PlayerDoc));
-/** A read doc, or null if it is not fit to load. */
+/** A read doc, or null if it is not fit to load. Fields it does not name ride along, so the next write keeps them. */
 export function parseDoc(doc: unknown, version: number, shard?: string): PlayerDoc | null {
   if (version !== PLAYER_DOC_VERSION) return null;
-  const parsed = v.safeParse(PlayerDocSchema, doc);
-  return parsed.success && validPlayerStore(parsed.output.store, shard, parsed.output.ledger.rows.some(row => row.grant === 'coins')) ? parsed.output : null;
+  const parsed = v.safeParse(PlayerDocSchema, known(PlayerDocSchema, doc));
+  return parsed.success && validPlayerStore(parsed.output.store, shard, parsed.output.ledger.rows.some(row => row.grant === 'coins')) ? keepUnknown(PlayerDocSchema, doc, parsed.output) as PlayerDoc : null;
 }
+/** A stored doc for a seat. A newer server's throws `SaveNewerError`; one at this version that fails is told to `contract`. */
+export function admitDoc(doc: unknown, version: number, shard: string, contract?: (issue: string) => void): PlayerDoc | null {
+  if (version > PLAYER_DOC_VERSION) throw new SaveNewerError(`Player save is version ${String(version)}; this server reads ${String(PLAYER_DOC_VERSION)}`);
+  const parsed = parseDoc(doc, version, shard);
+  if (parsed === null && version === PLAYER_DOC_VERSION && doc !== null && doc !== undefined) {
+    try { contract?.(`PlayerDoc v${String(version)} on ${shard} does not parse`); } catch { /* a report never breaks a read */ }
+  }
+  return parsed;
+}
+/** The doc to write: `next`, with every field of the doc the seat was read from that this server does not know. */
+export function carryDoc(read: PlayerDoc | null, next: PlayerDoc): PlayerDoc { return read === null ? next : keepUnknown(PlayerDocSchema, read, next) as PlayerDoc; }
 /** What a seat's owner keeps of a player beside the sim. */
 export interface DocStores { readonly store: Readonly<Record<string, string>>; readonly ledger: PlayerDoc['ledger'] }
 const NOW_MS = 1000;

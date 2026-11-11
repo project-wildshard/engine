@@ -2,6 +2,7 @@ import { appIdentity, installedIdentity, saveEpoch } from '../app/identity';
 import * as v from 'valibot';
 import { resetLegacy } from './legacy';
 import { saveEnvironment } from './environment';
+import { keepUnknown, known } from './shape';
 
 /**
  * Where a save key lives; `profile` (reserved, no key yet) is the player above every level.
@@ -29,7 +30,8 @@ export type InstanceSaveKeyDef<T> = SaveKeyDef<T> & { scope: 'shard' };
 /** A save slot bound to one durable instance, with no caller-supplied namespace on each operation. */
 export interface InstanceSaveSlot<T> { readonly instanceId: string; peek: () => T | null; read: () => T; write: (value: T) => boolean; reset: () => void }
 export interface SaveStorage { readonly length: number; key: (index: number) => string | null; getItem: (key: string) => string | null; setItem: (key: string, value: string) => void; removeItem: (key: string) => void }
-export interface SchemaFailure { kind: 'save-schema'; scope: string; key: string; version: number; issue: string }
+/** `contract`: the entry was written at this build's own version and still failed, so the save contract broke (WR7). */
+export interface SchemaFailure { kind: 'save-schema'; scope: string; key: string; version: number; issue: string; contract?: true }
 export interface CorruptSave { scope: string; key: string; at: string; bytes: number }
 export interface ImportReport { imported: string[]; skipped: { key: string; reason: string }[] }
 interface Entry { v: number; data: unknown }
@@ -57,6 +59,11 @@ const doc = (value: unknown): value is Document => object(value) && object(value
   && (value['reset'] === undefined || (typeof value['reset'] === 'number' && Number.isSafeInteger(value['reset']) && value['reset'] > 0));
 const clone = <T>(value: T): T => structuredClone(value);
 
+
+/** WR7: every definition any store in this process has taken, for `saves.lock.json` (test/saves-lock.test.ts). Stubs only
+ *  name a key, so they are not in it. */
+const everyDefinition = new Map<string, SaveKeyDef<unknown>>();
+export function definedSaveKeys(): ReadonlyMap<string, SaveKeyDef<unknown>> { return everyDefinition; }
 
 /** Renderer-free, write-through save service. Compare persisted text before borrowing a parsed document, preserving other writers. */
 export class SaveStore {
@@ -109,8 +116,8 @@ export class SaveStore {
     this.lastStamp = Math.max(epoch, this.lastStamp + 1);
     return new Date(this.lastStamp).toISOString();
   }
-  private report(scope: string, key: string, version: number, issue: string): void {
-    try { this.options.report?.({ kind: 'save-schema', scope, key, version, issue }); } catch { /* error reporting cannot break a read */ }
+  private report(scope: string, key: string, version: number, issue: string, contract = false): void {
+    try { this.options.report?.({ kind: 'save-schema', scope, key, version, issue, ...(contract ? { contract: true as const } : {}) }); } catch { /* error reporting cannot break a read */ }
   }
   private prune(keys: readonly string[], remove: (key: string) => void): void {
     for (const key of [...keys].sort().slice(0, -3)) remove(key);
@@ -157,6 +164,7 @@ export class SaveStore {
     const priorDef = this.definitions.get(id);
     if (priorDef && priorDef !== definition && priorDef.stub !== true) throw new Error(`Duplicate save definition: ${id}`);
     this.definitions.set(id, definition);
+    if (definition.stub !== true) everyDefinition.set(id, definition);
     const generations = new Map<string, number>();
     const remember = (name: string, stored: Document): void => { if (!generations.has(name)) generations.set(name, stored.reset ?? 0); };
     const read = (namespace?: string): T => {
@@ -176,12 +184,12 @@ export class SaveStore {
           if (!migrate) throw new Error(`Missing migration ${version} → ${version + 1}`);
           data = migrate(data); version++;
         }
-        const result = v.safeParse(definition.schema, data);
+        const result = v.safeParse(definition.schema, known(definition.schema, data));
         if (!result.success) {
           const first = result.issues[0];
           throw new Error(`${first.path?.map((item) => String(item.key)).join('.') ?? ''}: ${first.message}`);
         }
-        if (version !== raw.v) { savedDoc.keys[definition.key] = { v: version, data: result.output }; this.putDocument(definition.scope, name, savedDoc); }
+        if (version !== raw.v) { savedDoc.keys[definition.key] = { v: version, data: keepUnknown(definition.schema, data, result.output) }; this.putDocument(definition.scope, name, savedDoc); }
         return clone(result.output);
       } catch (error) { issue = error instanceof Error ? error.message : 'Migration failed'; }
       const prefix = `${definition.key}.corrupt.`;
@@ -190,7 +198,7 @@ export class SaveStore {
       const initial = definition.initial();
       savedDoc.keys[definition.key] = { v: definition.version, data: initial };
       this.putDocument(definition.scope, name, savedDoc);
-      this.report(scopeOf(name), definition.key, version, issue);
+      this.report(scopeOf(name), definition.key, version, issue, entry(raw) && raw.v === definition.version);
       return clone(initial);
     };
     const write = (value: T, namespace?: string): boolean => {
@@ -203,9 +211,11 @@ export class SaveStore {
       if (!result.success) { this.report(scopeOf(name), definition.key, definition.version, result.issues[0].message); return false; }
       // Equality is exact JSON content, not object identity. A failed durable
       // write still retries even when this page already retained the value.
-      const text = JSON.stringify(result.output);
+      // WR7: the whole document goes back, with the fields this build does not know.
+      const output = entry(prior) && prior.v === definition.version ? keepUnknown(definition.schema, prior.data, result.output) : result.output;
+      const text = JSON.stringify(output);
       if (entry(prior) && prior.v === definition.version && !this.failedWrites.has(name) && this.entryText(prior) === text) return true;
-      if (text === undefined) { savedDoc.keys[definition.key] = { v: definition.version, data: result.output }; return this.putDocument(definition.scope, name, savedDoc); }
+      if (text === undefined) { savedDoc.keys[definition.key] = { v: definition.version, data: output }; return this.putDocument(definition.scope, name, savedDoc); }
       return this.putEntry(definition.scope, name, savedDoc, definition.key, { v: definition.version, data: JSON.parse(text) }, text);
     };
     const peek = (namespace?: string): T | null => {
@@ -224,7 +234,7 @@ export class SaveStore {
           if (migrate === undefined) return null;
           data = migrate(data); version++;
         }
-        const result = v.safeParse(definition.schema, data);
+        const result = v.safeParse(definition.schema, known(definition.schema, data));
         return result.success ? clone(result.output) : null;
       } catch { return null; }
     };
@@ -245,7 +255,7 @@ export class SaveStore {
           if (migrate === undefined) return 'invalid';
           data = migrate(data); version++;
         }
-        return v.safeParse(definition.schema, data).success ? 'valid' : 'invalid';
+        return v.safeParse(definition.schema, known(definition.schema, data)).success ? 'valid' : 'invalid';
       } catch { return 'invalid'; }
     };
     const revisions = new Map<string, { raw: string | null; value: number }>();
@@ -381,9 +391,9 @@ export class SaveStore {
         let data = raw.data, version = raw.v;
         try {
           while (version < definition.version) { const migrate = definition.migrate?.[version]; if (!migrate) throw new Error('Missing migration'); data = migrate(data); version++; }
-          const result = v.safeParse(definition.schema, data);
+          const result = v.safeParse(definition.schema, known(definition.schema, data));
           if (!result.success) throw new Error(result.issues[0].message);
-          target.keys[key] = { v: version, data: result.output };
+          target.keys[key] = { v: version, data: keepUnknown(definition.schema, data, result.output) };
           if (this.putDocument(kind, savePrefix() + scope, target)) report.imported.push(identity);
           else report.skipped.push({ key: identity, reason: 'Storage unavailable or full: kept in memory for this page only' });
         } catch (error) { report.skipped.push({ key: identity, reason: error instanceof Error ? error.message : 'Invalid data' }); }

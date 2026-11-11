@@ -30,11 +30,11 @@ export interface CreatureRewardState {
   finishes: string[]; pending: Record<string, { x: number; y: number; z: number }>;
   journal: Record<string, { s: number; n: number; t: number; b: number }>;
 }
-export const CreatureRewardSchema: v.GenericSchema<unknown, CreatureRewardState> = v.strictObject({
-  finishes: v.array(v.string()), pending: v.record(v.string(), v.strictObject({ x: finite, y: finite, z: finite })),
-  journal: v.record(v.string(), v.strictObject({ s: finite, n: finite, t: finite, b: finite })),
+export const CreatureRewardSchema: v.GenericSchema<unknown, CreatureRewardState> = v.looseObject({
+  finishes: v.array(v.string()), pending: v.record(v.string(), v.looseObject({ x: finite, y: finite, z: finite })),
+  journal: v.record(v.string(), v.looseObject({ s: finite, n: finite, t: finite, b: finite })),
 });
-const CreatureRewards = v.strictObject({ legacyOwner: v.nullable(v.string()), players: v.record(v.string(), CreatureRewardSchema) });
+const CreatureRewards = v.looseObject({ legacyOwner: v.nullable(v.string()), players: v.record(v.string(), CreatureRewardSchema) });
 /** The first local device alone may inherit old shard-wide saves. Other devices start with their own record. */
 const creatureRewardsKey: SaveKeyDef<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = { key: 'creature-rewards', scope: 'shard', version: 1, schema: CreatureRewards, initial: () => ({ legacyOwner: null, players: {} }) };
 export const creatureRewardSave: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = saves.define(creatureRewardsKey);
