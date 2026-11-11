@@ -33,6 +33,7 @@
     "check:wire": "node node_modules/@wildshard/wire/bin.mjs check",
     "check:saves": "env -u WS_PUSH_GATE_PROFILE -u WS_CPU_ADMISSION vitest run test/saves-lock.test.ts",
     "md:wrap": "node src/scripts/md-wrap.mjs",
+    "inbox:pull": "node scripts/inbox-pull.mjs",
     "test:hooks": "node --test '.githooks/*.test.mjs'",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm check:sides && pnpm check:asks && pnpm check:agents && pnpm check:agent-sync && pnpm test:agent-hooks && pnpm check:parity && pnpm check:page-events && pnpm check:wire && pnpm check:saves && node scripts/vercel-prune-check.mjs",
     "typecheck:kit": "npr tsc -p src/tsconfig.json && npr tsc -p src/client/tsconfig.json",
