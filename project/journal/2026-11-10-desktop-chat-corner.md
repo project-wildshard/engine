@@ -19,3 +19,14 @@ and after).
 Proof: a real local online world (`online-rig.mjs`) at 1440x900, a 402x874
 keyboard window and a 402x874 phone, before and after; `hud-worst.mjs
 --check` on the after build.
+
+J206 Codex review, two MUSTs, both fixed. A fixed 210 px lift left a
+many-line Developer alert under the chat, so the lift is now measured:
+every 500 ms the corner reads what stands at the bottom left (coins, a
+steed's row, the health readout, the desktop Developer panel) and sits 10 px
+over the highest. And a mouse with Settings' Touch controls on showed the
+touch HUD with the chat in the keyboard spot over MOVE: the touch place now
+follows the touch HUD itself (`#hud.touch`, or a coarse pointer) through a
+`data-touch` mark, not only `@media (pointer: coarse)`. Measured again: the
+phone's boxes are the same as before; the forced touch HUD at 1440x900 puts
+the chat over MOVE; `hud-worst.mjs --check` passes in Chromium and WebKit.

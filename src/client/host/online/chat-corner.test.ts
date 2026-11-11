@@ -218,13 +218,27 @@ test('QA row 6: the real voice through asking, joining and on; B off says so, an
   } finally { vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
 });
 
-test('a keyboard page keeps the chat bottom left like a phone, lifted over a steed row or a desktop Developer alert', () => {
-  corner();
-  const css = document.head.textContent;
-  // the base (keyboard) corner is anchored to the bottom, never the top left under the quest chip
-  expect(css).toContain('top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + var(--ws-chat-lift))');
-  expect(css).not.toContain('top:calc(env(safe-area-inset-top,0px) + 92px)');
-  expect(css).toContain(':root:has(#hud .ws-ride-steed.show) #ws-chat{--ws-chat-lift:156px}');
-  // touch keeps its own place over MOVE, which drops the keyboard's bottom anchor
-  expect(css).toMatch(/@media \(pointer:coarse\)\{\n#ws-chat\{top:calc\(var\(--ws-vh,100vh\) - var\(--ws-chat-bar\) - var\(--ws-chat-gap\)\);bottom:auto;/u);
+test('Jake, 2026-11-10: a keyboard page puts the chat bottom left too, over what stands there; the touch HUD keeps its place', () => {
+  const hud = document.createElement('div'), coins = document.createElement('div'), alert = document.createElement('div');
+  hud.id = 'hud'; coins.className = 'ws-loot-chip'; alert.className = 'ws-perf-panel';
+  hud.append(coins); document.body.append(hud, alert);
+  const at = (el: HTMLElement, left: number, top: number, width: number, height: number): void => {
+    el.getBoundingClientRect = () => ({ left, top, width, height, x: left, y: top, right: left + width, bottom: top + height, toJSON: () => ({}) });
+  };
+  const { box } = corner();
+  at(box, 8, 0, 260, 60); at(coins, 22, innerHeight - 120, 60, 28);
+  vi.advanceTimersByTime(500);
+  // the base corner is anchored to the bottom, by a lift the page measures: just over the coins
+  expect(document.head.textContent).toContain('top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + var(--ws-chat-lift))');
+  expect(box.dataset['touch']).toBeUndefined();
+  expect(box.style.getPropertyValue('--ws-chat-lift')).toBe('130px');
+  // a many-line Developer alert at the left: the corner climbs over it, however tall it is
+  at(alert, 12, innerHeight - 260, 420, 130);
+  vi.advanceTimersByTime(500);
+  expect(box.style.getPropertyValue('--ws-chat-lift')).toBe('270px');
+  // Settings' Touch controls on a mouse: the touch HUD is up, so the corner takes its place over MOVE
+  hud.classList.add('touch');
+  vi.advanceTimersByTime(500);
+  expect(box.dataset['touch']).toBe('');
+  expect(document.head.textContent).toContain('#ws-chat[data-touch]{top:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap));bottom:auto;');
 });
