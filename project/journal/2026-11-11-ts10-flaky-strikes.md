@@ -33,3 +33,9 @@ files (its ci-pack and shard reports say so); land waits for the run's own
 second attempt; the quarantine commit is dated to its addedAt (J193's
 history check compares the commit time), re-dated after a rebase, and must
 change only land's entries on the tested HEAD.
+
+Follow-up review: a failed job qualifies only when its packed-share step is
+its only red step (the wall check after the upload is not a flaky file);
+land waits for exactly attempt 2; the quarantine file must equal the merged
+one plus land's own entries byte for byte. The tests add a rebase under the
+quarantine commit (re-dated) and a wall-step red that is not re-run.

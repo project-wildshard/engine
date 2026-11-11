@@ -79,7 +79,7 @@ if (sha !== undefined) {
   const id = Number(/runs\\/(\\d+)\\/jobs/.exec(path)?.[1]);
   const jobs = [];
   for (const [branch, names] of Object.entries(state.red ?? {})) for (const [name, job] of Object.entries(names)) jobs.push({ name: job, conclusion: 'failure', run: name, branch });
-  process.stdout.write(JSON.stringify({ jobs: jobs.filter(job => id % 10 === (job.run === 'ci' ? 1 : 2)).map(({ name, conclusion }) => ({ name, conclusion })) }));
+  process.stdout.write(JSON.stringify({ jobs: jobs.filter(job => id % 10 === (job.run === 'ci' ? 1 : 2)).map(({ name, conclusion }) => ({ name, conclusion, steps: [{ name: "Run this job's packed share", conclusion: 'failure' }, ...(state.flaky?.wallRed === true ? [{ name: "Record every shard's wall-budget verdict", conclusion: 'failure' }] : [])] })) }));
 }
 `;
 
@@ -798,7 +798,8 @@ describe('TS10 flaky strikes', () => {
     // Plan two: the same file flakes: the second plan's strike quarantines it on main, with no human.
     const two = f.worktree('two');
     f.commit(two, 'src/two.ts', 'export const two = 2;\n', 'two');
-    f.state({ red: { 'plan/two': { ci: 'tests (2)' } }, flaky: { ...flaky, jobs: [2] } });
+    // A peer lands while plan two waits on CI, so land rebases its quarantine commit and must re-date it (J193).
+    f.state({ red: { 'plan/two': { ci: 'tests (2)' } }, flaky: { ...flaky, jobs: [2] }, once: { marker: join(f.root, 'peer-once'), command: ['sh', f.peerScript('src/peer.ts', null, 'export const peer = 1;')] } });
     result = f.land(two);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/quarantine .*planted-flaky\.test\.ts quarantined for 48 h/u);
@@ -809,6 +810,7 @@ describe('TS10 flaky strikes', () => {
     expect(Date.parse(entries[0].addedAt)).toBe(committedAt);
     expect(Date.parse(entries[0].deadline) - committedAt).toBe(48 * 3600 * 1000);
     expect(f.git(f.remote, ['show', 'main:src/two.ts'])).toBe('export const two = 2;');
+    expect(f.git(f.remote, ['show', 'main:src/peer.ts'])).toBe('export const peer = 1;');
     // Plan three: red on its re-run too: not flaky, it stops, and main does not move.
     const three = f.worktree('three'), before = f.remoteMain();
     f.commit(three, 'src/three.ts', 'export const three = 3;\n', 'three');
@@ -817,6 +819,14 @@ describe('TS10 flaky strikes', () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toMatch(/hosted CI is red/u);
     expect(f.remoteMain()).toBe(before);
+    expect(f.read(join(f.root, 'strikes.jsonl')).trim().split('\n')).toHaveLength(2);
+    // Plan four: a test file red plus the wall check after the upload: not a flaky file, so no re-run and no strike.
+    const four = f.worktree('four');
+    f.commit(four, 'src/four.ts', 'export const four = 4;\n', 'four');
+    f.state({ red: { 'plan/four': { ci: 'tests (4)' } }, flaky: { ...flaky, jobs: [4], wallRed: true } });
+    result = f.land(four);
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toMatch(/re-running its failed jobs/u);
     expect(f.read(join(f.root, 'strikes.jsonl')).trim().split('\n')).toHaveLength(2);
   }, 120_000);
 });

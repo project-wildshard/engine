@@ -114,6 +114,18 @@ function runFailures(repo,id){
 
 const sleep=(/** @type {number} */ ms)=>new Promise(_resolve=>{setTimeout(_resolve,ms);});
 
+/** True when every failed blocking job of the run failed only in its packed-share step (TS10).
+ * @param {string} repo @param {number} id */
+function onlyPackedStepsFailed(repo,id){
+ try{
+  const data=ghApi(repo,`actions/runs/${id}/jobs?filter=latest&per_page=100`);
+  const jobs=data!==null&&typeof data==='object'&&'jobs'in data&&Array.isArray(data.jobs)?data.jobs:[];
+  const failed=jobs.filter(job=>job!==null&&typeof job==='object'&&FAILED.has(String(job.conclusion))&&!NONBLOCKING_JOB.test(String(job.name)));
+  return failed.length>0&&failed.every(job=>Array.isArray(job.steps)&&job.steps.filter(step=>step!==null&&typeof step==='object'&&FAILED.has(String(step.conclusion)))
+   .every(step=>step.name==="Run this job's packed share")&&job.steps.some(step=>step!==null&&typeof step==='object'&&FAILED.has(String(step.conclusion))));
+ }catch{return false;}
+}
+
 // TEST-SPEED TS10 (J255): a hosted red whose only failures are test files gets one re-run of its failed jobs. If the
 // re-run is green, each of those files takes a strike in the machine's strike book; a file with strikes from two
 // different plans within 24 h is quarantined under J200 (two days, owned by the standing TEST-SPEED lane) by a
@@ -203,6 +215,7 @@ class Landing{
   /** @type {{file:string,plans:string[],run:number}[]} */this.pendingQuarantine=[];
   /** @type {string[]} */this.quarantined=[];
   this.quarantineAt=0;
+  /** @type {unknown[]} */this.quarantinedEntries=[];
   this.lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'land';
   const inside=tryGit(cwd,['rev-parse','--show-toplevel']);
   if(inside.status!==0)throw new StopError('not inside a git checkout');
@@ -374,6 +387,8 @@ class Landing{
   const run=verdict.runs['ci'];
   if(run===undefined||run.conclusion!=='failure'||run.attempt>1)return null;
   const jobs=runFailures(this.repo,run.id);
+  // A failure after the tests (the wall check after the artifact upload, a later step) is never a flaky file.
+  if(!onlyPackedStepsFailed(this.repo,run.id))return null;
   mkdirSync(join(this.root,'tmp'),{recursive:true});
   const scratch=mkdtempSync(join(this.root,'tmp','land-flaky-'));
   /** @type {string[]|null} */let files=null;
@@ -391,7 +406,8 @@ class Landing{
    /** @type {unknown} */let data=null;
    try{data=ghApi(this.repo,`actions/runs/${run.id}`);}catch{/* retried below */}
    const field=(/** @type {string} */key)=>data!==null&&typeof data==='object'&&key in data?String(/** @type {Record<string,unknown>} */(data)[key]):'';
-   if(Number(field('run_attempt'))>=2&&field('status')==='completed'){
+   if(Number(field('run_attempt'))>2){this.say('flaky',`ci run ${run.id} is past its second attempt; stopping as red`);return null;}
+   if(Number(field('run_attempt'))===2&&field('status')==='completed'){
     if(field('conclusion')!=='success'){
      this.receipt(`TS10 re-run of ci ${run.id} red again on ${files.join(', ')}: not flaky; blocks only ${this.branch}`);
      return {...verdict,failed:[`ci run ${run.id} red on its re-run too (TS10): ${runFailures(this.repo,run.id).blocking.join('; ')}`]};
@@ -421,7 +437,11 @@ class Landing{
   const path=join(this.root,'test/quarantine.json'),added=[],now=Date.now(),parent=this.holds('before the TS10 quarantine');
   for(const {file,plans,run} of this.pendingQuarantine.splice(0)){
    const reason=`TS10 (J255): flaky on hosted CI, red then green on its re-run, with strikes from ${plans.join(' and ')} within 24 h (last: ci run ${run}); J200 deadline`;
-   if(quarantineFile(path,file,this.env.WS_QUARANTINE_OWNER??'opus-testspeed-lane',reason,now))added.push(file);
+   if(quarantineFile(path,file,this.env.WS_QUARANTINE_OWNER??'opus-testspeed-lane',reason,now)){
+    added.push(file);
+    const written=/** @type {{entries:{file:string}[]}} */(JSON.parse(readFileSync(path,'utf8'))).entries.find(entry=>entry.file===file);
+    if(written!==undefined)this.quarantinedEntries.push(written);
+   }
   }
   if(added.length===0)return false;
   this.quarantined.push(...added);this.quarantineAt=Math.floor(now/1000);
@@ -471,10 +491,8 @@ class Landing{
   const before=read(from),after=read(to);
   if(this.quarantined.length===0)return JSON.stringify(before)===JSON.stringify(after);
   if(before===null||after===null||!Array.isArray(before.entries)||!Array.isArray(after.entries))return false;
-  const rest=after.entries.filter(entry=>!this.quarantined.includes(entry.file));
-  const ours=after.entries.filter(entry=>this.quarantined.includes(entry.file));
-  return JSON.stringify({...before,entries:[]})===JSON.stringify({...after,entries:[]})&&JSON.stringify(rest)===JSON.stringify(before.entries)
-   &&ours.length===this.quarantined.length&&ours.every(entry=>entry.addedAt===new Date(this.quarantineAt*1000).toISOString());
+  // Exactly the merged entries, then land's own entries byte for byte, in that order.
+  return JSON.stringify(after)===JSON.stringify({...before,entries:[...before.entries,...this.quarantinedEntries]});
  }
 
  reached(tip){
