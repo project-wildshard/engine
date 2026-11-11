@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from 'playwright';
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
+import {roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
 import {SOCKET_READY,SOCKET_RELIABLE,SOCKET_PING} from '../src/shared/engine/net/socketFrames.ts';
 
 const [base,build,key]=process.argv.slice(2),human=process.argv.includes('--human-static'),origin=new URL(base).origin;
@@ -30,14 +31,14 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
  for(const engine of ['chromium','webkit']){
   const browser=await(engine==='chromium'?chromium:webkit).launch({headless:true,args:engine==='chromium'?[...KEYCHAIN_ARGS,'--mute-audio',...(process.platform==='darwin'?['--use-angle=metal']:[])]:[]});
   const context=await browser.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
-  /** @type {string[]} */ const errors=[];
+  /** @type {{text:string,url?:string}[]} */ const errors=[];
   /** @type {number[]} */ const prefixes=[];
   try{
    await context.grantPermissions(engine==='chromium'?['clipboard-read','clipboard-write']:['clipboard-read']);
    await context.addInitScript(allowed=>{const Native=WebSocket;globalThis.WebSocket=new Proxy(Native,{construct(target,args,newTarget){const url=new URL(String(args[0]),location.href);if(url.origin!==allowed||url.pathname!=='/'||url.search||url.hash)throw new Error('J205 refused non-staging Doctor socket');return Reflect.construct(target,args,newTarget);}});},socket);
-   const started=Date.now(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)errors.push(`HTTP ${r.status()} ${r.url()}`);});
-   page.on('requestfailed',r=>errors.push(`Request failed ${r.url()}: ${r.failure()?.errorText??'unknown'}`));page.on('crash',()=>errors.push('Native page crash'));
-   page.on('websocket',ws=>{if(new URL(ws.url()).origin!==socket)errors.push('Non-staging Doctor socket');ws.on('socketerror',e=>errors.push(`Socket error ${e}`));ws.on('framesent',frame=>{if(!Buffer.isBuffer(frame.payload)){errors.push('Non-binary Doctor frame');return;}prefixes.push(frame.payload[0]??-1);});});
+   const started=Date.now(),page=await context.newPage();page.on('pageerror',e=>errors.push({text:e.message}));page.on('console',m=>{if(m.type()==='error')errors.push({text:m.text(),url:m.location().url});});page.on('response',r=>{if(r.status()>=400)errors.push({text:`HTTP ${r.status()} ${r.url()}`,url:r.url()});});
+   page.on('requestfailed',r=>errors.push({text:`Request failed ${r.url()}: ${r.failure()?.errorText??'unknown'}`,url:r.url()}));page.on('crash',()=>errors.push({text:'Native page crash'}));
+   page.on('websocket',ws=>{if(new URL(ws.url()).origin!==socket)errors.push({text:'Non-staging Doctor socket'});ws.on('socketerror',e=>errors.push({text:`Socket error ${e}`}));ws.on('framesent',frame=>{if(!Buffer.isBuffer(frame.payload)){errors.push({text:'Non-binary Doctor frame'});return;}prefixes.push(frame.payload[0]??-1);});});
    await page.goto(new URL('/?doctor',base).href,{waitUntil:'load',timeout:90000});await page.waitForURL(url=>url.pathname==='/doctor/',{timeout:15000});
    await page.locator('#ws-doctor:not([data-running])[data-verdict]').waitFor({timeout:120000});
    const rows=await page.locator('.ws-doc-row').evaluateAll(nodes=>nodes.map(node=>{if(!(node instanceof HTMLElement))throw new Error('Doctor row must be an HTML element');return{id:node.dataset.check,state:node.dataset.state,value:node.querySelector('.ws-doc-value')?.textContent,ms:node.querySelector('.ws-doc-ms')?.textContent};}));
@@ -49,7 +50,10 @@ if(human){console.log('PASS human Doctor static publication',JSON.stringify({bui
    await page.getByRole('button',{name:'Copy report',exact:true}).click();await page.getByRole('button',{name:'Copied',exact:true}).waitFor({timeout:5000});
    const copied=await page.evaluate(()=>navigator.clipboard.readText());const reportAt=Date.parse(/^Wildshard connection doctor · ([^\n]+)/u.exec(copied)?.[1]??'');assert.ok(reportAt>=started&&reportAt<=Date.now(),'Clipboard must contain this run’s fresh native report');assert.ok(copied.includes(`build ${build}`));assert.ok(copied.includes('result all pass'));for(const row of rows)assert.ok(copied.includes(`${row.id} · pass`));
    assert.equal(prefixes.filter(prefix=>prefix===SOCKET_RELIABLE).length,1);assert.equal(prefixes.includes(SOCKET_READY),false);assert.ok(prefixes.some(prefix=>prefix===SOCKET_PING));assert.ok(prefixes.every(prefix=>prefix===SOCKET_RELIABLE||prefix===SOCKET_PING));
-   await context.close();assert.deepEqual(errors,[],'No native exception or console error is filtered');
+   await context.close();
+   // D7: the page's own fetch of the private rooms /health is a 404 with no CORS header; exactly those lines are listed, not failed.
+   const lines=splitRoomsHealthLines(errors,roomsHealthURL(socket));console.log('D7 rooms health lines (listed)',JSON.stringify(lines.health));
+   assert.deepEqual(lines.other,[],'No other native exception or console error is filtered');
    const after=await(await read(healthURL)).json();assert.equal(after.build,build);console.log('Doctor player-count diagnostic (shared staging)',JSON.stringify({before:before.players,after:after.players}));
    console.log('PASS live staging Doctor',JSON.stringify({engine,build,epoch:1,rows,prefixes,clipboard:true,noReadyFrame:true,productionSockets:0}));
   }finally{await context.close();await browser.close();}

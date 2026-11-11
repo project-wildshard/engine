@@ -16,3 +16,6 @@ opus-ship19 passed v0.1.9 only with hand-made copies of the staging proofs. Thre
   that id, so `voiceNear` found no body and silenced them. This bug is live in v0.1.9. Whoever joins an empty cell first
   can't be heard by anyone. The world now renames the voice seat when its cell posts `seated`. The voice proof stays
   strict and passes only once a staging server carries this fix.
+
+The proofs commit adds `test/staging-proof-lines.test.ts` for the line and Name rules. Phone contexts in the voice proof
+seed `firstPlayDone` (MG5), so a phone plays as a returning player.
