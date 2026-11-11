@@ -56,6 +56,8 @@ export interface NetVisitor { entity: <S>(id: string, cls: NetClass<S>, view: S)
 export interface NetWorld {
   /** Bind a welcomed seat to its persistent identity, including room handoffs. Dedicated hosts must verify the hello against their authenticated session. */
   identified?: (seat: string, identity: NetIdentity) => boolean;
+  /** MP2.4: the Name a dedicated host already claimed for this seat, which wins over the hello's. */
+  nameOf?: (seat: string) => string | undefined;
   tick: () => number;
   /** The cell frame positions are local to (§3.5). */
   cell: () => number;
@@ -321,7 +323,7 @@ export class NetRoom {
     if (this.required.some(id => !hello.capabilities.includes(id))) { this.stats.refused++; client.transport.close('reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.stats.refused++; client.transport.close('refused'); return; }
-    const identity = { player: said.output.player, name: cleanName(said.output.name) };
+    const identity = { player: said.output.player, name: this.world.nameOf?.(client.player.id) ?? cleanName(said.output.name) };
     if (this.world.identified?.(client.player.id, identity) === false) { this.stats.refused++; this.drop(client); return; }
     client.identity = identity;
     client.ledgerSeen = hello.ledger;

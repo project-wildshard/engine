@@ -24,5 +24,9 @@ export function plainLine(text: string, maxBytes: number): string {
   const line = text.normalize('NFKC').replaceAll(/[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Cn}]+/gu, ' ').replaceAll(/\s+/gu, ' ').trim();
   return fitText(line, maxBytes).trimEnd();
 }
-/** A typed Name as others will read it. */
-export function cleanName(name: string): string { return filterWords(plainLine(name, MAX_NAME_LENGTH * 3).slice(0, MAX_NAME_LENGTH)) || GUEST.name; }
+/** A typed Name as others will read it. MP2.4: a Name with a listed word in it is refused whole and reads as Guest, so no part of it,
+ *  starred or not, reaches another client. */
+export function cleanName(name: string): string {
+  const plain = plainLine(name, MAX_NAME_LENGTH * 3).slice(0, MAX_NAME_LENGTH).trim();
+  return plain === '' || filterWords(plain) !== plain ? GUEST.name : plain;
+}

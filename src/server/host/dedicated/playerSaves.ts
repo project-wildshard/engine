@@ -3,6 +3,7 @@ import { migrate } from './saves/migrate';
 import { openPg } from './saves/pgDatabase';
 import { healSave, lastCell, placeOf, readSave, recoveryReceipts, SaveQuarantinedError, writeSave, type SaveWrite } from './saves/saveStore';
 import { SaveWriteQueue } from './saves/writeQueue';
+import { claimName } from './saves/names';
 import { ReportWriteQueue, type ReportWrite } from './saves/reportQueue';
 import type { Database } from './saves/database';
 import type { PlayerSaves, SavedPlayer } from './world';
@@ -29,6 +30,7 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
       return { doc, seq: saved?.seq ?? 0, recovery, ...(previous === undefined ? {} : { previous: { doc: previous, recovery: receipts.filter(row => row.serial > previous.ledger.serial) } }) };
     },
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),
+    name: (device, name) => claimName(db, device, name),
     report: (report: ChatReport, shard: string) => { const accepted = reports.post(report, shard); if (!accepted) log({ at: 'report.refused', reason: 'backlog' }); return accepted; } };
 }
 /** The saves database at `url`, migrated. */

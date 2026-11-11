@@ -24,6 +24,8 @@ const emptyPose = (): AnimalPoseSample => ({ attackT: -1, attackDur: 1, groundY:
 export class SimNetWorld implements NetWorld {
   /** A device hello is sufficient for a local worker. E7 must override this with its authenticated seat-to-player binding. */
   identified(seat: string, identity: NetIdentity): boolean { actRoutes(this.host).identities.set(seat, identity.player); return true; }
+  /** MP2.4: a dedicated host sets this to the Name its door claimed; a local worker has none. */
+  nameOf?: (seat: string) => string | undefined;
   readonly player: NetPlayer;
   private readonly host: SimHost;
   private readonly pose: AnimalPoseSample = emptyPose();

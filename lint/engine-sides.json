@@ -1267,6 +1267,7 @@
     "src/server/host/dedicated/saves/migrate.ts": "server",
     "src/server/host/dedicated/saves/pgDatabase.ts": "server",
     "src/server/host/dedicated/saves/reportQueue.ts": "server",
+    "src/server/host/dedicated/saves/names.ts": "server",
     "src/server/host/dedicated/saves/saveStore.ts": "server",
     "src/server/host/dedicated/saves/writeQueue.ts": "server",
     "src/server/host/dedicated/seats.ts": "server",

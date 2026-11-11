@@ -93,6 +93,7 @@ export class DedicatedRoom {
       actRoutes(this.host).identities.set(body, seat.device);
       return true;
     };
+    this.sim.nameOf = body => bodies.get(body)?.name;
     this.net = new NetRoom({ world: this.sim, build: options.build, book: this.book, step: inputs => { this.step(inputs); }, ...(options.reports === undefined ? {} : { reports: options.reports }) });
     this.net.open();
     this.parkLead();

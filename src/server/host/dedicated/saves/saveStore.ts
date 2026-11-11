@@ -29,7 +29,8 @@ const CellSchema = v.array(v.object({ shard: v.string() }));
 const PlaceSchema = v.array(v.object({ cell: v.string() }));
 const RowSchema = v.array(v.object({ doc: v.unknown(), previous: v.unknown(), seq: Whole, revision: Whole, save_version: Whole }));
 
-const WRITE_PLAYER = 'insert into player (id, name) values ($1, $2) on conflict (id) do update set name = excluded.name, seen_at = now()';
+// MP2.4: a save never renames a player. The Name and its tag are the door's claim (`names.ts`), and a save only says they were here.
+const WRITE_PLAYER = 'insert into player (id, name) values ($1, $2) on conflict (id) do update set seen_at = now()';
 // A write moves `doc` to `previous`, which is J102's last-good copy on the server, and `seq` keeps an older write from landing.
 const WRITE_SAVE = `insert into player_save (player_id, epoch, shard, revision, build, save_version, seq, reason, doc)
   values ($1, $2, $3, 1, $4, $5, $6, $7, $8::jsonb)
@@ -63,7 +64,7 @@ export async function writeSave(db: Database, epoch: number, write: SaveWrite): 
   });
 }
 /** The answer, or a rejection once `ms` has passed. */
-async function within<Result>(ms: number, read: () => Promise<Result>): Promise<Result> {
+export async function within<Result>(ms: number, read: () => Promise<Result>): Promise<Result> {
   const scope = new Scope('dedicated.saves.read');
   try {
     return await Promise.race([read(), new Promise<never>((_resolve, reject) => { scope.timeout(ms, () => { reject(new Error(`Save read took over ${String(ms)} ms`)); }); })]);

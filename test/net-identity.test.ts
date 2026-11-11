@@ -47,7 +47,7 @@ test('the room keeps who a client says it is, cleans the Name, and refuses an id
   client.hello('', { player: 'device:ok', name: 'Sh1t​  Lord' }); good.pump();
   refused.hello('', { player: 'has space', name: 'x' }); bad.pump();
   room.open(); good.pump();
-  expect(room.identityOf(id)).toEqual({ player: 'device:ok', name: '**** Lord' });
+  expect(room.identityOf(id), 'MP2.4: a Name with a listed word is refused whole').toEqual({ player: 'device:ok', name: 'Guest' });
   expect(refused.closed).toBe('refused');
   expect(room.identityOf(other)).toBeNull();
   expect(client.welcome).not.toBeNull();

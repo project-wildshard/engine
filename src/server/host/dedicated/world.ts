@@ -76,6 +76,8 @@ export interface PlayerSaves {
   recover?: (device: string, shard: string, seq: number) => Promise<void>;
   write: (write: SaveWrite) => void;
   report: (report: ChatReport, shard: string) => boolean;
+  /** MP2.4: claim a cleaned Name for this device and answer what everyone reads (`Name#1234`). Left out, the Name goes as typed. */
+  name?: (device: string, name: string) => Promise<string>;
   /** Wait for what is on its way, at most `ms`. */
   drain: (ms: number) => Promise<boolean>;
   /** How writes are going: E7.8's numbers. */
@@ -262,7 +264,11 @@ export class World {
     if (hello.minor !== WIRE_MINOR && Math.abs(hello.minor - WIRE_MINOR) > 1) { this.refuse('stale-build'); end.close(hello.minor > WIRE_MINOR ? 'retry' : 'reload'); return; }
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
-    const device = said.output.player, name = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
+    const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options;
+    // MP2.4: the Name everyone reads is the claimed one, never the hello's, so a refused or duplicate Name reaches no client.
+    const name = saves.name === undefined ? typed : await saves.name(device, typed);
+    if (!end.isOpen || this.draining) return;
+    const holding = this.seated.get(device);
     if (holding !== undefined) {
       const found = await this.ask(holding, device, end);
       if (found.held && this.quits.has(end)) { this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
