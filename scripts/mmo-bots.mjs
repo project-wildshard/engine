@@ -86,7 +86,7 @@ let botsChild = null;
 /** @type {Promise<void> | null} */
 let stopping = null;
 /** `--remote`: ends the host's replica and removes its directory. */
-let remoteStop = () => {};
+let remoteStop = () => { /* local: the replica is a child of this script */ };
 /** The replica never outlives this script: an error, Ctrl-C or a kill takes it down too. Every caller waits on the one stop,
  * and `room` stays set until the process has gone, so the exit hook can still kill it. */
 const stopRoom = async () => {
