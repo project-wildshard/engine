@@ -91,6 +91,8 @@ export interface SettingsTabsHost {
   readonly desk: () => boolean;
   /** widen the sheet (layout B on a desktop) */
   readonly wide: (on: boolean) => void;
+  /** stage the Debug cards' pending picks before a reload (Codex review: a Graphics reload must not drop them) */
+  readonly applyPending: () => void;
 }
 export interface SettingsTabsView {
   readonly layout: SettingsLayout;
@@ -102,13 +104,15 @@ export interface SettingsTabsView {
 
 function el(cls: string, tag = 'div'): HTMLElement { const e = document.createElement(tag); e.className = cls; return e; }
 const words = (cls: string, key: EngineStringKey, tag = 'div', args: readonly unknown[] = []): HTMLElement => { const e = el(cls, tag); e.textContent = engineString(key, args); return e; };
+/** the render-scale / AA picks this page was built with (read once at page load, so a re-mounted layout keeps its pending count) */
+const BOOT_GFX = { ...gfxPrefs };
 const shown = (e: Element): boolean => (e as HTMLElement).hidden !== true;
 
 export function mountSettingsTabs(host: SettingsTabsHost, layout: Exclude<SettingsLayout, 'today'>): SettingsTabsView {
   const scope = host.scope.child(`settingsTabs.${layout}`);
   const tabs = layout === 'e' ? SIX : FIVE;
   const moved: { node: HTMLElement; parent: ParentNode; next: Node | null }[] = [];
-  const gfx = graphicsRows(scope);
+  const gfx = graphicsRows(scope, host.applyPending);
   const root = el(`ws-gmenu-sv ws-gmenu-sv-${layout}`);
   const iconTabs = layout !== 'e';
   const strip = el(`ws-gmenu-svtabs${iconTabs ? ' icons' : ' words'}`, 'nav');
@@ -266,9 +270,9 @@ function modeChooser(scope: Scope): { root: HTMLElement; note: HTMLElement; pain
 }
 
 /** the Graphics tab's own rows (and Controls' touch row): the live Low / High, then the picks a reload builds */
-function graphicsRows(scope: Scope): { rows: Partial<Record<RowKey, HTMLElement>>; paint: () => void } {
+function graphicsRows(scope: Scope, applyPending: () => void): { rows: Partial<Record<RowKey, HTMLElement>>; paint: () => void } {
   const phone = TIER === 'phone';
-  const boot = { ...gfxPrefs };
+  const boot = BOOT_GFX;
   const paints: (() => void)[] = [];
   const seg = (label: EngineStringKey, options: readonly (readonly [string, EngineStringKey, unknown[]?])[], get: () => string, set: (v: string) => void): HTMLElement => {
     const row = el('ws-gmenu-row'); row.append(words('ws-gmenu-swlabel', label, 'span'));
@@ -295,7 +299,7 @@ function graphicsRows(scope: Scope): { rows: Partial<Record<RowKey, HTMLElement>
   const reloadRow = (): { row: HTMLElement; paint: () => void } => {
     const row = el('ws-gmenu-row ws-gmenu-svreload'), note = el('ws-gmenu-swlabel', 'span');
     const b = words('ws-gmenu-segbtn', 's_sv_reload', 'button') as HTMLButtonElement; b.type = 'button';
-    listenTap(scope, b, () => { reloadWithPicks('settings tabs: reload to apply', b); });
+    listenTap(scope, b, () => { applyPending(); reloadWithPicks('settings tabs: reload to apply', b); });
     row.append(note, b);
     return { row, paint: () => {
       const count = pendingReload().length + (gfxPrefs.dpr === boot.dpr ? 0 : 1) + (gfxPrefs.aa === boot.aa ? 0 : 1);

@@ -394,7 +394,8 @@ export class GameMenu {
     const layout = settingsLayout();
     if (layout === 'today' || this.settingsView.cats === undefined) { this.syncCats(); return; }
     this.layoutView = mountSettingsTabs({ scope: this.scope, panel: this.panels.settings, desk: () => window.matchMedia(SETTINGS_DESK_QUERY).matches,
-      wide: (on) => { if (on !== this.wideLayout) { this.wideLayout = on; this.syncCats(); } } }, layout);
+      wide: (on) => { if (on !== this.wideLayout) { this.wideLayout = on; this.syncCats(); } },
+      applyPending: () => { this.settingsView.debug?.applyPending(); this.settingsView.developerTools?.applyPending(); } }, layout);
   }
   private prepareSettings(): void {
     if (this.settingsView.cats !== undefined) return;
