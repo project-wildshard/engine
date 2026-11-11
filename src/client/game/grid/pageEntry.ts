@@ -58,6 +58,15 @@ export function gridDestination(place: { readonly slug: string } | null, home: P
   return { name: row.name, art: arrivalArt(art) ? art : '' };
 }
 
+/** GO5: the world's door named the cell this player stands in. While the loading card is up it names that cell, not the hint's. */
+export function showGridDestination(slug: string): void {
+  const name = document.querySelector<HTMLElement>('.ws-load:not(.hide) [data-el="slug"]'), home = findTitleManifest(gridHome().slug);
+  if (name === null || home === undefined) return;
+  const shown = gridDestination({ slug }, home);
+  name.textContent = shown.name;
+  document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
+}
+
 /** Paint the loading shell before the title's durable handoff and fresh-page navigation. */
 export function enterGrid(): void {
   if (navigating !== null && !navigating.disposed) return;

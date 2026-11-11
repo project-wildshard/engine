@@ -491,6 +491,16 @@ export class LiveGridSession {
       ? { kind: 'cell', ...local, yaw: this.page.traveller.yaw } : { kind: 'road' });
   }
 
+  /** GO5 (DG3): the world's door names where this player stands, cell-local. On an MMO build that is the one save, and this page's
+   *  `grid.last-played` is only its hint: rewritten here, so the next entry's card names the server's place. A cell this catalogue
+   *  doesn't place changes nothing. */
+  serverPlace(instance: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }): boolean {
+    const cell = this.ports.assembly.cells.find(row => row.instance === instance);
+    if (cell === undefined) return false;
+    const road = { x: cell.origin.x + this.ports.assembly.pitch / 2 + 3.6, z: cell.origin.z, yaw: at.yaw };
+    return gridRecovery(this.page.saves).save(this.ports.assembly, cell, road, { kind: 'cell', x: at.x, y: at.y, z: at.z, yaw: at.yaw });
+  }
+
   /** Last grounded road lane; before the first road visit use the admitted home's adjacent lane. */
   recoveryRoad(): RoadPoint {
     return this.road.lastRoad() ?? { x: this.ports.home.origin.x + this.ports.assembly.pitch / 2 + 3.6,

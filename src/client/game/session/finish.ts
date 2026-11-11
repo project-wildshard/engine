@@ -5,6 +5,7 @@ import { sustainedFrames } from '@wildshard/engine/core/sustainedFrames';
 import { Rng } from '@wildshard/engine/core/rng';
 import { gridCells } from '../plugin/context';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
+import { showGridDestination } from '../grid/pageEntry';
 import type { playStage } from './play';
 import type { WorkerClientGrid } from '../shardfile/clientWorker';
 import { asShell } from '@wildshard/engine/app/ownership';
@@ -41,7 +42,9 @@ import { spawnViewThenNamed } from './readyFrame';
 
 /** What a grid page lends the worker client (J130). */
 function workerGrid({ grid, gridLive }: Pick<Awaited<ReturnType<typeof playStage>>, 'grid' | 'gridLive'>): WorkerClientGrid | null {
-  return grid === null || gridLive === null ? null : { cells: grid.assembly.cells, bindWire: wire => { gridLive.bindWire(wire); }, frame: () => gridLive.frame(), animals: () => gridLive.enteredAnimals(), items: () => gridLive.enteredItems(), saveLocation: () => { gridLive.saveLocation(); } };
+  return grid === null || gridLive === null ? null : { cells: grid.assembly.cells, bindWire: wire => { gridLive.bindWire(wire); }, frame: () => gridLive.frame(), animals: () => gridLive.enteredAnimals(), items: () => gridLive.enteredItems(), saveLocation: () => { gridLive.saveLocation(); },
+    // GO5: the server's place is the save; the hint and the loading card follow it.
+    serverPlace: (instance, at) => { gridLive.serverPlace(instance, at); const cell = grid.assembly.cells.find(row => row.instance === instance); if (cell !== undefined) showGridDestination(cell.slug); } };
 }
 
 /** how often the in-play warm-up asks whether an arrival's Explorer has closed, and how long it waits for one to open */

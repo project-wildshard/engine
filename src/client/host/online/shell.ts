@@ -23,8 +23,10 @@ import { linkScreens } from './linkScreens';
 
 /** `ready` with this byte is a clean quit: the door drops the body at once instead of holding it (server `socketPump.ts` `LEAVE_FLAG`). */
 const LEAVE_FLAG = 1;
-/** The door's `resume`: the cell this player's seat is in. */
-const ResumeSchema = v.object({ shard: v.string() });
+/** The door's `resume`: the shard this player's seat is in, and since GO3 its grid instance and where in it they stand. */
+const ResumeSchema = v.object({ shard: v.string(), cell: v.optional(v.string()), at: v.optional(v.object({ x: v.number(), y: v.number(), z: v.number(), yaw: v.number() })) });
+/** Where a seat stands, cell-local. */
+export interface SeatPlace { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }
 
 /** What a page says to the world. */
 export interface OnlineConfig {
@@ -35,6 +37,8 @@ export interface OnlineConfig {
   /** The cell this page has loaded. */
   readonly loaded: string;
   readonly identity: NetIdentity;
+  /** GO4: a grid page. Its seat may be in any cell: the session follows the frames there, so `elsewhere` never reloads it. */
+  readonly grid?: true;
   /** Optional anonymous measurements; the page supplies the existing API sink. */
   readonly record?:{readonly install:string;readonly session:string;readonly tag?:string;readonly send:(record:NetRecord)=>void};
 }
@@ -45,6 +49,8 @@ export interface OnlineView {
   readonly countdown: (countdown: Countdown) => void;
   /** The seat is in a cell this page hasn't loaded. */
   readonly elsewhere: (shard: string) => void;
+  /** GO4, GO5: a grid page's seat, by instance, and where in it. */
+  readonly placed?: (cell: string, at: SeatPlace | undefined) => void;
 }
 /** A running online session. */
 export interface OnlineShell {
@@ -98,8 +104,9 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       }
       if (control === 'countdown') { const said = decodeCountdown(bytes); if (said !== null) view.countdown(said); return; }
       if (control !== 'resume') return;
-      const seat = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))).shard;
-      if (seat !== config.loaded) { view.elsewhere(seat); return; }
+      const resume = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))), seat = resume.shard;
+      if (config.grid === true) view.placed?.(resume.cell ?? seat, resume.at);
+      else if (seat !== config.loaded) { view.elsewhere(seat); return; }
       arrive({ tick: 0, restored: false });
       if (loaded) transport.control('ready'); else unseated = transport;
     });
@@ -153,6 +160,8 @@ export interface StartOnline {
   readonly loaded: string; readonly build: string;
   /** Who this device is. A Name given here is kept with its id, and asked only once. */
   readonly identity: (name?: string) => NetIdentity;
+  /** GO4: a grid page, told where its seat stands instead of being reloaded there. */
+  readonly grid?: (cell: string, at: SeatPlace) => void;
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
   readonly recordTag?:string;
@@ -163,7 +172,7 @@ const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent(
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
-  const { release: at, key, identity, recordTag, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;
+  const { release: at, key, identity, recordTag, grid, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { setTitleArrival({ slug, mode: 'enter' }, { tab: true }); };
   const stale = async (): Promise<boolean> => { entering(link.loaded); const going = await reloadStale(); if (!going) dropTabArrival(); return going; };
@@ -183,9 +192,10 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
-  const shell = connectOnline({ ...link, socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
+  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { grid: true as const }), socket, identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
     countdown: said => { screens.countdown(said); preload(); },
+    placed: (cell, stand) => { if (stand !== undefined) grid?.(cell, stand); },
     elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); markUnload(`online seat elsewhere (${seat})`); location.replace(url); },
   });
   shellNow = shell;

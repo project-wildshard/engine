@@ -6,6 +6,8 @@ import { readSignedRelease } from '../src/client/host/online/release';
 import { connectOnline, type OnlineShell } from '../src/client/host/online/shell';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { World } from '../src/server/host/dedicated/world';
+import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
+import { cellFrame } from '../src/server/host/dedicated/gridCells';
 
 // E7.2d: the page's half of the one world, on the real door and a real socket, as a page calls it. Only the strips are left out.
 const SHARD = 'driftwood-isle', IDENTITY = { player: 'device:online', name: 'Jake' };
@@ -56,6 +58,23 @@ test('a seat in a cell the page has not loaded says so, and takes no body', { ti
   shell = connectOnline({ socket: bench.url, build: 'bench', loaded: 'nalati-grasslands', identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: shard => { places.push(shard); } });
   await vi.waitFor(() => { expect(places).toEqual([SHARD]); }, { timeout: 5000 });
   expect(bench.room(SHARD)?.holds(IDENTITY.player)).toBe(false);
+});
+
+test('GO4: a grid page whose seat is in another cell is told where, never reloaded, and takes its body there', { timeout: 60_000 }, async () => {
+  const saves = memoryPlayerSaves();
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'open-plot-night-market', cell: 'open-plot-nw', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'open-plot-nw'], workers: 2, saves });
+  const reloads: string[] = [], placed: { cell: string; at: unknown }[] = [];
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY, grid: true },
+    { link: () => undefined, countdown: () => undefined, elsewhere: shard => { reloads.push(shard); }, placed: (cell, at) => { placed.push({ cell, at }); } });
+  const { client, booted, ready } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await booted;
+  expect(placed).toEqual([{ cell: 'open-plot-nw', at: expect.objectContaining({ x: expect.any(Number), z: expect.any(Number) }) as unknown }]);
+  ready();
+  await vi.waitFor(() => { expect(bench?.room('open-plot-nw')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  await vi.waitFor(() => { expect(client.latest?.cell).toBe(cellFrame('open-plot-nw')); }, { timeout: 5000 });
+  expect(reloads, 'no `?chunk=` reload: the grid session follows the frames').toEqual([]);
 });
 
 // QA row 16: a player who chose to go is gone for everyone at once, not after J114's 30 s hold, and a page that leaves before
