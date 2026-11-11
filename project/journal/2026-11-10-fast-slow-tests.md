@@ -71,3 +71,17 @@ slow. Each now skips the idle part and keeps its assertions.
   sooner. The checkpoint stays mid-round 4 (J206: moving it to 945 would
   drop the restored round 4-to-5 transition). The planted restore bug
   still fails on the checkpoint assertion.
+- FS7 awareness (not quarantined; 63.6 and 64.6 s on slow runners
+  broke other lanes' lands): nothing senses the player for the first
+  3,468 ticks of the walk, yet the independent worker replayed all of
+  them with a checkpoint per 512. The resident now walks the first
+  3,200 inputs unrecorded (asserting awareness stays 'none'), saves,
+  and the replay worker starts from that save; Visible, Noticed and
+  Detected land on the same ticks (3,468, 3,780, 3,786). The restored
+  worker starts admitting the Noticed checkpoint as soon as it is
+  earned. Teleporting along the bank at tick 0 was tried and rejected:
+  the herds are elsewhere then and skip straight to Detected. Locally
+  18.5 s becomes 14.7 s; a dropped replay input fails both versions.
+  J206: the input cap counts the prelude, cleanup releases every owner
+  independently, and the first 3,200 inputs are no longer replayed here
+  (field taming keeps the full physical walk, unreplayed).
