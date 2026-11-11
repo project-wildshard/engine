@@ -35,7 +35,12 @@ import { directLoopback } from '../../src/test/engine/netLoopback.ts'
 import { runtimeAssets } from '../fixtures/engine-lift/product.ts'
 import { SIM_LEVEL } from '../fixtures/sim-level/level.ts'
 
-const limit = 9500
+// TEST-SPEED TS11: an honest wall budget per case, measured on hosted runners (packed ci, tests (2), where this proof
+// runs inside the static unit beside e2e). The file's first case pays the cold start: the first native product load,
+// Rapier's compile and the JIT. Green hosted runs took it 8.0 s, and two runs on 2026-11-11 (43069655147 on main, and
+// SC1's branch) passed 9.5 s and went red. The warm cases took 0.7-0.9 s. Cold: 20 s; warm: 9.5 s as before.
+const limit = 9500,
+  coldLimit = 20_000
 const idle = {
   viewTick: 0,
   steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 },
@@ -44,7 +49,11 @@ const idle = {
   buttons: 0,
 }
 
+let cold = true
 async function native(slug, work) {
+  // The first native proof in this process pays the cold start (see coldLimit); later ones are warm.
+  const budget = cold ? coldLimit : limit
+  cold = false
   const started = performance.now(),
     directory = `out/${slug}`
   const rapier = await loadRapier(
@@ -187,8 +196,8 @@ async function native(slug, work) {
     }
   }
   assert.ok(
-    performance.now() - started < limit,
-    'Complete native loadout proof exceeds 9.5 seconds',
+    performance.now() - started < budget,
+    `Complete native loadout proof exceeds ${budget / 1000} seconds`,
   )
 }
 
@@ -326,7 +335,7 @@ function publicationProof(rapier, policy, flags) {
 
 void test(
   'real Pine inputs earn both gated slots; 1,200 author frames preserve swap, aim and publication laws',
-  { timeout: limit },
+  { timeout: coldLimit },
   async () => {
     await native('pine-hollow', async f => {
       const policy = f.product.shardfile.items.loadout.native
