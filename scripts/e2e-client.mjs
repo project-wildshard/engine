@@ -10,7 +10,7 @@
 // build; later ones reuse it and wait only for the rebuild of what changed.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { CATALOGUE, E2E_DIR, START_LOCK, STATE_FILE, TEMPLATE, WATCH_LOG } from './e2e-paths.mjs';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
@@ -30,13 +30,22 @@ const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
  * receipt already names this dependency's index under this validator revision. @returns {boolean} installed now */
 function template() {
   const indexHash = createHash('sha256').update(readFileSync(join(root, FORMAT_INDEX))).digest('hex');
-  const receiptPath = join(root, TEMPLATE, 'validation.json');
-  if (existsSync(receiptPath)) {
-    const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
-    if (receipt.source?.indexHash === indexHash && receipt.revision === shardfileValidationRevision(root)) return false;
-  }
-  const run = spawnSync(process.execPath, ['scripts/pins.ts', 'install', '--from-format', SLUG], { cwd: root, encoding: 'utf8' });
-  if (run.status !== 0) throw new Error(`e2e-client: Template 2 install failed\n${run.stdout}\n${run.stderr}`);
+  const revision = shardfileValidationRevision(root);
+  /** @param {string} folder */
+  const receiptOf = folder => { const path = join(root, 'out', folder, 'validation.json'); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : undefined; };
+  /** @param {string[]} args */
+  const pins = args => {
+    const run = spawnSync(process.execPath, ['scripts/pins.ts', 'install', ...args], { cwd: root, encoding: 'utf8' });
+    if (run.status !== 0) throw new Error(`e2e-client: pins.ts install ${args.join(' ')} failed\n${run.stdout}\n${run.stderr}`);
+  };
+  // The build refuses any product in out/ whose receipt is from another validator revision (a rebase can move it), so a
+  // worktree's other pins are reinstalled first, from the pin cache. A tree holding only Template 2 skips this.
+  const others = existsSync(join(root, 'out')) ? readdirSync(join(root, 'out'), { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name !== SLUG && !entry.name.startsWith('.')) : [];
+  const stale = others.some(entry => { const receipt = receiptOf(entry.name); return receipt !== undefined && receipt.revision !== revision; });
+  if (stale) pins([]);
+  const receipt = receiptOf(SLUG);
+  if (!stale && receipt?.source?.indexHash === indexHash && receipt.revision === revision) return false;
+  pins(['--from-format', SLUG]);
   return true;
 }
 
