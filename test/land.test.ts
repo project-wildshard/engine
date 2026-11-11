@@ -100,7 +100,8 @@ function fixture() {
   const lines = Array.from({ length: 12 }, (_, index) => `export const line${index} = ${index};`).join('\n');
   write(join(repo, 'src/shared.ts'), `${lines}\n`);
   write(join(repo, 'src/a.ts'), 'export const a = 1;\n');
-  git(repo, ['add', 'src']);
+  write(join(repo, 'test/durations.json'), `{\n${Array.from({ length: 12 }, (_, index) => `  "test/t${index}.test.ts": ${index}`).join(',\n')}\n}\n`);
+  git(repo, ['add', 'src', 'test']);
   git(repo, ['commit', '--quiet', '-m', 'seed']);
   git(repo, ['push', '--quiet', 'origin', 'main']);
   git(repo, ['config', 'core.hooksPath', hooks]);
@@ -466,6 +467,31 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(result.status, result.stdout).toBe(1);
     expect(result.stdout).toContain('which this worktree did not push last');
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(theirs);
+  }, 60_000);
+
+  test('main and the plan both recorded test clocks: still carried, the clocks are not a harness change', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.edit(wt, 'test/durations.json', '"test/t10.test.ts": 10', '"test/t10.test.ts": 100', 'test: record clocks');
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('test/durations.json', ': 1,', ': 11,')] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/carried\s+disjoint/u);
+    expect(f.git(f.remote, ['show', 'main:test/durations.json'])).toMatch(/"test\/t1\.test\.ts": 11,[\s\S]*"test\/t10\.test\.ts": 100/u);
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0;/u);
+  }, 60_000);
+
+  test('clocks beside a real harness change still rerun hosted CI after a rebase', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'vitest.config.ts', 'export default {};', 'test: add a vitest config');
+    f.edit(wt, 'test/durations.json', '"test/t10.test.ts": 10', '"test/t10.test.ts": 100', 'test: record clocks');
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('test/durations.json', ': 1,', ': 11,')] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toContain('test/config/dependency harness: vitest.config.ts');
+    expect(f.read(f.files.receipts)).toMatch(/landed .*; exact; rounds 2; hosted reruns 1;/u);
   }, 60_000);
 
   test('a plan that changes hosted CI reruns it after any rebase', () => {

@@ -20,8 +20,12 @@ function verifiedStamp(file,root){
  }catch{return false;}
 }
 
-/** Complete pushed ranges, never an arbitrary recent commit or a time-budgeted subset.
- * @param {string | undefined} refs @param {string} [cwd] @param {{hosted?:boolean}} [options]
+/** Recorded test clocks: they decide how files are packed into shards, never what a test proves. */
+export const TIMING_RECORDS=/^test\/durations[^/]*\.jsonl?$/u;
+
+/** Complete pushed ranges, never an arbitrary recent commit or a time-budgeted subset. `timingRecords` (land's
+ * rebase rule only) counts the timing records as data, not harness: a rebase that only merged clocks stays carried.
+ * @param {string | undefined} refs @param {string} [cwd] @param {{hosted?:boolean,timingRecords?:boolean}} [options]
  * @returns {{mode:'full'|'related'|'docs',files:string[],reason:string}} */
 export function pushSelection(refs,cwd=process.cwd(),options={}) {
   if(!refs?.trim())return {mode:'full',files:[],reason:'no complete push range'};
@@ -40,6 +44,7 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
       if(!verifiedStamp(file,cwd))return {mode:'full',files:changed,reason:`Generated stamp does not match its actual inputs: ${file}`};
       continue;
     }
+    if(options.timingRecords&&TIMING_RECORDS.test(file))continue;
     // These files run on hosted CI. Their independent static checks stay local.
     if(!options.hosted&&file.startsWith('.github/'))continue;
     if(file.endsWith('.md')&&(/^(?:docs|plans|project\/journal)\//u.test(file)||!file.includes('/'))){
@@ -53,7 +58,7 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
     }
     inputs.push(file);
   }
-  if(changed.length>0&&inputs.length===0)return {mode:'docs',files:changed,reason:'Only hosted CI, verified generated stamps or Markdown without declared code consumers; local static/asks checks retained'};
+  if(changed.length>0&&inputs.length===0)return {mode:'docs',files:changed,reason:'Only hosted CI, verified generated stamps, timing records (land) or Markdown without declared code consumers; local static/asks checks retained'};
   const harness=inputs.find(file=>/(^|\/)package\.json$|(?:^|\/)(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$|^(?:\.githooks|public|out|test\/(?:fixtures|pins)|src\/test)\/|^(?:vitest|vite)(?:\.|\/)|^tsconfig|^[^/]+\.json$|^test\/(?:setup|.*config|durations[^/]*)\.|^scripts\/(?:vitest[-.]|push-vitest\.config\.|push-budget\.|push-duration-sequencer\.|test-shard-plan\.|engine-ci(?:\.config|-plan|-sequencer|-budget)\.|format-hook\.|bake-loader\.|sim-node-loader\.|lift-pending\.|test-quarantine\.|cpu-admission\.|cpu-broker\.|heavy-lane)/u.test(file));
   if(harness!==undefined)return {mode:'full',files:changed,reason:`test/config/dependency harness: ${harness}`};
   if(changed.length===0)return {mode:'full',files:[],reason:'no changed paths; verify full tree'};
