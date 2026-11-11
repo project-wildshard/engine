@@ -1,4 +1,4 @@
-import {packsBookPath, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
+import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming } from '@wildshard/engine/boot/timing';
 
@@ -166,9 +166,10 @@ async function partTable(slug: string): Promise<PartMembers | null> {
   if (selected === null || typeof selected.cacheName !== 'string' || typeof caches === 'undefined') return null;
   const address = bookSelection(await readPacksBook(), slug, 'client', partTier, '000');
   if (address === null) return null;
-  const response = await downloadFetch()(new URL(address.url, selected.base));
-  if (!response.ok) return null;
-  const manifest = readSpawnManifest(await response.json()), files = new Map<string, {file: SpawnManifest['files'][number]; part: SpawnPart; offset: number}>();
+  const [response, code] = await Promise.all([downloadFetch()(new URL(address.url, selected.base)),
+    address.code === undefined ? undefined : downloadFetch()(new URL(address.code.url, document.baseURI))]);
+  if (!response.ok || code?.ok === false) { void response.body?.cancel().catch(() => undefined); void code?.body?.cancel().catch(() => undefined); return null; }
+  const manifest = joinSpawnManifest(readSpawnManifest(await response.json()), code === undefined ? undefined : readSpawnCodeList(await code.json())), files = new Map<string, {file: SpawnManifest['files'][number]; part: SpawnPart; offset: number}>();
   for (const part of manifest.parts ?? []) for (const [index, offset] of part.members) {
     const file = manifest.files[index]; if (file !== undefined) files.set(new URL(file.url, document.baseURI).pathname, {file, part, offset});
   }
@@ -359,16 +360,33 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   const stopped = new Promise<never>((_resolve, reject) => { markStopped = reject; });
   const work = (async () => {
     try {
-      const manifestURL = new URL(address.url, packs).href, held = await ports.cached(manifestURL);
-      controller.signal.throwIfAborted();
-      const {bytes, copy} = await readSpawnFile(manifestURL, address.bytes, ports, controller.signal, undefined, held);
-      if (bytes.length !== address.bytes) {void copy?.body?.cancel().catch(() => undefined); throw new Error('Spawn manifest size differs');}
-      const text = new TextDecoder().decode(bytes);
-      const manifest = readSpawnManifest(JSON.parse(text));
-      if (manifest.totalBytes !== address.totalBytes || manifest.wireBytes !== address.wireBytes || manifest.files.length !== address.files) throw new Error('Spawn address differs from manifest');
-      // A default manifest never carries a part table, so it cannot pass as the whole level.
-      if (ports.whole === true && manifest.parts === undefined) throw new Error('Packs manifest has no part table');
-      if (copy !== undefined) await keepCopy(ports.store, manifestURL, copy);
+      // OVERNIGHT 6e: the manifest and its code list, read together. The list is the build's own, so it is read from the
+      // document's origin; the content may live on the packs home.
+      const manifestURL = new URL(address.url, packs).href, codeURL = address.code === undefined ? undefined : new URL(address.code.url, base).href;
+      const readOne = async (url: string, expected: number): Promise<{bytes: Uint8Array; copy: Response | undefined}> => {
+        const held = await ports.cached(url);
+        controller.signal.throwIfAborted();
+        const file = await readSpawnFile(url, expected, ports, controller.signal, undefined, held);
+        if (file.bytes.length !== expected) {void file.copy?.body?.cancel().catch(() => undefined); throw new Error('Spawn manifest size differs');}
+        return file;
+      };
+      // The first failure fails the job at once (its catch aborts the sibling read); a copy either read holds and no store
+      // took is cancelled (J206 review).
+      const reads = [readOne(manifestURL, address.bytes), codeURL === undefined || address.code === undefined ? Promise.resolve(undefined) : readOne(codeURL, address.code.bytes)] as const;
+      const drop = (): void => { for (const read of reads) void read.then(file => file?.copy?.body?.cancel(), () => undefined).catch(() => undefined); };
+      let manifest: SpawnManifest;
+      try {
+        const [own, code] = await Promise.all(reads), decode = (input: Uint8Array): unknown => JSON.parse(new TextDecoder().decode(input));
+        manifest = joinSpawnManifest(readSpawnManifest(decode(own.bytes)), code === undefined ? undefined : readSpawnCodeList(decode(code.bytes)));
+        if (manifest.totalBytes !== address.totalBytes || manifest.wireBytes !== address.wireBytes || manifest.files.length !== address.files) throw new Error('Spawn address differs from manifest');
+        // A default manifest never carries a part table, so it cannot pass as the whole level.
+        if (ports.whole === true && manifest.parts === undefined) throw new Error('Packs manifest has no part table');
+        // keepCopy cancels the copy it is given whenever it keeps nothing; one it has not been given yet is drop()'s
+        const ownCopy = own.copy; own.copy = undefined;
+        if (ownCopy !== undefined) await keepCopy(ports.store, manifestURL, ownCopy);
+        const codeCopy = code?.copy; if (code !== undefined) code.copy = undefined;
+        if (codeCopy !== undefined && codeURL !== undefined) await keepCopy(ports.store, codeURL, codeCopy);
+      } catch (failure) { drop(); throw failure; }
       const files = manifest.files.map(file => {
         const url = new URL(file.url, base); aliases.set(url.pathname, url.href); return {bytes: file.bytes, hash: file.hash, wireBytes: file.wireBytes ?? 0, url: url.href};
       });
@@ -725,7 +743,7 @@ export function reportSpawnOutcomes(sink: (outcome: SpawnOutcome) => void): () =
   };
 }
 const addressKey = (address: SpawnManifestAddress): string =>
-  `${address.url}|${address.bytes}|${address.totalBytes}|${address.files}|${address.wireBytes ?? ''}`;
+  `${address.url}|${address.bytes}|${address.totalBytes}|${address.files}|${address.wireBytes ?? ''}|${address.code?.url ?? ''}`;
 /** The selected entry is explicit; no engine import is needed on the title. */
 export function startSpawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode = '000'): SpawnDownload | null {
   return spawnDownload(slug, flow, tier, mode, true);

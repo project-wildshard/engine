@@ -21,7 +21,8 @@ import {join, resolve as resolvePath} from 'node:path';
 import {Worker} from 'node:worker_threads';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {brotliDecompressSync} from 'node:zlib';
-import {SPAWN_PART_ALIGN, type SpawnFile, type SpawnPart} from '../../shared/game/shardfile/spawnManifest';
+import {SPAWN_PART_ALIGN, spawnCodeListPath, splitSpawnManifest, type SpawnCodeAddress, type SpawnFile, type SpawnManifest, type SpawnManifestAddress,
+  type SpawnPart} from '../../shared/game/shardfile/spawnManifest';
 
 export const PART_BYTES = 12_000_000, PART_TARGET = 10, OVER_FETCH = 0.1;
 export interface SpawnPartInput {readonly rows: readonly SpawnFile[]; readonly public: boolean; readonly desktop?: boolean}
@@ -272,4 +273,22 @@ export function createPartEncoder(cacheDir: string = process.env['WILDSHARD_SPAW
     },
     stats: () => ({parts, rawBytes, wireBytes, encoded}),
     close: async () => { await Promise.all(all.map(worker => worker.terminate())); all.length = 0; idle.length = 0; }};
+}
+
+/** OVERNIGHT 6e: write one manifest as its content (`<shard>-<flow>-<tier>-<sha>.json`) and its code list
+ *  (`code/<sha>.json`), each named by its own bytes. The build's chunks change name with any code change, so they sit in
+ *  the list: a code change renames only lists, and a manifest's name moves only when its content does. */
+export function writeSpawnManifestFiles(outDir: string, manifest: SpawnManifest): SpawnManifestAddress {
+  const sha = (text: string): string => createHash('sha256').update(text).digest('hex');
+  const {content, code} = splitSpawnManifest(manifest), text = JSON.stringify(content);
+  const name = `assets/spawn/${manifest.shard}-${manifest.flow}-${manifest.tier}-${sha(text).slice(0, 16)}.json`;
+  writeFileSync(join(outDir, name), text);
+  let list: SpawnCodeAddress | undefined;
+  if (code !== undefined) {
+    const listText = JSON.stringify(code), listName = spawnCodeListPath(sha(listText));
+    mkdirSync(join(outDir, 'assets/spawn/code'), {recursive: true}); writeFileSync(join(outDir, listName), listText);
+    list = {url: `/${listName}`, bytes: Buffer.byteLength(listText)};
+  }
+  return {url: `/${name}`, bytes: Buffer.byteLength(text), totalBytes: manifest.totalBytes, files: manifest.files.length,
+    ...(manifest.wireBytes === undefined ? {} : {wireBytes: manifest.wireBytes}), ...(list === undefined ? {} : {code: list})};
 }

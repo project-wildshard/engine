@@ -37,7 +37,9 @@ const html = await (await fetch(new URL('/', base))).text();
 const bank = JSON.parse(/id="boot-module-files">([^<]+)</u.exec(html)?.[1] ?? 'null');
 const address = flow === 'grid' ? bank.spawnManifests.grid['000'][slug].phone : bank.spawnManifests.client[slug].phone;
 const manifest = await (await fetch(new URL(address.url, base))).json();
-const listed = new Set(manifest.files.map(row => row.url.split('?')[0]));
+// OVERNIGHT 6e: a manifest's code rows are in its code list.
+const codeRows = address.code === undefined ? [] : (await (await fetch(new URL(address.code.url, base))).json()).files;
+const listed = new Set([...manifest.files, ...codeRows].map(row => row.url.split('?')[0]));
 // Title art loads through <img> on the title page; any other image read before control is recorded (DL11: an unlisted
 // read waits for the whole set).
 const prefix = `/shardfiles/${slug}/`, shell = /^\/(?:assets\/(?!spawn\/|boot-tables-)|b\/)[^?]+$/u, code = /\.(?:js|mjs|css|map)$/u;
