@@ -164,3 +164,19 @@ test('the SimHost adapter produces ordinary admitted tick commands with today\'s
   expect(() => tickCommands([{ source: 'net', commands }], 2)).toThrow(/allowance|commandsPerTick/u);
   expect(netTickCommands(null, [])).toEqual([]);
 });
+
+test('a spent seq is dropped before its schema check, and a fresh malformed one is still refused', () => {
+  // MMO-PLAN MP1.2: bundles repeat older commands, so a copy whose seq is already spent skips the parse. It never queues
+  // either way; a malformed spent copy counts as a duplicate (it was checked on arrival), a malformed fresh one is refused.
+  const queue = new CommandQueue();
+  queue.admit([command(0xfffe), command(0xffff)]);
+  queue.admit([{ ...command(0xffff), yaw: Number.NaN }, { ...command(0x7fff), pitch: 4 }]); // 0x7fff is exactly half the ring behind 0xffff: spent
+  expect({ refused: queue.refused, duplicates: queue.duplicates }).toEqual({ refused: 0, duplicates: 2 });
+  // Past the wrap: 0 is after 0xffff, so a malformed 0 is fresh and refused; a valid 0 then queues, and its copy is a duplicate.
+  queue.admit([{ ...command(0), yaw: Number.NaN }, command(0), command(0)]);
+  expect({ refused: queue.refused, duplicates: queue.duplicates }).toEqual({ refused: 1, duplicates: 3 });
+  // A seq that is not a u16 is never spent: the schema refuses it.
+  queue.admit([{ ...command(1), seq: 70000 }, { ...command(1), seq: -1 }, { ...command(1), seq: 0.5 }]);
+  expect({ refused: queue.refused, duplicates: queue.duplicates }).toEqual({ refused: 4, duplicates: 3 });
+  expect([queue.next().command?.seq, queue.next().command?.seq, queue.next().command?.seq]).toEqual([0xfffe, 0xffff, 0]);
+});
