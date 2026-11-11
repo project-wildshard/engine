@@ -3,8 +3,8 @@
  *
  * This process holds the credentials and the network and never parses a shardfile. Each cook is a child (`cookJob.ts`)
  * with no credentials in its environment, Node's permission model over files, a heap cap, a resident-memory watch, a
- * wall clock, and `wrap`, the host's prefix that takes its network away (`scripts/cook-worker.service`). A hostile file
- * can only end its own child.
+ * wall clock, and `wrap`, the host's prefix that takes its network away (the `wildshard-cook` unit in
+ * `scripts/vps/rebuild.sh`). A hostile file can only end its own child.
  *
  * Publishing order is the guarantee: parts, then manifests, then the per-build index (J83). A shard is cooked for a build
  * when its index exists, so a killed cook leaves unreferenced parts for garbage collection, and never half a shard. */

@@ -1,32 +1,5 @@
-# C4: the cook worker's limits on the VPS (16 cores, 30 GB). Not installed yet: deployment waits for E7.2.
-# Each job is the worker's child, so these caps hold for every job at once; the worker's own clock and resident watch
-# hold for each job. `COOK_JOB_WRAP` puts a job in an empty network namespace, which leaves the worker's R2 and notify
-# traffic alone: nothing that reads a shardfile has a route out.
-[Unit]
-Description=Wildshard cook worker
-After=network-online.target
-
-[Service]
-User=wildshard-cook
-Group=wildshard-cook
-WorkingDirectory=/opt/wildshard/engine
-EnvironmentFile=/etc/wildshard/cook.env
-Environment=COOK_JOB_WRAP=["unshare","--user","--map-root-user","--net"]
-ExecStart=/usr/bin/node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs serve
-Restart=on-failure
-RestartSec=5
-MemoryMax=12G
-CPUQuota=1400%
-TasksMax=512
-LimitCORE=0
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-PrivateTmp=yes
-PrivateDevices=yes
-ReadWritePaths=/var/lib/wildshard-cook
-Environment=COOK_SCRATCH=/var/lib/wildshard-cook/scratch
-Environment=COOK_SERVER_PACKS=/var/lib/wildshard-cook/server
-
-[Install]
-WantedBy=multi-user.target
+# Retired (MMO-PLAN MP0.1): scripts/vps/rebuild.sh writes and installs the cook worker's unit, wildshard-cook.service.
+# This copy was never installed, and it had two faults the rebuild's container proof found: systemd strips the double
+# quotes out of an unquoted Environment=COOK_JOB_WRAP=[...] value, and the worker's default port was staging's 8791.
+# It stays as a pointer because the pre-commit stamp (renderer-revision.mjs reads HEAD's tree from disk) cannot commit
+# a deleted file under scripts/.

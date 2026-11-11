@@ -6,9 +6,9 @@
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs gc <build>...   keep those builds, delete the rest, print usage
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs report    print usage against the budget (J89)
 // Environment: WILDSHARD_API_URL, WILDSHARD_BUILD; R2_ACCOUNT_ID, R2_BUCKET_PACKS, R2_PACKS_ACCESS_KEY_ID,
-// R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8791), COOK_HOST (127.0.0.1);
+// R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
 // COOK_SERVER_PACKS, COOK_SCRATCH; COOK_SECONDS, COOK_MEMORY_MB, COOK_HEAP_MB, COOK_MAX_SHARDFILE_BYTES; COOK_JOB_WRAP, a JSON array the host puts
-// before each job to take its network away (see scripts/cook-worker.service).
+// before each job to take its network away (see the wildshard-cook unit in scripts/vps/rebuild.sh).
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,7 +39,7 @@ const worker = () => createCookWorker({
 
 const [command, ...rest] = process.argv.slice(2);
 if (command === 'serve') {
-  const cook = worker(), port = Number(env.COOK_PORT ?? 8791), host = env.COOK_HOST ?? '127.0.0.1';
+  const cook = worker(), port = Number(env.COOK_PORT ?? 8792), host = env.COOK_HOST ?? '127.0.0.1';
   notifyServer(cook, need('COOK_NOTIFY_TOKEN')).listen(port, host, () => { console.log(`cook worker on ${host}:${port}`); });
   // J30: what a missed notice left behind. A catalogue that can't be read waits for the next notice.
   try { await cook.recook(['live', 'preview']); } catch (error) { console.error(`boot list failed: ${String(error)}`); }

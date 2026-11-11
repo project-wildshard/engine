@@ -71,7 +71,7 @@ describe('the cook worker', () => {
 
   it('reports a crash as a failure of that job alone', async () => {
     // A h.real SIGABRT, but no core: under `ulimit -c unlimited` this one line wrote 6.5 GB to /cores on every run.
-    // The service sets LimitCORE=0 (scripts/cook-worker.service), so only this test needs the wrap.
+    // The service sets LimitCORE=0 (wildshard-cook in scripts/vps/rebuild.sh), so only this test needs the wrap.
     const outcome = await job('crash.mjs', 'process.abort();', {}, ['sh', '-c', 'ulimit -c 0; exec "$@"', 'sh']);
     expect(outcome.kind).toBe('killed');
   }, 30_000);

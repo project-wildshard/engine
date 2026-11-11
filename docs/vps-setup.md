@@ -52,6 +52,66 @@ AllowFunnel configuration refuses. A completed rerun is accepted.
 No Serve/Funnel reset, off command or Tailscale identity change occurs.
 The old quick-tunnel unit is left untouched and reported if still active.
 
+## Rebuild from nothing (MMO-PLAN MP0.1)
+
+`scripts/vps/rebuild.sh` takes a fresh Ubuntu 24.04 image to a serving
+host: Phase 1 (Node 24 from NodeSource, apt PostgreSQL 16, rclone,
+Tailscale, Caddy installed and off; the `raynos`, `wildshard` and
+`wildshard-cook` users; PostgreSQL's local-socket settings, role and both
+saves databases; a blank `ops.env`; the staged release public key), then
+`harden.sh` when VPS-HARDENING has written it, then `setup.sh` (Phase 2),
+then the cook worker. Every step checks first and does only what is
+missing, so a rerun is safe and a finished box reruns with no change.
+
+**Hard stop.** It refuses, in both modes, a host that still holds the old
+box's data (`/home/clawdbot`, `/home/matt`, any `.openclaw`, the Ollama
+snap, Coolify's volume). It is for the box after OPENCLAW-EXTRACT's OX10
+and the Hetzner rebuild (VPS-HARDENING VH2), never for today's VPS.
+
+On the fresh box, as root, from the release tag being deployed:
+
+```sh
+curl -fsSL https://github.com/project-wildshard/engine/archive/refs/tags/<tag>.tar.gz | tar -xz -C /root
+bash /root/engine-<tag without v>/scripts/vps/rebuild.sh --check
+bash /root/engine-<tag without v>/scripts/vps/rebuild.sh
+```
+
+Exit 0 is done. Exit 2 means it did everything it could and waits for
+one of Jake's inputs; it names each one, and a rerun picks up from there:
+
+- `sudo tailscale up --ssh`: Phase 2 needs the node's tailnet name.
+- `/etc/wildshard/cook.env`: the engine tag and build the worker cooks
+  for, the notify token api-server sends, and the four R2 packs rows
+  (or `COOK_STORE_DIR` on a scratch box). Until then the cook worker
+  stays off; the game servers do not need it.
+- `passwd raynos`, printed as `next`, for sudo and the console.
+
+Caddy's package would serve a page on port 80, so it is installed with
+its start refused, its default file is replaced by a comment, and it is
+disabled. VH9 writes the real file, which reruns leave alone; port 443
+opens by Jake's hand after VH16 (J179).
+
+The cook worker runs from `/opt/wildshard/engine` at `COOK_ENGINE_REF`
+(CI's sparse set, `pnpm install --frozen-lockfile --ignore-scripts` once
+per commit, so no package script runs as root) as
+`wildshard-cook`, on `127.0.0.1:8792`, with CPUs 13-15. Each cook job
+runs in a user and network namespace of its own. Ubuntu 24.04 refuses
+those to unconfined programs (`kernel.apparmor_restrict_unprivileged_userns=1`,
+true on the VPS), so the worker gets its own copy of `unshare` in
+`/usr/local/lib/wildshard-cook` and one AppArmor profile allowing that
+copy only. The unit checks the wrap once before it starts.
+
+**Proof without the VPS.** `bash scripts/vps-rebuild-proof.sh` runs the
+whole sequence in a throwaway container that boots systemd (Docker on
+the Mac, its own arm64; Rosetta's amd64 cannot run systemd's services): `--check`, a run that waits for Tailscale, a stub
+`tailscale up`, a run through Phase 2 that waits for `cook.env`, a run
+that starts the cook worker against a local catalogue of one pinned
+shardfile, and a last run that must change nothing. It passes only when
+both loopback ports answer from real servers that pulled the signed
+releases, the cook worker has written the shard's index, and nothing
+listens on 80 or 443. The stubbed parts are the tailnet (Jake's) and
+api-server; `api.wildshard.io` resolves to nothing inside the box.
+
 ## J205: live agent traffic is staging only
 
 Production serves humans only. Every live agent proof, bot and soak uses
@@ -67,6 +127,35 @@ that with a production database. Local isolated rigs may use memory or
 a disposable test database. No production wipe or sudo SQL cleanup is
 part of setup or proof preparation. Codex-port owns the page/proof guard;
 codex-j189 owns the runbook and VPS channel setup.
+
+## Bots (MMO-PLAN MP0.4)
+
+`node scripts/mmo-bots.mjs replica|staging` runs real-socket bots from
+this Mac (J202). Each bot is a phone's network end (`RoomBot`: `hello`,
+`resume`, `ready`, commands at 60 Hz) walking `headlessJourney`'s route
+cursor in rings around where it stands, steered by the feet the server
+sends back. Both modes read the signed staging release, check it
+against setup.sh's pinned key, and build the bots from that release's
+own commit, so build and wire match the server's.
+
+- `replica` (default 32 bots, 120 s) runs that release's exact server
+  bundle on loopback with production's shape: 4 workers, 32 seats,
+  Driftwood, packs read from R2, memory saves, nothing sent off the Mac.
+  The door seats 4 sockets and 10 connects a minute per address, and
+  behind loopback it reads the proxy's `X-Forwarded-For`, so each replica
+  bot says its own address from 198.18.0.0/15 (RFC 2544's benchmarking
+  range), as 32 phones would have. Its worker readings (tick p95, drops,
+  RSS) join the report.
+- `staging` (default 2 bots, 60 s) joins the staging socket only after
+  `/health` shows the release's build and enough free seats: it leaves
+  4 of staging's 16 for people. Through Funnel every bot is this Mac's
+  one address and no header says otherwise, so at most 4 join. Staging's
+  2 workers are its own setting.
+
+The bots refuse any socket but loopback and staging, and leave with the
+leave flag so no held body keeps a seat. The report is
+`tmp/mmo-bots/<stamp>/report.json`: seated, steady, metres walked,
+others seen, bytes down, RTT, and the server's windows on a replica.
 
 ## Sentry (SENTRY-TRIAGE S8)
 
