@@ -541,6 +541,31 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.read(f.files.receipts)).toMatch(/STOP rebased [0-9a-f]{10} is not main/u);
   }, 60_000);
 
+  test('a rebase that brings in a lockfile change installs before the pushes; one that does not, does not', () => {
+    const f = fixture();
+    // A fake pnpm on the fixture's PATH logs each call, so the test sees exactly what land runs.
+    const calls = join(f.root, 'pnpm-calls.log');
+    writeFileSync(join(f.root, 'bin/pnpm'), `#!/bin/sh\necho "$*" >> '${calls}'\n`);
+    chmodSync(join(f.root, 'bin/pnpm'), 0o755);
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/install\s+pnpm-lock\.yaml changed in the rebase; pnpm install --frozen-lockfile/u);
+    expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile']);
+    const g = fixture();
+    writeFileSync(join(g.root, 'bin/pnpm'), `#!/bin/sh\necho "$*" >> '${calls}.g'\n`);
+    chmodSync(join(g.root, 'bin/pnpm'), 0o755);
+    const plain = g.worktree('bar');
+    g.commit(plain, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    g.state({ once: { marker: join(g.root, 'once'), command: ['sh', g.peerScript('src/other.ts', null, 'export const other = 2;')] } });
+    const quiet = g.land(plain);
+    expect(quiet.status, quiet.stdout).toBe(0);
+    expect(quiet.stdout).not.toMatch(/frozen-lockfile/u);
+    expect(existsSync(`${calls}.g`)).toBe(false);
+  }, 90_000);
+
   test('a harness change carries too: J249 has no harness rule, main\'s own run checks it', () => {
     const f = fixture();
     const wt = f.worktree('foo');

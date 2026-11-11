@@ -48,3 +48,9 @@ SHOULD, open: dropping the lockfile means a transitive-only resolution
 change no longer moves the validation revision (the built-product key still
 hashes the lockfile). The one-time key move needs `pnpm pins` in old
 worktrees (AGENTS.md).
+
+**Land installs after a dependency rebase.** WR2 added `@wildshard/wire`, and
+every older worktree then failed its pre-push with ERR_MODULE_NOT_FOUND
+(opus-closeout lost 3 pushes; ignore-programs's carried main push failed
+the same way). A rebase that changes `pnpm-lock.yaml` or a `package.json` now
+runs `pnpm install --frozen-lockfile` before any push, with a land.test case.

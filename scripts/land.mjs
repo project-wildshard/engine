@@ -3,7 +3,8 @@
 //   2. Rebase first if main is already ahead, then push plan/<slug> under a lease its own reflog vouches for; the
 //      split pre-push runs (DS9).
 //   3. Wait for that exact SHA's `ci` to go green.
-//   4. Rebase onto origin/main if it moved during CI. Any conflict stops (no stamps are tracked since LS1, J250).
+//   4. Rebase onto origin/main if it moved during CI. Any conflict stops (no stamps are tracked since LS1, J250). A rebase
+//      that changes the lockfile or a package.json runs `pnpm install --frozen-lockfile` before any push.
 //      A clean rebase carries the branch's green run (J249: "they don't have to re-CI on rebase").
 //   5. Push the SHA to main, never forced. The pre-push knows it is land's (WS_LAND_MAIN_PUSH): exact runs nothing
 //      more, carried runs lint, TypeScript and the static checks, no Vitest (LS3). A lost race rebases and retries,
@@ -207,6 +208,7 @@ class Landing{
   if(result.status===0){
    this.expected=this.head();
    this.say('rebased',`${short(before)} -> ${short(this.expected)} onto main ${short(main)}`);
+   this.installIfDependenciesMoved(before);
    return;
   }
   const conflicts=git(this.root,['diff','--name-only','--diff-filter=U']).split('\n').filter(Boolean);
@@ -218,6 +220,19 @@ class Landing{
   }
   this.receipt(`STOP rebase conflict onto main ${short(main)}: ${paths}`);
   throw new StopError(`rebase onto main ${short(main)} conflicts in: ${paths}\nResolve: git rebase origin/main, fix those paths, git rebase --continue, then run land again. HEAD is back at ${short(before)}.`);
+ }
+
+ /** A rebase that brought in a lockfile or package.json change: install before any pre-push, or every check fails on a
+  * missing module (WR2's `@wildshard/wire` turned older worktrees red, 2026-11-11). Frozen, so the lockfile is the law.
+  * @param {string} before */
+ installIfDependenciesMoved(before){
+  const moved=git(this.root,['diff','--name-only',before,'HEAD','--','pnpm-lock.yaml','package.json','**/package.json']).split('\n').filter(Boolean);
+  if(moved.length===0)return;
+  this.say('install',`${moved.join(', ')} changed in the rebase; pnpm install --frozen-lockfile`);
+  const installed=spawnSync('pnpm',['install','--frozen-lockfile'],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:64<<20});
+  if(installed.status===0)return;
+  this.receipt(`STOP pnpm install --frozen-lockfile failed after the rebase`);
+  throw new StopError(`pnpm install --frozen-lockfile failed after the rebase (${moved.join(', ')} changed): ${`${installed.stderr}${installed.stdout}`.trim().split('\n').slice(-3).join(' ')}\nRun it by hand in the worktree, then run land again.`);
  }
 
  /** J249 provenance: what goes to main on the branch's green run must be exactly main plus that run's SHA. Git's own
