@@ -28,3 +28,15 @@ so the canonical checkout is never ahead of GitHub; then land fetches in
 the canonical checkout and runs the same guarded fast-forward. Dirty,
 diverged, on another branch or busy: a WARNING line and a receipt, never a
 reset or a stash, and the landing stands. Tests in `test/land.test.ts`.
+
+Second J206 review: two MUSTs. Only this process and its own shell are
+exempt from the process check now, so an agent whose session works in the
+canonical checkout blocks the follow even when it is the one running
+land. Git offers no lock that covers the merge's own first milliseconds
+before it locks the index; the follow takes one last look at the git
+states and HEAD right before the merge, and a canonical commit holds
+index.lock from before its pre-commit hook to its last write, so only a
+hookless writer finishing inside those milliseconds could slip through.
+That residue is recorded in WORKTREE-LAND-STANDARD WL7 for a shared
+canonical writer lock. If the merge fails after HEAD moved, it says so
+loudly instead of quietly.

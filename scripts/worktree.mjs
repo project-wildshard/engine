@@ -150,17 +150,11 @@ function cloneTrackedFiles(canonical,tree){
 /** Git states in which moving HEAD would break an operation someone is part way through. */
 const BUSY_GIT=['index.lock','MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','BISECT_LOG','rebase-merge','rebase-apply','sequencer'];
 
-/** This process and its ancestors: the shell that ran `worktree new` sits in the canonical checkout. @returns {Set<number>} */
-function selfAndAncestors(){
- const own=new Set([process.pid]);
- let pid=process.ppid;
- for(let depth=0;depth<32&&pid>1&&!own.has(pid);depth++){
-  own.add(pid);
-  const parent=spawnSync('ps',['-o','ppid=','-p',String(pid)],{encoding:'utf8'});
-  pid=Number(parent.stdout.trim());
-  if(parent.status!==0||!Number.isSafeInteger(pid))break;
- }
- return own;
+/** This process and the shell that started it: `worktree new` runs from the canonical checkout, so its own shell sits
+ * there. Nothing further up counts as ours: an agent whose session works in the canonical checkout still blocks the
+ * follow (J206 review). @returns {Set<number>} */
+function selfAndShell(){
+ return new Set([process.pid,process.ppid]);
 }
 
 /** Keep the canonical checkout on origin/main (Jake, 2026-11-10: "If the main checkout of the engine is stale, we
@@ -183,10 +177,17 @@ export function followMain(canonical,base){
  if(busy!==undefined)return leave(`git ${busy} in progress`);
  const directories=processDirectories();
  if(directories===undefined)return leave('cannot list process working directories');
- const real=realpathSync(canonical),trees=join(real,WORKTREES),own=selfAndAncestors();
+ const real=realpathSync(canonical),trees=join(real,WORKTREES),own=selfAndShell();
  const inside=[...directories].filter(([pid,path])=>!own.has(pid)&&(path===real||path.startsWith(`${real}/`))&&path!==trees&&!path.startsWith(`${trees}/`));
  if(inside.length>0)return leave(`pid ${inside.map(([pid])=>String(pid)).join(', ')} working in it`);
+ // Last look, right before git takes the index: a canonical commit holds index.lock from before its pre-commit hook
+ // until its index and HEAD are written, so one that started is seen here, and one that starts after this either
+ // waits on the merge's lock or fails on it. Git has no lock covering the merge's own few milliseconds before it
+ // locks the index; only a hookless writer could finish inside them (WORKTREE-LAND-STANDARD WL7).
+ const late=BUSY_GIT.find(name=>existsSync(resolve(canonical,git(canonical,['rev-parse','--git-path',name]).trim())));
+ if(late!==undefined||git(canonical,['rev-parse','HEAD']).trim()!==head)return leave(late===undefined?'HEAD moved during the check':`git ${late} started during the check`);
  const merged=tryGit(canonical,['merge','--ff-only','--no-autostash','--no-overwrite-ignore','--quiet',base]);
+ if(merged.status!==0&&git(canonical,['rev-parse','HEAD']).trim()!==head)return `CANONICAL MAIN NEEDS A LOOK: the fast-forward failed after HEAD moved (${merged.stderr.trim().split('\n')[0]})`;
  return merged.status===0?`canonical main fast-forwarded ${behind} commit(s)`:leave(`fast-forward refused (${merged.stderr.trim().split('\n')[0]})`);
 }
 
