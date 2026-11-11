@@ -44,15 +44,17 @@ Landing from a worktree (LAND-SIMPLIFY, J240/J249/J258; meta `docs/plans/WORKTRE
    2. Rebase first if main is already ahead, then push `plan/<slug>`. Land rewrites it only when this branch's
       reflog reached origin's tip, under a lease (LS4); the split pre-push runs (static checks, related tests).
    3. Wait for that exact SHA's `ci` to go green.
-   4. If main moved during CI, rebase. A conflict only in the generated stamps is regenerated; any other conflict stops, and
-      the resolved commit needs its own branch CI. A clean rebase carries the green run (J249).
+   4. If main moved during CI, rebase. Any conflict stops, and the resolved commit needs its own branch CI.
+      A clean rebase carries the green run (J249).
    5. Push the SHA to main, never forced. `exact` (main didn't move) runs no more checks; `carried` runs lint,
       TypeScript and the static checks, no Vitest (LS3). A lost race rebases and retries, at most 5 tries.
    6. Fast-forward the canonical checkout when it is on main and clean; otherwise a WARNING and a receipt.
    7. A `landed` receipt; `scripts/main-watch.mjs` follows main's own `ci` and reports it (LS5).
    8. Delete `origin plan/<slug>` and remove the worktree and its branch; `cd` back to the canonical checkout. A
       worktree with uncommitted or untracked files is kept.
- - Output: `land HH:MM:SS <state> <detail>`, states `start`, `rebased`, `stamps`, `pushing`, `ci`, `moved`,
+ - The renderer and validation revisions are computed live from source, in a checkout and in an installed engine
+   alike; nothing stamps them into git (LS1, J250).
+ - Output: `land HH:MM:SS <state> <detail>`, states `start`, `rebased`, `pushing`, `ci`, `moved`,
    `carried`, `merging`, `landed`, `canonical`, `watch`, `rule`, `cleaned`; a stop is one `land STOP …` line.
    Exit 0: landed or nothing to land. Exit 1: stopped; if a `landed` line came first, only the cleanup failed.
  - Landings, CI reds, refusals, conflicts and give-ups append a line to `~/.cache/wildshard/lane-receipts.log`
@@ -73,18 +75,14 @@ When land stops (each seen on 2026-11-10/11):
  - `rebase … failed and git rebase --abort did not restore`: the worktree is mid-rebase. `git status`, then
    `git rebase --abort` by hand, before anything else.
  - `land already running in this worktree (pid N)`: wait for it; one land per worktree.
- - `push of plan/<slug> … failed` (pre-push red): the failing check is printed above it. Seen: lint, a stale
-   stamp, an HTTPS remote using another GitHub login (403: use the SSH remote), a fresh clone with no pins exclude
-   block (run `pnpm pins` in the canonical checkout). Fix forward, commit, run land again.
+ - `push of plan/<slug> … failed` (pre-push red): the failing check is printed above it. Seen: lint, an HTTPS
+   remote using another GitHub login (403: use the SSH remote), a fresh clone with no pins exclude block (run
+   `pnpm pins` in the canonical checkout). Fix forward, commit, run land again.
  - `origin plan/<slug> is at X, which this worktree's branch never reached`: someone else pushed your branch.
    Fetch, rebase your commits onto `origin/plan/<slug>` and run land again; or start a new worktree with a new slug
    and cherry-pick your commits. Never force over it.
  - `rebase onto main … conflicts in: <paths>`: `git rebase origin/main`, fix those paths, `git rebase --continue`,
-   run land again. A both-sides edit of only `renderer-revision.json`/`validation-revision.json` land fixes
-   itself; a delete or rename conflict there still stops.
- - `Generated stamp does not match`: `node scripts/gen.mjs --inputs-only`, commit the stamp, run land again.
- - `gen.mjs --inputs-only failed after the rebase` / `could not amend`: commit only the two stamp files by hand,
-   then run land again.
+   run land again.
  - `main push of <sha> failed and main did not move`: the static main pre-push refused (lint or TypeScript on the
    rebased tree). Its failing check is printed above; fix forward.
  - `hosted CI is red for <sha>`: the stop names the blocking jobs; `quarantine (n)` reds never block. If main's

@@ -9,3 +9,4 @@ export function rendererCandidate(path: string): boolean;
 export function narrowedRendererHash(paths: readonly string[], read: (path: string) => Buffer): string;
 export function publishedRenderer(narrowed: string): string;
 export function rendererRevision(root?: string): string;
+export function installedSourceFiles(root: string): string[];

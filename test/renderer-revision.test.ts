@@ -1,12 +1,12 @@
 // J259 (SHARD-PIPELINE SP3): mutation tests for the narrowed renderer fingerprint over this checkout's real tree.
 // A one-line edit to the GLSL emitter or to a file that rewrites three's chunks, and a shader-library bump, each move it;
 // an edit under scripts/, or to client code that writes no shader text, doesn't.
-// oxlint-disable-next-line import/no-nodejs-modules -- Reads this checkout's committed sources.
-import {readFileSync} from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Reads this checkout's committed sources and copies an installed one.
+import {cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Checkout paths.
-import {resolve} from 'node:path';
+import {dirname, resolve} from 'node:path';
 import {describe, expect, it} from 'vitest';
-import {CARRIED_RENDERERS, narrowedRendererHash, publishedRenderer, rendererRevision, SHADER_TEXT} from '../scripts/renderer-revision.mjs';
+import {CARRIED_RENDERERS, installedSourceFiles, narrowedRendererHash, publishedRenderer, rendererRevision, SHADER_TEXT} from '../scripts/renderer-revision.mjs';
 import {committedSourceFiles} from '../scripts/source-input-proof.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -58,5 +58,19 @@ describe('narrowed renderer fingerprint (J259)', () => {
     for (const [narrowed, carried] of Object.entries(CARRIED_RENDERERS)) expect(publishedRenderer(narrowed)).toBe(carried);
     expect(publishedRenderer('0'.repeat(64))).toBe('0'.repeat(64));
     expect(rendererRevision(root)).toBe(publishedRenderer(base));
+  });
+  it('an installed engine (no git, no lockfile, no tests) computes the same value live (LS1, J250)', () => {
+    mkdirSync(resolve(root, 'tmp'), {recursive: true});
+    const installed = mkdtempSync(resolve(root, 'tmp/renderer-installed-'));
+    try {
+      for (const path of paths.filter(path => /^src\/(?:client|shared)\//u.test(path) && !/\.test\./u.test(path))) {
+        mkdirSync(dirname(resolve(installed, path)), {recursive: true}); cpSync(resolve(root, path), resolve(installed, path));
+      }
+      cpSync(resolve(root, 'package.json'), resolve(installed, 'package.json'));
+      expect(installedSourceFiles(installed).length).toBeGreaterThan(0);
+      expect(rendererRevision(installed)).toBe(rendererRevision(root));
+      writeFileSync(resolve(installed, 'src/client/engine/render/extra.ts'), 'export const extra = 1;');
+      expect(rendererRevision(installed)).not.toBe(rendererRevision(root));
+    } finally { rmSync(installed, {recursive: true, force: true}); }
   });
 });

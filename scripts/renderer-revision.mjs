@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {existsSync,lstatSync,readFileSync} from 'node:fs';
+import {existsSync,lstatSync,readdirSync,readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {committedSourceFiles} from './source-input-proof.mjs';
 
@@ -69,17 +69,33 @@ function importedPath(from,specifier,known){
  * @param {string} narrowed */
 export const publishedRenderer=narrowed=>CARRIED_RENDERERS[narrowed]??narrowed;
 
-/** This engine's renderer fingerprint. An installed engine (no lockfile, no git) uses its publisher's stamp. */
+/** Every file under `SOURCE_ROOTS` on disk, as root-relative paths: an installed engine's source inventory. It has no
+ * git and no lockfile, but `package.json` `files` ships all of `src` but tests, which are never inputs (LS1, J250).
+ * @param {string} root @returns {string[]} */
+export function installedSourceFiles(root){
+  /** @type {string[]} */
+  const files=[];
+  /** @param {string} folder */
+  const visit=folder=>{
+    if(!existsSync(resolve(root,folder)))return;
+    for(const entry of readdirSync(resolve(root,folder),{withFileTypes:true})){
+      const path=`${folder}${entry.name}`;
+      if(entry.isDirectory())visit(`${path}/`);
+      else if(entry.isFile())files.push(path);
+    }
+  };
+  for(const folder of SOURCE_ROOTS)visit(folder);
+  return files;
+}
+
+/** This engine's renderer fingerprint, computed live everywhere (LS1, J250: no stamp file). A checkout lists its
+ * committed files; an installed engine (no lockfile, no git) walks its shipped `src`, which holds the same inputs. */
 export function rendererRevision(root=resolve(import.meta.dirname,'..')){
-  if(!existsSync(resolve(root,'pnpm-lock.yaml'))){
-    const value=JSON.parse(readFileSync(resolve(root,'scripts/renderer-revision.json'),'utf8')).revision;
-    if(typeof value!=='string'||!/^[a-f0-9]{64}$/u.test(value))throw new Error('Missing engine renderer revision');
-    return value;
-  }
+  const installed=!existsSync(resolve(root,'pnpm-lock.yaml'));
   const read=path=>{
     const file=resolve(root,path);
     if(path!=='package.json'&&lstatSync(file).isSymbolicLink())throw new Error(`Renderer source input must be a regular tracked file: ${path}`);
     return readFileSync(file);
   };
-  return publishedRenderer(narrowedRendererHash(committedSourceFiles(root),read));
+  return publishedRenderer(narrowedRendererHash(installed?installedSourceFiles(root):committedSourceFiles(root),read));
 }

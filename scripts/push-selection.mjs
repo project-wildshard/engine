@@ -1,24 +1,4 @@
 import {execFileSync} from 'node:child_process';
-import {lstatSync,readFileSync} from 'node:fs';
-import {resolve} from 'node:path';
-import {createRequire} from 'node:module';
-
-// CI calls this selector before pnpm install. Only local stamp verification
-// loads the installed revision helpers; hosted classification stays Node-only.
-const revisionModule=createRequire(import.meta.url);
-
-/** A generated digest is represented by its changed inputs, never trusted by name.
- * @param {string} file @param {string} root */
-function verifiedStamp(file,root){
- try{
-  if(!lstatSync(resolve(root,file)).isFile())return false;
-  const value=/** @type {unknown} */(JSON.parse(readFileSync(resolve(root,file),'utf8')));
-  const expected=file==='scripts/renderer-revision.json'
-   ?/** @type {typeof import('./renderer-revision.mjs')} */(revisionModule('./renderer-revision.mjs')).rendererRevision(root)
-   :/** @type {typeof import('./shardfile-validation-revision.mjs')} */(revisionModule('./shardfile-validation-revision.mjs')).shardfileValidationRevision(root);
-  return value!==null&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===1&&'revision'in value&&value.revision===expected;
- }catch{return false;}
-}
 
 /** Complete pushed ranges, never an arbitrary recent commit or a time-budgeted subset.
  * @param {string | undefined} refs @param {string} [cwd] @param {{hosted?:boolean}} [options]
@@ -36,10 +16,6 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
   const changed=[...files].sort();
   /** @type {string[]} */const inputs=[];
   for(const file of changed){
-    if(!options.hosted&&['scripts/renderer-revision.json','scripts/validation-revision.json'].includes(file)){
-      if(!verifiedStamp(file,cwd))return {mode:'full',files:changed,reason:`Generated stamp does not match its actual inputs: ${file}`};
-      continue;
-    }
     // These files run on hosted CI. Their independent static checks stay local.
     if(!options.hosted&&file.startsWith('.github/'))continue;
     if(file.endsWith('.md')&&(/^(?:docs|plans|project\/journal)\//u.test(file)||!file.includes('/'))){
@@ -53,7 +29,7 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
     }
     inputs.push(file);
   }
-  if(changed.length>0&&inputs.length===0)return {mode:'docs',files:changed,reason:'Only hosted CI, verified generated stamps or Markdown without declared code consumers; local static/asks checks retained'};
+  if(changed.length>0&&inputs.length===0)return {mode:'docs',files:changed,reason:'Only hosted CI or Markdown without declared code consumers; local static/asks checks retained'};
   const harness=inputs.find(file=>/(^|\/)package\.json$|(?:^|\/)(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$|^(?:\.githooks|public|out|test\/(?:fixtures|pins)|src\/test)\/|^(?:vitest|vite)(?:\.|\/)|^tsconfig|^[^/]+\.json$|^test\/(?:setup|.*config)\.|^scripts\/(?:vitest[-.]|push-vitest\.config\.|push-budget\.|push-duration-sequencer\.|test-shard-plan\.|test-timings\.|engine-ci(?:\.config|-plan|-sequencer|-budget)\.|format-hook\.|bake-loader\.|sim-node-loader\.|lift-pending\.|test-quarantine\.|cpu-admission\.|cpu-broker\.|heavy-lane)/u.test(file));
   if(harness!==undefined)return {mode:'full',files:changed,reason:`test/config/dependency harness: ${harness}`};
   if(changed.length===0)return {mode:'full',files:[],reason:'no changed paths; verify full tree'};

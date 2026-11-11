@@ -40,7 +40,6 @@
     "pins": "node scripts/pins.ts install",
     "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 && node scripts/gen.mjs --inputs-only && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",
     "ring:1": "bash scripts/ring1.sh all",
-    "release:stamp": "node scripts/stamp-validation-revision.mjs",
     "lint:typed": "node scripts/lint-all.mjs",
     "test:checks": "pnpm gen && node scripts/check-graph.mjs --source-only && node scripts/check-engine-sides.mjs && node scripts/check-sim-players.mjs",
     "build:game": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=test/pins/catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",

@@ -3,7 +3,7 @@
 //   2. Rebase first if main is already ahead, then push plan/<slug> under a lease its own reflog vouches for; the
 //      split pre-push runs (DS9).
 //   3. Wait for that exact SHA's `ci` to go green.
-//   4. Rebase onto origin/main if it moved during CI. A conflict only in the generated stamps is regenerated; any other stops.
+//   4. Rebase onto origin/main if it moved during CI. Any conflict stops (no stamps are tracked since LS1, J250).
 //      A clean rebase carries the branch's green run (J249: "they don't have to re-CI on rebase").
 //   5. Push the SHA to main, never forced. The pre-push knows it is land's (WS_LAND_MAIN_PUSH): exact runs nothing
 //      more, carried runs lint, TypeScript and the static checks, no Vitest (LS3). A lost race rebases and retries,
@@ -23,8 +23,6 @@ import {canonicalRoot,followMain} from './worktree.mjs';
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
 export const LAND_WORKFLOWS=Object.freeze(['ci']);
 const PLAN_BRANCH=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
-/** Generated stamps: a rebase conflict in them alone is resolved by regenerating, never by a person. */
-export const STAMPS=Object.freeze(['scripts/renderer-revision.json','scripts/validation-revision.json']);
 const SHA=/^[a-f0-9]{40}$/u;
 
 class StopError extends Error{name='StopError';}
@@ -201,73 +199,17 @@ class Landing{
   if(dirty!=='')throw new StopError(`commit or drop tracked changes first:\n${dirty}`);
  }
 
- /** After a rebase that took main's side of a stamp conflict: regenerate the stamps for the finished tree and fold
-  * them into the plan's tip commit (its own message, hooks on). A plan with no commit left on main has nothing to fix.
-  * @param {string} main */
- regenerateStamps(main){
-  if(this.head()===main)return;
-  if(git(this.root,['status','--porcelain','--untracked-files=no'])!=='')throw new StopError('the worktree changed during the rebase; commit or drop those changes and run land again');
-  const generated=spawnSync(process.execPath,['scripts/gen.mjs','--inputs-only'],{cwd:this.root,env:this.env,encoding:'utf8',maxBuffer:64<<20});
-  if(generated.status!==0){
-   this.receipt(`STOP stamp regeneration failed after rebase onto ${short(main)}`);
-   throw new StopError(`gen.mjs --inputs-only failed after the rebase onto ${short(main)}: ${`${generated.stderr}${generated.stdout}`.trim().split('\n').slice(-3).join(' ')}\nRegenerate by hand, amend, and run land again.`);
-  }
-  const changed=git(this.root,['diff','--name-only']).split('\n').filter(Boolean);
-  // Only the stamps are folded in. gen.mjs also rewrites tables built from local, untracked products; those are
-  // land's own side effect on a tree that was clean a moment ago, so they go back to the committed bytes.
-  const others=changed.filter(path=>!STAMPS.includes(path)),rewritten=changed.filter(path=>STAMPS.includes(path));
-  if(others.length>0&&tryGit(this.root,['checkout','--',...others]).status!==0)throw new StopError(`could not restore ${others.join(', ')} after regenerating stamps`);
-  if(rewritten.length===0)return;
-  const amended=tryGit(this.root,['add','--',...rewritten]).status===0?tryGit(this.root,['commit','--quiet','--amend','--no-edit','--',...rewritten]):undefined;
-  if(amended===undefined||amended.status!==0){
-   this.receipt(`STOP stamp amend failed after rebase onto ${short(main)}`);
-   throw new StopError(`regenerated ${rewritten.join(', ')} but could not amend ${short(this.head())}: ${amended?.stderr.trim()??'git add failed'}\nCommit them by hand and run land again.`);
-  }
-  this.say('stamps',`regenerated ${rewritten.join(', ')} into ${short(this.head())}`);
- }
-
- /** A plain both-modified conflict: base, main and plan stages all present as regular files. A modify/delete or other
-  * structural conflict is not resolved by taking main's side. @param {string} path */
- contentConflict(path){
-  const stages=git(this.root,['ls-files','-u','-z','--',path]).split('\0').filter(Boolean).map(row=>/^(\d{6}) [0-9a-f]+ (\d)\t/u.exec(row));
-  return stages.length===3&&stages.every(match=>match!==null&&/^100(?:644|755)$/u.test(match[1]??''))&&new Set(stages.map(match=>match?.[2])).size===3;
- }
-
- /** True while a rebase is in progress in this worktree. */
- rebasing(){return ['rebase-merge','rebase-apply'].some(name=>existsSync(resolve(this.root,git(this.root,['rev-parse','--git-path',name]))));}
-
  /** Rebase onto origin/main; a conflict aborts and stops with the paths.
   * @param {string} main */
  rebase(main){
   const before=this.head();
-  let result=tryGit(this.root,['-c','rebase.autoStash=false','-c','rebase.updateRefs=false','rebase','--quiet',main]);
-  /** @returns {string[]} */
-  const unmerged=()=>git(this.root,['diff','--name-only','--diff-filter=U']).split('\n').filter(Boolean);
-  let resolved=0;
-  // A conflict only in generated stamps: take main's side (`--ours` while rebasing) and continue. The stamps are
-  // regenerated once, below, from the finished tree: gen.mjs reads the committed file list, which mid-rebase is not
-  // yet the replayed commit's. Any other conflicted path stops.
-  for(let step=0;result.status!==0&&step<200;step++){
-   const conflicts=unmerged();
-   if(conflicts.length===0&&tryGit(this.root,['diff','--cached','--quiet']).status===0&&this.rebasing()){
-    // The commit became empty (a stamp-only commit): drop it.
-    result=tryGit(this.root,['-c','core.editor=true','rebase','--skip']);
-    continue;
-   }
-   if(conflicts.length===0||!conflicts.every(path=>STAMPS.includes(path)&&this.contentConflict(path))||!this.rebasing())break;
-   if(tryGit(this.root,['checkout','--ours','--',...conflicts]).status!==0||tryGit(this.root,['add','--',...conflicts]).status!==0)break;
-   resolved++;
-   this.say('stamps',`took main's ${conflicts.join(', ')} for a stamp-only conflict; regenerating after the rebase`);
-   result=tryGit(this.root,['-c','core.editor=true','rebase','--continue']);
-  }
+  const result=tryGit(this.root,['-c','rebase.autoStash=false','-c','rebase.updateRefs=false','rebase','--quiet',main]);
   if(result.status===0){
-   // Every clean rebase gets stamps that match the rebased tree (J249: no rerun for a stale stamp either).
-   if(resolved>0||existsSync(join(this.root,'scripts/gen.mjs')))this.regenerateStamps(main);
    this.expected=this.head();
-   this.say('rebased',`${short(before)} -> ${short(this.expected)} onto main ${short(main)}${resolved===0?'':`; ${resolved} stamp conflict(s) regenerated`}`);
+   this.say('rebased',`${short(before)} -> ${short(this.expected)} onto main ${short(main)}`);
    return;
   }
-  const conflicts=unmerged();
+  const conflicts=git(this.root,['diff','--name-only','--diff-filter=U']).split('\n').filter(Boolean);
   const aborted=tryGit(this.root,['rebase','--abort']);
   const paths=conflicts.length>0?conflicts.join(', '):'(none reported)';
   if(aborted.status!==0||this.head()!==before||existsSync(resolve(this.root,git(this.root,['rev-parse','--git-path','rebase-merge'])))){
@@ -275,23 +217,20 @@ class Landing{
    throw new StopError(`rebase onto main ${short(main)} failed (${paths}) and git rebase --abort did not restore ${short(before)}: ${aborted.stderr.trim()}\nInspect the worktree by hand: git status, git rebase --abort.`);
   }
   this.receipt(`STOP rebase conflict onto main ${short(main)}: ${paths}`);
-  throw new StopError(`rebase onto main ${short(main)} conflicts in: ${paths}\nResolve: git rebase origin/main, fix those paths (stamp conflicts alone land regenerates itself), git rebase --continue, then run land again. HEAD is back at ${short(before)}.`);
+  throw new StopError(`rebase onto main ${short(main)} conflicts in: ${paths}\nResolve: git rebase origin/main, fix those paths, git rebase --continue, then run land again. HEAD is back at ${short(before)}.`);
  }
 
- /** J249 provenance: what goes to main on the branch's green run must be exactly main plus that run's SHA, stamps
-  * aside. Git's own three-way merge of the two is computed apart from the rebase, and the rebased HEAD must match it
-  * file for file; a commit made during the rebase or the stamp regeneration, or anything else, stops land (J206
-  * review). The stamps are excluded because land regenerates them for the rebased tree.
+ /** J249 provenance: what goes to main on the branch's green run must be exactly main plus that run's SHA. Git's own
+  * three-way merge of the two is computed apart from the rebase, and the rebased HEAD must match it file for file; a
+  * commit made during the rebase, or anything else, stops land (J206 review).
   * @param {string} main @param {string} tested */
  verifyReplay(main,tested){
   const merged=tryGit(this.root,['merge-tree','--write-tree','--name-only','--no-messages',main,tested]);
   const [tree='',...conflicted]=merged.stdout.split('\n').map(line=>line.trim()).filter(Boolean);
-  const excluded=STAMPS.map(path=>`:(exclude)${path}`);
-  const same=SHA.test(tree)&&(merged.status===0||merged.status===1)&&conflicted.every(path=>STAMPS.includes(path))
-   &&tryGit(this.root,['diff','--quiet',tree,'HEAD','--','.',...excluded]).status===0;
+  const same=SHA.test(tree)&&merged.status===0&&conflicted.length===0&&tryGit(this.root,['diff','--quiet',tree,'HEAD']).status===0;
   if(same)return;
   this.receipt(`STOP rebased ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)}`);
-  throw new StopError(`after the rebase, ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)} (stamps aside): a commit or edit came in during the land. Check git log, keep what you meant, and run land again; a new commit gets its own branch CI.`);
+  throw new StopError(`after the rebase, ${short(this.head())} is not main ${short(main)} plus the hosted-green ${short(tested)}: a commit or edit came in during the land. Check git log, keep what you meant, and run land again; a new commit gets its own branch CI.`);
  }
 
  /** Push the exact SHA to this worktree's own plan branch (LAND-SIMPLIFY LS4, J258). Land reads origin's real tip
