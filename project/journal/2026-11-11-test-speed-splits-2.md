@@ -38,3 +38,8 @@ larger weights until hosted runs re-time them.
 
 After the review dropped two unused imports, the refusals file was re-clocked
 for its new blob by the push gate.
+
+The nine parents (both batches) are re-clocked with the push gate's own
+recorder for their new blobs: their old weights (up to 48 s) described the
+unsplit files and pushed the full plan past 240 s a shard (ci 42972399841
+failed at planning). Now 229.8 s at 15 shards.
