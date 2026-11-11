@@ -231,6 +231,50 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.remoteMain()).toBe(before);
   }, 60_000);
 
+  test('a rebase conflict only in a generated stamp is regenerated for the landed tree, not a stop', () => {
+    const f = fixture();
+    // gen.mjs here writes the real renderer stamp of the checkout (engine's rendererRevision over committed inputs),
+    // so DS1's stamp check after the rebase judges it exactly as in engine.
+    const GEN = `import {writeFileSync} from 'node:fs';import {rendererRevision} from '${resolve('scripts/renderer-revision.mjs')}';\n`
+      + "writeFileSync('scripts/renderer-revision.json',JSON.stringify({revision:rendererRevision(process.cwd())})+'\\n');\n";
+    mkdirSync(join(f.repo, 'scripts'), { recursive: true });
+    mkdirSync(join(f.repo, 'src/shared'), { recursive: true });
+    writeFileSync(join(f.repo, 'scripts/gen.mjs'), GEN);
+    writeFileSync(join(f.repo, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'\n");
+    writeFileSync(join(f.repo, 'package.json'), '{"name":"fixture","private":true}\n');
+    writeFileSync(join(f.repo, 'src/shared/base.ts'), 'export const base = 1;\n');
+    writeFileSync(join(f.repo, 'scripts/renderer-revision.json'), '{}\n');
+    f.git(f.repo, ['add', 'scripts', 'pnpm-lock.yaml', 'package.json', 'src/shared']);
+    f.git(f.repo, ['commit', '--quiet', '-m', 'chore: stamps']);
+    const gen = (cwd: string) => execFileSync(process.execPath, ['scripts/gen.mjs', '--inputs-only'], { cwd, env: f.env });
+    gen(f.repo);
+    f.git(f.repo, ['commit', '--quiet', '-m', 'chore: stamp', '--', 'scripts/renderer-revision.json']);
+    f.git(f.repo, ['push', '--quiet', 'origin', 'main']);
+    const wt = f.worktree('foo');
+    // The plan adds a new input file: mid-rebase, HEAD's file list would not have it yet.
+    writeFileSync(join(wt, 'src/shared/feature.ts'), 'export const feature = true;\n');
+    f.git(wt, ['add', 'src/shared/feature.ts']);
+    f.git(wt, ['commit', '--quiet', '-m', 'feat: add feature']);
+    gen(wt);
+    f.git(wt, ['commit', '--quiet', '-m', 'feat: stamp feature', '--', 'scripts/renderer-revision.json']);
+    // Main moves mid-landing with its own input and its own regenerated stamp: the stamp line conflicts.
+    const peer = join(f.root, 'peer-stamp.sh');
+    writeFileSync(peer, `set -e\nunset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR\ncd '${f.peer}'\ngit pull --quiet --ff-only origin main\nprintf 'export const other = 2;\\n' > src/shared/other.ts\ngit add src/shared/other.ts\ngit commit --quiet -m 'peer lands'\n'${process.execPath}' scripts/gen.mjs --inputs-only\ngit commit --quiet -m 'peer stamp' -- scripts/renderer-revision.json\ngit push --quiet origin HEAD:main\n`);
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', peer] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toContain("took main's scripts/renderer-revision.json for a stamp-only conflict");
+    expect(result.stdout).toMatch(/stamps\s+regenerated scripts\/renderer-revision\.json into [0-9a-f]{10}/u);
+    expect(result.stdout).toMatch(/carried\s+disjoint/u);
+    expect(f.git(f.remote, ['log', '--format=%s', '-4', 'main']).split('\n')).toEqual(['feat: add feature', 'peer stamp', 'peer lands', 'chore: stamp']);
+    // The stamp-only plan commit emptied out under main's stamp and was dropped; the regenerated stamp joined the tip.
+    // The landed stamp is exactly the one gen.mjs makes for the landed tree.
+    f.git(wt, ['fetch', '--quiet', 'origin']);
+    expect(f.git(wt, ['rev-parse', 'HEAD'])).toBe(f.remoteMain());
+    gen(wt);
+    expect(f.git(wt, ['status', '--porcelain'])).toBe('');
+  }, 90_000);
+
   test('a rebase conflict stops with the conflicting paths and leaves the worktree as it was', () => {
     const f = fixture();
     const wt = f.worktree('foo');
