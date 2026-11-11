@@ -860,6 +860,7 @@ export const PUBLIC_BYTES = {
   "/assets/nine-dragon/viewmodel/fist-l-nrm.phone.webp": 62308,
   "/assets/nine-dragon/viewmodel/fist-l-nrm.webp": 213036,
   "/assets/nine-dragon/viewmodel/fp-rig.glb": 2478580,
+  "/assets/nine-dragon/viewmodel/fp-rig.phone.glb": 1049424,
   "/assets/nine-dragon/viewmodel/gauntlet-maps.phone.webp": 177202,
   "/assets/nine-dragon/viewmodel/gauntlet-maps.webp": 534196,
   "/assets/nine-dragon/viewmodel/gauntlet-nrm.phone.webp": 180694,

@@ -511,6 +511,7 @@ export const ASSET_VERSIONS: Readonly<Record<string, string>> = {
   "/assets/nine-dragon/viewmodel/fist-l-nrm.phone.webp": '63ec35f2',
   "/assets/nine-dragon/viewmodel/fist-l-nrm.webp": 'a71f15ec',
   "/assets/nine-dragon/viewmodel/fp-rig.glb": 'def60ea4',
+  "/assets/nine-dragon/viewmodel/fp-rig.phone.glb": '4d84215c',
   "/assets/nine-dragon/viewmodel/gauntlet-maps.phone.webp": '15f014cb',
   "/assets/nine-dragon/viewmodel/gauntlet-maps.webp": 'c896355f',
   "/assets/nine-dragon/viewmodel/gauntlet-nrm.phone.webp": 'aa562b7c',
