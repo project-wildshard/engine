@@ -54,6 +54,20 @@ slow. Each now skips the idle part and keeps its assertions.
   boards on to the other nine places (3,248 ticks), in the same native
   group. Both legs assert the entry list names real places, and a
   dropped replay input fails both.
-  The cave leg gets its own native group (the routes group would push the planner past its floor); its first local clock, 41 s on a loaded machine, and the worker file's 28 s are recorded; the full plan is 232.8 s of 240.
-  J206 MUST: a fresh cave-leg world lost the whole-tour check (duplicate notices or a quest fact once all 17 are found). The cave leg's save now first earns the eight entry places in the same world by standing in each (one notice each, checked), so its tour runs on every earlier discovery and must add no repeat notice.
-  Both new files join their originals in test/pins/ring-2-tests.json (Ring 1 has no full Nalati product: the cave leg hit ENOENT there), so their Ring 1 weights go.
+    The cave leg gets its own native group (the routes group would push
+  the planner past its floor); its first local clock, 41 s on a loaded
+  machine, and the worker file's 28 s are recorded; the full plan is
+  232.8 s of 240.
+    J206 MUST: a fresh cave-leg world lost the whole-tour check
+  (duplicate notices or a quest fact once all 17 are found). The cave
+  leg's save now first earns the eight entry places in the same world by
+  standing in each (one notice each, checked), so its tour runs on every
+  earlier discovery and must add no repeat notice.
+    Both new files join their originals in test/pins/ring-2-tests.json
+  (Ring 1 has no full Nalati product: the cave leg hit ENOENT there), so
+  their Ring 1 weights go.
+- FS4 hosted ran 49-65 s. Of eleven standing spots, (-3,-3) also wins
+  all five rounds first time and earns the prompt about 520 ticks
+  sooner. The checkpoint stays mid-round 4 (J206: moving it to 945 would
+  drop the restored round 4-to-5 transition). The planted restore bug
+  still fails on the checkpoint assertion.

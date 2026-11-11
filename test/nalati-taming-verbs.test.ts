@@ -16,11 +16,11 @@ const postBondCommands:readonly (readonly HeadlessCommand[])[]=[
 test('the entry walk earns a living stallion prompt and all five native bucking rounds',async()=>{
   expect(typeof window).toBe('undefined');expect(typeof document).toBe('undefined');
   let verified=false;
-  // FAST-SLOW-TESTS FS4: after the real walk the player stands 6 m west of the grazing stallion rather than chasing it
-  // for 5,900 ticks; the stallion still shies, and the prompt is still earned by the real approach law. The earned
-  // checkpoint falls mid-round 4 (rounds are 210 ticks), so the restored world still rides a round and a half and adopts.
+  // FAST-SLOW-TESTS FS4: after the real walk the player stands 3 m west and south of the grazing stallion rather
+  // than chasing it for 5,900 ticks; the stallion still shies, and the prompt is still earned by the real approach law.
+  // The earned checkpoint falls mid-round 4 (rounds are 210 ticks): the restored world rides into round 5 and adopts.
   const report=await runNalatiFieldTaming({prepare:withNalatiCompanions(prepareHeadlessRuntime),postBondCommands,
-    approach:{x:-6,z:0},checkpointAt:735,verifyBonded:(first,restored)=>{
+    approach:{x:-3,z:-3},checkpointAt:735,verifyBonded:(first,restored)=>{
     expect(first.phase).toBe('bonded');expect(first.upgraded).toBe(false);
     for(const flag of ['tamed:horse','talked:elder','won:kokpar','quest:tulpar','quest:golden-king','quest:father-wind'])expect(first.flags).not.toContain(flag);
     expect(first.quests.find(quest=>quest.id==='tulpar')).toMatchObject({started:false,complete:false,current:null});
