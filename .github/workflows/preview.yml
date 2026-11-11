@@ -1,0 +1,121 @@
+# SHELL-CUTOVER SC1 (meta docs/plans/multi-repo/SHELL-CUTOVER-PLAN.md; J172, J209, J210): preview.wildshard.io is the
+# solo build of engine's newest green main. Once an hour the newest green main `ci` run's commit builds the game with no world stamp
+# (the solo preview: no __WS_WORLD__, so the in-page server runs) and deploys it, prebuilt, as the production deployment
+# of the Vercel project that owns preview.wildshard.io (wildshard-singleplayer). Vercel builds nothing: GitHub does.
+# One run at a time; the deploy step then checks preview.wildshard.io serves this build.
+# Vercel spend (meta VERCEL-SPEND-PLAN): an hour whose newest green main changed no client input since the live preview's commit deploys
+# nothing; the deploy is --prebuilt (built here, on GitHub; the project is on the basic machine); superseded deployments
+# are pruned after (scripts/prune-deployments.mjs, repo-kit's shared copy).
+name: preview
+
+on:
+  # Hourly, not per push (Vercel spend: at most 24 deploys a day, and an hour whose newest green main changed no client
+  # input since the live preview deploys nothing)
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: A main commit whose ci run is green (default the newest green main)
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  actions: read # the newest green main ci run
+
+concurrency:
+  group: preview
+  cancel-in-progress: true
+
+env:
+  # The project that owns preview.wildshard.io. Ids are not secrets (API-SERVER-CD does the same); the token is.
+  PREVIEW_PROJECT_ID: prj_kpQ8mTayyeOpTmH1kLDTp11laeE7
+  VERCEL_CLI: vercel@59.11.2
+  WILDSHARD_CATALOGUE: test/pins/catalogue.json
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: The newest green main
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASKED: ${{ inputs.sha }}
+        run: |
+          sha="$ASKED"
+          [ -n "$sha" ] || sha=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha')
+          [ -n "$sha" ] || { echo "::error::no green main ci run"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"; echo "newest green main: $sha"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.pick.outputs.sha }}
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - name: Skip when the client is unchanged since the live preview
+        id: changed
+        run: |
+          live=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
+          # every input of the client build: the game's code, its shards (the pins), the build tooling and the lockfile
+          inputs=(src/client src/shared types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts vercel.json)
+          if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null && git diff --quiet "$live" HEAD -- "${inputs[@]}"; then
+            echo "preview.wildshard.io already serves $live, and no client input changed since: no deploy"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "live preview is '${live:-unknown}'; client inputs changed: deploy"
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changed.outputs.deploy == 'true'
+        uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - name: Build the solo game
+        if: steps.changed.outputs.deploy == 'true'
+        run: |
+          node scripts/pins.ts install
+          node scripts/gen.mjs --inputs-only
+          python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs
+          node scripts/check-devserver.mjs dist
+      - name: Prepare the prebuilt folder
+        if: steps.changed.outputs.deploy == 'true'
+        run: |
+          find dist/assets dist/b -maxdepth 2 -name '*.map' -print0 2>/dev/null | xargs -0 rm -f
+          # vercel.json's headers and redirects (?doctor) stay; the folder is already built
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('vercel.json','utf8')); c.buildCommand=''; c.framework=null; c.outputDirectory='.'; fs.writeFileSync('dist/vercel.json', JSON.stringify(c, null, 2))"
+          mkdir -p dist/.vercel
+          printf '{"projectId":"%s","orgId":"%s"}' "$PREVIEW_PROJECT_ID" "$VERCEL_ORG_ID" > dist/.vercel/project.json
+          node -p "'build ' + require('./dist/version.json').build"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      - name: Deploy to preview.wildshard.io, prebuilt
+        if: steps.changed.outputs.deploy == 'true'
+        working-directory: dist
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_PREVIEW_TOKEN }} # the long-lived raynos-projects token (CLI login tokens expire in 8 h)
+        run: |
+          npx --yes "$VERCEL_CLI" pull --yes --environment=production --scope raynos-projects --token "$VERCEL_TOKEN"
+          npx --yes "$VERCEL_CLI" build --prod --scope raynos-projects --token "$VERCEL_TOKEN"
+          npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --yes --scope raynos-projects --token "$VERCEL_TOKEN"
+      - name: preview.wildshard.io serves this build
+        if: steps.changed.outputs.deploy == 'true'
+        run: |
+          want=$(node -p "require('./dist/version.json').build")
+          for _ in $(seq 1 24); do
+            got=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).build)}catch{console.log('')}})" || true)
+            [ "$got" = "$want" ] && { echo "preview.wildshard.io serves $got"; exit 0; }
+            sleep 5
+          done
+          echo "::error::preview.wildshard.io serves '$got', not $want"; exit 1
+      # Every deployment is a full copy billed as storage, and Vercel's retention doesn't clear them (VERCEL-SPEND-PLAN).
+      # Keeps the live, the aliased and the newest five; a failure only warns.
+      - name: Prune superseded deployments
+        if: steps.changed.outputs.deploy == 'true' && !cancelled()
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_PREVIEW_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: node scripts/prune-deployments.mjs --project "$PREVIEW_PROJECT_ID"
