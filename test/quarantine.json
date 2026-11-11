@@ -2,19 +2,5 @@
   "schema": 1,
   "policy": "J193: execute and report; failures are non-blocking until deadline. Expired entries return to the blocking cohort.",
   "createdAt": "2026-11-08T11:13:28.000Z",
-  "entries": [
-    {
-      "file": "test/nalati-taming-verbs.test.ts",
-      "owner": "codex-pinefix2",
-      "addedAt": "2026-11-08T12:21:18.000Z",
-      "deadline": "2026-11-10T12:20:11.000Z",
-      "reason": "60-second file budget overrun: 89597 ms, assertion passed; ci 42479173262 shard 5 subsequently exceeded its job clock",
-      "extension": {
-        "reason": "First J200 decision at the scheduled06:00UTC review. Latest CI42764703480: 1 original cases passed, full module36.960s; streak1/10 after executed reset76.601s in CI42763893464. Preserve the entry walk, all five real field rounds, earned mid-round checkpoint and complete restored/post-bond suffix. Safe frame/layout reuse is unproved; no successor covers the whole continuation. One48h extension; no second.",
-        "grantedAt": "2026-11-10T06:02:19.000Z",
-        "decidedBy": "codex-pinefix2",
-        "deadline": "2026-11-12T12:20:11.000Z"
-      }
-    }
-  ]
+  "entries": []
 }
