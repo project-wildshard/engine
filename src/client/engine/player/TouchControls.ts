@@ -88,7 +88,6 @@ import { AimAssist } from './AimAssist';
 import { lockOn, meleeLock } from './AimTargets';
 import { FlickTracker, addLockOffset, type LockOnSystem } from './LockOnTarget';
 import { getSetting } from '../ui/Settings';
-import { paintSettingsButton } from '../ui/settingsLayout';
 import { hudSlots, type DiscSpot, type TouchRelabel } from '../ui/hudSlots';
 
 export const IS_TOUCH: boolean = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -415,7 +414,6 @@ export class TouchControls {
     btn('.surface', () => { this.player.touchSurface = true; }, () => { this.player.touchSurface = false; });
     root.classList.toggle('submerged', this.player.submerged);
     btn('.ws-touch-pause', () => { app.input.press('pause'); });
-    paintSettingsButton(); // QA 49: SETTINGS and a cog under a prototype layout
     btn('.ws-touch-use', () => { app.input.pressGesture('use'); });
     // the interact prompt ("[E] Open door") becomes a big USE band above the right-thumb arc, labelled with the action
     const use = el(root, '.ws-touch-use');

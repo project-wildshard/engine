@@ -27,7 +27,6 @@ import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { OPTION_VALUES, saveSetting, setting, settingsReloadUrl } from './Settings';
 import type { DebugRowSpec } from '../../../server/engine/level/context';
 import { isDev, onDev } from '../core/devMode';
-import { SETTINGS_LAYOUTS, layoutChoiceText, onSettingsLayout, setSettingsLayout, settingsLayout } from './settingsLayout';
 
 /** what "applies" reads: the shard you are in and the weapons you hold (re-read every time the menu opens) */
 export interface DebugCtx { chunk: LevelSpec; weapons: ReadonlySet<string> }
@@ -177,15 +176,6 @@ const failScreensRow = action('failScreens', 'tools', engineString('s_debug_fail
   document.dispatchEvent(new CustomEvent('ws:failscreen', { detail: 'gallery' }));
 }, { purpose: 'developer', ask: 'E133', reviewBy: '2026-12-30', note: engineString('s_debug_fail_screens_note') });
 
-/** QA 49 (Jake, 2026-11-10: "lots of variants, lots of in-game prototypes, tabbed"): the Settings layout prototypes, live */
-const settingsLayoutRow: DebugRow = { id: 'settingsLayout', group: 'tools', label: engineString('s_sv_row'), reload: false, when: always,
-  choices: () => SETTINGS_LAYOUTS.map((v) => ({ v, text: layoutChoiceText(v) })),
-  get: () => settingsLayout(),
-  set: (next) => { const layout = SETTINGS_LAYOUTS.find((v) => v === next); if (layout !== undefined) setSettingsLayout(layout); },
-  on: (fn) => { onSettingsLayout(fn); },
-  note: 'QA 49 (meta SETTINGS-REDESIGN-PLAN): Today = the shipped column; A-E = the tabbed prototypes. Live; saved on this device.',
-  ask: 'E162', reviewBy: '2026-12-30' };
-
 export const DEBUG_ROWS: readonly DebugRow[] = [
   // ── Look ──
 
@@ -202,7 +192,6 @@ export const DEBUG_ROWS: readonly DebugRow[] = [
   clearDownloadsRow,
 
   // ── Developer tools ──
-  settingsLayoutRow,
   weatherRow,
   failScreensRow,
 

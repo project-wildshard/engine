@@ -33,10 +33,10 @@ test('first settings open synchronously keeps early sections and omits removed r
   const {menu}=fixture(), first=document.createElement('div'), last=document.createElement('div'), removed=document.createElement('div');
   first.textContent='Early first';last.textContent='Early last';removed.textContent='Removed early';
   const refresh=vi.fn<()=>void>();
-  menu.addSettingsSection('save',[first],{first:true,refresh});
-  const removeLast=menu.addSettingsSection('save',[last]);
-  menu.addSettingsSection('save',[removed])();
-  expect(menu.root.querySelector('.ws-gmenu-pane')).toBeNull();expect(refresh).not.toHaveBeenCalled();
+  menu.addSettingsSection('saves.game',[first],{first:true,refresh});
+  const removeLast=menu.addSettingsSection('saves.game',[last]);
+  menu.addSettingsSection('saves.game',[removed])();
+  expect(menu.root.querySelector('.ws-gmenu-sv')).toBeNull();expect(refresh).not.toHaveBeenCalled();
   menu.open('settings');
   expect(document.querySelector('.ws-progress')).toBeNull();
   expect(first.isConnected).toBe(true);
@@ -58,7 +58,7 @@ test('closing never reopens the menu or changes the resumed app state',()=>{
 
 test('retiring removes the synchronously mounted settings pane',()=>{
   const {owner,menu}=fixture();menu.open('settings');
-  const pane=menu.root.querySelector('.ws-gmenu-pane');expect(pane?.isConnected).toBe(true);
+  const pane=menu.root.querySelector('.ws-gmenu-sv');expect(pane?.isConnected).toBe(true);
   owner.dispose();
   expect(menu.root.isConnected).toBe(false);
   expect(pane?.isConnected).toBe(false);

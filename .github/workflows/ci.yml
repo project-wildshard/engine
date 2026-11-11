@@ -245,6 +245,8 @@ jobs:
       - run: pnpm test:e2e
       # Jake 2026-11-10: the title's hero stays big and its build label short and clear of the logo
       - run: node --test test/title-layout-browser.proof.mjs
+      # J245 (Jake 2026-11-10, layout A): every Settings tab opens and every setting in it works, phone and desktop
+      - run: node --test test/settings-tabs-browser.proof.mjs
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

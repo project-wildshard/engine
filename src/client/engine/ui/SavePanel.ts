@@ -22,7 +22,9 @@ const button = (scope: Scope, text: string, run: () => void): HTMLButtonElement 
   const element = document.createElement('button'); element.type = 'button'; element.className = 'ws-gmenu-btn'; element.textContent = text;
   scope.listen(element, 'click', run); return element;
 };
-export function buildSavePanel(): HTMLDivElement & { refresh: () => void } {
+/** The progress file (export / import, the corrupt copies) for Settings ▸ Saves; `system` holds the rows Settings ▸ System
+ *  shows (J245): Check connection, the build, and Offline play when the game installed its download. */
+export function buildSavePanel(): HTMLDivElement & { refresh: () => void; system: readonly HTMLElement[] } {
   const scope = (app.levelScope ?? currentOwner() ?? app.engineScope).child('save-panel');
   const card = document.createElement('div'); card.className = 'ws-gmenu-card';
   const title = document.createElement('div'); title.className = 'ws-gmenu-cardtitle'; title.textContent = strings.title;
@@ -53,8 +55,7 @@ export function buildSavePanel(): HTMLDivElement & { refresh: () => void } {
   });
   card.append(title, note, row, picker, status, reload, aside);
   const offline = buildOfflineRow(scope);
-  if (offline !== null) { offline.dataset['sv'] = 'offline'; card.append(offline); }
-  const connection = buildConnectionRow(scope), build = buildBuildRow(scope); connection.dataset['sv'] = 'connection'; build.dataset['sv'] = 'build'; // QA 49
-  card.append(connection, build); // E7.5 prep: the Connection doctor, beside Offline play; R9: Build beside it
-  renderAside(); return Object.assign(card, { refresh: renderAside });
+  // E7.5 prep: the Connection doctor; R9: Build beside it; G727 / I9: Offline play
+  const system = [buildConnectionRow(scope), buildBuildRow(scope), ...(offline === null ? [] : [offline])];
+  renderAside(); return Object.assign(card, { refresh: renderAside, system });
 }

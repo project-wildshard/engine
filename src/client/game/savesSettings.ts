@@ -184,5 +184,5 @@ export function installSavesSettings(menu: GameMenu, opts: SavesSettingsOptions)
       return box;
     }));
   };
-  menu.addSettingsSection('save', [label, strip], { first: true, refresh: render });
+  menu.addSettingsSection('saves.game', [label, strip], { first: true, refresh: render });
 }

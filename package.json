@@ -572,6 +572,7 @@
     "./ui/hudAdapters": "./src/client/engine/ui/hudAdapters.ts",
     "./ui/hudSlots": "./src/client/engine/ui/hudSlots.ts",
     "./ui/icons": "./src/client/engine/ui/icons.ts",
+    "./ui/graphicsControls": "./src/client/engine/ui/graphicsControls.ts",
     "./ui/ItemCard": "./src/client/engine/ui/ItemCard.ts",
     "./ui/layers": "./src/client/engine/ui/layers.ts",
     "./ui/ownership": "./src/client/engine/ui/ownership.ts",

@@ -17,10 +17,8 @@ import { activeLevel } from '../../../shared/engine/level/selection';
 import type { FullMap } from './Map';
 import { icon, type IconId } from './icons';
 import { onReview, reviewUnlocked } from './review';
-import { SETTINGS_DESK_QUERY, settingsHint, type SettingsCat } from './settingsCats';
 import { buildMenuSettings, type MenuSettingsState, type SettingsCtx } from './menuSettings';
-import { mountSettingsTabs, type SettingsTabsView } from './settingsTabs';
-import { LAYOUT_EVENT, paintSettingsButton, settingsLayout } from './settingsLayout';
+import type { SettingsGroup } from './settingsTabs';
 import { withOwner } from '../../../shared/engine/app/ownership';
 
 type BuiltInTab = 'map' | 'settings' | 'feedback';
@@ -36,7 +34,8 @@ const TABS: { id: MenuTab; label: string; icon?: IconId }[] = [
 export type MenuGroup = 'pause' | 'play';
 const PAUSE_TABS: ReadonlySet<MenuTab> = new Set(['settings', 'feedback']);
 const groupOf = (tab: MenuTab): MenuGroup => (PAUSE_TABS.has(tab) ? 'pause' : 'play');
-const TITLE: Record<MenuGroup, string> = { pause: engineString('s_e159b06187d3'), play: engineString('s_b053c961f2ac') };
+/** J245: the engine's menu is SETTINGS (it was PAUSED); the Bag's title is the game's */
+const TITLE: Record<MenuGroup, string> = { pause: engineString('s_74a883a037bc'), play: engineString('s_b053c961f2ac') };
 /** the menu's keys (Esc is handled apart: it pauses, and closes whatever tab is open) */
 
 /** what a Settings row's "applies when" reads: the weapons you hold now and the shard */
@@ -68,7 +67,7 @@ const tabButton = (label: string, ic?: IconId): HTMLButtonElement => {
 };
 
 export class GameMenu {
-  private readonly settingsView: MenuSettingsState = {cats:undefined,settingsCard:undefined,gated:[],debug:null,
+  private readonly settingsView: MenuSettingsState = {tabs:undefined,gated:[],debug:null,
     developerTools:null,paintPendingReload:()=>undefined,savePanel:null,controlsPanel:undefined};
   readonly scope: ReturnType<typeof uiScope> = uiScope('GameMenu');
   readonly root: HTMLElement;
@@ -104,9 +103,6 @@ export class GameMenu {
   /** pause ▸ Settings's categories: a rail + one pane on a desktop (J10 layout A), one column on a phone */
   /** the Settings card (its title, then every section) and the sections the game added to it (`addSettingsSection`) */
   private readonly sectionRefresh = new Set<() => void>();
-  /** QA 49: the tabbed Settings prototype picked in Debug (settingsLayout.ts), null for today's column */
-  private layoutView: SettingsTabsView | null = null;
-  private wideLayout = false;
 
   private opts: GameMenuOptions;
   constructor(opts: GameMenuOptions) {
@@ -129,7 +125,7 @@ export class GameMenu {
     }
     this.sheet.append(this.tabBar);
     const body = el('ws-gmenu-body');
-    this.panels = { map: el('ws-gmenu-panel map'), settings: el('ws-gmenu-panel scroll'), feedback: el('ws-gmenu-panel scroll') };
+    this.panels = { map: el('ws-gmenu-panel map'), settings: el('ws-gmenu-panel ws-gmenu-svpanel'), feedback: el('ws-gmenu-panel scroll') };
     for (const p of Object.values(this.panels)) { if (p === undefined) continue; if (p.classList.contains('scroll')) p.dataset['scroll'] = ''; body.append(p); } // index.html swallows touchmove outside [data-scroll]
     this.sheet.append(body);
     this.hint = el('ws-gmenu-hint');
@@ -187,9 +183,6 @@ export class GameMenu {
     this.select('settings');
     this.syncReview(); onReview(() => this.syncReview());
     installKeyHelp(this.scope); // F1 or / during play: the live key bindings (E419), on every level
-    // QA 49: a Settings layout picked in Debug re-lays the built Settings live and renames PAUSE
-    this.scope.listen(document, LAYOUT_EVENT, () => { if (this.settingsView.cats !== undefined) { this.mountLayout(); this.applies(); } this.syncTabs(); });
-    paintSettingsButton();
   }
 
   /** the FEEDBACK tab exists only while the review inbox is unlocked */
@@ -214,14 +207,14 @@ export class GameMenu {
     this.tabBar.classList.toggle('four', shown === 4); // a BAG without FINDS (Nalati, Nine Dragon): ACHIEVEMENTS must fit a phone
     this.tabBar.hidden = shown <= 1;
     this.tabBar.classList.toggle('icons', group === 'play');
-    this.title.textContent = this.practice && group === 'pause' ? engineString('s_d3857b12b4ce') : group === 'pause' && settingsLayout() !== 'today' ? engineString('s_74a883a037bc') : TITLE[group];
+    this.title.textContent = this.practice && group === 'pause' ? engineString('s_d3857b12b4ce') : TITLE[group];
     // E178: the PAUSE menu leaves to the title from its header; the BAG only closes
     const pause = group === 'pause';
     this.closeBtn.textContent = pause ? engineString('s_d640c7421da0') : engineString('s_7d9eb7acb13e');
     this.exitBtn.hidden = !pause;
     // E176: the build pill shows over the PAUSE menu (not the BAG), so the root says which one is up
     this.root.classList.toggle('pause', pause);
-    this.root.classList.toggle('ws-gmenu-svmenu', pause && settingsLayout() !== 'today'); // QA 49: SETTINGS is wider than PAUSED
+    this.root.classList.toggle('ws-gmenu-svmenu', pause); // J245: SETTINGS is wider than PAUSED was
     window.dispatchEvent(new Event('ws-menu'));
   }
 
@@ -308,7 +301,7 @@ export class GameMenu {
     for (const b of this.tabBar.children) (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['tab'] === tab);
     for (const [id, p] of Object.entries(this.panels)) p?.classList.toggle('active', id === tab);
     this.hint.textContent = this.hintFor(tab);
-    this.syncTabs(); this.syncCats();
+    this.syncTabs();
     if (this._open) { if (tab === 'map') { this.opts.fullMap.show(); this.syncZoom(); this.renderQuest(); } else this.opts.fullMap.hide(); }
     if (tab === 'settings') {
       if (this.openScope !== null) this.prepareSettings();
@@ -374,44 +367,30 @@ export class GameMenu {
   }
 
   // ── SETTINGS ──
-  /** builds the Settings tab: only what applies live (E55) — renderer, quality, render scale, AA and touch controls
-   *  are read at boot and live in main menu ▸ Settings (src/client/engine/ui/BootSettings.ts, APPLY & RELOAD). Two cards (E81, the user's
-   *  split): SETTINGS holds what ships with the finished game; DEBUG holds the variant pickers and taste toggles that
-   *  exist only while the look and sound are being decided — each leaves that card once it is locked in (E78 the
-   *  painted horizon, E83 the photo sky, E85 the colour grade, E87 the lighting, E88 the post) */
+  /** builds Settings (J245, layout A: menuSettings.ts and settingsTabs.ts): the Bag's tab bar over GRAPHICS · SOUND ·
+   *  CONTROLS · SAVES · SYSTEM, and DEV in Developer mode. Graphics now holds the boot-time picks too (they apply on reload) */
   private readonly pendingSettings = new Set<() => void>();
   private buildSettings(): void {
     if (this.scope.disposed) return;
-    withOwner(this.scope, () => buildMenuSettings({scope:this.scope,panel:this.panels.settings,hint:this.hint,
-      syncCats:()=>{this.syncCats();},tab:()=>this._tab},this.settingsView));
+    withOwner(this.scope, () => buildMenuSettings({scope:this.scope,panel:this.panels.settings,hint:this.hint,tab:()=>this._tab},this.settingsView));
     for (const install of this.pendingSettings) install();
-    this.mountLayout();
-    this.syncCats();this.applies();
-  }
-  /** QA 49: (re)mount the picked tabbed layout over the built rows; 'today' leaves the shipped column */
-  private mountLayout(): void {
-    this.layoutView?.dispose(); this.layoutView = null; this.wideLayout = false;
-    const layout = settingsLayout();
-    if (layout === 'today' || this.settingsView.cats === undefined) { this.syncCats(); return; }
-    this.layoutView = mountSettingsTabs({ scope: this.scope, panel: this.panels.settings, desk: () => window.matchMedia(SETTINGS_DESK_QUERY).matches,
-      wide: (on) => { if (on !== this.wideLayout) { this.wideLayout = on; this.syncCats(); } },
-      applyPending: () => { this.settingsView.debug?.applyPending(); this.settingsView.developerTools?.applyPending(); } }, layout);
+    this.applies();
   }
   private prepareSettings(): void {
-    if (this.settingsView.cats !== undefined) return;
+    if (this.settingsView.tabs !== undefined) return;
     this.buildSettings();
   }
-  /** A section the game adds to pause ▸ Settings: its label and rows join the Settings card under category `cat` (on a
-   *  desktop they show with that category; on a phone in the one column). `first` puts them right under the card's title
-   *  (SAVES, G83); `refresh` runs on every open, before the rows are shown. Returns the disposer; the menu's scope disposes it too. */
-  addSettingsSection(cat: SettingsCat, els: readonly HTMLElement[], opts: { first?: boolean; refresh?: () => void } = {}): () => void {
-    const card = this.settingsView.settingsCard, cats = this.settingsView.cats;
-    if (card === undefined || cats === undefined) {
+  /** A section the game adds to Settings: its rows join `group` of a tab (settingsTabs.ts GROUPS; the game's shard cards
+   *  are 'saves.game', G83). `first` puts them at the top of the group; `refresh` runs on every open, before the rows are
+   *  shown. Graphics controls register through graphicsControls.ts instead. Returns the disposer; the menu's scope disposes it too. */
+  addSettingsSection(group: SettingsGroup, els: readonly HTMLElement[], opts: { first?: boolean; refresh?: () => void } = {}): () => void {
+    const tabs = this.settingsView.tabs;
+    if (tabs === undefined) {
       let release = (): void => undefined, forget = (): void => undefined;
       let live = true;
       const install = (): void => {
         this.pendingSettings.delete(install); forget();
-        if (live) release = this.addSettingsSection(cat, els, opts);
+        if (live) release = this.addSettingsSection(group, els, opts);
       };
       this.pendingSettings.add(install);
       const remove = (): void => {
@@ -420,8 +399,7 @@ export class GameMenu {
       forget=this.scope.capture('disposers',remove);
       return remove;
     }
-    if (opts.first === true) card.firstElementChild?.after(...els); else card.append(...els);
-    cats.tag(cat, ...els);
+    tabs.put(group, els, opts.first === true);
     const refresh = opts.refresh;
     if (refresh !== undefined) this.sectionRefresh.add(refresh);
     let live = true;
@@ -430,17 +408,11 @@ export class GameMenu {
       if (!live) return; live = false; forget(); // SF57: an early remove drops the menu's hold on `refresh` too
       for (const e of els) { e.hidden = true; e.remove(); }
       if (refresh !== undefined) this.sectionRefresh.delete(refresh);
-      cats.sync();
+      tabs.sync();
     };
     forget = this.scope.capture('disposers', remove);
-    if (this._open) this.applies(); else cats.sync();
+    if (this._open) this.applies(); else tabs.sync();
     return remove;
-  }
-  /** layout A on a desktop: the sheet goes wide for Settings, and the footer says click (J10) */
-  private syncCats(): void {
-    const wide = (this.layoutView === null ? this.settingsView.cats?.desk === true : this.wideLayout) && this._tab === 'settings';
-    this.root.classList.toggle('wide', wide);
-    this.hint.textContent = wide ? settingsHint() : this.hintFor(this._tab);
   }
   /** show only the Settings rows that apply now (E130: the weapons you hold, the shard) — every open and every Settings select */
   private applies(): void {
@@ -449,10 +421,9 @@ export class GameMenu {
     for (const refresh of this.sectionRefresh) refresh();
     const c: SettingsCtx = { ...this.opts.settings(), chunk: activeLevel() };
     for (const g of this.settingsView.gated) g.el.hidden = !g.when(c);
-    this.settingsView.cats?.sync();
     this.settingsView.debug?.applies(c);
     this.settingsView.developerTools?.applies(c);
-    this.layoutView?.sync();
+    this.settingsView.tabs?.sync();
   }
   /** Settings → REVIEW: a password unlocks the review inbox (src/client/engine/ui/review.ts); unlocked, the Quick note switch + LOCK */
 
