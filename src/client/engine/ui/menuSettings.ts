@@ -17,6 +17,7 @@ import { buildDebugMenu, type DebugMenu } from './DebugMenu';
 import { buildMusicStyleRow } from './musicStyleRow';
 import { buildSettingsTabs, touchRows, type SettingsGroup, type SettingsTabsView } from './settingsTabs';
 import type { GraphicsControl } from './graphicsControls';
+import { voiceSettingsRows } from './voiceSettings';
 
 export interface SettingsCtx { weapons: ReadonlySet<string>; melee: boolean; tracers: boolean; huntersEye: boolean; chunk: LevelSpec }
 /** a gated row's test: what you hold (no row reads the shard, so the title can ask it too) */
@@ -92,6 +93,11 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     paintCredit(); onSfxCredit(paintCredit);
     put('sound.volume', slider('volume', engineString('s_31a1802e19b8'), false), slider('music', engineString('s_4db5c63706fd'), false));
     put('sound.music', buildMusicStyleRow(host.scope), el('ws-gmenu-note', MUSIC_CREDIT), sfxNote);
+    // VOICE-POLISH V10: Voice, only in a build of the online world (single player has no voice); re-read on every tap into Sound
+    if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined) {
+      const voice = voiceSettingsRows(host.scope); put('sound.voice', ...voice.rows);
+      host.scope.listen(tabs.root, 'pointerup', () => { if (tabs.selected === 'sound') queueMicrotask(voice.refresh); }, { capture: true });
+    }
 
     // ── CONTROLS: the camera, lock-on (E50: Gentle = Jake's pick; Off keeps the lock but never turns the view), the aim aids
     //    that apply to what you hold (the bow's drop arc, the bolts' tracers), touch, and a desktop's key bindings ──

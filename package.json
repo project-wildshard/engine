@@ -576,6 +576,7 @@
     "./ui/ReloadPrompt": "./src/client/engine/ui/ReloadPrompt.ts",
     "./ui/RotateGate": "./src/client/engine/ui/RotateGate.ts",
     "./ui/Settings": "./src/client/engine/ui/Settings.ts",
+    "./ui/voiceSettings": "./src/client/engine/ui/voiceSettings.ts",
     "./ui/SpeedLines": "./src/client/engine/ui/SpeedLines.ts",
     "./ui/WeaponStrip": "./src/client/engine/ui/WeaponStrip.ts",
     "./ui/WindupWarn": "./src/client/engine/ui/WindupWarn.ts",

@@ -471,6 +471,7 @@
     "src/client/engine/ui/SavePanel.ts": "client",
     "src/client/engine/ui/saveStrings.ts": "client",
     "src/client/engine/ui/Settings.ts": "client",
+    "src/client/engine/ui/voiceSettings.ts": "client",
     "src/client/engine/ui/graphicsControls.ts": "client",
     "src/client/engine/ui/settingsTabs.ts": "client",
     "src/client/engine/ui/SpeedLines.ts": "client",

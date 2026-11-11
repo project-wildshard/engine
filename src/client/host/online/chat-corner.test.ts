@@ -6,6 +6,7 @@ import { CHAT_FADE_MS, CHAT_FRESH_MS, cornerOpen, lineLook } from './chatCorner'
 import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
+import { voiceSettings } from '@wildshard/engine/ui/voiceSettings';
 
 interface Said { line: number; from: number; name: string; text: string }
 const owners: Scope[] = [];
@@ -19,7 +20,7 @@ function corner(peers: readonly VoicePeer[] = []): { box: HTMLElement; field: HT
   const client = { welcome: { handle: 1 }, onChat: (fn: (said: Said) => void) => { heard.push(fn); return () => undefined; },
     say: (_to: string, text: string) => { sent.push(text); }, report: (line: number) => { reported.push(line); } } as unknown as NetClient;
   const roster = new Map(peers.map(peer => [peer.id, peer]));
-  const voice = { state: 'on', speaking: false, level: 0, roster, onChange: () => () => undefined, toggle: () => undefined,
+  const voice = { state: 'on', speaking: false, level: 0, roster, mode: 'toggle', sending: true, onChange: () => () => undefined, toggle: () => undefined, press: () => undefined, release: () => undefined,
     mute: (id: string, on: boolean) => { muted.push([id, on]); } } as unknown as VoiceChat;
   const chat = chatLines(scope, client);
   voiceUi(scope, voice, chat);
@@ -131,7 +132,7 @@ function voiceCorner(state: 'off' | 'on' | 'denied' | 'unsupported'): { box: HTM
   const changes = new Set<() => void>();
   const voice = { state: state as string, toggles: 0, speaking: false, level: 0, roster: new Map<string, VoicePeer>(), onChange: (fn: () => void) => { changes.add(fn); return () => { changes.delete(fn); }; },
     toggle() { this.toggles++; this.state = this.state === 'on' ? 'off' : this.state === 'denied' || this.state === 'off' ? (state === 'denied' ? 'denied' : 'on') : this.state; for (const fn of changes) fn(); },
-    mute: () => undefined };
+    mode: 'toggle', get sending() { return this.state === 'on'; }, press() { this.toggle(); }, release: () => undefined, mute: () => undefined };
   const chat = chatLines(scope, client);
   voiceUi(scope, voice as unknown as VoiceChat, chat);
   const tip = (): string | null => { const el = chat.box.querySelector<HTMLElement>('#ws-voice-tip'); return el === null || el.hidden === true ? null : el.querySelector('span')?.textContent ?? null; };
@@ -216,6 +217,37 @@ test('QA row 6: the real voice through asking, joining and on; B off says so, an
     expect(button?.dataset['state']).toBe('full');
     expect(tip()).toBe('Voice is full here: 8 players are on it already.');
   } finally { vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
+});
+
+test('VOICE-POLISH V11: in hold mode B joins voice and opens the mic only while held; the mic button still leaves', async () => {
+  const scope = new Scope('voice-hold-test'); owners.push(scope);
+  const hear = new Set<(word: VoiceHeard) => void>(), sent: object[] = [];
+  const say = (word: VoiceHeard): void => { for (const fn of hear) fn(word); };
+  vi.stubGlobal('RTCPeerConnection', (): void => undefined);
+  const track = { enabled: true, kind: 'audio', stop: () => undefined }, stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: () => Promise.resolve(stream) } });
+  voiceSettings.write({ mode: 'hold' });
+  try {
+    const client = { welcome: { handle: 1 }, onChat: () => () => undefined, say: () => undefined, report: () => undefined } as unknown as NetClient;
+    const voice = new VoiceChat(scope, { send: word => { sent.push(word); }, on: fn => { hear.add(fn); return () => { hear.delete(fn); }; } }, '');
+    const chat = chatLines(scope, client);
+    voiceUi(scope, voice, chat);
+    const button = chat.box.querySelector<HTMLElement>('#ws-voice');
+    const key = (type: 'keydown' | 'keyup'): void => { document.body.dispatchEvent(new KeyboardEvent(type, { code: 'KeyB', key: 'b', bubbles: true })); };
+    say({ k: 'you', id: 'me' });
+    key('keydown');
+    await vi.waitFor(() => { expect(sent).toContainEqual({ k: 'join' }); });
+    say({ k: 'hi', ice: [], peers: [] });
+    expect(button?.dataset['state']).toBe('on');
+    expect(track.enabled).toBe(true); expect(voice.sending).toBe(true); expect(button?.dataset['ptt']).toBe('held');
+    key('keyup');
+    expect(track.enabled).toBe(false); expect(voice.sending).toBe(false); expect(button?.dataset['ptt']).toBe('idle');
+    expect(button?.dataset['state']).toBe('on'); // still on voice, hearing everyone
+    key('keydown'); expect(track.enabled).toBe(true);
+    window.dispatchEvent(new Event('blur')); expect(track.enabled).toBe(false); // a key let go in another window still closes the mic
+    voiceSettings.write({ mode: 'toggle' }); expect(track.enabled).toBe(true); // toggle mode: on is open
+    button?.click(); expect(button?.dataset['state']).toBe('off');
+  } finally { voiceSettings.write({ mode: 'toggle' }); vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
 });
 
 test('Jake, 2026-11-10: a keyboard page puts the chat bottom left too, over what stands there; the touch HUD keeps its place', () => {

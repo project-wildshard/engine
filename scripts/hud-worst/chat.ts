@@ -22,7 +22,7 @@ function mount(lines: readonly (readonly [string, string])[], state: VoiceChat['
   const voice = {
     state, speaking: true, level: 0.6, roster,
     onChange: (): (() => void) => () => undefined,
-    toggle: (): void => undefined, mute: (): void => undefined,
+    toggle: (): void => undefined, mute: (): void => undefined, press: (): void => undefined, release: (): void => undefined, mode: 'toggle', sending: state === 'on',
   } as unknown as VoiceChat;
   const chat = chatLines(scope, client);
   voiceUi(scope, voice, chat);

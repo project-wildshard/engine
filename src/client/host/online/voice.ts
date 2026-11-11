@@ -5,12 +5,15 @@ import { listenPage } from '@wildshard/engine/input/dom';
 import * as v from 'valibot';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { talkerKey, voiceNear } from '@wildshard/engine/net/voiceNear';
+import { voiceSettings, type VoiceMode } from '@wildshard/engine/ui/voiceSettings';
 
 // J218: voice chat, peer to peer. The server's main thread only says who in this cell is on voice and carries signalling
 // (`src/server/host/dedicated/voiceRelay.ts`); audio goes straight between players, or through TURN. Whoever joins offers to
 // everyone already on, so two offers never cross. Off by default: nothing touches the microphone until the player asks.
 // VOICE-POLISH V7: a voice fades with the distance to its player's body and is silent from 40 m (`voiceNear.ts`); the links stay up,
 // so walking back in range is heard at once. iOS Safari ignores a media element's volume, so an iPhone hears full or nothing.
+// VOICE-POLISH V10, V11: Settings ▸ Sound ▸ Voice picks the microphone (swapped in mid-call), the volume, and the talk key's mode.
+// In `hold` mode the player stays on voice, hearing everyone, and the mic's track is enabled only while the key is held.
 
 /** What the server says on the `voice` control. */
 export type VoiceHeard =
@@ -61,6 +64,15 @@ async function fetchIce(url: string): Promise<RTCIceServer[] | null> {
   } catch { return null; }
 }
 const MIC: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+/** The mic Settings picked, or the browser's default when that one is gone (unplugged, or another browser profile's id). */
+async function openMic(input: string): Promise<MediaStream> {
+  if (input === '') return navigator.mediaDevices.getUserMedia({ audio: MIC, video: false });
+  try { return await navigator.mediaDevices.getUserMedia({ audio: { ...MIC, deviceId: { exact: input } }, video: false }); }
+  catch (error) {
+    if (error instanceof DOMException && (error.name === 'OverconstrainedError' || error.name === 'NotFoundError')) return navigator.mediaDevices.getUserMedia({ audio: MIC, video: false });
+    throw error;
+  }
+}
 
 /** `early` holds candidates heard before the remote description; `held`, our own found before our description went out. */
 interface Link { readonly pc: RTCPeerConnection; readonly offerer: boolean; readonly audio: HTMLAudioElement; readonly early: RTCIceCandidateInit[]; readonly held: RTCIceCandidateInit[]; readonly openedAt: number; described: boolean; everLinked: boolean; heardAt: number; retries: number }
@@ -105,8 +117,15 @@ export class VoiceChat {
   private turn: { readonly at: number; readonly servers: Promise<RTCIceServer[] | null> } | null = null;
   private turned: RTCIceServer[] | null = null;
   private readonly iceUrl: string;
+  /** V11: the talk key is down (hold mode opens the mic only while it is). */
+  private held = false;
+  private input = voiceSettings.read().input;
   constructor(scope: Scope, link: VoiceLink, iceUrl: string = VOICE_ICE_URL) {
     this.link = link; this.iceUrl = iceUrl;
+    scope.onDispose(voiceSettings.on(now => {
+      if (now.input !== this.input) { this.input = now.input; void this.switchInput(); }
+      this.openTrack(); this.changed();
+    }));
     if (typeof RTCPeerConnection !== 'function' || typeof navigator.mediaDevices?.getUserMedia !== 'function') this.state = 'unsupported';
     scope.onDispose(link.on(word => { this.heard(word); }));
     scope.interval(LEVEL_POLL_MS, () => { void this.poll(); });
@@ -131,7 +150,7 @@ export class VoiceChat {
     const turn = this.ask();
     let mic: MediaStream;
     try {
-      mic = this.mic ?? await navigator.mediaDevices.getUserMedia({ audio: MIC, video: false });
+      mic = this.mic ?? await openMic(this.input);
     } catch (error) {
       void context?.close().catch(() => undefined);
       if (session !== this.session) return;
@@ -141,7 +160,7 @@ export class VoiceChat {
     }
     // Stopped, or started again, while the browser asked: this answer is nobody's.
     if (session !== this.session || !this.wanted) { void context?.close().catch(() => undefined); if (mic !== this.mic) for (const track of mic.getTracks()) track.stop(); return; }
-    this.mic = mic;
+    this.mic = mic; this.openTrack();
     if (context !== null) this.listenToSelf(context);
     this.set('joining');
     // The TURN list is in hand before joining, so nobody's offer can arrive while this page still waits for it.
@@ -166,6 +185,41 @@ export class VoiceChat {
     this.set(this.state === 'unsupported' ? 'unsupported' : 'off');
   }
   toggle(): void { if (this.state === 'on' || this.state === 'joining' || this.state === 'asking') this.stop(); else void this.start(); }
+  /** The talk key's mode, from Settings ▸ Sound ▸ Voice. */
+  get mode(): VoiceMode { return voiceSettings.read().mode; }
+  /** Whether this player's voice goes out now: on voice, and in hold mode only while the key is held. */
+  get sending(): boolean { return this.state === 'on' && (this.mode === 'toggle' || this.held); }
+  /** V11: the talk key went down. Toggle mode turns voice on or off; hold mode joins if need be and opens the mic while held. */
+  press(): void {
+    if (this.mode === 'toggle') { this.toggle(); return; }
+    this.held = true; this.openTrack();
+    if (this.state !== 'on' && this.state !== 'joining' && this.state !== 'asking') void this.start();
+    this.changed();
+  }
+  /** The talk key came up (or the page lost focus with it down): hold mode closes the mic and stays on voice. */
+  release(): void {
+    if (!this.held) return;
+    this.held = false; this.openTrack(); this.changed();
+  }
+  /** The mic's track carries sound only while the player's voice should go out; a disabled track sends silence. */
+  private openTrack(): void {
+    const open = this.mode === 'toggle' || this.held;
+    for (const track of this.mic?.getAudioTracks() ?? []) track.enabled = open;
+  }
+  /** V10: a new microphone, mid-call: every link's sender swaps to it, and the old one is given back. */
+  private async switchInput(): Promise<void> {
+    const old = this.mic, session = this.session;
+    if (old === null) return;
+    let next: MediaStream;
+    try { next = await openMic(this.input); } catch { return; }
+    if (session !== this.session || this.mic !== old) { for (const track of next.getTracks()) track.stop(); return; }
+    const track = next.getAudioTracks()[0] ?? null;
+    this.mic = next; this.openTrack();
+    for (const { pc } of this.links.values()) for (const sender of pc.getSenders()) if (sender.track?.kind === 'audio' || sender.track === null) await sender.replaceTrack(track).catch(() => undefined);
+    for (const gone of old.getTracks()) gone.stop();
+    const context = this.analyser?.context ?? null;
+    if (context !== null) { this.analyser = null; this.listenToSelf(context); }
+  }
   /** Silence one player, for this player only. */
   mute(id: string, muted: boolean): void {
     if (muted) this.muted.add(id); else this.muted.delete(id);
@@ -319,7 +373,7 @@ export class VoiceChat {
     const gain = voiceNear.gain(talker(peer));
     peer.far = gain === 0;
     link.audio.muted = peer.muted || peer.far;
-    link.audio.volume = Math.min(1, Math.max(0, gain));
+    link.audio.volume = Math.min(1, Math.max(0, gain * voiceSettings.read().volume));
     return gain;
   }
   /** V8: the Names heard talking, for the ring over their heads. */

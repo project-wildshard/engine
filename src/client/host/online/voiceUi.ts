@@ -3,6 +3,7 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import type { ChatBox } from './chatLines';
 import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './voice';
+import { voiceTalkKey, voiceTalkKeys } from '@wildshard/engine/ui/voiceSettings';
 
 // J218: voice's controls live in the chat row, so the one mic button is both the phone's HUD toggle and the prompt "near the
 // chat". On a keyboard `B` toggles it (no binding uses B: `src/client/game/inputContexts.ts`). Over the row, one tip says
@@ -14,6 +15,8 @@ import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './v
 // under an open menu does nothing, because the mic it would open is hidden there (QA row 15).
 // Only online worlds say anything: a single-player page has no voice and B there stays silent (Jake, 2026-11-10: "we
 // don't have to show a banner in single player about there being no voice chat … Just don't do that").
+// VOICE-POLISH V10, V11: the key is the `voice.talk` binding (B unless rebound in Controls ▸ Key bindings, a mouse side button
+// too), and in Settings' hold mode it opens the mic only while held: the button stays the tap toggle for joining and leaving.
 
 const CYAN = '#8fe3ff', NAVY = 'rgba(9,22,36,.86)', RED = '#ff7a7a', AMBER = '#ffc56b';
 /** The first-time tip, the "you're on, alone" tip and the "voice off" tip go after this long. */
@@ -23,9 +26,10 @@ const CSS = `
 #ws-voice svg{width:20px;height:20px}
 #ws-voice[data-state=asking],#ws-voice[data-state=joining]{color:${CYAN};border-color:${CYAN};animation:ws-voice-pulse 1s ease-in-out infinite}
 #ws-voice[data-state=on]{color:#04121d;background:${CYAN};border-color:${CYAN}}
+#ws-voice[data-state=on][data-ptt=idle]{color:${CYAN};background:${NAVY}}
 #ws-voice[data-state=denied],#ws-voice[data-state=failed]{color:${RED};border-color:${RED}}
 #ws-voice[data-state=full]{color:${AMBER};border-color:${AMBER}}
-#ws-voice .ws-voice-key{position:absolute;right:-5px;bottom:-5px;min-width:14px;height:14px;border-radius:3px;background:#0b1a2a;border:1px solid rgba(143,227,255,.6);color:${CYAN};font:700 9px/13px system-ui,sans-serif;text-align:center}
+#ws-voice .ws-voice-key{position:absolute;right:-5px;bottom:-5px;min-width:14px;padding:0 2px;white-space:nowrap;height:14px;border-radius:3px;background:#0b1a2a;border:1px solid rgba(143,227,255,.6);color:${CYAN};font:700 9px/13px system-ui,sans-serif;text-align:center}
 @keyframes ws-voice-pulse{50%{box-shadow:0 0 0 5px rgba(143,227,255,.25)}}
 #ws-voice-tip{display:flex;gap:8px;align-items:center;align-self:flex-start;max-width:100%;padding:5px 6px 5px 9px;border-radius:8px;background:rgba(6,16,28,.9);border:1px solid rgba(143,227,255,.35);color:#dff6ff;font:600 12px/1.3 system-ui,sans-serif;pointer-events:auto}
 #ws-voice-tip[data-tone=bad]{border-color:rgba(255,122,122,.6)}
@@ -55,12 +59,14 @@ function deniedHelp(): string {
   const agent = navigator.userAgent;
   if (/iPhone|iPad|iPod/u.test(agent) || (/Macintosh/u.test(agent) && touchFirst())) return 'Microphone blocked. Tap aA in the address bar, Website Settings, Microphone: Allow. Then tap the mic again.';
   if (/Android/u.test(agent)) return 'Microphone blocked. Tap the icon left of the address, Permissions, Microphone: Allow. Then tap the mic again.';
-  return 'Microphone blocked. Click the icon left of the address, allow the Microphone, then press B again.';
+  return `Microphone blocked. Click the icon left of the address, allow the Microphone, then press ${voiceTalkKey()} again.`;
 }
-/** A press of B that is meant for voice: not typed into a field, not held, not a shortcut, and not under an open menu. */
+/** Whether a key is the talk key: its code, or a sided key bound either side (`Shift` for `ShiftLeft`). */
+const isTalkKey = (code: string): boolean => { const keys = voiceTalkKeys(); return keys.includes(code) || keys.includes(code.replace(/(?:Left|Right)$/u, '')); };
+/** A press of the talk key that is meant for voice: not typed into a field, not a repeat, not a shortcut, and not under an open menu. */
 function voiceKey(event: KeyboardEvent): boolean {
   const target = event.target as HTMLElement | null;
-  if (event.code !== 'KeyB' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return false;
+  if (!isTalkKey(event.code) || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return false;
   if (target !== null && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/u.test(target.tagName))) return false;
   return document.documentElement.dataset['wsMenu'] === undefined;
 }
@@ -86,13 +92,20 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
   const heading = document.createElement('div');
   heading.dataset['title'] = ''; heading.textContent = 'On voice · tap to mute'; peers.append(heading);
   chat.form.append(button); chat.box.append(tip, peers);
-  const touch = touchFirst(), act = touch ? 'Tap the mic' : 'Press B';
+  const touch = touchFirst(), act = (): string => touch ? 'Tap the mic' : `${voice.mode === 'hold' ? 'Hold' : 'Press'} ${voiceTalkKey()}`;
   let dismissed = '', firstUntil = voicePrefs.read().seen ? 0 : diagnosticNow() + FIRST_TIP_MS, aloneUntil = 0, offUntil = 0, was: VoiceState = voice.state;
   const seen = (): void => { voicePrefs.write({ seen: true }); firstUntil = 0; };
   // A press is a fresh question: whatever it leads to shows, even a tip the player closed before (a second "blocked").
   const pressed = (): void => { seen(); dismissed = ''; voice.toggle(); };
   scope.listen(button, 'click', event => { event.preventDefault(); pressed(); button.blur(); });
-  listenPage(scope, 'keydown', event => { if (voiceKey(event)) pressed(); }, { capture: true });
+  // V11: the key presses (toggle mode: on or off; hold mode: open while held), and its release closes a held mic wherever focus is
+  const press = (): void => { seen(); dismissed = ''; voice.press(); };
+  listenPage(scope, 'keydown', event => { if (voiceKey(event)) press(); }, { capture: true });
+  listenPage(scope, 'keyup', event => { if (isTalkKey(event.code)) voice.release(); }, { capture: true });
+  listenPage(scope, 'pointerdown', event => { if (event instanceof PointerEvent && event.pointerType === 'mouse' && isTalkKey(`Mouse${String(event.button)}`) && document.documentElement.dataset['wsMenu'] === undefined) press(); }, { capture: true });
+  listenPage(scope, 'pointerup', event => { if (event instanceof PointerEvent && event.pointerType === 'mouse' && isTalkKey(`Mouse${String(event.button)}`)) voice.release(); }, { capture: true });
+  scope.listen(window, 'blur', () => { voice.release(); });
+  scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') voice.release(); });
 
   const tipFor = (): { key: string; text: string; tone: 'ok' | 'bad' } | null => {
     const others = [...voice.roster.values()], now = diagnosticNow();
@@ -102,14 +115,14 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
     if (state === 'denied') return { key: 'denied', text: deniedHelp(), tone: 'bad' };
     if (state === 'failed') return { key: 'failed', text: 'No microphone was found. Check it is plugged in and allowed.', tone: 'bad' };
     if (state === 'full') return { key: 'full', text: 'Voice is full here: 8 players are on it already.', tone: 'bad' };
-    if (state === 'on') return others.length === 0 && now < aloneUntil ? { key: 'alone', text: 'You\'re on voice. Players here hear you once they join.', tone: 'ok' } : null;
+    if (state === 'on') return others.length === 0 && now < aloneUntil ? { key: 'alone', text: voice.mode === 'hold' && !touch ? `You're on voice. Hold ${voiceTalkKey()} to talk.` : 'You\'re on voice. Players here hear you once they join.', tone: 'ok' } : null;
     if (state !== 'off') return null;
-    if (now < offUntil) return { key: 'off', text: `Voice off. ${act} to talk again.`, tone: 'ok' };
-    if (others.length > 0) return { key: `join:${others.map(peer => peer.id).join(',')}`, text: `${names(others)} on voice. ${act} to join.`, tone: 'ok' };
-    if (now < firstUntil) return { key: 'first', text: touch ? 'Tap the mic to talk with players here.' : 'Press B (or click the mic) to talk with players here.', tone: 'ok' };
+    if (now < offUntil) return { key: 'off', text: `Voice off. ${act()} to talk again.`, tone: 'ok' };
+    if (others.length > 0) return { key: `join:${others.map(peer => peer.id).join(',')}`, text: `${names(others)} on voice. ${act()} to join.`, tone: 'ok' };
+    if (now < firstUntil) return { key: 'first', text: touch ? 'Tap the mic to talk with players here.' : `${act()} (or click the mic) to talk with players here.`, tone: 'ok' };
     return null;
   };
-  let drawnOff: boolean | null = null, drawnTip: string | null = null;
+  let drawnOff: string | null = null, drawnTip: string | null = null;
   const chips = new Map<string, { readonly chip: HTMLButtonElement; readonly label: HTMLSpanElement; readonly action: HTMLElement }>();
   const chipFor = (peer: VoicePeer): HTMLButtonElement => {
     let held = chips.get(peer.id);
@@ -133,13 +146,16 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
     was = voice.state;
     const off = voice.state !== 'on' && voice.state !== 'asking' && voice.state !== 'joining';
     button.dataset['state'] = voice.state;
-    if (off !== drawnOff) {
-      drawnOff = off;
-      button.innerHTML = icon(off) + (touch ? '' : '<span class="ws-voice-key">B</span>');
+    if (voice.mode === 'hold' && !touch) button.dataset['ptt'] = voice.sending ? 'held' : 'idle'; else delete button.dataset['ptt'];
+    const key = touch ? '' : voiceTalkKey();
+    if (`${String(off)}|${key}` !== drawnOff) {
+      drawnOff = `${String(off)}|${key}`;
+      button.innerHTML = icon(off);
+      if (!touch) { const badge = document.createElement('span'); badge.className = 'ws-voice-key'; badge.textContent = key; button.append(badge); }
       button.setAttribute('aria-label', off ? 'Turn voice on' : 'Turn voice off');
       button.setAttribute('aria-pressed', String(!off));
     }
-    button.style.boxShadow = voice.state === 'on' && voice.speaking ? `0 0 0 ${String(2 + Math.round(voice.level * 6))}px rgba(143,227,255,.45)` : '';
+    button.style.boxShadow = voice.sending && voice.speaking ? `0 0 0 ${String(2 + Math.round(voice.level * 6))}px rgba(143,227,255,.45)` : '';
     button.dataset['speaking'] = String(voice.state === 'on' && voice.speaking);
     const said = tipFor(), shown = said === null || said.key === dismissed ? null : said;
     if ((shown === null ? '' : `${shown.key}|${shown.text}`) !== drawnTip) {

@@ -29,4 +29,9 @@ export const KEY_BINDINGS: Table = {
     row('menus', 'help', 'Key help', ['help']),
   ],
 };
-export function describeKeyBindings(scope: Scope): void { app.input.bindings.describe(KEY_BINDINGS, scope); }
+/** VOICE-POLISH V10: voice chat's talk key, in a build of the online world only (single player has no voice). */
+export const VOICE_BINDINGS: Table = { groups: [{ id: 'voice', label: 'Voice chat', column: 0 }], rows: [row('voice', 'talk', 'Talk', ['voice.talk'])] };
+export function describeKeyBindings(scope: Scope): void {
+  app.input.bindings.describe(KEY_BINDINGS, scope);
+  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined) app.input.bindings.describe(VOICE_BINDINGS, scope);
+}
