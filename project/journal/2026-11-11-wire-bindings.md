@@ -20,3 +20,11 @@ accessor returning the wrong kind fails the typecheck.
 - Codex review (J206): no MUST. Its SHOULDs are in: the layer regex refuses
   a look-alike package (`@wildshard/wirefoo`), and the bindings test samples
   the script, state and encounter accessors, not just their columns.
+
+## WR3: the socket wrapper carries wire v1 unchanged
+
+- `test/wire-socket-routing.test.ts` pairs the real server and client socket
+  transports over `ws`: v1-shaped payloads on prefixes 0 and 1 reach only
+  the game listener, byte for byte; ready, playtest, voice (8), resume and
+  countdown reach only the control listener; ping and pong (2, 3) are the
+  wrapper's own. The v1 codec itself is shardfile 918ec19.
