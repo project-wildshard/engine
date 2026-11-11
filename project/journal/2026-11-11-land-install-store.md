@@ -14,3 +14,8 @@ prune lock, through worktree.mjs's `withStoreUse` (G10). While a
 `test/land.test.ts` checks the exact install arguments, that the
 announce was there during the install and gone after, and the stop
 under a held lock.
+
+The J206 review's two MUSTs are in: an install a stopped land owed is
+remembered in the worktree's git dir and runs first next time (the rebase
+had already moved HEAD), and land never purges through a node_modules that
+is a link (it could point at the canonical checkout's).

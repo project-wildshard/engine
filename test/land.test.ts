@@ -5,7 +5,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories, hooks and the land CLI.
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A local Actions API double for the main-run reuse check.
 import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Evaluate ci.yml's real concurrency-key expressions.
@@ -619,8 +619,27 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
       expect(stopped.status).not.toBe(0);
       expect(stopped.stdout + stopped.stderr).toMatch(/store prune is running/u);
       expect(existsSync(`${calls}.g`)).toBe(false);
+      // J206 review: the rebase already moved HEAD, so the next land must still owe and run the install first.
+      prune.kill();
+      await new Promise(gone => prune.once('exit', gone));
+      const again = g.land(plain);
+      expect(again.status, again.stdout + again.stderr).toBe(0);
+      expect(g.read(`${calls}.g`).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false']);
     } finally { prune.kill(); }
-  }, 120_000);
+    // A node_modules that links elsewhere (say the canonical checkout's) is never purged through.
+    const h = fixture();
+    writeFileSync(join(h.root, 'bin/pnpm'), `#!/bin/sh\necho "$*" >> '${calls}.h'\n`);
+    chmodSync(join(h.root, 'bin/pnpm'), 0o755);
+    const linked = h.worktree('baz');
+    h.commit(linked, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    mkdirSync(join(h.root, 'canonical-modules'));
+    symlinkSync(join(h.root, 'canonical-modules'), join(linked, 'node_modules'));
+    h.state({ once: { marker: join(h.root, 'once'), command: ['sh', h.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
+    const refused = h.land(linked);
+    expect(refused.status).not.toBe(0);
+    expect(refused.stdout + refused.stderr).toMatch(/node_modules is a symlink/u);
+    expect(existsSync(`${calls}.h`)).toBe(false);
+  }, 180_000);
 
   test('a harness change carries too: J249 has no harness rule, main\'s own run checks it', () => {
     const f = fixture();

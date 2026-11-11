@@ -14,7 +14,7 @@
 //   8. Delete origin's plan branch and remove this worktree (--keep skips it).
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
-import {appendFileSync,existsSync,linkSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -327,18 +327,38 @@ class Landing{
  installIfDependenciesMoved(before){
   const moved=git(this.root,['diff','--name-only',before,'HEAD','--','pnpm-lock.yaml','package.json','**/package.json']).split('\n').filter(Boolean);
   if(moved.length===0)return;
+  // Owed until it succeeds: a stop here leaves HEAD rebased, so the next land must not skip it.
+  writeFileSync(this.installMarker(),`${moved.join('\n')}\n`);
+  this.install(moved);
+ }
+
+ /** Where an owed install is remembered, inside this worktree's own git dir. */
+ installMarker(){return resolve(this.root,git(this.root,['rev-parse','--git-path','wildshard-land-install']));}
+
+ /** GVS G9/G10: confirmModulesPurge=false lets a worktree made before a store-layout flip reinstall without a TTY
+  * (pnpm otherwise aborts: ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Purging is only safe in this worktree's own
+  * node_modules, never through a link to the canonical checkout's, so a linked one stops. withStoreUse keeps the
+  * install out of a running store prune (meta make prune), as worktree.mjs's install does.
+  * @param {string[]} moved */
+ install(moved){
+  const modules=join(this.root,'node_modules');
+  let linked=false;
+  try{linked=lstatSync(modules).isSymbolicLink();}catch{/* no node_modules yet */}
+  if(linked){
+   this.receipt('STOP node_modules here is a link; land will not purge through it');
+   throw new StopError(`${modules} is a symlink; land installs only into this worktree's own node_modules. Replace it with a real install (rm the link, pnpm install --frozen-lockfile), then run land again.`);
+  }
   this.say('install',`${moved.join(', ')} changed in the rebase; pnpm install --frozen-lockfile`);
-  // GVS G9/G10: confirmModulesPurge=false lets a worktree made before a store-layout flip reinstall without a TTY
-  // (pnpm otherwise aborts: ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY), and withStoreUse keeps it out of a running
-  // store prune (meta make prune), as worktree.mjs's install does.
   let installed;
   try{
    installed=withStoreUse(this.env,'land install',()=>spawnSync('pnpm',['install','--frozen-lockfile','--config.confirmModulesPurge=false'],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:64<<20}));
   }catch(error){
-   this.receipt('STOP pnpm install waits: a pnpm store prune is running');
-   throw new StopError(`${error instanceof Error?error.message:String(error)}\nRun land again once the prune ends.`);
+   const why=error instanceof Error?error.message:String(error);
+   const busy=/store prune is running/u.test(why);
+   this.receipt(busy?'STOP pnpm install waits: a pnpm store prune is running':`STOP pnpm install could not start: ${why}`);
+   throw new StopError(`${why}\n${busy?'Run land again once the prune ends; the install is still owed and runs first.':'Fix that, then run land again; the install is still owed and runs first.'}`);
   }
-  if(installed.status===0)return;
+  if(installed.status===0){rmSync(this.installMarker(),{force:true});return;}
   this.receipt(`STOP pnpm install --frozen-lockfile failed after the rebase`);
   throw new StopError(`pnpm install --frozen-lockfile failed after the rebase (${moved.join(', ')} changed): ${`${installed.stderr}${installed.stdout}`.trim().split('\n').slice(-3).join(' ')}\nRun it by hand in the worktree, then run land again.`);
  }
@@ -562,6 +582,8 @@ class Landing{
   let main=this.fetchMain();
   if(start===main||isAncestor(this.root,start,main)){this.say('nothing',`${this.branch} ${short(start)} has nothing main lacks`);return 0;}
   this.say('start',`${this.branch} ${short(start)} -> main ${short(main)} (repo ${this.repo})`);
+  // An install a stopped land owed (its rebase had already moved HEAD) runs before anything else (J206 review).
+  if(existsSync(this.installMarker()))this.install(['an earlier land\'s rebase']);
   if(!isAncestor(this.root,main,start)){
    this.rebase(main);
    if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return 0;}
