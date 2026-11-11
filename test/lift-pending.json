@@ -102,7 +102,6 @@
   "test/mover-swell-parity.test.ts",
   "test/music-export-midi.test.ts",
   "test/nalati-actor-paint.test.ts",
-  "test/nalati-author-tools.test.ts",
   "test/nalati-carried-terrain-ports.test.ts",
   "test/nalati-chapter-binding.test.ts",
   "test/nalati-chapter-one.test.ts",

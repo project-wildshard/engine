@@ -566,6 +566,7 @@
   "test/budget-ratchet.test.ts": 0.03769625799999999,
   "test/build-identity.test.ts": 0.047153564000000016,
   "test/build-mirror.test.ts": 9.162281165,
+  "test/build-validation-receipts.test.ts": 0.07383075000000001,
   "test/build-vercel-output.test.ts": 0.21356712400000002,
   "test/built-product-dom.test.ts": 0.47085372600000003,
   "test/built-product.test.ts": 5.671399965000001,
