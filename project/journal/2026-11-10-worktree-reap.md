@@ -37,3 +37,6 @@ made, and the full install's ledger and publish paths go through it too.
 land's carried pre-push gets `WS_PUSH_TIMING_RECORDS=1`, so it selects the
 plan's related tests as land's classifier did; the timing records are an
 explicit list of four files. The markdown hook resolves with `realpath`.
+
+Clocks for `test/tooling/pins-reuse.test.mjs` and `test/tooling/worktree-reap.test.mjs`
+recorded with `push-test-timings.mjs record` from the bounced gate.
