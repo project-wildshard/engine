@@ -22,3 +22,5 @@ graph twice and proves a leaf change renames only its own chunk.
 
 Cost: the map is ~11 kB inline in each document, and Safari before 16.4 (no import maps) can't boot the build. Plan:
 meta `docs/plans/LOADING-DIAGNOSTICS-PLAN.md` LD6b.
+
+Timings: `test/chunk-import-map.test.ts` runs in about 0.1 s; its clocks are in the weight tables.

@@ -579,6 +579,7 @@
   "test/character-motor-values.test.ts": 0.7363207730000001,
   "test/checked-replay-pipeline.test.ts": 0.040025024999999985,
   "test/chromium-memory-browser.test.ts": 0.366777928,
+  "test/chunk-import-map.test.ts": 0.29247937399999996,
   "test/ci-bisect.test.ts": 0.21736495299999997,
   "test/ci-culprits.test.ts": 1.697595678,
   "test/ci-product-cache.test.ts": 1.7871123949999999,
