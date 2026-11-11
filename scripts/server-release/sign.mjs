@@ -54,10 +54,22 @@ export function bundleDescriptor(archive, tag) {
   return { name: `${tag}/${basename(archive)}`, sha256: createHash('sha256').update(readFileSync(archive)).digest('hex') };
 }
 
-/** @param {unknown} pins @param {string} names @returns {ReleaseFile['shards']} */
+/** A pin whose installed folder isn't its slug: the template's shardfile is `template` on the API (J259 slugs are kebab-case), but it
+ *  installs into `_template`, and the server book, the grid and the server's cells all say `_template`. The release names the folder,
+ *  so a server opening the whole grid finds the template's cell (GO7: `template` in the release opened 24 of 25 cells). */
+const PIN_FOLDERS = new Map([['template', '_template']]);
+/** The folder a pinned slug installs into, which is the name the server, its book and the grid use. */
+export const servedSlug = (/** @type {string} */ slug) => PIN_FOLDERS.get(slug) ?? slug;
+
+/** The release's shards, by the name the server reads them under; a variable may give a pin's slug or its folder.
+ * @param {unknown} pins @param {string} names @returns {ReleaseFile['shards']} */
 export function releaseShards(pins, names) {
   const rows = v.parse(v.object({ shards: v.array(v.object({ slug: v.string(), revision: v.pipe(v.number(), v.integer(), v.minValue(0)) })) }), pins).shards;
-  const selected = names.split(',').map(name => name.trim()).filter(Boolean);
+  const selected = names.split(',').map(name => name.trim()).filter(Boolean).map(servedSlug);
   if (selected.length === 0 || new Set(selected).size !== selected.length) throw new Error('E7_SERVER_SHARDS must name unique pinned shards');
-  return selected.map(slug => { const row = rows.find(shard => shard.slug === slug); if (row === undefined) throw new Error(`No pinned revision for ${slug}`); return row; });
+  return selected.map(slug => {
+    const row = rows.find(shard => servedSlug(shard.slug) === slug);
+    if (row === undefined) throw new Error(`No pinned revision for ${slug}`);
+    return { slug, revision: row.revision };
+  });
 }

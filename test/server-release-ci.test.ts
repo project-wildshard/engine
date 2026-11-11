@@ -13,7 +13,9 @@ import { join, resolve } from 'node:path';
 import { S3Client } from '@aws-sdk/client-s3';
 import { afterAll, expect, test } from 'vitest';
 import { createTempRepo } from '../src/test/helpers/git.ts';
-import { bundleDescriptor, releasePublicKey, signRelease } from '../scripts/server-release/sign.mjs';
+import { bundleDescriptor, releasePublicKey, releaseShards, signRelease } from '../scripts/server-release/sign.mjs';
+import { GridAssembly } from '../src/shared/game/grid/assembly';
+import { worldCells } from '../src/server/host/dedicated/gridCells';
 import { publishChannel, serverPacksReady } from '../scripts/server-release/publish.mjs';
 import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 import { readSignedRelease } from '../src/client/host/online/release';
@@ -177,6 +179,21 @@ test('J234: both channels sign a build only after its server book and parts are 
     await expect(publish(newest, true, 'production')).rejects.toThrow(/Only staging/u);
     expect(writes).toBe(4);
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
+});
+
+test('GO7: the release names the template by its folder, the grid\'s spelling, so the whole grid opens', () => {
+  const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string; revision: number }[] };
+  const template = pins.shards.find(row => row.slug === 'template');
+  expect(template).toBeDefined();
+  // Either spelling in a variable names one shard, under the folder name the server book and the grid read.
+  for (const names of ['driftwood-isle,template', 'driftwood-isle,_template']) {
+    expect(releaseShards(pins, names)).toEqual([{ slug: 'driftwood-isle', revision: pins.shards.find(row => row.slug === 'driftwood-isle')?.revision }, { slug: '_template', revision: template?.revision }]);
+  }
+  expect(() => releaseShards(pins, 'template,_template')).toThrow(/unique/u);
+  // A release of every pin opens every grid cell, through the server's own WORLD_CELLS=grid reading.
+  const served = releaseShards(pins, pins.shards.map(row => row.slug).join(',')).map(row => row.slug);
+  const { cells } = new GridAssembly({ developer: false, devserver: false });
+  expect(worldCells('grid', served)).toHaveLength(cells.length);
 });
 
 test('J234: every run signs with main\'s publisher and builds in the source\'s own tree', () => {
