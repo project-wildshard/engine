@@ -96,7 +96,7 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     // VOICE-POLISH V10: Voice, only in a build of the online world (single player has no voice); re-read on every tap into Sound
     if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined) {
       const voice = voiceSettingsRows(host.scope); put('sound.voice', ...voice.rows);
-      host.scope.listen(tabs.root, 'pointerup', () => { if (tabs.selected === 'sound') queueMicrotask(voice.refresh); }, { capture: true });
+      host.scope.listen(tabs.root, 'pointerup', () => { queueMicrotask(() => { if (tabs.selected === 'sound') voice.refresh(); }); }, { capture: true });
     }
 
     // ── CONTROLS: the camera, lock-on (E50: Gentle = Jake's pick; Off keeps the lock but never turns the view), the aim aids
