@@ -29,3 +29,8 @@ connect on staging through Cloudflare TURN (both selected candidates
 `relay`, udp 3478), Chromium-Chromium, WebKit-Chromium and WebKit-WebKit,
 with decoded audio both ways; WebKit's own getUserMedia (mock device) works
 once the permission is granted.
+
+J206 Codex review: no MUST; its SHOULD (cover the real VoiceChat, not
+only a stub) is a test that drives VoiceChat through asking, joining,
+on, a B off and a server "full". The solo listener is `listenPage` on
+the level scope, so it goes with the level like every other one.

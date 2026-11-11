@@ -4,7 +4,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
 import { CHAT_FADE_MS, CHAT_FRESH_MS, cornerOpen, lineLook } from './chatCorner';
 import { chatLines } from './chatLines';
-import type { VoiceChat, VoicePeer } from './voice';
+import { VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
 
 interface Said { line: number; from: number; name: string; text: string }
@@ -178,4 +178,42 @@ test('QA row 6: a browser with no voice has no mic, and B says why for a moment'
   expect(tip()).toBe('Voice chat doesn\'t work in this browser. Text chat still does.');
   vi.advanceTimersByTime(5000);
   expect(tip()).toBeNull();
+});
+
+test('QA row 6: the real voice through asking, joining and on; B off says so, and the server saying full never does', async () => {
+  const scope = new Scope('voice-real-test'); owners.push(scope);
+  const hear = new Set<(word: VoiceHeard) => void>(), sent: object[] = [];
+  const say = (word: VoiceHeard): void => { for (const fn of hear) fn(word); };
+  vi.stubGlobal('RTCPeerConnection', (): void => undefined); // only its presence matters until a peer joins
+  const stream = { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream;
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: () => Promise.resolve(stream) } });
+  try {
+    const client = { welcome: { handle: 1 }, onChat: () => () => undefined, say: () => undefined, report: () => undefined } as unknown as NetClient;
+    const voice = new VoiceChat(scope, { send: word => { sent.push(word); }, on: fn => { hear.add(fn); return () => { hear.delete(fn); }; } }, '');
+    const chat = chatLines(scope, client);
+    voiceUi(scope, voice, chat);
+    const button = chat.box.querySelector<HTMLElement>('#ws-voice'), tip = (): string | null => { const el = chat.box.querySelector<HTMLElement>('#ws-voice-tip'); return el === null || el.hidden === true ? null : el.querySelector('span')?.textContent ?? null; };
+    const press = (): void => { document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true })); };
+    press();
+    expect(button?.dataset['state']).toBe('asking');
+    expect(tip()).toBe('Allow the microphone when your browser asks.');
+    await vi.waitFor(() => { expect(button?.dataset['state']).toBe('joining'); });
+    expect(tip()).toBe('Joining voice…');
+    say({ k: 'you', id: 'me' });
+    expect(sent).toContainEqual({ k: 'join' });
+    say({ k: 'hi', ice: [], peers: [] });
+    expect(button?.dataset['state']).toBe('on');
+    expect(tip()).toContain('You\'re on voice');
+    press();
+    expect(button?.dataset['state']).toBe('off');
+    expect(tip()).toBe('Voice off. Press B to talk again.');
+    vi.advanceTimersByTime(4000);
+    expect(tip()).toBeNull();
+    // the server's "full" is not a press: it says full, never "Voice off"
+    press();
+    await vi.waitFor(() => { expect(button?.dataset['state']).toBe('joining'); });
+    say({ k: 'you', id: 'me' }); say({ k: 'full' });
+    expect(button?.dataset['state']).toBe('full');
+    expect(tip()).toBe('Voice is full here: 8 players are on it already.');
+  } finally { vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
 });
