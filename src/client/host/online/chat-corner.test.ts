@@ -123,3 +123,59 @@ test('QA row 43: the players on voice are a list in the open chat with mute and 
   expect(reported).toEqual([7]);
   expect(open(box)).toBe(true);
 });
+
+/** The voice controls over a voice that moves the way the real one does on a press: off, on, off. */
+function voiceCorner(state: 'off' | 'on' | 'denied' | 'unsupported'): { box: HTMLElement; voice: { state: string; toggles: number }; tip: () => string | null; press: () => void } {
+  const scope = new Scope('voice-feedback-test'); owners.push(scope);
+  const client = { welcome: { handle: 1 }, onChat: () => () => undefined, say: () => undefined, report: () => undefined } as unknown as NetClient;
+  const changes = new Set<() => void>();
+  const voice = { state: state as string, toggles: 0, speaking: false, level: 0, roster: new Map<string, VoicePeer>(), onChange: (fn: () => void) => { changes.add(fn); return () => { changes.delete(fn); }; },
+    toggle() { this.toggles++; this.state = this.state === 'on' ? 'off' : this.state === 'denied' || this.state === 'off' ? (state === 'denied' ? 'denied' : 'on') : this.state; for (const fn of changes) fn(); },
+    mute: () => undefined };
+  const chat = chatLines(scope, client);
+  voiceUi(scope, voice as unknown as VoiceChat, chat);
+  const tip = (): string | null => { const el = chat.box.querySelector<HTMLElement>('#ws-voice-tip'); return el === null || el.hidden === true ? null : el.querySelector('span')?.textContent ?? null; };
+  const press = (): void => { document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true })); };
+  return { box: chat.box, voice, tip, press };
+}
+
+test('QA row 6: B says what it did: on shows the mic on, off says "Voice off" for a moment', () => {
+  const { box, voice, tip, press } = voiceCorner('off');
+  press();
+  expect(voice.state).toBe('on');
+  expect(box.querySelector<HTMLElement>('#ws-voice')?.dataset['state']).toBe('on');
+  expect(tip()).toContain('You\'re on voice');
+  press();
+  expect(voice.state).toBe('off');
+  expect(tip()).toBe('Voice off. Press B to talk again.');
+  vi.advanceTimersByTime(4000);
+  expect(tip()).toBeNull();
+});
+
+test('QA row 6: a press shows a closed tip again, so a second "blocked" is never silent', () => {
+  const { box, tip, press } = voiceCorner('denied');
+  expect(tip()).toContain('Microphone blocked');
+  box.querySelector<HTMLButtonElement>('#ws-voice-tip button')?.click();
+  expect(tip()).toBeNull();
+  press();
+  expect(tip()).toContain('Microphone blocked');
+});
+
+test('QA row 6: B under an open menu does nothing, because the mic it would open is hidden there', () => {
+  const { voice, press } = voiceCorner('off');
+  document.documentElement.dataset['wsMenu'] = 'open';
+  try { press(); expect(voice.toggles).toBe(0); }
+  finally { delete document.documentElement.dataset['wsMenu']; }
+  press();
+  expect(voice.toggles).toBe(1);
+});
+
+test('QA row 6: a browser with no voice has no mic, and B says why for a moment', () => {
+  const { box, tip, press } = voiceCorner('unsupported');
+  expect(box.querySelector('#ws-voice')).toBeNull();
+  expect(tip()).toBeNull();
+  press();
+  expect(tip()).toBe('Voice chat doesn\'t work in this browser. Text chat still does.');
+  vi.advanceTimersByTime(5000);
+  expect(tip()).toBeNull();
+});
