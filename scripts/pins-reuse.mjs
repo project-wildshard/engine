@@ -45,6 +45,7 @@ export const KEY_EXEMPT=Object.freeze({
  'scripts/apfs-clone.mjs':'clones bytes that are then hashed against the manifest',
  'scripts/slice-inputs.ts':'slice and ring commands only, which delete the manifest',
  'src/cook/game/shardCook.ts':'slice command only',
+ 'scripts/renderer-revision.mjs':'names a printed preparation label only (J262); no byte under out/',
 });
 
 /** @typedef {{version:number,key:string,products:Record<string,Record<string,string>>,mounts:Record<string,string>}} Manifest */
