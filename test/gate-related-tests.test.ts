@@ -5,8 +5,8 @@ import {execFileSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
 import {join, resolve} from 'node:path';
-import {BROWSER_TESTS, LOCAL_FILE_SECONDS, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, logHostedOnly, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
-import {codeProvingJobs, githubSlug, hostedGreen, landingVerdict} from '../scripts/push-hosted-green.mjs';
+import {BROWSER_TESTS, LOCAL_FILE_SECONDS, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
+import {provesCode} from '../scripts/ci-proof-jobs.mjs';
 import { capRelated, productReaderTests, scriptScenarioTests, QUICK_TESTS, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
 
 const durations = new Map([['test/slow.test.ts', 40], ['test/cheap.test.ts', 1], ['test/mid.test.ts', 8], ['test/cover-grid.test.ts', 30]]);
@@ -84,7 +84,7 @@ mkdirSync('tmp', {recursive: true});
 const scratch = mkdtempSync(resolve('tmp/push-split-'));
 afterAll(() => rmSync(scratch, {recursive: true, force: true}));
 
-it('only plan branch pushes or a watching driver ask for the split', () => {
+it('only plan branch pushes ask for the split', () => {
   expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(true);
   expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}\nrefs/heads/plan/bar ${b} refs/heads/plan/bar ${a}`)).toBe(true);
   expect(splitRequested({}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(false);
@@ -94,15 +94,27 @@ it('only plan branch pushes or a watching driver ask for the split', () => {
   // Deleting a plan branch pushes nothing to check.
   expect(splitRequested({}, `(delete) ${zero} refs/heads/plan/foo ${a}`)).toBe(false);
   expect(splitRequested({}, '')).toBe(false);
-  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(true);
-  // The watching-driver flag never splits a tag, another branch or a release check (no refs).
-  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBe(false);
-  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/main ${a} refs/heads/main ${b}\nrefs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBe(false);
-  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/feature/x ${a} refs/heads/feature/x ${zero}`)).toBe(false);
-  expect(splitRequested({WS_PUSH_POST_CI: '1'}, undefined)).toBe(false);
+  // LS3: land's main push has its own lane; the retired driver flag splits nothing.
+  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(false);
   // Hosted CI never runs a split of itself.
-  expect(splitRequested({CI: 'true', WS_PUSH_POST_CI: '1'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);
+  expect(splitRequested({CI: 'true'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);
   expect(splitRequested({GITHUB_ACTIONS: 'true'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);
+});
+
+it('only land\'s marked main push gets the land lane; a hand main push keeps the full gate (LS3)', () => {
+  const main = `refs/heads/main ${a} refs/heads/main ${b}`;
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`}, main)).toBe('carried');
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${a}`}, main)).toBe('exact');
+  // The marker binds the SHA land proved: another SHA, no SHA or an unknown kind keeps the full gate.
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${b}`}, main)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: 'exact'}, main)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `skip:${a}`}, main)).toBeNull();
+  // No marker, another ref alongside, a plan branch or hosted CI: the normal gate.
+  expect(landMainMode({}, main)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`}, `${main}\nrefs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}`)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `carried:${a}`, CI: 'true'}, main)).toBeNull();
+  expect(landMainMode({WS_LAND_MAIN_PUSH: `exact:${a}`}, undefined)).toBeNull();
 });
 
 it('a first plan push selects against its merge-base with origin/main', () => {
@@ -164,45 +176,18 @@ it('only files over the budget are logged for VITEST-BENCH', () => {
   expect(rows.map(row => [row.file, row.sha, row.lane])).toEqual([['test/b.test.ts', a, 'opus-x']]);
 });
 
-it('a landing reuses only an exact SHA whose ci is green (CI-JOB-PACKING: ring-1 is part of ci)', () => {
-  const run = (id: number, name: string, conclusion: string | null, status = 'completed', sha = a, event = 'push') => ({id, name, path: `.github/workflows/${name}.yml`, event, head_sha: sha, status, conclusion});
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success')]}, a).state).toBe('green');
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', null, 'in_progress')]}, a).state).toBe('pending');
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure')]}, a).state).toBe('red');
-  // An old ring-1 run of the same SHA neither blocks nor stands in.
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success'), run(2, 'ring-1', 'failure')]}, a).state).toBe('green');
-  expect(landingVerdict({workflow_runs: [run(2, 'ring-1', 'success')]}, a).state).toBe('pending');
-  // The newest run decides: a re-run green replaces an older red.
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'failure'), run(3, 'ci', 'success')]}, a).state).toBe('green');
-  expect(landingVerdict({workflow_runs: [run(3, 'ci', 'cancelled'), run(1, 'ci', 'success')]}, a).state).toBe('red');
-  // Another SHA's runs and other workflows prove nothing.
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', b), run(4, 'deploy', 'success')]}, a).state).toBe('pending');
-  expect(landingVerdict(null, a).state).toBe('pending');
-  // A pull-request run or a recording dispatch of the same SHA proves nothing here.
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', a, 'pull_request')]}, a).state).toBe('pending');
-  expect(landingVerdict({workflow_runs: [run(1, 'ci', 'success', 'completed', a, 'workflow_dispatch')]}, a).state).toBe('pending');
+it('a ci run proves code only when every packed share ran its step green (CI-JOB-PACKING)', () => {
   const job = (name: string, conclusion = 'success') => ({name, status: 'completed', conclusion});
   const code = {jobs: [job('changes'), job('static'), job('plan'), job('e2e'), job('tests (1)'), job('tests (2)')]};
-  expect(codeProvingJobs(code)).toBe(true);
-  // A docs-only run skips plan, tests and e2e: not a code proof.
-  expect(codeProvingJobs({jobs: [job('changes'), job('static'), job('plan', 'skipped'), job('e2e', 'skipped')]})).toBe(false);
-  expect(codeProvingJobs({jobs: [job('changes'), job('static'), job('plan'), job('e2e'), job('tests (1)'), job('tests (2)', 'failure')]})).toBe(false);
+  expect(provesCode('ci.yml', code.jobs)).toBe(true);
+  expect(provesCode('ci.yml', [job('changes'), job('static'), job('plan', 'skipped'), job('e2e', 'skipped')])).toBe(false);
+  expect(provesCode('ci.yml', [job('changes'), job('static'), job('plan'), job('e2e'), job('tests (1)'), job('tests (2)', 'failure')])).toBe(false);
   // CI-JOB-PACKING (J244): a packed ci run is its `tests (N)` shares, each of which ran its packed step.
   const share = (name: string, step = 'success', conclusion = 'success') => ({...job(name, conclusion), steps: [{name: "Run this job's packed share", status: 'completed', conclusion: step}]});
-  expect(codeProvingJobs({jobs: [share('tests (1)'), share('tests (2)'), share('tests (3)'), job('quarantine', 'failure')]})).toBe(true);
+  expect(provesCode('ci.yml', [share('tests (1)'), share('tests (2)'), share('tests (3)'), job('quarantine', 'failure')])).toBe(true);
   // A reused or docs-only run is green with the packed step skipped: never a code proof.
-  expect(codeProvingJobs({jobs: [share('tests (1)', 'skipped'), share('tests (2)', 'skipped'), job('quarantine')]})).toBe(false);
-  expect(codeProvingJobs({jobs: [share('tests (1)'), share('tests (2)', 'skipped')]})).toBe(false);
-  expect(codeProvingJobs({jobs: [job('tests (1)'), job('tests (2)')]})).toBe(false);
-  expect(codeProvingJobs({jobs: [job('quarantine')]})).toBe(false);
-  expect(githubSlug('git@github.com:project-wildshard/engine.git')).toBe('project-wildshard/engine');
-  expect(githubSlug('https://github.com/project-wildshard/engine')).toBe('project-wildshard/engine');
-  expect(githubSlug('/local/path/engine.git')).toBeNull();
-  const paths: string[] = [];
-  const green = (path: string) => {paths.push(path); return path.includes('/jobs') ? code : {workflow_runs: [run(7, 'ci', 'success')]};};
-  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', green)).toEqual({ci: {id: 7, status: 'completed', conclusion: 'success'}});
-  expect(paths).toEqual([`repos/project-wildshard/engine/actions/runs?head_sha=${a}&event=push&per_page=100`, 'repos/project-wildshard/engine/actions/runs/7/jobs?filter=latest&per_page=100']);
-  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', path => path.includes('/jobs') ? {jobs: [job('changes'), job('static')]} : green(path))).toBeNull();
-  expect(hostedGreen(a, 'git@github.com:project-wildshard/engine.git', () => {throw new Error('offline');})).toBeNull();
-  expect(hostedGreen('HEAD', 'git@github.com:project-wildshard/engine.git', green)).toBeNull();
+  expect(provesCode('ci.yml', [share('tests (1)', 'skipped'), share('tests (2)', 'skipped'), job('quarantine')])).toBe(false);
+  expect(provesCode('ci.yml', [share('tests (1)'), share('tests (2)', 'skipped')])).toBe(false);
+  expect(provesCode('ci.yml', [job('tests (1)'), job('tests (2)')])).toBe(false);
+  expect(provesCode('ci.yml', [job('quarantine')])).toBe(false);
 });

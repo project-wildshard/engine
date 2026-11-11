@@ -74,7 +74,7 @@ while read old new ref; do echo "$ref $new" >> "$PUSHED_LOG"; done
 // The fixture pre-push records what land asked for and can fail or race on demand.
 const PRE_PUSH = `#!/bin/sh
 refs=$(cat)
-echo "post_ci=\${WS_PUSH_POST_CI:-0} $refs" >> "$PREPUSH_LOG"
+echo "land=\${WS_LAND_MAIN_PUSH:-0} $refs" >> "$PREPUSH_LOG"
 printf '%s\\n' "$refs" | node "$RECORD_PLAN_PUSH"
 [ -f "$PREPUSH_FAIL" ] && { echo "pre-push: planted red check"; exit 1; }
 case "$refs" in *refs/heads/main*) if [ -f "$PREPUSH_RACE" ]; then rm "$PREPUSH_RACE"; sh "$RACE_SCRIPT"; fi ;; esac
@@ -159,8 +159,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tip);
     // The plan push came first, then main got the same SHA under the normal gate.
     const [plan, main, ...rest] = prepushLines(f);
-    expect(plan).toMatch(new RegExp(`^post_ci=0 \\S+ ${tip} refs/heads/plan/foo 0{40}$`, 'u'));
-    expect(main).toMatch(new RegExp(`^post_ci=0 ${tip} ${tip} refs/heads/main [a-f0-9]{40}$`, 'u'));
+    expect(plan).toMatch(new RegExp(`^land=0 \\S+ ${tip} refs/heads/plan/foo 0{40}$`, 'u'));
+    expect(main).toMatch(new RegExp(`^land=exact:${tip} ${tip} ${tip} refs/heads/main [a-f0-9]{40}$`, 'u'));
     expect(rest).toEqual([]);
     expect(f.read(f.files.gh)).toContain(`head_sha=${tip}`);
     expect(f.read(f.files.receipts)).toMatch(new RegExp(`^\\d\\d:\\d\\d UTC fixture-lane land plan/foo landed ${tip.slice(0, 10)} on main .*; exact; rounds 1; hosted reruns 0;`, 'mu'));
@@ -222,7 +222,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.git(f.remote, ['log', '--format=%s', '-3', 'main']).split('\n')).toEqual(['feat: add feature', 'peer lands', 'seed']);
     expect(result.stdout).toMatch(/carried\s+clean rebase onto/u);
     // The rebased SHA reached main only, under the split gate; plan/foo still holds the tested SHA.
-    expect(prepushLines(f).at(-1)).toMatch(new RegExp(`^post_ci=1 ${landed} ${landed} refs/heads/main [a-f0-9]{40}$`, 'u'));
+    expect(prepushLines(f).at(-1)).toMatch(new RegExp(`^land=carried:${landed} ${landed} ${landed} refs/heads/main [a-f0-9]{40}$`, 'u'));
     expect(f.git(f.remote, ['rev-parse', 'plan/foo'])).toBe(tested);
     expect(f.read(f.files.gh)).toContain(`head_sha=${landed}`);
     expect(f.read(f.files.receipts)).toMatch(/landed .*; carried; rounds 1; hosted reruns 0; .*main ci green/u);

@@ -4,6 +4,7 @@ export const TIMING_TESTS: readonly string[];
 export const NATIVE_TESTS: readonly string[];
 export const PLAN_REF: RegExp;
 export function pushedRefs(refs:string|undefined):{local:string;remote:string;base:string}[];
+export function landMainMode(env:NodeJS.ProcessEnv,refs:string|undefined):'exact'|'carried'|null;
 export function splitRequested(env:NodeJS.ProcessEnv,refs?:string):boolean;
 export function planBaseRefs(refs:string|undefined,cwd?:string):string|undefined;
 export function hostedOnlyReason(file:string,seconds:Record<string,number>):string|null;

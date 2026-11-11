@@ -100,7 +100,7 @@ Never:
 
  - push main by hand (`git push origin main`, `HEAD:main`, a bare `git push` on main): land or the queue only;
  - force main, or force anything but your own `plan/*` branch, and then only `--force-with-lease` (land does it);
- - `--no-verify`, `SKIP_*`, `ALLOW_*`, `WS_PUSH_POST_CI` or `WS_PREFLIGHT_SKIP` by hand;
+ - `--no-verify`, `SKIP_*`, `ALLOW_*` or `WS_LAND_MAIN_PUSH` by hand (land sets it on its own main push);
  - commit in the canonical checkout off main, or in someone else's worktree; remove a worktree by hand (`reap`).
 
 Shared checkout

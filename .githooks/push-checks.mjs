@@ -1,5 +1,5 @@
 import {execFileSync,spawn} from 'node:child_process';
-import {constants, getPriority, loadavg,homedir} from 'node:os';
+import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:os';
 import {resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
@@ -46,7 +46,7 @@ export async function parallelChecks(tasks,options={}) {
   if(options.timeoutMs!==undefined&&(!Number.isFinite(options.timeoutMs)||options.timeoutMs<=0))throw new Error('Invalid owned command deadline');
   if(options.env?.WS_CPU_ADMISSION==='1')tasks=tasks.map(task=>({...task,commands:task.commands.map(command=>{
     if(task.name.startsWith('vitest'))return command; // Actual files own their grants.
-    const slots=command.includes('--builders')?PUSH_BUDGET.builders:task.name.startsWith('lint')?2:1;
+    const slots=command.includes('--builders')?PUSH_BUDGET.builders:task.name.startsWith('lint')?Math.min(Math.max(2,availableParallelism()-2),Math.max(2,Number(options.env?.WS_PUSH_LINT_THREADS)||0)):1;
     return ['python3',resolve('scripts/cpu-admission.py'),'run','--slots',String(slots),'--',...command];
   })}));
   const active=new Set(),results=[],started=Date.now(),grace=options.graceMs??1500;
@@ -90,6 +90,36 @@ export async function parallelChecks(tasks,options={}) {
     }));
   } finally {clearTimeout(deadline);process.off('SIGINT',interrupted);process.off('SIGTERM',interrupted);}
   return {ok:!refused&&results.every(row=>row.code===0),seconds:(Date.now()-started)/1000,results,timedOut};
+}
+
+/** The static half of the gate: no test runs here. @param {number} [lintThreads] */
+function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
+  return [
+    {name:'typecheck (kit + layers)',commands:[['pnpm','run','--silent','typecheck:kit'],['pnpm','exec','npr','tsc','-b','tsconfig.layers.json','--builders',String(PUSH_BUDGET.builders)]]},
+    {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(lintThreads)],['pnpm','run','--silent','lint:game']]},
+    {name:'format:check',commands:[['pnpm','run','--silent','format:check']]},
+    {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
+    {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
+    {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
+  ];
+}
+
+/** Lint workers on land's carried main push: 6 took lint:game from 27 s to 11.5 s on the Mac (2026-11-11). Never
+ * more than the CPU broker grants one request (all cores but two, scripts/cpu-admission.py). */
+const LAND_LINT_THREADS=Math.max(1,Math.min(6,availableParallelism()-2));
+
+/** LAND-SIMPLIFY LS3 (J258): land's main push after a clean rebase. Lint, TypeScript and the static checks, in
+ * parallel under the CPU broker; no Vitest, no heavy lane. Branch CI ran the suite on the same diff.
+ * @param {NodeJS.ProcessEnv} env @returns {Promise<number>} the exit code */
+export async function landMainChecks(env){
+  const began=Date.now();
+  // Lint is the long pole (type-aware, 27 s on one thread); with no tests beside it, it gets LAND_LINT_THREADS,
+  // and the broker meters that many slots.
+  const lint={...env,WS_PUSH_LINT_THREADS:String(LAND_LINT_THREADS),GOMAXPROCS:String(LAND_LINT_THREADS)};
+  const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
+  const result=generated.ok?await parallelChecks(staticChecks(LAND_LINT_THREADS),{env:lint}):generated;
+  console.error(`  - land main push (carried, LS3): static lane ${result.ok?'green':'RED'} in ${((Date.now()-began)/1000).toFixed(1)} s; no Vitest (branch CI ran it)`);
+  return result.ok?0:1;
 }
 
 async function main(){
@@ -143,12 +173,7 @@ async function main(){
     ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
     :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
   const result=await parallelChecks([
-    {name:'typecheck (kit + layers)',commands:[['pnpm','run','--silent','typecheck:kit'],['pnpm','exec','npr','tsc','-b','tsconfig.layers.json','--builders',String(PUSH_BUDGET.builders)]]},
-    {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
-    {name:'format:check',commands:[['pnpm','run','--silent','format:check']]},
-    {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
-    {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
-    {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
+    ...staticChecks(),
     {name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},
     ...vitest,
   ],{env});
