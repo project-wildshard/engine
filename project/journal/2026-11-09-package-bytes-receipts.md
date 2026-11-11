@@ -36,7 +36,10 @@ Nalati's map.tilesHash and its enclosing source/pack identities match too.
 Open Plots covers eighteen actual products, not a representative sample.
 The timing values are observations, not a packaging speedup claim.
 
-Independent Linux CI proves the actual pinned package still cooks and plays.
+Independent Linux CI proves six pinned cold cooks and actual authored routes.
+Open Plots reads and admits its exact prepared products in dispatch CI;
+that job packages eighteen plots but reserves play/restore for Ring 2.
+Its green dispatch is not a cold Linux cook or a Linux play proof.
 Exact runs are Dunes42685729639, Sky42671209250, Driftwood42671120505,
 Nine42671165703, Pine42687379241, Nalati42671149148 and Open42688039753.
 All seven complete green at the consumer heads in the meta receipt.
