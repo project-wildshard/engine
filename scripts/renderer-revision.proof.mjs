@@ -10,21 +10,21 @@ import {assertProductionBuild} from './check-devserver.mjs';
 
 const root=mkdtempSync(join(tmpdir(),'renderer-identity-'));
 after(()=>rmSync(root,{recursive:true,force:true}));
-mkdirSync(join(root,'src/client'),{recursive:true});
+mkdirSync(join(root,'src/client/engine/render'),{recursive:true});
 mkdirSync(join(root,'public'));
 writeFileSync(join(root,'package.json'),JSON.stringify({version:'1.0.0',dependencies:{three:'fixed'}}));
 writeFileSync(join(root,'pnpm-lock.yaml'),'lockfileVersion: 9');
-writeFileSync(join(root,'src/client/material.ts'),'export const material = "first";');
+writeFileSync(join(root,'src/client/engine/render/material.ts'),'export const material = "first";');
 writeFileSync(join(root,'public/host.bin'),'host bytes');
-execFileSync('git',['-C',root,'init','-q']);execFileSync('git',['-C',root,'add','public/host.bin','src/client/material.ts','pnpm-lock.yaml']);
+execFileSync('git',['-C',root,'init','-q']);execFileSync('git',['-C',root,'add','public/host.bin','src/client/engine/render/material.ts','pnpm-lock.yaml']);
 execFileSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@localhost','commit','-qm','fixture']);
 
-await Promise.all([test('renderer identity changes for actual client or shipped host bytes',()=>{
+await Promise.all([test('renderer identity changes for render source, not shipped host bytes (J259)',()=>{
   const first=rendererRevision(root);
-  writeFileSync(join(root,'src/client/material.ts'),'export const material = "second";');
+  writeFileSync(join(root,'src/client/engine/render/material.ts'),'export const material = "second";');
   const second=rendererRevision(root);assert.notEqual(first,second);
   writeFileSync(join(root,'public/host.bin'),'new host bytes');
-  assert.notEqual(rendererRevision(root),second);
+  assert.equal(rendererRevision(root),second);
 }),
 test('release version, shell identity and generated product tables do not rename the renderer',()=>{
   const first=rendererRevision(root);
@@ -35,7 +35,7 @@ test('release version, shell identity and generated product tables do not rename
 test('exported mirror uses its bound committed inventory without Git discovery',()=>{
   const mirror=realpathSync(mkdtempSync(join(root,'mirror-'))),inventory=join(root,'inventory.json');
   for(const path of ['public','src','pnpm-lock.yaml','package.json'])cpSync(join(root,path),join(mirror,path),{recursive:true});
-  writeFileSync(inventory,JSON.stringify({root:mirror,files:['public/host.bin','src/client/material.ts','pnpm-lock.yaml']}));
+  writeFileSync(inventory,JSON.stringify({root:mirror,files:['public/host.bin','src/client/engine/render/material.ts','pnpm-lock.yaml']}));
   const expected=rendererRevision(root);
   /** @param {string} cap */
   /** @param {string} cap */
