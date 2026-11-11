@@ -18,6 +18,7 @@ const { MAX_SHARDFILE_BYTES } = await import('../src/cook/game/cookJob.ts');
 const { addStoredShards } = await import('./app-build/catalogue.ts');
 const { refreshServiceWorker } = await import('./app-build/serviceWorker.ts');
 const { folderStore, r2Store } = await import('../src/cook/game/packStore.ts');
+const { rendererRevision } = await import('./renderer-revision.mjs');
 
 const env = process.env;
 /** @param {string} name */
@@ -28,12 +29,14 @@ const store = env.COOK_STORE_DIR === undefined || env.COOK_STORE_DIR === ''
   : folderStore(env.COOK_STORE_DIR);
 const root = fileURLToPath(new URL('..', import.meta.url));
 const maxBytes = Number(env.COOK_MAX_SHARDFILE_BYTES ?? MAX_SHARDFILE_BYTES);
+/** J262: the jobs can't compute it under `--permission`; a host that can't either cooks every preparation as stale. */
+const renderer = (() => { try { return rendererRevision(root); } catch { return undefined; } })();
 const worker = () => createCookWorker({
   build: need('WILDSHARD_BUILD'), store, source: apiSource(need('WILDSHARD_API_URL'), fetch, maxBytes), log: line => { console.log(line); },
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch: resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch'),
   launcher: {
     root, execPath: process.execPath, loader: fileURLToPath(new URL('bake-loader.mjs', import.meta.url)), script: fileURLToPath(new URL('cook-job.mjs', import.meta.url)),
-    wrap: JSON.parse(env.COOK_JOB_WRAP ?? '[]'),
+    wrap: JSON.parse(env.COOK_JOB_WRAP ?? '[]'), ...(renderer === undefined ? {} : { renderer }),
     limits: { seconds: Number(env.COOK_SECONDS ?? DEFAULT_LIMITS.seconds), memoryMB: Number(env.COOK_MEMORY_MB ?? DEFAULT_LIMITS.memoryMB), heapMB: Number(env.COOK_HEAP_MB ?? DEFAULT_LIMITS.heapMB), maxBytes },
   },
 });

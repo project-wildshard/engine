@@ -18,7 +18,7 @@ export function checkSlice(bytes:Uint8Array,slug:string):void {
       sections.set(row.name,JSON.parse(new TextDecoder().decode(body)));
     }
     const source=assembleOutputShardfile(raw,sections);
-    const rows=serverRows({slug:index.identity.slug,index,source,sections,header,read,cook:undefined});
+    const rows=serverRows({slug:index.identity.slug,index,source,sections,header,read,cook:undefined,preparation:'none'});
     const wanted=new Set(rows.map(row=>row.path));
     for(const row of rows) {
       const body=read(row.path);

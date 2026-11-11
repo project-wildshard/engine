@@ -10,6 +10,7 @@ await import('./bake-loader.mjs');
 const { createCookWorker, indexKey } = await import('../src/cook/game/cookWorker.ts');
 const { folderStore } = await import('../src/cook/game/packStore.ts');
 const { cookRevision } = await import('./cook-revision.ts');
+const { rendererRevision } = await import('./renderer-revision.mjs');
 const { values } = parseArgs({ options: { out: {type:'string',default:'tmp/ring-cook'}, build: {type:'string',default:'ring-local'},
   only: {type:'string'}, ring2: {type:'boolean',default:false}, 'timeout-ms': {type:'string',default:'120000'} } });
 const timeout = Number(values['timeout-ms']);
@@ -33,7 +34,7 @@ const store = folderStore(join(out,'store'));
 const worker = createCookWorker({ build: values.build, store, serverPacks: join(out,'server'), scratch: join(out,'jobs'),
   source: { heads: () => Promise.resolve(heads.map(row => ({...row, revision:1}))), download: hash => Promise.resolve(readFileSync(join(cache,`${hash}.tar`))) },
   launcher: { root, execPath: process.execPath, loader:join(root,'scripts/bake-loader.mjs'), script:join(root,'scripts/cook-job.mjs'),
-    wrap:[], limits:{seconds:timeout/1000,memoryMB:4096,heapMB:2048} } });
+    wrap:[], limits:{seconds:timeout/1000,memoryMB:4096,heapMB:2048}, renderer: rendererRevision(root) } });
 const recipe = cookRevision(), indexes = [];
 for (const head of heads) {
   const started = performance.now(), row = await worker.cook(head);
@@ -41,7 +42,8 @@ for (const head of heads) {
   const bytes = await store.get(indexKey(values.build,head.hash));
   if (bytes === undefined) throw new Error('Cook published no index');
   const index = JSON.parse(new TextDecoder().decode(bytes)); indexes.push(index);
-  console.log(`${head.slug}: ${index.proof}, ${index.keys.length} stored objects, ${((performance.now()-started)/1000).toFixed(1)}s`);
+  console.log(`${head.slug}: ${index.proof}, ${index.keys.length} stored objects, ${((performance.now()-started)/1000).toFixed(1)}s${index.preparation === undefined || index.preparation === 'none' ? '' : `, ${index.preparation} preparation`}`);
+  if (index.preparation === 'stale') console.warn(`stale preparation: ${head.slug}`);
 }
 if (cookRevision().revision !== recipe.revision) throw new Error('Cook source changed during the batch');
 const receipt = { build:values.build, cook:recipe, store:join(out,'store'), heads, indexes };

@@ -36,6 +36,8 @@ export interface CookJobPorts {
   readonly maxBytes?: number;
   readonly encoder?: PartEncoder;
   readonly warn?: (line: string) => void;
+  /** The renderer fingerprint the worker cooks for (J262); this process's own when unset. */
+  readonly renderer?: string;
 }
 export interface ServerPackReport {readonly files: number; readonly bytes: number}
 export interface CookJobReport {
@@ -92,9 +94,10 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   }
   const proof = product.shard.runtime === null ? await proved(product, ports) : 'unmeasured' as const;
   const client = join(out, 'client');
-  const cook = await cookShard(tarball, client, {wireBytes: ports.wireBytes, now: ports.now, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
+  const renderer = ports.renderer === undefined ? {} : {renderer: ports.renderer};
+  const cook = await cookShard(tarball, client, {wireBytes: ports.wireBytes, now: ports.now, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
-  const shard = openShardfile(tarball), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
+  const shard = openShardfile(tarball, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
   return {slug: product.index.identity.slug, hash: sha256(tarball), proof, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000};
 }

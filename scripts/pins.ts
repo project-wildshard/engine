@@ -35,6 +35,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
+import { rendererRevision } from './renderer-revision.mjs';
 import { excludePublished } from './pins-exclude.mjs';
 import { dropManifest, folderName, insideTree, lockPins, mountPath, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
 import type { PackedIndex } from './pin-packs.ts';
@@ -163,6 +164,19 @@ const PUBLISHED = /^\/(?:assets|programs)\//u;
 function cookMounts(files: ReadonlyMap<string, Uint8Array>): readonly CookMount[] {
   const body = files.get('cook.json');
   return body === undefined ? [] : (JSON.parse(decoder.decode(body)) as { readonly mounts?: readonly CookMount[] }).mounts ?? [];
+}
+
+/** J262: `current` when the author preparation names this engine's renderer fingerprint, `stale` for another (or when this
+ *  tree can't compute its own), `none` without one. The same verdict `openShardfile` reaches; validation already
+ *  refused a preparation that doesn't match its own inputs. */
+let ownRenderer: string | null | undefined;
+function preparationOf(files: ReadonlyMap<string, Uint8Array>, root: string): 'current' | 'stale' | 'none' {
+  const body = files.get('cook.json');
+  if (body === undefined) return 'none';
+  const cook = JSON.parse(decoder.decode(body)) as { readonly version?: number; readonly renderer?: string };
+  if (cook.version !== 3) return 'none';
+  if (ownRenderer === undefined) { try { ownRenderer = rendererRevision(root); } catch { ownRenderer = null; } }
+  return cook.renderer === ownRenderer ? 'current' : 'stale';
 }
 
 function tracked(): ReadonlySet<string> {
@@ -307,7 +321,10 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     const validation = `${JSON.stringify({ ...receipt, revision, pin: { hash: pin.hash, revision: pin.revision }, ...(pin.slug === dependency?.pin.slug ? {source: dependency.source} : {}) })}\n`;
     writeFileSync(join(target, 'validation.json'), validation);
     written['validation.json'] = sha256(Buffer.from(validation));
-    console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${mounts} mounts published`);
+    // J262 (SP1a): a preparation from another renderer installs and cooks as it is; say so, as the cook does.
+    const preparation = preparationOf(files, root);
+    console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${mounts} mounts published${preparation === 'none' ? '' : `, ${preparation} preparation`}`);
+    if (preparation === 'stale') console.warn(`stale preparation: ${pin.slug}`);
   }
   for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   if (failed > 0) process.exitCode = 1;

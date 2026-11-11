@@ -25,6 +25,7 @@ import {Scope} from '@wildshard/engine/app/scope';
 import {shardSlugOf} from '@wildshard/format/standaloneCatalogue';
 import {ShardfileHashSchema, ShardSlugSchema, RevisionNumberSchema} from '@wildshard/format/uploadWire';
 import {MAX_SHARDFILE_BYTES, type CookJobReport} from './cookJob';
+import {stalePreparationLine} from './shardCook';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
 
@@ -64,6 +65,8 @@ export interface CookIndex {
   readonly serverPack?: NonNullable<CookJobReport['cook']['server']>;
   readonly proof: 'proved' | 'unmeasured';
   readonly seconds: number;
+  /** J262 (SP1a): which author preparation the cook went by; an index from before it has none. */
+  readonly preparation?: CookJobReport['cook']['preparation'];
 }
 
 export const indexKey = (build: string, hash: string): string => `index/${build}/${hash}.json`;
@@ -105,6 +108,9 @@ export interface JobLauncher {
   /** The host's prefix, such as `unshare --net`; a job never sees a route out. */
   readonly wrap: readonly string[];
   readonly limits: CookLimits;
+  /** This engine's renderer fingerprint (J262). A job can't run git under `--permission`, so the worker hands it over;
+   *  without it every author preparation cooks as `stale`. */
+  readonly renderer?: string;
 }
 
 // oxlint-disable-next-line typescript/strict-void-return -- promisify takes execFile's callback form; nothing is dropped.
@@ -132,7 +138,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
     // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
     // is decoded against its hash before use, so one job can't poison the next.
     const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
-      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)})}, stdio: ['ignore', 'pipe', 'pipe']});
+      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer})}, stdio: ['ignore', 'pipe', 'pipe']});
     let stdout = '', stderr = '', peak = 0, why: string | undefined;
     const take = (text: string, kept: string): string => (kept + text).slice(-CAPTURE_BYTES);
     child.stdout.setEncoding('utf8').on('data', (text: string) => { stdout = take(text, stdout); });
@@ -257,7 +263,11 @@ export interface CookWorkerOptions {
   readonly log?: (line: string) => void;
   readonly now?: () => number;
 }
-export interface CookRow {readonly slug: string; readonly hash: string; readonly state: 'cooked' | 'present' | 'refused' | 'failed'; readonly detail?: string; readonly seconds?: number; readonly peakMB?: number}
+export interface CookRow {
+  readonly slug: string; readonly hash: string; readonly state: 'cooked' | 'present' | 'refused' | 'failed'; readonly detail?: string; readonly seconds?: number; readonly peakMB?: number;
+  /** J262: set on a cook that ran, so a recook's list names every shardfile cooked on a stale preparation. */
+  readonly preparation?: CookJobReport['cook']['preparation'];
+}
 const TRANSIENT_TRIES = 3;
 /** A retry can't change these: another clock runs out the same way, and a store stays full. */
 const FINAL = /^(?:past |Over the pack budget)/u;
@@ -294,7 +304,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
-    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', seconds: report.seconds};
+    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', seconds: report.seconds,
+      ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation})};
     await store.put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
   };
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
@@ -306,7 +317,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     if (outcome.report.hash !== head.hash) return {...head, state: 'failed', detail: 'The job cooked other bytes'};
     if (!new Set([shardSlugOf(head.slug)]).has(outcome.report.slug)) return {...head, state: 'refused', detail: `A shardfile for ${outcome.report.slug} under ${head.slug}`};
     await publish(work, outcome.report, head.hash);
-    return {...head, state: 'cooked', seconds: outcome.report.seconds, peakMB: outcome.peakMB};
+    const {preparation} = outcome.report.cook;
+    return {...head, state: 'cooked', seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
   };
   const cookOnce = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow> => {
     const known = verdicts.get(head.hash);
@@ -327,7 +339,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: try ${tries + 1} failed: ${row.detail ?? ''}`);
     }
     verdicts.set(head.hash, row);
-    log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${row.state}${row.seconds === undefined ? '' : ` in ${row.seconds.toFixed(1)} s`}${row.detail === undefined ? '' : `: ${row.detail}`}`);
+    log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${row.state}${row.seconds === undefined ? '' : ` in ${row.seconds.toFixed(1)} s`}${row.preparation === undefined ? '' : `, ${row.preparation === 'stale' ? stalePreparationLine(head.slug) : `${row.preparation} preparation`}`}${row.detail === undefined ? '' : `: ${row.detail}`}`);
     return row;
   };
   let queue: Promise<unknown> = Promise.resolve();

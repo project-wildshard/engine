@@ -191,6 +191,8 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
       const body = Object.keys(client).some(slug => bareSlug(slug) === bareSlug(head.slug)) ? undefined : await store.get(indexKey(build, head.hash));
       if (body === undefined) continue;
       const index = JSON.parse(new TextDecoder().decode(body)) as CookIndex;
+      // J262 (SP1a): the cook went by a preparation from another renderer; the bake says so beside its list.
+      if (index.preparation === 'stale') console.warn(`stale preparation: ${index.slug}`);
       for (const row of index.manifests) await copy(row.url.slice(1), scratch);
       await copy(index.header, out);
       for (const key of index.keys) if (key.startsWith('assets/spawn/server/')) await copy(key, out);
