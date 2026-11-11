@@ -31,8 +31,13 @@ const args = process.argv.slice(2);
 if (args[0] === 'run' && args[1] === 'download') {
   const dir = args[args.indexOf('-D') + 1];
   if (state.flaky !== undefined) {
-    fs.mkdirSync(dir + '/engine-ci-1/engine-ci', { recursive: true });
-    fs.writeFileSync(dir + '/engine-ci-1/engine-ci/shard-1-ordinary.json', JSON.stringify({ files: [{ file: state.flaky.file, state: 'failed', durationMs: 900 }, { file: 'test/fine.test.ts', state: 'passed', durationMs: 10 }] }));
+    for (const job of state.flaky.jobs ?? [1]) {
+      fs.mkdirSync(dir + '/engine-ci-' + job + '/engine-ci', { recursive: true });
+      fs.mkdirSync(dir + '/engine-ci-' + job + '/ci-pack', { recursive: true });
+      fs.writeFileSync(dir + '/engine-ci-' + job + '/ci-pack/job-' + job + '.json', JSON.stringify({ pinsCode: 0, units: [{ name: 'shard:' + job, blocking: true, code: 1 }, { name: 'static', blocking: true, code: state.flaky.staticRed === true ? 1 : 0 }] }));
+      fs.writeFileSync(dir + '/engine-ci-' + job + '/engine-ci/shard-' + job + '-ordinary.json', JSON.stringify({ files: [{ file: state.flaky.file, state: 'failed', durationMs: 900 }, { file: 'test/fine.test.ts', state: 'passed', durationMs: 10 }] }));
+      fs.writeFileSync(dir + '/engine-ci-' + job + '/engine-ci/shard-' + job + '-wall.json', JSON.stringify({ overBudget: false }));
+    }
   }
   process.exit(0);
 }
@@ -66,6 +71,10 @@ if (sha !== undefined) {
     return { id: runId(sha, name), run_attempt: (state.reran ?? []).includes(runId(sha, name)) ? 2 : 1, name, event: 'push', head_sha: sha, head_branch: branch, status: 'completed', conclusion: cancelled(branch) ? 'cancelled' : red === undefined ? 'success' : 'failure', html_url: '' };
   }));
   process.stdout.write(JSON.stringify({ workflow_runs }));
+} else if (/actions\\/runs\\/\\d+$/.test(path)) {
+  const id = Number(/runs\\/(\\d+)$/.exec(path)?.[1]);
+  const red = Object.values(state.red ?? {}).some(names => Object.keys(names).includes(id % 10 === 1 ? 'ci' : 'ring-1'));
+  process.stdout.write(JSON.stringify({ id, status: 'completed', conclusion: red ? 'failure' : 'success', run_attempt: (state.reran ?? []).includes(id) ? 2 : 1 }));
 } else {
   const id = Number(/runs\\/(\\d+)\\/jobs/.exec(path)?.[1]);
   const jobs = [];
@@ -747,16 +756,28 @@ describe('TS10 flaky strikes', () => {
     expect(strikePlans(`${book}\n${row('2026-11-11T11:30:00Z', 'plan/three')}`, 'test/a.test.ts', now)).toEqual(['plan/one', 'plan/three']);
     mkdirSync('tmp', { recursive: true });
     const root = mkdtempSync(resolve('tmp', 'land-strikes-')); roots.push(root);
-    mkdirSync(join(root, 'engine-ci-2/engine-ci'), { recursive: true });
+    mkdirSync(join(root, 'engine-ci-2/engine-ci'), { recursive: true }); mkdirSync(join(root, 'engine-ci-2/ci-pack'), { recursive: true });
+    const job = (units: unknown[]) => writeFileSync(join(root, 'engine-ci-2/ci-pack/job-2.json'), JSON.stringify({ pinsCode: 0, units }));
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-native.json'), JSON.stringify({ files: [{ file: 'test/slow.test.ts', state: 'passed', durationMs: 61_000 }, { file: 'test/ok.test.ts', state: 'passed', durationMs: 5 }] }));
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-ordinary.json'), JSON.stringify({ files: [{ file: 'test/red.test.ts', state: 'failed', durationMs: 5 }] }));
-    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ files: [{ file: 'test/not-a-report.test.ts', state: 'failed' }] }));
-    expect(flakyFiles(root)).toEqual(['test/red.test.ts', 'test/slow.test.ts']);
+    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: false }));
+    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'boundaries', blocking: false, code: 1 }]);
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts', 'test/slow.test.ts']);
+    // Anything but test files keeps it red: another failed job, a red static unit, a shard over its wall, no report.
+    expect(flakyFiles(root, ['tests (2) (failure)', 'quarantine-check (failure)'])).toBeNull();
+    expect(flakyFiles(root, ['tests (5) (failure)'])).toBeNull();
+    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'static', blocking: true, code: 1 }]);
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
+    job([{ name: 'shard:3', blocking: true, code: 1 }]);
+    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: true }));
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
     const quarantine = join(root, 'quarantine.json');
     writeFileSync(quarantine, JSON.stringify({ schema: 1, entries: [] }));
     expect(quarantineFile(quarantine, 'test/red.test.ts', 'opus-testspeed-lane', 'why', now)).toBe(true);
     expect(quarantineFile(quarantine, 'test/red.test.ts', 'opus-testspeed-lane', 'why', now)).toBe(false);
     expect(JSON.parse(readFileSync(quarantine, 'utf8')).entries).toEqual([{ file: 'test/red.test.ts', owner: 'opus-testspeed-lane', addedAt: '2026-11-11T12:00:00.000Z', deadline: '2026-11-13T12:00:00.000Z', reason: 'why' }]);
+    expect(quarantineFile(quarantine, 'test/late.test.ts', 'opus-testspeed-lane', 'why', now + 999)).toBe(true);
+    expect(JSON.parse(readFileSync(quarantine, 'utf8')).entries[1].addedAt).toBe('2026-11-11T12:00:00.000Z');
   });
 
   test('a planted flaky file: one strike lands its plan, a second plan\'s strike quarantines it, a red re-run stops only its plan', () => {
@@ -777,17 +798,21 @@ describe('TS10 flaky strikes', () => {
     // Plan two: the same file flakes: the second plan's strike quarantines it on main, with no human.
     const two = f.worktree('two');
     f.commit(two, 'src/two.ts', 'export const two = 2;\n', 'two');
-    f.state({ red: { 'plan/two': { ci: 'tests (2)' } }, flaky });
+    f.state({ red: { 'plan/two': { ci: 'tests (2)' } }, flaky: { ...flaky, jobs: [2] } });
     result = f.land(two);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/quarantine .*planted-flaky\.test\.ts quarantined for 48 h/u);
     const entries = JSON.parse(f.git(f.remote, ['show', 'main:test/quarantine.json'])).entries;
     expect(entries).toMatchObject([{ file: 'test/planted-flaky.test.ts', owner: 'opus-testspeed-lane' }]);
+    // J193's history check: addedAt is the introducing commit's own time on main, the deadline 48 h later.
+    const committedAt = Number(f.git(f.remote, ['log', '-1', '--first-parent', '--format=%ct', 'main', '--', 'test/quarantine.json'])) * 1000;
+    expect(Date.parse(entries[0].addedAt)).toBe(committedAt);
+    expect(Date.parse(entries[0].deadline) - committedAt).toBe(48 * 3600 * 1000);
     expect(f.git(f.remote, ['show', 'main:src/two.ts'])).toBe('export const two = 2;');
     // Plan three: red on its re-run too: not flaky, it stops, and main does not move.
     const three = f.worktree('three'), before = f.remoteMain();
     f.commit(three, 'src/three.ts', 'export const three = 3;\n', 'three');
-    f.state({ red: { 'plan/three': { ci: 'tests (3)' } }, flaky: { ...flaky, stillRed: true } });
+    f.state({ red: { 'plan/three': { ci: 'tests (3)' } }, flaky: { ...flaky, jobs: [3], stillRed: true } });
     result = f.land(three);
     expect(result.status).toBe(1);
     expect(result.stdout).toMatch(/hosted CI is red/u);

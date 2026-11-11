@@ -26,3 +26,10 @@ re-run. `test/land.test.ts` plants a flaky file through the real land
 CLI with a fake `gh`: one plan's strike lands it, a second plan's strike
 quarantines it on main, and a red re-run stops a third plan with main
 unchanged.
+
+Review (J206), four MUSTs fixed: a re-run happens only when every failed
+blocking job is a tests share whose red units are all shards with failed
+files (its ci-pack and shard reports say so); land waits for the run's own
+second attempt; the quarantine commit is dated to its addedAt (J193's
+history check compares the commit time), re-dated after a rebase, and must
+change only land's entries on the tested HEAD.
