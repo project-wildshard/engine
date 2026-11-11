@@ -3,9 +3,9 @@
 // hook), a post-receive hook records every pushed tip, and a fake `gh` on PATH
 // answers Actions queries only for SHAs that were really pushed.
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories, hooks and the land CLI.
-import { execFile, execFileSync, spawnSync } from 'node:child_process';
+import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A local Actions API double for the main-run reuse check.
 import { createServer } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Evaluate ci.yml's real concurrency-key expressions.
@@ -119,6 +119,7 @@ function fixture() {
     PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush,
     PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript,
     WS_LAND_REPO: 'project-wildshard/fixture', WS_FLAKE_STRIKES: join(root, 'strikes.jsonl'), WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
+    WS_STORE_USERS: join(root, 'store-users'), WS_STORE_RESERVATION: join(root, 'store-maintenance.lock'),
   };
   for (const key of Object.keys(env)) if (key.startsWith('GIT_') && !['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL'].includes(key)) Reflect.deleteProperty(env, key);
   const git = (cwd: string, args: readonly string[]): string => execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -578,7 +579,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/install\s+pnpm-lock\.yaml changed in the rebase; pnpm install --frozen-lockfile/u);
-    expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile']);
+    expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false']);
     const g = fixture();
     writeFileSync(join(g.root, 'bin/pnpm'), `#!/bin/sh\necho "$*" >> '${calls}.g'\n`);
     chmodSync(join(g.root, 'bin/pnpm'), 0o755);
@@ -590,6 +591,36 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(quiet.stdout).not.toMatch(/frozen-lockfile/u);
     expect(existsSync(`${calls}.g`)).toBe(false);
   }, 90_000);
+
+  test('GVS G9/G10: the rebase install survives a layout flip without a TTY, announces itself, and waits out a store prune', async () => {
+    const f = fixture();
+    const calls = join(f.root, 'pnpm-calls.log'), users = join(f.root, 'store-users');
+    // The fake pnpm logs its arguments and whether land announced it in store-users/ while it ran.
+    writeFileSync(join(f.root, 'bin/pnpm'), `#!/bin/sh\necho "$* users=$(ls '${users}' | wc -l | tr -d ' ')" >> '${calls}'\n`);
+    chmodSync(join(f.root, 'bin/pnpm'), 0o755);
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false users=1']);
+    expect(readdirSync(users)).toEqual([]);
+    // A prune holds the store: land stops before installing, and says why.
+    const g = fixture();
+    writeFileSync(join(g.root, 'bin/pnpm'), `#!/bin/sh\necho "$*" >> '${calls}.g'\n`);
+    chmodSync(join(g.root, 'bin/pnpm'), 0o755);
+    const prune = spawn('python3', ['-c', 'import fcntl,sys,time\nf=open(sys.argv[1],"a+")\nfcntl.flock(f,fcntl.LOCK_EX)\nprint("held",flush=True)\ntime.sleep(60)', join(g.root, 'store-maintenance.lock')]);
+    await new Promise(held => prune.stdout.once('data', held));
+    try {
+      const plain = g.worktree('bar');
+      g.commit(plain, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+      g.state({ once: { marker: join(g.root, 'once'), command: ['sh', g.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
+      const stopped = g.land(plain);
+      expect(stopped.status).not.toBe(0);
+      expect(stopped.stdout + stopped.stderr).toMatch(/store prune is running/u);
+      expect(existsSync(`${calls}.g`)).toBe(false);
+    } finally { prune.kill(); }
+  }, 120_000);
 
   test('a harness change carries too: J249 has no harness rule, main\'s own run checks it', () => {
     const f = fixture();
