@@ -74,6 +74,10 @@ try {
     await page.goto(`${rig.base}/?mute=1&nolock=1`, { waitUntil: 'load' });
     await page.locator('.ws-main').waitFor({ state: 'visible', timeout: 120_000 }).catch(async () => { await page.screenshot({ path: join(shots, `${name}-no-title.png`) }); });
     await page.locator('.ws-main-select').click({ timeout: 60_000 });
+    // MP2.4: a fresh device's first PLAY asks its Name before SHARD SELECT opens
+    const named = await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false);
+    note(`${name}: the first PLAY asks a Name`, named);
+    if (named) { await page.locator('#ws-name-box input').fill(name); await page.locator('#ws-name-box button[type=submit]').click(); }
     await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
     note(`${name}: Shard select opens the deck`, true);
     // By the card's own name: "Blender Template" (off the grid) also says template.
@@ -86,10 +90,6 @@ try {
     const selected = await page.evaluate(() => { const shown = document.querySelector('.ws-menu-card.selected'); return shown instanceof HTMLElement ? shown.dataset.i : undefined; });
     note(`${name}: the ${card} card is selected`, selected === String(index), { selected });
     await page.locator('.ws-menu-play').click();
-    // The guest's Name is asked once the page goes online; a page that stayed solo never asks.
-    const named = await page.locator('#ws-name-box input').waitFor({ timeout: 150_000 }).then(() => true).catch(() => false);
-    note(`${name}: the grid page goes online and asks a Name`, named);
-    if (named) { await page.locator('#ws-name-box input').fill(name); await page.locator('#ws-name-box button[type=submit]').click(); }
     const watch = setInterval(() => { void (async () => { const step = await page.evaluate(() => { const shown = document.querySelector('.ws-load'); return shown instanceof HTMLElement ? shown.dataset.step ?? '' : ''; }).catch(() => ''); if (step !== '') stepsSeen.add(step); })(); }, 100);
     const played = await page.waitForFunction(() => typeof window.__workerClient === 'function' && window.__workerClient().frames > 30, undefined, { timeout: 150_000 }).then(() => true).catch(() => false);
     clearInterval(watch);

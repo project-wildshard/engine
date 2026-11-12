@@ -191,8 +191,8 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     if (naming) return;
     if (!nameAskDue()) { next(); return; }
     naming = true;
-    const answered = await askNameOnce(owner);
-    naming = false;
+    let answered = false;
+    try { answered = await askNameOnce(owner, { parent: document.body }); } finally { naming = false; }
     if (answered && !owner.disposed) next();
   };
   const enterPlay = (): void => {

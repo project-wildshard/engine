@@ -315,7 +315,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { startOnline } = await onlineModule();
     // MP2.4: a page that came in without the title's PLAY (a link, a reload) asks for the Name here, once per device, before it joins
-    await askNameOnce(scope, { doctor: () => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'join' })); } });
+    const answered = await askNameOnce(scope, { parent: document.body, doctor: () => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'join' })); } });
+    // a page that left while it asked never joins (Codex review): a cancelled load must not take the device's seat
+    if (!answered || scope.disposed) throw new Error('The page left before it joined the world');
     const { grid } = ports, booted = grid?.booted;
     return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
       ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, cells: grid.cells.map(cell => cell.instance), placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); },

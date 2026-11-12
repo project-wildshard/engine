@@ -6,7 +6,7 @@ import { saveEnvironment } from '../../../shared/engine/saves/environment';
 import type { SaveStorage } from '../../../shared/engine/saves/store';
 import { engineString } from '../../../shared/engine/strings';
 import { jsonSlot } from '../saves/slots';
-import { mountUi } from './ownership';
+import { followsTap, listenTap } from '../input/dom';
 import './styles/namePrompt.css';
 
 /**
@@ -37,8 +37,12 @@ export function savedName(): string {
   const at = keep(), held = at === null ? null : heldName(at.storage, at.prefix);
   return held === null || held === GUEST.name ? '' : held;
 }
-/** Keep `name` (already passed `nameRefusal`) with this device's id; the next join sends it. */
-export function saveName(name: string): void { const at = keep(); if (at !== null) deviceIdentity(at.storage, at.prefix, cleanName(name)); }
+/** Keep `name` (already passed `nameRefusal`) with this device's id; the next join sends it. False when storage refused it. */
+export function saveName(name: string): boolean {
+  const at = keep();
+  if (at === null) return false;
+  try { deviceIdentity(at.storage, at.prefix, cleanName(name)); return true; } catch { return false; }
+}
 
 /** The friendly line for what the server would refuse, or '' when the Name passes. */
 export function nameProblem(typed: string): string {
@@ -57,13 +61,17 @@ const field = (current: string): HTMLInputElement => {
 };
 
 /** Options for the prompt: the Name to show in the field, and the online page's way into the Connection doctor. */
-export interface NamePromptOptions { readonly current?: string; readonly doctor?: () => void; readonly parent?: HTMLElement }
+export interface NamePromptOptions {
+  /** where it mounts: over everything the page shows (the title, or the loading card), so the page's top, not a HUD band */
+  readonly parent: HTMLElement;
+  readonly current?: string; readonly doctor?: () => void;
+}
 
 /**
  * Show the prompt. Resolves the Name typed (cleaned), null for Skip, or undefined when `scope` closed it first. The card sits in
  * the visible part of the page (`visualViewport`), so a phone's keyboard never covers the field or the buttons.
  */
-export function showNamePrompt(scope: Scope, options: NamePromptOptions = {}): Promise<string | null | undefined> {
+export function showNamePrompt(scope: Scope, options: NamePromptOptions): Promise<string | null | undefined> {
   const own = scope.child('name-prompt');
   const box = make('form', 'ws-name'), card = make('div', 'ws-name-card'), input = field(options.current ?? '');
   const error = make('p', 'ws-name-error'), go = make('button', 'ws-name-go', engineString('s_name_go')), skip = make('button', 'ws-name-skip', engineString('s_name_skip'));
@@ -84,8 +92,7 @@ export function showNamePrompt(scope: Scope, options: NamePromptOptions = {}): P
   const view = globalThis.visualViewport;
   const fit = (): void => { if (view === null || view === undefined) return; box.style.top = `${String(view.offsetTop)}px`; box.style.height = `${String(view.height)}px`; };
   if (view !== null && view !== undefined) { own.listen(view, 'resize', fit); own.listen(view, 'scroll', fit); fit(); }
-  // over everything the page shows (the title, or the loading card): the page's top, not a HUD band
-  mountUi(box, own, options.parent ?? document.body);
+  own.ownNode(box); options.parent.append(box);
   input.focus({ preventScroll: true });
   return new Promise(resolve => {
     let settled = false;
@@ -98,16 +105,18 @@ export function showNamePrompt(scope: Scope, options: NamePromptOptions = {}): P
       if (problem !== '') { error.textContent = problem; error.hidden = false; input.setAttribute('aria-invalid', 'true'); input.focus({ preventScroll: true }); return; }
       end(cleanName(input.value));
     });
-    own.listen(skip, 'click', () => { end(null); });
+    // the PLAY tap that opened it was answered on its pointerup: iOS's synthesized click that follows it is not an answer here
+    listenTap(own, skip, () => { end(null); });
+    own.listen(go, 'click', event => { if (followsTap(event)) event.preventDefault(); }, { capture: true });
   });
 }
 
 /** PLAY's step: ask once per device and keep the answer. Resolves true once the device has answered (or never needed to). */
-export async function askNameOnce(scope: Scope, options: Omit<NamePromptOptions, 'current'> = {}): Promise<boolean> {
+export async function askNameOnce(scope: Scope, options: Omit<NamePromptOptions, 'current'>): Promise<boolean> {
   if (!nameAskDue()) return true;
   const answer = await showNamePrompt(scope, { ...options, current: savedName() });
   if (answer === undefined) return false;
-  if (answer !== null) saveName(answer);
+  if (answer !== null) saveName(answer); // a full storage still goes on: the join sends the device's Name
   markNameAsked();
   return true;
 }

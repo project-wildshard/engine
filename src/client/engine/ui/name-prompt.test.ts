@@ -19,7 +19,7 @@ const tick = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 0
 
 test('a first PLAY shows the prompt; Let\'s go keeps the Name for the join; a second PLAY skips it', async () => {
   expect(nameAskDue()).toBe(true);
-  const first = askNameOnce(scope());
+  const first = askNameOnce(scope(), { parent: document.body });
   expect(box()).not.toBeNull();
   expect(box()?.textContent).toContain('What should we call you?');
   expect(box()?.querySelector('button[type=submit]')?.textContent).toBe('Let\'s go');
@@ -34,12 +34,12 @@ test('a first PLAY shows the prompt; Let\'s go keeps the Name for the join; a se
   if (storage === null) throw new Error('no storage');
   expect(deviceIdentity(storage, appIdentity().savePrefix).name).toBe('Matt');
   // the second PLAY goes straight in
-  expect(await askNameOnce(scope())).toBe(true);
+  expect(await askNameOnce(scope(), { parent: document.body })).toBe(true);
   expect(box()).toBeNull();
 });
 
 test('Skip keeps the default Name, and the device is not asked again', async () => {
-  const first = askNameOnce(scope());
+  const first = askNameOnce(scope(), { parent: document.body });
   const skip = box()?.querySelector<HTMLButtonElement>('[data-name=skip]');
   if (skip === null || skip === undefined) throw new Error('no Skip');
   skip.click();
@@ -50,12 +50,12 @@ test('Skip keeps the default Name, and the device is not asked again', async () 
   if (storage === null) throw new Error('no storage');
   expect(deviceIdentity(storage, appIdentity().savePrefix).name).toBe(GUEST.name);
   expect(nameAskDue()).toBe(false);
-  expect(await askNameOnce(scope())).toBe(true);
+  expect(await askNameOnce(scope(), { parent: document.body })).toBe(true);
   expect(box()).toBeNull();
 });
 
 test('the server\'s own rule refuses inline: an empty Name, or one with a listed word, stays on the prompt', async () => {
-  const asking = askNameOnce(scope());
+  const asking = askNameOnce(scope(), { parent: document.body });
   let done = false; void asking.then(() => { done = true; return done; });
   type('   '); submit(); await tick();
   expect(done).toBe(false);
@@ -74,7 +74,7 @@ test('the prompt fills in a Name the device already keeps', async () => {
   const storage = saveEnvironment().storage('global');
   if (storage === null) throw new Error('no storage');
   deviceIdentity(storage, appIdentity().savePrefix, 'Jake');
-  const asking = askNameOnce(scope());
+  const asking = askNameOnce(scope(), { parent: document.body });
   expect(box()?.querySelector('input')?.value).toBe('Jake');
   submit();
   expect(await asking).toBe(true);
@@ -82,7 +82,7 @@ test('the prompt fills in a Name the device already keeps', async () => {
 });
 
 test('a closed page ends the prompt unanswered: the next PLAY asks again', async () => {
-  const owner = scope(), asking = askNameOnce(owner);
+  const owner = scope(), asking = askNameOnce(owner, { parent: document.body });
   owner.dispose();
   expect(await asking).toBe(false);
   expect(box()).toBeNull();
