@@ -393,6 +393,7 @@ export const ENGINE_STRINGS = {
   "s_96f0c06bbcb7": "Developer tools",
   "s_f6d2705a823f": "Loading & memory",
   "s_debug_early_programs": "Early shader compile",
+  "s_debug_look_light": "Look light (LF1-4)",
   "s_debug_fail_screens": "Failure screens",
   "s_debug_fail_screens_open": "Open",
   "s_debug_fail_screens_note": "A13: prototypes of every screen a player sees when the online world's link fails. None is wired to a real failure yet.",

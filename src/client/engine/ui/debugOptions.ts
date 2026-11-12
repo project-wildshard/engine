@@ -27,6 +27,7 @@ import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { OPTION_VALUES, saveSetting, setting, settingsReloadUrl } from './Settings';
 import type { DebugRowSpec } from '../../../server/engine/level/context';
 import { isDev, onDev } from '../core/devMode';
+import { lookLightSaved, setLookLight } from './lookLightOption';
 
 /** what "applies" reads: the shard you are in and the weapons you hold (re-read every time the menu opens) */
 export interface DebugCtx { chunk: LevelSpec; weapons: ReadonlySet<string> }
@@ -144,6 +145,15 @@ const earlyProgramsRow: DebugRow = { id: 'earlyPrograms', group: 'loading', labe
   on: () => undefined,
   note: 'DL10: compile the spawn view\'s shader programs during loading, as soon as the world is built; default off until a Simulator / iPhone reading.',
   ask: 'E526', reviewBy: '2026-12-30' };
+/** LF1-4 (meta TEMPLATE-E2E-PLAN): a look's optional light and post settings (contact AO, a warm rim, height fog, light
+ *  pools, a declared bloom; render/lookLight.ts). Read at load, so a pick reloads; default off until Jake picks. */
+const lookLightRow: DebugRow = { id: 'lookLight', group: 'look', label: engineString('s_debug_look_light'), reload: true, when: always,
+  choices: () => [{ v: 'off', text: engineString('s_ca7981b46ecf') }, { v: 'on', text: engineString('s_130011756125') }],
+  get: () => lookLightSaved() ? 'on' : 'off',
+  set: (next) => { if (next === 'off' || next === 'on') setLookLight(next === 'on'); },
+  on: () => undefined,
+  note: 'LF1-4: a level look\'s light settings (look.light: contact AO, warm rim, height fog, light pools; look.grade.bloom). Off draws as before.',
+  ask: 'E526', reviewBy: '2026-12-30' };
 const weatherWord = (value: string): value is (typeof OPTION_VALUES.weather)[number] => OPTION_VALUES.weather.some(choice => choice === value);
 /** The Weather setting, live: a level that reads it hears it, and on the wire the server's sky does. */
 const weatherRow: DebugRow = { purpose: 'developer', id: 'liveWeather', group: 'tools', label: engineString('s_debug_weather'), reload: false, when: always,
@@ -178,6 +188,7 @@ const failScreensRow = action('failScreens', 'tools', engineString('s_debug_fail
 
 export const DEBUG_ROWS: readonly DebugRow[] = [
   // ── Look ──
+  lookLightRow,
 
 
 

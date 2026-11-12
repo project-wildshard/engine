@@ -722,9 +722,11 @@ export class Game {
       if (AoPass === null) throw new Error('Game.buildComposer with AO on before prepareComposer()');
       const ao = new AoPass(this.rootScene, this.camera, window.innerWidth, viewportHeight());
       aoPass = ao;
-      ao.configuration.aoRadius = 2.5;
+      // a level's tier knobs may tune it (LF1-4: a shardfile look's `light.ao`)
+      const aoRadius = knobs['ao.radius'], aoIntensity = knobs['ao.intensity'];
+      ao.configuration.aoRadius = typeof aoRadius === 'number' ? aoRadius : 2.5;
       ao.configuration.distanceFalloff = 1.0;
-      ao.configuration.intensity = 2.5;
+      ao.configuration.intensity = typeof aoIntensity === 'number' ? aoIntensity : 2.5;
       ao.configuration.halfRes = true;
       ao.configuration.screenSpaceRadius = false;
       ao.configuration.gammaCorrection = false;

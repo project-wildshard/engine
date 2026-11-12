@@ -17,6 +17,8 @@ import type { AudioData } from '@wildshard/format/audio';
 import { parseShardSlug } from '../../../shared/game/shard/slug';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { ownedPresentationImages } from '../shardfile/presentation';
+import { lookLightManifest } from '@wildshard/engine/render/lookLight';
+import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
 import { absentShardProduct, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 
 
@@ -160,6 +162,8 @@ export function sourceManifest(source: Pick<Shardfile, 'identity' | 'accent' | '
   if (source.map !== undefined && map === undefined) throw new Error('Map image is missing admitted bytes');
   const slug = parseShardSlug(source.identity.slug);
   const images = imageOwner === undefined ? undefined : ownedPresentationImages(source, assets, imageOwner);
+  // LF1-4: the look's light settings (height fog, bloom, desktop AO) behind Settings ▸ Debug ▸ Look ▸ "Look light"
+  const light = lookLightManifest(source.look, lookLightOn());
   const card = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/%3E';
   return {
     ...(source.navigation === null || source.navigation === undefined || navigation === undefined ? {} : { navigation: { row: source.navigation, bytes: navigation } }),
@@ -169,10 +173,10 @@ export function sourceManifest(source: Pick<Shardfile, 'identity' | 'accent' | '
     treeCount: 0, trees: { factory: 'none', noun: 'trees' }, ground: { structures: true, paths: 'plugin' }, horizon: { rings: [], cloudSea: false },
     spawn: { ...source.spawn }, spawns: [], species: [], uses: [], boundary: { visible: false },
     sky: { sunColor: [1, 1, 1], sunIntensity: 1, envIntensity: 0.5, bgIntensity: 1, fogSunColor: [1, 1, 1], cloudSunColor: [1, 1, 1], hemiSky: 0x9ca7b4, hemiGround: 0x606060, hemiIntensity: 0.7, sun: { azimuth: 35, elevation: 45 } },
-    atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0, fogDistDensity: 0, volumetricSunColor: [1, 1, 1] },
-    grade: { saturation: source.look.grade.saturation - 1, brightness: 0, contrast: source.look.grade.contrast - 1, bloomIntensity: 0, bloomThreshold: 1, shadowTint: [1, 1, 1], highTint: [1, 1, 1], lift: [0, 0, 0], gain: [1, 1, 1], gamma: 1 },
+    atmosphere: { ...light.atmosphere, fogDistDensity: 0, volumetricSunColor: [1, 1, 1] },
+    grade: { saturation: source.look.grade.saturation - 1, brightness: 0, contrast: source.look.grade.contrast - 1, bloomIntensity: light.bloom.intensity, bloomThreshold: light.bloom.threshold, shadowTint: [1, 1, 1], highTint: [1, 1, 1], lift: [0, 0, 0], gain: [1, 1, 1], gamma: 1 },
     budgets: {}, fight: {}, loadout: { weapons: [], tools: [], start: [] }, minimap: images?.map === undefined ? {} : { image: images.map },
-    render: async () => source.look.keys.length === 0 ? (await import('../shardfile/emptyLook')).emptyLook(source.look.dayOverride) : (await import('../shardfile/look')).shardfileLook(source.look), tiers: { phone: { ao: false, godRays: false }, desktop: { ao: false, godRays: false } },
+    render: async () => source.look.keys.length === 0 ? (await import('../shardfile/emptyLook')).emptyLook(source.look.dayOverride) : (await import('../shardfile/look')).shardfileLook(source.look), tiers: { phone: { ao: false, godRays: false }, desktop: light.ao === null ? { ao: false, godRays: false } : { ao: true, godRays: false, 'ao.intensity': light.ao.intensity, 'ao.radius': light.ao.radius } },
     audio: { ambience: 'none', score: 'none' },
     boot: { files: () => [], sources: () => ({ sky: [], baked: [], terrain: [], trees: [], physics: [], cabins: [], props: [], art: [], music: [], sfx: [] }), viewmodelSets: [], audio: () => Promise.resolve([]), precache: [] },
     // A plugin source enters the ordinary staged LevelLoader, even with no authored hooks.

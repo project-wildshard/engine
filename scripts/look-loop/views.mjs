@@ -9,7 +9,7 @@
 // JSON; every later run shoots exactly those cameras, so a before / after pair is the same frame.
 //
 //   node scripts/look-loop/views.mjs --cameras=<json> --out=<dir> [--anchor=a,b] [--tag=r2] [--query=k=v&...]
-//        [--url=http://127.0.0.1:4173] [--settle=4] [--timeout=300]
+//        [--url=http://127.0.0.1:4173] [--settle=4] [--timeout=300] [--save=debug.lookLight=on,…]
 //
 // Writes <out>/<anchor>/[<tag>-]capture-<n>-<id>.jpg and <out>/[<tag>-]<anchor>-sheet.jpg (JPEG, <= 490 KB). Cells:
 // row 1 FP front / left / right, row 2 FP back / TOP / DIAG front, row 3 DIAG left / right / back; each cell is labelled
@@ -23,7 +23,7 @@ import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { NAME_ASKED, developerSettings, harnessPins, hideDeveloperOverlays, saveFixture } from '../debug-settings.mjs';
 import { captureName, contextOptions, parseCameraFile, parseFlags, resolveMissing } from './cameras.mjs';
 
-const flags = parseFlags(process.argv.slice(2), ['cameras', 'out', 'anchor', 'tag', 'query', 'url', 'settle', 'timeout', 'help']);
+const flags = parseFlags(process.argv.slice(2), ['cameras', 'out', 'anchor', 'tag', 'query', 'url', 'settle', 'timeout', 'save', 'help']);
 if (flags.help || typeof flags.cameras !== 'string' || typeof flags.out !== 'string') {
   console.error(readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(1, 17).map(l => l.replace(/^\/\/ ?/u, '')).join('\n'));
   process.exit(flags.help ? 0 : 2);
@@ -35,6 +35,8 @@ const SETTLE = Number(str(flags.settle, '4')) * 1000, TIMEOUT = Number(str(flags
 const only = str(flags.anchor, '').split(',').filter(Boolean);
 if (TAG !== '' && !/^[a-z0-9][a-z0-9-]*$/u.test(TAG)) throw new Error(`--tag=${TAG}: lowercase letters, digits and - only (targets.py reads it back)`);
 const DEF = parseCameraFile(JSON.parse(readFileSync(CAMS, 'utf8')));
+/** `--save=key=value,…`: device save slots written before the load (a Debug row read at load, e.g. debug.lookLight=on) */
+const SAVES = str(flags.save, '').split(',').filter(Boolean).map(pair => { const at = pair.indexOf('='); if (at < 1) throw new Error(`--save=${pair}: key=value`); return { scope: 'device', key: pair.slice(0, at), data: pair.slice(at + 1) }; });
 const unknown = only.filter(id => !DEF.anchors.some(a => a.id === id));
 if (unknown.length > 0) throw new Error(`--anchor: no anchor ${unknown.join(', ')} in ${CAMS}`);
 const anchors = DEF.anchors.filter(a => only.length === 0 || only.includes(a.id));
@@ -102,6 +104,7 @@ try {
     try {
       await developerSettings(ctx, { tier: g.tier, volume: 0, ...DEF.settings });
       await ctx.addInitScript(hideDeveloperOverlays);
+      for (const fixture of SAVES) await saveFixture(ctx, fixture);
       await harnessPins(ctx, { seed: 357 });
       await saveFixture(ctx, NAME_ASKED); // a page with a world asks for the Name before it joins (MP2.4); a capture never answers it
       const page = await ctx.newPage();

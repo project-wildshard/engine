@@ -1,6 +1,8 @@
 import { DATA_LOOK_DAY, dataLook } from '@wildshard/engine/render/dataLook';
 import type { LookStrategy } from '@wildshard/engine/render/look';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { lookLightManifest } from '@wildshard/engine/render/lookLight';
+import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
 
 /**
  * A shardfile's file reference → its URL: products sit beside the page that embeds `shard.json` (the SDK build writes
@@ -8,9 +10,14 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
  */
 export function shardfileFileUrl(ref: string): string { return `./${ref.replace(/^commons:/u, '')}`; }
 
-/** A shardfile's look section → the engine's data look (SF10b): its day keys on the engine clock and its LUT file. */
-export function shardfileLook(look: Shardfile['look'], assets?: ReadonlyMap<string, Uint8Array>): LookStrategy {
+/**
+ * A shardfile's look section → the engine's data look (SF10b): its day keys on the engine clock and its LUT file, and its
+ * light settings (LF1-4, `look.light`) while Settings ▸ Debug ▸ Look ▸ "Look light" is on (`light` overrides the row).
+ */
+export function shardfileLook(look: Shardfile['look'], assets?: ReadonlyMap<string, Uint8Array>, light: boolean = lookLightOn()): LookStrategy {
   const lut = look.grade.lut === null ? null : assets?.get(look.grade.lut) ?? shardfileFileUrl(look.grade.lut);
   if (assets !== undefined && look.grade.lut !== null && !assets.has(look.grade.lut)) throw new Error('Missing admitted look LUT');
-  return dataLook({ day: look.day ?? DATA_LOOK_DAY, dayOverride: look.dayOverride, keys: look.keys, lut });
+  const resolved = lookLightManifest(look, light);
+  return dataLook({ day: look.day ?? DATA_LOOK_DAY, dayOverride: look.dayOverride, keys: look.keys, lut,
+    light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity } });
 }

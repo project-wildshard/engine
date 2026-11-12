@@ -22,6 +22,8 @@ import { loadLookGraphCompiler } from './graphBackend';
 import { EmissiveLook } from './families/emissive';
 import { familyMaterial } from './families/registry';
 import { ToonLook } from './families/toon';
+import { LOOK_RIM_PATCH, lightPools, rimPatch } from './lookLight';
+import type { LookPools, LookRim } from '@wildshard/format/look-light';
 
 type Rgb = readonly [number, number, number];
 const mesh = (object: THREE.Object3D): object is THREE.Mesh => object instanceof THREE.Mesh;
@@ -53,6 +55,11 @@ export interface DataLookSpec {
   readonly keys: readonly LookKey[];
   /** a 33³ × RGBA8 LUT (render/lut.ts format), applied last in the grade; null for none */
   readonly lut: string | Uint8Array | null;
+  /**
+   * its light settings as they resolved at load (LF1-4, `render/lookLight.ts`): a rim patched into every lit material, the
+   * light pools' decal draw and the fog program's height density; absent: none of them
+   */
+  readonly light?: { readonly rim: LookRim | null; readonly pools: LookPools | null; readonly heightFogDensity: number };
 }
 
 /** A sampled look: plain numbers, blended between the two keys around a time of day. */
@@ -129,6 +136,8 @@ async function lutTexture(url: string | Uint8Array | null): Promise<LookupTextur
 export function dataLook(spec: DataLookSpec): LookStrategy {
   if (spec.keys.length === 0) throw new Error('[look] a data look needs at least one key');
   const linear = spec.keys[0]?.fog.near !== undefined;
+  // the mist's GLSL is in the linear fog only when the look declares it (LF1-4): off, the shader text is as before
+  const mist = (spec.light?.heightFogDensity ?? 0) > 0;
   const fog = { wsLookFogNear: new THREE.Uniform(0), wsLookFogFar: new THREE.Uniform(1), wsLookFogEnabled: new THREE.Uniform(0) };
   const patchFog = (shader: ShaderSource): void => {
     if (shader.uniforms['wsLookFogNear'] !== undefined) return;
@@ -137,6 +146,16 @@ export function dataLook(spec: DataLookSpec): LookStrategy {
       #ifdef USE_FOG
       if (wsLookFogEnabled > 0.5) {
         float amount = clamp((length(vFogWorldPos - cameraPosition) - wsLookFogNear) / (wsLookFogFar - wsLookFogNear), 0.0, 1.0);
+${mist ? `
+        {
+          // LF1-4: the fog program's height term (look.light.heightFog) over the linear fog: mist pooled low. The optical
+          // depth along the ray is density x length x mean of exp(-falloff (y - height)), written as a difference of two
+          // bounded exponentials (no 0 x inf at a high camera over a steep falloff)
+          float mistA = max(fogHeightFalloff * (cameraPosition.y - fogHeight), -20.0), mistB = max(fogHeightFalloff * (vFogWorldPos.y - fogHeight), -20.0);
+          float mistMean = abs(mistB - mistA) > 1e-3 ? (exp(-mistA) - exp(-mistB)) / (mistB - mistA) : exp(-mistA);
+          float mist = 1.0 - exp(-fogHeightDensity * mistMean * length(vFogWorldPos - cameraPosition));
+          amount = 1.0 - (1.0 - amount) * (1.0 - clamp(mist, 0.0, 1.0));
+        }` : ''}
         gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, amount);
       } else {
         #include <fog_fragment>
@@ -144,10 +163,30 @@ export function dataLook(spec: DataLookSpec): LookStrategy {
       #endif`);
     shader.fragmentShader = `#ifdef USE_FOG\nuniform float wsLookFogNear; uniform float wsLookFogFar; uniform float wsLookFogEnabled;\n#endif\n${patched}`;
   };
-  const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null } = { dome: null, lut: null };
+  const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean } = { dome: null, lut: null, pools: null, rim: false };
   return {
     // the sky builds before the composer: the level scope takes the dome and the LUT here
     mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope }) => {
+      const rim = spec.light?.rim ?? null, pools = spec.light?.pools ?? null;
+      if (rim !== null && !owned.rim) {
+        owned.rim = true; scope.onDispose(() => { owned.rim = false; });
+        // LF1-4: one rim patch over every lit material, present and later (its values are uniforms: one shader text)
+        const patchRim = rimPatch(rim), seen = new Set<THREE.Material>();
+        setInheritedPatch(patchRim, { scope, chain: true });
+        scene.traverse((object) => {
+          if (!mesh(object)) return;
+          for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+            if (seen.has(material)) continue;
+            seen.add(material); patchShader(material, LOOK_RIM_PATCH, PATCH_ORDER.decorate, patchRim, { scope });
+          }
+        });
+      }
+      if (pools !== null && owned.pools === null) {
+        // once per look: a composer rebuild (a graphics change) composes again without retiring this scope
+        const decal = lightPools(pools);
+        owned.pools = decal;
+        scene.add(decal); scope.own(decal.geometry); scope.own(decal.material); scope.onDispose(() => { decal.removeFromParent(); decal.dispose(); if (owned.pools === decal) owned.pools = null; });
+      }
       if (linear) {
         setInheritedPatch(patchFog, { scope, chain: true });
         const seen = new Set<THREE.Material>();
@@ -185,7 +224,7 @@ export function dataLook(spec: DataLookSpec): LookStrategy {
           targets.fog.near = now.fogNear; targets.fog.far = now.fogFar;
           fog.wsLookFogNear.value = now.fogNear; fog.wsLookFogFar.value = now.fogFar;
         }
-        targets.fogU.fogDistDensity.value = now.fogDensity; targets.fogU.fogHeightDensity.value = 0;
+        targets.fogU.fogDistDensity.value = now.fogDensity; targets.fogU.fogHeightDensity.value = spec.light?.heightFogDensity ?? 0;
         targets.fogU.fogSunColor.value.copy(now.sun);
       };
       sampleLook(spec.keys, clock.hour / 24, now);
