@@ -6,7 +6,7 @@ import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {GATE_DIR, copyReason, makeGateCopy, pushedCommit} from '../../scripts/push-gate-copy.mjs';
+import {GATE_DIR, copyReason, makeGateCopy, pushedCommit, sweepDeadCopies} from '../../scripts/push-gate-copy.mjs';
 import {mainPull} from '../../scripts/main-pull.mjs';
 import {capturePushTree} from '../../scripts/push-proof-cache.mjs';
 
@@ -78,6 +78,15 @@ describe('push gate copy (EV1)', () => {
     expect(readFileSync(join(root, 'shared.mjs'), 'utf8')).toBe(brokenEdit);
     expect(readFileSync(join(root, 'scratch.mjs'), 'utf8')).toBe(brokenNew);
     expect(git(root, ['status', '--porcelain'])).toBe(' M shared.mjs\n?? scratch.mjs'.trim());
+
+    // A killed gate's copy (its pid gone) is swept by the next gate; a live one stays.
+    const dead = join(root, GATE_DIR, `${head.slice(0, 12)}-999999`);
+    git(root, ['worktree', 'add', '-q', '--detach', dead, head]);
+    const live = makeGateCopy(root, head, {say: () => {}});
+    expect(existsSync(dead)).toBe(false);
+    expect(sweepDeadCopies(root)).toBe(0);
+    expect(existsSync(live.path)).toBe(true);
+    live.remove();
 
     // A type-broken pushed commit is still red in its copy.
     writeFileSync(join(root, 'c.mjs'), 'export const c = ;\n');

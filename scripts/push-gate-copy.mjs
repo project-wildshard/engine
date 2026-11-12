@@ -9,10 +9,11 @@
 //   2. build state, cloned whole (copy-on-write, no new blocks): node_modules, .bin-deps/node_modules, .tsc-layers (the
 //      tsc -b cache) and out/ with the pins mounts this checkout's install published (pins-reuse.mjs);
 //   3. if that still leaves the copy unclean (a commit that moves the pins key), `pnpm pins` in the copy, once;
-//   4. the gate runs there; then the copy and its worktree entry are removed, green or red.
+//   4. the gate runs there; then the copy and its worktree entry are removed, green or red. A copy whose gate was
+//      killed is swept by the next one (its pid is gone).
 // Each step's seconds print as one `push-gate copy` line. Turn it off in one commit: CLEAN_COPY below.
 import {execFileSync,spawnSync} from 'node:child_process';
-import {existsSync,lstatSync,mkdirSync,rmSync} from 'node:fs';
+import {existsSync,lstatSync,mkdirSync,readdirSync,rmSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {clonePaths} from './apfs-clone.mjs';
 import {verifiedPinsOutputs} from './pins-reuse.mjs';
@@ -60,6 +61,24 @@ export function copyReason(root,sha,env,enabled=CLEAN_COPY){
  return dirt.length===0?null:`${dirt.length} uncommitted path(s) in the checkout, e.g. ${dirt[0]}`;
 }
 
+/** Remove copies a killed gate left behind: their pid (the name's suffix) is gone. A live gate's copy is never touched.
+ * @param {string} root @returns {number} removed */
+export function sweepDeadCopies(root){
+ let removed=0;
+ /** @type {string[]} */let names=[];
+ try{names=readdirSync(join(root,GATE_DIR));}catch{return 0;}
+ for(const name of names){
+  const pid=Number(/-(\d+)$/u.exec(name)?.[1]??'0');
+  if(!Number.isInteger(pid)||pid<=0||pid===process.pid)continue;
+  try{process.kill(pid,0);continue;}catch(error){if(!(error instanceof Error)||!('code' in error)||error.code!=='ESRCH')continue;}
+  const path=join(root,GATE_DIR,name);
+  try{git(root,['worktree','remove','--force',path]);}catch{/* Not registered. */}
+  rmSync(path,{recursive:true,force:true});removed++;
+ }
+ if(removed>0)try{git(root,['worktree','prune']);}catch{/* Housekeeping only. */}
+ return removed;
+}
+
 /** Make the clean copy of `sha`. Returns its path and a remover; on failure removes what it made and throws.
  * @param {string} root the pushing checkout @param {string} sha
  * @param {{say?:(line:string)=>void,env?:NodeJS.ProcessEnv}} [options] */
@@ -74,6 +93,7 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   try{git(root,['worktree','prune']);}catch{/* Prune is housekeeping only. */}
  };
  mkdirSync(dirname(path),{recursive:true});
+ sweepDeadCopies(root);
  if(existsSync(path))rmSync(path,{recursive:true,force:true});
  try{
   timed('add',()=>{git(root,['worktree','add','--quiet','--detach','--no-checkout',path,sha]);git(path,['reset','--quiet']);});

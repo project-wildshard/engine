@@ -16,3 +16,5 @@ related Vitest files, as a plan branch does. Main's own ci runs the full suite, 
 SHA (`--after-push` waits for it to reach main and quits if the push lost a race), so a red is reported to the lane
 and fixed forward (J249). `MAIN_PUSH_SPLIT` in `scripts/push-local-split.mjs` is the switch. A tag or release push
 keeps the complete gate.
+
+A gate killed mid-run (SIGKILL, a closed terminal) leaves its copy; the next gate sweeps every copy whose pid is gone.
