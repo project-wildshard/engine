@@ -21,3 +21,7 @@
   held or done; `Status:` is refused), so the updated plan-gate test
   holds. `main-only.test.mjs` now matches the slimmer brief's
   `plan worktrees (n):` line.
+
+- Stamped the agent layer from repo-kit v2.1.0 (2 paths): the tenth kit
+  skill, look-loop (Jake, 2026-11-11: the look loop into all the
+  repositories); owner skills untouched. Landed with land.mjs (J240).
