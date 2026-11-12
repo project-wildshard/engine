@@ -86,7 +86,8 @@ export function retainProductInputs(root, name, receipt, key, recipe, memo) {
 }
 /** Locate a normal build's product without generating or publishing bytes.
  * A cache path loan remains pinned through this consumer process's lifetime.
- * CI consumes its exact build output. Local callers require a matching sealed input receipt.
+ * CI consumes its exact build output: WS_TEST_PRODUCTS_SHA (set by ci-checks once the run's artifacts verify) must equal
+ * the checkout's GITHUB_SHA. Local callers require a matching sealed input receipt.
  * The caller still admits the returned product's complete bytes through its normal loader.
  * @param {string} sourceRoot @param {string} name
  * @param {{cacheRoot?:string,env?:NodeJS.ProcessEnv}} [options] */
@@ -94,7 +95,7 @@ export function readBuiltShardfile(sourceRoot, name, { cacheRoot = shardfileCach
   if (!/^[a-z0-9_-]+$/u.test(name)) throw new Error('Invalid built product name');
   const root = resolve(sourceRoot);
   const destination = resolve(root, 'out', name), built = env.WS_TEST_PRODUCTS_SHA;
-  if (built !== undefined && /^[a-f0-9]{40}$/u.test(built) && built === env.VERCEL_GIT_COMMIT_SHA
+  if (built !== undefined && /^[a-f0-9]{40}$/u.test(built) && built === env.GITHUB_SHA
     && existsSync(resolve(destination, 'shard.json'))) return destination;
   // P3: no shard source to rebuild from, so a product is a pinned shardfile (J65) or it is missing.
   if (!existsSync(resolve(root, 'src/shards'))) {

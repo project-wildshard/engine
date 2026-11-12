@@ -70,7 +70,6 @@ if (prepared) {
   // Its children consume that restored product, just like the product cohort;
   // machine-local input/cache receipts are deliberately absent from artifacts.
   process.env.WS_TEST_PRODUCTS_SHA = sha;
-  process.env.VERCEL_GIT_COMMIT_SHA = sha;
   console.log(`ci-checks: verified same-run preparation ${((Date.now()-t0)/1000).toFixed(0)} s; running ${commands.length} in parallel`);
 } else {
   if (spawnSync('pnpm', ['gen'], { stdio: 'inherit' }).status !== 0) process.exit(1);

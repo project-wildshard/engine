@@ -442,7 +442,7 @@ class PreparedProducts(unittest.TestCase):
               if(existsSync('absent-cache'))throw new Error('Unexpected local product cache');
               const folder=readBuiltShardfile(process.cwd(),'fictional',{{cacheRoot:resolve('absent-cache')}});
               if(folder!==resolve('out/fictional'))throw new Error('Did not use verified restored product');
-              writeFileSync('verified-env.json',JSON.stringify({{sha:process.env.WS_TEST_PRODUCTS_SHA,commit:process.env.VERCEL_GIT_COMMIT_SHA}}));
+              writeFileSync('verified-env.json',JSON.stringify({{sha:process.env.WS_TEST_PRODUCTS_SHA,github:process.env.GITHUB_SHA}}));
               writeFileSync('checks-ran','once');
             """)
         return subprocess.run(['node', 'scripts/ci-checks.mjs', '--prepared', 'node extra.mjs'],
@@ -454,12 +454,11 @@ class PreparedProducts(unittest.TestCase):
         for name in ['pnpm-lock.yaml', 'pnpm-workspace.yaml']:
             (self.root / name).write_text('{}')
         products.pack(self.root)
-        with patch.dict(os.environ, {'WS_TEST_PRODUCTS_SHA': 'f' * 40,
-                                     'VERCEL_GIT_COMMIT_SHA': 'e' * 40}):
+        with patch.dict(os.environ, {'WS_TEST_PRODUCTS_SHA': 'f' * 40}):
             result = self.run_prepared_checks(read_product=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(json.loads((self.root / 'verified-env.json').read_text()),
-                         {'sha': self.sha, 'commit': self.sha})
+                         {'sha': self.sha, 'github': self.sha})
         self.assertFalse((self.root / 'absent-cache').exists())
         self.assertNotIn('ci-checks: gen ', result.stdout)
 

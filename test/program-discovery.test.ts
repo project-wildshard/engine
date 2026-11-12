@@ -20,7 +20,7 @@ import { TIER } from '../src/client/engine/core/tier';
 
 const slug = 'discovery-fixture';
 const sha = 'a'.repeat(40);
-const options = { env: { WS_TEST_PRODUCTS_SHA: sha, VERCEL_GIT_COMMIT_SHA: sha } };
+const options = { env: { WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: sha } };
 const discovery = parseDiscoveryValues({
   budgets: {},
   'boot.files': { modes: { phone: { img: ['phone.png'], ktx2: ['phone.ktx2'] }, desktop: { img: ['desktop.png'], ktx2: ['desktop.ktx2'] } } },
@@ -57,7 +57,7 @@ function providerFixture(): { readonly root: string; readonly directory: string;
 test('discovery refresh retains the complete old module when its current receipt refuses', () => {
   const f = providerFixture(), old = 'export const retained = "original provider";\n';
   try {
-    vi.stubEnv('WS_TEST_PRODUCTS_SHA', sha); vi.stubEnv('VERCEL_GIT_COMMIT_SHA', sha);
+    vi.stubEnv('WS_TEST_PRODUCTS_SHA', sha); vi.stubEnv('GITHUB_SHA', sha);
     build(f.root); writeFileSync(f.file, old);
     const original = receipt(f.root), inode = statSync(f.file).ino;
     putReceipt(f.root, { ...original, indexHash: '0'.repeat(64) });
@@ -73,7 +73,7 @@ test('discovery refresh retains the complete old module when its current receipt
 test('missing discovery stays absent on refusal and is initialized only from a valid complete product', () => {
   const f = providerFixture();
   try {
-    vi.stubEnv('WS_TEST_PRODUCTS_SHA', sha); vi.stubEnv('VERCEL_GIT_COMMIT_SHA', sha);
+    vi.stubEnv('WS_TEST_PRODUCTS_SHA', sha); vi.stubEnv('GITHUB_SHA', sha);
     refreshDiscovery(f.root); expect(existsSync(f.file)).toBe(false);
     build(f.root); refreshDiscovery(f.root);
     expect(readFileSync(f.file, 'utf8')).toBe(relocateDiscoverySource(f.root, {slug,folder:slug,output:null}, authoredManifestSource(f.root, slug, { discovery })));
@@ -86,7 +86,7 @@ test('discovery replacement is atomic for an already-open reader and leaves no s
   const f = providerFixture(), old = 'export const retained = "open reader";\n';
   let reader: number | undefined;
   try {
-    vi.stubEnv('WS_TEST_PRODUCTS_SHA', sha); vi.stubEnv('VERCEL_GIT_COMMIT_SHA', sha);
+    vi.stubEnv('WS_TEST_PRODUCTS_SHA', sha); vi.stubEnv('GITHUB_SHA', sha);
     build(f.root); writeFileSync(f.file, old); reader = openSync(f.file, 'r');
     refreshDiscovery(f.root);
     expect(readFileSync(reader, 'utf8')).toBe(old);

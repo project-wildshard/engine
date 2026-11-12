@@ -12,6 +12,6 @@ test('DOM suites can select CI products without loading a build CLI', () => {
   try {
     mkdirSync(directory, { recursive: true }); writeFileSync(resolve(directory, 'shard.json'), '{}');
     const sha = 'a'.repeat(40);
-    expect(readBuiltShardfile(root, 'fixture', { env: { WS_TEST_PRODUCTS_SHA: sha, VERCEL_GIT_COMMIT_SHA: sha } })).toBe(directory);
+    expect(readBuiltShardfile(root, 'fixture', { env: { WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: sha } })).toBe(directory);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

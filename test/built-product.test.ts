@@ -110,8 +110,8 @@ test('named-output map recipes resolve exactly and shared validation changes inv
 test('CI reads its preceding exact-SHA build; mismatched or malformed stamps do not bless output', async () => {
   const f = await fixture(), output = resolve(f.root, 'out', f.name), sha = 'a'.repeat(40);
   write(output, 'shard.json', '{}'); write(f.root, f.source, 'changed');
-  expect(readBuiltShardfile(f.root, f.name, { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, VERCEL_GIT_COMMIT_SHA: sha } })).toBe(output);
-  for (const built of ['bad', 'b'.repeat(40)]) expect(() => readBuiltShardfile(f.root, f.name, { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: built, VERCEL_GIT_COMMIT_SHA: sha } })).toThrow('Missing current product');
+  expect(readBuiltShardfile(f.root, f.name, { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: sha } })).toBe(output);
+  for (const built of ['bad', 'b'.repeat(40)]) expect(() => readBuiltShardfile(f.root, f.name, { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: built, GITHUB_SHA: sha } })).toThrow('Missing current product');
   expect(() => readBuiltShardfile(f.root, '../escape', f.options)).toThrow('Invalid built product name');
 });
 
@@ -148,8 +148,8 @@ test('product-suite preflight retains exact-SHA CI admission', async () => {
   const f = await fixture(), sha = 'a'.repeat(40);
   write(f.root, 'scripts/test-products.json', JSON.stringify({ 'test/current.test.ts': [f.name] }));
   write(f.root, f.source, 'changed'); write(f.root, `out/${f.name}/shard.json`, '{}');
-  expect(() => assertBuiltTestProducts(f.root, ['test/current.test.ts'], { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, VERCEL_GIT_COMMIT_SHA: sha } })).not.toThrow();
-  expect(() => assertBuiltTestProducts(f.root, ['test/current.test.ts'], { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, VERCEL_GIT_COMMIT_SHA: 'b'.repeat(40) } })).toThrow('Missing current products');
+  expect(() => assertBuiltTestProducts(f.root, ['test/current.test.ts'], { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: sha } })).not.toThrow();
+  expect(() => assertBuiltTestProducts(f.root, ['test/current.test.ts'], { cacheRoot: f.cacheRoot, env: { WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: 'b'.repeat(40) } })).toThrow('Missing current products');
 });
 
 test('real Vitest refuses missing products before loading worker setup or suite code', async () => {
@@ -160,7 +160,7 @@ test('real Vitest refuses missing products before loading worker setup or suite 
   write(f.root, 'test/setup.mjs', "import fs from 'node:fs';fs.writeFileSync('worker-started','yes');");
   write(f.root, 'vitest.config.mts', `import {DurationSequencer} from ${JSON.stringify(resolve('scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/product.test.ts'],setupFiles:['test/setup.mjs'],sequence:{sequencer:DurationSequencer}}};`);
   expect(() => execFileSync(process.execPath, [resolve('node_modules/vitest/vitest.mjs'), 'run', '--config', resolve(f.root, 'vitest.config.mts')], {
-    cwd: f.root, env: { ...fixtureEnvironment(), WS_TEST_COHORT:undefined, WILDSHARD_SHARDFILE_CACHE: f.cacheRoot, WS_TEST_PRODUCTS_SHA: '', VERCEL_GIT_COMMIT_SHA: '' }, stdio: 'pipe', timeout: 10_000, maxBuffer: 1_048_576,
+    cwd: f.root, env: { ...fixtureEnvironment(), WS_TEST_COHORT:undefined, WILDSHARD_SHARDFILE_CACHE: f.cacheRoot, WS_TEST_PRODUCTS_SHA: '', GITHUB_SHA: '' }, stdio: 'pipe', timeout: 10_000, maxBuffer: 1_048_576,
   })).toThrow('Missing current products author');
   expect(existsSync(resolve(f.root, 'worker-started'))).toBe(false);
 });
@@ -176,7 +176,7 @@ test.each(['local-related', 'ci-related', 'focused', 'all-blocked', 'local-commi
   write(f.root,'vitest.config.mts',`import {DurationSequencer} from ${JSON.stringify(resolve('scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/*.test.ts'],setupFiles:['test/setup.mjs'],sequence:{sequencer:DurationSequencer}}};`);
   const args=mode==='focused'||mode.endsWith('-commit')?['run','test/pure.test.ts','test/product.test.ts']:['related','--run','source.ts'];
   const result=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),...args,'--config',resolve(f.root,'vitest.config.mts')],{
-    cwd:f.root,env:{...fixtureEnvironment(),WS_PUSH_GATE_PROFILE:mode==='push-related'?PUSH_PROFILE:undefined,WS_TEST_COHORT:undefined,CI:mode.startsWith('ci-')?'1':'',GITHUB_ACTIONS:'',WS_COMMIT_RELATED_TOKEN:mode.endsWith('-commit')?'fixture':undefined,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',VERCEL_GIT_COMMIT_SHA:'',NO_COLOR:'1'},
+    cwd:f.root,env:{...fixtureEnvironment(),WS_PUSH_GATE_PROFILE:mode==='push-related'?PUSH_PROFILE:undefined,WS_TEST_COHORT:undefined,CI:mode.startsWith('ci-')?'1':'',GITHUB_ACTIONS:'',WS_COMMIT_RELATED_TOKEN:mode.endsWith('-commit')?'fixture':undefined,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',GITHUB_SHA:'',NO_COLOR:'1'},
     encoding:'utf8',stdio:'pipe',timeout:15_000,maxBuffer:1_048_576,
   });
   expect(result.error).toBeUndefined();
@@ -206,7 +206,7 @@ test.each([
     `import {test} from 'vitest';import {writeFileSync} from 'node:fs';test('${name}',()=>writeFileSync('${name}-ran','yes'));`);
   write(f.root,'vitest.config.mts',`import {DurationSequencer} from ${JSON.stringify(resolve('scripts/vitest-shard.ts'))};export default {root:${JSON.stringify(f.root)},test:{include:['test/*.test.ts'],sequence:{sequencer:DurationSequencer}}};`);
   const result=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','--shard=1/1','--config',resolve(f.root,'vitest.config.mts')],{
-    cwd:f.root,env:{...fixtureEnvironment(),CI:'1',WS_TIMINGS_DIR:timings,WS_TEST_COHORT:cohort,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',VERCEL_GIT_COMMIT_SHA:'',NO_COLOR:'1'},
+    cwd:f.root,env:{...fixtureEnvironment(),CI:'1',WS_TIMINGS_DIR:timings,WS_TEST_COHORT:cohort,WILDSHARD_SHARDFILE_CACHE:f.cacheRoot,WS_TEST_PRODUCTS_SHA:'',GITHUB_SHA:'',NO_COLOR:'1'},
     encoding:'utf8',timeout:15_000,maxBuffer:1_048_576,
   });
   expect(result.error).toBeUndefined();
