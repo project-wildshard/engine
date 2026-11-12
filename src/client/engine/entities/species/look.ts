@@ -28,6 +28,9 @@ export interface SpeciesLook extends Pick<SpeciesDef, 'rigContract' | 'fur' | 'b
    *  once per material, so a copy per animal was a node build per animal: 33 frames of Driftwood's road entry on the
    *  Simulator (O15). */
   sharedBody?: (glow?: readonly [number, number, number]) => object;
+  /** with `material`: the hull's further groups' materials (1..n), fresh per rig, so the hit flash may write them; a skin
+   *  look's mapped GLB materials (TE-ENG10: an emissive eye or gullet). Each is one more draw per rig. */
+  partMaterials?: () => readonly THREE.Material[];
   /** Decorate the existing instance materials after lighting is installed; preserve their hit-flash owners. */
   decorateMaterials?: (materials: readonly AnimalMaterial[]) => void;
   hasSkin?: (variant: VariantDef) => boolean;

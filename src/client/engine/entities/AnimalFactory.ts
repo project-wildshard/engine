@@ -137,6 +137,8 @@ export interface AnimalRig {
   mesh: THREE.SkinnedMesh;
   bones: Record<string, THREE.Bone>;
   materials: AnimalMaterial[];
+  /** a look's further part materials (TE-ENG10: a skin's mapped GLB materials), drawn after the body; the hit flash's too */
+  parts?: readonly THREE.Material[];
 }
 
 /** Lit body materials retain colour, map and emissive hit-flash ports, including compiled standard/toon graphs. */
@@ -729,7 +731,11 @@ export class AnimalFactory {
       const slot = `${model.map?.uuid ?? '-'}|${model.doubleSided === true ? 'double' : 'front'}`, known = bodies.get(slot);
       if (known === undefined) { drawn = fur.clone(); bodies.set(slot, drawn); first = true; } else drawn = known;
     }
-    const mesh = new THREE.SkinnedMesh(model.geometry, model.render.oneMaterial || model.hull !== undefined ? [drawn] : [drawn, model.hard, model.eye]);
+    // TE-ENG10: a look's part materials (a skin's mapped GLB materials) draw the hull's groups 1..n, one more draw each
+    const parts = look?.material === undefined ? [] : look.partMaterials?.() ?? [];
+    for (const part of parts) if (!(part instanceof THREE.MeshBasicMaterial) && Reflect.get(part, 'isGraphShaderMaterial') !== true) this.sky.setupMaterial(part);
+    const body: AnimalMaterial[] = parts.length > 0 || model.render.oneMaterial || model.hull !== undefined ? [drawn] : [drawn, model.hard, model.eye];
+    const mesh = new THREE.SkinnedMesh(model.geometry, [...body, ...parts]);
     if (drawn !== fur) {
       // a shared body's colours follow this animal's fur: uniforms only (draw-neutral)
       mesh.onBeforeRender = drawNeutral((_renderer, _scene, _camera, _geometry, material) => {
@@ -737,7 +743,7 @@ export class AnimalFactory {
         drawn.color.copy(fur.color); drawn.emissive.copy(fur.emissive); drawn.emissiveIntensity = fur.emissiveIntensity;
       });
     }
-    if (drawn === fur || first) look?.decorateMaterials?.(mesh.material);
+    if (drawn === fur || first) look?.decorateMaterials?.(body);
     this.pendingRigs.get(`${model.kind}:${model.variant}`)?.push({ mesh, fur: drawn });
     const root = bones['body'];
     if (root === undefined) throw new Error(`species '${model.kind}': no 'body' bone`);
@@ -755,6 +761,6 @@ export class AnimalFactory {
     // sees the rig — ~260 ms of the first frame at 4× CPU for the herds (project/archive/2026-09-22-load-perf.md Status).
     const bs = model.geometry.boundingSphere;
     if (bs !== null) mesh.boundingSphere = bs.clone();
-    return { mesh, bones, materials: [fur, model.hard, model.eye] };
+    return { mesh, bones, materials: [fur, model.hard, model.eye], ...(parts.length > 0 ? { parts } : {}) };
   }
 }

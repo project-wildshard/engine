@@ -33,6 +33,8 @@ export interface ClientSkin {
   readonly bones: readonly BoneDef[];
   /** a fresh family material per rig (the hit flash writes its emissive), scope-owned like the loader's catalogue */
   readonly material: () => MeshStandardMaterial | MeshLambertMaterial;
+  /** TE-ENG10: one fresh look material per mapped GLB material (geometry groups 1..n), per rig; none without a map */
+  readonly parts: readonly (() => Material)[];
   readonly clips: ReadonlyMap<ClipName, SampledClip>;
   readonly skeleton: string;
   readonly sockets: readonly string[];
@@ -74,7 +76,7 @@ function materialFactory(compile: (entry: unknown) => Material, entry: unknown):
  * Load every skin look of `source` from admitted bytes (`assets`, the library closure) with its binding's family
  * material (`compile`, the loader's material compiler). Keyed by look row id; everything is disposed with `scope`.
  */
-export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files'>, assets: ReadonlyMap<string, Uint8Array>, compile: (entry: unknown) => Material, scope: Scope): Promise<ReadonlyMap<string, ClientSkin>> {
+export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' | 'look'>, assets: ReadonlyMap<string, Uint8Array>, compile: (entry: unknown) => Material, scope: Scope): Promise<ReadonlyMap<string, ClientSkin>> {
   const skins = new Map<string, ClientSkin>();
   for (const look of source.rows.looks) {
     if (look.recipe !== SKIN_LOOK_RECIPE) continue;
@@ -84,10 +86,17 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files'>,
     if (declared?.dependencies.length !== 1 || declared.dependencies[0] !== row.file) throw new Error(`skin look ${look.id}: the skin file must depend on exactly its GLB`);
     const glb = assets.get(row.file); if (glb === undefined) throw new Error(`skin look ${look.id}: missing admitted skin GLB`);
     const material = materialFactory(compile, binding.material);
-    const player = await loadSkin(glb, row, binding, material(), scope);
+    // TE-ENG10: the binding's GLB material name -> look.materials id, as props.materials maps a prop's; each mapped part
+    // one more draw per rig (and one more shadow draw where the rig casts)
+    const mapped = Object.entries(binding.materials ?? {});
+    const parts = mapped.map(([, id]) => {
+      const entry = source.look.materials[id]; if (entry === undefined) throw new Error(`skin look ${look.id}: no look material ${id}`);
+      return (): Material => compile(entry);
+    });
+    const player = await loadSkin(glb, row, binding, material(), scope, mapped.map(([name]) => name));
     await macrotask(); // the GLB's parse and the clips' sampling a task apart
     const geometry = player.mesh.geometry, joints = player.mesh.skeleton.bones;
-    geometry.clearGroups(); geometry.addGroup(0, geometry.index?.count ?? geometry.getAttribute('position').count, 0);
+    if (parts.length === 0) { geometry.clearGroups(); geometry.addGroup(0, geometry.index?.count ?? geometry.getAttribute('position').count, 0); }
     // animated limbs and the corpse never leave this (the factory's margin for procedural creatures)
     geometry.computeBoundingSphere(); if (geometry.boundingSphere !== null) geometry.boundingSphere.radius += 0.6;
     const clips = new Map<ClipName, SampledClip>();
@@ -98,7 +107,7 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files'>,
     // Instances use sampled tracks; the temporary player's mixer never plays.
     // Keep its mesh/skeleton scope-owned, but release unused actions/bindings.
     player.machine.dispose();
-    skins.set(look.id, { id: row.id, geometry, bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, clips, skeleton: row.rig.skeleton, sockets: row.rig.sockets, attackSpan: parameters.attackSpan });
+    skins.set(look.id, { id: row.id, geometry, bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, parts, clips, skeleton: row.rig.skeleton, sockets: row.rig.sockets, attackSpan: parameters.attackSpan });
   }
   return skins;
 }
@@ -167,6 +176,7 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
     // the procedural stand-in is the hull itself (the factory swaps in `skin`'s shared geometry before any rig is made)
     build: () => ({ bones: bones(), furParts: [], hardParts: [skin.geometry.clone()], eyeParts: [], dims: dims() }),
     material: () => skin.material(),
+    ...(skin.parts.length === 0 ? {} : { partMaterials: () => skin.parts.map((part) => part()) }),
     skin: () => ({ geometry: skin.geometry, map: null, normalMap: null, bones: bones(), overgrown: false }),
     animate: (c) => { let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(skin, c.bones); drivers.set(c.bones, driver); } driver.step(c); },
   };

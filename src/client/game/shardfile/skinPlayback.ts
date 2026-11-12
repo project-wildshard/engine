@@ -9,7 +9,8 @@
  *   const skin = await loadSkin(bytes, row, binding, material);   // admitted, bound, posed at the clip's first frame
  *   skin.play('walk'); skin.update(dt);                            // per frame, as the engine's rigs do
  */
-import type { Material, Object3D, SkinnedMesh } from 'three';
+import type { BufferGeometry, Material, Object3D, SkinnedMesh } from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { bindRig, prepareRigLoader, type ClipName, type RigInstance } from '@wildshard/engine/anim/rig';
 import { AnimMachine } from '@wildshard/engine/anim/machine';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -38,6 +39,34 @@ export interface SkinPlayer {
 }
 
 const isSkin = (node: Object3D): node is SkinnedMesh => (node as Partial<SkinnedMesh>).isSkinnedMesh === true;
+const materialName = (mesh: SkinnedMesh): string => (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material)?.name ?? '';
+
+/**
+ * One skinned mesh from a GLB mesh's primitives (TE-ENG10): three loads each primitive as its own SkinnedMesh on the one
+ * skeleton. The primitives merge into the first mesh's geometry, ordered and grouped by slot: group 0 every primitive
+ * whose GLB material is not in `parts` (the family material, one draw), then one group per mapped name in `parts` order.
+ * Returns the group count; with no `parts` the geometry keeps a single primitive as loaded.
+ */
+function mergePrimitives(meshes: readonly SkinnedMesh[], parts: readonly string[], id: string): number {
+  const first = meshes[0]; if (first === undefined) throw new Error(`skin ${id}: expected one skinned mesh`);
+  if (meshes.some((mesh) => mesh.skeleton.bones.length !== first.skeleton.bones.length || mesh.skeleton.bones.some((bone, i) => bone !== first.skeleton.bones[i]))) throw new Error(`skin ${id}: expected one skinned mesh`);
+  const slot = (mesh: SkinnedMesh): number => parts.indexOf(materialName(mesh)) + 1;
+  for (const name of parts) if (!meshes.some((mesh) => materialName(mesh) === name)) throw new Error(`skin ${id}: no GLB material ${name}`);
+  if (meshes.length === 1 && parts.length === 0) return 1;
+  const ordered = [...meshes].sort((a, b) => slot(a) - slot(b));
+  const merged: BufferGeometry | null = meshes.length === 1 ? first.geometry.clone() : mergeGeometries(ordered.map((mesh) => mesh.geometry), false);
+  if (merged === null) throw new Error(`skin ${id}: skin primitives differ in their channels`);
+  merged.clearGroups();
+  let start = 0;
+  for (const mesh of ordered) {
+    const count = mesh.geometry.index?.count ?? mesh.geometry.getAttribute('position').count, last = merged.groups.at(-1), index = slot(mesh);
+    if (last?.materialIndex === index) last.count += count; else merged.addGroup(start, count, index);
+    start += count;
+  }
+  for (const mesh of meshes) { mesh.geometry.dispose(); if (mesh !== first) mesh.removeFromParent(); }
+  first.geometry = merged;
+  return parts.length + 1;
+}
 
 /** Scope teardown needs the owned resources, not a player's private playback tables. */
 function skinDisposer(mesh: SkinnedMesh, machine: AnimMachine): () => void {
@@ -52,7 +81,7 @@ function skinDisposer(mesh: SkinnedMesh, machine: AnimMachine): () => void {
  * Admit, load and bind one exported skin. Refuses bytes whose hash-addressed rig differs from the row (skeleton, joint
  * order, clips, sockets) or whose parsed cost exceeds the row's declared cost. `scope` disposes it with its owner.
  */
-export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBinding, material: Material, scope?: Scope): Promise<SkinPlayer> {
+export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBinding, material: Material, scope?: Scope, parts: readonly string[] = []): Promise<SkinPlayer> {
   if (binding.skin !== row.id) throw new Error(`skin ${row.id}: binding for ${binding.skin}`);
   parseSkinBindings([binding], [row]);
   await prepareGlbCost();
@@ -61,11 +90,14 @@ export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBindi
   if (cost.gpu > row.cost.gpu || cost.decoded > row.cost.decoded || cost.triangles > row.cost.triangles || cost.draws > row.cost.draws) throw new Error(`skin ${row.id}: cost above its declaration`);
   const file = await (await prepareRigLoader()).createRigLoader().parseBytesAsync(glb, '');
   const meshes: SkinnedMesh[] = []; file.scene.traverse((node) => { if (isSkin(node)) meshes.push(node); });
-  const mesh = meshes[0]; if (mesh === undefined || meshes.length !== 1) throw new Error(`skin ${row.id}: expected one skinned mesh`);
-  const loaded = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  for (const m of loaded) m.dispose();
-  mesh.material = material;
-  const extras: unknown = mesh.userData['castShadow'];
+  // a GLB mesh's primitives (one per GLB material) load as sibling skinned meshes: merged into the first, grouped by `parts`
+  const mesh = meshes[0], node = meshes.length > 1 ? mesh?.parent : mesh;
+  const groups = mergePrimitives(meshes, parts, row.id);
+  if (mesh === undefined) throw new Error(`skin ${row.id}: expected one skinned mesh`);
+  for (const loaded of meshes) for (const m of Array.isArray(loaded.material) ? loaded.material : [loaded.material]) m.dispose();
+  // the caller's material on every group (its own per-part materials replace groups 1..n where it draws them)
+  mesh.material = groups === 1 ? material : Array.from({ length: groups }, () => material);
+  const extras: unknown = (node ?? mesh).userData['castShadow'];
   mesh.castShadow = extras === true; mesh.receiveShadow = true;
   const rig = bindRig(file.scene, file.animations, { skeleton: row.rig.skeleton, clips: row.rig.clips, sockets: row.rig.sockets }, { skeleton: row.rig.skeleton, joints: row.rig.joints });
   const states: Record<string, { clip: ClipName; fade: number }> = {};

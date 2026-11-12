@@ -90,6 +90,8 @@ export class Animal extends AnimalSim {
   private flashMat: AnimalMaterial | null = null;
   private flashBase = new THREE.Color();
   private flashBaseI = 1;
+  /** TE-ENG10: the rig's part materials, each flashed with the body and returned to its own base (an unlit glow by colour) */
+  private flashParts: { readonly colour: THREE.Color; readonly base: THREE.Color; readonly intensity: { emissiveIntensity: number } | null; readonly baseI: number }[] = [];
   private flash = 0;
   private bones: Record<string, THREE.Bone>;
   private readonly bBody: THREE.Bone;
@@ -221,6 +223,12 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     this.jointPose=this.custom?null:new QuadrupedRigPose(rig.bones);
     const fur = rig.materials[0];
     if (fur !== undefined && fur !== model.hard) { this.flashMat = fur; this.flashBase.copy(fur.emissive); this.flashBaseI = fur.emissiveIntensity; }
+    for (const part of rig.parts ?? []) {
+      const emissive: unknown = Reflect.get(part, 'emissive'), colour: unknown = Reflect.get(part, 'color'), lit = emissive instanceof THREE.Color;
+      const flashed = lit ? emissive : colour instanceof THREE.Color ? colour : null; if (flashed === null) continue;
+      const intensity = lit && typeof Reflect.get(part, 'emissiveIntensity') === 'number' ? part as unknown as { emissiveIntensity: number } : null;
+      this.flashParts.push({ colour: flashed, base: flashed.clone(), intensity, baseI: intensity?.emissiveIntensity ?? 1 });
+    }
     this.rigCtx = {
       bones: this.bones, dims: model.dims, dt: 0, t: 0, seed, scale, speed: 0, strafe: 0, phase: 0, state: 'idle', alive: true,
       deathT: -1, flinch: 0, brace: 0, attack: -1, lookTarget: this.lookTarget, lookWeight: 0, position: this.position, yaw: 0, mem: this.mem, animal: this,
@@ -271,8 +279,16 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     const m = this.flashMat;
     if (m === null) return;
     const k = this.flash;
-    if (k <= 0) { m.emissive.copy(this.flashBase); m.emissiveIntensity = this.flashBaseI; return; }
+    if (k <= 0) {
+      m.emissive.copy(this.flashBase); m.emissiveIntensity = this.flashBaseI;
+      for (const part of this.flashParts) { part.colour.copy(part.base); if (part.intensity !== null) part.intensity.emissiveIntensity = part.baseI; }
+      return;
+    }
     m.emissive.setRGB(1, 1, 1).lerp(this.flashBase, 1 - k); m.emissiveIntensity = THREE.MathUtils.lerp(this.flashBaseI, FLASH_I, k);
+    for (const part of this.flashParts) {
+      part.colour.setRGB(1, 1, 1).lerp(part.base, 1 - k);
+      if (part.intensity !== null) part.intensity.emissiveIntensity = THREE.MathUtils.lerp(part.baseI, Math.max(part.baseI, FLASH_I), k);
+    }
   }
 
   // ── combat ─────────────────────────────────────────────────────────────────────────────
@@ -473,7 +489,8 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     if (level === this.drawLod || this.fadeT >= 0) return;
     const mesh = this.mesh;
     if (this.lodBase === null) {
-      if (!Array.isArray(mesh.material) || mesh.material.length !== 3 || eyesInHard(mesh.geometry) === null) return;
+      // a rig with part materials (TE-ENG10) keeps every group: a glowing part never folds into the body
+      if (!Array.isArray(mesh.material) || mesh.material.length !== 3 || this.flashParts.length > 0 || eyesInHard(mesh.geometry) === null) return;
       this.lodBase = { geometry: mesh.geometry, materials: mesh.material };
     }
     const { geometry, materials } = this.lodBase;
