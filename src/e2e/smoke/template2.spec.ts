@@ -19,13 +19,6 @@ import {
 
 /** The plan's budget for the whole smoke, client included (J233). Report-only until T2E-4 makes it block. */
 const BUDGET_MS = 60_000
-/** The one off-machine host the real title asks for: the draft cards' thumbnails (src/client/game/draftTitles.ts). */
-const DRAFT_THUMBS = '64yencbq8tncsy39.public.blob.vercel-storage.com'
-/** A transparent 1×1 PNG. */
-const PIXEL = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-  'base64',
-)
 /** Template 2's hall (shardfile corpus/handwritten): the door at z = 15.6, the guardian's 4 m region at z = 32. Steps 4
  * (a pickup) and 5 (a fight) wait for Template 2 content: shardfile rows S2-1 and S2-2. */
 const BEFORE_DOOR_Z = 13.8
@@ -73,27 +66,18 @@ test('Template 2: title, walk, door, guardian, reload', async ({
       errors.push(message.text())
     }
   })
-  // Nothing leaves the machine (T2E-1): the draft thumbnails get an empty image, and any other host fails the smoke.
+  // Nothing leaves the machine (T2E-1): any request off it fails the smoke. The draft cards' key art is the client's own copy
+  // in public/drafts/ (OFF-VERCEL OV10, DRAFTS DR5), so no host is excepted.
   await page.route(
     (url: Readonly<URL>): boolean =>
       url.protocol.startsWith('http') && url.hostname !== '127.0.0.1',
     async (route): Promise<void> => {
       const request = route.request()
       const { hostname, pathname } = new URL(request.url())
-      if (
-        hostname !== DRAFT_THUMBS ||
-        request.resourceType() !== 'image' ||
-        !pathname.startsWith('/draft/')
-      ) {
-        errors.push(
-          `left the machine: ${request.method()} ${hostname}${pathname}`,
-        )
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: 'image/png',
-        body: PIXEL,
-      })
+      errors.push(
+        `left the machine: ${request.method()} ${hostname}${pathname}`,
+      )
+      await route.abort('blockedbyclient')
     },
   )
 

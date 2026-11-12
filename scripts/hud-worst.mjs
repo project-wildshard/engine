@@ -44,8 +44,8 @@ const modes = arg('dev', 'off,on').split(','), check = process.argv.includes('--
 const chatRev = arg('chat-rev', '');
 /** QA row 43's calm corner is in the chat modules drawn: this tree's, or a --chat-rev that has chatCorner.ts */
 let calmChat = chatRev === '';
-/** the hosts a local build loads from: itself, our Vercel blob store and our own domain (J148) */
-const OURS = /^(?:127\.0\.0\.1|localhost|[a-z0-9]+\.public\.blob\.vercel-storage\.com|(?:[a-z0-9-]+\.)*wildshard\.io)$/u;
+/** the hosts a local build loads from: itself and our own domain (J148) */
+const OURS = /^(?:127\.0\.0\.1|localhost|(?:[a-z0-9-]+\.)*wildshard\.io)$/u;
 mkdirSync(out, { recursive: true });
 
 /** @typedef {{ name: string, left: number, top: number, right: number, bottom: number }} Box */
