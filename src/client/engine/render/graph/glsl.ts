@@ -52,7 +52,8 @@ export type GraphGlslUniform =
 export type GraphGlslHostUniform =
   | 'time' | 'windTime' | 'windGust' | 'fogZenithColour' | 'atmosphereSunDirection' | 'atmosphereSunColour'
   | 'skyLightDirection' | 'skyLightColour' | 'materialColour' | 'materialEmissive' | 'materialEmissiveIntensity' | 'screenSize' | 'codecStep' | 'codecOrigin'
-  | 'scene' | 'depth' | 'normal' | 'depthNear' | 'depthFar' | 'weight' | 'meshMap' | 'bumpMap';
+  | 'scene' | 'depth' | 'normal' | 'depthNear' | 'depthFar' | 'weight' | 'meshMap' | 'bumpMap'
+  | 'viewForward' | 'viewRight' | 'viewUp';
 
 /** one stage's code: declarations at file scope, and statements inside `main` (the vertex stage's `end` runs after the transform) */
 export interface GraphGlslStage { readonly head: string; readonly body: string; readonly end: string }
@@ -689,6 +690,12 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
         case 'materialColour': return { t: 'vec3', e: host('materialColour', 'vec3') };
         case 'materialEmissive': return { t: 'vec3', e: `(${host('materialEmissive', 'vec3')} * ${host('materialEmissiveIntensity', 'float')})` };
         case 'screenUV': return fragmentUv();
+        // the scene camera's world ray through this pixel: the centre's ray plus the screen offset along the steps to the
+        // right and top edges, all on the image plane at unit depth (`feedViewRay` in glslPost.ts fills them every frame)
+        case 'viewRay': {
+          const uv = fragmentUv().e;
+          return out('vec3', `normalize(${host('viewForward', 'vec3')} + (${uv}.x * 2.0 - 1.0) * ${host('viewRight', 'vec3')} + (${uv}.y * 2.0 - 1.0) * ${host('viewUp', 'vec3')})`);
+        }
         case 'pointCoord': return { t: 'vec2', e: 'vec2(gl_PointCoord.x, 1.0 - gl_PointCoord.y)' };
         case 'fragCoord': return out('vec2', `vec2(gl_FragCoord.x, ${host('screenSize', 'vec2')}.y - gl_FragCoord.y)`);
         case 'viewBillboard': {

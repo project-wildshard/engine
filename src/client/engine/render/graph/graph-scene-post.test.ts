@@ -77,3 +77,29 @@ test('the normal pre-pass draws packed normals into its own target, restoring th
   prepass.setSize(8, 4); expect([prepass.target.width, prepass.target.height]).toEqual([8, 4]);
   prepass.dispose();
 });
+
+test('viewRay is the scene camera\'s world ray through the pixel: the centre is forward, the corner the frustum edge', () => {
+  const ray: GraphIr = { version: 1, kind: 'post', nodes: { r: { op: 'viewRay' } }, stages: { post: { colour: 'r' } } };
+  const camera = new THREE.PerspectiveCamera(90, 2, 0.5, 750), graph = compileClassicGraph(ray, { weighted: true });
+  camera.position.set(3, 1, 2); camera.rotation.set(0, Math.PI / 2, 0); camera.updateMatrixWorld();
+  const pass = new ClassicPostPass(graph.material, camera, false), uniforms = graph.material.uniforms, { renderer } = recorder();
+  expect(graph.material.fragmentShader).toMatch(/normalize\(\s*wsViewForward \+ .*wsViewRight.*wsViewUp/);
+  pass.render(renderer, new THREE.WebGLRenderTarget(4, 4), new THREE.WebGLRenderTarget(4, 4));
+  const at = (name: string): number[] => {
+    const value: unknown = uniforms[name]?.value;
+    if (!(value instanceof THREE.Vector3)) throw new Error(`${name} is not fed`);
+    return value.toArray().map(v => Math.round(v * 1e6) / 1e6 + 0);
+  };
+  // turned a quarter left, the camera looks down −x; its right is −z, at tan 45° × aspect 2, and its up stays +y
+  expect(at('wsViewForward')).toEqual([-1, 0, 0]);
+  expect(at('wsViewRight')).toEqual([0, 0, -2]);
+  expect(at('wsViewUp')).toEqual([0, 1, 0]);
+  // a crop of the right half (a view offset) keeps every pixel's ray on the full frustum: the crop's centre looks at
+  // x = 1 on the unit-depth plane of the uncropped view, its right edge at x = 2
+  camera.rotation.set(0, 0, 0); camera.setViewOffset(200, 100, 100, 0, 100, 100); camera.updateMatrixWorld();
+  pass.render(renderer, new THREE.WebGLRenderTarget(4, 4), new THREE.WebGLRenderTarget(4, 4));
+  expect(at('wsViewForward')).toEqual([1, 0, -1]);
+  expect(at('wsViewRight')).toEqual([1, 0, 0]);
+  expect(at('wsViewUp')).toEqual([0, 1, 0]);
+  graph.material.dispose();
+});

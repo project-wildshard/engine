@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { Pass } from 'postprocessing';
 import type { GraphShaderMaterial } from './glslMaterial';
+import { feedViewRay } from './viewRay';
 
 /** the program's uniforms by name (a host uniform absent: the graph never reads that input) */
 type Uniforms = GraphShaderMaterial['uniforms'];
@@ -48,6 +49,7 @@ export class ClassicPostPass extends Pass {
       if (near !== undefined) near.value = camera.near;
       if (far !== undefined) far.value = camera.far;
     }
+    feedViewRay(this.graph, camera);
     renderer.setRenderTarget(this.renderToScreen ? null : outputBuffer);
     renderer.render(this.scene, this.camera);
   }

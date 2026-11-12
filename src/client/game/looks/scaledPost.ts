@@ -8,6 +8,7 @@ import { BLEND_ADD_KEEP_ALPHA, type UniformMap } from '../plugin/shaderFamily';
 import { buildYield } from '@wildshard/engine/core/workSlice';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { compileOffscreenPass } from '@wildshard/engine/render/precompile';
+import { feedViewRay } from '@wildshard/engine/render/graph/viewRay';
 
 const compilers = new WeakMap<Renderer, PostGraphCompiler>();
 /** a scaled post program's per-frame feeds, read once from its row (`ScaledPostPass.frame`) */
@@ -189,6 +190,8 @@ export class ScaledPostPass extends Pass {
     this.plan ??= postFeeds(this.row, this.selective ? new Set(this.draws().map(draw => draw.program)) : undefined);
     for (const feed of this.plan) {
       const graph = this.graphs.get(feed.name); if (graph === undefined) continue;
+      const uniforms: unknown = Reflect.get(graph.material, 'uniforms');
+      if (typeof uniforms === 'object' && uniforms !== null) feedViewRay(uniforms as Parameters<typeof feedViewRay>[0], camera);
       for (const key of feed.links) {
         const value: unknown = this.ctx.links?.[key]?.value;
         if (isTexture(value)) graph.setTexture(key, value);

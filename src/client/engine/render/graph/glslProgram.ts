@@ -627,7 +627,8 @@ function uniformValue(glsl: GraphGlsl, u: GraphGlslUniform, opts: GraphShaderOpt
         case 'materialColour': return { value: new THREE.Color(1, 1, 1) };
         case 'materialEmissive': return { value: new THREE.Color(0, 0, 0) };
         case 'scene': case 'depth': case 'normal': case 'meshMap': case 'bumpMap': return { value: null };
-        case 'codecOrigin': case 'fogZenithColour': case 'skyLightColour': case 'skyLightDirection': return { value: new THREE.Vector3() };
+        case 'codecOrigin': case 'fogZenithColour': case 'skyLightColour': case 'skyLightDirection': case 'viewRight': case 'viewUp': return { value: new THREE.Vector3() };
+        case 'viewForward': return { value: new THREE.Vector3(0, 0, -1) };
         default: throw new Error('material graph: an unknown host uniform');
       }
     default: throw new Error('material graph: an unknown uniform source');
