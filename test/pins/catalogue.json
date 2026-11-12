@@ -758,9 +758,9 @@
   "shards": [
     {
       "slug": "blender-template",
-      "name": "Blender Template",
-      "revision": 1,
-      "hash": "7badedbba65d7a0ffb59a6f9028234d4601471dfa804061a34d1ca454a79c0b0"
+      "name": "Brasscap Mesa",
+      "revision": 2,
+      "hash": "c74e27f2a54f666fb32e716716c6c36112a550c07b58df0a2a9b44d94c592cb0"
     },
     {
       "slug": "driftwood-isle",

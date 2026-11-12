@@ -31,7 +31,7 @@ import {definitions} from './fixtures/saveDefinitions';
 // standalone grid opens a fresh world and carries the player's progress (cellWorld `adopt`). The fixture proves the refusal is
 // that clean one and that the carry takes; its bytes stay as provenance (git holds the pin it last resumed on). Moving the pin
 // again makes a lane decide afresh (ENG-17, Mossgate v3).
-interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;pin?:string;refused?:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
+interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;pin?:string;refused?:string;carry?:'flags';tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
 const fixtures=readdirSync('test/pins/saves').filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`test/pins/saves/${name}`,'utf8')) as ReleasedSave);
 const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')) as {shards:{slug:string;hash:string}[]};
 const epoch=JSON.parse(readFileSync('save-epoch.json','utf8')) as {saveEpoch:number};
@@ -63,7 +63,12 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
     // The standalone grid then opens a fresh world and adopts the refused save's progress (gridServer `open`).
     const world=await openCellWorld({instance:slug},{shard,product,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},undefined,
       {saves:new SaveStore({local:null,session:null}),lone:true},old);
-    try {expect(world.adopt(old)).toBe(true);} finally {world.dispose();}
+    // `carry: 'flags'`: the save's level is gone (a template rev that is a different level), so its client state can't migrate
+    // and carryRefusedSave keeps its fallback, the flags; wallet and ledger live outside the snapshot (ENG-3, Brasscap rev 2).
+    try {
+      expect(world.adopt(old)).toBe(fixture.carry!=='flags');
+      for(const flag of old.flags)expect(world.host.flags.has(flag)).toBe(true);
+    } finally {world.dispose();}
     return;
   }
   if(declared) {
