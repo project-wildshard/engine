@@ -782,12 +782,12 @@ packages:
     hasBin: true
 
   '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire':
-    resolution: {gitHosted: true, path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
+    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
     version: 0.0.0
     hasBin: true
 
   '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576#path:/packages/wire':
-    resolution: {gitHosted: true, path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576}
+    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576}
     version: 0.0.0
     hasBin: true
 
