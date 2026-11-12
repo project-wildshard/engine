@@ -14,3 +14,7 @@
   back to rev 1 (`test/pins/*`, `scripts/physics-route.json`,
   `test/released-save-play.test.ts`); the format bump stays. Re-pin rev 2
   once the canyon's north edge entry walks.
+- Ring 1's step then went red on two chains: f62f6cf7 (HS2) drives
+  moored movers on the server, so driftwood-isle and sunscar-dunes step
+  new bodies. With HS2's two files reverted the old chains match; the
+  new chains are recorded for darwin and linux (CI's prefixes match).
