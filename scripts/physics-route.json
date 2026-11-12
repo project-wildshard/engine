@@ -3063,362 +3063,89 @@
   ],
   "blender-template": [
     {
-      "name": "north rise entry to hub",
+      "name": "depot porch into camp 1",
       "start": {
-        "x": 0,
-        "z": 245,
-        "yaw": 0
-      },
-      "waypoints": [
-        {
-          "x": 0,
-          "z": 232
-        },
-        {
-          "x": 0,
-          "z": 188
-        },
-        {
-          "x": 0,
-          "z": 54
-        },
-        {
-          "x": -18,
-          "z": 54
-        },
-        {
-          "x": -18,
-          "z": 0
-        },
-        {
-          "x": 0,
-          "z": 0
-        }
-      ],
-      "timeout": 100,
-      "expect": {
-        "y": 0
-      }
-    },
-    {
-      "name": "west stoa entry to hub (+x)",
-      "start": {
-        "x": 245,
-        "z": 0,
-        "yaw": 1.5708
-      },
-      "waypoints": [
-        {
-          "x": 175,
-          "z": 0
-        },
-        {
-          "x": 20,
-          "z": 0
-        },
-        {
-          "x": 0,
-          "z": 0
-        }
-      ],
-      "timeout": 85,
-      "expect": {
-        "y": 0
-      }
-    },
-    {
-      "name": "east amphitheatre entry to hub (-x)",
-      "start": {
-        "x": -245,
-        "z": 0,
-        "yaw": -1.5708
-      },
-      "waypoints": [
-        {
-          "x": -180,
-          "z": 0
-        },
-        {
-          "x": -20,
-          "z": 0
-        },
-        {
-          "x": 0,
-          "z": 0
-        }
-      ],
-      "timeout": 85,
-      "expect": {
-        "y": 0
-      }
-    },
-    {
-      "name": "south aqueduct entry to hub",
-      "start": {
-        "x": 0,
-        "z": -245,
+        "x": -1.6,
+        "z": 2.6,
+        "y": 0.35,
         "yaw": 3.1416
       },
       "waypoints": [
         {
-          "x": 0,
-          "z": -190
+          "x": 1.5,
+          "z": -4
         },
         {
           "x": 0,
-          "z": -30
-        },
-        {
-          "x": 9,
-          "z": -26
-        },
-        {
-          "x": 9,
-          "z": -6
-        },
-        {
-          "x": 0,
-          "z": 0
-        }
-      ],
-      "timeout": 85,
-      "expect": {
-        "y": 0
-      }
-    },
-    {
-      "name": "north bridge ascent and crossing",
-      "start": {
-        "x": 92,
-        "z": 182,
-        "yaw": 1.5708
-      },
-      "waypoints": [
-        {
-          "x": 18,
-          "z": 182
-        },
-        {
-          "x": 10,
-          "z": 182
-        },
-        {
-          "x": 12,
-          "z": 195
-        },
-        {
-          "x": 12,
-          "z": 209
-        },
-        {
-          "x": 0,
-          "z": 209
-        },
-        {
-          "x": -20,
-          "z": 204
-        }
-      ],
-      "timeout": 50,
-      "expect": {
-        "y": 19.2
-      }
-    },
-    {
-      "name": "hall roof ascent and overhang",
-      "start": {
-        "x": 29,
-        "z": 28,
-        "yaw": 1.5708
-      },
-      "waypoints": [
-        {
-          "x": 10,
-          "z": 28
-        },
-        {
-          "x": 4,
-          "z": 28
-        },
-        {
-          "x": -4,
-          "z": 28
-        }
-      ],
-      "timeout": 15,
-      "expect": {
-        "y": 5.6
-      }
-    },
-    {
-      "name": "watchtower stair",
-      "start": {
-        "x": -9,
-        "z": 209,
-        "yaw": 1.5708,
-        "y": 19.2
-      },
-      "waypoints": [
-        {
-          "x": -24,
-          "z": 204.5
-        },
-        {
-          "x": -43,
-          "z": 204.5
-        }
-      ],
-      "timeout": 25,
-      "expect": {
-        "y": 28.2
-      }
-    },
-    {
-      "name": "market stoa roof stair and footbridge",
-      "start": {
-        "x": 169.5,
-        "z": 44,
-        "yaw": 0
-      },
-      "waypoints": [
-        {
-          "x": 169.5,
-          "z": 24
-        },
-        {
-          "x": 157,
-          "z": 10
-        },
-        {
-          "x": 157,
           "z": -10
         },
         {
-          "x": 157,
-          "z": -20
+          "x": -2,
+          "z": -18
+        },
+        {
+          "x": -7,
+          "z": -23
+        },
+        {
+          "x": -11,
+          "z": -25
         }
       ],
-      "timeout": 30,
-      "expect": {
-        "y": 7.5
-      }
+      "timeout": 40,
+      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 3 pinned, ENG-3b). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
     },
     {
-      "name": "amphitheatre aisle to the top tier",
+      "name": "canyon branch to the ledge stair",
       "start": {
-        "x": -200,
-        "z": -14,
-        "yaw": 0
-      },
-      "waypoints": [
-        {
-          "x": -216,
-          "z": -34
-        },
-        {
-          "x": -204,
-          "z": -42
-        },
-        {
-          "x": -200,
-          "z": -50
-        },
-        {
-          "x": -200,
-          "z": -70.5
-        }
-      ],
-      "timeout": 35,
-      "expect": {
-        "y": 4.8
-      }
-    },
-    {
-      "name": "aqueduct ramp, deck and cistern stair",
-      "start": {
-        "x": 66,
-        "z": -215,
+        "x": -2,
+        "z": -22,
         "yaw": 1.5708
       },
       "waypoints": [
         {
-          "x": 12,
-          "z": -213
+          "x": 3.2,
+          "z": -25.8
         },
         {
-          "x": -60,
-          "z": -212
-        },
-        {
-          "x": -84,
-          "z": -209.5
-        },
-        {
-          "x": -97,
-          "z": -209.5
+          "x": 16.9,
+          "z": -25.8
         }
       ],
-      "timeout": 45,
-      "expect": {
-        "y": 14.2
-      }
+      "timeout": 30,
+      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 3 pinned, ENG-3b). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
     },
     {
-      "name": "hub obelisk dais",
+      "name": "side canyon into camp 3",
       "start": {
-        "x": 0,
-        "z": -40,
+        "x": 3.2,
+        "z": -25.8,
         "yaw": 3.1416
       },
       "waypoints": [
         {
           "x": 0,
-          "z": -26
+          "z": -40
         },
         {
-          "x": 0,
-          "z": -20
+          "x": 2,
+          "z": -52
+        },
+        {
+          "x": 6.5,
+          "z": -57.5
+        },
+        {
+          "x": 9.5,
+          "z": -55.6
+        },
+        {
+          "x": 13.5,
+          "z": -52.5
         }
       ],
-      "timeout": 12,
-      "expect": {
-        "y": 0.9
-      }
-    },
-    {
-      "name": "ring road loop on the hoverboard",
-      "start": {
-        "x": 6,
-        "z": 114,
-        "yaw": -1.5708,
-        "hover": true
-      },
-      "waypoints": [
-        {
-          "x": 114,
-          "z": 114
-        },
-        {
-          "x": 114,
-          "z": -114
-        },
-        {
-          "x": -114,
-          "z": -114
-        },
-        {
-          "x": -114,
-          "z": 114
-        },
-        {
-          "x": -6,
-          "z": 114
-        }
-      ],
-      "timeout": 240,
-      "expect": {
-        "y": 0
-      }
+      "timeout": 40,
+      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 3 pinned, ENG-3b). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
     }
   ],
   "open-plot-frostline-peaks": [

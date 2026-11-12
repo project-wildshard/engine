@@ -29,3 +29,14 @@
   camps fall. Each passes twice in a row.
 - Brasscap stays a Developer shard on Shard select, off the grid, as
   the API catalogue places it (`hidden`); the row asks for no grid move.
+
+## Rev 3 (opus-eng3b, ENG-3b)
+
+- Rev 2's pin was backed out (505f32ec): Ring 1's cook walks a real
+  capsule 50 m in from every edge midpoint at road height, and rev 2's
+  canyon floor stepped up 1 m 34 m in on all four edges. The format's
+  own entry check covers only the first 15 m, so prepare and the API
+  validator passed it. Shardfile 285a9a2 flattens the four entry
+  corridors and moves one mesa; rev 3 (5400ea84, v0.4.4) carries it and
+  opus-hero's card art. The pin files are a5d17381's, on rev 3, plus
+  that pin's three review SHOULDs.

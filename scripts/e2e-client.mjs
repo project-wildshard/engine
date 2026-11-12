@@ -57,7 +57,9 @@ function catalogue() {
   if (shard === undefined || placement === undefined) throw new Error('e2e-client: the pinned catalogue has no Template 2');
   const text = `${JSON.stringify({
     ...full,
-    shards: [{ ...shard, hash: receipt.pin.hash, revision: receipt.pin.revision }],
+    // The pinned row is the API's blender-template (Brasscap Mesa since ENG-3b); the product here is the format's own
+    // Template 2, so its name comes from that product's index, or the smoke loses its "Blender Template" card.
+    shards: [{ ...shard, name: readJson(`${TEMPLATE}/shard.json`).identity.name, hash: receipt.pin.hash, revision: receipt.pin.revision }],
     placements: [{ ...placement, cell: [0, 0] }],
     missing: [],
     grid: { ...full.grid, cells: full.grid.cells.map((/** @type {{instance:string,cell:number[]}} */ row) => ({ slug: SLUG, instance: row.instance, cell: row.cell })) },

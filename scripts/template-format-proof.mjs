@@ -6,6 +6,8 @@ import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 const started = performance.now(), root = resolve(import.meta.dirname, '..');
+/** blender-template revision 1 (v0.4.2), the archive @wildshard/format's corpus/handwritten reproduces byte for byte. */
+const REVISION_1 = '7badedbba65d7a0ffb59a6f9028234d4601471dfa804061a34d1ca454a79c0b0';
 assert.equal(process.platform, 'darwin', 'This proof requires the macOS network sandbox');
 const baseline = process.argv.find(value => value.startsWith('--baseline='))?.slice(11);
 const scratch = process.argv.find(value => value.startsWith('--scratch='))?.slice(10);
@@ -31,11 +33,9 @@ try {
   const receipt = JSON.parse(readFileSync(join(root, 'out/blender-template/validation.json'), 'utf8'));
   assert.equal(receipt.source.kind, 'format-dependency');
   assert.equal(receipt.source.path, '@wildshard/format/corpus/handwritten');
-  /** @type {{shards: {slug: string; hash: string}[]}} */
-  const pins = JSON.parse(readFileSync(join(root, 'test/pins/shardfiles.json'), 'utf8'));
-  const pin = pins.shards.find(row => row.slug === 'blender-template');
-  assert.ok(pin !== undefined);
-  assert.equal(receipt.pin.hash, pin.hash, 'This frozen dependency equals the original API archive');
+  // The format's corpus/handwritten is the Blender Template's revision 1 archive; the API's blender-template pin moved on to
+  // Brasscap Mesa (ENG-3b), so the frozen dependency is held to rev 1's own hash, not to test/pins/shardfiles.json.
+  assert.equal(receipt.pin.hash, REVISION_1, 'This frozen dependency equals the original API archive');
 } finally {
   rmSync(temporary, {recursive: true});
 }
