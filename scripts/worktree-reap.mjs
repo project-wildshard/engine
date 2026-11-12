@@ -4,7 +4,7 @@
 // A worktree at <canonical>/.worktrees/<slug> on plan/<slug> is reaped only when all of these hold:
 //   - landed: the branch tip is on origin/main itself (`merge-base --is-ancestor`; land fast-forwards), after a fetch;
 //   - clean: `git status --porcelain` is empty (tracked edits and untracked files; ignored build output doesn't count);
-//   - idle: no process has its working directory inside it, no `land` holds its lock, no `worktree new` is running,
+//   - idle: no process has its working directory inside it (orphans reparented to pid 1 are stopped first, FL30), no `land` holds its lock, no `worktree new` is running,
 //     and nothing in it (index, HEAD, reflog, tip commit) changed for --grace hours (default 24: a lane between
 //     landings keeps its worktree). The reaper then holds the worktree's land lock and checks HEAD, the tree, the
 //     processes and setup again before it removes anything; a worktree whose folder resolves outside
@@ -61,6 +61,45 @@ export function processDirectories(){
   else if(line.startsWith('n')&&pid>0)found.set(pid,line.slice(1));
  }
  return found;
+}
+
+/** pid -> parent pid and command line, from `ps`. @returns {Map<number,{ppid:number,command:string}>} */
+function processTable(){
+ /** @type {Map<number,{ppid:number,command:string}>} */const table=new Map();
+ const listed=spawnSync('ps',['-Ao','pid=,ppid=,command='],{encoding:'utf8',maxBuffer:64<<20});
+ for(const line of (listed.stdout??'').split('\n')){
+  const match=/^\s*(\d+)\s+(\d+)\s(.*)$/u.exec(line);
+  if(match!==null)table.set(Number(match[1]),{ppid:Number(match[2]),command:match[3]??''});
+ }
+ return table;
+}
+
+/** TEST-SPEED FL30: stop what still runs inside a worktree before it is removed, so nothing outlives its folder
+ * holding a resource (an orphaned Vitest from a removed worktree kept its CPU broker's slots all night). Never this
+ * process or its ancestors (land runs from the worktree), never a bare interactive shell, and only processes whose own
+ * working directory is inside. `orphansOnly` (the reaper) takes only processes reparented to pid 1: something live
+ * still keeps a worktree.
+ * SIGTERM, then SIGKILL after 3 s. Returns the pids it signalled (with `dryRun`, would signal).
+ * @param {string} tree the worktree's physical path @param {{orphansOnly?:boolean,dryRun?:boolean}} [options]
+ * @returns {number[]} */
+export function stopWorktreeProcesses(tree,options={}){
+ const directories=processDirectories();
+ if(directories===undefined)return [];
+ const table=processTable(),spared=new Set();
+ // Without the table nothing tells land's own parents apart (J206 review): stop nothing.
+ if(!table.has(process.pid))return [];
+ for(let pid=process.pid;pid>1&&!spared.has(pid);pid=table.get(pid)?.ppid??0)spared.add(pid);
+ const shell=(/** @type {string} */ command)=>/^-?(?:\S*\/)?(?:ba|z|da|fi|k|tc|c)?sh$/u.test(command.trim());
+ // Only processes whose own working directory is inside: a daemon's children elsewhere are not this worktree's.
+ const pids=[...directories].filter(([pid,path])=>(path===tree||path.startsWith(`${tree}${sep}`))&&!spared.has(pid)
+  &&!shell(table.get(pid)?.command??'')&&(options.orphansOnly!==true||table.get(pid)?.ppid===1)).map(([pid])=>pid);
+ if(options.dryRun===true||pids.length===0)return pids;
+ const signal=(/** @type {number} */ pid,/** @type {NodeJS.Signals|0} */ name)=>{try{process.kill(pid,name);return true;}catch{return false;}};
+ for(const pid of pids)signal(pid,'SIGTERM');
+ const until=Date.now()+3000,nap=new Int32Array(new SharedArrayBuffer(4));
+ while(Date.now()<until&&pids.some(pid=>signal(pid,0)))Atomics.wait(nap,0,0,50);
+ for(const pid of pids)signal(pid,'SIGKILL');
+ return pids;
 }
 
 /** Newest change in the worktree's own Git state, in ms. @param {string} tree @param {string} gitDir */
@@ -123,7 +162,10 @@ export function reap(canonical,options,env,say){
   const gitDir=git(tree.path,['rev-parse','--absolute-git-dir']).trim();
   const busy=(/** @type {Map<number,string>|undefined} */ seen)=>seen===undefined?'cannot list process working directories'
    :[...seen].filter(([,path])=>path===physical||path.startsWith(`${physical}${sep}`)).map(([pid])=>String(pid)).join(', ');
-  const using=busy(directories);
+  // FL30: orphans (reparented to pid 1) in a landed, clean worktree are nobody's; they don't make it busy, and they
+  // are stopped only once it passed the grace, under its land lock (J206 review).
+  const orphans=new Set(stopWorktreeProcesses(physical,{orphansOnly:true,dryRun:true}));
+  const using=busy(directories===undefined?undefined:new Map([...directories].filter(([pid])=>!orphans.has(pid))));
   if(using!==''){keep(directories===undefined?using:`in use by pid ${using}`);continue;}
   const idleHours=Math.max(0,(now-lastActivity(tree.path,gitDir))/3_600_000);
   if(options.graceHours>0&&idleHours<options.graceHours){keep(`active ${idleHours.toFixed(1)} h ago, under the ${String(options.graceHours)} h grace`);continue;}
@@ -133,9 +175,14 @@ export function reap(canonical,options,env,say){
   try{release=pidLock(join(gitDir,'wildshard-land.lock'));}catch(error){keep(error instanceof Error?error.message:String(error));continue;}
   if(release===undefined){keep('land is running there');continue;}
   try{
+   if(orphans.size>0){
+    const stopped=stopWorktreeProcesses(physical,{orphansOnly:true,dryRun:options.dryRun});
+    if(stopped.length>0)say(`${options.dryRun?'would stop':'stopped '} ${slug}: orphaned pid ${stopped.join(', ')}`);
+   }
    const head=tryGit(tree.path,['rev-parse','HEAD']).stdout.trim();
    const now2=git(tree.path,['status','--porcelain','--untracked-files=all']).trim();
-   const using2=busy(processDirectories());
+   const seen2=processDirectories();
+   const using2=busy(seen2===undefined||!options.dryRun?seen2:new Map([...seen2].filter(([pid])=>!orphans.has(pid))));
    const why=head!==tree.head?`HEAD moved to ${head.slice(0,10)} during the check`:now2!==''?'edited during the check':using2!==''?`in use during the check (${using2})`
     :existsSync(join(common,'wildshard-worktree-setup.lock'))?'a worktree setup started during the check':!onMain(canonical,head)?'not on main during the check':'';
    if(why!==''){keep(why);continue;}

@@ -39,7 +39,7 @@ export async function holdBrokerCpu(address,slots,repo){
  const endpoint=v.parse(endpointSchema,JSON.parse(address));
  const socket=createConnection({host:'127.0.0.1',port:endpoint.port});
  let buffer='',granted=false,closing=false;
- socket.once('connect',()=>{socket.write(`${JSON.stringify({...endpoint,slots,repo})}\n`);});
+ socket.once('connect',()=>{socket.write(`${JSON.stringify({...endpoint,slots,repo,pid:process.pid})}\n`);});
  /** @type {Promise<v.InferOutput<typeof grantSchema>>} */
  const admission=new Promise((resolve,reject)=>{
   socket.once('error',reject);socket.once('close',()=>{if(!granted)reject(new Error('CPU broker closed before admission'));});

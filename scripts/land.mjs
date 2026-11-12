@@ -14,11 +14,12 @@
 //   8. Delete origin's plan branch and remove this worktree (--keep skips it).
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
-import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
+import {stopWorktreeProcesses} from './worktree-reap.mjs';
 
 /** The hosted workflows a landing needs green, by workflow name (J195, J240). */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -684,6 +685,10 @@ class Landing{
   if(now!==`refs/heads/${this.branch}`||at!==head)parts.push(`worktree kept: HEAD moved off ${this.branch} ${short(head)} after landing`);
   else if(dirty!=='')parts.push(`worktree kept: ${dirty.split('\n').length} uncommitted or untracked path(s)`);
   else{
+   // TEST-SPEED FL30: nothing started here may outlive the folder (an orphaned Vitest held the CPU slots).
+   let stopped=[];
+   try{stopped=stopWorktreeProcesses(realpathSync(this.root));}catch{/* Listing failed: remove as before. */}
+   if(stopped.length>0)parts.push(`stopped ${String(stopped.length)} process(es) still running there (pid ${stopped.join(', ')})`);
    const removed=tryGit(canonical,['worktree','remove',this.root]);
    if(removed.status===0){
     tryGit(canonical,['update-ref','-d',`refs/heads/${this.branch}`,head]);

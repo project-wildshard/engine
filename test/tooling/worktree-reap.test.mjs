@@ -1,11 +1,11 @@
 // DEV-SPEED DS13: `worktree.mjs reap` against real git. A bare repo stands in for GitHub. Only a landed, clean, idle
 // plan worktree goes, with its local branch and its origin branch; every other kind stays, named with its reason.
 import {spawn, spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {parseReapArgs} from '../../scripts/worktree-reap.mjs';
+import {parseReapArgs,stopWorktreeProcesses} from '../../scripts/worktree-reap.mjs';
 
 const SCRIPT = resolve(import.meta.dirname, '../../scripts/worktree.mjs');
 /** @type {string[]} */
@@ -101,6 +101,44 @@ describe('worktree reap', () => {
     expect(f.remoteBranches().sort()).toEqual(['plan/busy', 'plan/dirty', 'plan/landing', 'plan/unlanded']);
     expect(readFileSync(f.receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC fixture-lane worktree reap engine: reaped landed; kept busy \(.*\), dirty \(.*\), landing \(.*\), unlanded \(.*\); origin landed deleted$/mu);
   }, 60_000);
+
+  test('FL30: an orphaned process in a landed worktree is stopped and the worktree reaped; a dry run only names it', async () => {
+    const f = repos(['orphaned']);
+    f.work('orphaned', true);
+    const started = spawnSync('sh', ['-c', 'sleep 30 >/dev/null 2>&1 & echo $!'], {cwd: f.tree('orphaned'), encoding: 'utf8'});
+    const orphan = Number(started.stdout.trim());
+    const alive = () => { try { process.kill(orphan, 0); return true; } catch { return false; } };
+    try {
+      await new Promise(done => setTimeout(done, 200));
+      const dry = f.reap(['--grace=0', '--dry-run']);
+      expect(dry.stdout).toMatch(new RegExp(`would stop orphaned: orphaned pid ${String(orphan)}`, 'u'));
+      expect(alive()).toBe(true);
+      const result = f.reap();
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(new RegExp(`stopped  orphaned: orphaned pid ${String(orphan)}`, 'u'));
+      expect(result.stdout).toMatch(/reaped {3}orphaned: worktree removed/u);
+      expect(alive()).toBe(false);
+    } finally { if (alive()) process.kill(orphan, 'SIGKILL'); }
+  }, 60_000);
+
+  test('FL30: stopWorktreeProcesses stops what runs in a worktree, with its children, and spares this process', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'worktree-stop-'));
+    roots.push(base);
+    const tree = realpathSync(base);
+    const runner = spawn('sh', ['-c', 'sleep 30 & sleep 30; wait'], {cwd: tree, stdio: 'ignore'});
+    children.push(runner);
+    await new Promise(done => setTimeout(done, 200));
+    expect(stopWorktreeProcesses(tree, {orphansOnly: true})).toEqual([]);
+    const stopped = stopWorktreeProcesses(tree);
+    expect(stopped).toContain(runner.pid);
+    expect(stopped).not.toContain(process.pid);
+    expect(stopped.length).toBeGreaterThanOrEqual(3);
+    // The runner is this test's own child: it stays a zombie until reaped here, so wait for its exit.
+    const exited = runner.exitCode !== null || runner.signalCode !== null ? undefined : new Promise(done => { runner.once('exit', done); });
+    await exited;
+    expect(runner.signalCode ?? runner.exitCode).not.toBeNull();
+    for (const pid of stopped.filter(pid => pid !== runner.pid)) expect(() => process.kill(pid, 0)).toThrow();
+  }, 30_000);
 
   test('the grace keeps a worktree that landed moments ago', () => {
     const f = repos(['fresh']);

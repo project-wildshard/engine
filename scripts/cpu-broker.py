@@ -35,12 +35,20 @@ async def serve(root, capacity):
             slots = capacity if weight == 'all' else weight
             if type(slots) is not int or not 1 <= slots <= capacity or not isinstance(repo, str) or len(repo) > 8192:
                 raise ValueError('Invalid CPU broker request')
-            entry = {'token': uuid.uuid4().hex, 'pid': os.getpid(), 'repo': str(Path(repo).resolve()), 'slots': slots}
+            holder = request.get('pid')
+            if holder is not None and (type(holder) is not int or not 1 < holder < 2 ** 31):
+                raise ValueError('Invalid CPU broker request')
+            # FL30: the holder is the client process, the owner this broker's parent (the run); either gone frees it.
+            entry = {'token': uuid.uuid4().hex, 'pid': os.getpid(), 'owner': os.getppid(), 'repo': str(Path(repo).resolve()), 'slots': slots}
+            if holder is not None:
+                entry['holder'] = holder
             began = time.monotonic()
             deadline = began + 300
             while not admission.acquire_cpu(root, entry, capacity, deadline):
                 if reader.at_eof():
                     return
+                if stopping.is_set():
+                    raise RuntimeError('CPU broker is stopping')
                 if time.monotonic() >= deadline:
                     raise TimeoutError('CPU admission exceeded five minutes waiting for owned work')
                 await asyncio.sleep(.01)
@@ -82,11 +90,15 @@ async def serve(root, capacity):
     finally:
         loop.remove_reader(sys.stdin.fileno())
         server.close()
+        # Release the grants first: since Python 3.12 wait_closed also waits for every open connection, so
+        # waiting before the cancel never returns while a client holds a lease (FL30).
+        while clients:
+            pending = list(clients)
+            for client in pending:
+                client.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            await asyncio.sleep(0)
         await server.wait_closed()
-        pending = list(clients)
-        for client in pending:
-            client.cancel()
-        await asyncio.gather(*pending, return_exceptions=True)
 
 
 def main():
