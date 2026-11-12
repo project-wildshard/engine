@@ -141,13 +141,18 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     pause: idle, resume: idle, hold: idle, bossGod: idle, hardHits: idle, place: idle, raise: idle,
     // The door hears a quit on any link of this build: seated, still admitted, or handed a held body back. A link that is down (a redial's
     // wait) gets a fresh one to say it on, so a held body goes too. No redial follows: the page is going.
+    // FL27: a door that heard the quit closes plainly. A link it closed `stalled` was dropped before the quit reached it (it went out
+    // in the same turn as the close, before the page heard it), so the quit is said once more on a fresh link.
     leave: () => {
       redial.dispose();
-      let quitting = link;
-      if (quitting === null || down) { quitting = new WebSocketTransport(config.socket); link = quitting; down = false; client.rejoin(quitting); }
-      const gone = new Promise<void>(resolve => { quitting.onClose(() => { resolve(); }); });
-      quitting.control('ready', new Uint8Array([LEAVE_FLAG]).buffer);
-      return gone;
+      const say = (again: boolean): Promise<void> => {
+        let quitting = link;
+        if (quitting === null || down) { quitting = new WebSocketTransport(config.socket); link = quitting; down = false; client.rejoin(quitting); }
+        const gone = new Promise<void>(resolve => { quitting.onClose(reason => { if (again && reason === 'stalled') void say(false).then(resolve); else resolve(); }); });
+        quitting.control('ready', new Uint8Array([LEAVE_FLAG]).buffer);
+        return gone;
+      };
+      return say(true);
     },
     save: () => Promise.resolve({ tick: tickOf(), ok: true }), probe: () => Promise.resolve({ tick: tickOf(), tickMs: 0, rows: [] }),
     join: () => { throw new Error('A second client belongs to a server in this page'); },

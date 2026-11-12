@@ -160,7 +160,8 @@ test('a quit on the link that came back for a held body ends the hold at once', 
 
 test('a quit while the link is down and redialling still lets the held body go', { timeout: 30_000 }, async () => {
   bench = await roomBench();
-  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  const links: LinkState[] = [];
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: state => { links.push(state); }, countdown: () => undefined, elsewhere: () => undefined });
   const { client, booted, ready, leave } = shell;
   pump = setInterval(() => { client.present(); client.flush(); }, 16);
   await booted;
@@ -168,8 +169,24 @@ test('a quit while the link is down and redialling still lets the held body go',
   await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
   // The door drops the link the way a stalled phone's is dropped: the body is held (J114) and the page starts redialling.
   for (const end of (bench.world as unknown as { ends: Set<{ close: (reason: string) => void }> }).ends) end.close('stalled');
-  await new Promise(resolve => { setTimeout(resolve, 50); });
+  // The page has heard the close and is redialling: the quit below is said while the link is down, not on the dropped one.
+  await vi.waitFor(() => { expect(links).toContain('reconnecting'); }, { timeout: 3000 });
   expect(bench.room(SHARD)?.holds(IDENTITY.player), 'a lost link holds its body').toBe(true);
+  await leave();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
+});
+
+test('a quit said on a link the door has dropped, before the page hears the close, still lets the held body go', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  const { client, booted, ready, leave } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await booted;
+  ready();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  // ci 43165862958: the door dropped the link and the quit went out on it in the same turn, before its close frame reached the
+  // page. The door never heard it, and the body stood for J114's 30 s.
+  for (const end of (bench.world as unknown as { ends: Set<{ close: (reason: string) => void }> }).ends) end.close('stalled');
   await leave();
   await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(false); expect(bench?.world.health().players).toBe(0); }, { timeout: 3000 });
 });
