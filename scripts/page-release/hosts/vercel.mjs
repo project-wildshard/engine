@@ -64,7 +64,8 @@ export function vercelHost({token, exec = runRedacted, fetch: get = fetch}) {
   const rest = async path => {
     const response = await get(`https://api.vercel.com${path}`, {headers: {Authorization: `Bearer ${token()}`}, redirect: 'error', signal: AbortSignal.timeout(20_000)});
     if (response.status !== 200) throw new Error(`Vercel GET ${path.split('?')[0]} answered ${response.status}`);
-    return /** @type {any} */ (await response.json());
+    const body = /** @type {unknown} */ (await response.json());
+    return /** @type {any} */ (body);
   };
   return {
     name: 'vercel',

@@ -48,7 +48,7 @@ try {
     root, channel: /** @type {any} */ (channel), build,
     host: vercelHost({token: () => { if (token === '') { token = vercelToken(); secrets.push(token); } return token; }}),
     packs: r2Packs({log}),
-    run: (file, argv, env) => execFileSync(file, argv, {cwd: root, env: {...process.env, ...env}, stdio: 'inherit'}),
+    run: (file, argv, env) => { execFileSync(file, argv, {cwd: root, env: {...process.env, ...env}, stdio: 'inherit'}); },
     fetchJSON: async url => (await fetch200(url)).json(),
     fetchText: async url => (await fetch200(url)).text(),
     readFile: path => readFileSync(path),
