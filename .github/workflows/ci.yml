@@ -101,12 +101,15 @@ jobs:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-selection.mjs
-      # A docs-only push still runs lint, format and the committed asks, once.
+      # A docs-only push still runs lint, format, the committed asks, agent parity and any test that reads a changed
+      # doc (EV9), once.
       - if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs == 'true' && matrix.job == 1
         uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
       - if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs == 'true' && matrix.job == 1
+        env:
+          DOCS_TESTS: ${{ steps.paths.outputs.docs_tests }}
         run: bash scripts/ci-static.sh docs
       - id: code
         if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'

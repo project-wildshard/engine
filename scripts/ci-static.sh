@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # CI-JOB-PACKING (J244): ci's static checks as one command, so a packed job runs them as one unit beside its test shards.
 #   bash scripts/ci-static.sh code   every check a code push needs (the old `static` job, step for step)
-#   bash scripts/ci-static.sh docs   what a docs-only push still runs: lint, format and the committed asks
+#   bash scripts/ci-static.sh docs   what a docs-only push still runs: lint, format, the committed asks, agent parity
+#                                    (it reads AGENTS.md and CLAUDE.md) and $DOCS_TESTS, the tests that read a changed doc (EV9)
 # Each check prints its seconds; a red one doesn't hide the rest, and any red makes the exit code 1.
 # Run it before `pnpm pins`: some proofs install their own few pins, which replaces the published mounts.
 set -uo pipefail
@@ -37,6 +38,13 @@ if [ "$mode" = code ]; then
   check declared-input bash -c 'node scripts/pins.ts install nine-dragon-stack && node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs'
 fi
 check asks node src/scripts/asks.mjs check --all
+if [ "$mode" = docs ]; then
+  check parity pnpm check:parity
+  # Space-separated repo paths from scripts/ci-selection.mjs. A file the config excludes (lift-pending, quarantine)
+  # is excluded from the full suite too, so zero selected files is green here.
+  # shellcheck disable=SC2086
+  if [ -n "${DOCS_TESTS:-}" ]; then check doc-tests node scripts/vitest-tmp.ts run --passWithNoTests $DOCS_TESTS; fi
+fi
 if [ "$mode" = code ]; then
   check sides pnpm check:sides
   # OFF-VERCEL OV5: was deploy.yml's prepare step, which never ran on main.

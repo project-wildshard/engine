@@ -155,6 +155,9 @@ async function main(){
       {name:'lint (docs-only)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
       {name:'format:check (docs-only; history scan already green)',commands:[['pnpm','run','--silent','format:check']]},
       {name:'check:asks (committed docs)',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
+      // EV9: agent-parity reads AGENTS.md and CLAUDE.md; a test that reads a changed doc runs too.
+      {name:'check:parity (docs-only)',commands:[['pnpm','run','--silent','check:parity']]},
+      ...(selection.tests?.length?[{name:`vitest (docs readers: ${selection.tests.length})`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests',...selection.tests]]}]:[]),
     ],{env});
     console.error(`  - docs-only push lane ${result.ok?'green':'RED'} in ${result.seconds.toFixed(1)} s`);if(result.ok)record(result.seconds);process.exitCode=result.ok?0:1;return;
   }

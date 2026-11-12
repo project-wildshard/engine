@@ -16,7 +16,7 @@ const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value)
 export async function selectCI(env=process.env,cwd=process.cwd()){
  const sha=env.GITHUB_SHA??'',repo=env.GITHUB_REPOSITORY??'',token=env.GH_TOKEN;
  /** @param {string} reason */
- const full=reason=>({docs:false,base:null,reason});
+ const full=reason=>({docs:false,base:null,tests:/** @type {string[]} */([]),reason});
  if(env.GITHUB_EVENT_NAME!=='push'||!shaPattern.test(sha)||!token||!/^[-\w.]+\/[-\w.]+$/u.test(repo))return full('No exact successful code proof; run full');
  const origin=env.GITHUB_API_URL??'https://api.github.com';
  /** @param {string} path @returns {Promise<unknown>} */
@@ -49,7 +49,8 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
     const pending=readLiftPending(cwd);
     if(pending.files.length>0&&pending.excluded.length===0)return full('Inherited migration exclusion expired; require the complete current test inventory');
    }
-   return {docs:selected.mode==='docs',base:run.head_sha,reason:`Compared with code-proving CI run ${run.id}: ${selected.reason}`};
+   // EV9: tests that read a changed doc's content run in the docs lane (scripts/ci-static.sh docs).
+   return {docs:selected.mode==='docs',base:run.head_sha,tests:selected.mode==='docs'?selected.tests??[]:[],reason:`Compared with code-proving CI run ${run.id}: ${selected.reason}`};
   }
   return full('No successful code-proving ancestor in Actions history; run full');
  }catch{return full('Code-proof lookup unavailable; run full');}
@@ -57,6 +58,6 @@ export async function selectCI(env=process.env,cwd=process.cwd()){
 
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const result=await selectCI();
- if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,`docs=${String(result.docs)}\ncode_base=${result.base??''}\n`);
+ if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,`docs=${String(result.docs)}\ncode_base=${result.base??''}\ndocs_tests=${result.tests.join(' ')}\n`);
  console.log(JSON.stringify(result));
 }
