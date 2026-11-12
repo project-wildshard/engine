@@ -12,6 +12,9 @@ valid section, and a `vX.Y.Z` tag whose commit has none.
 ## v0.1.10 (2026-11-11)
 
 - Game files now come straight from Cloudflare's CDN.
+- You can hear the first player in a room again; they no longer show as too far away.
+- A player who takes over a room's first spot shows their own Name, not the last player's.
+- Picking a shard online opens the shared world grid again, so the Template's spot is reachable.
 
 ## v0.1.9 (2026-11-11)
 
