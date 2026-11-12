@@ -14,6 +14,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { ScriptEntity } from '@wildshard/engine/script/effects';
 
 import { ItemContextSchema, ItemFamilyNameSchema as name, parseItems, type ShardItems } from '@wildshard/format/items';
+import { WeaponProfileSchema } from '@wildshard/format/weaponProfiles';
 
 /** Extend an admitted weapon context with bounded author rows. Observations come from the session owner. */
 export function declaredItemContext(row: ShardItems['contexts'][number], observation?: InputObservation): InputContextDef {
@@ -68,11 +69,31 @@ export function shardItemFamilies(kit: ReadonlyMap<string, ItemFamily>, shard: N
   }
   return merged;
 }
-/** The kit families whose numeric runtime the server owns under the wire (SR11, C8 and C9). */
-export const SERVER_KIT_FAMILIES: ReadonlySet<string> = new Set(['kit.melee', 'kit.lantern']);
-/** The held slot each declared kit melee weapon goes by on the wire: its order among them. Page and server read the same rows. */
+/** A declared lever-action rifle (TE-ENG2): a `firearm` profile with a `lever` block, fired and reloaded by the server. */
+export const LEVER_FAMILY = 'kit.lever';
+/** The kit families whose numeric runtime the server owns under the wire (SR11, C8 and C9; TE-ENG2's lever). */
+export const SERVER_KIT_FAMILIES: ReadonlySet<string> = new Set(['kit.melee', 'kit.lantern', LEVER_FAMILY]);
+/** The held slot each declared kit weapon (melee or lever) goes by on the wire: its order among them. Page and server read the same rows. */
 export function declaredKitSlots(rows: readonly { readonly id: string; readonly kind?: string; readonly family?: string }[]): ReadonlyMap<string, number> {
-  return new Map(rows.filter(row => row.kind === 'weapon' && row.family === 'kit.melee').slice(0, 32).map((row, slot) => [row.id, slot] as const));
+  return new Map(rows.filter(row => row.kind === 'weapon' && (row.family === 'kit.melee' || row.family === LEVER_FAMILY)).slice(0, 32).map((row, slot) => [row.id, slot] as const));
+}
+/** A lever's numbers, admitted from its row's `firearm` profile: the tube (magazine), the per-round reload and the cycle. */
+export interface LeverProfile {
+  readonly magazine: number; readonly reserve: number; readonly reload: number; readonly range: number; readonly autoReload: number;
+  readonly lever: { readonly cycleDelay: number; readonly cycleTime: number; readonly reloadIn: number; readonly reloadOut: number; readonly ejectAt: number; readonly cockAt: number; readonly autoReloadClose: number };
+}
+/** Admit a `kit.lever` row's profile: a firearm with `action: "lever"`, `reloadMode: "perRound"` and its `lever` block. */
+export function leverProfile(row: { readonly id: string; readonly profile?: unknown }): LeverProfile {
+  const p = row.profile === undefined ? undefined : v.parse(WeaponProfileSchema, row.profile);
+  if (p?.family !== 'firearm' || p.action !== 'lever' || p.reloadMode !== 'perRound' || p.lever === undefined) throw new Error(`Lever ${row.id} needs a firearm profile with action lever, reloadMode perRound and a lever block`);
+  const { magazine, reserve, reload, range, autoReload, lever } = p;
+  if (!Number.isInteger(magazine) || magazine < 2 || magazine > 64 || reload <= 0 || range <= 0 || range > 1000) throw new RangeError(`Lever ${row.id} has an invalid profile`);
+  return { magazine, reserve, reload, range, autoReload, lever: { cycleDelay: lever.cycleDelay, cycleTime: lever.cycleTime, reloadIn: lever.reloadIn, reloadOut: lever.reloadOut, ejectAt: lever.ejectAt, cockAt: lever.cockAt, autoReloadClose: lever.autoReloadClose } };
+}
+/** The owned lines a lever's server seat publishes to its holder: rounds in the gun (tube and chamber), the reserve, a reload under
+ *  way (0 or 1) and whether the player has taken it (0 or 1). A line at zero is dropped from `owned`, so absent reads as zero. */
+export function leverLines(id: string): { readonly rounds: string; readonly reserve: string; readonly reloading: string; readonly taken: string } {
+  return { rounds: `${id}.rounds`, reserve: `${id}.reserve`, reloading: `${id}.reloading`, taken: `${id}.taken` };
 }
 /** Normal equipment factory result plus authoritative fixed-step runtimes, scoped to the one session. */
 export interface DeclaredItems {
@@ -120,6 +141,7 @@ export function installDeclaredItems(input: unknown, ports: DeclaredItemPorts): 
   });
   const scope = ports.scope.child('declared-items');
   const weapons = new Map<string, Weapon>(), tools = new Map<string, Tool>(), runtimes = new Map<string, ItemRuntime>();
+  const locked = new Set(data.rows.filter((_row, index) => families[index]?.locked === true).map(row => row.id));
   try {
     if (ports.contexts !== 'runtime') for (const ctx of data.contexts) {
       ports.input.register(declaredItemContext(ctx, ports.observation), scope);
@@ -150,7 +172,7 @@ export function installDeclaredItems(input: unknown, ports: DeclaredItemPorts): 
     const primary = data.loadout.primary === null ? null : weapons.get(data.loadout.primary) ?? null;
     const secondary = data.loadout.secondary === null ? null : weapons.get(data.loadout.secondary) ?? null;
     return { primary, secondary, extras: [...weapons.values()].filter((w) => w !== primary && w !== secondary), tools: [...tools.values()], order: [...weapons.values()].map((w) => w.id), runtimes,
-      install: (equipment) => { for (const w of weapons.values()) equipment.unlock(w.id); for (const id of data.loadout.tools) { const t = tools.get(id); if (t !== undefined) equipment.add(t, { locked: false }); } },
+      install: (equipment) => { for (const w of weapons.values()) if (!locked.has(w.row.id)) equipment.unlock(w.id); for (const id of data.loadout.tools) { const t = tools.get(id); if (t !== undefined) equipment.add(t, { locked: false }); } },
       step: (tick, dt) => { if (!scope.disposed) for (const runtime of runtimes.values()) runtime.step(tick, dt); } };
   } catch (error) { scope.dispose(); throw error; }
 }

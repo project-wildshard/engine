@@ -58,7 +58,7 @@
     "@sentry/browser": "11.0.0",
     "@sentry/core": "11.0.0",
     "@valibot/to-json-schema": "1.8.0",
-    "@wildshard/format": "github:project-wildshard/shardfile#672820370d7c49ef83f8531f04f0f685dc965ae0",
+    "@wildshard/format": "github:project-wildshard/shardfile#e51eec6bff0f88905b88ea31be6a6d511fbb43f0",
     "@wildshard/wire": "github:project-wildshard/shardfile#a51f56fbe54197b879fa309a1b1946df7384d576&path:/packages/wire",
     "ajv": "6.15.0",
     "fflate": "0.8.3",

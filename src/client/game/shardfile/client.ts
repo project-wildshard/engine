@@ -70,7 +70,8 @@ import { buildYield } from '@wildshard/engine/core/workSlice';
 import { clientScene, handledItemInputs, itemScene } from './clientItems';
 import { installShardfileColliders } from '../../../shared/game/shardfile/collisionBindings';
 import type { ClientAssets } from './clientAssets';
-import { installDeclaredItems, type DeclaredItems } from '../../../shared/game/shardfile/items';
+import { installDeclaredItems, leverLines, type DeclaredItems } from '../../../shared/game/shardfile/items';
+import { declaredLever } from '../plugin/weaponFamily';
 import { runtimeBoundWorldFiles, withoutRuntimeRows } from "../../../shared/game/plugin/runtimeRows";
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { nearPlaceholderRoots } from '@wildshard/format/nearPlaceholder';
@@ -542,7 +543,24 @@ export class ShardfileClient {
     }
     yield;
     // The server keeps this world's saves and reads a page's old ones, and it runs its scenes: a press goes by the prompt's `wireId`.
-    const scene = clientScene(source, items.runtimes, () => undefined, (item, action) => relayItem(source, item, action));
+    // TE-ENG2: a declared lever starts on its rack. On the wire the server takes it and says so in an owned line; with no wire the
+    // rack's scene takes it here. Taken, it unlocks and comes to hand.
+    const levers = [items.primary, items.secondary, ...items.extras].flatMap(weapon => { const lever = declaredLever(weapon); return lever === null ? [] : [lever]; });
+    const takeHere = (item: string, action: number): boolean => {
+      const lever = levers.find(entry => entry.row.id === item); if (lever === undefined) return false;
+      if (action === 3) lever.take(); else lever.reload();
+      return true;
+    };
+    const scene = clientScene(source, items.runtimes, () => undefined, (item, action) => relayItem(source, item, action) || takeHere(item, action));
+    if (levers.length > 0) ctx.system({ id: 'shardfile.lever-lines', phase: 'update', run: () => {
+      for (const lever of levers) {
+        if (wirePage.client !== null) {
+          const lines = leverLines(lever.row.id);
+          lever.mirror(wirePage.line(lines.rounds), wirePage.line(lines.reserve), wirePage.line(lines.reloading) > 0, wirePage.line(lines.taken) > 0);
+        }
+        if (lever.taken && !play.weapons.has(lever.id)) { play.weapons.unlock(lever.id); play.weapons.select(lever.id); }
+      }
+    } });
     // SR11 (C9): the server burns the lantern; its owned lines are what this page's runtime shows, since it never steps.
     const mirrored = (source.targets.itemFields ?? []).flatMap(row => {
       const field = source.state.player.find(entry => entry.id === row.fieldId), item = items.runtimes.get(row.item);

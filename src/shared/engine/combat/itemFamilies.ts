@@ -29,4 +29,6 @@ export type ItemFamily = ({ kind: 'weapon'; create: (row: EquipmentRow, spec: Ex
   | { kind: 'tool'; create: (row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'tool' }>, ports: ItemFamilyPorts) => Tool }) & { presentation?: ItemFamilyPresentation;
   /** Explicit profile kinds consumed by this native implementation; absent means legacy rows only. */
   profiles?: readonly string[];
+  /** TE-ENG2: the family's weapons start locked, and an item scene (a rack's prompt) unlocks them; absent means unlocked at install. */
+  locked?: boolean;
 };

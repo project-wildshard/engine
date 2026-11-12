@@ -4,7 +4,9 @@ import { admitHeldRecipe } from './heldRecipe';
 import { createClientChannels, bindClientChannelInputs } from '../../../shared/game/plugin/channels';
 import { readBorrowedOwner, type BorrowedOwnerPath } from '../../../shared/game/plugin/borrowed';
 import { createClientScene, createHeldMeleeBinding, type ClientScene, type ClientScenePorts } from './scene';
-import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, CylinderGeometry, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, Vector2, Vector3, MathUtils } from "three";
+import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, CylinderGeometry, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, SphereGeometry, Vector2, Vector3, MathUtils } from "three";
+import { RangedAction } from "@wildshard/engine/combat/Firearm";
+import { leverProfile, type LeverProfile } from "../../../shared/game/shardfile/items";
 import { blocks } from "@wildshard/engine/blocks";
 import type { WorldContactDispatcher } from "@wildshard/engine/combat/contactWeapon";
 import { Weapon, type WeaponState, type AimInfo } from "@wildshard/engine/combat/Weapon";
@@ -57,6 +59,7 @@ function itemMesh(ports: ItemFamilyPorts): Group {
     return model;
   }
   const recipe = ports.view.recipe;
+  if (recipe === 'kit.rifle') return rifleMesh(ports);
   if (!['kit.whip', 'kit.sword', 'kit.lantern'].includes(recipe)) throw new Error(`Unresolved item view ${recipe}`);
   const model = new Group();
   const material = new MeshStandardMaterial({ color: ports.view.colour, flatShading: true, emissive: ports.view.colour, emissiveIntensity: ITEM_VIEW_LIFT });
@@ -67,6 +70,112 @@ function itemMesh(ports: ItemFamilyPorts): Group {
   ports.scope.onDispose(() => { model.removeFromParent(); geometry.dispose(); material.dispose(); });
   return model;
 }
+/** TE-ENG2: a lever's stand-in when its row names no GLB: a barrel and a stock in the row's colour, the muzzle at the barrel's end. */
+function rifleMesh(ports: ItemFamilyPorts): Group {
+  const model = new Group(), material = new MeshStandardMaterial({ color: ports.view.colour, flatShading: true, emissive: ports.view.colour, emissiveIntensity: ITEM_VIEW_LIFT });
+  const barrel = new BoxGeometry(0.035, 0.045, 0.75), stock = new BoxGeometry(0.055, 0.11, 0.3);
+  const front = new Mesh(barrel, material), back = new Mesh(stock, material);
+  front.position.set(0, 0.02, -0.3); back.position.set(0, -0.02, 0.2); model.add(front, back);
+  const muzzle = new Object3D(); muzzle.name = 'muzzle'; muzzle.position.set(0, 0.02, -0.68); model.add(muzzle);
+  model.position.set(...ports.view.position); model.rotation.set(...ports.view.rotation);
+  ports.scope.onDispose(() => { model.removeFromParent(); barrel.dispose(); stock.dispose(); material.dispose(); });
+  return model;
+}
+/** Seconds the muzzle flash shows after a round leaves. */
+const FLASH_SECONDS = 0.06;
+/** Frames the page's count may differ from the server's at rest before the server's stands. */
+const APART_FRAMES = 15;
+/** A lever the page holds, as the shardfile client reads and drives it (TE-ENG2). */
+export interface DeclaredLeverHandle {
+  /** Whether this player has taken it off its rack: the server's word on the wire, this page's own off it. */
+  readonly taken: boolean;
+  /** The rack's scene ran here with no wire: take it. */
+  readonly take: () => void;
+  /** The server's owned lines for this lever: rounds in the gun, the reserve, a reload under way, taken. */
+  readonly mirror: (rounds: number, reserve: number, reloading: boolean, taken: boolean) => void;
+}
+/**
+ * A declared lever-action rifle (TE-ENG2, `kit.lever`): Pine's per-round cycle (`RangedAction.Cycle`) from the row's `firearm` profile,
+ * with the shard's GLB in hand. On the wire the server fires every round (a hitscan at any body) and feeds every reload; this page
+ * plays its own cycle for the feel (the hammer, the lever throw, the flash at the `muzzle` empty) and takes the server's count when
+ * they differ at rest. Its weapon state fills the HUD's ammo strip: rounds in the gun over the tube, and the reserve. Until the player
+ * takes it from its rack it is hidden and refuses every press.
+ */
+class DeclaredLever extends Weapon implements DeclaredLeverHandle {
+  readonly model: Group;
+  readonly state: WeaponState = { ammo: undefined, magazine: 0, reserve: 0, loaded: false, reloading: false, reloadProgress: 0, ads: false };
+  holster = 0; enabled = true; adsHeld = false; aimInfo: AimInfo | null = null;
+  taken = false;
+  private readonly ports: ItemFamilyPorts;
+  private readonly store: { reserve: number };
+  private readonly act: InstanceType<typeof RangedAction.Cycle>;
+  private readonly flash: Mesh;
+  private readonly lever: Object3D | null;
+  private flashT = 0; private kick = 0; private apart = 0;
+  constructor(row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
+    const profile: LeverProfile = leverProfile({ id: spec.id, profile: ports.profile });
+    super({ ...row, ui: { ...row.ui, touch: 'ranged', melee: false, lockOn: false, ammo: { label: 'Rounds', segments: profile.magazine, magazine: true } } });
+    this.ports = ports; this.store = { reserve: profile.reserve };
+    this.act = new RangedAction.Cycle(this.store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever });
+    this.model = itemMesh(ports); this.setAimSource(ports.aim);
+    const muzzle = this.model.getObjectByName('muzzle') ?? this.model;
+    const ball = new SphereGeometry(0.035, 6, 4), glow = new MeshBasicMaterial({ color: 0xffd27a });
+    this.flash = new Mesh(ball, glow); this.flash.visible = false; muzzle.add(this.flash);
+    this.lever = this.model.getObjectByName('lever') ?? null;
+    ports.scope.onDispose(() => { ball.dispose(); glow.dispose(); });
+    this.state.magazine = profile.magazine; this.sync();
+  }
+  override install(ctx: EquipContext): void {
+    super.install(ctx); ctx.scope.onDispose(() => { this.ports.scope.dispose(); });
+    this.ports.input.bind('attack', () => { this.tryFire(); }, ctx.scope, () => this.enabled);
+    this.ports.input.bind('reload', () => { this.reload(); }, ctx.scope, () => this.enabled);
+  }
+  take(): void { this.taken = true; this.sync(); }
+  tryFire(): void {
+    if (!this.enabled || !this.taken) return;
+    const { act } = this;
+    // Pine's trigger: a pull mid-reload stops it after this round; an empty chamber throws the lever, or reloads a dry tube.
+    if (act.phase === 'reload') { act.triggerWhileReloading(); this.wire?.press(false); return; }
+    if (act.phase !== 'idle') return;
+    if (!act.chambered) { this.onDry?.(); if (act.tube > 0) act.throwLever(); else this.reload(); this.wire?.press(false); return; }
+    act.dropHammer(); this.kick = 1; this.flashT = FLASH_SECONDS; this.onFire?.();
+    this.wire?.press(false); // the server fires the round along this look; off the wire no round lands here
+  }
+  override reload(): void {
+    if (!this.enabled || !this.taken || !this.act.beginReload()) return;
+    this.onReloadStart?.(); this.wire?.reload();
+  }
+  mirror(rounds: number, reserve: number, reloading: boolean, taken: boolean): void {
+    if (taken && !this.taken) this.taken = true;
+    this.store.reserve = reserve;
+    // At rest both sides agree, or the server's count stands; mid-cycle the page's own count leads for a beat.
+    const { act } = this;
+    if (act.phase !== 'idle' || reloading || act.rounds === rounds) { this.apart = 0; return; }
+    this.apart += 1;
+    if (this.apart < APART_FRAMES) return;
+    act.chambered = rounds > 0; act.tube = Math.min(act.tubeMax, Math.max(0, rounds - 1)); this.apart = 0;
+  }
+  update(dt: number, _t: number): void {
+    for (const event of this.act.events(dt, false)) if (event === 'reloadEnd') this.onReloadEnd?.();
+    this.sync();
+    const [x, y, z] = this.ports.view.position, [rx, ry, rz] = this.ports.view.rotation;
+    this.kick *= Math.exp(-dt * 14); this.flashT = Math.max(0, this.flashT - dt);
+    const throwing = Math.sin(this.act.cycleU * Math.PI), dip = this.act.phase === 'reload' ? 1 : 0;
+    this.model.visible = this.taken && (this.enabled || this.holster > 0);
+    this.model.position.set(x, y - throwing * 0.03 - dip * 0.06, z + this.kick * 0.07);
+    this.model.rotation.set(rx + this.kick * 0.14, ry, rz + (this.lever === null ? throwing * 0.25 : 0) + dip * 0.45);
+    if (this.lever !== null) this.lever.rotation.x = throwing * 0.9;
+    this.flash.visible = this.flashT > 0;
+    keepInFrame(this.model, this.ports.view.position);
+  }
+  private sync(): void {
+    const s = this.state, { act } = this;
+    s.ammo = this.taken ? act.rounds : undefined; s.reserve = this.store.reserve; s.loaded = act.chambered;
+    s.reloading = act.phase === 'reload'; s.reloadProgress = act.reloadProgress;
+  }
+}
+/** The page's lever, if this weapon is one. */
+export function declaredLever(weapon: unknown): (Weapon & DeclaredLeverHandle) | null { return weapon instanceof DeclaredLever ? weapon : null; }
 class DeclaredMelee extends Weapon {
   readonly model: Group;
   readonly state: WeaponState = { ammo: undefined, magazine: 0, reserve: 0, loaded: true, reloading: false, reloadProgress: 0, ads: false };
@@ -210,6 +319,7 @@ export function declaredKitItemFamilies(): ReadonlyMap<string, ItemFamily> {
   return new Map<string, ItemFamily>([
     ['kit.melee', { kind: 'weapon', create: (row, spec, ports) => new DeclaredMelee(row, spec, ports) }],
     ['kit.lantern', { kind: 'tool', create: (row, spec, ports) => new DeclaredLantern(row, spec, ports) }],
+    ['kit.lever', { kind: 'weapon', create: (row, spec, ports) => new DeclaredLever(row, spec, ports), profiles: ['firearm'], locked: true }],
   ]);
 }
 

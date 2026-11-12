@@ -1,0 +1,23 @@
+{
+  "context": { "id": "fixture.lever", "keysFrom": "weapon.ranged", "actions": ["attack", "aim", "reload"], "touch": "ranged", "lockable": false },
+  "row": {
+    "id": "weapon.fixture-lever", "kind": "weapon", "family": "kit.lever", "slot": "declared.weapon.fixture-lever", "context": "fixture.lever",
+    "ui": { "name": "Lever rifle", "icon": "lever", "swapIcon": "⌐", "blurb": "Six in the tube, loaded one round at a time." },
+    "view": { "recipe": "kit.rifle", "colour": "#8a5a2b", "position": [0.22, -0.28, -0.55], "rotation": [0, 0, 0] },
+    "hook": null,
+    "profile": {
+      "family": "firearm", "action": "lever", "magazine": 6, "reserve": 12, "interval": 0.68, "reload": 0.4, "reloadMode": "perRound", "autoReload": 0.35,
+      "damageScale": 1, "range": 120, "spreadAds": 0, "spreadHip": 0, "spreadRadius": "sqrt", "bloomShot": 0, "bloomMax": 0, "movingSpread": 0, "movingAimReduction": 0,
+      "lever": { "cycleDelay": 0.12, "cycleTime": 0.56, "reloadIn": 0.22, "reloadOut": 0.2, "ejectAt": 0.34, "cockAt": 0.2, "autoReloadClose": 5 },
+      "projectile": { "kind": "bullet", "delivery": "hitscan", "speed": 0, "radius": 0, "flight": { "gravity": 0, "drag": 0, "windCoupling": 0 }, "pool": 1, "substeps": 1, "lifetime": 1 }
+    },
+    "light": { "id": "fixture.lever.round", "damage": 10, "range": 1, "width": 0.1, "cooldown": 0.68, "effect": null, "tags": ["actor.player", "weapon.fixture-lever", "dmg.ranged"] },
+    "heavy": { "id": "fixture.lever.round-heavy", "damage": 10, "range": 1, "width": 0.1, "cooldown": 0.68, "effect": null, "tags": ["actor.player", "weapon.fixture-lever", "dmg.ranged"] },
+    "charge": 1
+  },
+  "interaction": { "id": "fixture.rack.use", "at": [20, 0, 20], "radius": 2, "label": "Take the rifle", "scene": "fixture.rack.take" },
+  "itemActions": [
+    { "scene": "fixture.rack.take", "item": "weapon.fixture-lever", "action": 3 },
+    { "scene": "fixture.rack.reload", "item": "weapon.fixture-lever", "action": 4 }
+  ]
+}

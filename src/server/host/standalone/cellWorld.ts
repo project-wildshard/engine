@@ -173,6 +173,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
       const claim = act.kind === 'interact' ? routes.claims.get(act.id) : undefined;
       if (act.kind === 'equip' && items?.equip(player, act.slot) === true) continue;
       if (act.kind === 'interact' && items?.scene(player, act.id) === true) continue;
+      if (act.kind === 'reload' && items?.reload(player, act.slot) === true) continue;
       if (act.kind === 'interact' && act.id.startsWith('seen:') && routes.seen !== null) routes.seen(player, act.id);
       else if (act.kind === 'interact' && act.id.startsWith(STORY_ACT)) routes.story?.(player, act.id.slice(STORY_ACT.length));
       else if (claim !== undefined) claim(player);
