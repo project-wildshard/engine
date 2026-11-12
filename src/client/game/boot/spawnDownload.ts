@@ -2,6 +2,7 @@ import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, 
 import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming } from '@wildshard/engine/boot/timing';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
+import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -787,7 +788,8 @@ function onPacks(path: string, packs: string): string {
  * page URLs: a part delivers them, and the product reads them by those. */
 function packBase(home: unknown, slug: string): string {
   const shards = get(home, 'shards'), base = get(home, 'base');
-  if (Array.isArray(shards) && shards.includes(slug) && typeof base === 'string') return base;
+  // a bake names a stored cook by its product slug (`template`); a placement asks by its authored one (`_template`)
+  if (Array.isArray(shards) && shards.some((row: unknown) => typeof row === 'string' && bareSlug(row) === bareSlug(slug)) && typeof base === 'string') return base;
   // PZ3: the content base (an origin, or PZ13's `content/<set>/` on one) when the boot bank names one; else this page
   return contentBase() || document.baseURI;
 }
@@ -795,9 +797,15 @@ function packBase(home: unknown, slug: string): string {
 export function shardPackBase(slug: string): string | null {
   const text = document.getElementById('boot-module-files')?.textContent;
   if (!text) return document.baseURI;
-  const bank: unknown = JSON.parse(text);
-  if (get(get(bank, 'entryPrograms'), slug) === false) return null;
+  const bank: unknown = JSON.parse(text), recorded = get(bank, 'entryPrograms');
+  if (get(recorded, slug) === false || get(recorded, bareSlug(slug)) === false) return null;
   return packBase(get(get(bank, 'spawnManifests'), 'home'), slug);
+}
+/** DL10: a shard's recorded entry programs, or null when its cook published none. The file carries the product slug: a
+ *  placement's authored `_template` reads `/programs/template.json` (a `_template.json` read 404s, TEMPLATE-E2E TE13). */
+export function entryProgramsURL(slug: string): string | null {
+  const base = shardPackBase(slug);
+  return base === null ? null : new URL(`programs/${bareSlug(slug)}.json`, base).href;
 }
 function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): {address: SpawnManifestAddress; cacheName: unknown; base: string} | null {
   const text = document.getElementById('boot-module-files')?.textContent; if (!text) return null;

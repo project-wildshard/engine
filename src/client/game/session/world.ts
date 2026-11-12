@@ -32,7 +32,7 @@ import { bootstrap, type World } from '@wildshard/engine/core/bootstrap';
 import { earlyProgramsOn, queueBakedPrograms, type BakedPrograms } from '@wildshard/engine/boot/earlyPrograms';
 import { TIER } from '@wildshard/engine/core/tier';
 import { cachedResourceAllocations } from '@wildshard/engine/render/textureBytes';
-import { shardPackBase } from '../boot/spawnDownload';
+import { entryProgramsURL } from '../boot/spawnDownload';
 import { installEntrySockets } from '@wildshard/engine/physics/entrySockets';
 import { installPagePathRamps } from '../shardfile/pagePreparation';
 import { showError } from '@wildshard/engine/ui/ErrorModal';
@@ -43,9 +43,9 @@ import { HorizonMatte } from '@wildshard/engine/world/HorizonMatte';
 
 /** DL10: the shard's recorded entry programs (`scripts/bake-entry-programs.mjs`), or null when it has none. */
 async function bakedEntryPrograms(slug: string): Promise<BakedPrograms | null> {
-  const base = shardPackBase(slug);
-  if (base === null) return null;
-  const response = await fetch(new URL(`programs/${slug}.json`, base));
+  const url = entryProgramsURL(slug);
+  if (url === null) return null;
+  const response = await fetch(url);
   if (!response.ok) return null;
   const data: unknown = await response.json();
   if (typeof data !== 'object' || data === null || !('version' in data) || data.version !== 2 || !('lines' in data) || !('shaders' in data)
