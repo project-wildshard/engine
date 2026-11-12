@@ -6,6 +6,7 @@ import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { prepareAssetDecoders } from '@wildshard/format/product';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { MoverScriptDriver, type MoverRuntime } from '@wildshard/engine/game/plugin/mover';
+import { installRopeDecks } from './ropeDecks';
 import type { NearColliders } from '@wildshard/engine/physics/nearColliders';
 import { installCableModes } from '@wildshard/engine/player/modes';
 import { createNativeCombatFrame, nativeRangedItem, otherCombatFrame, readNativeRangedItem, type NativeCombatFrame, type NativeRangedItem } from '@wildshard/engine/game/plugin/nativeItems';
@@ -173,7 +174,7 @@ export function headlessAssemblyPorts(rapier: Rapier, room?: boolean): NativeAss
 export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?: boolean): Promise<HeadlessRuntimePlan> {
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(provided.shard.identity.slug)) throw new Error('Invalid native product identity');
   await prepareAssetDecoders();
-  let plan: HeadlessRuntimePlan, source = provided.shard, places: readonly PlaceArea[] = [];
+  let plan: HeadlessRuntimePlan, source = provided.shard, places: readonly PlaceArea[] = [], decks = provided.product;
   if (provided.sections !== undefined) {
     const declaration = parseNativeRuntimePlan(provided.sections.get('sim/runtime-plan'));
     plan = await prepareRuntimePlan(source, provided.assets, declaration.baked, declaration.recipe, provided.sections);
@@ -186,7 +187,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
     }
     const { slug: actualIdentity } = product, { slug: expectedIdentity } = provided.shard.identity;
     if (actualIdentity !== expectedIdentity || product.revision !== provided.shard.identity.revision) throw new Error('Native product and trusted identity differ');
-    source = product.shardfile;
+    source = product.shardfile; decks = product;
     plan = await prepareProductRuntimePlan(product, provided.assets, headlessAssemblyPorts(provided.rapier, room));
     if (product.has('economy/loot')) plan = { ...plan, economy: product.section('economy/loot') };
     places = await serverPlaces(product);
@@ -195,6 +196,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
   if (plan.level.id !== identity.id || plan.level.seed !== identity.seed) throw new Error('Trusted runtime simulation identity mismatch');
   return { ...plan, install: (host, context) => {
     installRoomRespawn(host, places);
+    installRopeDecks(host, decks, context.restoring); // NL5: the planks the page stands on
     installCableModes(host.scope, source.modes?.traverse ?? [], host.flags).bindNative(host);
     const carried = source.runtime?.binds?.includes('movers') === true || hasDeclaredClientPage(source)
       ? source.movers.filter(row => row.carry !== undefined) : [];
