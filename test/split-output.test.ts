@@ -1,12 +1,12 @@
 // @vitest-environment node
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
-import {existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under tmp.
 import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as build:game does.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {contentDirOf, joinOutput, splitOutput} from '../scripts/app-build/splitOutput.mjs';
+import {SPLITTING, contentDirOf, joinOutput, splitOutput} from '../scripts/app-build/splitOutput.mjs';
 import {gatePage, pageSize} from '../scripts/page-size.mjs';
 
 const roots: string[] = [];
@@ -69,6 +69,19 @@ test('a fresh build replaces a stale dist-content; --join puts the one tree back
   expect(existsSync(contentDirOf(dist))).toBe(false);
   // join with nothing to join is a no-op
   expect(joinOutput(dist).files).toBe(0);
+});
+
+test('a retry after an interrupted split keeps what already moved; overlapping roots are refused', () => {
+  const dist = fixture(), content = contentDirOf(dist), first = CONTENT[0] ?? '';
+  // the split was interrupted after its first move
+  writeFileSync(join(dist, SPLITTING), '');
+  mkdirSync(dirname(join(content, first)), {recursive: true});
+  renameSync(join(dist, first), join(content, first));
+  splitOutput(dist);
+  expect(tree(content)).toEqual([...CONTENT].sort());
+  expect(tree(dist)).toEqual([...PAGE].sort());
+  expect(() => splitOutput(dist, dist)).toThrow('overlap');
+  expect(() => joinOutput(dist, join(dist, 'assets'))).toThrow('overlap');
 });
 
 test('the CLI splits, gates and joins', () => {

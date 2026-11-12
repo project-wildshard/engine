@@ -89,6 +89,10 @@ test('a split build reads its packs book from dist-content/ beside the page (PAG
     cooked: { phone: { url: '/assets/spawn/cooked-whole-phone-0123abcd.json', wireBytes: 5 } } } }));
   writeFileSync(join(content, 'assets/spawn/engine-dddd.json'), JSON.stringify({ client: { phone: { wireBytes: 7 } } }));
   expect(readPhoneDownloads(dist)).toEqual({ cooked: 12 });
+  // a whole dist (build-app.mjs's gate, before the split) wins over an older split's book with the same build id
+  mkdirSync(join(dist, 'assets/spawn'), { recursive: true });
+  writeFileSync(join(dist, 'assets/spawn/packs-dddd.json'), JSON.stringify({ client: { fresh: { phone: { wireBytes: 999 } } } }));
+  expect(readPhoneDownloads(dist)).toEqual({ fresh: 999 });
 });
 
 test('a cooked row is read with the engine half its page also downloads', () => {

@@ -6,7 +6,7 @@
 // joins before it packages, and the jobs that serve the whole game from dist (nightly, hover contract) join too.
 //
 //   node scripts/app-build/splitOutput.mjs [dist] [--join]
-import {existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, rmdirSync} from 'node:fs';
+import {existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {classify, shardNames} from '../page-size.mjs';
@@ -53,22 +53,37 @@ function move(from, to, rows) {
   return {files: rows.length, bytes: rows.reduce((sum, row) => sum + row.bytes, 0)};
 }
 
-/** Split a freshly built page. A dist-content left by an earlier build is replaced; a page that holds no content is
- * already split, and nothing moves.
+/** The page's mark while a split runs: a retry after an interruption resumes, keeping what already moved. */
+export const SPLITTING = '.splitting';
+
+/** @param {string} root @param {string} content */
+function disjoint(root, content) {
+  if (root === content || content.startsWith(`${root}/`) || root.startsWith(`${content}/`)) throw new Error(`splitOutput: ${content} and ${root} overlap`);
+}
+
+/** Split a freshly built page. A dist-content left by an earlier build is replaced; one an interrupted split of this page
+ * left (the page still holds SPLITTING) is kept and finished. A page that holds no content is already split.
  * @param {string} dist @param {string} [content] @returns {{files: number, bytes: number}} */
 export function splitOutput(dist, content = contentDirOf(dist)) {
-  const root = resolve(dist);
+  const root = resolve(dist), target = resolve(content), mark = join(root, SPLITTING);
+  disjoint(root, target);
   if (!existsSync(join(root, 'index.html'))) throw new Error(`splitOutput: ${root} holds no index.html; give a built page`);
-  const shards = shardNames(root), rows = files(root).filter(row => isContent(row.path, shards));
-  if (rows.length === 0) return {files: 0, bytes: 0};
-  rmSync(content, {recursive: true, force: true});
-  return move(root, resolve(content), rows);
+  const shards = shardNames(root), rows = files(root).filter(row => row.path !== SPLITTING && isContent(row.path, shards));
+  if (rows.length > 0) {
+    if (!existsSync(mark)) rmSync(target, {recursive: true, force: true});
+    writeFileSync(mark, '');
+  }
+  const moved = move(root, target, rows);
+  rmSync(mark, {force: true});
+  return moved;
 }
 
 /** Put the content back into the page, one tree again, and remove dist-content.
  * @param {string} dist @param {string} [content] @returns {{files: number, bytes: number}} */
 export function joinOutput(dist, content = contentDirOf(dist)) {
-  const from = resolve(content), moved = move(from, resolve(dist), files(from));
+  const from = resolve(content);
+  disjoint(resolve(dist), from);
+  const moved = move(from, resolve(dist), files(from));
   rmSync(from, {recursive: true, force: true});
   return moved;
 }

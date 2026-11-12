@@ -26,10 +26,11 @@ export function readPhoneDownloads(dist) {
   // This build's own book by its id: a deploy carries older builds' files into dist beside it.
   const version = resolve(dist, 'version.json');
   if (!existsSync(version)) return null;
-  // PAGE-SIZE PZ4: build:game splits the page, so the books sit in dist-content/; build-app.mjs's own run reads the
-  // whole dist before the split.
+  // PAGE-SIZE PZ4: build:game splits the page, so the books sit in dist-content/. A book in dist itself comes first: that
+  // is build-app.mjs's own run, before the split, and a dist-content beside it is an older build's (the same id when a
+  // release rebuilds one SHA).
   const { build } = JSON.parse(readFileSync(version, 'utf8'));
-  const books = [contentDirOf(dist), resolve(dist)].find(dir => existsSync(resolve(dir, `assets/spawn/packs-${build}.json`)));
+  const books = [resolve(dist), contentDirOf(dist)].find(dir => existsSync(resolve(dir, `assets/spawn/packs-${build}.json`)));
   if (books === undefined) return null;
   const { client } = JSON.parse(readFileSync(resolve(books, `assets/spawn/packs-${build}.json`), 'utf8'));
   const cooked = row => /-whole-phone-[a-f0-9]+\.json$/u.test(row.phone.url ?? '');

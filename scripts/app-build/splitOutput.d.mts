@@ -3,3 +3,4 @@ export function contentDirOf(dist: string): string;
 export function isContent(path: string, shards: ReadonlySet<string>): boolean;
 export function splitOutput(dist: string, content?: string): {files: number; bytes: number};
 export function joinOutput(dist: string, content?: string): {files: number; bytes: number};
+export const SPLITTING: string;
