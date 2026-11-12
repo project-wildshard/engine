@@ -5,6 +5,10 @@ import * as v from 'valibot';
 /** Shot ids by camera number - 1. The sheet's cells follow this order, three per row. */
 export const SHOTS = Object.freeze(['fp-front', 'fp-left', 'fp-right', 'fp-back', 'top', 'diag-front', 'diag-left', 'diag-right', 'diag-back']);
 
+/** RotateGate.ts's query, `(orientation: landscape) and (pointer: coarse) and (min-aspect-ratio: 5/4)`, for a touch viewport.
+ * @param {readonly [number, number]} viewport */
+const rotateGated = ([w, h]) => w * 4 >= h * 5;
+
 const finite = v.pipe(v.number(), v.finite());
 const xz = v.object({ x: finite, z: finite });
 const size = v.tuple([v.pipe(v.number(), v.integer(), v.minValue(16)), v.pipe(v.number(), v.integer(), v.minValue(16))]);
@@ -29,10 +33,6 @@ const file = v.pipe(v.looseObject({
     v.check(list => new Set(list.map(a => a.id)).size === list.length, 'anchor ids must be unique')),
 }), v.check(f => f.fp.tier !== 'phone' || !rotateGated(f.fp.viewport),
   'a phone FP viewport must be portrait (narrower than 5:4): the game covers a landscape touch phone with its rotate page and stops the frame loop; use fp.tier "desktop" for a landscape shot'));
-
-/** RotateGate.ts's query, `(orientation: landscape) and (pointer: coarse) and (min-aspect-ratio: 5/4)`, for a touch viewport.
- * @param {readonly [number, number]} viewport */
-const rotateGated = ([w, h]) => w * 4 >= h * 5;
 
 /** Admit a cameras.json; defaults are Pine Hollow's (topUp 90, diagUp 45, diagOut 55, god fov 72°, FP pitch -0.06).
  * @param {unknown} value */
