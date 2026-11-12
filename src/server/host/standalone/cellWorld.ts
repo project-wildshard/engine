@@ -36,6 +36,7 @@ import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput } from '../headlessRuntime';
+import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
 import { FallFloor } from './fallFloor';
 import { stepResident } from '../../../shared/host/standalone/netInput';
@@ -92,7 +93,10 @@ function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEd
 async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], lone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
   await Promise.resolve();
   const { shard, assets, rapier } = input;
-  const ports: ShardfileSimPorts = { rapier,
+  // A data shard's decisions, moves and targets ride its product sections (TE-ENG1's boss rows): without them the
+  // encounter runs no decision and the boss falls back to its native phase chase.
+  const sections = input.sections ?? (input.product === undefined ? undefined : productHeadlessSections(input.product));
+  const ports: ShardfileSimPorts = { rapier, ...(sections === undefined ? {} : { sections }),
     quest: { fact: (name, actorId) => { effects.push({ kind: 'fact', name, actorId }); }, coins: (amount, actorId) => { effects.push({ kind: 'coins', amount, actorId }); } } };
   // SR11: the kit items install with the simulation, so a restore finds their seats where the save put them.
   const kitOf = (sim: ShardfileSimulation): DeclaredKitItems | null => installDeclaredKitItems(sim.host, shard, sim.itemHooks);
