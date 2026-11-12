@@ -11,3 +11,7 @@ singleplayer `a627a8c925` added those three files, so the tarball never held the
 (`retireGpuFile`; `standIn` then answers undefined), warns, reports one `assets.gpu` fault with verdict `retry`, and
 loads the same URL again, which now resolves to the tier's own GLB (embedded images). Any other 404 fails as before.
 The content fix is a new Pine Hollow revision cooked from shard-pine-hollow HEAD, whose `mounts.json` lists the files.
+
+Codex review (MUST, folded): three shares one read among concurrent loads of a URL and fails every caller, so each
+caller that saw the 404 now retries and only the first reports. SHOULD (folded): a content-base URL maps back to its
+page path (`pageURL`) before the registry lookup.

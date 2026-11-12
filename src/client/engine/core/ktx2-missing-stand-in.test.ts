@@ -9,7 +9,8 @@ import { onFault, type Fault } from '../../../shared/engine/core/faults';
 // spawnDetail on a 404. A stand-in that answers 404 is retired for the page and the tier's own file loads instead,
 // reported once as a recoverable fault.
 const SERVED = '/assets/game89/npcs/miller.glb', GPU = '/assets/gpu/game89/npcs/miller-2d664352.glb';
-registerGpuFiles({ phone: { [SERVED]: GPU }, desktop: { [SERVED]: GPU } });
+const RANGER = '/assets/game89/npcs/ranger.glb', RANGER_GPU = '/assets/gpu/game89/npcs/ranger-c5f60d88.glb';
+registerGpuFiles({ phone: { [SERVED]: GPU, [RANGER]: RANGER_GPU }, desktop: { [SERVED]: GPU, [RANGER]: RANGER_GPU } });
 
 class HttpError extends Error {
   readonly response: { status: number; url: string };
@@ -50,6 +51,23 @@ test('a stand-in that answers 404 falls back to the served file, is retired for 
   expect(faults[0]).toMatchObject({ system: 'assets.gpu', verdict: 'retry' });
   expect(String(faults[0]?.error)).toContain(GPU);
   expect(warn).toHaveBeenCalledTimes(1);
+});
+
+test('concurrent loads that all saw the 404 all fall back, and it is reported once (Codex review)', async () => {
+  FakeLoader.served.add(RANGER);
+  const faults: Fault[] = [], off = onFault(f => { faults.push(f); });
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const a = new FakeLoader(), b = new FakeLoader();
+  await expect(Promise.all([load(a, RANGER), load(b, RANGER)])).resolves.toEqual([{ url: RANGER }, { url: RANGER }]);
+  expect([a.asked, b.asked]).toEqual([[RANGER_GPU, RANGER], [RANGER_GPU, RANGER]]);
+  off();
+  expect(faults).toHaveLength(1);
+});
+
+test('an absolute URL with a query names the stand-in by its page path', async () => {
+  const { retireGpuFile } = await import('../boot/gpuFiles');
+  expect(retireGpuFile('https://play.wildshard.io/assets/gpu/game89/npcs/none-00000000.glb?v=1')).toBeUndefined();
+  expect(retireGpuFile(`https://play.wildshard.io${GPU}?v=1`)).toBe('retired');
 });
 
 test('a 404 on a file that is no stand-in still fails as before', async () => {

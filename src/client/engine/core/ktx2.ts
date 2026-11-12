@@ -253,13 +253,15 @@ export function installGltfKtx2(type: typeof GLTFLoader): void {
       value(this: GLTFLoader, ...args: Parameters<GLTFLoader['load']>): void {
         const [url, onLoad, onProgress, onError] = args;
         Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, (error: unknown): void => {
-          const missing = missingStandIn(error);
-          if (missing === undefined || !retireGpuFile(missing)) {
+          const missing = missingStandIn(error), retired = missing === undefined ? undefined : retireGpuFile(missing);
+          if (retired === undefined) {
             if (onError !== undefined) onError(error); else console.error(error);
             return;
           }
-          console.warn(`[ktx2] stand-in ${missing} answered 404; loading ${url} instead`);
-          emitFault({ system: 'assets.gpu', error: new Error(`KTX2 stand-in not served: ${missing} (for ${url})`), verdict: 'retry' });
+          if (retired === 'new') {
+            console.warn(`[ktx2] stand-in ${String(missing)} answered 404; loading ${url} instead`);
+            emitFault({ system: 'assets.gpu', error: new Error(`KTX2 stand-in not served: ${String(missing)} (for ${url})`), verdict: 'retry' });
+          }
           Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, onError]);
         }]);
       },

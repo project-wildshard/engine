@@ -38,6 +38,7 @@
 
 import { GPU_FILES as ENGINE_GPU_FILES } from './ktx2.generated';
 import { TIER } from '../core/tier';
+import { pageURL } from './contentBase';
 import { CONTENT_CAPS, PAGE_LEVEL } from '../../../shared/engine/core/config';
 import { harnessPins } from '../../../shared/engine/app/identity';
 import { ktx2Probe, ktx2ProbeResult, type Ktx2Probe } from '../render/ktx2Probe';
@@ -59,14 +60,16 @@ export function isRegisteredGpuFile(url: string): boolean {
 /** WILDSHARD-GAME-89: stand-ins a table names but the host does not serve (a shardfile that left them out). Never
  *  asked for again on this page: `standIn` answers undefined, so the tier's own file loads. */
 const retired = new Set<string>();
-/** Retire a registered stand-in that answered 404 (an absolute URL or a path; query and origin are ignored). True when
- *  it was a registered stand-in not retired before: the caller retries the served file and reports it once. */
-export function retireGpuFile(url: string): boolean {
+/** Retire a registered stand-in that answered 404 (an absolute URL, a content-base URL or a path; query and origin are
+ *  ignored). 'new': first retired now, so the caller reports it once; 'retired': an earlier caller did (three shares one
+ *  read among concurrent loads and fails them all); either way the caller retries the served file. undefined: no stand-in. */
+export function retireGpuFile(url: string): 'new' | 'retired' | undefined {
   let path = url.replace(/[?#].*$/u, '');
-  try { path = new URL(path, 'http://page.invalid').pathname; } catch { /* keep the path as given */ }
-  if (retired.has(path) || !isRegisteredGpuFile(path)) return false;
+  try { path = new URL(pageURL(path), 'http://page.invalid').pathname; } catch { /* keep the path as given */ }
+  if (retired.has(path)) return 'retired';
+  if (!isRegisteredGpuFile(path)) return undefined;
   retired.add(path);
-  return true;
+  return 'new';
 }
 
 export type TexMode = 'ktx2' | 'img';
