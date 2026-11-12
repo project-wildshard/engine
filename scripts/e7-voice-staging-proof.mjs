@@ -42,7 +42,7 @@ try{
    };
   },socket);
   await saveFixture(context,{scope:'device',key:'devMode',data:true});
-  // MG5: a phone's first play skips SHARD SELECT for the first-play card; this proof plays as a returning phone.
+  // MG5: this proof plays as a returning phone, so the first-play toggle card stays out of the way.
   if(phone)await saveFixture(context,{scope:'device',key:'firstPlayDone',data:true});
   await saveFixture(context,{scope:'global',key:'settings',data:{music:false,sfx:false,volume:0},merge:true});
   const page=await context.newPage();

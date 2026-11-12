@@ -17,8 +17,8 @@ import './firstPlay.css';
  * to 90. Yep, GG, approved."). The in-world toggle is that card: a title, Low | High, one line, Done. The whole card rests at
  * REST_OPACITY; a touch takes it to PEAK_OPACITY at once, then it fades back over FADE_MS (it opens at the peak too).
  *
- * It shows once the player has control: on a phone's first PLAY with no `firstPlayDone` mark (the title skips SHARD SELECT for
- * Driftwood, mainMenu.ts), and on every entry while Settings ▸ Graphics ▸ In-world toggle is on. Low or High applies that preset
+ * It shows once the player has control: on a phone's first entry with no `firstPlayDone` mark (the title arms it for the card picked in
+ * SHARD SELECT, which opens on Driftwood; mainMenu.ts), and on every entry while Settings ▸ Graphics ▸ In-world toggle is on. Low or High applies that preset
  * to every Graphics control (MG8, graphicsQuality.ts); on Custom neither is lit and the line says so. MG3's Low Power lock
  * holds (a refused High says why). DONE marks the device; Settings ▸ Replay first-time setup clears the mark (MG6).
  */

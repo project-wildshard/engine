@@ -67,7 +67,7 @@ try {
     const lines = /** @type {string[]} */ ([]);
     page.on('console', line => { if (line.type() === 'warning' || line.type() === 'error') lines.push(`${line.type()} ${line.text().slice(0, 400)}`); });
     context.on('close', () => { writeFileSync(join(work, `${name}-console.log`), `${lines.join('\n')}\n`); });
-    // MG5: a phone's first PLAY skips the deck by design; a returning device opens it.
+    // a returning device (MG5's first-play card already done), so the leg's toggle card stays out of the shots
     await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
     // The template card is Developer's (its placement is hidden in the public catalogue), as in online-rig's pages.
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });

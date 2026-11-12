@@ -19,7 +19,7 @@ import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
 import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
-import { buildTitleDeck, titleCards, type TitleCard, type TitleDeck, type TitleDeckOptions } from './titleDeck';
+import { buildTitleDeck, titleCards, type TitleDeck, type TitleDeckOptions } from './titleDeck';
 import { gridEntryShown, menuMode, gridMode } from './grid/menu';
 import { dropGridIntent, enterGrid, gridRecoveryLoop } from './grid/pageEntry';
 import { worldHosted } from './grid/oneWayIn';
@@ -93,13 +93,13 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const leaveTitle = (): void => { leavingTitle = true; stopReadAhead?.(); };
   const mode = opts.mode ?? menuMode;
   const { notice, onGrid, screen: first, cards = titleCards(), whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
-  let firstEntry: TitleCard | null = null; // MG5: the card the first PLAY is entering
   // leaving the title for a world resets it: pause ▸ EXIT TO MAIN opens on the main menu again
   // MG4 / MG5: a phone, by the rule the tier uses (core/tier.ts), read here without the tier's render tables (the title's graph)
   const phone = mobileDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
   const deck = buildTitleDeck({ ...deckOpts, cards,
-    // MG5: an entry that is not the first PLAY's own drops a first play armed and never reached
-    onEnter: (card) => { if (card !== firstEntry) dropFirstPlay(); firstEntry = null; leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
+    // MG5: a phone with no first-play mark arms its first play for the card the player picked from the deck (the intent is a
+    // session save, so it survives the hand-over); any other entry drops a first play armed and never reached
+    onEnter: (card) => { if (!(phone && !firstPlayDone() && startFirstPlay(card.slug))) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); },
     onExplore: (card) => { dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onExplore(card); } });
   const grid = gridEntryShown(mode());
   // GO7 (DG4): on a build with a world, Infinite Wildshard shows once the world says it hosts the grid; until then it stays hidden.
@@ -171,7 +171,6 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const selectCard = required(main, '.ws-main-select', HTMLButtonElement);
   const show = (next: MainMenuScreen): void => {
     screen = next;
-    if (next === 'select') firstEntry = null; // MG5: a first PLAY that never got there is not this entry's
     root.dataset['screen'] = next;
     main.classList.toggle('hide', next !== 'main');
     deck.root.classList.toggle('hide', next !== 'select');
@@ -179,11 +178,11 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     deck.root.inert = next !== 'select';
     if (next === 'main') selectCard.focus({ preventScroll: true });
   };
-  // MOBILE-GRAPHICS MG5: a phone's first PLAY (no `firstPlayDone` mark on the device) skips SHARD SELECT for the deck's first
-  // playable card (Driftwood), where the first-play card waits (firstPlay.ts); every later PLAY, and every desktop one, opens
-  // SHARD SELECT as before
-  // The deck's own entry decides (its admission rules: a draft, a locked or unavailable card enters nothing); when it enters
-  // nothing, SHARD SELECT opens as usual
+  // SHARD SELECT always opens the deck, and nothing loads until a card is picked (Jake, 2026-11-12: "That shard select insta
+  // loads driftwood bug is still here"). MOBILE-GRAPHICS MG5 used to skip the deck on a phone's first PLAY for card 0
+  // (Driftwood) until the first-play card's DONE marked the device; a phone that never pressed DONE (a load that stalled, a
+  // player who backed out or never noticed the card) skipped it on every tap. A phone with no mark now opens the deck on card 0, and the
+  // first-play card is armed for whichever card the player enters (onEnter above)
   // MMO-PLAN MP2.4 (Jake, 2026-11-11: "Ask the user for their name… after they hit play but before we pop them into the world"):
   // a device's first PLAY (or INFINITE WILDSHARD) asks for the Name once, then goes on; every later one goes straight through
   let naming = false;
@@ -196,11 +195,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     if (answered && !owner.disposed) next();
   };
   const enterPlay = (): void => {
-    if (phone && !firstPlayDone()) {
-      deck.select(0, false);
-      const entered = deck.activate();
-      if (entered !== null) { firstEntry = startFirstPlay(entered.slug) ? entered : null; return; }
-    }
+    if (phone && !firstPlayDone()) deck.select(0, false);
     show('select'); deck.start();
   };
   const play = (): void => { void named(enterPlay); };
