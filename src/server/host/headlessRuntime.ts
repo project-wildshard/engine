@@ -16,6 +16,7 @@ import type { NativeSweptMeleeInput } from '@wildshard/engine/game/plugin/native
 import { installPortableMath } from '@wildshard/engine/core/portableMath';
 import { createSimHost, type SimHost, type SimHostPorts, type SimLevel, type SimTickCommand } from '@wildshard/engine/sim';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { shardRows } from '@wildshard/engine/sim/shardRows';
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { NetTickAct } from '@wildshard/engine/net/acts';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
@@ -202,8 +203,8 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
     installRoomRespawn(host, places);
     installRopeDecks(host, decks, context.restoring); // NL5: the planks the page stands on
     installCableModes(host.scope, source.modes?.traverse ?? [], host.flags).bindNative(host);
-    const carried = source.runtime?.binds?.includes('movers') === true || hasDeclaredClientPage(source)
-      ? source.movers.filter(row => row.carry !== undefined) : [];
+    const declared = source.runtime?.binds?.includes('movers') === true || hasDeclaredClientPage(source) ? source.movers : [];
+    const carried = declared.filter(row => row.carry !== undefined);
     if (carried.length > 0) {
       let motion: MoverRuntime | null = null;
       host.onStep('movers.commands', () => {
@@ -219,6 +220,14 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
       { id: 'movers.carried', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true });
     }
     plan.install(host, context);
+    // SERVER-PARITY HS2: every other declared mover the page stands on (Driftwood's moored boat, a `platform` on the swell), when
+    // the plan has no mover motion of its own. A plan that drives movers (Far Reach's recipe) owns them all, its skipped rows too.
+    // Rope chains stay with the rope decks above (NL5). Its own step, joined: a room saved before HS2 has none and builds them.
+    const rows = shardRows(host).bodies, planMoves = declared.some(row => rows.has(`script:${row.id}`) && row.carry === undefined);
+    const moored = planMoves ? [] : declared.filter(row => row.carry === undefined && row.kind !== 'chain');
+    if (moored.length > 0) new MoverScriptDriver(moored, host).install(host, { content: { identity: source.identity,
+      sim: { ...source.sim, bindings: [] }, state: source.state }, assets: new Map(), rules: { fields: {}, archetypes: [], events: [], maxEntities: 32 } },
+    { id: 'movers.moored', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true, joined: true });
   } };
 }
 /** Install the selected plan into one fresh or strictly restored native host.

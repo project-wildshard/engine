@@ -440,6 +440,24 @@ export class MoverRuntime {
       else this.lifecycle.drain();
     } catch (error) { this.pending = pending; this.bodyHandles = handles; this.lifecycle.restore(lifecycle); this.seedLifecycleOnReconnect = seed; throw error; }
   }
+  /** After a restore whose save held none of these movers (a joined step), build their bodies fresh at their published poses. */
+  rebuild(): void {
+    if (this.data.some(row => row.kind === 'chain')) throw new Error('Unsupported mover native rebuild');
+    // no saved script world either: a once-only mover whose restored flag is set stands at its end, as a fresh install puts it
+    const ends = new Map(this.data.flatMap(row => row.restoreFrom !== undefined && this.flags?.has(row.restoreFrom.flag) === true ? [[row.entity, moverEndState(row)] as const] : []));
+    if (ends.size > 0) {
+      const state = this.host.world.state();
+      for (const entity of state) { const end = ends.get(entity.id); if (end !== undefined) { entity.position = end.position; entity.fields = { ...entity.fields, ...end.fields }; } }
+      this.host.world.restore(state);
+    }
+    for (const row of this.data) this.lifecycle.seed(row.id, this.host.world.entity(row.entity)?.fields ?? {});
+    this.bodies.clear(); this.bodyHandles.clear();
+    for (const row of this.data) {
+      if (row.kind === 'channel') continue;
+      const body = new KinematicMover(this.physics(), row.boxes, this.pose(row.id), row.id, row.kind === 'static');
+      this.bodies.set(row.id, body); this.bodyHandles.set(row.id, body.body.handle);
+    }
+  }
   /** After native world/tag restore, reconnect existing bodies and reset only durable lift road poses. */
   reconnect(resetIds: ReadonlySet<string> = new Set()): void {
     for (const row of this.data) if (row.carry !== undefined) this.previousRides.set(row.id, [1, 0.5].includes(this.host.world.entity(row.entity)?.fields[6] ?? 0));
@@ -514,7 +532,7 @@ export class MoverScriptDriver {
       schedules: [this.schedule(() => { if (this.runtime === undefined) throw new Error('Missing mover runtime'); return this.runtime; }, permissions), ...(extra?.schedules ?? [])] });
   }
   /** Attach native handles to the same host; an explicit drive owns one fixed tick, never another script host. */
-  install(sim: SimHost, input: ReturnType<typeof createShardfileComposedLane> | DeclaredMoverComposition, options: { id: string; restoring?: boolean; restoreFlags?: ReadonlySet<string>; activation?: MoverActivationPorts; drive?: boolean; permissions?: () => ReadonlyMap<string, number> }): MoverRuntime {
+  install(sim: SimHost, input: ReturnType<typeof createShardfileComposedLane> | DeclaredMoverComposition, options: { id: string; restoring?: boolean; restoreFlags?: ReadonlySet<string>; activation?: MoverActivationPorts; drive?: boolean; permissions?: () => ReadonlyMap<string, number>; joined?: boolean }): MoverRuntime {
     if (this.runtime !== undefined) throw new Error('Mover driver is already installed');
     const lane = 'host' in input ? input : this.compose({ ...input.content, sim: { ...input.content.sim, scripts: [...input.assets.keys()] } }, input.assets,
       { rules: input.rules, entities: [], actors: new Map(), query: () => [] }, undefined, options.permissions,
@@ -525,13 +543,16 @@ export class MoverScriptDriver {
       activation: { ground: () => playerGrounds(sim), ...options.activation } });
     this.runtime = runtime; runtime.bindNativeCarry(sim);
     for (const row of this.data) publishScriptBody(sim, row.id, () => runtime.pose(row.id));
+    // `joined`: a save from before these movers had their step holds none of it, so its world has no bodies to reconnect: build them
+    let continued = false;
+    const joined = options.joined === true ? { joined: true as const } : {};
     sim.onStep(options.id, () => { if (options.drive === true) lane.step(sim.state.tick); runtime.capture(); }, {
       snapshot: () => runtime.snapshotState(this.resetIds), restore: value => {
-        if (typeof value !== 'string') throw new Error('Invalid mover continuation'); runtime.restoreState(value);
-      }, physicsRestored: () => { runtime.reconnect(this.resetIds); } });
+        if (typeof value !== 'string') throw new Error('Invalid mover continuation'); runtime.restoreState(value); continued = true;
+      }, physicsRestored: () => { if (continued || options.joined !== true) runtime.reconnect(this.resetIds); else runtime.rebuild(); continued = false; }, ...joined });
     if (options.drive === true) sim.onStep(`${options.id}.script`, () => undefined, { snapshot: () => lane.snapshot(), restore: value => {
       if (typeof value !== 'string') throw new Error('Invalid script adapter snapshot'); lane.restore(value);
-    } });
+    }, ...joined });
     return runtime;
   }
   /** Typed role state; the owning composition captures module memories and host quotas once. */

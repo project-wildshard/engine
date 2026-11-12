@@ -7,9 +7,10 @@
  },
  "shards": {
   "driftwood-isle": {
-   "row": "SERVER-PARITY HS2 (boat) and SS10 (castaway; pier tiles split on the page)",
+   "row": "SERVER-PARITY SS10 (castaway; pier tiles split on the page; the boat's owner and material names only, its solids agree since HS2)",
    "known": [
-    "boat (planks): 5 page collider(s) with no server match, e.g. [-5, -1, -206, -5, 1, -200]",
+    "boat (planks): 5 page collider(s) the server holds as driftwood.boat (wood), same shape",
+    "driftwood.boat (wood): 5 server collider(s) the page holds as boat (planks), same shape",
     "npc-castaway (wood): 1 page collider(s) with no server match, e.g. [0, 0, 0, 0, 2, 0]",
     "pier (planks): 7 page collider(s) more than the server holds in the same place"
    ]
