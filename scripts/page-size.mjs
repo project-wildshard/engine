@@ -69,7 +69,7 @@ export function classify(path, shards) {
   if (second === 'physics') return { kind: 'runtime' };
   if (second === 'spawn') {
     if (third === 'parts') return { kind: 'shard content', part: 'S2' };
-    if (third === 'server' || (parts.length === 3 && /^server-/u.test(third ?? ''))) return { kind: 'shard content', part: 'S3' };
+    if (third === 'server' || (parts.length === 3 && (third ?? '').startsWith('server-'))) return { kind: 'shard content', part: 'S3' };
     return { kind: 'shard content', part: 'S4' };
   }
   let owner = second;
@@ -129,8 +129,10 @@ export function pageSize(dir) {
   for (const row of files(root)) {
     const { kind, part } = classify(row.path, shards), isCarried = carried?.paths.has(row.path) === true;
     add(total, row.bytes, isCarried);
-    add(/** @type {Tally} */ (kinds[kind]), row.bytes, isCarried);
-    if (part !== undefined) add(/** @type {Tally} */ (parts[part]), row.bytes, isCarried);
+    const into = kinds[kind];
+    if (into !== undefined) add(into, row.bytes, isCarried);
+    const shardPart = part === undefined ? undefined : parts[part];
+    if (shardPart !== undefined) add(shardPart, row.bytes, isCarried);
   }
   return { dir: root, carriedBuilds: carried?.builds, total, kinds, parts };
 }
@@ -155,8 +157,8 @@ export function formatPageSize(report) {
     '|---|---:|---:|---:|---:|---:|',
   ];
   for (const kind of KINDS) {
-    out.push(line(kind, /** @type {Tally} */ (kinds[kind])));
-    if (kind === 'shard content') for (const [part, what] of Object.entries(SHARD_PARTS)) out.push(line(`  ${part} ${what}`, /** @type {Tally} */ (parts[part])));
+    out.push(line(kind, kinds[kind] ?? tally()));
+    if (kind === 'shard content') for (const [part, what] of Object.entries(SHARD_PARTS)) out.push(line(`  ${part} ${what}`, parts[part] ?? tally()));
   }
   out.push(line('**total**', total));
   out.push('', `this build's own: ${mb(total.bytes - total.carriedBytes)} MB in ${n(total.files - total.carriedFiles)} files; carried: ${mb(total.carriedBytes)} MB in ${n(total.carriedFiles)} files`);
@@ -164,7 +166,7 @@ export function formatPageSize(report) {
 }
 
 function main() {
-  const args = process.argv.slice(2), json = args.includes('--json'), [dir] = args.filter(arg => arg !== '--json');
+  const args = process.argv.slice(2), json = args.includes('--json'), dir = args.find(arg => arg !== '--json');
   if (dir === undefined) throw new Error('usage: node scripts/page-size.mjs <dist | .vercel/output/static> [--json]');
   const report = pageSize(dir);
   console.log(json ? JSON.stringify(report, null, 2) : formatPageSize(report));
