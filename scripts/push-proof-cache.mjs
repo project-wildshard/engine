@@ -45,8 +45,14 @@ function exclusionScope(root){
  * stops on exactly what this check would refuse, before the gate instead of minutes into it.
  * @param {string} cwd @param {ReadonlySet<string>} [pinned] @returns {string[]} */
 export function checkedTreeDirt(cwd,pinned=verifiedPinsOutputs(cwd).paths){
-  return execFileSync('git',['status','--porcelain','-z','--untracked-files=all'],{cwd,encoding:'utf8',maxBuffer:64<<20}).split('\0').filter(Boolean)
-    .filter(line=>!(line.startsWith('?? ')&&pinned.has(line.slice(3))));
+  const entries=execFileSync('git',['status','--porcelain','-z','--untracked-files=all'],{cwd,encoding:'utf8',maxBuffer:64<<20}).split('\0').filter(Boolean);
+  /** @type {string[]} */const lines=[];
+  // Under -z a rename or copy is two entries, `R  new` then the bare old path: the old one joins its line.
+  for(let index=0;index<entries.length;index++){
+    const line=entries[index]??'';
+    lines.push(/^[RC]|^.[RC]/u.test(line)&&index+1<entries.length?`${line} <- ${entries[++index]??''}`:line);
+  }
+  return lines.filter(line=>!(line.startsWith('?? ')&&pinned.has(line.slice(3))));
 }
 
 /** Never cache dirty bytes or use local receipts to skip CI.

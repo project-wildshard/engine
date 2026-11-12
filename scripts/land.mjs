@@ -34,32 +34,38 @@ class StopError extends Error{name='StopError';}
 /** DEV-SPEED DS22: the boot stamps the pre-push's gen:inputs rewrites from the tree (scripts/app-build/gen.ts). After a
  * rebase they go stale whenever main changed public/assets, and the pre-push's clean-tree check then refused the push
  * minutes in (58 `pre-push red` receipts in a day). Land runs the same generator first and commits these, and only
- * these, on the plan branch, so branch CI checks them like any commit. */
+ * these, on the plan branch, so they ride the plan push and its pre-push like any commit. Hosted CI regenerates them
+ * itself (ci.yml runs gen:inputs before the tests) and doesn't yet diff them against the commit (DS22 follow-up). */
 export const STAMPS=Object.freeze(['src/client/game/boot/audio.generated.ts','src/client/game/boot/bytes.generated.ts','src/client/game/boot/versions.generated.ts']);
 /** package.json `gen:inputs`, run directly: pnpm adds nothing here and a fixture's pnpm is a stub. */
 const GEN=Object.freeze(['scripts/gen.mjs','--inputs-only']);
 const STAMPS_MESSAGE='chore(gen): regenerate boot stamps\n\nDEV-SPEED DS22: land ran gen:inputs after its rebase and commits the\nboot stamps it rewrote, so the pre-push sees a clean tree.\n\nAssisted-by: land:ds22-stamps';
 
-/** What to do about one porcelain line that keeps the tree from being clean.
+/** What to do about one porcelain line that keeps the tree from being clean. Never a fix that deletes new work.
  * @param {string} code @param {string} path @param {string} branch */
 function dirtFix(code,path,branch){
  if(code==='??'){
   if(/^public\/(?:assets\/gpu|programs)\//u.test(path))return `untracked pin output: run \`pnpm pins\` here (its manifest no longer matches this tree), or ignore that pin folder in .gitignore as engine 2fa94a78 did`;
   return `untracked: commit it on ${branch} (git add ${path}, then git commit -- ${path}), move it under tmp/, or delete it`;
  }
+ if(code.startsWith('A'))return `staged new file: commit it on ${branch} (git commit -- ${path}), or unstage it (git restore --staged ${path}) and move it under tmp/`;
  return `uncommitted change: commit it on ${branch} (git commit -- ${path}), or drop it (git restore --staged --worktree ${path})`;
 }
 
-/** The pre-push's own reason for refusing a push, from git's output (under --porcelain a hook's stdout is git's): a thrown error's message, a check's `RED` line, a
- * remote's rejection, else its last line. Git's own `failed to push` summary is never the cause.
- * @param {string} stderr @returns {string} */
-export function prePushCause(stderr){
+/** Git's own lines in a refused push's output, never the hook's cause. */
+const GIT_OWN=/^error: failed to push some refs|^To \S+$|^hint: |^Done$|^!\s/u;
+/** The pre-push's own reason for refusing a push, from git's output (under --porcelain a hook's stdout is git's
+ * stdout): a check's `RED` line, else the last thrown error's message, else a remote's rejection, else the hook's
+ * last line.
+ * @param {string} output @returns {string} */
+export function prePushCause(output){
  // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
- const lines=stderr.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!==''&&!/^error: failed to push some refs|^To \S+$|^hint: |^Done$/u.test(line));
- const pick=lines.find(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
-  ??lines.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
-  ??lines.find(line=>/^! \[(?:remote )?rejected\]/u.test(line))
-  ??lines.at(-1);
+ const lines=output.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!=='');
+ const hook=lines.filter(line=>!GIT_OWN.test(line));
+ const pick=hook.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
+  ??hook.findLast(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
+  ??lines.find(line=>/^!\s.*\[(?:remote )?rejected\]/u.test(line))
+  ??hook.at(-1);
  return pick===undefined?'no output':pick.slice(0,300);
 }
 
@@ -384,7 +390,10 @@ class Landing{
   }
   const stamps=this.preflight(`after ${GEN.join(' ')}`);
   if(stamps.length===0)return;
-  const committed=spawnSync('git',['commit','--quiet','-m',STAMPS_MESSAGE,'--',...stamps],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+  // The commit hooks run, but not D25's journal rule (a re-baked shard rewrites dozens of stamp lines, and a journal
+  // line would be a second path in what must stay a stamps-only commit) nor the commit lane's 8 s cap (a loaded
+  // machine would stop land for a generated file). The commit message says why it exists.
+  const committed=spawnSync('git',['commit','--quiet','-m',STAMPS_MESSAGE,'--',...stamps],{cwd:this.root,env:{...this.env,SKIP_JOURNAL:'1',SKIP_BUDGET:'1'},encoding:'utf8',stdio:['ignore','pipe','pipe']});
   const sha=this.head();
   const changed=tryGit(this.root,['diff','--name-only',before,sha]).stdout.trim().split('\n').filter(Boolean);
   if(committed.status!==0||tryGit(this.root,['rev-parse',`${sha}^`]).stdout.trim()!==before||changed.some(path=>!STAMPS.includes(path))){
@@ -686,6 +695,7 @@ class Landing{
   if(stamps.length>0&&!isAncestor(this.root,main,start)){
    git(this.root,['restore','--staged','--worktree','--',...stamps]);
    this.say('stamps',`set aside ${stamps.join(', ')} for the rebase; gen:inputs rewrites them after it`);
+   this.receipt(`stamps set aside for the rebase: ${stamps.join(', ')}`);
   }
   if(!isAncestor(this.root,main,start)){
    this.rebase(main);

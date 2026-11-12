@@ -495,7 +495,10 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(prePushCause('  - lint RED in 3.0 s\nerror: failed to push some refs to \'x\'\n')).toBe('lint RED in 3.0 s');
     expect(prePushCause('file:///x/run-checks.mjs:63\nError: Push target requires a clean checked tree; enqueue a committed immutable checkout\n    at capturePushTree (x)\nerror: failed to push some refs to \'x\'\n'))
       .toBe('Push target requires a clean checked tree; enqueue a committed immutable checkout');
-    expect(prePushCause('To /remote.git\n ! [remote rejected] x\nerror: failed to push some refs to \'x\'\n')).toBe('! [remote rejected] x');
+    expect(prePushCause('To /remote.git\n!\trefs/heads/plan/x:refs/heads/plan/x\t[remote rejected] (hook declined)\nDone\nerror: failed to push some refs to \'x\'\n'))
+      .toBe('!\trefs/heads/plan/x:refs/heads/plan/x\t[remote rejected] (hook declined)');
+    // A passing check's logged Error never outranks the check that went RED.
+    expect(prePushCause('  - tests green in 9 s\nError: expected in a passing test\n  - lint RED in 3.0 s\n')).toBe('lint RED in 3.0 s');
     expect(prePushCause('')).toBe('no output');
   });
 

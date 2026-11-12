@@ -10,3 +10,6 @@ Land now runs the same dirt list (`checkedTreeDirt`, shared with the proof cache
 each path and its fix. After its rebase it runs `scripts/gen.mjs --inputs-only` and commits only the boot stamps it
 rewrote (`chore(gen): regenerate boot stamps`) on the plan branch, so branch CI checks them; a generator that commits
 or writes anything else stops land. A refused plan push's receipt now says the pre-push's own cause.
+
+Review (claude -p) folded: the stamps commit skips the journal rule and the 8 s commit cap; hosted CI regenerates
+the stamps and does not diff them yet, a follow-up on DS22.
