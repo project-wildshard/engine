@@ -27,7 +27,7 @@ test.each([false, true])('boot stays main and only live decoding uses bounded pa
       return new Uint8Array(await response.arrayBuffer());
     },
     fetch: (url: string, init: RequestInit) => { native.push({ url, init }); return Promise.resolve(new Response(wire)); },
-    currentSpawnDownload: () => undefined,
+    currentSpawnDownload: () => undefined, contentURL: (url: string) => url, // PZ3: no content base
     browserLiveJsonParser: () => { calls.push('parser'); return parser; },
     TIER_CONFIG: {}, TIER: 'phone', splatDrawTier: () => 'phone', builtIndexes: null, ktx2TranscodeSupport: () => ({}),
     pauseDescriptor: () => pause, browserProductCache: (_storage: unknown, options: unknown) => { cachePreparation = options; return {}; },
