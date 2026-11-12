@@ -12,6 +12,9 @@ export const shardFallFloor = (declared: number | undefined): number => Math.max
 /** Seconds on firm ground before a spot is safe to come back to, the page's. */
 const SAFE_SECONDS = 0.2;
 const STEP_SECONDS = 1 / 60;
+/** ENG-18: how long a resident's player may be off every collider under the floor before the net takes them. A shard's
+ * edge docks sit under its declared floor (Sky Reach's at y 0 under 12): a step or a settle there is not a fall. */
+export const RESIDENT_FALL_GRACE = 0.25;
 
 type Body = Pick<PlayerSim, 'yaw' | 'led' | 'resetPose'> & { readonly position: { x: number; y: number; z: number }; readonly fall: { readonly grounded: boolean }; readonly board: { readonly on: boolean } };
 /** One cell's fall recovery. `soft` takes a player back; a hard floor is a death. `start` is where they go with no safe ground yet. */
@@ -21,16 +24,22 @@ export class FallFloor {
   private readonly floor: number;
   private readonly soft: boolean;
   private readonly start: { readonly x: number; readonly y: number; readonly z: number };
-  constructor(floor: number, soft: boolean, start: { readonly x: number; readonly y: number; readonly z: number }) { this.floor = floor; this.soft = soft; this.start = start; }
+  private air = 0;
+  private readonly grace: number;
+  /** `grace`: seconds a player may be off every collider under the floor before it counts (0, the page's: at once). */
+  constructor(floor: number, soft: boolean, start: { readonly x: number; readonly y: number; readonly z: number }, grace = 0) { this.floor = floor; this.soft = soft; this.start = start; this.grace = grace; }
   /** One tick for this player. */
   step(player: Body, die: () => void): void {
-    if (player.led) { this.since = 0; return; }
+    if (player.led) { this.since = 0; this.air = 0; return; }
     const { position } = player;
     if (position.y < this.floor && !player.fall.grounded) { // a deck going down to the road carries its rider past it, standing
-      this.since = 0;
+      this.since = 0; this.air += STEP_SECONDS;
+      if (this.air < this.grace) return;
+      this.air = 0;
       if (this.soft) player.resetPose(this.spot ?? this.start, player.yaw); else die();
       return;
     }
+    this.air = 0;
     if (!player.fall.grounded || player.board.on) { this.since = 0; return; }
     this.since += STEP_SECONDS;
     if (this.since < SAFE_SECONDS) return;
@@ -53,7 +62,7 @@ export function residentFallNet(host: Pick<SimHost, 'players' | 'parked' | 'embe
     for (const player of host.players.values()) {
       if (!player.hasMotor || player.borrowed || host.parked.has(player.id)) continue;
       let net = nets.get(player.id);
-      if (net === undefined) { net = new FallFloor(floor, true, start); nets.set(player.id, net); }
+      if (net === undefined) { net = new FallFloor(floor, true, start, RESIDENT_FALL_GRACE); nets.set(player.id, net); }
       net.step(player, () => { throw new Error('A soft fall floor never kills'); });
     }
   };

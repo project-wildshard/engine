@@ -6,6 +6,7 @@ import type { SimHost } from '../src/server/engine/sim';
 import type { PlayerSim } from '../src/server/engine/sim/playerSim';
 import { floorBelow } from '../src/shared/engine/physics/query';
 import { playBounds } from '../src/client/engine/world/bounds';
+import { FALL_FLOOR } from '../src/server/host/standalone/fallFloor';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { serverInput } from './fixtures/dedicated/roomBench';
 
@@ -18,7 +19,7 @@ afterEach(() => { for (const close of closers.splice(0).reverse()) close(); });
 
 /** Stand `player` on the ground under (x, z). */
 function standAt(player: PlayerSim, host: SimHost, x: number, z: number): void {
-  const y = floorBelow(host.physics, x, z, 200, 400, player.motor.collider) ?? host.heightAt(x, z);
+  const y = floorBelow(host.physics, x, z, 200, 400, player.motor.collider);
   if (y === undefined) throw new Error(`No ground at ${String(x)}, ${String(z)}`);
   player.resetPose({ x, y, z }, 0);
 }
@@ -42,6 +43,7 @@ function run(step: () => void, player: PlayerSim, ticks: number): { lowest: numb
 async function fallsAndRecovers(slug: string, host: SimHost, player: PlayerSim, step: (move: Move) => void): Promise<void> {
   const repro = REPROS.find(row => row.slug === slug), floor = await floorOf(slug);
   if (repro === undefined) throw new Error(`No repro for ${slug}`);
+  run(() => { step({ moveX: 0, moveZ: 0 }); }, player, 2); // a world's colliders answer queries after its first step
   standAt(player, host, repro.at[0], repro.at[1]);
   const walked = run(() => { step(repro.move); }, player, repro.ticks);
   expect(walked.lowest, `${slug}: the repro never falls far under the floor`).toBeGreaterThan(floor - 10);
@@ -87,7 +89,7 @@ for (const { slug } of REPROS) {
 test('ENG-18 page: a level with no authored bounds still has a fall floor', () => {
   const authored = { x0: -10, x1: 10, z0: -10, z1: 10, floor: 3 };
   expect(playBounds(authored, false)).toBe(authored);
-  expect(playBounds(undefined, false).floor).toBe(-250);
+  expect(playBounds(undefined, false).floor).toBe(FALL_FLOOR);
   expect(playBounds(undefined, true).floor).toBe(-60);
   expect(playBounds(undefined, false).x0).toBe(-Infinity);
 });
