@@ -7,6 +7,14 @@ interface TimingScope {
   addEventListener?: (name: string, callback: (event: {data: unknown; stopImmediatePropagation: () => void}) => void, options?: {capture: boolean}) => void;
 }
 
+/** A performance entry as plain data that postMessage can clone. Chromium's `toJSON()` keeps `serverTiming` as
+ * PerformanceServerTiming objects, which can't be cloned: a response with a `Server-Timing` header (every Cloudflare
+ * edge response, OFF-VERCEL OV6) killed the standalone server worker's boot. JSON calls their own `toJSON()`. */
+export function plainEntry(entry: { toJSON: () => unknown }): unknown {
+  // oxlint-disable-next-line unicorn/prefer-structured-clone -- structuredClone is what refuses these rows; JSON calls toJSON()
+  return JSON.parse(JSON.stringify(entry)) as unknown;
+}
+
 /** Install explicitly at a worker module's first body. Initial graph fetch/evaluation remains a combined parent span. */
 export function installWorkerBootTiming(purpose: string): void {
   const scope = globalThis as typeof globalThis & TimingScope;
@@ -57,7 +65,7 @@ export function installWorkerBootTiming(purpose: string): void {
   if (typeof PerformanceObserver === 'function') {
     try {
       performance.setResourceTimingBufferSize(4096);
-      observer = new PerformanceObserver(list => { for (const row of list.getEntries()) send({ type: 'resource', value: row.toJSON() }); });
+      observer = new PerformanceObserver(list => { for (const row of list.getEntries()) send({ type: 'resource', value: plainEntry(row) }); });
       observer.observe({ type: 'resource', buffered: true });
       owner.listen(performance, 'resourcetimingbufferfull', () => { timing.mark('resource-buffer-overflow'); });
     } catch { timing.mark('resource-timing-unavailable'); }
