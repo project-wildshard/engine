@@ -32,7 +32,7 @@ export function spentUses(source: Pick<Shardfile, 'targets' | 'hooks' | 'items'>
 }
 
 /** Bind admitted targets to existing panels, physics active-state ports and the session's interaction list. A `spent` use
- *  (TE-ENG6) leaves the list while it is spent and comes back when it is not. */
+ *  (TE-ENG6) has no reach while it is spent, so no prompt or USE band picks it, and its reach comes back when it is not. */
 export function installDeclaredTargets(data: ShardTargets, ports: {
   panels: ReadonlyMap<string, Object3D>; colliders: ReadonlyMap<string, { setActive: (value: boolean) => void }>;
   read: (scope: 'shared' | 'player', fieldId: number) => number; scene: (id: string) => void;
@@ -54,22 +54,11 @@ export function installDeclaredTargets(data: ShardTargets, ports: {
   };
   sync();
   if (bindings.length > 0) ports.system({ id: 'game.shardfile.targets', phase: 'fixed.post', after: ['game.shardfile.sim'], run: sync });
-  const uses = data.interactions.map(row => {
-    const interaction = { position: new Vector3(...row.at), radius: row.radius, label: row.label, wireId: row.id, onInteract: () => { ports.scene(row.scene); } };
+  // A spent use (TE-ENG6) keeps its place in the list with no reach, as a hidden prompt does: the pick order never changes.
+  const { spent } = ports;
+  for (const row of data.interactions) {
+    const interaction: Interactable = { position: new Vector3(...row.at), get radius() { return spent?.(row) === true ? 0 : row.radius; }, label: row.label, wireId: row.id, onInteract: () => { ports.scene(row.scene); } };
     ports.interactables.push(interaction);
     ports.scope.onDispose(() => { const index = ports.interactables.indexOf(interaction); if (index !== -1) ports.interactables.splice(index, 1); });
-    return { row, interaction };
-  });
-  const { spent } = ports;
-  if (spent === undefined || uses.length === 0) return;
-  const offer = (): void => {
-    if (ports.scope.disposed) return;
-    for (const { row, interaction } of uses) {
-      const index = ports.interactables.indexOf(interaction), gone = spent(row);
-      if (gone && index !== -1) ports.interactables.splice(index, 1);
-      else if (!gone && index === -1) ports.interactables.push(interaction);
-    }
-  };
-  offer();
-  ports.system({ id: 'game.shardfile.spent-uses', phase: 'update', run: offer });
+  }
 }

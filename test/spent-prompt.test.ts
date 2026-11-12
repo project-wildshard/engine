@@ -11,7 +11,7 @@ import { declaredKitItemFamilies, declaredLever } from '../src/client/game/plugi
 import { installDeclaredTargets, spentUses } from '../src/client/game/shard/declaredTargets';
 
 // TE-ENG6: a use target whose action can no longer run drops its prompt (and so the touch USE band, which shows the picked
-// prompt). Rows only: Mossgate's brazier A names its own lit condition in `unless`; a kit.lever's rack (TE-ENG2) needs no row,
+// prompt; a spent one keeps its place with no reach, so the pick order never changes). Rows only: Mossgate's brazier A names its own lit condition in `unless`; a kit.lever's rack (TE-ENG2) needs no row,
 // the page knows its lever is in hand. Rows that name neither keep their prompt whatever the fields say.
 type Targets = Shardfile['targets'];
 interface Mossgate { readonly interactions: Targets['interactions']; readonly conditions: Shardfile['hooks']['conditions'] }
@@ -31,7 +31,10 @@ function page(rows: Pick<Shardfile, 'targets' | 'hooks' | 'items'>, taken: (item
   const read = (_scope: 'shared' | 'player', id: number): number => fields.get(id) ?? 0;
   installDeclaredTargets(rows.targets, { panels: new Map(), colliders: new Map(), read, scene: () => undefined, interactables, scope, system: spec => { systems.push(spec); },
     ...(spent ? { spent: spentUses(rows, { read, taken }) } : {}) });
-  return { labels: () => interactables.map(prompt => prompt.label), frame: () => { for (const system of systems) system.run(1 / 60, 0); }, fields, scope };
+  // What a prompt or the USE band can pick: a spent use stays in the list, in its place, with no reach.
+  const order = interactables.map(prompt => prompt.label);
+  return { labels: () => { expect(interactables.map(prompt => prompt.label)).toEqual(scope.disposed ? [] : order); return interactables.filter(prompt => prompt.radius > 0).map(prompt => prompt.label); },
+    frame: () => { for (const system of systems) system.run(1 / 60, 0); }, fields, scope };
 }
 
 test('Mossgate: "Light brazier A" shows until A is lit, then is gone; the hut door stays', () => {

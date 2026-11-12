@@ -10,3 +10,8 @@ stops (a reset puts A out). Rows that name neither are never spent, so native an
 server also projects a lever's take to a player field when `itemFields` asks (`property: "taken"`), so a panel can hide
 the rack's own rifle (BM-3's follow-up; Brasscap needs that panel and field in its rows). Not here: a grid template copy's
 prompts (`copyPrompts`) still show spent uses.
+
+Codex review, three MUSTs, fixed: a spent use now keeps its place in the prompt list with no reach (a `radius` getter, as
+hidden prompts do), so a returning prompt never changes which of two equal ones is picked, and no per-frame list walk;
+shardfile `563d680` refuses an `unless` the page cannot read (a player field no item projects) and a collider on a
+projected panel (the server's colliders read script fields). Off the wire a lever's projected `taken` reads the page's lever.

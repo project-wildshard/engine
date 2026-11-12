@@ -135,6 +135,5 @@ test('a rows-only lever projects its take to a player field', async () => {
   expect(kit.scene(PLAYER, fixture.interaction.id)).toBe(true);
   tick(sim, kit);
   expect(line(sim, TAKEN)).toBe(1);
-  expect(line(sim, 'template.lantern.lit')).toBe(line(sim, 'template.lantern.lit')); // the lantern's own projections are untouched
   sim.dispose();
 });

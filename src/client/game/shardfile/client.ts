@@ -453,7 +453,14 @@ export class ShardfileClient {
     // at its authored default: no such row, and none invented here (RETIRE-FEED A6).
     // SR11 (C9): an item's field is an owned line once a wire is up; a line at zero is dropped from `owned`, so absent is zero.
     const itemLines = new Set((source.targets.itemFields ?? []).flatMap(row => source.state.player.filter(field => field.id === row.fieldId).map(field => field.name)));
-    const itemLine = (name: string): number | undefined => wirePage.client === null || !itemLines.has(name) ? undefined : wirePage.line(name);
+    // TE-ENG6: off the wire a lever's take is this page's own, so its projected field reads the page's lever (bound once the levers are).
+    const takenFields = new Map((source.targets.itemFields ?? []).flatMap(row => row.property !== 'taken' ? [] : source.state.player.filter(field => field.id === row.fieldId).map(field => [field.name, row.item] as const)));
+    let takenHere = (_item: string): boolean => false;
+    const itemLine = (name: string): number | undefined => {
+      if (!itemLines.has(name)) return undefined;
+      if (wirePage.client !== null) return wirePage.line(name);
+      const item = takenFields.get(name); return item === undefined ? undefined : Number(takenHere(item));
+    };
     const fieldValue = (scope: 'shared' | 'player', name: string): number | undefined => {
       const field = source.state[scope].find((row) => row.name === name);
       if (field === undefined || (scope === 'shared' ? field.privacy !== 'public' : field.privacy === 'host')) return undefined;
@@ -552,6 +559,7 @@ export class ShardfileClient {
       if (action === 3) lever.take(); else lever.reload();
       return true;
     };
+    takenHere = item => levers.some(lever => lever.row.id === item && lever.taken);
     const scene = clientScene(source, items.runtimes, () => undefined, (item, action) => relayItem(source, item, action) || takeHere(item, action));
     if (levers.length > 0) ctx.system({ id: 'shardfile.lever-lines', phase: 'update', run: () => {
       for (const lever of levers) {
@@ -585,7 +593,7 @@ export class ShardfileClient {
     }
     installDeclaredTargets(source.targets, { panels: tiles.props?.panels ?? new Map(), colliders, read, scene, interactables: runtime.interactables, scope: ctx.scope, system: ctx.system,
       // TE-ENG6: a use that can no longer run drops its prompt: its `unless` condition holds, or its rack's lever is in hand.
-      spent: spentUses(source, { read, taken: item => levers.some(lever => lever.row.id === item && lever.taken) }) });
+      spent: spentUses(source, { read, taken: item => takenHere(item) }) });
     // TE-ENG3: a quest-giver from rows. The server keeps each player's node and says it as an owned line; answers go by name.
     if ((source.targets.talks?.length ?? 0) > 0) {
       if (presentation === null) throw new Error('Missing talk presentation module');
