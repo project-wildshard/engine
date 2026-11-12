@@ -1,11 +1,12 @@
 // E7.6 (Q87): everyone else in this world, drawn from their rows. A body walks, runs and stands by how fast its row moves, rides its
-// board by the row's word and holds what the row says. The game has no third-person model of a player, so this is the practice
-// figure, with its limbs moved here, and its Name over it.
+// board by the row's word and holds what the row says. The body is the castaway (RP2, models/castawayBody.ts), one shared mesh on
+// a skeleton of its own, its limbs moved here, and its Name over it.
 import * as THREE from 'three';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
-import { loadTrainingDummy } from '../practice/TrainingDummyAssets';
 import type { DummyJoint, DummyJoints } from '../practice/TrainingDummy';
+import { castawayBody, groundContact, type CastawayBody } from '../models/castawayBody';
+import { AnimMachine } from '../anim/machine';
 import { buildHoverboard } from '../render/hoverboardGeometry';
 import type { NetClient } from './client';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
@@ -23,8 +24,6 @@ const SETTLE = 8;
 const NAME_HEIGHT = 2.05, NAME_WIDTH = 1.5, NAME_RATIO = 4;
 /** VOICE-POLISH V8: the ring over a talking player's Name, its size in metres, and how fast and far it breathes. */
 const TALK_HEIGHT = 2.62, TALK_SIZE = 0.5, TALK_PULSE = 9, TALK_SWELL = 0.1;
-/** A body's height, in metres: the practice figure stands taller than a player does. */
-const BODY_HEIGHT = 1.8;
 /** How far a board floats, with its rider on it. */
 const BOARD_LIFT = 0.22;
 /** How high a rider's feet sit over the row, which stands at the horse's own feet. */
@@ -68,35 +67,8 @@ function talkRing(): THREE.Sprite {
   return ring;
 }
 
-/** The figure's post and its feet are bound to its root bone, and a player has neither. The first copy pays for this, and every body shares it. */
-const posted = new WeakMap<THREE.BufferGeometry, { readonly geometry: THREE.BufferGeometry; readonly soles: number; readonly crown: number }>();
-function withoutPost(geometry: THREE.BufferGeometry, post: number): { readonly geometry: THREE.BufferGeometry; readonly soles: number; readonly crown: number } {
-  const held = posted.get(geometry), whole = { geometry, soles: 0, crown: 1 };
-  if (held !== undefined) return held;
-  const joints = geometry.getAttribute('skinIndex'), weights = geometry.getAttribute('skinWeight'), heights = geometry.getAttribute('position'), { index } = geometry, kept: number[] = [];
-  if (index === null) return whole;
-  let soles = Infinity, crown = -Infinity;
-  const onPost = (vertex: number): boolean => {
-    let heaviest = 0, bone = -1;
-    for (let slot = 0; slot < 4; slot++) { const weight = weights.getComponent(vertex, slot); if (weight > heaviest) { heaviest = weight; bone = joints.getComponent(vertex, slot); } }
-    return bone === post;
-  };
-  for (let at = 0; at < index.count; at += 3) {
-    const a = index.getX(at), b = index.getX(at + 1), c = index.getX(at + 2);
-    if (onPost(a) || onPost(b) || onPost(c)) continue;
-    kept.push(a, b, c);
-    for (const vertex of [a, b, c]) { const y = heights.getY(vertex); soles = Math.min(soles, y); crown = Math.max(crown, y); }
-  }
-  const shorn = new THREE.BufferGeometry();
-  for (const [name, attribute] of Object.entries(geometry.attributes)) shorn.setAttribute(name, attribute);
-  shorn.setIndex(kept); shorn.boundingSphere = geometry.boundingSphere; shorn.boundingBox = geometry.boundingBox;
-  const made = { geometry: shorn, soles, crown };
-  posted.set(geometry, made);
-  return made;
-}
-
 /** What a page drew of another player. */
-export interface OtherShown { readonly name: string; readonly x: number; readonly y: number; readonly z: number; readonly speed: number; readonly gait: string; readonly board: boolean; readonly mounted: boolean; readonly held: number; readonly hp: number; readonly modelled: boolean; readonly talking: boolean }
+export interface OtherShown { readonly name: string; readonly x: number; readonly y: number; readonly z: number; readonly speed: number; readonly gait: string; readonly board: boolean; readonly mounted: boolean; readonly held: number; readonly hp: number; readonly modelled: boolean; readonly model: string; readonly talking: boolean }
 
 /** One other player on screen. */
 class OtherBody {
@@ -109,13 +81,15 @@ class OtherBody {
   private joints: DummyJoints = {};
   private figure: THREE.Group | null = null;
   private blade: THREE.Mesh | null = null;
+  /** Plays the body's idle slot on the chest and head, which no pose here drives. */
+  private anim: AnimMachine | null = null;
   /** Where the figure stands so its soles are on the ground. */
   private feet = 0;
   private speed = 0;
   private phase = 0;
   /** Whether a row has put it anywhere yet. */
   placed = false;
-  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, talking: false };
+  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false };
   /** Its player row's id, which voice names its talker by. */
   readonly id: string;
   constructor(name: string, id: string) {
@@ -126,18 +100,16 @@ class OtherBody {
     this.board.visible = false; this.board.position.y = BOARD_LIFT; this.group.name = `Player · ${name}`;
     this.group.add(this.tag, this.ring, this.board);
   }
-  dress(model: { readonly root: THREE.Group; readonly joints: DummyJoints }): void {
-    this.figure = model.root; this.joints = model.joints; this.group.add(model.root); this.shown = { ...this.shown, modelled: true };
-    model.root.traverse(node => {
-      if (!(node instanceof THREE.SkinnedMesh)) return;
-      const post = node.skeleton.bones.indexOf(model.joints.root as THREE.Bone), shorn = post === -1 ? null : withoutPost(node.geometry as THREE.BufferGeometry, post);
-      if (shorn === null) return;
-      const scale = BODY_HEIGHT / Math.max(0.1, shorn.crown - shorn.soles);
-      node.geometry = shorn.geometry; model.root.scale.setScalar(scale); this.feet = -shorn.soles * scale; model.root.position.y = this.feet;
-    });
+  /** Stops its idle, when the body goes. */
+  undress(): void { this.anim?.dispose(); this.anim = null; }
+  /** RP2: the castaway's body, standing on the ground (its soles are at its root), the blade in its right grip, its idle playing. */
+  dress(model: CastawayBody): void {
+    this.figure = model.root; this.joints = model.joints; this.feet = 0; model.root.position.y = 0;
+    this.group.add(model.root, groundContact()); this.shown = { ...this.shown, modelled: true, model: model.id };
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, BLADE, 0.015), new THREE.MeshStandardMaterial({ color: 0xb8c0c8, metalness: 0.7, roughness: 0.4 }));
-    this.blade = blade; blade.position.y = BLADE / 2; blade.visible = false; model.joints.rightHand?.add(blade);
+    this.blade = blade; blade.position.y = BLADE / 2; blade.visible = false; model.mounts.rightHand.add(blade);
     for (const joint of SWUNG) { const bone = model.joints[joint]; if (bone !== undefined) this.rest.set(joint, bone.quaternion.clone()); }
+    this.anim = new AnimMachine({ states: {}, loops: ['idle'] }, model.rig); this.anim.base('idle');
   }
   /** Where the row is now, and the limbs that go with it. */
   show(row: Float64Array, dt: number, mounted: boolean): void {
@@ -151,6 +123,7 @@ class OtherBody {
     this.board.visible = riding;
     if (this.blade !== null) this.blade.visible = !riding && !mounted;
     if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : 0);
+    this.anim?.update(dt);
     this.pose(gait, this.speed, dt);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
     const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
@@ -178,12 +151,11 @@ export class OtherPlayers {
   private readonly bodies = new Map<number, OtherBody>();
   private readonly client: NetClient;
   private readonly scene: THREE.Object3D;
-  private readonly scope: Scope;
   private readonly row = new Float64Array(PLAYER_CLASS.row.length);
   /** Where this page's own player stands, for voice's distances (VOICE-POLISH V7); without it voice can't measure. */
   private readonly me: Readonly<THREE.Vector3> | null;
   constructor(client: NetClient, scene: THREE.Object3D, scope: Scope, me: Readonly<THREE.Vector3> | null = null) {
-    this.client = client; this.scene = scene; this.scope = scope; this.me = me;
+    this.client = client; this.scene = scene; this.me = me;
     scope.onDispose(() => { for (const handle of this.bodies.keys()) this.drop(handle); });
     if (me !== null) scope.onDispose(voiceNear.lend({ distanceTo: talker => this.distanceTo(talker) }));
   }
@@ -210,23 +182,23 @@ export class OtherPlayers {
       (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''), info.id)).show(row, dt, client.riders.has(handle));
     }
   }
+  /** RP2: a body is dressed as it enters, from the one shared build; one that fails to build stands with its Name alone. */
   private enter(handle: number, name: string, id: string): OtherBody {
     const body = new OtherBody(name, id);
     this.bodies.set(handle, body); this.scene.add(body.group);
-    void this.dress(handle, body);
+    try { body.dress(castawayBody()); } catch (error) { console.error('[other players]', error); }
     return body;
-  }
-  /** A body stands with its Name until its figure has loaded. A figure that never does costs a player nothing but the view. */
-  private async dress(handle: number, body: OtherBody): Promise<void> {
-    try {
-      const model = await loadTrainingDummy('wood-steel');
-      if (this.bodies.get(handle) === body && !this.scope.disposed) body.dress(model);
-    } catch (error) { console.error('[other players]', error); }
   }
   private drop(handle: number): void {
     const body = this.bodies.get(handle);
     if (body === undefined) return;
-    this.bodies.delete(handle); this.scene.remove(body.group);
-    body.group.traverse(node => { if (node instanceof THREE.Mesh || node instanceof THREE.Sprite) { for (const material of [node.material].flat() as THREE.Material[]) { if (material instanceof THREE.SpriteMaterial) material.map?.dispose(); material.dispose(); } } });
+    this.bodies.delete(handle); this.scene.remove(body.group); body.undress();
+    // The castaway's mesh and contact disc are shared by every body (userData.shared): only a body's own are freed, its skeleton's
+    // bone texture with them. A sprite's geometry is three's own, shared by every sprite.
+    body.group.traverse(node => {
+      if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose();
+      if (node instanceof THREE.Mesh) { const geometry = node.geometry as THREE.BufferGeometry; if (geometry.userData['shared'] !== true) geometry.dispose(); }
+      if (node instanceof THREE.Mesh || node instanceof THREE.Sprite) { for (const material of [node.material].flat() as THREE.Material[]) { if (material.userData['shared'] === true) continue; if (material instanceof THREE.SpriteMaterial) material.map?.dispose(); material.dispose(); } }
+    });
   }
 }

@@ -224,6 +224,7 @@
     "src/client/engine/level/registrations.ts": "client",
     "src/client/engine/math/color.ts": "client",
     "src/client/engine/models/animalGeometry.ts": "client",
+    "src/client/engine/models/castawayBody.ts": "client",
     "src/client/engine/models/colliders.ts": "client",
     "src/client/engine/models/creature.ts": "client",
     "src/client/engine/models/cull.ts": "client",
