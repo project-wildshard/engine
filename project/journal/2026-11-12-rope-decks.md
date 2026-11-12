@@ -16,3 +16,5 @@
   0/20 after. The page's half holds: with a chain on both sides a crossing
   needs no correction, and a correction writing the server's feet 0.3 or
   1 m under the planks replays back onto them (`net-predict-deck`).
+- Second commit: `test/net-predict-deck.test.ts` keeps the page half pinned
+  (real Player and PlayerSim, a rope chain on each side, delays 3/6/9).
