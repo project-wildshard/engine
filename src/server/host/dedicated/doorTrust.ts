@@ -15,8 +15,7 @@ export type TrustProxy = 'caddy' | 'cloudflare' | 'none';
 const MODES: readonly TrustProxy[] = ['caddy', 'cloudflare', 'none'];
 export const DEFAULT_TRUST_PROXY: TrustProxy = 'caddy';
 /** The pages that open the game (the client's `errorReportOrigins`), when `ALLOWED_ORIGINS` says nothing. */
-export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io',
-  'https://wildshard-singleplayer.vercel.app'];
+export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io'];
 
 /** What a door is told to trust. `allowedOrigins: null` lets any Origin in (`ALLOWED_ORIGINS=*`). */
 export interface DoorTrust { readonly trustProxy: TrustProxy; readonly allowedOrigins: readonly string[] | null }

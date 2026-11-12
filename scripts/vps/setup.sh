@@ -262,7 +262,7 @@ Environment=PLAYTEST_DIR=$HOME_DIR/%i/logs
 # VH10: Caddy (and the Funnel before MS8) set one X-Forwarded-For hop and pass CF-Connecting-IP through, so trust only the last XFF hop.
 # Only a browser on these pages may open a socket. An env-file line overrides either.
 Environment=TRUST_PROXY=caddy
-Environment="ALLOWED_ORIGINS=https://play.wildshard.io https://staging.wildshard.io https://preview.wildshard.io https://wildshard-singleplayer.vercel.app"
+Environment="ALLOWED_ORIGINS=https://play.wildshard.io https://staging.wildshard.io https://preview.wildshard.io"
 EnvironmentFile=$ETC/%i.env
 # J266 (MS3.5): the non-secret settings, read after the secrets so they win; wildshard-config set writes them.
 EnvironmentFile=-$ETC/%i.settings

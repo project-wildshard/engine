@@ -63,6 +63,8 @@ test('a bad Origin gets 403; a listed one or none gets a socket', async () => {
 });
 
 test('TRUST_PROXY and ALLOWED_ORIGINS: caddy and the game hosts by default, a strange word stops the server', () => {
+  // OFF-VERCEL OV9: the default is the three game hosts and nothing else.
+  expect(DEFAULT_ALLOWED_ORIGINS).toEqual(['https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io']);
   expect(doorTrust({})).toEqual({ trustProxy: 'caddy', allowedOrigins: DEFAULT_ALLOWED_ORIGINS });
   expect(doorTrust({ TRUST_PROXY: 'cloudflare', ALLOWED_ORIGINS: 'https://a.example, https://b.example:8443' }))
     .toEqual({ trustProxy: 'cloudflare', allowedOrigins: ['https://a.example', 'https://b.example:8443'] });

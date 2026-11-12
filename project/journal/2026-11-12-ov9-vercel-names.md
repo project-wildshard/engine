@@ -7,3 +7,4 @@
   refused by the door.
 - page-release: the Vercel host module, its API route helper (`e7-page-routes*.mjs`) and the per-channel host defaults
   are gone; `--host=workers` is the only value. Red first: a CLI usage test for any other `--host`.
+- Commit order: the page-release commit went in first; the origins commit's commit lane timed out once on a loaded machine.

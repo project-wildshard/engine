@@ -19,8 +19,7 @@ export const WILDSHARD_IDENTITY: AppIdentity = {
   exposeProbe: (probe) => { window.__wildshard = probe; },
   harness: () => (typeof window === 'undefined' ? undefined : window.__wildshardHarness),
   // SENTRY-TRIAGE S1: the live hosts report too, each under its own Sentry environment.
-  errorReportOrigins: ['https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io',
-    'https://wildshard-singleplayer.vercel.app'],
+  errorReportOrigins: ['https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io'],
   errorReportEnvironments: {
     'https://play.wildshard.io': 'production',
     'https://staging.wildshard.io': 'staging',

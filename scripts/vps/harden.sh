@@ -247,7 +247,7 @@ if has systemctl && systemctl cat wildshard-server@.service >/dev/null 2>&1; the
     else bad VH10 "$channel TRUST_PROXY=$mode; want caddy behind Funnel or Caddy (cloudflare only with a tunnel)"; fi
     if [ -z "$origins" ]; then bad VH10 "$channel sets no ALLOWED_ORIGINS"
     elif printf '%s\n' "$origins" | grep -q '\*'; then bad VH10 "$channel ALLOWED_ORIGINS lets any page in"
-    elif printf '%s\n' "$origins" | tr ', ' '\n\n' | grep -v '^$' | grep -Evq '^https://(play|staging|preview)\.wildshard\.io$|^https://wildshard-singleplayer\.vercel\.app$'; then
+    elif printf '%s\n' "$origins" | tr ', ' '\n\n' | grep -v '^$' | grep -Evq '^https://(play|staging|preview)\.wildshard\.io$'; then
       bad VH10 "$channel ALLOWED_ORIGINS has a page outside the game's hosts: $origins"
     else ok VH10 "$channel ALLOWED_ORIGINS is the game's own hosts"; fi
   done

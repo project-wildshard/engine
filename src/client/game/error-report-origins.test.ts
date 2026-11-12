@@ -16,20 +16,15 @@ test.each([
   expect(environments[origin]).toBe(environment);
 });
 
-test('singleplayer still reports, as production', () => {
-  expect(origins).toContain('https://wildshard-singleplayer.vercel.app');
-  expect(environments['https://wildshard-singleplayer.vercel.app']).toBeUndefined();
-});
-
-test('every mapped environment belongs to a reporting origin, and only the four origins report', () => {
-  expect([...origins].sort()).toEqual(['https://play.wildshard.io', 'https://preview.wildshard.io', 'https://staging.wildshard.io',
-    'https://wildshard-singleplayer.vercel.app']);
+// OFF-VERCEL OV9: the page is served only from the three game hosts, so only they report.
+test('every mapped environment belongs to a reporting origin, and only the three game hosts report', () => {
+  expect([...origins].sort()).toEqual(['https://play.wildshard.io', 'https://preview.wildshard.io', 'https://staging.wildshard.io']);
   for (const origin of Object.keys(environments)) expect(origins).toContain(origin);
 });
 
 test.each([
   'https://wildshard.io', 'http://play.wildshard.io', 'https://play.wildshard.io.evil.invalid', 'https://dev.wildshard.io',
-  'https://wildshard-singleplayer-git-main.vercel.app', 'http://localhost:4401',
+  'https://wildshard-play.workers.dev', 'http://localhost:4401',
 ])('an unknown origin %s is not on the list', (origin) => {
   expect(origins).not.toContain(origin);
 });

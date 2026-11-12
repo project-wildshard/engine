@@ -147,6 +147,13 @@ test('an env-file override is what counts, and a spoofable or open setting fails
   expect(run.out).not.toContain('not-printed');
 });
 
+test('VH10: the retired singleplayer page host is outside the game hosts (OFF-VERCEL OV9)', () => {
+  const run = check({ ...HARDENED, systemctl: `case "$1" in cat) [ "$2" != cloudflared.service ] ;; show) echo 'Environment=TRUST_PROXY=caddy "ALLOWED_ORIGINS=https://play.wildshard.io"' ;; esac` },
+    {}, ['--check'], { 'etc/wildshard/staging.env': 'ALLOWED_ORIGINS=https://play.wildshard.io https://wildshard-singleplayer.vercel.app\n' });
+  expect(run.out).toContain("ok      VH10  production ALLOWED_ORIGINS is the game's own hosts");
+  expect(run.out).toContain("fail    VH10  staging ALLOWED_ORIGINS has a page outside the game's hosts");
+});
+
 test("a Hetzner firewall on another server, or one that lets in more, is not this box's", () => {
   const elsewhere = check(HARDENED, { HARDEN_TEST_FIREWALLS: '[{"name":"other","applied_to":[{"server":{"id":2}}],"rules":[]}]' });
   expect(elsewhere.out).toContain('fail    VH4   no Hetzner Cloud Firewall is applied to this server');

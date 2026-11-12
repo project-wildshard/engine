@@ -55,3 +55,10 @@ test('--print without addresses stops', () => {
   expect(run.status).toBe(1);
   expect(run.stdout).toContain('usage: harden-caddy.sh --print <addresses>');
 });
+
+test('VH9: Caddy lets in only the three game pages (the server unit ALLOWED_ORIGINS; OFF-VERCEL OV9)', () => {
+  const caddyfile = render('203.0.113.7');
+  const patterns = [...caddyfile.matchAll(/@foreign not header_regexp Origin (\S+)/gu)].map(match => match[1]);
+  expect(patterns.length).toBeGreaterThan(0);
+  for (const pattern of patterns) expect(pattern).toBe('^https://(play|staging|preview)\\.wildshard\\.io$');
+});
