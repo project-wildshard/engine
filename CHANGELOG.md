@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.12 (2026-11-12)
+
+- The game's pages now load from Cloudflare.
+- Pine Hollow opens on desktop again when one of its characters' models is missing.
+- Swords and other held weapons swing with each strike.
+- Quitting an online game takes your character out of the world at once, even on a shaky connection.
+- Single player saves your progress as you play, so a reload picks up where you were.
+
 ## v0.1.11 (2026-11-11)
 
 - Picking the Template card on Shard select takes you to the Template's spot in the shared world again.
