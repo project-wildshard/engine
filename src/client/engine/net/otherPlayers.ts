@@ -9,6 +9,7 @@ import { castawayBody, groundContact, type CastawayBody } from '../models/castaw
 import { AnimMachine } from '../anim/machine';
 import { buildHoverboard } from '../render/hoverboardGeometry';
 import type { NetClient } from './client';
+import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
@@ -181,6 +182,7 @@ export class OtherPlayers {
       if (info.cls.cls !== PLAYER_CLASS.cls || handle === own || !client.interpolator.sample(handle, renderTick, row)) continue;
       (bodies.get(handle) ?? this.enter(handle, String(info.initial['name'] ?? ''), info.id)).show(row, dt, client.riders.has(handle));
     }
+    othersOnMap.update(bodies.values()); // REMOTE-PLAYERS RP3: the minimap draws each body where it stands, facing its way
   }
   /** RP2: a body is dressed as it enters, from the one shared build; one that fails to build stands with its Name alone. */
   private enter(handle: number, name: string, id: string): OtherBody {

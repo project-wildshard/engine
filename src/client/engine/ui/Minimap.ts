@@ -22,6 +22,8 @@ import type { MapPoi as MapPoiRow } from '@wildshard/format/minimap';
  *      wounded) pulses;
  *   3b. marks (`setMarks`): small glass-coloured diamonds a shard asks for — Driftwood's sea chart (E314 stage 2): every
  *      unfound beach sea glass piece; the full map draws the same list;
+ *   3c. other players (REMOTE-PLAYERS RP3, `net/othersOnMap.ts`): a magenta teardrop each, nosed the way they face, for every other
+ *      live player in the radius; filled by the online world's bodies, empty in single player;
  *   4. the player arrow, a rim vignette. The cyan rim, 45° ticks and "N" are CSS. (The heading readout under the circle is
  *      gone, E51: the arrow already says where you face.)
  *
@@ -47,6 +49,7 @@ import { hasSpecies, speciesDef } from '../../../shared/engine/entities/species/
 import { app } from '../app/runtime';
 import { onOwnerDispose } from '../../../shared/engine/app/ownership';
 import { ROOM_BG, arenaMap, fitRoom, paintRoom, type RoomMap } from './roomMap';
+import { drawOther, othersOnMap, type OtherMark } from '../net/othersOnMap';
 
 /** the level's baked map while it loads (`image` null) and once decoded; `closed` once released */
 interface BakedGround { url: string; image: ImageBitmap | null; closed: boolean; ready: Promise<void> }
@@ -380,14 +383,15 @@ export class Minimap {
 
     // BA-6 (MF7, battery): repaint only when what the map shows changed, at most PAINT_HZ; a hostile's pulsing ring animates
     const marks = this.marks, t = app.clock.real * 1000; // the engine clock (ms), not a raw timer
-    const hash = this.signature(pos, deg, animals, marks, baseAlpha);
+    const D = this.size, c = D / 2, k = D / (2 * VIEW_RADIUS); // device px per metre
+    const others = othersOnMap.inView(pos, c, k, VIEW_RADIUS);
+    const hash = this.signature(pos, deg, animals, marks, baseAlpha, others);
     const pulsing = this.hotInView;
     const same = hash === this.paintedHash && ground === this.paintedGround && overlay === this.paintedOverlay;
     if (same && !pulsing) return;
     if (t - this.paintedAt < 1000 / PAINT_HZ) return;
     this.paintedHash = hash; this.paintedGround = ground; this.paintedOverlay = overlay; this.paintedAt = t;
 
-    const D = this.size, c = D / 2, k = D / (2 * VIEW_RADIUS); // device px per metre
     const ctx = this.ctx;
     ctx.save();
     ctx.beginPath(); ctx.arc(c, c, c, 0, Math.PI * 2); ctx.clip();
@@ -460,6 +464,9 @@ export class Minimap {
 
     if (overlay !== null && overlay.labels.length > 0) this.paintExtraLabels(overlay.labels, pos, c, k);
 
+    // 3c. other players (RP3): over the creatures and marks, under the own arrow
+    for (const other of others) drawOther(ctx, other.sx, other.sy, other.angle, this.dpr);
+
     // 4. the player arrow (heading is clockwise from north; canvas rotate() is clockwise on screen)
     ctx.translate(c, c); ctx.rotate((deg * Math.PI) / 180);
     const s = this.dpr;
@@ -478,8 +485,8 @@ export class Minimap {
   private paintedGround: HTMLCanvasElement | ImageBitmap | null = null; private paintedOverlay: MapExtras | null = null;
   private hotInView = false;
   /** A digest of everything the paint reads that can move, in device pixels: the player (half a pixel, 0.5 deg), the size and fade, each animal and
-   *  mark in view. Sets `hotInView` when a hostile's ring pulses (that animates, so it repaints at PAINT_HZ). */
-  private signature(pos: { x: number; z: number }, deg: number, animals: readonly MinimapAnimal[], marks: readonly MapMark[], alpha: number): number {
+   *  mark and other player in view. Sets `hotInView` when a hostile's ring pulses (that animates, so it repaints at PAINT_HZ). */
+  private signature(pos: { x: number; z: number }, deg: number, animals: readonly MinimapAnimal[], marks: readonly MapMark[], alpha: number, others: readonly OtherMark[]): number {
     // in device pixels: a dot or the terrain only repaints when it visibly moves (the player to half a pixel)
     const k = this.size / (2 * VIEW_RADIUS);
     let h = fold(fold(fold(fold(fold(FNV_SEED, Math.round(pos.x * k * 2)), Math.round(pos.z * k * 2)), Math.round(deg * 2)), this.size), Math.round(alpha * 100));
@@ -494,6 +501,8 @@ export class Minimap {
     }
     h = fold(h, marks.length);
     for (const m of marks) h = fold(fold(fold(h, Math.round(m.x * k)), Math.round(m.z * k)), m.color.length);
+    h = fold(h, others.length); // others are in device px already; their nose to 3 degrees
+    for (const o of others) h = fold(fold(fold(h, Math.round(o.sx)), Math.round(o.sy)), Math.round((o.angle * 60) / Math.PI));
     this.hotInView = pulse;
     return h;
   }
