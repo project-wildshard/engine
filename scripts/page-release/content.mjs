@@ -163,19 +163,20 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
   const uploadedBytes = missing.reduce((sum, file) => sum + file.bytes, 0);
   log(`content ${set}: ${files.length} files (${mb(bytes)} MB), ${files.length - missing.length} held (read back equal), ${missing.length} to upload (${mb(uploadedBytes)} MB, ${wrong} present with other bytes)`);
   if (missing.length > 0) {
-    // `wrangler r2 bulk put` stops at the first failed object (a 502 was seen); what landed answers a HEAD, so a retry
+    // `wrangler r2 bulk put` stops at the first failed object (a 502 and a 429 were seen); what landed answers a HEAD, so a retry
     // puts only the rest.
     for (let round = 0, left = missing; ; round++) {
       try {
         await store.put(left.map(file => ({key: contentKey(set, file.path), file: join(root, file.path), headers: contentHeaders(file.path)})));
         break;
       } catch (error) {
-        if (round >= 3) throw error;
+        if (round >= 6) throw error;
         /** @type {ContentFile[]} */ const still = [];
         await pool(left, 32, async file => { if (!await store.exists(contentKey(set, file.path))) still.push(file); });
         log(`content ${set}: put failed (${error instanceof Error ? error.message : String(error)}); ${still.length} still missing, retrying`);
         left = still.sort((a, b) => (a.path < b.path ? -1 : 1));
-        await sleep(5_000);
+        // The API answers 429 under load (seen on the first real run): back off longer each round.
+        await sleep(30_000 * (round + 1));
       }
     }
     let read = 0;
@@ -252,7 +253,7 @@ export function r2Content({root, scratch, token, fetch: get = fetch, exec = runR
         /** @type {Headers} */ const headers = JSON.parse(id);
         const list = join(scratch, `bulk-${createHash('sha256').update(id).digest('hex').slice(0, 8)}.json`);
         writeFileSync(list, JSON.stringify(items.map(item => ({key: item.key, file: item.file}))));
-        const args = ['r2', 'bulk', 'put', BUCKET, '--remote', '--filename', list, '--content-type', headers.type, '--cache-control', headers.cache, '--concurrency', '16', '--force'];
+        const args = ['r2', 'bulk', 'put', BUCKET, '--remote', '--filename', list, '--content-type', headers.type, '--cache-control', headers.cache, '--concurrency', '6', '--force'];
         if (headers.encoding !== undefined) args.push('--content-encoding', headers.encoding);
         try {
           exec(join(root, 'node_modules/.bin/wrangler'), args, {cwd: root, env: {...process.env, CLOUDFLARE_ACCOUNT_ID: CLOUDFLARE_ACCOUNT}, timeout: 3 * 60 * 60_000}, secrets);
