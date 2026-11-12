@@ -14,9 +14,12 @@
   fights or world state, across a deploy. The save epoch stays 1:
   progress documents did not change.
 - So the fixture is re-cut, not deleted: `test/pins/saves/template.json`
-  now names the pin as `refused`, and `released-save-play` proves that
-  pin refuses the save with exactly that error. The bytes stay as
-  provenance. A later pin move fails the pin check, so a lane decides
+  now names the pin as `refused`. `released-save-play` proves every other
+  `validateSnapshot` clause holds (version, API, level id, tick), that the
+  fingerprint differs from a fresh rev 2 world's, that the restore is
+  refused, and that a fresh data cell adopts the save's progress
+  (`openCellWorld` `adopt`, `carryRefusedSave` true). The bytes stay as
+  provenance; git holds the rev 1 pin it last resumed on. A later pin move fails the pin check, so a lane decides
   again.
 - Ring 1's template digest chain re-recorded (`b039e3fa…`); every other
   ring shard is unchanged. Darwin and Linux carry the same chain, as

@@ -15,7 +15,9 @@ import {HeadlessSimulation} from '../src/server/host/headless';
 import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
-import {decodeSimSnapshot,leadSnapshot} from '../src/shared/engine/sim/snapshot';
+import {decodeSimSnapshot,leadSnapshot,SIM_SNAPSHOT_VERSION} from '../src/shared/engine/sim/snapshot';
+import {SIM_API_VERSION} from '../src/shared/engine/sim/apiVersion';
+import {openCellWorld} from '../src/server/host/standalone/cellWorld';
 import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
 import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
@@ -27,7 +29,8 @@ import {definitions} from './fixtures/saveDefinitions';
 // `shardfile` is where the save was made; `pin`, when present, is the later shard pin it is proven to resume on (D5-4).
 // `refused`, instead, is a later pin whose level changed: the world snapshot is refused whole, by its level fingerprint, and the
 // standalone grid opens a fresh world and carries the player's progress (cellWorld `adopt`). The fixture proves the refusal is
-// that clean one and stays as provenance; moving the pin again makes a lane decide afresh (ENG-17, Mossgate v3).
+// that clean one and that the carry takes; its bytes stay as provenance (git holds the pin it last resumed on). Moving the pin
+// again makes a lane decide afresh (ENG-17, Mossgate v3).
 interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;pin?:string;refused?:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
 const fixtures=readdirSync('test/pins/saves').filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`test/pins/saves/${name}`,'utf8')) as ReleasedSave);
 const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')) as {shards:{slug:string;hash:string}[]};
@@ -44,15 +47,26 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
   const declared=shard.runtime===null&&!product.has('sim/runtime-plan');
   const distance=(x:number,z:number):number=>Math.hypot(x-fixture.position[0],z-fixture.position[2]);
   const walk:HeadlessCommand={kind:'player',moveX:.2,moveZ:-1,yaw:0};
+  const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)]));
   if(fixture.refused!==undefined) {
-    const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)]));
-    const resume=declared?HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'}).then(sim=>sim.dispose())
-      :Promise.resolve().then(async()=>{(await createTrustedHeadlessResident({shard,product,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},saved)).dispose();});
-    await expect(resume).rejects.toThrow('Incompatible simulation snapshot');
+    // Only a declared (data) shard has been refused so far; a native one needs its own carry proof before it can be.
+    expect(fixture.pin).toBeUndefined();expect(declared).toBe(true);
+    // Every other clause of validateSnapshot holds, so the level fingerprint is the one that refuses.
+    const old=decodeSimSnapshot(saved);
+    expect([old.version,old.apiVersion,old.levelId,old.state.tick]).toEqual([SIM_SNAPSHOT_VERSION,SIM_API_VERSION,slug,fixture.tick]);
+    const fresh=await HeadlessSimulation.create(shard,assets,undefined,{deadline:'advisory'});
+    try {
+      const now=decodeSimSnapshot((await fresh.step([{source:'released-save',commands:[]}])).snapshot);
+      expect(now.levelId).toBe(old.levelId);expect(now.levelFingerprint).not.toBe(old.levelFingerprint);
+    } finally {await fresh.dispose();}
+    await expect(HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'})).rejects.toThrow('Incompatible simulation snapshot');
+    // The standalone grid then opens a fresh world and adopts the refused save's progress (gridServer `open`).
+    const world=await openCellWorld({instance:slug},{shard,product,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},undefined,
+      {saves:new SaveStore({local:null,session:null}),lone:true},old);
+    try {expect(world.adopt(old)).toBe(true);} finally {world.dispose();}
     return;
   }
   if(declared) {
-    const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)]));
     const sim=await HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'});
     try {
       let result=await sim.step([{source:'released-save',commands:[{kind:'player',moveX:0,moveZ:0,yaw:0}]}]);
