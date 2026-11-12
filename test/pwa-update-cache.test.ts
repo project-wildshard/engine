@@ -101,6 +101,6 @@ test('worker updates revalidate unchanged bytes and fetch a changed script in fu
     const rechecked = await fetch(url, { headers: { 'if-none-match': nextTag } });
     expect(rechecked.status).toBe(304); expect((await rechecked.arrayBuffer()).byteLength).toBe(0);
   } finally {
-    server.close(); rmSync(root, { recursive: true, force: true });
+    await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 });
   }
 }, 20_000);

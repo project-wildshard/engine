@@ -44,7 +44,7 @@ test('the real preview records exact telemetry bytes and payloads; its own refus
     expect((await fetch(new URL('api/errors', server.base), {method: 'POST', body: '{}'})).status).toBe(405);
     expect((await fetch(new URL('api/telemetry', server.base))).status).toBe(405);
     expect(readdirSync(directory)).toHaveLength(payloads.length * 2);
-  } finally {server.close(); rmSync(root, {recursive: true, force: true});}
+  } finally {await server.close(); rmSync(root, {recursive: true, force: true, maxRetries: 5});}
 }, 15_000);
 
 test('an unwritable telemetry target is an HTTP500, never a silent acknowledgement', async () => {
@@ -55,7 +55,7 @@ test('an unwritable telemetry target is an HTTP500, never a silent acknowledgeme
   try {
     const response = await fetch(new URL('api/telemetry', server.base), {method: 'POST', body: JSON.stringify({kind: 'analytics', build: 'fixture', install: 'local', events: []})});
     expect(response.status).toBe(500); expect(await response.json()).toEqual({error: 'telemetry recording failed'});
-  } finally {server.close(); rmSync(root, {recursive: true, force: true});}
+  } finally {await server.close(); rmSync(root, {recursive: true, force: true, maxRetries: 5});}
 }, 15_000);
 
 test('public static cache entries are Origin-invariant without changing API or preflight CORS', async () => {
@@ -92,5 +92,5 @@ test('public static cache entries are Origin-invariant without changing API or p
       expect(api.status).toBe(405); expect(api.headers.get('access-control-allow-origin')).toBe(origin === local ? local : null);
       expect(api.headers.get('vary')).toBe(origin === local ? 'Origin' : null);
     }
-  } finally {server.close(); rmSync(root, {recursive: true, force: true});}
+  } finally {await server.close(); rmSync(root, {recursive: true, force: true, maxRetries: 5});}
 }, 15_000);

@@ -98,7 +98,18 @@ async function pageServer(): Promise<NonNullable<typeof page>> {
 }
 
 beforeAll(async () => { page = await pageServer(); }, 90_000);
-afterAll(() => { if (page !== undefined) { page.child.kill('SIGTERM'); rmSync(page.root, { recursive: true, force: true }); } });
+// wrangler dev still writes its logs while it shuts down: remove the directory only once it has exited (main ci
+// 43141220801 failed rmSync with ENOTEMPTY when the removal raced the child's last write).
+afterAll(async () => {
+  if (page === undefined) return;
+  const { child, root } = page;
+  if (child.exitCode === null && child.signalCode === null) {
+    const exited = new Promise<void>(done => { child.once('exit', () => { done(); }); });
+    child.kill('SIGTERM');
+    await exited;
+  }
+  rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+}, 30_000);
 
 function served(): string {
   if (page === undefined) throw new Error('wrangler dev did not start');
@@ -196,7 +207,7 @@ test('encoded responses follow file changes and concurrent readers receive compl
     expect(current.headers['content-length']).toBeUndefined();
     expect(current.headers.etag).not.toBe(readers[0]?.headers.etag);
   } finally {
-    server.close(); rmSync(root, { recursive: true, force: true });
+    await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 });
   }
 }, 20_000);
 
@@ -254,7 +265,7 @@ test('binary preview transport keeps exact quality-3 bytes, headers, ranges and 
     expect(outside.status).toBe(416); expect(outside.headers['content-range']).toBe(`bytes */${body.length}`);
     expect(outside.headers['content-encoding']).toBeUndefined();
   } finally {
-    server.close(); rmSync(root, { recursive: true, force: true });
+    await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 });
   }
 }, 20_000);
 
@@ -294,5 +305,5 @@ test('spawn parts: br as-is, gzip for gzip-only clients, decoded for identity, 4
     expect((await wire(new URL(broken, base), { ...all, 'accept-encoding': 'identity' })).status).toBe(500);
     // The server is still up.
     expect((await wire(new URL(good, base), { ...all, 'accept-encoding': 'br' })).status).toBe(200);
-  } finally { server.close(); rmSync(root, { recursive: true, force: true }); }
+  } finally { await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 }); }
 });
