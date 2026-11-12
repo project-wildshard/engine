@@ -1,0 +1,2 @@
+{ "bank": [{ "name": "count", "kind": "number" }, { "name": "pc", "kind": "number" }], "columns": [], "members": 4,
+  "signals": ["advance", "trap", "spin"], "actions": [], "outputs": 1, "pages": 1, "fuel": 400000 }
