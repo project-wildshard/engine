@@ -229,7 +229,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
   const arg=(/** @type {string} */name)=>process.argv.find(row=>row.startsWith(`--${name}=`))?.slice(name.length+3);
   const io=liveIo(),sha=arg('follow'),afterPush=Number(arg('after-push')??'0');
   // EV2: the pre-push starts a follow before git pushes; follow only once the SHA is on main, else quit quietly.
-  if(sha!==undefined&&afterPush>0&&!await reached(io,sha,afterPush*1000))process.exit(0);
-  const verdicts=sha===undefined?sweep(io):await follow(io,{sha,lane:arg('lane'),pane:arg('pane')});
+  const lost=sha!==undefined&&afterPush>0&&!await reached(io,sha,afterPush*1000);
+  const verdicts=lost?[]:sha===undefined?sweep(io):await follow(io,{sha,lane:arg('lane'),pane:arg('pane')});
   for(const verdict of verdicts)process.stdout.write(`main-watch ${verdict.kind} ${short(verdict.run.head_sha)} run ${verdict.run.id}\n`);
 }
