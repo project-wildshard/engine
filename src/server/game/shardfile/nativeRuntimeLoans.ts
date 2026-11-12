@@ -1,5 +1,5 @@
 import { parse } from 'valibot';
-import { ReturnModulesSchema } from '@wildshard/format/scriptContract';
+import { ReturnModulesSchema, type ReturnModuleRow } from '@wildshard/format/scriptContract';
 import { hasStaticGround } from '@wildshard/engine/physics/query';
 import { combatSpeedFactor } from '@wildshard/engine/player/combatMotion';
 import type { SimHost } from '@wildshard/engine/sim';
@@ -11,9 +11,13 @@ import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 
 interface ProductInput { readonly product: ShardProduct; readonly assets: ReadonlyMap<string, Uint8Array> }
+/** SS7: the server never loads a `view` return row; only the page runs it (timer, cue and channel, no gameplay). */
+export function serverReturnRows(input: unknown): ReturnModuleRow[] {
+  return parse(ReturnModulesSchema, input).filter(row => row.side !== 'view');
+}
 /** Retain full program admission before prepare and the original per-host module loan on install. */
 export async function prepareReturns(preparation: ProductInput): Promise<(host: SimHost) => void> {
-  const returns = preparation.product.has('actors/return-scripts') ? parse(ReturnModulesSchema, preparation.product.section('actors/return-scripts')) : [];
+  const returns = preparation.product.has('actors/return-scripts') ? serverReturnRows(preparation.product.section('actors/return-scripts')) : [];
   if (returns.length > 0) await ReturnProgram.prepareModules(preparation.product, preparation.assets, returns);
   return host => { if (returns.length > 0) ReturnProgram.lendModules(host.scope, preparation.assets, returns); };
 }

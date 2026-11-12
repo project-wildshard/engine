@@ -6,8 +6,9 @@ import { decisionRuntime, focusPlayer, ShardDecisions, type DecisionRuntime } fr
 import { WorldTargetHost } from '../../../shared/game/shardfile/worldTargets';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseWorldTargets, worldTargetRules } from '@wildshard/format/worldTargets';
-import { ReturnModulesSchema, decisionScriptsFromSections } from '@wildshard/format/scriptContract';
+import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
 import { prepareNativePopulation, type NativePopulationRows } from '../shardfile/bossRow';
+import { serverReturnRows } from '../shardfile/nativeRuntimeLoans';
 import { parseQuestWorldReactions, type QuestWorldReactionsData } from '@wildshard/format/questInteractions';
 import { installQuestGraph, type QuestGraphPorts } from '../../../shared/game/plugin/quests';
 import { parseQuestHost, type QuestHostRow } from '@wildshard/format/questHost';
@@ -180,7 +181,7 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
   return { level: trustedLevel(shard, player, recipe.ground), ports: { ground: false, heightAt }, install: (host, context) => {
   const seats = scriptSeats(host), { first } = seats;
     if(sections.has('actors/return-scripts')){
-      const returns=v.parse(ReturnModulesSchema,sections.get('actors/return-scripts'));
+      const returns=serverReturnRows(sections.get('actors/return-scripts'));
       if(returns.some(candidate=>candidate.abi===2))ReturnProgram.lendModules(host.scope,assets,returns);
     }
     const restoring = context.restoring;

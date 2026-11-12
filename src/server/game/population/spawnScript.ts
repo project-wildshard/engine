@@ -20,7 +20,7 @@ import { canReach } from '@wildshard/engine/ai/reach';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
-import { DecisionHost, type DecisionContext, type DecisionScript, type DecisionWorld, type DecisionSnapshot,type DecisionExternalCommand } from '@wildshard/engine/script/decision';
+import { DecisionHost, simDecisionRow, type DecisionContext, type DecisionScript, type DecisionWorld, type DecisionSnapshot,type DecisionExternalCommand } from '@wildshard/engine/script/decision';
 import { ActorMoveRunner } from '@wildshard/engine/ai/moves';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { DayCycleClock } from '@wildshard/engine/world/dayCycle';
@@ -150,7 +150,7 @@ export class SpawnScript {
     const scripts: DecisionScript[] = [];
     for (const row of actorDecisionRows(rows.script)) {
       const state: DecisionScript['state'][number][] = [...row.state];
-      scripts.push({ ...row, ids: decisionBindingMap(row, registries).ids, state,
+      scripts.push({ ...simDecisionRow(row), ids: decisionBindingMap(row, registries).ids, state,
         reads: row.reads.filter((name): name is ScriptV1ReadName => Object.hasOwn(SCRIPT_V1_READS, name)),
         lists: row.reads.filter((name): name is ScriptV1ListName => Object.hasOwn(SCRIPT_V1_LISTS, name)),
       });

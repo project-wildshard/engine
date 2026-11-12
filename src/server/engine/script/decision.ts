@@ -13,6 +13,11 @@ export interface DecisionScript {
   reads: readonly ScriptV1ReadName[]; lists: readonly ScriptV1ListName[]; commands: readonly ScriptV1CommandName[];
   onFail: 'hold' | 'reset' | 'skip';
 }
+/** SS7: `sim/scripts` and spawn rows are always `sim` (format refuses a `view` row there); narrow before spreading. */
+export function simDecisionRow<T extends { id: string; side: 'sim' | 'view' }>(row: T): T & { side: 'sim' } {
+  if (row.side !== 'sim') throw new Error(`Decision script ${row.id} is a view row; only the page runs it`);
+  return row as T & { side: 'sim' };
+}
 /** Stable, numeric binding identity and its actor ownership. Instance seeds a fresh encounter stream. */
 export interface DecisionBinding { id: number; script: string; self: number; actors: readonly number[]; instance: number }
 /** Every query and transaction knows the trusted binding, not caller-supplied actor ownership. */

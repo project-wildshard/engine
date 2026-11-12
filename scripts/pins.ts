@@ -281,10 +281,12 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     const started = performance.now(), files = readTar(bytes);
     const fileNamed = (path: string): Uint8Array => { const body = files.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); return body; };
     try {
-      validateShardfileProduct(
+      const { warnings } = validateShardfileProduct(
         { read: (path, maximum) => { const body = fileNamed(path); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => files.keys() },
         { hash: digest },
       );
+      // SS12: a grandfathered product (Pine's page.life, SERVER-PARITY SS11) is admitted with a warning; say it.
+      for (const warning of warnings) console.warn(`warning ${pin.slug}: ${warning}`);
       // S11: every target of the KTX2 table is in the product, a tracked engine file or a pinned public asset.
       assertKtx2TableTargets({ paths: () => files.keys(), read: fileNamed }, url => shared.has(`public${url}`) || publicUrls.has(url));
     } catch (error) {

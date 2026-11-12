@@ -10,7 +10,7 @@ import { SCRIPT_V1_COMMANDS, SCRIPT_V1_READS, SCRIPT_V1_LISTS, type ScriptV1Even
 import type { DeclaredBodyOps } from '../quest/bodyOps';
 import { admitScriptContract } from '@wildshard/format/scriptContract';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { DecisionHost, type DecisionWorld, type DecisionContext, type DecisionSnapshot, type DecisionScript } from '@wildshard/engine/script/decision';
+import { DecisionHost, simDecisionRow, type DecisionWorld, type DecisionContext, type DecisionSnapshot, type DecisionScript } from '@wildshard/engine/script/decision';
 import { ActorMoveRunner } from '@wildshard/engine/ai/moves';
 import { canReach } from '@wildshard/engine/ai/reach';
 import type { PhaseEncounter } from '@wildshard/engine/ai/phases';
@@ -177,7 +177,7 @@ export class ShardDecisions {
       if (self > 0 && !actorIds.includes(self)) throw new Error('Decision encounter does not own its actor');
       const bytes = requireValue(assets.get(row.module.slice('blobs/wasm/'.length, -'.wasm'.length)), 'module bytes');
       admitScriptContract(bytes, { abi: 1, pages: row.pages }); modules.set(row.module, bytes);
-      scripts.push({ ...row, state: [...row.state], ids: map.ids, reads: row.reads.filter(readName), lists: row.reads.filter(listName) });
+      scripts.push({ ...simDecisionRow(row), state: [...row.state], ids: map.ids, reads: row.reads.filter(readName), lists: row.reads.filter(listName) });
       return { id: index + 1, script: row.id, self, actors: actorIds, instance: 0 };
     });
     const world: DecisionWorld = { player: DECISION_PLAYER_HANDLE, read: (op, a, b, context) => this.read(op, a, b, context), list: (op, a, b, out) => this.list(op, a, b, out),
