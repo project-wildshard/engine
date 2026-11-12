@@ -25,13 +25,16 @@ import {admitDoc} from '../src/server/host/dedicated/playerDoc';
 import {definitions} from './fixtures/saveDefinitions';
 
 // `shardfile` is where the save was made; `pin`, when present, is the later shard pin it is proven to resume on (D5-4).
-interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;pin?:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
+// `refused`, instead, is a later pin whose level changed: the world snapshot is refused whole, by its level fingerprint, and the
+// standalone grid opens a fresh world and carries the player's progress (cellWorld `adopt`). The fixture proves the refusal is
+// that clean one and stays as provenance; moving the pin again makes a lane decide afresh (ENG-17, Mossgate v3).
+interface ReleasedSave {release:string;saveEpoch:number;slug:string;shardfile:string;pin?:string;refused?:string;tick:number;position:[number,number,number];file:string;sha256:string;bytes:number;remote?:boolean}
 const fixtures=readdirSync('test/pins/saves').filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`test/pins/saves/${name}`,'utf8')) as ReleasedSave);
 const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')) as {shards:{slug:string;hash:string}[]};
 const epoch=JSON.parse(readFileSync('save-epoch.json','utf8')) as {saveEpoch:number};
-for(const fixture of fixtures)test(`released ${fixture.slug} save resumes in place and keeps walking`,async()=>{
+for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refused===undefined?'resumes in place and keeps walking':'is refused whole on its changed level'}`,async()=>{
   const {slug}=fixture;
-  expect(fixture.pin??fixture.shardfile).toBe(pins.shards.find(row=>row.slug===slug)?.hash);
+  expect(fixture.refused??fixture.pin??fixture.shardfile).toBe(pins.shards.find(row=>row.slug===slug)?.hash);
   expect(fixture.saveEpoch).toBe(epoch.saveEpoch);
   const bytes=readFileSync(fixture.remote===true?join(process.env['WILDSHARD_PIN_CACHE']??join(homedir(),'.cache/wildshard/pins'),fixture.file):`test/pins/saves/${fixture.file}`);
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(fixture.sha256);
@@ -41,6 +44,13 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save resumes in pla
   const declared=shard.runtime===null&&!product.has('sim/runtime-plan');
   const distance=(x:number,z:number):number=>Math.hypot(x-fixture.position[0],z-fixture.position[2]);
   const walk:HeadlessCommand={kind:'player',moveX:.2,moveZ:-1,yaw:0};
+  if(fixture.refused!==undefined) {
+    const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)]));
+    const resume=declared?HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'}).then(sim=>sim.dispose())
+      :Promise.resolve().then(async()=>{(await createTrustedHeadlessResident({shard,product,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},saved)).dispose();});
+    await expect(resume).rejects.toThrow('Incompatible simulation snapshot');
+    return;
+  }
   if(declared) {
     const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)]));
     const sim=await HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'});
