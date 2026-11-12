@@ -1,21 +1,27 @@
 // SENTRY-TRIAGE S3 (WILDSHARD-GAME-82): a v2 group guest that traps keeps the group's last state and says so once.
 // The Nalati herd's module ran out of fuel mid-call and the meter trapped as `RuntimeError: unreachable`; the host
 // treats that as one failed step. `group-trap.wasm` (source `fixtures/group-trap/group-trap.as`, rebuilt by its
-// `build.mjs`) traps two ways after it has opened the state and written to it: `unreachable()` and an endless loop
-// the v2 fuel meter stops. The brain below drives it through `GroupBrain.runGuest` and catches as `GrazerBrain` does.
+// `build.mjs`) traps two ways after it has drawn from the borrowed RNG and written its bank: `unreachable()` and an
+// endless loop the v2 fuel meter stops. It is driven three ways: through `GroupStepV2` alone, through
+// `GroupBrain.runGuest` with the grazer's catch, and through a real herd `GrazerBrain.tick` bound to the module.
 // oxlint-disable-next-line import/no-nodejs-modules -- the committed fixture module's bytes
 import { readFileSync } from 'node:fs';
+import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
+import { parseGroupStepV2 } from '@wildshard/format/scriptGroupStepV2';
 import type { GroupBankValueV2 } from '@wildshard/format/scriptGroupBankV2';
 import { GroupBrain, type GroupGuestFrameV2, type GroupGuestProjectionV2, type GroupGuestPublicationV2 } from '../src/shared/engine/ai/GroupBrain';
 import { Scope } from '../src/shared/engine/app/scope';
 import { onFault, type Fault } from '../src/shared/engine/core/faults';
 import { Rng } from '../src/shared/engine/core/rng';
-import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
+import { GrazerBrain, type GuardedHerdContext, type GuardedHerdPorts } from '../src/server/engine/ai/grazer';
+import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
+import herdRows from './fixtures/group-trap/herd-rows.json' with { type: 'json' };
 import rows from './fixtures/group-trap/rows.json' with { type: 'json' };
 
 const bytes = Uint8Array.from(readFileSync('test/fixtures/group-trap/group-trap.wasm'));
+const herdBytes = Uint8Array.from(readFileSync('test/fixtures/group-trap/herd-trap.wasm'));
 const TRAPS = ['trap', 'spin', 'trap', 'spin'] as const;
 type Members = GroupGuestFrameV2['input']['members'];
 
@@ -101,5 +107,49 @@ test('a trapping v2 group keeps its prior state, reports once and steps on after
     expect(herd.commits).toBe(2);
     expect(herd.random.snapshot()).toStrictEqual(oracle.snapshot());
     expect(faults).toHaveLength(1);
+  } finally { off(); scope.dispose(); }
+});
+
+/** A one-horse herd with its shared and context RNG. `herd-rows.json` is Nalati's admitted herd bank, signals and two
+ *  random streams, with no columns. */
+function horseHerd(random: Rng, local: Rng): { herd: GrazerBrain<AnimalSim>; body: AnimalSim; context: GuardedHerdContext<AnimalSim> } {
+  const body = new AnimalSim({ kind: 'horse', label: 'Horse', variant: 'leader', rarity: 'common', hp: 20, aggressive: false,
+    dims: { bodyY: 0.6, bodyHalfLen: 0.5, bodyRadius: 0.3, headRadius: 0.2, legLen: 0.5, feet: [], halfWidth: 0.3 },
+    mods: { speed: 1, chargeDist: 1, damageTaken: 1, chargeDamage: 5, relentless: false } }, 1, 1, 'horse', { heightAt: () => 0, random: () => 0.5 });
+  const context: GuardedHerdContext<AnimalSim> = { dt: 0.1, t: 2, player: new Vector3(1, 0, 3), playerSpeed: 0, calm: false, rng: local,
+    sound: () => undefined, hurt: () => undefined, steer: () => undefined, pathYaw: () => 0, confine: () => undefined };
+  const ports: GuardedHerdPorts<AnimalSim> = { sharedRng: () => random, environment: () => ({ playerMounted: false, playerCrouched: false }),
+    visibility: () => 0, hearing: () => 0, downwind: () => false, inBounds: () => true, normalY: () => 1, passThrough: () => undefined,
+    chargeContact: () => undefined, scarePack: () => false };
+  const herd = new GrazerBrain([body], { pattern: 'herd', spec: { walkSpeed: 2, trotSpeed: 4, gallopSpeed: 7, chargeSpeed: 8, sightRadius: 40,
+    grazingSightRadius: 20, coneAngle: 1, hearing: [1, 2, 3, 4], alertThreshold: 0.5, flightMinDistance: 20, flightMaxDistance: 40,
+    stallionVariant: 'leader', foalPrefix: 'young', snortCue: 'snort', neighCue: 'neigh', squealCue: 'squeal' }, ports });
+  return { herd, body, context };
+}
+
+test('a herd GrazerBrain whose bound guest traps on tick keeps the herd, body and RNG, and reports once', () => {
+  const scope = new Scope('group-trap-grazer'), step = new GroupStepV2(herdBytes, herdRows, scope), faults: Fault[] = [];
+  expect(step.layout.bytes).toBe(3008); // build.mjs compiles against this
+  const random = new Rng(5), local = new Rng(7), { herd, body, context } = horseHerd(random, local), twin = horseHerd(new Rng(5), new Rng(7));
+  // The guest's own `initialize` would run this module; the native one gives an initialized herd to restore instead.
+  twin.herd.initialize();
+  herd.bindGuest({ groupBindings: parseGroupStepV2(herdRows), prepareGroup: input => step.prepare(input) },
+    { profile: 'main', parameters: {}, resume: { field: 'continuation', values: [0], segments: 4 } },
+    { scope, group: 'herd', handle: 1, player: context.player, actors: [body] });
+  herd.restore(twin.herd.snapshot());
+  const off = onFault(fault => { faults.push(fault); });
+  try {
+    const saved = herd.snapshot(), pose = body.snapshot(), entropy = random.snapshot(), own = local.snapshot();
+    for (let frame = 0; frame < 4; frame++) {
+      context.t += 0.1;
+      expect(() => { herd.tick(context); }).not.toThrow();
+      expect(herd.snapshot()).toStrictEqual(saved);
+      expect(body.snapshot()).toStrictEqual(pose);
+      expect(random.snapshot()).toStrictEqual(entropy);
+      expect(local.snapshot()).toStrictEqual(own);
+    }
+    expect(faults).toHaveLength(1);
+    expect(faults[0]).toMatchObject({ system: 'ai.group', verdict: 'retry' });
+    expect(faults[0]?.error).toBeInstanceOf(WebAssembly.RuntimeError);
   } finally { off(); scope.dispose(); }
 });
