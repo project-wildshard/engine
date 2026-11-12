@@ -37,7 +37,7 @@ import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engin
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput } from '../headlessRuntime';
 import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
-import { FallFloor, shardFallFloor } from './fallFloor';
+import { FallFloor, shardFallFloor, shardPlayArea } from './fallFloor';
 import { stepResident } from '../../../shared/host/standalone/netInput';
 
 /** The host's own player: the seat its systems are bound to. */
@@ -81,7 +81,10 @@ const leadSeat = (host: SimHost): PlayerSim => {
   return player;
 };
 /** A cell's fall recovery, off what its shard declares. */
-const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor => new FallFloor(shardFallFloor(input.shard.manifest?.bounds?.floor), lone, host.level.player.at);
+/** SS6: the same area the page reads, the manifest's bounds under its `client/plan` rows. An input with no product can't read
+ *  those rows, so it keeps the manifest's floor alone and no x/z edge, rather than an edge the page may not have. */
+const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor => new FallFloor(input.product === undefined
+  ? shardFallFloor(input.shard.manifest?.bounds?.floor) : shardPlayArea(input.shard.manifest?.bounds, input.product), lone, host.level.player.at);
 
 /** A lone cell has the walls a shard's own page stands inside. */
 function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics); }); }

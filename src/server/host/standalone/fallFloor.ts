@@ -3,11 +3,23 @@
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
+import type { Bounds } from '@wildshard/engine/level/spec';
+import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
+import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
 
 /** Below this a player has left a cell's world (half a chunk down): what recovery falls back to where a shard declares no floor. */
 export const FALL_FLOOR: number = -CHUNK_HALF;
 /** Where a shard's fall is caught: its declared bounds floor, never under the chunk's own. */
 export const shardFallFloor = (declared: number | undefined): number => Math.max(FALL_FLOOR, declared ?? FALL_FLOOR);
+/** SS6: a shard's play area as its page reads it, the manifest's bounds under its `client/plan` rows (`playArea.ts`), each
+ *  floor never under the chunk's own. A shard that declares none has no x/z edge and the chunk's floor. */
+export function shardPlayArea(authored: Bounds | undefined, product: Pick<ShardProduct, 'has' | 'section'> | undefined): PlayArea {
+  const area = declaredPlayArea(authored, product);
+  if (area === undefined) return { x0: -Infinity, x1: Infinity, z0: -Infinity, z1: Infinity, floorAt: () => FALL_FLOOR };
+  return { x0: area.x0, x1: area.x1, z0: area.z0, z1: area.z1, floorAt: (x, z) => shardFallFloor(area.floorAt(x, z)) };
+}
+/** A bare floor height: no x/z edge (a road's). */
+const flatArea = (floor: number): PlayArea => ({ x0: -Infinity, x1: Infinity, z0: -Infinity, z1: Infinity, floorAt: () => floor });
 
 /** Seconds on firm ground before a spot is safe to come back to, the page's. */
 const SAFE_SECONDS = 0.2;
@@ -17,22 +29,29 @@ const STEP_SECONDS = 1 / 60;
 export const RESIDENT_FALL_GRACE = 0.25;
 
 type Body = Pick<PlayerSim, 'yaw' | 'led' | 'resetPose'> & { readonly position: { x: number; y: number; z: number }; readonly fall: { readonly grounded: boolean }; readonly board: { readonly on: boolean } };
-/** One cell's fall recovery. `soft` takes a player back; a hard floor is a death. `start` is where they go with no safe ground yet. */
+/** One cell's fall recovery. `soft` takes a player back; a hard floor is a death. `start` is where they go with no safe ground yet.
+ *  A soft floor also takes back a player past its area's x/z edge, as the page's lone `installBounds` does; a hard one (a grid
+ *  cell's) leaves the edge to the grid, as the page's grid does. */
 export class FallFloor {
   private since = 0;
   private spot: { x: number; y: number; z: number } | null = null;
-  private readonly floor: number;
+  private readonly area: PlayArea;
   private readonly soft: boolean;
   private readonly start: { readonly x: number; readonly y: number; readonly z: number };
   private air = 0;
   private readonly grace: number;
   /** `grace`: seconds a player may be off every collider under the floor before it counts (0, the page's: at once). */
-  constructor(floor: number, soft: boolean, start: { readonly x: number; readonly y: number; readonly z: number }, grace = 0) { this.floor = floor; this.soft = soft; this.start = start; this.grace = grace; }
+  constructor(floor: number | PlayArea, soft: boolean, start: { readonly x: number; readonly y: number; readonly z: number }, grace = 0) { this.area = typeof floor === 'number' ? flatArea(floor) : floor; this.soft = soft; this.start = start; this.grace = grace; }
   /** One tick for this player. */
   step(player: Body, die: () => void): void {
     if (player.led) { this.since = 0; this.air = 0; return; }
-    const { position } = player;
-    if (position.y < this.floor && !player.fall.grounded) { // a deck going down to the road carries its rider past it, standing
+    const { position } = player, { area } = this;
+    if (this.soft && (position.x < area.x0 || position.x > area.x1 || position.z < area.z0 || position.z > area.z1)) {
+      this.since = 0; this.air = 0;
+      player.resetPose(this.spot ?? this.start, player.yaw);
+      return;
+    }
+    if (position.y < area.floorAt(position.x, position.z) && !player.fall.grounded) { // a deck going down to the road carries its rider past it, standing
       this.since = 0; this.air += STEP_SECONDS;
       if (this.air < this.grace) return;
       this.air = 0;
@@ -54,7 +73,7 @@ export class FallFloor {
  * as a lone room's seats and the page do: below `floor` each goes back to the last firm ground they stood on, else `start`.
  * Call it after each world step; a room's seats keep their own `FallFloor`s instead.
  */
-export function residentFallNet(host: Pick<SimHost, 'players' | 'parked' | 'embedded'>, floor: number, start: { readonly x: number; readonly y: number; readonly z: number }): () => void {
+export function residentFallNet(host: Pick<SimHost, 'players' | 'parked' | 'embedded'>, floor: number | PlayArea, start: { readonly x: number; readonly y: number; readonly z: number }): () => void {
   const nets = new Map<string, FallFloor>();
   return () => {
     if (host.embedded) return;

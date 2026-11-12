@@ -5,23 +5,17 @@ import type { ShardRuntime } from '../../../shared/game/shard/runtime';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { ShardContext } from '../plugin/context';
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
-
-/** An admitted play-area policy over the current entered world's player. */
-export interface RuntimeBoundsRows {
-  readonly x: readonly [number, number];
-  readonly z: readonly [number, number];
-  readonly outer: { readonly maxAbsXZ: number; readonly floor: number };
-}
+// An admitted play-area policy over the current entered world's player; a room reads the same rows (SS6).
+import { outerFloor, type RuntimeBoundsRows } from '@wildshard/engine/game/shardfile/playArea';
 
 /** Preserve the authored fall floor inside the declared threshold and without a player.
  * The getter observes the current world rather than retaining an earlier player. */
 export function runtimeLevelBounds(runtime: Pick<ShardRuntime, 'world'>, rows: RuntimeBoundsRows, authored: Bounds | undefined): Bounds | undefined {
   if (authored === undefined) return undefined;
   const [x0, x1] = rows.x, [z0, z1] = rows.z;
-  const { maxAbsXZ, floor } = rows.outer;
   return { x0, x1, z0, z1, get floor(): number {
     const position = runtime.world?.player.position;
-    return position !== undefined && Math.max(Math.abs(position.x), Math.abs(position.z)) > maxAbsXZ ? floor : authored.floor;
+    return position === undefined ? authored.floor : outerFloor(rows, authored.floor, position.x, position.z);
   } };
 }
 

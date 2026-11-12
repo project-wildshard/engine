@@ -6,7 +6,7 @@ import type { SimHost } from '../src/server/engine/sim';
 import type { PlayerSim } from '../src/server/engine/sim/playerSim';
 import { floorBelow } from '../src/shared/engine/physics/query';
 import { playBounds } from '../src/client/engine/world/bounds';
-import { FALL_FLOOR } from '../src/server/host/standalone/fallFloor';
+import { FALL_FLOOR, shardPlayArea } from '../src/server/host/standalone/fallFloor';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { serverInput } from './fixtures/dedicated/roomBench';
 
@@ -29,8 +29,12 @@ const REPROS: readonly { readonly slug: string; readonly at: readonly [number, n
   { slug: DUNES, at: [-14, -140], move: { moveX: 0, moveZ: -1 }, ticks: 3000 },
   { slug: SKY, at: [-60.8, -135.3], move: { moveX: 0, moveZ: 0 }, ticks: 900 },
 ];
-/** The lowest a player may be after a fall net: the shard's declared floor, less one tick of a terminal fall. */
-const floorOf = async (slug: string): Promise<number> => (await serverInput(slug)).shard.manifest?.bounds?.floor ?? -Infinity;
+/** The floor a fall net holds at (x, z). A room's is the page's own area (SS6: Sky Reach's `player.enter` floor −8, under its
+ *  manifest's 12); a bare resident's is still the manifest's. */
+const floorOf = async (slug: string, room: boolean, x: number, z: number): Promise<number> => {
+  const input = await serverInput(slug), authored = input.shard.manifest?.bounds;
+  return room ? shardPlayArea(authored, input.product).floorAt(x, z) : authored?.floor ?? -Infinity;
+};
 
 /** Step `ticks` times; the lowest the player got and how many times it was put back. */
 function run(step: () => void, player: PlayerSim, ticks: number): { lowest: number; resets: number } {
@@ -40,9 +44,10 @@ function run(step: () => void, player: PlayerSim, ticks: number): { lowest: numb
   return { lowest, resets: player.resets - resets };
 }
 /** The repro's input, then the hard case: the player is dropped under the ground at the repro's spot, with nothing below. */
-async function fallsAndRecovers(slug: string, host: SimHost, player: PlayerSim, step: (move: Move) => void): Promise<void> {
-  const repro = REPROS.find(row => row.slug === slug), floor = await floorOf(slug);
+async function fallsAndRecovers(slug: string, host: SimHost, player: PlayerSim, step: (move: Move) => void, room: boolean): Promise<void> {
+  const repro = REPROS.find(row => row.slug === slug);
   if (repro === undefined) throw new Error(`No repro for ${slug}`);
+  const floor = await floorOf(slug, room, repro.at[0], repro.at[1]);
   run(() => { step({ moveX: 0, moveZ: 0 }); }, player, 2); // a world's colliders answer queries after its first step
   standAt(player, host, repro.at[0], repro.at[1]);
   const walked = run(() => { step(repro.move); }, player, repro.ticks);
@@ -65,7 +70,7 @@ for (const { slug } of REPROS) {
     closers.push(() => { resident.dispose(); });
     const { host } = resident, player = [...host.players.values()][0];
     if (player === undefined) throw new Error('No player');
-    await fallsAndRecovers(slug, host, player, move => { resident.step([{ kind: 'player', ...move, yaw: 0 }]); });
+    await fallsAndRecovers(slug, host, player, move => { resident.step([{ kind: 'player', ...move, yaw: 0 }]); }, false);
   });
 
   test(`ENG-18 online: a net room catches a fall off ${slug}`, { timeout: 120_000 }, async () => {
@@ -82,7 +87,7 @@ for (const { slug } of REPROS) {
     tick({ moveX: 0, moveZ: 0 });
     const player = room.bodyOf(device);
     if (player === undefined) throw new Error('No body');
-    await fallsAndRecovers(slug, room.host, player, tick);
+    await fallsAndRecovers(slug, room.host, player, tick, true);
   });
 }
 

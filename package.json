@@ -984,6 +984,7 @@
     "./game/shardfile/runtimeProduct": "./src/client/game/shardfile/runtimeProduct.ts",
     "./game/shardfile/clientSource": "./src/client/game/shardfile/clientSource.ts",
     "./game/shardfile/shardProduct": "./src/shared/game/shardfile/shardProduct.ts",
+    "./game/shardfile/playArea": "./src/shared/game/shardfile/playArea.ts",
     "./game/shardfile/props": "./src/shared/game/shardfile/props.ts",
     "./game/shardfile/hybrid": "./src/client/game/shardfile/hybrid.ts",
     "./game/shardfile/movers": "./src/shared/game/shardfile/movers.ts",
