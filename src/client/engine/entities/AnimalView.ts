@@ -130,8 +130,13 @@ export class Animal extends AnimalSim {
   get simulationBound(): boolean { return this.externalSimulation !== null || this.rowDriven; }
   /** A wire row stands this body (`showRow`): no decision or step of its own, only its pose. */
   rowDriven = false;
+  /** The last row's flinch. A blow is a rise in the wire's own flinch: the local copy decays every frame (the pose law,
+   *  a custom rig's ragdoll) while a dead body's row keeps its last flinch, so comparing against the local copy re-armed
+   *  the white flash every frame on a corpse (TE-ENG9). */
+  private rowFlinch = 0;
   override showRow(row: Parameters<AnimalSim['showRow']>[0], dt: number): void {
-    const hit = row.flinch > this.flinch + 0.05, died = this.alive && !row.alive;
+    const hit = row.flinch > this.rowFlinch + 0.05, died = this.alive && !row.alive;
+    this.rowFlinch = row.flinch;
     super.showRow(row, dt);
     if (hit) this.hitFlash();
     if (died) { this.deathT = 0; this.deathSide = 1; }
