@@ -105,7 +105,7 @@ import { hudSlots } from '@wildshard/engine/ui/hudSlots';
 import { installPlayerDeath } from '@wildshard/engine/ui/playerDeath';
 import { PlayerHurt } from '@wildshard/engine/ui/playerHurt';
 import { onReview, queuedCount, quickNote } from '@wildshard/engine/ui/review';
-import { installBounds } from '@wildshard/engine/world/bounds';
+import { installBounds, playBounds } from '@wildshard/engine/world/bounds';
 import { gridCells, gridHomeSim, pageMode } from '../plugin/context';
 import type { RowBodies } from '@wildshard/engine/entities/RowBodies';
 import { whenControl } from '@wildshard/engine/boot/prefetch';
@@ -207,10 +207,9 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     player.spawn(arrivalSpawn.x, arrivalSpawn.z, arrivalSpawn.yaw, arrivalSpawn.y); if (!boot.handoff?.arrive) { const y = boot.runtime.hooks.spawnFloor?.(player.position.x, player.position.z); if (y !== undefined) player.position.y = y; }
   };
   const respawn = () => { toSpawn(); music.sting('death'); };
-  // in the grid every frame has fall recovery (a level without authored bounds, Driftwood, gets the grid's fall floor; the horizontal check is the grid's)
-  const GRID_FALL_FLOOR = -60;
+  // every play has fall recovery (ENG-18): a level without authored bounds, Driftwood, gets a fall floor; in the grid the horizontal check is the grid's
   const authoredBounds = resolveLevelBounds(game.level.bounds, boot.runtime.hooks);
-  const bounds = authoredBounds ?? (grid === null ? undefined : { x0: -Infinity, x1: Infinity, z0: -Infinity, z1: Infinity, floor: GRID_FALL_FLOOR });
+  const bounds = playBounds(authoredBounds, grid !== null);
 
   let kills = 0, swimHold = false;
   // SF28 (G87 / G104): the big item cards wear the shard's declared accent (in the grid, the cell's: grid/gridHud.ts)
@@ -226,7 +225,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   app.registerPlayer(playerHealth, game.levelScope);
   installBounds(app, game.levelScope, bounds, { player,
     toSpawn: () => { if (gridLive === null) toSpawn(); else app.combat.fall(playerHealth, player.position, { kind: 'out-of-world', label: '' }); },
-    fallFloor: () => gridLive?.fallFloor() ?? bounds?.floor ?? GRID_FALL_FLOOR,
+    fallFloor: () => gridLive?.fallFloor() ?? bounds.floor,
     floorAt: (x, z) => ((gridLive?.spawn() ?? null) === null ? registry.floorAt(x, z) : floorBelow(world.physics, x, z, player.position.y + 0.6, 1.2)),
     suspended: () => player.link !== null || world.freeCamera || world.tour.active || away() || (grid !== null && player.carried), grid: () => grid !== null, frame: () => gridLive?.frame() });
   // the grid client step 2: the live crossing (LiveGridHost + GridCrossing in the page's one fixed step; G68's safe zone)

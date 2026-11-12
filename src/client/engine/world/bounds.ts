@@ -2,6 +2,17 @@ import type { App } from '../app/app';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { inState } from '../app/systems';
 import type { Bounds } from '../../../shared/engine/level/spec';
+import { CHUNK_HALF } from '../../../shared/engine/core/config';
+
+/** A grid frame's fall floor when its level authors none (Driftwood). */
+export const GRID_FALL_FLOOR = -60;
+/**
+ * ENG-18: every play has a fall floor. A level's authored bounds win; without them the grid's floor, else the server's own
+ * (`fallFloor.ts`'s half a chunk down), so a level with no bounds never falls for ever on the page either.
+ */
+export function playBounds(authored: Bounds | undefined, grid: boolean): Bounds {
+  return authored ?? { x0: -Infinity, x1: Infinity, z0: -Infinity, z1: Infinity, floor: grid ? GRID_FALL_FLOOR : -CHUNK_HALF };
+}
 
 interface BoundedPlayer {
   position: { x: number; y: number; z: number }; yaw: number; onGround: boolean; hover: boolean;

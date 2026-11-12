@@ -10,7 +10,7 @@ import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
 import type { GridCell } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { HOST_PROBE } from '@wildshard/engine/game/plugin/simulation';
-import { FALL_FLOOR } from './cellWorld';
+import { FALL_FLOOR } from './fallFloor';
 
 /** Ground under the whole grid, far below the road's strips, and a player's pace on them. */
 const ROAD_HALF_SIZE = 2000, ROAD_SPEED = 8;

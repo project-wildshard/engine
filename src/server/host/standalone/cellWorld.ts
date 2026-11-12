@@ -2,7 +2,6 @@
 // between them is in `CellWorldOptions`: who keeps a player's goods and facts, and whether solids stay near one player.
 import { bootTask } from '@wildshard/engine/boot/timing';
 import { withOwner } from '@wildshard/engine/app/ownership';
-import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import type { NetTickInput } from '@wildshard/engine/net/room';
 import { NearColliders } from '@wildshard/engine/physics/nearColliders';
 import { addEdgeWalls } from '@wildshard/engine/physics/terrain';
@@ -38,11 +37,9 @@ import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engin
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput } from '../headlessRuntime';
 import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
-import { FallFloor } from './fallFloor';
+import { FallFloor, shardFallFloor } from './fallFloor';
 import { stepResident } from '../../../shared/host/standalone/netInput';
 
-/** Below this a player has left a cell's world: what a page's grid recovery falls back to where a shard declares no floor. */
-export const FALL_FLOOR: number = -CHUNK_HALF;
 /** The host's own player: the seat its systems are bound to. */
 export const LEAD_SEAT = 'actor.player';
 
@@ -84,7 +81,7 @@ const leadSeat = (host: SimHost): PlayerSim => {
   return player;
 };
 /** A cell's fall recovery, off what its shard declares. */
-const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor => new FallFloor(Math.max(FALL_FLOOR, input.shard.manifest?.bounds?.floor ?? FALL_FLOOR), lone, host.level.player.at);
+const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor => new FallFloor(shardFallFloor(input.shard.manifest?.bounds?.floor), lone, host.level.player.at);
 
 /** A lone cell has the walls a shard's own page stands inside. */
 function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics); }); }
