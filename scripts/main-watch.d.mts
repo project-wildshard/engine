@@ -15,4 +15,5 @@ export function paneFor(panes:readonly Pane[],slug:string):string|undefined;
 export function readState(file:string):State|null;
 export function liveIo(env?:NodeJS.ProcessEnv):Io;
 export function sweep(io:Io,hint?:{sha?:string;lane?:string;pane?:string}):Verdict[];
+export function reached(io:{tip:()=>string;contains:(ancestor:string,descendant:string)=>boolean},sha:string,waitMs:number,pollMs?:number):Promise<boolean>;
 export function follow(io:Io,options:{sha:string;lane?:string;pane?:string;pollMs?:number;timeoutMs?:number}):Promise<Verdict[]>;
