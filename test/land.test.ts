@@ -14,6 +14,7 @@ import { runInNewContext } from 'node:vm';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
+import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
 import { failedJobs, flakyFiles, mainPushArgs, parseArgs, prePushCause, quarantineFile, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
@@ -892,6 +893,20 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     }
     expect(jobs.get('tests')).toContain("name: Run this job's packed share");
     expect(jobs.get('tests')).toContain('--units=static,e2e,plan-proofs,tests,products,boundaries');
+    // EV3: six shares, the last of them Ring 1's products alone.
+    expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5, 6]');
+  });
+
+  test('products and boundaries take the last packed job to themselves; everything else packs over the rest (EV3)', () => {
+    const kinds = ['static', 'e2e', 'plan-proofs', 'tests', 'products', 'boundaries'];
+    const names = (bins: { name: string }[][]) => bins.map(bin => bin.map(unit => unit.name));
+    const six = names(packUnits(runUnits(15, kinds, index => 100 + index), 6));
+    expect(six[5]).toEqual(['products', 'boundaries']);
+    expect([...six.slice(0, 5).flat()].sort()).toEqual(['e2e', 'plan-proofs', 'static', ...Array.from({ length: 15 }, (_, i) => `shard:${i + 1}`)].sort());
+    expect(six.slice(0, 5).every(bin => bin.length > 0)).toBe(true);
+    // One job runs everything, products after the shards; a run without products packs over every job.
+    expect(names(packUnits(runUnits(3, kinds), 1))[0]).toEqual(['static', 'e2e', 'plan-proofs', 'shard:1', 'shard:2', 'shard:3', 'products', 'boundaries']);
+    expect(names(packUnits(runUnits(6, ['tests']), 6)).every(bin => bin.length === 1)).toBe(true);
   });
 });
 

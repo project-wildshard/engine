@@ -5,6 +5,9 @@ name: ci
 # once. Now every unit of work runs once, packed longest-first into the `tests` matrix by scripts/ci-pack.mjs:
 # ci's static checks, the planner's proofs, e2e, every planned test shard, Ring 1's products (cook, build, boot)
 # and the engine-boundaries cook-to-play report. Quarantine keeps its own non-blocking job (J193).
+# EV3 (HOW-WE-BUILD, 2026-11-12): products and boundaries take the last share, `tests (6)`, to themselves, beside the
+# shards (after that job's own set-up and pins); jobs 1-5 pack everything else. Run after job 1's shards, products
+# made job 1 the long pole.
 on:
   # J240: a plan worktree pushes plan/<slug>; scripts/land.mjs waits for this
   # exact SHA to go green here, then fast-forwards main to it. Main's run of
@@ -48,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job: [1, 2, 3, 4, 5]
+        job: [1, 2, 3, 4, 5, 6]
     env:
       WS_TEST_QUARANTINE: blocking
       WS_CI_PLAN: tmp/engine-ci/plan.json

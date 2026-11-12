@@ -11,7 +11,10 @@
 //   plan-proofs the planner's own proofs (membership, order, module cache, CPU census, budget refusal, shard wall)
 //   shard:<k>   one planned test shard: exact membership, the 60 s file budget, and the five-minute shard wall (J193)
 //   quarantine  every active quarantined file, non-blocking (J193/J200); ci.yml runs it as its own job instead
-//   products    Ring 1's cook-step, build and boot; it replaces the full pins with Ring 1's, so it runs after the shards
+//   products    Ring 1's cook-step, build and boot; it replaces the full pins with Ring 1's, so it runs after any shards
+//               in its job. With more than one job it takes the last job to itself (EV3), beside the shards, after that
+//               job's set-up and pins; the other units pack over the rest. Packed after job 1's shards, it made job 1
+//               the long pole (p50 12.6 min against 9.1).
 //   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products: report-only (J186), so non-blocking,
 //               and always in the job that runs products
 // Phases run in order: before pins (up to C units at once), `pnpm pins && pnpm gen:inputs`, the shards ONE AT A TIME,
@@ -33,6 +36,8 @@ export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quar
 const PHASE=Object.freeze({static:0,e2e:0,'plan-proofs':0,quarantine:2,products:3,boundaries:4});
 /** Units that go wherever another unit went, after it (they need its state), instead of being balanced on their own. */
 const FOLLOWS=Object.freeze(/** @type {Record<string,string>} */({boundaries:'products'}));
+/** Units that take the last job to themselves (with their followers) when a run has more than one (EV3). */
+const OWN_JOB=new Set(['products']);
 const NONBLOCKING=new Set(['quarantine','boundaries']);
 const SHARD_LIMIT_MS=300_000;
 /** @typedef {{name:string,phase:number,seconds:number,blocking:boolean}} Unit */
@@ -52,17 +57,19 @@ export function runUnits(shards,kinds,shardSeconds=()=>120){
 }
 
 /** Longest first onto the least-loaded job; ties go to the lower job, so every job computes the same answer.
+ * With more than one job, an OWN_JOB unit takes the last job and everything else packs over the jobs before it.
  * A following unit joins its leader's job (or the least-loaded one if its leader isn't in the run).
  * @param {readonly Unit[]} units @param {number} jobs @returns {Unit[][]} */
 export function packUnits(units,jobs){
   if(!Number.isSafeInteger(jobs)||jobs<1)throw new Error('Invalid packed job count');
   /** @type {Unit[][]} */const bins=Array.from({length:jobs},()=>[]);const load=Array.from({length:jobs},()=>0);
   const byName=(/** @type {Unit} */a,/** @type {Unit} */b)=>a.name.localeCompare(b.name,'en',{numeric:true});
-  const least=()=>{let best=0;for(let index=1;index<jobs;index++)if((load[index]??0)<(load[best]??0))best=index;return best;};
+  const own=jobs>1&&units.some(unit=>OWN_JOB.has(unit.name)),shared=own?jobs-1:jobs;
+  const least=()=>{let best=0;for(let index=1;index<shared;index++)if((load[index]??0)<(load[best]??0))best=index;return best;};
   // A leader is balanced with its followers' seconds, so the job that takes both isn't the long one.
   const weight=(/** @type {Unit} */unit)=>unit.seconds+units.filter(row=>FOLLOWS[row.name]===unit.name).reduce((sum,row)=>sum+row.seconds,0);
   const order=[...units].filter(unit=>FOLLOWS[unit.name]===undefined).sort((a,b)=>weight(b)-weight(a)||byName(a,b));
-  for(const unit of order){const best=least();bins[best]?.push(unit);load[best]=(load[best]??0)+weight(unit);}
+  for(const unit of order){const best=own&&OWN_JOB.has(unit.name)?jobs-1:least();bins[best]?.push(unit);load[best]=(load[best]??0)+weight(unit);}
   for(const unit of units.filter(row=>FOLLOWS[row.name]!==undefined)){
     const leader=bins.findIndex(bin=>bin.some(row=>row.name===FOLLOWS[unit.name])),at=leader===-1?least():leader;
     bins[at]?.push(unit);if(leader===-1)load[at]=(load[at]??0)+unit.seconds;
