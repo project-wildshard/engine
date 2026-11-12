@@ -902,7 +902,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5, 6]');
   });
 
-  test('products and boundaries take the last packed job to themselves; everything else packs over the rest (EV3)', () => {
+  test('products and boundaries start the last packed job; a heavy last job takes nothing else (EV3)', () => {
     const kinds = ['static', 'e2e', 'plan-proofs', 'tests', 'products', 'boundaries'];
     const names = (bins: { name: string }[][]) => bins.map(bin => bin.map(unit => unit.name));
     const six = names(packUnits(runUnits(15, kinds, index => 100 + index), 6));
@@ -912,9 +912,24 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     // One job runs everything, products after the shards; a run without products packs over every job.
     expect(names(packUnits(runUnits(3, kinds), 1))[0]).toEqual(['static', 'e2e', 'plan-proofs', 'shard:1', 'shard:2', 'shard:3', 'products', 'boundaries']);
     expect(names(packUnits(runUnits(6, ['tests']), 6)).every(bin => bin.length === 1)).toBe(true);
-    // EV3b: ci.yml runs boundaries alone in its own job; the planner weighs it at its measured 223-338 s.
+    // EV3b: ci.yml runs boundaries alone in its own job; the planner weighs it at its measured 258-392 s (p50 320).
     expect(names(packUnits(runUnits(0, ['boundaries']), 1))).toEqual([['boundaries']]);
-    expect(runUnits(0, ['boundaries'])[0]).toMatchObject({ seconds: 300, blocking: false });
+    expect(runUnits(0, ['boundaries'])[0]).toMatchObject({ seconds: 320, blocking: false });
+  });
+
+  test('products starts the last job and shards fill it once it is the least loaded (EV3b)', () => {
+    // ci.yml's kinds (boundaries has its own job), at run 43315969089's measured shard seconds: alone, products left its
+    // job 2-4 min short while one of jobs 1-5 ran four shards deep.
+    const measured = [137, 155, 88, 157, 137, 135, 95, 146, 121, 161, 108, 74, 116, 126, 164];
+    const units = runUnits(15, ['static', 'e2e', 'plan-proofs', 'tests', 'products'], index => measured[index - 1] ?? 0);
+    const bins = packUnits(units, 6);
+    const last = bins[5]?.map(unit => unit.name) ?? [];
+    expect(last.at(-1)).toBe('products');
+    expect(last.length).toBeGreaterThan(1);
+    expect(last.slice(0, -1).every(name => name.startsWith('shard:'))).toBe(true);
+    expect(bins.flat().map(unit => unit.name).sort()).toEqual(units.map(unit => unit.name).sort());
+    const loads = bins.map(bin => bin.reduce((sum, unit) => sum + unit.seconds, 0));
+    expect(Math.max(...loads)).toBeLessThan(450);
   });
 });
 

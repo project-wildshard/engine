@@ -5,12 +5,14 @@ name: ci
 # once. Now every unit of work runs once, packed longest-first into the `tests` matrix by scripts/ci-pack.mjs:
 # ci's static checks, the planner's proofs, e2e, every planned test shard, Ring 1's products (cook, build, boot)
 # and the engine-boundaries cook-to-play report. Quarantine keeps its own non-blocking job (J193).
-# EV3 (HOW-WE-BUILD, 2026-11-12): products and boundaries take the last share, `tests (6)`, to themselves, beside the
+# EV3 (HOW-WE-BUILD, 2026-11-12): products and boundaries took the last share, `tests (6)`, to themselves, beside the
 # shards (after that job's own set-up and pins); jobs 1-5 pack everything else. Run after job 1's shards, products
 # made job 1 the long pole.
 # EV3b (2026-11-12): boundaries (report-only cook-to-play, J186) is 223-338 s, and after products it made `tests (6)` the
 # long pole at 13.7 min. It needs nothing products makes (full pins, then its own Ring 1, Chromium and build): its own
 # non-blocking `boundaries` job from t=0, like quarantine.
+# EV3b measured (2026-11-12): alone, `tests (6)` ran 5.2-8.1 min while jobs 1-5 ran 9.6-11.3, one of them four shards
+# deep. Products still starts the last job, but the shards now pack over all six, that one included (before products).
 on:
   # J240: a plan worktree pushes plan/<slug>; scripts/land.mjs waits for this
   # exact SHA to go green here, then fast-forwards main to it. Main's run of

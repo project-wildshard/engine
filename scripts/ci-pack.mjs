@@ -12,9 +12,9 @@
 //   shard:<k>   one planned test shard: exact membership, the 60 s file budget, and the five-minute shard wall (J193)
 //   quarantine  every active quarantined file, non-blocking (J193/J200); ci.yml runs it as its own job instead
 //   products    Ring 1's cook-step, build and boot; it replaces the full pins with Ring 1's, so it runs after any shards
-//               in its job. With more than one job it takes the last job to itself (EV3), beside the shards, after that
-//               job's set-up and pins; the other units pack over the rest. Packed after job 1's shards, it made job 1
-//               the long pole (p50 12.6 min against 9.1).
+//               in its job. With more than one job it starts the last job (EV3), so it never lands behind job 1's
+//               shards (that made job 1 the long pole, p50 12.6 min against 9.1); the other units pack over every job,
+//               and the last takes shards once it is the least loaded (EV3b: alone it ran 5.2-8.1 min against 9.6-11.3).
 //   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products: report-only (J186), so non-blocking.
 //               It needs the full pins (its Ring 1 cook reads raw tarballs only `pnpm pins` fetches, run 43303094170),
 //               then installs Ring 1's and Chromium itself and builds its own tree, so it needs no other unit: ci.yml
@@ -35,12 +35,14 @@ import {pathToFileURL} from 'node:url';
 
 /** Seconds a unit takes alone on the hosted runner; only the packing reads them. TEST-SPEED TS2 (2026-11-11): re-measured
  * over 12 packed runs (42960973990 .. 42974435994): products grew from 205 to 347-384 s and set the long job. EV3b
- * (HOW-WE-BUILD, 2026-11-12): boundaries is 223-338 s, not 32 (runs 43292331966, 43295196045). */
-export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quarantine:135,products:360,boundaries:300});
+ * (HOW-WE-BUILD, 2026-11-12): boundaries is 258-392 s, p50 320, in its own job (8 main runs, 43310335051 .. 43315974456). */
+export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quarantine:135,products:360,boundaries:320});
 const PHASE=Object.freeze({static:0,e2e:0,'plan-proofs':0,quarantine:2,products:3,boundaries:4});
 /** Units that go wherever another unit went, after it (they need its state), instead of being balanced on their own. */
 const FOLLOWS=Object.freeze(/** @type {Record<string,string>} */({boundaries:'products'}));
-/** Units that take the last job to themselves (with their followers) when a run has more than one (EV3). */
+/** Units that start the last job (with their followers) when a run has more than one (EV3). EV3c (HOW-WE-BUILD EV3b,
+ * 2026-11-12): that job then packs like the rest, so the shards fill the 2-4 min products leaves free there. Alone it ran
+ * 5.2-8.1 min while jobs 1-5 ran 9.6-11.3 (runs 43313302390 .. 43315974456). Its shards still run before products. */
 const OWN_JOB=new Set(['products']);
 const NONBLOCKING=new Set(['quarantine','boundaries']);
 const SHARD_LIMIT_MS=300_000;
@@ -61,18 +63,20 @@ export function runUnits(shards,kinds,shardSeconds=()=>120){
 }
 
 /** Longest first onto the least-loaded job; ties go to the lower job, so every job computes the same answer.
- * With more than one job, an OWN_JOB unit takes the last job and everything else packs over the jobs before it.
+ * With more than one job, an OWN_JOB unit starts the last job; everything else packs over every job, that one included.
  * A following unit joins its leader's job (or the least-loaded one if its leader isn't in the run).
  * @param {readonly Unit[]} units @param {number} jobs @returns {Unit[][]} */
 export function packUnits(units,jobs){
   if(!Number.isSafeInteger(jobs)||jobs<1)throw new Error('Invalid packed job count');
   /** @type {Unit[][]} */const bins=Array.from({length:jobs},()=>[]);const load=Array.from({length:jobs},()=>0);
   const byName=(/** @type {Unit} */a,/** @type {Unit} */b)=>a.name.localeCompare(b.name,'en',{numeric:true});
-  const own=jobs>1&&units.some(unit=>OWN_JOB.has(unit.name)),shared=own?jobs-1:jobs;
-  const least=()=>{let best=0;for(let index=1;index<shared;index++)if((load[index]??0)<(load[best]??0))best=index;return best;};
+  const own=jobs>1&&units.some(unit=>OWN_JOB.has(unit.name));
+  const least=()=>{let best=0;for(let index=1;index<jobs;index++)if((load[index]??0)<(load[best]??0))best=index;return best;};
   // A leader is balanced with its followers' seconds, so the job that takes both isn't the long one.
   const weight=(/** @type {Unit} */unit)=>unit.seconds+units.filter(row=>FOLLOWS[row.name]===unit.name).reduce((sum,row)=>sum+row.seconds,0);
-  const order=[...units].filter(unit=>FOLLOWS[unit.name]===undefined).sort((a,b)=>weight(b)-weight(a)||byName(a,b));
+  // An OWN_JOB unit goes first, so the last job holds it before anything packs over it.
+  const first=(/** @type {Unit} */unit)=>own&&OWN_JOB.has(unit.name)?0:1;
+  const order=[...units].filter(unit=>FOLLOWS[unit.name]===undefined).sort((a,b)=>first(a)-first(b)||weight(b)-weight(a)||byName(a,b));
   for(const unit of order){const best=own&&OWN_JOB.has(unit.name)?jobs-1:least();bins[best]?.push(unit);load[best]=(load[best]??0)+weight(unit);}
   for(const unit of units.filter(row=>FOLLOWS[row.name]!==undefined)){
     const leader=bins.findIndex(bin=>bin.some(row=>row.name===FOLLOWS[unit.name])),at=leader===-1?least():leader;

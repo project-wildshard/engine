@@ -11,3 +11,14 @@
   products does. `UNIT_SECONDS.boundaries` is 300. land's `failedJobs` counts a red
   `boundaries` job as non-blocking.
 - Expected: products job about 8.5 min; the long pole becomes the slowest shard job.
+
+## Measured, and shards fill the products job (EV3b, opus-ev3c)
+
+- Measured on main after the Brasscap back-out: products job 5.2-8.1 min, boundaries
+  job 5.4-6.9 min (unit 258-392 s, p50 320, now `UNIT_SECONDS.boundaries`). But jobs 1-5
+  ran 9.6-11.3 min: the plan grew to 14-15 shards and one job got four of them
+  (runs 43313302390 .. 43315974456). Longest blocking job p50 10.4 min over 4 green runs.
+- Change: products still starts the last job (and runs after its shards, which it must,
+  since it swaps the full pins for Ring 1's), but `packUnits` now packs the other units
+  over all six jobs. On run 43315969089's measured seconds the heaviest share drops from
+  about 613 s to about 440 s.
