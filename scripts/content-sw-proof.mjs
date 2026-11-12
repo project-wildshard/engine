@@ -58,7 +58,7 @@ function send(response, file, range, extra) {
   createReadStream(file).pipe(response);
 }
 /** @param {import('node:http').Server} server @returns {Promise<string>} */
-const listen = server => new Promise(done => { server.listen(0, '127.0.0.1', () => { const address = server.address(); done(`http://127.0.0.1:${typeof address === 'object' && address !== null ? address.port : 0}`); }); });
+const listen = server => new Promise(resolve => { server.listen(0, '127.0.0.1', () => { const address = server.address(); resolve(`http://127.0.0.1:${typeof address === 'object' && address !== null ? address.port : 0}`); }); });
 
 // the real Clear downloads, bundled from source for the page to import (no menu taps, the same code)
 const clearBundle = await rolldown({ input: join(root, 'src/client/engine/boot/clearDownloads.ts'), platform: 'browser', transform: { target: 'es2022' } });
@@ -118,17 +118,17 @@ async function until(page, test, what) {
 }
 /** DL1's ask, as the page makes it at control: the worker answers once this build's code and books are held.
  * @param {import('playwright').Page} page */
-const precache = page => page.evaluate(() => new Promise(done => {
+const precache = page => page.evaluate(() => new Promise(resolve => {
   const worker = navigator.serviceWorker.controller, channel = new MessageChannel();
-  if (worker === null) { done('no controller'); return; }
-  channel.port1.onmessage = event => { done(event.data); };
+  if (worker === null) { resolve('no controller'); return; }
+  channel.port1.onmessage = event => { resolve(event.data); };
   worker.postMessage({ type: 'PRECACHE' }, [channel.port2]);
-})).catch(error => String(error));
+})).catch(String);
 /** The controlling worker's build. @param {import('playwright').Page} page @returns {Promise<unknown>} */
-const buildOf = page => page.evaluate(() => new Promise(done => {
+const buildOf = page => page.evaluate(() => new Promise(resolve => {
   const worker = navigator.serviceWorker.controller, channel = new MessageChannel();
-  if (worker === null) { done(null); return; }
-  channel.port1.onmessage = event => { done(event.data?.build ?? null); };
+  if (worker === null) { resolve(null); return; }
+  channel.port1.onmessage = event => { resolve(event.data?.build ?? null); };
   worker.postMessage({ type: 'BUILD' }, [channel.port2]);
 }));
 /** @param {string} name */
@@ -163,9 +163,9 @@ try {
     const adopted = await page.evaluate(async () => {
       const waiting = (await navigator.serviceWorker.getRegistration())?.waiting;
       if (!waiting) return 'no waiting worker';
-      const reply = await new Promise(done => { const channel = new MessageChannel(); channel.port1.onmessage = event => { done(event.data); }; waiting.postMessage({ type: 'PRECACHE' }, [channel.port2]); });
-      const changed = new Promise(done => { navigator.serviceWorker.addEventListener('controllerchange', () => { done(true); }, { once: true }); });
-      waiting.postMessage({ type: 'SKIP_WAITING' }); await changed;
+      const reply = await new Promise(resolve => { const channel = new MessageChannel(); channel.port1.onmessage = event => { resolve(event.data); }; waiting.postMessage({ type: 'PRECACHE' }, [channel.port2]); });
+      const changed = new Promise(resolve => { navigator.serviceWorker.addEventListener('controllerchange', () => { resolve(true); }, { once: true }); });
+      waiting.postMessage({ type: 'SKIP_WAITING' }, []); await changed;
       return reply;
     });
     result.adopted = adopted;

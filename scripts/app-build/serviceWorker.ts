@@ -46,7 +46,7 @@ function documentContentBase(html: string): string {
   return readContentBase(typeof value === 'object' && value !== null ? Reflect.get(value, 'contentBase') : undefined);
 }
 
-type Book = { readonly url: string; readonly bytes: Uint8Array };
+interface Book { readonly url: string; readonly bytes: Uint8Array }
 
 /** The build owns names. No worker parses boot banks, packs or runtime product metadata. */
 export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>, root: string, buildId: string, serverBook?: Book, packsBook?: Book): Promise<{
