@@ -75,5 +75,6 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
  *  initial text to every creature spawn (an empty one for Nalati's native bodies). Re-taken for ENG-18: three far bots
  *  of this bare resident fell through to y -300 for ever; its fall net now puts them back at the spawn. */
 const EXPECTED = '5857ce77a0faf690b61a775431a1750f337cdad285a36846b96d9ba6878c3b2e';
-/** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. */
-const EXPECTED_ROOM = 'dd6192e4f181950610894ea2d8377dcb19c9fd87730e361e440b3d70a92b0fb6';
+/** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
+ *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. */
+const EXPECTED_ROOM = '9385d89a7ebaf1d9e37e1fd89270a491a14edf9eab9e0d0a8caa8e3d848c9890';
