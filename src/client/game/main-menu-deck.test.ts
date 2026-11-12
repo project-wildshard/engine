@@ -20,6 +20,7 @@ const tap = (el: Element | null): void => {
 };
 
 let ua: PropertyDescriptor | undefined;
+const views: { dispose: () => void }[] = [];
 beforeEach(() => {
   installShards([]);
   ua = Object.getOwnPropertyDescriptor(navigator, 'userAgent');
@@ -28,6 +29,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   if (ua === undefined) Reflect.deleteProperty(navigator, 'userAgent'); else Object.defineProperty(navigator, 'userAgent', ua);
+  for (const view of views.splice(0)) view.dispose();
   resetFirstPlay(); dropFirstPlay(); document.body.replaceChildren();
 });
 
@@ -37,7 +39,7 @@ const loading = (): boolean => document.querySelector('.ws-load[data-navigation]
 
 const menu = (onEnter: (c: TitleCard) => void) => {
   const view = buildTitleMenu({ cards: CARDS, active: null, onEnter, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
-  document.body.append(view.root);
+  document.body.append(view.root); views.push(view);
   return view;
 };
 
@@ -65,3 +67,17 @@ for (const visit of ['a fresh phone (no first-play mark)', 'a return visit (firs
     expect(firstPlayPending('driftwood-isle')).toBe(visit.startsWith('a fresh'));
   });
 }
+
+test('a fresh phone that picks another card gets its first-play card there, and nothing loads before the pick', async () => {
+  resetFirstPlay();
+  const onEnter = vi.fn<(c: TitleCard) => void>();
+  const view = menu(onEnter);
+  tap(view.root.querySelector('.ws-main-select'));
+  await frames();
+  expect(view.screen).toBe('select'); expect(view.index).toBe(0); expect(loading()).toBe(false);
+  view.select(1, false);
+  tap(view.root.querySelector('.ws-menu-play'));
+  await frames();
+  expect(onEnter.mock.calls.map(([c]) => c.slug)).toEqual(['nalati']);
+  expect(firstPlayPending('nalati')).toBe(true); expect(firstPlayPending('driftwood-isle')).toBe(false);
+});
