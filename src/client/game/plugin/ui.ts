@@ -1505,3 +1505,6 @@ export function bindDeclaredFight(ctx: ShardContext, row: BossViewRows | undefin
   }
   return installBossView(ctx, row.id, boss, ports.armed, summoned);
 }
+
+/** TE-ENG3: the dialogue box a data shard's talks open, made in this presentation module. */
+export function talkBox(scope: Scope): DialogueBox { return new DialogueBox(scope); }

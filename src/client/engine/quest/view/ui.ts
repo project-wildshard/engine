@@ -17,6 +17,7 @@ import { engineString } from '../../../../shared/engine/strings';
 import '../../ui/styles/quest.css';
 import type { Scope } from '../../../../shared/engine/app/scope';
 import { app } from '../../app/runtime';
+import { listenPage } from '../../input/dom';
 
 const hudRoot = (): HTMLElement => document.getElementById('hud') ?? document.body;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent?: HTMLElement): HTMLElementTagNameMap[K] => {
@@ -100,6 +101,9 @@ export class ObjectiveLine {
 }
 
 /** the NPC dialogue panel: the speaker's name and the typed-out lines, advanced with E or a tap */
+/** One answer a dialogue node offers: its label, and what taking it does. */
+export interface DialogueChoice { readonly label: string; readonly pick: () => void }
+
 export class DialogueBox {
   readonly root: HTMLDivElement = el('div', 'ws-quest-talk');
   private name = el('div', 'ws-quest-talk-name', this.root);
@@ -107,6 +111,9 @@ export class DialogueBox {
   private foot = el('div', 'ws-quest-talk-foot', this.root);
   private page = el('span', '', this.foot);
   private next = el('b', '', this.foot);
+  /** TE-ENG3: a node's choices, under its last line: E takes the first, a digit or a tap takes its own. */
+  private readonly options = el('div', 'ws-quest-talk-choices', this.root);
+  private choices: readonly DialogueChoice[] = [];
   private readonly clock = new DialogueClock();
   private layer: UiHandle | null = null;
   private get open_(): boolean { return this.layer?.active ?? false; }
@@ -123,7 +130,25 @@ export class DialogueBox {
     scope.listen(this.root, 'pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); this.advance(); });
     for (const action of ['use', 'confirm'] as const) app.input.bind(action, () => { this.advance(); }, scope,
       () => this.open_ && (this.layer?.top ?? false) && app.clock.real * 1000 - this.openT >= 150);
+    scope.listen(this.options, 'pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const row = e.target instanceof HTMLElement ? e.target.closest<HTMLElement>('[data-choice]') : null;
+      if (row !== null && this.choosing) this.choose(Number(row.dataset['choice']));
+    });
+    listenPage(scope, 'keydown', (e) => {
+      const n = Number.parseInt(e.key, 10);
+      if (!this.choosing || !(this.layer?.top ?? false) || !Number.isInteger(n) || n < 1 || n > this.choices.length) return;
+      e.preventDefault(); this.choose(n - 1);
+    });
     scope.onDispose(() => { this.close(false); this.root.remove(); });
+  }
+
+  /** On the last line, typed out, with choices to make. */
+  private get choosing(): boolean { return this.open_ && this.choices.length > 0 && this.clock.index + 1 >= this.clock.count && this.clock.text.length >= this.clock.line.length; }
+  /** Take a choice: the box closes without its done, and the choice says what comes next. */
+  private choose(index: number): void {
+    const choice = this.choices[index]; if (choice === undefined) return;
+    this.finish_ = null; this.close(false); choice.pick();
   }
 
   dispose(): void { this.scope.dispose(); }
@@ -132,18 +157,30 @@ export class DialogueBox {
   /** Lend the panel's actual clock to a reading opened by its NPC owner. */
   get readingClock():DialogueClock {return this.clock;}
 
-  open(name: string, lines: string[], onDone: () => void): void {
+  open(name: string, lines: string[], onDone: () => void, choices: readonly DialogueChoice[] = []): void {
     if (lines.length === 0) { onDone(); return; }
     this.name.textContent = name;
+    this.setChoices(choices);
     this.clock.open(lines); this.finish_ = onDone; this.layer?.dispose();
     this.layer = app.ui.push('modal', { root: this.root, presentation: 'world', order: -42, yieldsToMenu: true, back: () => { this.close(false); } }, this.scope); this.openT = app.clock.real * 1000;
     this.root.classList.add('show');
     this.render();
   }
 
+  /** Replace the open node's choices, its lines and place kept: a flag they read changed. */
+  offer(choices: readonly DialogueChoice[]): void { if (this.open_) { this.setChoices(choices); this.render(); } }
+  private setChoices(choices: readonly DialogueChoice[]): void {
+    this.choices = choices; this.options.replaceChildren();
+    for (const [index, choice] of choices.entries()) {
+      const row = el('div', 'ws-quest-talk-choice', this.options);
+      row.textContent = choice.label; row.dataset['choice'] = String(index);
+    }
+  }
+
   /** E / tap: finish the typing, else the next line, else close */
   advance(): void {
     if (!this.open_) return;
+    if (this.choosing) { this.choose(0); return; }
     if (this.clock.advance() === 'finished') { this.close(true); return; }
     this.render();
   }
@@ -151,7 +188,7 @@ export class DialogueBox {
   close(finished = false): void {
     if (!this.open_) return;
     this.layer?.dispose(); this.layer = null; this.clock.close();
-    this.root.classList.remove('show');
+    this.root.classList.remove('show', 'choosing');
     const done = this.finish_; this.finish_ = null;
     if (finished) done?.();
   }
@@ -163,6 +200,7 @@ export class DialogueBox {
 
   private render(): void {
     this.text.textContent = this.clock.text;
+    this.root.classList.toggle('choosing', this.choosing);
     this.page.textContent = engineString('s_9404497cf77d', [this.clock.index + 1, this.clock.count]);
     const touch = document.getElementById('hud')?.classList.contains('touch') === true;
     this.next.textContent = engineString('s_4ecdc2db1bc2', [touch ? '' : engineString('s_4f911ee89601'), this.clock.index + 1 < this.clock.count ? engineString('s_c93aad5dddf0') : engineString('s_f13a1ed0cf3c')]);

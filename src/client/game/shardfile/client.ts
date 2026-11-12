@@ -40,6 +40,7 @@ import type { ShardPlayHost } from '../../../shared/game/shard/runtime';
 import { installDeclaredPlumbing } from '../shard/declaredPlumbing';
 import { declaredProductCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
 import { installDeclaredTargets } from '../shard/declaredTargets';
+import { installDeclaredTalks } from './declaredTalks';
 import { mountDeclaredUi } from '../shard/declaredUi';
 import type { ClientScriptViewTarget } from "../plugin/ui";
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
@@ -131,7 +132,7 @@ function emptyHybridData(source: Shardfile, audioOwner: ShardfileClientBindings[
   // behavior and presentation declarations below still select their data host.
   const inventory = runtimeWorld ? 0 : source.files.filter(file => shown(file.hash)).length + source.requires.commons.length
     + source.library.filter(shown).length + source.critical.filter(ref => ref !== source.navigation?.file).length;
-  return (source.modes?.traverse.length ?? 0) + source.movers.length + source.crowds.length + source.clientScripts.bindings.length + inventory + source.requires.capabilities.length + source.tiles.length + source.ui.length + source.sim.scripts.length + source.sim.bindings.length + source.state.shared.length + source.state.player.length + Object.values(source.rows).reduce((sum, rows) => sum + rows.length, 0) + (runtimeWorld ? 0 : source.water.length) + source.creatures.brains.length + source.creatures.groups.length + source.creatures.spawns.length + source.encounters.length + Object.values(source.quests).reduce((sum, rows) => sum + rows.length, 0) + source.ledger.length + source.hooks.conditions.length + source.hooks.scenes.length + source.items.rows.length + source.items.contexts.length + source.targets.panels.length + source.targets.interactions.length + source.look.families.length + source.look.keys.length + Object.keys(source.look.materials).length + Object.keys(source.look.familyLooks).length === 0
+  return (source.modes?.traverse.length ?? 0) + source.movers.length + source.crowds.length + source.clientScripts.bindings.length + inventory + source.requires.capabilities.length + source.tiles.length + source.ui.length + source.sim.scripts.length + source.sim.bindings.length + source.state.shared.length + source.state.player.length + Object.values(source.rows).reduce((sum, rows) => sum + rows.length, 0) + (runtimeWorld ? 0 : source.water.length) + source.creatures.brains.length + source.creatures.groups.length + source.creatures.spawns.length + source.encounters.length + Object.values(source.quests).reduce((sum, rows) => sum + rows.length, 0) + source.ledger.length + source.hooks.conditions.length + source.hooks.scenes.length + source.items.rows.length + source.items.contexts.length + source.targets.panels.length + source.targets.interactions.length + (source.targets.talks?.length ?? 0) + source.look.families.length + source.look.keys.length + Object.keys(source.look.materials).length + Object.keys(source.look.familyLooks).length === 0
     && source.terrain === null && propsEmpty && (source.plumbing === null || source.plumbing.input.length + source.plumbing.debug.length === 0)
     && audioEmpty && source.look.grade.lut === null
     && source.look.day === undefined && source.look.dayOverride === null;
@@ -221,7 +222,7 @@ export class ShardfileClient {
       : emptyHybridData(withoutPresentation(data), bindings.audioOwner, bindings.worldOwner) ? 'presentation' : 'full';
 
     if (this.mode === 'full' && !hasDeclaredClientPage(source)) readModuleGroups([
-      ...(data.clientScripts.bindings.length > 0 || data.quests.quests.length > 0 ? ['presentation'] : []),
+      ...(data.clientScripts.bindings.length > 0 || data.quests.quests.length > 0 || (data.targets.talks?.length ?? 0) > 0 ? ['presentation'] : []),
       ...(data.rows.loot.some(row => 'gear' in row) ? ['loot'] : []),
       ...(data.rows.compendiums.length > 0 ? ['compendium'] : []),
     ]);
@@ -384,7 +385,7 @@ export class ShardfileClient {
    *  task at 4x CPU). Each part runs under the owner the call began with, and the sim does not step until the last part. */
   async play(ctx: ShardContext): Promise<void> {
     const own = enteredOwner(), scope = ctx.scope, product = ctx.product;
-    const presentation = this.mode === 'full' && !this.nativeFeatures && (this.source.clientScripts.bindings.length > 0 || this.source.quests.quests.length > 0) ? await import('../plugin/ui') : null;
+    const presentation = this.mode === 'full' && !this.nativeFeatures && (this.source.clientScripts.bindings.length > 0 || this.source.quests.quests.length > 0 || (this.source.targets.talks?.length ?? 0) > 0) ? await import('../plugin/ui') : null;
     const lootPresentation = this.mode === 'full' && !this.nativeFeatures && this.source.rows.loot.some(row => 'gear' in row) ? await import('../loot/runtime') : null;
     const compendium = this.mode === 'full' && !this.nativeFeatures && this.source.rows.compendiums.length > 0 ? await import('../compendium/install') : null;
     if (ctx.scope !== scope || ctx.product !== product || scope.disposed || scope.disposing) throw new Error('Shardfile left during presentation import');
@@ -583,6 +584,16 @@ export class ShardfileClient {
       if (source.plumbing.input.some(row => row.when !== undefined)) ctx.system({ id: 'declared.input.conditions', phase: 'input', before: ['engine.input.contexts'], run: plumbing.update });
     }
     installDeclaredTargets(source.targets, { panels: tiles.props?.panels ?? new Map(), colliders, read, scene, interactables: runtime.interactables, scope: ctx.scope, system: ctx.system });
+    // TE-ENG3: a quest-giver from rows. The server keeps each player's node and says it as an owned line; answers go by name.
+    if ((source.targets.talks?.length ?? 0) > 0) {
+      if (presentation === null) throw new Error('Missing talk presentation module');
+      let box: ReturnType<typeof presentation.talkBox> | null = null;
+      const talkBox = (): ReturnType<typeof presentation.talkBox> => { box ??= presentation.talkBox(ctx.scope.child('talks')); return box; };
+      const talks = installDeclaredTalks(source, { root: ctx.root, scope: ctx.scope, interactables: runtime.interactables, system: ctx.system, flags,
+        line: name => wirePage.line(name), send: id => { wirePage.send(id); }, box: talkBox,
+        player: () => world.player.position });
+      ctx.debug.expose('shardfileTalks', { talks: () => talks.map(talk => ({ id: talk.id, node: talk.node() ?? null, open: box?.isOpen ?? false })) });
+    }
     for (const declaration of source.quests.quests) {
       const quest = new QuestState(declaration, flags, ctx.app.events, ctx.scope);
       const options = declaration.track === false ? { chip: () => ({ label: '', count: '' }) } : {};

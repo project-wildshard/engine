@@ -1,0 +1,27 @@
+{
+  "flags": ["fixture.keeper.accepted", "fixture.keeper.lamp", "fixture.keeper.reported", "fixture.keeper.done"],
+  "quest": {
+    "id": "fixture.keeper", "title": "Light the lamp", "completeFlag": "fixture.keeper.done",
+    "startWhen": { "all": ["fixture.keeper.accepted"] },
+    "steps": [
+      { "id": "lamp", "objective": "Light the lamp", "done": { "all": ["fixture.keeper.lamp"] } },
+      { "id": "report", "objective": "Tell the keeper", "done": { "all": ["fixture.keeper.reported"] } }
+    ],
+    "onComplete": { "coins": 7, "fact": "fixture.keeper" }
+  },
+  "trigger": { "id": "fixture.keeper.lamp", "kind": "region", "flag": "fixture.keeper.lamp", "x": -30, "z": 30, "radius": 3, "when": { "all": ["fixture.keeper.accepted"] } },
+  "dialogue": {
+    "id": "fixture.keeper", "name": "Keeper", "start": "offer",
+    "nodes": [
+      { "id": "offer", "lines": ["The lamp went out.", "Will you light it?"], "choices": [
+        { "id": "accept", "label": "I will.", "next": "waiting", "sets": ["fixture.keeper.accepted"] }
+      ] },
+      { "id": "waiting", "lines": ["The lamp is still dark."], "choices": [
+        { "id": "report", "label": "It's lit.", "next": "thanks", "when": { "all": ["fixture.keeper.lamp"] }, "sets": ["fixture.keeper.reported"] }
+      ] },
+      { "id": "thanks", "lines": ["Thank you. Take these."], "choices": [] }
+    ]
+  },
+  "ledger": { "fact": "fixture.keeper", "origin": { "kind": "engine", "source": "quest.complete" }, "rewards": [{ "kind": "achievement", "id": "fixture.keeper", "title": "Light the lamp", "threshold": 1 }] },
+  "talk": { "id": "fixture.keeper.talk", "at": [20, 0, 20], "radius": 2.5, "label": "Talk to the keeper", "dialogue": "fixture.keeper" }
+}

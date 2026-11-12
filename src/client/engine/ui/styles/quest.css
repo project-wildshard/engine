@@ -37,6 +37,13 @@
 .ws-quest-talk-foot b { color: var(--ws-cyan); font-weight: 400; }
 #hud.touch .ws-quest-talk-foot b { padding: 4px 10px; margin: -4px -6px -4px 0; border: 1px solid var(--ws-cyan-line); background: rgba(143, 227, 255, 0.08); }
 #hud.intro .ws-quest-talk { display: none; }
+/* TE-ENG3: a node's choices show once its last line is typed out */
+.ws-quest-talk-choices { display: none; flex-direction: column; gap: 4px; margin-top: 8px; counter-reset: ws-talk-choice; }
+.ws-quest-talk.choosing .ws-quest-talk-choices { display: flex; }
+.ws-quest-talk.choosing .ws-quest-talk-foot { display: none; }
+.ws-quest-talk-choice { font-family: var(--ws-display); font-size: 15px; color: var(--ws-text); padding: 5px 10px; border: 1px solid var(--ws-cyan-line); background: rgba(143, 227, 255, 0.06); }
+.ws-quest-talk-choice::before { counter-increment: ws-talk-choice; content: counter(ws-talk-choice) '. '; font-family: var(--ws-mono); color: var(--ws-cyan); }
+.ws-quest-talk-choice:first-child { border-color: var(--ws-cyan); background: rgba(143, 227, 255, 0.14); }
 
 /* ── the reward caption (the golden-hour view) ── */
 .ws-quest-reward { position: absolute; left: 0; right: 0; top: 22%; display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; transition: opacity 1.6s; pointer-events: none; text-align: center; }

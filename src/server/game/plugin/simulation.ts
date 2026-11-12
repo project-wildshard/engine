@@ -48,6 +48,7 @@ import { WaterBodies } from "@wildshard/engine/world/water/body";
 import { floorBelow } from "@wildshard/engine/physics/query";
 import { playerSeats } from './playerSeats';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
+import { installDeclaredTalks } from '../shardfile/declaredTalks';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { installShardfileColliders, shardfileColliderIds } from "../../../shared/game/shardfile/collisionBindings";
 import { validateMeshCollisionAssets } from "@wildshard/format/meshCollisionAssets";
@@ -580,6 +581,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     const quest = new DeclaredQuests(host, shard.quests, { ...ports.quest,
       ...(lane === undefined ? {} : { script: createQuestScriptPorts(lane, hooks, actors) }),
     });
+    installDeclaredTalks(host, shard, quest); // TE-ENG3: a no-code quest-giver's answers and each player's node
     const needsDay = (shard.directors ?? []).some(data => Object.values(data.inputs).some(binding => directorDayRange(binding) !== null));
     let day: (() => number) | undefined;
     if (needsDay) {
