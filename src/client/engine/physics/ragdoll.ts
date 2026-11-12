@@ -98,6 +98,8 @@ const RIGHT_KP = 3, RIGHT_KD = 0.6, RIGHT_SLOW = 0.8, RIGHT_BAND = [0.35, 0.08] 
  * than RIGHT_SLOW m/s, so the throw and the tumble in the air stay the hit's; it lands and rolls onto its base.
  */
 const UP_KP = 3, UP_ZETA = 0.9;
+/** rad off the ground's normal a rigid box may freeze at (it rests square on its base; a bump or a stone may prop it) */
+const UP_REST = 0.35;
 
 type Limits3 = readonly [readonly [number, number], readonly [number, number], readonly [number, number]];
 interface End { bone: string; offset?: readonly [number, number, number] }
@@ -159,6 +161,7 @@ const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Qua
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _m = new THREE.Matrix4(), _e = new THREE.Euler();
 const Y = new THREE.Vector3(0, 1, 0);
 const DOWN = { x: 0, y: -1, z: 0 } as const;
+const _o = { x: 0, y: 0, z: 0 };
 const Q_Y_TO_Z = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 
 /** an object's world position + rotation, scale dropped (the rig is uniformly scaled) */
@@ -187,7 +190,7 @@ export class Ragdoll {
   /** the righting bias: the whole ragdoll's weight × half width (N·m per unit gain), the side it falls to on a tie (+1: left side up) */
   private rightScale = 0; private rightSide = 1;
   /** the rigid build's upright spring: N·m per radian of tilt and N·m per rad/s of tilt rate (0 for the other builds) */
-  private upK = 0; private upD = 0;
+  private upK = 0; private upD = 0; private upReach = 0;
 
   private readonly system: Ragdolls;
   constructor(system: Ragdolls, spec: RagdollSpec) {
@@ -234,7 +237,7 @@ export class Ragdoll {
       if (rigid) {
         const reach = Math.max(d.halfWidth, d.bodyY * 0.6, Math.max(d.bodyHalfLen, d.bodyRadius)) * s;
         const inertia = body.principalInertia(), I = Math.max(inertia.x, inertia.y, inertia.z);
-        this.upK = UP_KP * body.mass() * 9.81 * reach;
+        this.upK = UP_KP * body.mass() * 9.81 * reach; this.upReach = reach;
         this.upD = UP_ZETA * 2 * Math.sqrt(this.upK * I);
       }
       return;
@@ -346,9 +349,10 @@ export class Ragdoll {
     }
     if (stepped) this.sinceStep = 0;
     this.quietT = fastest < QUIET_V ? this.quietT + dt : 0;
-    const settled = asleep || this.quietT >= QUIET_T || this.age >= MAX_T;
+    // a rigid box still off its base keeps rolling (its spring wakes it), however still or asleep: only MAX_T freezes it
+    const tilt = this.build === 'rigid' ? this.upright(fastest) : 0;
+    const settled = ((asleep || this.quietT >= QUIET_T) && tilt < UP_REST) || this.age >= MAX_T;
     if (!settled && this.build === 'quadruped') this.right(fastest);
-    if (!settled && this.build === 'rigid') this.upright(fastest);
     const alpha = settled ? 1 : THREE.MathUtils.clamp(alphaClock !== null ? alphaClock() : this.sinceStep / FIXED_STEP, 0, 1);
     this.write(alpha);
     this.fastest = fastest;
@@ -396,23 +400,26 @@ export class Ragdoll {
   /**
    * The rigid build's upright spring (UP_KP): set the box's tilt torque for the fixed steps until the next pose(). It turns
    * the body's up axis onto the ground's normal under it (straight up off the ground or on a miss); on its head the turn
-   * goes over its forward axis.
+   * goes over its side axis. Returns the tilt (rad).
    */
-  private upright(fastest: number): void {
+  private upright(fastest: number): number {
     const part = this.parts[0];
-    if (part === undefined || this.upK === 0) return;
+    if (part === undefined || this.upK === 0) return 0;
     const b = part.body;
     b.resetTorques(false);
     const t = b.translation(), r = b.rotation();
     _q.set(r.x, r.y, r.z, r.w);
-    const hit = castRay(this.system.physics, t, DOWN, 3);
+    // the ground under it: the body's origin is its feet, on the ground once it lies upright, so cast from above them
+    const lift = this.upReach;
+    _o.x = t.x; _o.y = t.y + lift; _o.z = t.z;
+    const hit = castRay(this.system.physics, _o, DOWN, 3 + lift * 2);
     const n = _b.set(0, 1, 0);
     if (hit !== null && hit.normal.y > 0.3) n.set(hit.normal.x, hit.normal.y, hit.normal.z);
     const u = _a.set(0, 1, 0).applyQuaternion(_q);
     const axis = _c.crossVectors(u, n);
     const sin = axis.length(), cos = u.dot(n);
     const tilt = Math.atan2(sin, cos);
-    if (b.isSleeping() && tilt < 0.05) return;
+    if (b.isSleeping() && tilt < 0.05) return tilt;
     if (sin > 1e-4) axis.divideScalar(sin);
     else if (cos < 0) axis.set(1, 0, 0).applyQuaternion(_q);   // on its head: over the box's side axis
     else axis.set(0, 0, 0);
@@ -423,6 +430,7 @@ export class Ragdoll {
     const w = 1 - (2 / 3) * THREE.MathUtils.smoothstep(fastest, RIGHT_SLOW * 0.5, RIGHT_SLOW * 1.5);
     const k = this.upK * w * tilt, dmp = this.upD * w;
     b.addTorque({ x: axis.x * k - wx * dmp, y: axis.y * k - wy * dmp, z: axis.z * k - wz * dmp }, tilt > 0.05);
+    return tilt;
   }
 
   private write(alpha: number): void {

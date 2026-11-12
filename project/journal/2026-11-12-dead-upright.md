@@ -21,3 +21,10 @@
   (up . Y = -1 for all three bodies), green after: 48 hits each (four
   damages, six directions, level and from above) rest at up . Y = 1,
   settled in 1.1 to 1.7 s.
+- Codex review: one MUST, one SHOULD, fixed. MUST: the ground ray started
+  at the feet, inside the floor once the box lay on its base, so it aimed
+  at world up and a body on a 26° slope rocked to MAX_T; it now casts
+  from above the feet (a 26° slope test, red before). SHOULD: an asleep
+  or quiet box froze however it lay; now it freezes only within UP_REST
+  (0.35 rad) of the ground's normal, MAX_T still the escape. Tests for a
+  body dying on its head and two fixed steps per frame.
