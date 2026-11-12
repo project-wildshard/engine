@@ -34,7 +34,8 @@ import { takeNativeBossReward } from '../boss/native';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { installNativeQuestSecret, type NativeQuestSecret } from './nativeSecret';
 import { questBooks, type QuestBook } from '@wildshard/engine/quest/players';
-import { AchievementCounterBook } from '../../../shared/game/achievements';
+import { AchievementCounterBook, type AchievementCounters } from '../../../shared/game/achievements';
+import { landedBy } from '@wildshard/engine/combat/damageBook';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
 import { boardLines, OWNED_ROW } from '../../../shared/game/loot/ownedRows';
@@ -240,6 +241,14 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   const chapterClock = rows.chapter === undefined ? null : installNativeChapterDirector(host, need(ports.director, 'chapter director'), { id: `${rows.step}.chapter`, rows: rows.chapter });
   if (rows.chapter !== undefined && chapter === undefined) throw new Error('Story requires its chapter');
   const counterBook = earlyCounters ?? entry.achievements(ports.counters), feats = counterBook.counters;
+  /** SS13: every other player's flag feats (Pine's three secrets, its lanterns, tokens and resin), counted over that player's own
+   *  book, not the world's, and filed under their name (`ledgerFilings` pays a `player:` fact to that player). A changed flag marks
+   *  the seat; the quest's step counts it, so a player who left is dropped, not counted. */
+  const seatFeats = new Map<string, { readonly book: QuestBook; readonly feats: AchievementCounterBook; dirty: boolean; readonly off: () => void }>();
+  /** SS13b: what a seat's counter reached (its flags' counts, its own kills), filed under that player. */
+  function fileSeatFeats(): void {
+    for (const [player, seat] of seatFeats) for (const row of seat.feats.takeFacts()) input.ledger.fact(row.fact, `${player}:${row.entity}`);
+  }
   const boardFor = (): ContractBoard | null => rows.board === undefined ? null : new ContractBoard({ contracts: need(ports.contracts, 'contracts'), prompt: need(spots.board, 'board prompt'), radius: need(spots.board, 'board prompt').radius });
   const board = boardFor();
   const initialBoard = board?.snapshot();
@@ -252,14 +261,26 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   };
   counterBook.observe();
   if (rows.effects !== undefined) {
-    const killed = bindQuestDeathEffects(ports.deaths, { kill: feats.kill, event: feats.event,
+    // SS13b: a death's feats (a kill, Pine's thrall) are the killer's own. The page's one player counts every death; a room's
+    // kill counts for the player who landed it, and one no player dealt (a fall, a trap) for the first, as alone.
+    let killer: string | null = null;
+    const killerFeats = (): AchievementCounters | undefined => {
+      if (killer === null || killer === books.lead.player) return feats;
+      books.of(killer); // a seat's counter comes with its book: open it before the first kill reads it
+      return seatFeats.get(killer)?.feats.counters;
+    };
+    const killed = bindQuestDeathEffects(ports.deaths, { kill: (kind, variant) => { killerFeats()?.kill(kind, variant); },
+      event: event => { killerFeats()?.event(event); },
       calls: new Map([['contracts', (body: SimHost['entities'] extends ReadonlyMap<string, infer Entity> ? Entity : never) => {
-        // a room's kill counts on every player's board: the death names no killer
+        // a room's kill counts on every player's contract board, whoever landed it
         if (board !== null) for (const book of books.each()) gearOf(book.player).board?.killed(contractKill(need(ports.contracts, 'contracts'), body));
       }]]) });
-    host.events.on('actor.died', ({ actor }) => {
+    host.events.on('actor.died', ({ actor, req }) => {
       const body = [...host.entities.values()].find(candidate => candidate.combatActor() === actor);
-      if (body !== undefined) { killed(body); counterBook.flush(); }
+      if (body === undefined) return;
+      const outer = killer; killer = landedBy(req, host.players);
+      try { killed(body); } finally { killer = outer; }
+      counterBook.flush(); fileSeatFeats();
     }, host.scope);
     counterBook.sync();
   }
@@ -354,17 +375,13 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     counterBook.restore(rows.counts === 'declared' ? Object.fromEntries(ports.counters.feats.map(feat => [feat.id, counts[feat.id] ?? 0])) : counts);
   } });
   if (dialogue !== null) leadParts.part(`reading:${rows.step}`, { read: () => JSON.stringify(dialogue.active ? dialogue.snapshot() : null), write: saved => { dialogue.prepareRestore(JSON.parse(saved))(); } });
-  /** SS13: every other player's flag feats (Pine's three secrets, its lanterns, tokens and resin), counted over that player's own
-   *  book, not the world's, and filed under their name (`ledgerFilings` pays a `player:` fact to that player). A changed flag marks
-   *  the seat; the quest's step counts it, so a player who left is dropped, not counted. */
-  const seatFeats = new Map<string, { readonly book: QuestBook; readonly feats: AchievementCounterBook; dirty: boolean; readonly off: () => void }>();
   const countSeatFeats = (): void => {
     for (const [player, seat] of seatFeats) {
       if (!host.players.has(player)) continue; // its book may outlive this tick; a rejoin's new book replaces the seat
       if (!seat.dirty) continue;
       seat.dirty = false; seat.feats.counters.syncFlags(seat.book.flags);
-      for (const row of seat.feats.takeFacts()) input.ledger.fact(row.fact, `${player}:${row.entity}`);
     }
+    fileSeatFeats();
   };
   host.scope.onDispose(() => { for (const seat of seatFeats.values()) seat.off(); seatFeats.clear(); });
   books.install(book => {
