@@ -48,6 +48,7 @@ import { eliteDrops } from '../quest/eliteDrops';
 import { installQuestKillSteps } from '../quest/killSteps';
 import { installNativeChapterDirector } from '../quest/nativeChapter';
 import { installNativeQuestComposition, readNativeQuestSpots, type NativeQuestCompositionInput } from '../quest/nativeComposition';
+import { readNativeQuestSecret } from '../quest/nativeSecret';
 import { installMountedPlayer } from '../riding/native';
 import { installNativeBootRoster, installNativePopulationHunt, type NativePopulationBootRows } from '../riding/nativePopulation';
 import { installNativeTaming, type NativeTamingRows } from '../riding/nativeTaming';
@@ -90,10 +91,11 @@ async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<Native
     flags: feats.map(feat => counters.flags.find(flag => flag.id === feat.id) ?? { id: feat.id, method: 'count', value: { constant: 0 } }) });
   const props = row.props === undefined ? undefined : await read<unknown>(row.props);
   const trades = row.barter === true ? parseBarterEconomy(need(shard.rows.loot[0], 'Missing barter row').economy).exchange : undefined;
+  const secret = content === undefined ? undefined : await readNativeQuestSecret(product);
   return run => { run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
     ...(content === undefined ? {} : { steps: content.steps, deaths: content.deaths, readings: content.readings, lead: content.lead }),
     ...(contracts === undefined ? {} : { contracts: ownContractCatalogue(contracts, run.host.scope) }), ...(trades === undefined ? {} : { trades }), ...(director === undefined ? {} : { director }),
-    ...(props === undefined ? {} : { props }), ...(row.restoring === true ? { restoring: run.context.restoring } : {}) }); };
+    ...(props === undefined ? {} : { props }), ...(secret === undefined ? {} : { secret }), ...(row.restoring === true ? { restoring: run.context.restoring } : {}) }); };
 }
 async function prepareMixed<C extends NativeAssemblyContext>(row: Extract<NativeAssemblyFeature, { host: 'population.mixed' }>, at: AssemblyPrepared<C>): Promise<Step<C>> {
   const { product, bake, nav } = at, shard = product.shardfile, species = product.section('actors/species-programs');

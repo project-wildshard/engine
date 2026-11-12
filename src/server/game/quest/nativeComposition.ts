@@ -32,6 +32,7 @@ import { questBenchPose } from '../../../shared/game/quest/storyLaw';
 import { installNativeChapterDirector } from './nativeChapter';
 import { takeNativeBossReward } from '../boss/native';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
+import { installNativeQuestSecret, type NativeQuestSecret } from './nativeSecret';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
@@ -98,6 +99,8 @@ export interface NativeQuestCompositionInput {
   readonly steps?: unknown; readonly deaths?: unknown;
   readonly readings?: QuestReadingRows<NpcDialogueRow>; readonly contracts?: ContractCatalogue; readonly trades?: unknown;
   readonly lead?: { readonly program: unknown; readonly path: readonly (readonly [number, number])[] };
+  /** SS5: the page's quest-view secret (Pine's hollow log), asked here for each player. */
+  readonly secret?: NativeQuestSecret;
   readonly director?: Awaited<ReturnType<typeof readDirectorProduct>>;
 }
 
@@ -113,7 +116,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   readonly ownsFinish: (skin: string) => boolean; readonly ownsBoardFinish: () => boolean; readonly takePickup: () => boolean;
 } {
   if (!isJsonData({ rows: ports.rows, table: ports.table, spots: ports.spots, counters: ports.counters, props: ports.props ?? null,
-    steps: ports.steps ?? null, deaths: ports.deaths ?? null, readings: ports.readings ?? null, contracts: ports.contracts ?? null, trades: ports.trades ?? null, lead: ports.lead ?? null }))
+    steps: ports.steps ?? null, deaths: ports.deaths ?? null, readings: ports.readings ?? null, contracts: ports.contracts ?? null, trades: ports.trades ?? null, lead: ports.lead ?? null, secret: ports.secret ?? null }))
     throw new Error('Native quest composition requires JSON rows');
   const rows = parseNativeQuestComposition(ports.rows), spots = ports.spots, flags = host.flags;
   const need = <T>(value: T | undefined, name: string): T => { if (value === undefined) throw new Error(`Missing native quest ${name}`); return value; };
@@ -261,6 +264,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   }
 
   const lead = rows.lead === undefined ? null : prepareNativeQuestLead(host, { ...need(ports.lead, 'lead program'), ...rows.lead });
+  const secret = ports.secret === undefined ? null : installNativeQuestSecret(host, ports.secret, books);
 
   function commandOwners(): NonNullable<Parameters<typeof entry.install>[0]> {
     const actions = new Map<string, (value: number, player: string) => void>(), observations = new Map<string, (player: string) => boolean>();
@@ -428,7 +432,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     value => ammunition.prepareRestore(v.parse(v.optional(NativeAmmunitionSavedSchema), value)));
   const keys = new Set<string>(rows.saved.snapshot);
   if (rows.saved.snapshot.some(key => !parts.has(key))) throw new Error('Native saved role has no mechanic');
-  host.onStep(rows.step, dt => { for (const phase of rows.phases) need(phases.get(phase), 'phase')(dt); }, {
+  host.onStep(rows.step, dt => { for (const phase of rows.phases) need(phases.get(phase), 'phase')(dt); secret?.(dt); }, {
     snapshot: () => entry.saved.encode(Object.fromEntries(rows.saved.snapshot.flatMap(key => {
       const value = need(parts.get(key), 'saved role').capture(); return value === undefined ? [] : [[key, value]];
     }))),
