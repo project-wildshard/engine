@@ -52,6 +52,7 @@ import { readNativeQuestSecret } from '../quest/nativeSecret';
 import { installMountedPlayer } from '../riding/native';
 import { installNativeBootRoster, installNativePopulationHunt, type NativePopulationBootRows } from '../riding/nativePopulation';
 import { installNativeTaming, type NativeTamingRows } from '../riding/nativeTaming';
+import { prepareNativeStealth } from '../stealth/nativeStealth';
 import { installGrapple } from '../grapple/native';
 import { arenaSpecies, installArenaEntry } from '../boss/arenaRoomEntry';
 import { parseGrappleProfile } from '@wildshard/format/grapple';
@@ -156,10 +157,13 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       return run => { if (run.context.room === true) installArenaEntry(run.host, input, row, { spec, grantItem: at.ports.grantItem(run.context), snapshot: run.context.snapshot }); };
     }
     case 'held.arms': {
-      const arms = await prepareHeldArms(product, { ...row, weather: await readAssemblyInput<unknown>(product, row.weather) });
-      return run => { if (run.context.room === true) { installCombatMotion(run.host, run.context, row.speed);
-        arms(run.host, { combat: combatOf(run), room: true, tick: at.ports.heldTick(run.context), arrowTargets: openArenaArrows,
-          contacts: (host, from, direction, distance, hit) => patrolOf(host)?.target(from, direction, distance, hit) ?? hit }); } };
+      const arms = await prepareHeldArms(product, { ...row, weather: await readAssemblyInput<unknown>(product, row.weather) }), stealth = prepareNativeStealth(product);
+      return run => { if (run.context.room === true) { installCombatMotion(run.host, run.context, row.speed); const tick = at.ports.heldTick(run.context);
+        arms(run.host, { combat: combatOf(run), room: true, tick, arrowTargets: openArenaArrows,
+          contacts: (host, from, direction, distance, hit) => patrolOf(host)?.target(from, direction, distance, hit) ?? hit });
+        // SS4: the sneak shot the page doubles, decided here from each player's own Hidden state. Installed after the arms so
+        // exportSeats keeps its indexes; a shot therefore reads the state one tick old, where the page reads the same frame's.
+        stealth?.(run.host, { tick, groups: run.groups }); } };
     }
     case 'encounter.patrol': {
       if (at.ports.room !== true) return () => undefined;

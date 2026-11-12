@@ -40,6 +40,7 @@ import { mountedPlayerOf } from '../riding/native';
 import { nativePopulationOf } from '../riding/nativePopulation';
 import { nativeTamingOf } from '../riding/nativeTaming';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
+import { nativeStealthOf } from '../stealth/nativeStealth';
 
 const finite=v.pipe(v.number(),v.finite()),count=v.pipe(finite,v.integer(),v.minValue(0)),vector=v.tuple([finite,finite,finite]);
 const SwingSaved=v.strictObject({move:v.nullable(count),swingT:finite,comboIdx:count,lastSwingEnd:finite,cooldown:finite,
@@ -124,6 +125,8 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
     // On the wire a start is the command that made it, and what it lands says so: a page lets go of a swing no one owns.
     let seq=0,pressing=false,chained:number|null=null,swing=0;
     const started=():void=>{if(swing!==0)player.swing.seq=swing;};
+    // SS4: the page's stealth hears every weapon fire and scales the bow's hits and the javelin's flight by the sneak shot.
+    const fired=():void=>{nativeStealthOf(host)?.of(player).noteShot();},sneak=():number=>nativeStealthOf(host)?.of(player).sneakMultiplier()??1;
     let slot=slots.selection.initial??bowSlot.id,queued=false,aim=0,pitch=0,ammo=thrown.carried,bolts=bow.base.quiver,weaponsEnabled=true;
     let shots=0,letdowns=0,fullDraws=0,aimOn=false,aimBlend=0,passes=0,passDamage=melee.damage,thrusts=0,throws=0,recovered=0;
     const scope=first?host.scope:host.scope.child(`held:${player.id}`),moves:string[]=[],draw=new BowDraw(bow.base.draw),decision=new HeldDecision(blade.program,scope),pass=new MountedPassLaw(decision);
@@ -194,7 +197,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
     const javelins:JavelinSlot[]=Array.from({length:thrown.pool},()=>({state:0,pos:new Vector3(),vel:new Vector3(),q:new Quaternion(),age:0}));
     const flight=new JavelinFlight<NonNullable<ReturnType<typeof ray>>>(javelins,thrown,{worldHit:(from,to,radius)=>worldHit(host.physics,from,to,radius),raycast:ray,
       strike:(hit,damage,dir)=>{const killed=room?landed(hit.animal,damage,hit.point,dir,spearItem.id,swing):hit.animal.applyDamage(damage,hit.point,dir);if(!killed)hit.animal.stagger(scratch.set(dir.x,0,dir.z).normalize(),thrown.stagger);},
-      impact:()=>undefined,water:(x,z)=>host.waterSurfaceAt(x,z),floor,random,damageScale:()=>1,
+      impact:()=>undefined,water:(x,z)=>host.waterSurfaceAt(x,z),floor,random,damageScale:sneak,
       surface:material=>material==='flesh'?'flesh':material==='wood'||material==='planks'?'wood':'ground'});
     const extra=[bladeMoves.passes.left,bladeMoves.passes.right];
     const live=():void=>{if(host.scope.disposed||host.scope.disposing)throw new Error('Native held equipment owner retired');};
@@ -208,7 +211,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
     }};
     const pose=():void=>{const p=player.position;eye.set(p.x,p.y+1.68,p.z);rotation.setFromEuler(euler.set(pitch,player.yaw,0));forward.set(0,0,-1).applyQuaternion(rotation);};
     const clock=new SweptMeleeCore(bladeMoves,melee,{queue:()=>{queued=true;chained=seq;},consume:()=>{const before=queued;queued=false;return before;}},{
-      start:(move,lunge)=>{swing=pressing?seq:chained??seq;chained=null;started();moves.push(move.name);if(moves.length>64)moves.shift();sweep.reset();retiredContacts.clear();basePose.startSwing();
+      start:(move,lunge)=>{swing=pressing?seq:chained??seq;chained=null;started();fired();moves.push(move.name);if(moves.length>64)moves.shift();sweep.reset();retiredContacts.clear();basePose.startSwing();
         const heavy=move===bladeMoves.heavy;
         const target=lunge?pickLunge(targets(),player.position,player.yaw,heavy?melee.lunge.heavyRange:melee.lunge.range,melee.lunge.cone):null;
         if(target!==null){const feet=player.position,dash=sweptLunge(melee.lunge,heavy,target.position.x-feet.x,target.position.z-feet.z,targetRadius(target));
@@ -248,7 +251,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
         shotSpread(forward,MathUtils.degToRad(spread),random,bow.base.loose??{radius:'sqrt',axisScale:1},scratch);
         eye.addScaledVector(forward,bowMuzzle(bow.base));velocity.copy(forward).multiplyScalar(bowLaunchSpeed(bow.base,1));
         velocity.x+=saddle.carrier.x;velocity.y+=saddle.carrier.y;velocity.z+=saddle.carrier.z;
-        arrows.launch(eye,velocity,{damageScale:bow.base.damageScale}).seq=swing=seq;started();bolts--;shots++;
+        fired();arrows.launch(eye,velocity,{damageScale:bow.base.damageScale,onHitScale:sneak}).seq=swing=seq;started();bolts--;shots++;
       }
       aimOn=bowAimOn({asked:aim>0,enabled:enabled&&slot===bowSlot.id,running:blocked.running,swimming:player.swim.on});
       aimBlend+=((aimOn?1:0)-aimBlend)*Math.min(1,dt*bow.base.aimIn);if(Math.abs(aimBlend-(aimOn?1:0))<.002)aimBlend=aimOn?1:0;
@@ -284,7 +287,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
       const out=polearm.decide(dt,host.clock.now,{player:player.position,heading:mounted?.yaw??player.yaw,held:slot===spearSlot.id,
         enabled,ads:slot===spearSlot.id&&aim>0,ammo,capacity:thrown.carried,mount:mounted,targets:targets(),
         radius:targetRadius,javelins,random,policy:spear.profile,projectile:thrown});
-      if(out!==null){if(out.launch&&ammo>0&&flight.free()){ammo--;pose();if(flight.launch(eye,rotation,forward,mounted))throws++;}
+      if(out!==null){if(out.start)fired();if(out.launch&&ammo>0&&flight.free()){ammo--;pose();if(flight.launch(eye,rotation,forward,mounted)){throws++;fired();}}
         if(out.strike){thrusts++;pose();spearContacts.thrust(eye,rotation,forward,spear.profile);}
         if(out.target!==undefined){pose();spearContacts.lance(eye,out.target,out.damage,host.clock.now,player.position);}
         const pickup=javelins[out.pickup];if(pickup!==undefined){pickup.state=0;if(out.recover){ammo++;recovered++;}}}
@@ -310,7 +313,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
         polearm.restore(saved.polearm,body,id=>!host.entities.has(id)&&retired().has(id));draw.load(saved.draw);
         arrows.stopped.restore(saved.stopped,arrowBody);
         saved.flying.forEach((row,index)=>{const target=arrows.pool.slots[index];if(target===undefined)throw new Error('Missing native arrow slot');
-          target.active=row.active;target.age=row.age;target.glanced=row.glanced;target.pos.fromArray(row.pos);target.vel.fromArray(row.vel);target.origin.fromArray(row.origin);target.scale=row.scale;});
+          target.active=row.active;target.age=row.age;target.glanced=row.glanced;target.pos.fromArray(row.pos);target.vel.fromArray(row.vel);target.origin.fromArray(row.origin);target.scale=row.scale;target.hitScale=sneak;});
         saved.javelins.forEach((row,index)=>{const target=javelins[index];if(target===undefined)throw new Error('Missing native javelin slot');
           target.state=row.state;target.age=row.age;target.pos.fromArray(row.pos);target.vel.fromArray(row.vel);target.q.fromArray(row.q);});
         slot=saved.slot;queued=saved.queued;aim=saved.aim;pitch=saved.pitch;ammo=saved.ammo;bolts=saved.bolts;shots=saved.shots;letdowns=saved.letdowns;

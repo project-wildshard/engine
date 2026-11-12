@@ -1256,6 +1256,7 @@
     "src/server/game/shardfile/portalLinkProof.ts": "server",
     "src/server/game/shardfile/scriptComposition.ts": "server",
     "src/server/game/shardfile/scripts.ts": "server",
+    "src/server/game/stealth/nativeStealth.ts": "server",
     "src/server/game/weapons/nativeHeld.ts": "server",
     "src/server/game/weather/continuation.ts": "server",
     "src/server/game/weather/reactions.ts": "server",
