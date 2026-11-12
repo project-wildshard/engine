@@ -108,6 +108,20 @@ test('the four phases run in order and move the alias last', async () => {
   expect(lines.some(line => line.includes('alias last'))).toBe(true);
 });
 
+test('--content publishes the content set before the packs and the page (PAGE-SIZE PZ2)', async () => {
+  const {deps, calls} = rig();
+  const seen: {dir: string, cors: string, dryRun: boolean}[] = [];
+  deps.content = {publish: context => {
+    seen.push(context); calls.push('content.publish');
+    return Promise.resolve({set: '0123456789abcdef', base: 'https://packs.wildshard.io/content/0123456789abcdef/', files: 5, bytes: 50, uploaded: 2, uploadedBytes: 20, held: 3, cors: context.cors});
+  }};
+  await through(deps, 'upload');
+  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
+  expect(seen).toEqual([{dir: '/out', cors: CHANNELS.staging.origin, dryRun: false}]);
+  deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.staging.origin})};
+  await expect(runPhase('upload', deps)).rejects.toThrow(/content: 3 held \+ 1 uploaded is not 5/u);
+});
+
 test('the build bakes the channel release file from packs.wildshard.io', async () => {
   for (const channel of ['staging', 'production'] as const) {
     const {deps} = rig(channel);

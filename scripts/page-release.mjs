@@ -10,6 +10,8 @@
 //   --dry-run                print every step and read the live gate; build, upload and alias nothing
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
 //   --after-staging-proofs   production go-live: the strict staging proofs passed on this exact build
+//   --content                upload: publish the page's content set to packs.wildshard.io first (PAGE-SIZE PZ2,
+//                            page-release/content.mjs); off until PZ4 and PZ6 stamp contentBase into the page
 //
 // The flow and its gates are scripts/page-release/flow.mjs; the page hosts are scripts/page-release/hosts/*.mjs.
 // Phase results go to <root>/tmp/page-release/<channel>-<sha>.json, which the next phase reads.
@@ -21,6 +23,7 @@ import {RefusedError, runPhase} from './page-release/flow.mjs';
 import {vercelHost, vercelToken} from './page-release/hosts/vercel.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
+import {publishContent, r2Content} from './page-release/content.mjs';
 
 const args = process.argv.slice(2);
 const flag = (/** @type {string} */ name) => args.find(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
@@ -31,7 +34,7 @@ const DEFAULT_HOSTS = /** @type {const} */ ({preview: 'workers', staging: 'verce
 const [channel, phaseList] = args.filter(arg => !arg.startsWith('--'));
 const hostName = value('host') ?? (channel !== undefined && Object.hasOwn(DEFAULT_HOSTS, channel) ? DEFAULT_HOSTS[/** @type {keyof typeof DEFAULT_HOSTS} */ (channel)] : undefined);
 if (channel === undefined || phaseList === undefined || (hostName !== 'workers' && hostName !== 'vercel')) {
-  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers|vercel] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs]');
+  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers|vercel] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--content]');
   process.exit(2);
 }
 if (channel === 'preview' && hostName === 'vercel') {
@@ -68,6 +71,10 @@ try {
     const {refusals} = await runPhase(/** @type {any} */ (phase), {
       root, channel: /** @type {any} */ (channel), build, host,
       packs: r2Packs({log}),
+      ...(flag('content') === undefined ? {} : {content: {
+        publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,
+          scratch: join(root, 'tmp/page-release/content'), store: r2Content({root, scratch: join(root, 'tmp/page-release/content'), token: cloudflareToken})}),
+      }}),
       run: (file, argv, env) => { execFileSync(file, argv, {cwd: root, env: {...process.env, ...env}, stdio: 'inherit'}); },
       fetchJSON: async url => (await fetch200(url)).json(),
       fetchText: async url => (await fetch200(url)).text(),

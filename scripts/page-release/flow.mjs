@@ -76,12 +76,19 @@ export class RefusedError extends Error {
  *   Parts first, the book last; an existing object must already have the same bytes.
  * @property {(context: {root: string, build: string, cors: string}) => Promise<PacksSummary>} verify  Read-only.
  *
+ * @typedef {{set: string, base: string, files: number, bytes: number, uploaded: number, uploadedBytes: number, held: number, cors: string}} ContentSummary
+ * @typedef {object} ContentPublisher
+ * @property {(context: {dir: string, cors: string, dryRun: boolean}) => Promise<ContentSummary>} publish
+ *   PAGE-SIZE PZ2: the page's shard content and engine art to the packs bucket, read back with CORS (content.mjs).
+ *
  * @typedef {object} Deps
  * @property {string} root
  * @property {Channel} channel
  * @property {string} build  The full source SHA.
  * @property {PageHost} host
  * @property {PackStore} packs
+ * @property {ContentPublisher} [content]  PZ2: publish the page's content set before the page goes up (page-release.mjs
+ *   --content). Nothing stamps its base into the page yet: PZ4 and PZ6 do.
  * @property {(file: string, args: string[], env: Record<string, string>) => void} run
  * @property {(url: string) => Promise<unknown>} fetchJSON  200 only, no cache, no redirects.
  * @property {(url: string) => Promise<string>} fetchText
@@ -153,6 +160,13 @@ export async function runPhase(phase, deps) {
   }
 
   if (phase === 'upload') {
+    /** @type {ContentSummary|undefined} */
+    let content;
+    if (deps.content !== undefined) {
+      plan(`publish the page's content (S1 to S7, E1) from ${deps.host.outputDir(context)} to ${PACKS_ORIGIN}/content/<set>/ with CORS ${channel.origin} (PZ2, before the page)`);
+      content = await deps.content.publish({dir: deps.host.outputDir(context), cors: channel.origin, dryRun: dry});
+      if (!dry && content.held + content.uploaded !== content.files) refuse(`content: ${content.held} held + ${content.uploaded} uploaded is not ${content.files}`);
+    }
     /** @type {PacksSummary|undefined} */
     let packs;
     if (!channel.solo) {
@@ -163,7 +177,7 @@ export async function runPhase(phase, deps) {
     for (const line of deps.host.describe('upload', context)) plan(line);
     if (dry) return {refusals};
     const deployment = await deps.host.upload(context);
-    deps.state.write('upload', {build: deps.build, channel: channel.channel, deployment, ...(packs === undefined ? {} : {packs})});
+    deps.state.write('upload', {build: deps.build, channel: channel.channel, deployment, ...(packs === undefined ? {} : {packs}), ...(content === undefined ? {} : {content})});
     deps.log(`PASS ${channel.channel} uploaded ${deployment.id} ${deployment.url}${packs === undefined ? '; solo, no packs' : `; packs ${packs.parts} parts (${packs.uploaded} uploaded, ${packs.held} held)`}; alias not moved`);
     return {refusals};
   }
