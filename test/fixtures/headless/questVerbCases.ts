@@ -10,11 +10,16 @@ import {pathToFileURL} from 'node:url';
 import process from 'node:process';
 import {expect,test} from 'vitest';
 
+// TEST-SPEED FL29: the child is ~3.4 s and ~6 CPU-s alone (boot ~75 %: two module graphs, the 194 MB Nalati product
+// loaded and admitted in parent and worker, the worker's initial full-world checkpoint; then the 4,103-tick tape). At
+// nice 10 under ~50 load it gets <0.2 core and passed 30 s (status null). The kill is only a hang guard; the time
+// budget is J193's 60 s file cap (the ordinary Nalati native children guard at 175 s). 55 s child, 60 s case.
+const CHILD_MS=55_000;
 export function questVerbCases(slugs: readonly string[]): void {
 for(const slug of slugs)test(`${slug}: native quest verbs require the real walk and earned prerequisites`,()=>{
   const child=spawnSync(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
-    resolve('test/fixtures/headless/quest-verbs-run.mjs'),slug],{encoding:'utf8',timeout:30_000});
-  expect(child.status,child.stdout+child.stderr).toBe(0);
+    resolve('test/fixtures/headless/quest-verbs-run.mjs'),slug],{encoding:'utf8',timeout:CHILD_MS});
+  expect(child.status,`${child.signal===null?'':`killed ${child.signal}${child.error===undefined?'':` (${child.error.message})`}\n`}${child.stdout}${child.stderr}`).toBe(0);
   expect(child.stdout).toContain(`"slug":"${slug}"`);
-},35_000);
+},60_000);
 }
