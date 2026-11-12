@@ -42,15 +42,23 @@ one clean release clone per channel at the exact SHA (never a worktree
 with untracked pins, never the canonical checkout):
 
 ```
-node scripts/page-release.mjs staging build|upload|check|go-live
-node scripts/page-release.mjs production build|upload|check|go-live --after-staging-proofs
+node scripts/page-release.mjs staging build|upload|check|go-live [--host=workers|vercel]
+node scripts/page-release.mjs production build|upload|check|go-live --after-staging-proofs [--host=workers|vercel]
+node scripts/page-release.mjs preview build,upload,check,go-live
 ```
+
+A comma list runs the phases in order and stops at the first failure.
+`--host` picks the page host. Staging and production stay on `vercel`
+until their cutover (OFF-VERCEL OV7, OV8); preview is `workers` only
+(the Vercel preview is still `preview.yml`'s own deploy until OV6).
+Preview is the solo game: no release file, no packs and no gate, so
+its `check` compares bytes and its `go-live` moves the alias.
 
 | Phase | Does | Never |
 | --- | --- | --- |
 | `build` | `pnpm build:game` with `WS_BUILD_ID=<sha>`, `WS_RELEASE=1`, `WS_CHANNEL=<channel>` (old builds carry from the channel's own domain, OFF-VERCEL OV3) and `WILDSHARD_RELEASE_URL=https://packs.wildshard.io/releases/<channel>.json` (PACKS-CDN PC3), then the host's packaging. The build fails above 90,000 files or any file over 25 MiB (Workers static-asset limits; source maps not counted). Checks the output names this build, this channel's release file and key, and not the other channel's file. | uploads |
 | `upload` | The server book and parts to the packs bucket, parts first and the book last, each read back through `packs.wildshard.io` with the channel page's `Origin` (CORS). Existing objects must have the same bytes. Each read adds a fresh query, because the CDN caches 404s. Then the page, unaliased. | moves the alias |
-| `check` | The uploaded page's `version.json` and `index.html` equal the local build; the packs answer with CORS; then waits (`--wait=<minutes>`, 45) until the signed release file names this build, epoch and channel socket and the channel's tailnet `/health` shows this build at that serial. | moves the alias |
+| `check` | The uploaded page's `version.json`, `index.html`, `sw.js` and `deploy-chunks.json` equal the local build; the packs answer with CORS; then waits (`--wait=<minutes>`, 45) until the signed release file names this build, epoch and channel socket and the channel's tailnet `/health` shows this build at that serial. | moves the alias |
 | `go-live` | Re-reads the signed file and `/health` and refuses unless they still match, then moves the alias (last) and waits for the domain to serve the build. | runs without a fresh match |
 
 Each phase refuses until the one before it has run for the same SHA
@@ -85,7 +93,19 @@ package, upload, deployed digests, go-live). Today that is Vercel:
 (a file's `uid` is its SHA-1) and `vercel promote`. The token is
 `~/.config/vercel/api-token`, else the CLI's own login, passed in
 `VERCEL_TOKEN`; child output is captured and printed redacted. Pack writes use `wrangler r2 object put` with wrangler's login.
-OFF-VERCEL OV4 adds `hosts/workers.mjs` without changing the flow.
+
+`scripts/page-release/hosts/workers.mjs` (OFF-VERCEL OV4) is the
+Cloudflare host, three Workers from `pages/wrangler.jsonc` (production
+is `--env ''`, then `--env staging` and `--env preview`). `package`
+sends the source maps to Sentry, strips them from `dist/` and checks
+the asset limits. `upload` is `wrangler versions upload --tag <sha>
+--message v<version>`, a version only. The check reads `wrangler
+versions view <id> --json` (its tag must be the build) and the SHA-256
+of each document from the version's own preview URL. `go-live` is
+`wrangler versions deploy <id>@100% --yes`, the alias move. The token
+is `CLOUDFLARE_API_TOKEN` from the environment (GitHub Actions), else
+wrangler's own login (production from the MacBook, J274); it is never
+in argv and child output is printed redacted.
 
 **Staging alignment.** Run this workflow by hand (`workflow_dispatch`) on
 main with `build` set to a full green main SHA whose packs are published:

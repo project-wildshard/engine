@@ -2,15 +2,17 @@
 // tmp/codex-release/v019-*-{refresh,promote}.mjs): `vercel pull`, `build-vercel-output.mjs` and `e7-page-routes.mjs`,
 // `vercel deploy --prebuilt --skip-domain` (never aliases), authenticated REST reads of the immutable deployment's
 // file index, and `vercel promote` as the alias move. A Vercel file's `uid` is the SHA-1 of its bytes (checked on
-// v0.1.9 staging dpl_G6iXAuksHU2SLqgPmWcPcwqNf4dK: version.json and index.html both equal their local SHA-1). OV4's hosts/workers.mjs replaces this file and nothing else.
+// v0.1.9 staging dpl_G6iXAuksHU2SLqgPmWcPcwqNf4dK: version.json and index.html both equal their local SHA-1). hosts/workers.mjs (OV4) replaces it channel by channel (OV6 to OV8).
 //
 // The token is the long-lived ~/.config/vercel/api-token, else the CLI's own (8-hour) auth.json. It goes to the CLI in
 // VERCEL_TOKEN (never argv; build-vercel-output.mjs alone still passes its VERCEL_BUILD_TOKEN as --token) and to REST
 // in a header. Every child's stdout and stderr is captured and printed redacted, and page-release.mjs redacts errors.
-import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
+import {runRedacted} from '../redact.mjs';
+
+export {runRedacted};
 
 export const SCOPE = 'raynos-projects';
 export const TEAM = 'team_HPUh311dFa6AoKlBNtS9Oiph';
@@ -33,29 +35,16 @@ export function vercelToken() {
 }
 
 /**
- * Run a child with its output captured, then print it with every secret replaced. Throws on a non-zero exit.
- * @param {string} file @param {string[]} args @param {{cwd: string, env: NodeJS.ProcessEnv}} options @param {string[]} secrets
- * @returns {string} stdout, redacted
- */
-export function runRedacted(file, args, options, secrets) {
-  const hide = (/** @type {string} */ text) => secrets.reduce((out, secret) => secret === '' ? out : out.split(secret).join('<token>'), text);
-  const result = spawnSync(file, args, {...options, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024});
-  if (result.stderr !== '') process.stderr.write(hide(result.stderr));
-  if (result.error !== undefined) throw new Error(`${file} ${args[0] ?? ''} could not start: ${hide(result.error.message)}`);
-  if (result.status !== 0) {
-    process.stdout.write(hide(result.stdout));
-    throw new Error(`${file} ${args[0] ?? ''} exited ${String(result.status)}`);
-  }
-  return hide(result.stdout);
-}
-
-/**
  * @param {{token: () => string, exec?: typeof runRedacted, fetch?: typeof fetch}} options
  * @returns {import('../flow.mjs').PageHost}
  */
 export function vercelHost({token, exec = runRedacted, fetch: get = fetch}) {
   /** @param {import('../flow.mjs').HostContext} context */
-  const project = context => PROJECTS[context.channel.channel];
+  const project = context => {
+    const found = context.channel.channel === 'preview' ? undefined : PROJECTS[context.channel.channel];
+    if (found === undefined) throw new Error(`the Vercel host has no ${context.channel.channel} project (preview.yml deploys preview): use --host workers`);
+    return found;
+  };
   /** @param {import('../flow.mjs').HostContext} context */
   const env = context => ({...process.env, VERCEL_PROJECT_ID: project(context).projectId, VERCEL_ORG_ID: TEAM});
   /** @param {import('../flow.mjs').HostContext} context @param {string[]} args */

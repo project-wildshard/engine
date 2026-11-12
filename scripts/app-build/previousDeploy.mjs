@@ -103,7 +103,7 @@ function ownBuild(build) {
 }
 
 /** @type {Readonly<Record<string, string>>} */
-const CHANNEL_ORIGINS = Object.freeze({production: 'https://play.wildshard.io', staging: 'https://staging.wildshard.io'});
+const CHANNEL_ORIGINS = Object.freeze({production: 'https://play.wildshard.io', staging: 'https://staging.wildshard.io', preview: 'https://preview.wildshard.io'});
 
 /** OFF-VERCEL OV3: a release carries the kept builds from its own channel's domain, never a vercel.app address. A main
  * push on CI names no channel and builds what production ships, so it carries from production.

@@ -15,3 +15,11 @@ deployed-bytes check reads only the file index, not base64 bodies.
 Codex review fixes: the Vercel CLI gets its token in `VERCEL_TOKEN` and child output is printed redacted; every
 pack read carries a fresh query because `packs.wildshard.io` caches 404s (MISS then HIT, checked 11-11); go-live logs
 `ALIAS MOVED` the moment it moves the alias.
+
+**OV4, the Workers host (opus-ov4, 20:10 Cancún).** `hosts/workers.mjs` plugs into the same seam: `wrangler versions
+upload --tag <sha> --message v<version>` (the version id and preview URL come from `WRANGLER_OUTPUT_FILE_PATH`'s
+`version-upload` entry, not scraped text), the check reads `versions view <id> --json` for the tag and SHA-256s each
+document off the version URL, and go-live is `versions deploy <id>@100% --yes`. Production is `--env ''`. `--host`
+picks the host; vercel stays the default for staging and production until OV7/OV8. Preview joins the flow as the solo
+channel (no release file, packs or gate). `importmap.json` is not a file (the map is inline in `index.html`), so the
+checked documents add only `sw.js` and `deploy-chunks.json`. Nothing deployed: OV6 does the first upload.

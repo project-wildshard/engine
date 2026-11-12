@@ -211,10 +211,11 @@ test('a paused production origin (503) stops a release build, but a CI test buil
 test('a release carries from its own channel, never a vercel.app address (OFF-VERCEL OV3)', () => {
   expect(channelOrigin('production')).toBe('https://play.wildshard.io');
   expect(channelOrigin('staging')).toBe('https://staging.wildshard.io');
+  expect(channelOrigin('preview')).toBe('https://preview.wildshard.io');
   // CI's main push names no channel: it builds what production ships.
   expect(channelOrigin(undefined)).toBe('https://play.wildshard.io');
   expect(channelOrigin('')).toBe('https://play.wildshard.io');
-  for (const wrong of ['preview', 'constructor', 'wildshard-singleplayer.vercel.app']) expect(() => channelOrigin(wrong)).toThrow(/WS_CHANNEL/u);
+  for (const wrong of ['constructor', 'wildshard-singleplayer.vercel.app']) expect(() => channelOrigin(wrong)).toThrow(/WS_CHANNEL/u);
   const pipeline = readFileSync('scripts/app-build-pipeline.mjs', 'utf8');
   expect(pipeline).not.toMatch(/vercel\.app|VERCEL_ENV/u);
   expect(pipeline).toContain('process.env.WS_RELEASE === "1"');

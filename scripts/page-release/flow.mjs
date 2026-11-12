@@ -1,4 +1,4 @@
-// The staging and production page release, in four phases, behind a page host (meta OFF-VERCEL OV4, Jake 2026-11-11:
+// The preview, staging and production page release, in four phases, behind a page host (meta OFF-VERCEL OV4, Jake 2026-11-11:
 // "Add staging & production release flow to the engine repo"). It replaces the scratch release scripts the v0.1.5 to
 // v0.1.9 lanes copied by hand (singleplayer tmp/codex-release/v019-*-{refresh,promote,production-static}.mjs).
 //
@@ -8,8 +8,11 @@
 //            the producer's signed serial to name this build and the channel's /health to show that build and serial.
 //   go-live  the alias move, LAST: refused without a fresh signed-release and /health match.
 //
-// The flow owns order and gates; the host (hosts/vercel.mjs today, hosts/workers.mjs for OV4) owns how a page is
-// packaged, uploaded, read back and aliased. Every dependency comes in through `deps`, so the tests drive a fake host.
+// Preview (the solo build of green main, J274: hourly) has no world: no release file, no packs and no gate. Its check
+// and go-live compare bytes and move the alias.
+//
+// The flow owns order and gates; the host (hosts/vercel.mjs or hosts/workers.mjs, page-release.mjs --host) owns how a
+// page is packaged, uploaded, read back and aliased. Every dependency comes in through `deps`, so the tests drive a fake host.
 // J205: the flow opens no socket. Nothing here ever joins a channel; production proofs are static.
 import {createHash, createPublicKey, verify} from 'node:crypto';
 
@@ -17,23 +20,29 @@ export const PACKS_ORIGIN = 'https://packs.wildshard.io';
 /** E7_RELEASE_PUBLIC_KEY (engine variable), SPKI DER as hex: the box's RELEASE_PUBLIC_KEY and the pages' key. */
 export const RELEASE_PUBLIC_KEY = '302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b';
 export const PHASES = /** @type {const} */ (['build', 'upload', 'check', 'go-live']);
-/** The static documents whose deployed bytes must equal the local build before the alias moves. */
-export const CHECKED_DOCUMENTS = /** @type {const} */ (['version.json', 'index.html']);
+/** The static documents whose deployed bytes must equal the local build before the alias moves (OV4). The import map
+ * is inline in index.html (scripts/app-build/importMap.mjs), so there is no importmap.json to compare. */
+export const CHECKED_DOCUMENTS = /** @type {const} */ (['version.json', 'index.html', 'sw.js', 'deploy-chunks.json']);
 
-/** @typedef {'staging'|'production'} Channel */
+/** @typedef {'staging'|'production'} WorldChannel */
+/** @typedef {WorldChannel|'preview'} Channel */
 /** @typedef {typeof PHASES[number]} Phase */
-/** @typedef {{channel: Channel, other: Channel, origin: string, release: string, socket: string, health: string}} ChannelConfig */
+/** @typedef {{channel: WorldChannel, solo: false, other: WorldChannel, origin: string, release: string, socket: string, health: string}} WorldChannelConfig */
+/** @typedef {{channel: 'preview', solo: true, origin: string}} SoloChannelConfig */
+/** @typedef {WorldChannelConfig|SoloChannelConfig} ChannelConfig */
 
-/** @type {Record<Channel, ChannelConfig>} */
+/** @type {{staging: WorldChannelConfig, production: WorldChannelConfig, preview: SoloChannelConfig}} */
 export const CHANNELS = {
+  // SHELL-CUTOVER SC1: the solo build of the newest green main, no world stamp, so the in-page server runs.
+  preview: {channel: 'preview', solo: true, origin: 'https://preview.wildshard.io'},
   staging: {
-    channel: 'staging', other: 'production', origin: 'https://staging.wildshard.io',
+    channel: 'staging', solo: false, other: 'production', origin: 'https://staging.wildshard.io',
     release: `${PACKS_ORIGIN}/releases/staging.json`, socket: 'wss://rooms-staging.wildshard.io',
     // D7: rooms' public /health is private; the tailnet one is the build's proof.
     health: 'https://wildshard.tailb41b20.ts.net:8443/health',
   },
   production: {
-    channel: 'production', other: 'staging', origin: 'https://play.wildshard.io',
+    channel: 'production', solo: false, other: 'staging', origin: 'https://play.wildshard.io',
     release: `${PACKS_ORIGIN}/releases/production.json`, socket: 'wss://rooms.wildshard.io',
     health: 'https://wildshard.tailb41b20.ts.net/health',
   },
@@ -98,8 +107,9 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
  * @param {Phase} phase @param {Deps} deps @returns {Promise<{refusals: string[]}>}
  */
 export async function runPhase(phase, deps) {
-  const channel = CHANNELS[deps.channel];
-  if (channel === undefined) throw new RefusedError(`unknown channel ${deps.channel}: staging or production`);
+  /** @type {ChannelConfig|undefined} */
+  const channel = Object.hasOwn(CHANNELS, deps.channel) ? CHANNELS[deps.channel] : undefined;
+  if (channel === undefined) throw new RefusedError(`unknown channel ${deps.channel}: preview, staging or production`);
   if (!PHASES.includes(phase)) throw new RefusedError(`unknown phase ${phase}: ${PHASES.join(', ')}`);
   /** @type {string[]} */
   const refusals = [];
@@ -123,11 +133,11 @@ export async function runPhase(phase, deps) {
     const env = buildEnv(channel, deps);
     for (const line of deps.host.describe('prepare', context)) plan(line);
     if (!dry) await deps.host.prepare(context);
-    plan(`run pnpm build:game with WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL} WS_BUILD_ID=${deps.build}`);
+    plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
     if (!dry) deps.run('pnpm', ['build:game'], {...env, ...deps.host.buildEnv(context)});
     for (const line of deps.host.describe('package', context)) plan(line);
     if (!dry) await deps.host.package(context);
-    plan(`check ${deps.host.outputDir(context)} names ${channel.release} and build ${deps.build}`);
+    plan(`check ${deps.host.outputDir(context)} names ${channel.solo ? 'no release file' : channel.release} and build ${deps.build}`);
     if (dry) return {refusals};
     const files = checkOutput(channel, deps, context, refuse);
     deps.state.write('build', {build: deps.build, channel: channel.channel, host: deps.host.name, files});
@@ -143,14 +153,18 @@ export async function runPhase(phase, deps) {
   }
 
   if (phase === 'upload') {
-    plan(`publish server book and parts for ${deps.build} to ${PACKS_ORIGIN} with CORS ${channel.origin} (packs first, J234)`);
-    const packs = await deps.packs.publish({root: deps.root, build: deps.build, cors: channel.origin, dryRun: dry});
-    if (!dry && packs.held + packs.uploaded !== packs.parts) refuse(`packs: ${packs.held} held + ${packs.uploaded} uploaded is not ${packs.parts}`);
+    /** @type {PacksSummary|undefined} */
+    let packs;
+    if (!channel.solo) {
+      plan(`publish server book and parts for ${deps.build} to ${PACKS_ORIGIN} with CORS ${channel.origin} (packs first, J234)`);
+      packs = await deps.packs.publish({root: deps.root, build: deps.build, cors: channel.origin, dryRun: dry});
+      if (!dry && packs.held + packs.uploaded !== packs.parts) refuse(`packs: ${packs.held} held + ${packs.uploaded} uploaded is not ${packs.parts}`);
+    }
     for (const line of deps.host.describe('upload', context)) plan(line);
     if (dry) return {refusals};
     const deployment = await deps.host.upload(context);
-    deps.state.write('upload', {build: deps.build, channel: channel.channel, deployment, packs});
-    deps.log(`PASS ${channel.channel} uploaded ${deployment.id} ${deployment.url}; packs ${packs.parts} parts (${packs.uploaded} uploaded, ${packs.held} held); alias not moved`);
+    deps.state.write('upload', {build: deps.build, channel: channel.channel, deployment, ...(packs === undefined ? {} : {packs})});
+    deps.log(`PASS ${channel.channel} uploaded ${deployment.id} ${deployment.url}${packs === undefined ? '; solo, no packs' : `; packs ${packs.parts} parts (${packs.uploaded} uploaded, ${packs.held} held)`}; alias not moved`);
     return {refusals};
   }
 
@@ -166,6 +180,13 @@ export async function runPhase(phase, deps) {
   if (phase === 'check') {
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
+    if (channel.solo) {
+      // Preview has no gate (J274): no release file, no packs, no rooms.
+      if (dry) return {refusals};
+      deps.state.write('check', {build: deps.build, channel: channel.channel, deployment});
+      deps.log(`PASS ${channel.channel} check ${deployment.id}: deployed bytes equal; solo, no gate; alias not moved`);
+      return {refusals};
+    }
     plan(`verify the server book and parts on ${PACKS_ORIGIN} answer with CORS ${channel.origin}`);
     if (!dry) await deps.packs.verify({root: deps.root, build: deps.build, cors: channel.origin});
     plan(`wait for ${channel.release} to sign ${deps.build} and ${channel.health} to match its serial`);
@@ -181,18 +202,23 @@ export async function runPhase(phase, deps) {
   if (checked?.build !== deps.build || checked?.channel !== channel.channel || checked?.deployment?.id !== deployment.id) refuse(`no ${channel.channel} check of ${deployment.id}: run the check phase first`);
   for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
   if (!dry) await checkDeployed(deps, deployed, refuse);
-  plan(`re-read ${channel.release} and ${channel.health}: both must name ${deps.build} and one serial`);
-  const gate = await readGate(channel, deps);
-  if (gate.problem !== undefined) refuse(gate.problem);
-  else if (checked !== undefined && gate.serial !== checked.serial) deps.log(`note: serial moved ${checked.serial} -> ${gate.serial} since check, still ${deps.build}`);
+  /** @type {{serial?: number, problem?: string}} */
+  let gate = {};
+  if (!channel.solo) {
+    plan(`re-read ${channel.release} and ${channel.health}: both must name ${deps.build} and one serial`);
+    gate = await readGate(channel, deps);
+    if (gate.problem !== undefined) refuse(gate.problem);
+    else if (checked !== undefined && gate.serial !== checked.serial) deps.log(`note: serial moved ${checked.serial} -> ${gate.serial} since check, still ${deps.build}`);
+  }
   for (const line of deps.host.describe('goLive', deployed)) plan(line);
   if (dry) return {refusals};
   await deps.host.goLive(deployed);
   deps.log(`ALIAS MOVED ${channel.origin} -> ${deployment.id}; checking the domain`);
   await waitForDomain(channel, deps, refuse);
-  deps.state.write('go-live', {build: deps.build, channel: channel.channel, deployment, serial: gate.serial});
-  deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} after matching serial ${gate.serial} (alias last)`);
-  deps.log(channel.channel === 'staging'
+  deps.state.write('go-live', {build: deps.build, channel: channel.channel, deployment, ...(gate.serial === undefined ? {} : {serial: gate.serial})});
+  deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} ${channel.solo ? 'solo, no gate' : `after matching serial ${gate.serial}`} (alias last)`);
+  deps.log(channel.solo ? `next: node scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} --human-static`
+    : channel.channel === 'staging'
     ? `next: strict staging proofs, then production. node scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} ${RELEASE_PUBLIC_KEY}; node scripts/e7-live-staging-proof.mjs ${channel.origin} ${deps.build} ${RELEASE_PUBLIC_KEY} chromium|webkit`
     : `next: static proof only (J205). node scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} ${RELEASE_PUBLIC_KEY} --human-static`);
   return {refusals};
@@ -200,11 +226,13 @@ export async function runPhase(phase, deps) {
 
 /** @param {ChannelConfig} channel @param {Deps} deps @returns {Record<string, string>} */
 export function buildEnv(channel, deps) {
-  return {
+  const common = {
     WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: 'test/pins/catalogue.json',
-    WILDSHARD_RELEASE_URL: channel.release, WILDSHARD_RELEASE_KEY: deps.releaseKey ?? RELEASE_PUBLIC_KEY,
     WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin, WS_RELEASE: '1', WS_CHANNEL: channel.channel,
   };
+  // Preview is the solo game: no release file, so the build stamps no world (app-build-pipeline.mjs E7.2d).
+  return channel.solo ? common
+    : {...common, WILDSHARD_RELEASE_URL: channel.release, WILDSHARD_RELEASE_KEY: deps.releaseKey ?? RELEASE_PUBLIC_KEY};
 }
 
 /**
@@ -223,6 +251,10 @@ function checkOutput(channel, deps, context, refuse) {
   const html = Buffer.from(deps.readFile(`${out}/index.html`)).toString('utf8');
   if (!html.includes(`globalThis.__WS_BUILD_ID__=${JSON.stringify(deps.build)};`)) refuse('index.html is not stamped with this build');
   const stamp = /globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(html)?.[1];
+  if (channel.solo) {
+    if (stamp !== undefined || html.includes('/releases/')) refuse('index.html names a world, but preview is the solo game');
+    return files;
+  }
   const world = stamp === undefined ? undefined : JSON.parse(stamp);
   if (world?.release !== channel.release) refuse(`index.html release file is ${world?.release}, not ${channel.release}`);
   if (world?.key !== (deps.releaseKey ?? RELEASE_PUBLIC_KEY)) refuse('index.html release key is not E7_RELEASE_PUBLIC_KEY');
@@ -257,7 +289,7 @@ async function productionGates(phase, deps, refuse) {
 
 /**
  * The signed release file names this build, and the channel's /health shows this build at that serial.
- * @param {ChannelConfig} channel @param {Deps} deps
+ * @param {WorldChannelConfig} channel @param {Deps} deps
  * @returns {Promise<{serial?: number, problem?: string}>}
  */
 export async function readGate(channel, deps) {
@@ -282,7 +314,7 @@ export async function readGate(channel, deps) {
   return {serial: release.serial};
 }
 
-/** @param {ChannelConfig} channel @param {Deps} deps @param {(message: string) => void} refuse */
+/** @param {WorldChannelConfig} channel @param {Deps} deps @param {(message: string) => void} refuse */
 async function waitForGate(channel, deps, refuse) {
   const deadline = deps.now() + (deps.dryRun ? 0 : deps.waitMs ?? 45 * 60_000);
   for (let last = '';;) {
@@ -306,5 +338,6 @@ async function waitForDomain(channel, deps, refuse) {
     await deps.sleep(10_000);
   }
   const html = await deps.fetchText(`${channel.origin}/`);
+  if (channel.solo) { if (html.includes('/releases/')) refuse(`${channel.origin} page names a release file, but preview is solo`); return; }
   if (!html.includes(channel.release) || html.includes(`/releases/${channel.other}.json`)) refuse(`${channel.origin} page does not name only ${channel.release}`);
 }

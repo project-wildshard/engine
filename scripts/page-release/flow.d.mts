@@ -1,6 +1,9 @@
-export type Channel = 'staging' | 'production';
+export type WorldChannel = 'staging' | 'production';
+export type Channel = WorldChannel | 'preview';
 export type Phase = 'build' | 'upload' | 'check' | 'go-live';
-export interface ChannelConfig { channel: Channel; other: Channel; origin: string; release: string; socket: string; health: string }
+export interface WorldChannelConfig { channel: WorldChannel; solo: false; other: WorldChannel; origin: string; release: string; socket: string; health: string }
+export interface SoloChannelConfig { channel: 'preview'; solo: true; origin: string }
+export type ChannelConfig = WorldChannelConfig | SoloChannelConfig;
 export interface Deployment { id: string; url: string }
 export interface HostContext { root: string; channel: ChannelConfig; build: string; saveEpoch: number; version: string; deployment?: Deployment }
 export type HostStep = 'prepare' | 'package' | 'upload' | 'deployedDigests' | 'goLive';
@@ -46,9 +49,9 @@ export interface Deps {
 export const PACKS_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;
 export const PHASES: readonly Phase[];
-export const CHECKED_DOCUMENTS: readonly ['version.json', 'index.html'];
-export const CHANNELS: Record<Channel, ChannelConfig>;
+export const CHECKED_DOCUMENTS: readonly ['version.json', 'index.html', 'sw.js', 'deploy-chunks.json'];
+export const CHANNELS: { staging: WorldChannelConfig; production: WorldChannelConfig; preview: SoloChannelConfig };
 export class RefusedError extends Error { constructor(message: string) }
 export function runPhase(phase: Phase, deps: Deps): Promise<{ refusals: string[] }>;
 export function buildEnv(channel: ChannelConfig, deps: Deps): Record<string, string>;
-export function readGate(channel: ChannelConfig, deps: Deps): Promise<{ serial?: number; problem?: string }>;
+export function readGate(channel: WorldChannelConfig, deps: Deps): Promise<{ serial?: number; problem?: string }>;
