@@ -8,12 +8,12 @@
 //      verified clone, hashed against its blob afterwards); git writes the rest, so other lanes' edits never enter;
 //   2. build state, cloned whole (copy-on-write, no new blocks): node_modules, .bin-deps/node_modules, .tsc-layers (the
 //      tsc -b cache) and out/ with the pins mounts this checkout's install published (pins-reuse.mjs);
-//   3. if that still leaves the copy unclean (a commit that moves the pins key), `pnpm pins` in the copy, once;
+//   3. `pnpm install --offline` in the copy when the pushed lockfile is not the installed one; if the copy is still unclean (a commit that moves the pins key), `pnpm pins` in the copy, once;
 //   4. the gate runs there; then the copy and its worktree entry are removed, green or red. A copy whose gate was
 //      killed is swept by the next one (its pid is gone).
 // Each step's seconds print as one `push-gate copy` line. Turn it off in one commit: CLEAN_COPY below.
-import {execFileSync,spawnSync} from 'node:child_process';
-import {existsSync,lstatSync,mkdirSync,readdirSync,rmSync} from 'node:fs';
+import {execFileSync,spawn,spawnSync} from 'node:child_process';
+import {existsSync,lstatSync,mkdirSync,readFileSync,readdirSync,renameSync,rmSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {clonePaths} from './apfs-clone.mjs';
 import {verifiedPinsOutputs} from './pins-reuse.mjs';
@@ -87,14 +87,17 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
  /** @type {string[]} */const steps=[];
  /** @param {string} step @param {() => (string|void)} work */
  const timed=(step,work)=>{const at=performance.now(),detail=work();steps.push(`${step} ${((performance.now()-at)/1000).toFixed(1)} s${typeof detail==='string'?` (${detail})`:''}`);};
+ // Removal is off the push's path: the copy is renamed aside, unregistered, and deleted by a detached rm (about 4 s).
  const remove=()=>{
-  try{git(root,['worktree','remove','--force',path]);}catch{/* Not registered, or already gone. */}
-  rmSync(path,{recursive:true,force:true});
+  const trash=`${path}.trash`;
+  try{renameSync(path,trash);spawn('rm',['-rf',trash],{detached:true,stdio:'ignore'}).unref();}
+  catch{rmSync(path,{recursive:true,force:true});}
   try{git(root,['worktree','prune']);}catch{/* Prune is housekeeping only. */}
  };
  mkdirSync(dirname(path),{recursive:true});
  sweepDeadCopies(root);
- if(existsSync(path))rmSync(path,{recursive:true,force:true});
+ // A leftover registration of this very path (a reused pid) would make `worktree add` refuse: clear both.
+ remove();
  try{
   timed('add',()=>{git(root,['worktree','add','--quiet','--detach','--no-checkout',path,sha]);git(path,['reset','--quiet']);});
   timed('tracked',()=>{
@@ -116,6 +119,16 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
    for(const mount of verifiedPinsOutputs(root).paths)if(!existsSync(join(path,mount))){mkdirSync(dirname(join(path,mount)),{recursive:true});pairs.push([join(root,mount),join(path,mount)]);}
    return `${pairs.length} paths, ${clonePaths(pairs)}`;
   });
+  // The cloned packages are the checkout's install, which another lane's uncommitted `pnpm add` may have changed: the
+  // copy installs its own (offline, from the store) whenever the pushed lockfile is not the one installed (J206 review).
+  const lock=join(path,'pnpm-lock.yaml'),installed=join(path,'node_modules/.pnpm/lock.yaml');
+  if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(!existsSync(installed)||!readFileSync(lock).equals(readFileSync(installed)))){
+   timed('install',()=>{
+    const child=spawnSync('pnpm',['install','--frozen-lockfile','--offline'],{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
+    if(child.status!==0)throw new Error(`pnpm install in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);
+    return 'pushed lockfile differs from the checkout\'s install';
+   });
+  }
   let dirt=checkedTreeDirt(path);
   if(dirt.length>0&&existsSync(join(path,'node_modules'))){
    // A commit that moves the pins key leaves the cloned mounts unverified: publish this tree's own, once.

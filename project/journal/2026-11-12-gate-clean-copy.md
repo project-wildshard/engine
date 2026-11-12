@@ -18,3 +18,5 @@ and fixed forward (J249). `MAIN_PUSH_SPLIT` in `scripts/push-local-split.mjs` is
 keeps the complete gate.
 
 A gate killed mid-run (SIGKILL, a closed terminal) leaves its copy; the next gate sweeps every copy whose pid is gone.
+
+The J206 review (claude -p) found two MUSTs, folded: the copy installs its own packages (offline) when the pushed lockfile is not the installed one, since another lane's uncommitted `pnpm add` would otherwise pass a commit main CI fails; and main-pull puts the tree back if another lane commits between its tree move and its ref move. Also folded: a stale registration of the copy path, fixture identities for hosted CI, main-watch follows the main row's SHA. The copy is deleted by a detached rm, off the push's path. Left: per-copy lease scope is intended (3 mode-1 gates may overlap under CPU admission); local push proofs die with the copy.

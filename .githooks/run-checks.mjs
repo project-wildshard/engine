@@ -105,7 +105,8 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   if(code===0&&split&&sha!==null&&mainPushed(env.WS_PUSH_REFS)&&process.env.WS_MAIN_WATCH!=='0'&&existsSync(join(root,'scripts/main-watch.mjs'))){
     const lane=process.env.WS_LANE_NAME??'',pane=process.env.HERDR_PANE_ID??'';
     try{
-      spawn(process.execPath,[join(root,'scripts/main-watch.mjs'),`--follow=${sha}`,'--after-push=300',...(lane===''?[]:[`--lane=${lane}`]),...(pane===''?[]:[`--pane=${pane}`])],
+      const mainSha=(env.WS_PUSH_REFS??'').split('\n').map(line=>line.trim().split(/\s+/u)).find(row=>row[2]==='refs/heads/main')?.[1]??sha;
+      spawn(process.execPath,[join(root,'scripts/main-watch.mjs'),`--follow=${mainSha}`,'--after-push=300',...(lane===''?[]:[`--lane=${lane}`]),...(pane===''?[]:[`--pane=${pane}`])],
         {cwd:root,env:process.env,detached:true,stdio:'ignore'}).unref();
       console.error(`  - main-watch follows ${sha.slice(0,10)} once it reaches main; main's ci runs the full suite (J249: a red is fixed forward at once)`);
     }catch(error){console.error(`  !! main-watch not started (${error instanceof Error?error.message:String(error)}); run node scripts/main-watch.mjs by hand`);}

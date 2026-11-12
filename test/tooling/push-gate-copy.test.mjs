@@ -127,6 +127,8 @@ describe('push gate copy (EV1)', () => {
     git(work, ['clone', '-q', '--bare', work, origin]);
     git(work, ['clone', '-q', origin, root]);
     git(work, ['clone', '-q', origin, other]);
+    // main-pull's replay writes commits with the checkout's own identity (hosted CI has no global one).
+    for (const clone of [root, other]) { git(clone, ['config', 'user.name', 'T']); git(clone, ['config', 'user.email', 't@example.com']); }
     // Another machine's lane moves origin/main meanwhile.
     writeFileSync(join(other, 'theirs.mjs'), 'export const theirs = 1;\n');
     git(other, ['add', 'theirs.mjs']);

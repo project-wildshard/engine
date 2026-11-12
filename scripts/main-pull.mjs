@@ -53,12 +53,20 @@ export function mainPull(cwd,{fetch=true,remote='origin'}={}){
  if(git(cwd,['rev-parse','HEAD'])!==head)throw new StopError('HEAD moved while pulling (another lane committed); run it again');
  // A two-way merge, as `git checkout` does: it refuses before writing anything if a path that changes is dirty, and
  // keeps every other index entry and file (`reset --keep` would unstage another lane's `git add`ed new file).
+ // Stat-only changes would read as "not uptodate" without a refresh.
+ run(cwd,['update-index','-q','--refresh']);
  const moved=run(cwd,['read-tree','-m','-u',head,target]);
  if(moved.status!==0){
   const files=[...moved.stderr.matchAll(/^error: Entry '([^']+)'/gmu)].map(match=>match[1]);
   throw new StopError(`uncommitted edits in paths main changes, so nothing moved${files.length===0?` (${moved.stderr.trim().split('\n')[0]})`:`: ${files.join(', ')}`}; if they are another lane's, wait for its commit and run this again`);
  }
- git(cwd,['update-ref','-m',`main-pull: ${how}`,'refs/heads/main',target,head]);
+ const ref=run(cwd,['update-ref','-m',`main-pull: ${how}`,'refs/heads/main',target,head]);
+ if(ref.status!==0){
+  // Another lane committed between the check and the move: put the tree back onto its HEAD, then stop.
+  const now=git(cwd,['rev-parse','HEAD']),back=run(cwd,['read-tree','-m','-u',target,now]);
+  throw new StopError(back.status===0?'another lane committed while pulling; nothing moved, run it again'
+   :`another lane committed while pulling and the tree could not be put back (${back.stderr.trim().split('\n')[0]}): git status, then git read-tree -m -u ${target.slice(0,10)} HEAD`);
+ }
  return `main ${head.slice(0,10)} -> ${target.slice(0,10)} (${how}); other lanes' files untouched`;
 }
 
