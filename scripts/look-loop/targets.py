@@ -132,7 +132,7 @@ def run(jobs, work, *, parallel, timeout, model):
             except subprocess.TimeoutExpired: continue
 
     try:
-        poll(queue, running, failed, t0, timeout, parallel, start, stop)
+        poll(queue, running, failed, t0, timeout, parallel, start, stop, work)
     finally:
         for jid, (p, _, _) in list(running.items()):
             print('stopped', jid, flush=True); stop(p); failed.append(jid)
@@ -141,17 +141,18 @@ def run(jobs, work, *, parallel, timeout, model):
     return failed
 
 
-def poll(queue, running, failed, t0, timeout, parallel, start, stop):
-    """start jobs up to `parallel`, collect each PNG as it lands, until the queue drains or the batch times out"""
+def poll(queue, running, failed, t0, timeout, parallel, start, stop, work, gen=GEN, tick=10, settle=2):
+    """start jobs up to `parallel`, collect each PNG as it lands (copied into `work`, converted to the job's `out`),
+    until the queue drains or the batch times out. `gen`, `tick` and `settle` are for the tests"""
     while (queue or running) and time.time() - t0 < timeout:
         while queue and len(running) < parallel: start(queue.pop(0))
-        time.sleep(10)
+        time.sleep(tick)
         for jid, (p, log, j) in list(running.items()):
             m = re.search(r'session id:\s*([0-9a-f-]+)', log.read_text(errors='ignore'))
-            d = GEN / m.group(1) if m else None
+            d = gen / m.group(1) if m else None
             pngs = sorted(d.glob('*.png')) if d and d.is_dir() else []
             if pngs:
-                s1 = pngs[0].stat().st_size; time.sleep(2)
+                s1 = pngs[0].stat().st_size; time.sleep(settle)
                 if s1 > 0 and pngs[0].stat().st_size == s1:
                     shutil.copy(pngs[0], work / f'{jid}.png'); to_jpeg(work / f'{jid}.png', j['out'])
                     print(f"done {jid} {time.time() - t0:.0f}s -> {j['out']}", flush=True)
