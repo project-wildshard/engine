@@ -1,65 +1,25 @@
 // J262 (SP1a): a renderer move no longer refuses a cook. A shardfile whose author preparation names another renderer
 // fingerprint cooks with that preparation as it is, says `stale preparation`, and writes the same bytes the matching
-// renderer would; a preparation that doesn't match its own inputs still refuses.
-// oxlint-disable-next-line import/no-nodejs-modules -- Hash real cook output and the fixture's preparation.
-import {createHash} from 'node:crypto';
+// renderer would; a preparation that doesn't match its own inputs still refuses. The cook worker's case is its own file,
+// cook-stale-preparation-worker.test.ts, so each stays under the 60 s CI file budget (J193).
 // oxlint-disable-next-line import/no-nodejs-modules -- The test owns its temporary output directories.
 import {existsSync, mkdtempSync, readdirSync, readFileSync, rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The wrapper's per-run temp root.
 import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Output trees are compared by relative path.
-import {join, relative, resolve} from 'node:path';
+import {join, relative} from 'node:path';
 import {afterAll, expect, test} from 'vitest';
 import {readCookData} from '@wildshard/format/cookData';
-import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
-import {readTar, writeTar} from '@wildshard/format/tar';
+import {writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
-import {createCookWorker, indexKey} from '../src/cook/game/cookWorker';
-import {folderStore} from '../src/cook/game/packStore';
-import {productTarball} from '../src/cook/game/productTarball';
 import {cookShard, openShardfile, type CookReport} from '../src/cook/game/shardCook';
 import {createPartEncoder} from '../src/cook/game/spawnParts';
-import {builtProduct} from './fixtures/engine-lift/product';
+import {digest, json, legacy, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
 
 const root = mkdtempSync(join(tmpdir(), 'cook-stale-preparation-'));
 const encoder = createPartEncoder();
 afterAll(async () => { await encoder.close(); rmSync(root, {recursive: true, force: true}); });
-const digest = (bytes: Readonly<Uint8Array>): string => createHash('sha256').update(bytes).digest('hex');
-const json = (bytes: Uint8Array | undefined): unknown => JSON.parse(new TextDecoder().decode(bytes));
-/** Template with no author preparation (sdk 0.2, a cook v1 of mounts only). Since D5-4 the pinned Template carries one, so
- *  it is taken off here: its program mount goes and the remaining mounts stay, as the shardfile was before `wildshard prepare`. */
-function unprepared(tar: Uint8Array): Uint8Array {
-  const files = new Map(readTar(tar)), held = parseOutputIndex(json(files.get('shard.json')));
-  if (held.sdk === '0.2') return tar;
-  const programs = `/programs/${held.identity.slug}.json`, data = readCookData(json(files.get('cook.json')));
-  for (const row of data.mounts) if (row.url === programs) files.delete(row.path);
-  const cook = validationSourceBytes({version: 1, mounts: data.mounts.filter(row => row.url !== programs)});
-  files.set('cook.json', cook);
-  files.set('shard.json', validationSourceBytes({...held, sdk: '0.2', cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
-  return writeTar(files);
-}
-const legacy = unprepared(productTarball(builtProduct('_template')));
-/** Two renderer fingerprints, neither this engine's: the cook is told which one it runs on. */
-const PREPARED = '7d1dd888'.padEnd(64, '0'), MOVED = '6d0a0a78'.padEnd(64, '0');
-
-/** Template as `wildshard prepare` leaves it: sdk 0.3, a cook v3 preparation recorded on `renderer`, fence packs, a program mount. */
-function prepared(renderer: string, fenced = true): Map<string, Uint8Array> {
-  const files = new Map(readTar(legacy)), held = parseOutputIndex(json(files.get('shard.json')));
-  const old = readCookData(json(files.get('cook.json'))), slug = held.identity.slug;
-  const program = validationSourceBytes({version: 2, build: 'stale-fixture', lines: ['void main() {}'], shaders: [[0]], programs: [[0, 0]]});
-  const asset = new TextEncoder().encode('a mounted fence read');
-  files.set(`mounts/programs/${slug}.json`, program); files.set('mounts/assets/stale-proof.bin', asset);
-  const mounts = [...old.mounts.filter(row => row.url !== `/programs/${slug}.json`),
-    {url: `/programs/${slug}.json`, path: `mounts/programs/${slug}.json`, hash: digest(program), bytes: program.length},
-    {url: '/assets/stale-proof.bin', path: 'mounts/assets/stale-proof.bin', hash: digest(asset), bytes: asset.length}];
-  const index = parseOutputIndex({...held, sdk: '0.3'});
-  const cook = validationSourceBytes({version: 3, renderer, mounts, packs: 'fence', fence: fenced ? [digest(asset)] : [], programs: json(program),
-    inputHash: digest(cookPreparationBytes(index, mounts, renderer))});
-  files.set('cook.json', cook);
-  files.set('shard.json', validationSourceBytes({...index, cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
-  return files;
-}
 /** Re-point the index at changed `cook.json` bytes, so only the preparation's own binding can catch the change. */
 function withCook(files: Map<string, Uint8Array>, cook: Uint8Array): Uint8Array {
   const index = parseOutputIndex(json(files.get('shard.json')));
@@ -131,25 +91,4 @@ test('a preparation relabelled to this renderer without re-recording still refus
   const out = join(root, 'forged');
   await expect(cookShard(forged, out, {wireBytes: (_url, bytes) => bytes.length, now: () => 0, encoder, renderer: MOVED})).rejects.toThrow(/stale cook preparation/u);
   expect(existsSync(out)).toBe(false);
-});
-
-test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: 60_000}, async () => {
-  const tarball = writeTar(prepared(PREPARED)), hash = digest(tarball), lines: string[] = [];
-  const worker = (build: string, renderer?: string): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(root, 'worker-store')),
-    source: {heads: () => Promise.resolve([{slug: 'template', hash, revision: 1}]), download: () => Promise.resolve(tarball)},
-    serverPacks: join(root, 'worker-server'), scratch: join(root, 'worker-jobs'), log: line => { lines.push(line); },
-    launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('scripts/bake-loader.mjs'), script: resolve('scripts/cook-job.mjs'), wrap: [],
-      limits: {seconds: 50, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer})}});
-  const stale = await worker('moved', MOVED).cook({slug: 'template', hash});
-  expect(stale).toMatchObject({state: 'cooked', preparation: 'stale'});
-  expect(lines.some(line => line.includes('stale preparation: template'))).toBe(true);
-  const store = folderStore(join(root, 'worker-store'));
-  expect(json(await store.get(indexKey('moved', hash)))).toMatchObject({slug: 'template', preparation: 'stale'});
-  const fast = await worker('prepared', PREPARED).cook({slug: 'template', hash});
-  expect(fast).toMatchObject({state: 'cooked', preparation: 'current'});
-  // Same parts either way: the second build's index names exactly the first one's stored objects.
-  const keys = (build: string): Promise<unknown> => store.get(indexKey(build, hash)).then(body => (json(body) as {keys: string[]}).keys);
-  expect(await keys('prepared')).toEqual(await keys('moved'));
-  // A host that hands its job no fingerprint still cooks: the job can't run git under --permission, so it can't call it current.
-  expect(await worker('unnamed').cook({slug: 'template', hash})).toMatchObject({state: 'cooked', preparation: 'stale'});
 });
