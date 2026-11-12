@@ -91,7 +91,7 @@ test('the page comes from the assets with no-store, /index.html as /', async () 
     const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), assets(seen));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(response.headers.get('content-type')).toBe('text/html');
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8'); // OV6: what Vercel sent; the edge's assets drop the charset
     expect(response.headers.get('etag')).toBe('"page"');
     expect(await response.text()).toBe('<!doctype html>');
     expect(seen).toEqual(['/']);

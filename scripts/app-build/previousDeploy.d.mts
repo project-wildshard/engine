@@ -9,5 +9,8 @@ export function carryPreviousDeploy(directory: string, options?: {
   /** a CI test build: a 5xx or network failure fetching the origin's manifest warns and carries nothing (a release refuses) */
   readonly optional?: boolean;
 }): Promise<{current: number; builds: number; carried: number; bytes: number}>;
+/** Whether an unreachable carried origin may mean no previous builds: a CI test build or the solo preview, never a
+ * staging or production release (OFF-VERCEL OV6). */
+export function previousDeployOptional(env: Readonly<Record<string, string | undefined>>): boolean;
 /** OFF-VERCEL OV3: the origin a release carries from, by WS_CHANNEL (unset: production). Throws on another channel. */
 export function channelOrigin(channel: string | undefined): string;

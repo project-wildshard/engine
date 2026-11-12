@@ -54,6 +54,8 @@ async function page(request: Request, url: URL, env: Env): Promise<Response> {
   const asset = await env.ASSETS.fetch(new Request(new URL('/', url), request))
   const response = new Response(asset.body, asset)
   response.headers.set('cache-control', 'no-store')
+  // OV6: the Cloudflare edge's assets say `text/html` (local wrangler dev adds the charset); Vercel said this.
+  response.headers.set('content-type', 'text/html; charset=utf-8')
   return response
 }
 

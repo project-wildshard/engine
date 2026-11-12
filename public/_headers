@@ -71,6 +71,10 @@
 /*.js
   Content-Type: application/javascript; charset=utf-8
 
+# OV6: the Cloudflare edge says `text/css` (local wrangler dev adds the charset); Vercel said this.
+/*.css
+  Content-Type: text/css; charset=utf-8
+
 /
   ! Cache-Control
   Cache-Control: no-store
