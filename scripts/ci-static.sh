@@ -39,6 +39,8 @@ fi
 check asks node src/scripts/asks.mjs check --all
 if [ "$mode" = code ]; then
   check sides pnpm check:sides
+  # OFF-VERCEL OV5: was deploy.yml's prepare step, which never ran on main.
+  check css node scripts/check-css.mjs
   check check-asks pnpm check:asks
   check page-events pnpm check:page-events
   check wire pnpm check:wire
