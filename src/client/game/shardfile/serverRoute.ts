@@ -7,9 +7,11 @@ export type ServerRoute = 'online' | 'standalone';
 
 /** The route for a page. `world` is the build's stamp (`__WS_WORLD__`); `storage` is null where the page can keep nothing, and an
  *  online seat needs a device id it can keep. A grid page goes online only once the world hosts the grid (`gridHosted`: the door's
- *  `world` word counts more than the home cell, which `WORLD_CELLS` decides); until then it keeps today's solo grid. */
-export function serverRoute(world: unknown, storage: unknown, grid?: { readonly page: boolean; readonly hosted: boolean }): ServerRoute {
-  return world !== undefined && storage !== null && (grid === undefined || !grid.page || grid.hosted) ? 'online' : 'standalone';
+ *  `world` word counts more than the home cell, which `WORLD_CELLS` decides); until then it keeps today's solo grid. A one-shard page of a
+ *  shard the grid doesn't place (`placed` false: Brasscap's Developer-only card) plays solo: the world opens only grid cells, so its door
+ *  would seat the device in another cell and the page would leave for the title (opus-brass3, Jake 2026-11-12: "kicked me out"). */
+export function serverRoute(world: unknown, storage: unknown, grid?: { readonly page: boolean; readonly hosted: boolean }, placed = true): ServerRoute {
+  return world !== undefined && storage !== null && (grid === undefined || !grid.page || grid.hosted) && (grid?.page === true || placed) ? 'online' : 'standalone';
 }
 
 /** Whether the door's `world` word (`socketFrames.ts` `WorldWord`, sent on every socket before hello) says it hosts the grid: more
@@ -19,5 +21,6 @@ export function hostsGrid(world: unknown): boolean {
   return typeof cells === 'number' && cells > 1;
 }
 
-/** Whether a page may start the in-page server before its Worker boot step. A build with a world never does: its pages join the world. */
-export function earlyStandalone(world: unknown): boolean { return world === undefined; }
+/** Whether a page may start the in-page server before its Worker boot step. A build with a world never does: its pages join the world,
+ *  except a one-shard page of a shard the grid doesn't place (`placed` false), which plays solo. */
+export function earlyStandalone(world: unknown, placed = true): boolean { return world === undefined || !placed; }

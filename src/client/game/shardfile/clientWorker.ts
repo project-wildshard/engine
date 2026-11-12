@@ -52,6 +52,7 @@ import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 import { earlyStandalone, hostsGrid, serverRoute } from './serverRoute';
+import { shardCell } from '../grid/oneWayIn';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
@@ -279,7 +280,7 @@ async function leaveEarly(shell: Promise<Shell>): Promise<void> {
  *  that step instead, as before. A level left before adoption saves and stops this server as an adopted one would. */
 export function startWorkerServerEarly(options: { readonly slug: string; readonly lone: boolean; readonly scope: Scope }): void {
   // GO4: a build with a world puts every page in it, a grid page too: no in-page server to start early.
-  if (!earlyStandalone((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__)) return;
+  if (!earlyStandalone((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__, !options.lone || shardCell(options.slug) !== undefined)) return;
   if (early !== null && !early.adopted) return;
   const reads: EarlyServer['reads'] = { count: 0, card: null };
   const shell = bootStandalone(options.slug, options.lone, () => { if (reads.card === null) reads.count++; else reads.card.add(); });
@@ -329,7 +330,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   // GO4 gate: a grid page joins the world only once the world hosts the grid; until then, today's solo grid.
   const hosted = world !== undefined && page !== null && ports.grid !== null && (gotoHosted() || await bootTask('server:grid-hosted', async () => (await onlineModule()).worldHostsGrid(world, hostsGrid)));
-  const shell = await (world !== undefined && page !== null && serverRoute(world, page, { page: ports.grid !== null, hosted }) === 'online' ? online(world, page) : standalone()), { client } = shell;
+  // A one-shard page of a shard the grid doesn't place plays solo: the world opens only grid cells.
+  const placed = ports.grid !== null || shardCell(slug) !== undefined;
+  const shell = await (world !== undefined && page !== null && serverRoute(world, page, { page: ports.grid !== null, hosted }, placed) === 'online' ? online(world, page) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
   // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held
   // body may already be back). Once the page can save, the hold below replaces this one.
