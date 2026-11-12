@@ -8,6 +8,9 @@ name: ci
 # EV3 (HOW-WE-BUILD, 2026-11-12): products and boundaries take the last share, `tests (6)`, to themselves, beside the
 # shards (after that job's own set-up and pins); jobs 1-5 pack everything else. Run after job 1's shards, products
 # made job 1 the long pole.
+# EV3b (2026-11-12): boundaries (report-only cook-to-play, J186) is 223-338 s, and after products it made `tests (6)` the
+# long pole at 13.7 min. It needs nothing products makes (its own Ring 1 pins, Chromium and build), so it is its own
+# non-blocking `boundaries` job from t=0, like quarantine.
 on:
   # J240: a plan worktree pushes plan/<slug>; scripts/land.mjs waits for this
   # exact SHA to go green here, then fast-forwards main to it. Main's run of
@@ -174,7 +177,7 @@ jobs:
         if: steps.code.outputs.run == 'true'
         env:
           RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
-        run: node scripts/ci-pack.mjs --jobs=${{ strategy.job-total }} --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products,boundaries
+        run: node scripts/ci-pack.mjs --jobs=${{ strategy.job-total }} --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
       - name: Retain actual membership, budget and timing evidence
         if: always() && steps.code.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -184,7 +187,6 @@ jobs:
             tmp/engine-ci
             tmp/ci-pack/*.json
             tmp/ring-cook/step.json
-            tmp/engine-boundaries
           retention-days: 7
           if-no-files-found: ignore
       - name: Keep the recorded Ring 1 baseline
@@ -286,6 +288,69 @@ jobs:
         with:
           path: tmp/timings
           key: timings-${{ github.run_id }}
+
+  boundaries:
+    # J186's report-only cook-to-play (engine-boundaries' push half): cook Ring 1, attach, and play the same bytes.
+    # Non-blocking and on its own runner from t=0 (EV3b), so it never sets the run's long pole behind products.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # cook-to-play's build is a test build, never shipped: a paused production warns instead of failing it (as tests).
+      WS_PREVIOUS_DEPLOY_OPTIONAL: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+      - name: Reuse this exact SHA's green plan-branch run (J240)
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-exact-reuse.mjs ci.yml
+      - name: Classify from an actually green code-proving ancestor
+        if: steps.reuse.outputs.reused != 'true'
+        id: paths
+        env:
+          BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-selection.mjs
+      - id: code
+        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        run: echo "run=true" >> "$GITHUB_OUTPUT"
+      - if: steps.code.outputs.run == 'true'
+        uses: ./.github/actions/ring-setup
+      - id: playwright
+        if: steps.code.outputs.run == 'true'
+        run: echo "version=$(node -p "require('./package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
+      - if: steps.code.outputs.run == 'true'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-pack-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          restore-keys: ms-playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: steps.code.outputs.run == 'true'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ring1-spawn-parts-br-${{ github.sha }}
+          restore-keys: ring1-spawn-parts-br-
+      - name: Cook, attach, and play the same bytes
+        if: steps.code.outputs.run == 'true'
+        run: node scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries
+      - name: Keep the report
+        if: always() && steps.code.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: engine-boundaries
+          path: |
+            tmp/engine-boundaries
+            tmp/ci-pack/*.json
+          retention-days: 7
+          if-no-files-found: ignore
 
   quarantine:
     # J193: run every active quarantined proof with its ordinary exit code,

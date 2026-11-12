@@ -779,9 +779,10 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
 
 describe('failedJobs', () => {
   test('splits non-blocking quarantine jobs from blocking reds', () => {
-    const jobs = [['tests (4)', 'failure'], ['quarantine (1)', 'failure'], ['quarantine', 'timed_out'], ['static', 'success'], ['e2e', 'cancelled'], ['quarantine-check', 'failure']]
+    const jobs = [['tests (4)', 'failure'], ['quarantine (1)', 'failure'], ['quarantine', 'timed_out'], ['static', 'success'], ['e2e', 'cancelled'], ['quarantine-check', 'failure'], ['boundaries', 'failure']]
       .map(([name, conclusion]) => ({ name, conclusion }));
-    expect(failedJobs({ jobs })).toEqual({ blocking: ['tests (4) (failure)', 'e2e (cancelled)', 'quarantine-check (failure)'], nonblocking: ['quarantine (1) (failure)', 'quarantine (timed_out)'] });
+    // EV3b: J186's report-only boundaries job never blocks either.
+    expect(failedJobs({ jobs })).toEqual({ blocking: ['tests (4) (failure)', 'e2e (cancelled)', 'quarantine-check (failure)'], nonblocking: ['quarantine (1) (failure)', 'quarantine (timed_out)', 'boundaries (failure)'] });
     expect(failedJobs(null)).toEqual({ blocking: [], nonblocking: [] });
   });
 });
@@ -871,7 +872,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(existsSync('.github/workflows/ring-1.yml')).toBe(false);
     expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {2}push:/mu);
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    expect([...jobs.keys()]).toEqual(['tests', 'timings', 'quarantine']);
+    expect([...jobs.keys()]).toEqual(['tests', 'timings', 'boundaries', 'quarantine']);
     // LS2: the one bookkeeping job saves main's measured timings after the tests; it never decides the run's verdict.
     const timings = jobs.get('timings') ?? '';
     jobs.delete('timings');
@@ -892,7 +893,11 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
       expect(code, name).toContain("steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'");
     }
     expect(jobs.get('tests')).toContain("name: Run this job's packed share");
-    expect(jobs.get('tests')).toContain('--units=static,e2e,plan-proofs,tests,products,boundaries');
+    expect(jobs.get('tests')).toContain('--units=static,e2e,plan-proofs,tests,products');
+    // EV3b: boundaries (report-only, 223-338 s) is its own non-blocking job from t=0, never behind products.
+    expect(jobs.get('tests')).not.toContain('boundaries');
+    expect(jobs.get('boundaries')).toMatch(/^ {4}continue-on-error: true$/mu);
+    expect(jobs.get('boundaries')).toContain('scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries');
     // EV3: six shares, the last of them Ring 1's products alone.
     expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5, 6]');
   });
@@ -907,6 +912,9 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     // One job runs everything, products after the shards; a run without products packs over every job.
     expect(names(packUnits(runUnits(3, kinds), 1))[0]).toEqual(['static', 'e2e', 'plan-proofs', 'shard:1', 'shard:2', 'shard:3', 'products', 'boundaries']);
     expect(names(packUnits(runUnits(6, ['tests']), 6)).every(bin => bin.length === 1)).toBe(true);
+    // EV3b: ci.yml runs boundaries alone in its own job; the planner weighs it at its measured 223-338 s.
+    expect(names(packUnits(runUnits(0, ['boundaries']), 1))).toEqual([['boundaries']]);
+    expect(runUnits(0, ['boundaries'])[0]).toMatchObject({ seconds: 300, blocking: false });
   });
 });
 

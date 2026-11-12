@@ -15,8 +15,10 @@
 //               in its job. With more than one job it takes the last job to itself (EV3), beside the shards, after that
 //               job's set-up and pins; the other units pack over the rest. Packed after job 1's shards, it made job 1
 //               the long pole (p50 12.6 min against 9.1).
-//   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products: report-only (J186), so non-blocking,
-//               and always in the job that runs products
+//   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products: report-only (J186), so non-blocking.
+//               It installs Ring 1's pins and Chromium itself and builds its own tree, so it needs no other unit: ci.yml
+//               runs it as its own non-blocking job from t=0 (EV3b; after products in job 6 it took that job to 13.7
+//               min). Packed with products, it still follows products into products' job
 // Phases run in order: before pins (up to C units at once), `pnpm pins && pnpm gen:inputs`, the shards ONE AT A TIME,
 // then products and boundaries. A shard has the runner to itself, as its plan assumes: two at once on the 4-vCPU runner
 // pushed four files past the 60 s cap and failed a timing proof (run 42955579476, CI-JOB-PACKING-PLAN).
@@ -31,14 +33,17 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 /** Seconds a unit takes alone on the hosted runner; only the packing reads them. TEST-SPEED TS2 (2026-11-11): re-measured
- * over 12 packed runs (42960973990 .. 42974435994): products grew from 205 to 347-384 s and set the long job. */
-export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quarantine:135,products:360,boundaries:32});
+ * over 12 packed runs (42960973990 .. 42974435994): products grew from 205 to 347-384 s and set the long job. EV3b
+ * (HOW-WE-BUILD, 2026-11-12): boundaries is 223-338 s, not 32 (runs 43292331966, 43295196045). */
+export const UNIT_SECONDS=Object.freeze({static:170,e2e:45,'plan-proofs':45,quarantine:135,products:360,boundaries:300});
 const PHASE=Object.freeze({static:0,e2e:0,'plan-proofs':0,quarantine:2,products:3,boundaries:4});
 /** Units that go wherever another unit went, after it (they need its state), instead of being balanced on their own. */
 const FOLLOWS=Object.freeze(/** @type {Record<string,string>} */({boundaries:'products'}));
 /** Units that take the last job to themselves (with their followers) when a run has more than one (EV3). */
 const OWN_JOB=new Set(['products']);
 const NONBLOCKING=new Set(['quarantine','boundaries']);
+/** Units that install the pins they need themselves, so a job of only these skips the full `pnpm pins`. */
+const OWN_PINS=new Set(['boundaries']);
 const SHARD_LIMIT_MS=300_000;
 /** @typedef {{name:string,phase:number,seconds:number,blocking:boolean}} Unit */
 /** @typedef {{name:string,phase:number,blocking:boolean,started:number,charged:number,ended:number,seconds:number,code:number}} UnitResult */
@@ -94,7 +99,8 @@ function commandOf(unit,charged){
   if(unit.name==='quarantine')return {command:['node','scripts/test-quarantine.mjs','--shard=1/1'],env};
   // BROWSER-TESTS-BENCH BB2 (J231): Chromium installs in the background while Ring 1 cooks and builds.
   if(unit.name==='products')return {command:['bash','-c','bash scripts/ci-browser.sh start && bash scripts/ring1.sh cook-step && bash scripts/ring1.sh build && bash scripts/ci-browser.sh wait && bash scripts/ring1.sh boot'],env};
-  if(unit.name==='boundaries')return {command:['bash','-c','node scripts/pins.ts install --ring 1 && pnpm gen:inputs && node scripts/cook-to-play.mjs --out=tmp/engine-boundaries'],env};
+  // cook-to-play boots its build in Chromium: install it beside the pins, as products does (BB2).
+  if(unit.name==='boundaries')return {command:['bash','-c','bash scripts/ci-browser.sh start && node scripts/pins.ts install --ring 1 && pnpm gen:inputs && bash scripts/ci-browser.sh wait && node scripts/cook-to-play.mjs --out=tmp/engine-boundaries'],env};
   throw new Error(`No command for ${unit.name}`);
 }
 
@@ -185,7 +191,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
     const timed=async(/** @type {string} */phase,/** @type {()=>Promise<void>} */work)=>{const started=Date.now();await work();phases.push({phase,started,ended:Date.now()});};
     await timed('before-pins',async()=>{results.push(...await runPhase(mine.filter(unit=>unit.phase===0),concurrency,logs,0));});
     let pinsCode=0;
-    if(mine.some(unit=>unit.phase>=2))await timed('pins',async()=>{const started=Date.now();pinsCode=await step(['bash','-c','pnpm pins && pnpm gen:inputs']);setupMs+=Date.now()-started;});
+    if(mine.some(unit=>unit.phase>=2&&!OWN_PINS.has(unit.name)))await timed('pins',async()=>{const started=Date.now();pinsCode=await step(['bash','-c','pnpm pins && pnpm gen:inputs']);setupMs+=Date.now()-started;});
     if(pinsCode!==0)console.log('::error title=pins::pnpm pins && pnpm gen:inputs failed; no test unit ran');
     else{
       await timed('tests',async()=>{results.push(...await runPhase(mine.filter(unit=>unit.phase===2),1,logs,setupMs));});

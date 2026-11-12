@@ -143,8 +143,8 @@ function ghApi(repo,path){
 }
 
 /** J193/J200: `quarantine (n)` jobs run quarantined files with their ordinary exit code and are continue-on-error;
- * they are red by design until rewritten and never block a landing. */
-const NONBLOCKING_JOB=/^quarantine(?: \(\d+\))?$/u;
+ * they are red by design until rewritten and never block a landing. So is J186's report-only `boundaries` job (EV3b). */
+const NONBLOCKING_JOB=/^(?:quarantine|boundaries)(?: \(\d+\))?$/u;
 const FAILED=new Set(['failure','timed_out','cancelled','startup_failure']);
 
 /** A run's failed jobs, split into the blocking ones and the non-blocking quarantine ones.
