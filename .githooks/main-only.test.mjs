@@ -58,7 +58,7 @@ describe('session brief: main only', () => {
     git(['update-ref', 'refs/remotes/origin/plan/foo', 'HEAD']);
     git(['worktree', 'add', '-q', '-b', 'plan/foo', join(root, '.worktrees', 'foo')]);
     const out = brief();
-    assert.match(out, /plan worktree .*\.worktrees\/foo/);
+    assert.match(out, /plan worktrees \(1\): \.worktrees\/foo/);
     assert.match(out, /\(clean: main only\)/);
     assert.doesNotMatch(out, /!!/);
   });
