@@ -51,8 +51,8 @@
   "pine-hollow": {
    "baselinePhoneBytes": 78299562,
    "recordedPhoneBytes": 111018672,
-   "ceilingPhoneBytes": 50543163,
-   "latchedPhoneBytes": 50543163,
+   "ceilingPhoneBytes": 37091647,
+   "latchedPhoneBytes": 37091647,
    "shrinkOnly": true,
    "baseline": {
     "phone": {
