@@ -35,7 +35,7 @@ const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'suns
 const swDelay=delayKind==='sw-open'||delayKind==='sw-put';
 const controlled = option('sw') === 'warm' || swDelay;
 const remote=option('base');
-if(remote!==undefined&&remote!=='https://wildshard-singleplayer.vercel.app')throw new Error('Remote proof requires the real production origin');
+if(remote!==undefined&&remote!=='https://play.wildshard.io')throw new Error('Remote proof requires the real production origin');
 if(remote!==undefined){
   assert.equal(delayKind,undefined,'Network fault proxies require a local finished build');
   const response=await fetch(`${remote}/version.json`,{cache:'no-store'}),version=await response.json();

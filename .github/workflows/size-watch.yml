@@ -1,6 +1,6 @@
 # SHARD-SIZE row 8: what the build's size gate can't see. Nightly, measure production by the same meter that set the
 # baseline, and open or update one issue when a title passes 3 MB or a flow passes its book by 10 %.
-# Reads production and files an issue. No build, no Vercel secret, no deploy step belongs here: deploys live in deploy.yml.
+# Reads production and files an issue. No build, no deploy secret, no deploy step belongs here: deploys live in deploy.yml.
 name: size-watch
 
 on:
@@ -31,7 +31,7 @@ jobs:
       - run: bash scripts/ci-playwright-install.sh chromium
       - name: Measure production
         id: watch
-        run: node scripts/shard-size-watch.mjs --upstream https://wildshard-singleplayer.vercel.app/ --out size-watch
+        run: node scripts/shard-size-watch.mjs --upstream https://play.wildshard.io/ --out size-watch
         continue-on-error: true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

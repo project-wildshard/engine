@@ -56,7 +56,7 @@ function command(file: string, args: string[], env: NodeJS.ProcessEnv = process.
 }
 const owner = `phone-loading-${process.pid}`;
 const env = {...process.env, SERVE_OWNER: owner};
-let url = values.url ?? 'https://wildshard-singleplayer.vercel.app/';
+let url = values.url ?? 'https://play.wildshard.io/';
 let leased = false;
 try {
   if (values.head || values.rev !== undefined) {

@@ -4,8 +4,8 @@
  * `.review/handled/`) as `<id>.json` + `<id>.jpg`, then print a table (time, category, shard, pose, note).
  * The notes come from the in-game FEEDBACK tab / quick note (src/client/engine/ui/Feedback.ts) through api-server's `/api/inbox` (api-server `src/server/routes/`).
  *
- * The password comes from `REVIEW_PASSWORD` in the environment, else from `.env.local` (what `vercel env pull`
- * writes; gitignored). The site defaults to the API (scripts/api-origin.mjs); `INBOX_URL` or `--url` point it elsewhere.
+ * The password comes from `REVIEW_PASSWORD` in the environment, else from `.env.local` (gitignored; the
+ * value is the api Worker's `REVIEW_PASSWORD` secret). The site defaults to the API (scripts/api-origin.mjs); `INBOX_URL` or `--url` point it elsewhere.
  * `--all` re-downloads entries already handled. The drain-inbox skill (.claude/skills/drain-inbox) reads the output.
  *
  * Client error reports (E133: window.onerror, unhandled rejections, a frame-loop system switched off — src/client/engine/core/errorReport.ts
@@ -82,7 +82,7 @@ async function main() {
   const base = (arg('--url') ?? process.env.INBOX_URL ?? apiOrigin()).replace(/\/$/u, '');
   const password = process.env.REVIEW_PASSWORD ?? envLocal('REVIEW_PASSWORD');
   if (password === null || password === '') {
-    console.error('inbox-pull: no REVIEW_PASSWORD (env or .env.local — run `vercel env pull`)');
+    console.error('inbox-pull: no REVIEW_PASSWORD (env or .env.local — set REVIEW_PASSWORD)');
     process.exit(2);
   }
   const headers = { 'x-review-password': password };

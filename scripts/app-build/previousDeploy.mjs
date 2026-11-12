@@ -181,7 +181,7 @@ export async function carryPreviousDeploy(directory, options = {}) {
   if (options.previousDirectory !== undefined) {
     previous = readManifest(JSON.parse(readFileSync(join(options.previousDirectory, MANIFEST), 'utf8')));
   } else if (options.previousOrigin !== undefined) {
-    // A test build may meet a paused or failing production (Vercel's spend cap answers 503 DEPLOYMENT_PAUSED, main ci
+    // A test build may meet a paused or failing production (a host's spend cap answered 503 DEPLOYMENT_PAUSED, main ci
     // 43111080979): a 5xx or a transport failure (before or after the headers) warns and carries nothing. A release still
     // refuses, so it never ships without the kept graphs. A body that arrives but is not a valid manifest always refuses.
     /** @param {string} why */

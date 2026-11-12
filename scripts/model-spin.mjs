@@ -8,7 +8,7 @@
 //   node scripts/model-spin.mjs --url=<served build> --shard=<slug> --list      # the catalog's ids + names, in its order
 //   --models=<id>@* spins each of a card's variants (its chips: Camp people's five), <id>@<n> its n-th (1-based), E353
 //
-//   scripts/browser-lane.sh node scripts/model-spin.mjs --url=https://wildshard-singleplayer.vercel.app \
+//   scripts/browser-lane.sh node scripts/model-spin.mjs --url=https://play.wildshard.io \
 //     --shard=driftwood-isle --models=hut --out=art/models-audit/round-3-spin-clips/driftwood-hut.mp4
 //
 // What it does:

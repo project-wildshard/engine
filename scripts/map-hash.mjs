@@ -1,7 +1,7 @@
 // The baked map's staleness key (SF66, G246 / G247): a hash of the files that place a shard's world. A shard's map image
 // is baked from the world (scripts/bake-maps.mjs) and stamped with this hash in src/shards/<slug>/look/map.baked.json; the
 // gate test (test/baked-maps.test.ts) recomputes it, so a world change without a rebake fails before it deploys.
-// Node only, no git (the Vercel tree has no .git): file paths and contents, sorted.
+// Node only, no git (an exported tree has no .git): file paths and contents, sorted.
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';

@@ -68,7 +68,7 @@ export interface LastEnd {
  *  reloads back into the world where the player stands (SETTINGS-REDESIGN SR12); unlike `reload` it does not return to the title. */
 export type ReloadReason = 'reload' | 'settings' | 'gpu' | 'background' | 'new-game';
 
-/** `<sha>-<stamp>` → the sha, else the stamp (a Vercel CLI build has no commit): the build pill's short id (src/client/engine/ui/Update.ts) */
+/** `<sha>-<stamp>` → the sha, else the stamp (a build outside a git checkout has no commit): the build pill's short id (src/client/engine/ui/Update.ts) */
 const build = (): string => { try { const [sha = '', time = ''] = __BUILD_ID__.split('-'); return sha.length >= 7 ? sha : time; } catch { return ''; } };
 const store = (kind: 'local' | 'session'): ReturnType<typeof saveStorage> | null => saveStorage(kind === 'local' ? 'device' : 'session');
 const readJson = (s: ReturnType<typeof saveStorage> | null, key: string): unknown => { try { const v = s?.getItem(key); return v === null || v === undefined ? null : JSON.parse(v) as unknown; } catch { return null; } };

@@ -22,7 +22,7 @@ const mode = args[0];
 if (!['cold', 'warm', 'upgrade'].includes(mode)) { console.error('usage: drive.mjs <cold|warm|upgrade> --shard <regex> --out <dir> [--base <url>] [--play <s>] [--packs] [--device-save <key>=<value>]... [--public]'); process.exit(2); }
 const udid = process.env.SIM_UDID;
 if (!udid) { console.error('drive.mjs: run inside scripts/sim-lane.sh run (SIM_UDID unset)'); process.exit(2); }
-const BASE = opt('base', 'https://wildshard-singleplayer.vercel.app').replace(/\/$/u, '');
+const BASE = opt('base', 'https://play.wildshard.io').replace(/\/$/u, '');
 const SHARD = new RegExp(opt('shard', 'nine'), 'iu');
 const PLAY_S = Number(opt('play', '30'));
 // DL16's gate: the same flow with Debug ▸ Loading & memory ▸ Level download on Runtime packs (the row's own slot)

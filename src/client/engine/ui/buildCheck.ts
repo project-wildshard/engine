@@ -9,7 +9,7 @@ declare const __BUILD_ID__: string;
 /** vite.config.ts: package.json's version and its CHANGELOG.md section (scripts/changelog.mjs); absent under Node */
 declare const __ENGINE_RELEASE__: EngineRelease;
 
-/** `<sha>-<stamp>` → the 7-character commit, or the time token: Vercel CLI builds have no git checkout. A world build's
+/** `<sha>-<stamp>` → the 7-character commit, or the time token when the build had no git checkout. A world build's
  *  id is the full 40-character commit (Jake, 2026-11-10: "show the short commit, not this long ass thing"). */
 export const shortBuild = (id: string): string => {
   const [gitSha = '', stamp = ''] = id.split('-');

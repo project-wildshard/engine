@@ -15,7 +15,7 @@
 # bar's verdicts, seconds after the tap) and board.jpg (labelled, iPhone portrait). Keep boards in art/download/dl23-flow/.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-base=https://wildshard-singleplayer.vercel.app
+base=https://play.wildshard.io
 out="tmp/loading-flow/$(date +%Y%m%d-%H%M)"
 downloads=(shardfile packs)
 modes='cold warm'

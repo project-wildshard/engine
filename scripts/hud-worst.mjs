@@ -264,7 +264,7 @@ for (const kind of browsers) {
       for (const mode of modes) {
         const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}`;
         const context = await browser.newContext(phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } });
-        // our own pages only (J148): the local build and the asset hosts it names (our Vercel blob store, *.wildshard.io); any
+        // our own pages only (J148): the local build and the asset hosts it names (*.wildshard.io); any
         // other request, a redirect included, fails the case. Watched, not intercepted: WebKit's request interception stalls
         // the build's pack downloads (the Driftwood page never reached play under it, before and after A14 alike)
         /** @type {string[]} */ const refused = [];

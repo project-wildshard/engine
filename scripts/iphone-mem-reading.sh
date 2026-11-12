@@ -3,10 +3,10 @@
 # E263 method: paired USB Web Inspector, Memory.trackingUpdate (~500 ms) summed, decimal GB.
 #
 # Before: the iPhone on USB, unlocked, trusted; Safari ▸ Settings ▸ Advanced ▸ Web Inspector ON; one Safari tab open on
-# https://wildshard-singleplayer.vercel.app/version.json in front (the script drives that tab); Low Power Mode OFF
+# https://play.wildshard.io/version.json in front (the script drives that tab); Low Power Mode OFF
 # (Settings ▸ Battery) for the fps reading; pause ▸ Settings ▸ graphics at max if the build has such a pick.
 #
-#   scripts/iphone-mem-reading.sh [--base https://wildshard-singleplayer.vercel.app] [--fps 150]
+#   scripts/iphone-mem-reading.sh [--base https://play.wildshard.io] [--fps 150]
 #
 # Runs, each written to progress/b8/phone-<run>-<time>.jsonl and summarised on stdout:
 #   1. pine→nalati (href)     the E263 flow exactly: Pine Hollow loaded, then Nalati by an assigned navigation
@@ -15,7 +15,7 @@
 #                             (the thermal fall-off after 1–2 min shows in the later windows)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-BASE=https://wildshard-singleplayer.vercel.app
+BASE=https://play.wildshard.io
 FPS=150
 while [ $# -gt 0 ]; do case "$1" in --base) BASE=$2; shift 2;; --fps) FPS=$2; shift 2;; *) echo "unknown $1" >&2; exit 2;; esac; done
 UDID=$(xcrun devicectl list devices 2>/dev/null | awk '/iPhone 17/ && $0 !~ /unavailable/ {print "ok"}' | head -1)

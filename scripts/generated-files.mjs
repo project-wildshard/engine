@@ -47,7 +47,7 @@ export function generatedFiles(root, apiOver = null) {
   return { outputs, measurement: { edges, ratchet } };
 }
 /**
- * Refuse stale bytes and unlisted measured increases, including the docs Vercel excludes.
+ * Refuse stale bytes and unlisted measured increases, including the docs an exported tree excludes.
  * The serialized pusher may reuse a candidate it just measured on this same unchanged committed export.
  */
 export function checkGenerated(root, predecessor, message, candidate = generatedFiles(root)) {

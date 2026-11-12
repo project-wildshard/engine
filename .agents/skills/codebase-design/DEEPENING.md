@@ -18,7 +18,7 @@ The category decides how the deepened module is tested at its seam.
    an in-memory one. `Transport` is the model: `WorkerLoopback` today,
    `WebSocketTransport` at E7, `ConditionedTransport` for latency and
    loss in tests.
-4. **True external**: R2, Neon, Vercel, a model API. Inject a port and
+4. **True external**: R2, Neon, Cloudflare, a model API. Inject a port and
    hold every adapter to one contract, as api-server's
    `objectStoreContract` does for its local store and its R2 store.
 

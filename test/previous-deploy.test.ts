@@ -245,10 +245,10 @@ test('a clash with the deploy live right now, when it is ours, fails the build a
 
 test('a paused production origin (503) stops a release build, but a CI test build warns once and carries nothing', async () => {
   mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-paused-'));
-  // Vercel's spend cap answers every path 503 DEPLOYMENT_PAUSED (main ci 43111080979)
+  // A paused host answers every path 503 DEPLOYMENT_PAUSED (the old host's spend cap, main ci 43111080979)
   let mode: 'paused' | 'reset' | 'garbage' = 'paused';
   const server = createServer((_request, response) => {
-    if (mode === 'paused') {response.writeHead(503, {'x-vercel-error': 'DEPLOYMENT_PAUSED'}); response.end(); return;}
+    if (mode === 'paused') {response.writeHead(503, {'x-error': 'DEPLOYMENT_PAUSED'}); response.end(); return;}
     response.writeHead(200, {'Content-Type': 'application/json', 'Content-Length': '100'});
     if (mode === 'garbage') {response.end('{not json'.padEnd(100)); return;}
     response.write('{"format":'); setTimeout(() => {response.socket?.destroy();}, 10);

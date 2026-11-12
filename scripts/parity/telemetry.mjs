@@ -1,4 +1,4 @@
-/** Proof-only substitute for the Vercel telemetry POST endpoint absent from vite preview.
+/** Proof-only substitute for the API's telemetry POST endpoint absent from vite preview.
  * Unexpected methods/payloads continue to the real server and remain class-D errors.
  * @param {string} method @param {unknown} payload */
 export function telemetryFixtureAccepts(method, payload) {

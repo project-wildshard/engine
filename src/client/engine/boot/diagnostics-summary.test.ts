@@ -3,7 +3,7 @@ import { diagnosticPath, diagnosticSummary, safeBootDiagnostics, DIAGNOSTIC_PRIV
 import type { BootTiming } from '../../../shared/engine/boot/timing';
 
 // LD3 (J208): Jake's d91507e paste named its 34.6 s wait only as resource-N and operation-N.
-const ORIGIN = 'https://wildshard-singleplayer.vercel.app';
+const ORIGIN = 'https://play.wildshard.io';
 
 it('names this page\'s own files by path and keeps every other URL private', () => {
   expect(diagnosticPath(`${ORIGIN}/b/d91507e-mw810im4/control-0-0-startup-BrJ0bkDk.js`, ORIGIN)).toBe('/b/d91507e-mw810im4/control-0-0-startup-BrJ0bkDk.js');
@@ -15,8 +15,8 @@ it('names this page\'s own files by path and keeps every other URL private', () 
   expect(diagnosticPath('/version.json', ORIGIN)).toBe('/version.json');
   expect(diagnosticPath(`${ORIGIN}/assets/a%20b/c.bin`, ORIGIN)).toBe('/assets/…/c.bin');
   expect(diagnosticPath('https://api.wildshard.io/v1/hello', ORIGIN)).toBeNull();
-  expect(diagnosticPath(`https://user:pass@wildshard-singleplayer.vercel.app/x.js`, ORIGIN)).toBeNull();
-  expect(diagnosticPath('blob:https://wildshard-singleplayer.vercel.app/123', ORIGIN)).toBeNull();
+  expect(diagnosticPath(`https://user:pass@play.wildshard.io/x.js`, ORIGIN)).toBeNull();
+  expect(diagnosticPath('blob:https://play.wildshard.io/123', ORIGIN)).toBeNull();
   expect(diagnosticPath('/x.js', 'null')).toBeNull(); // an opaque origin (file:, sandboxed) names nothing
 });
 

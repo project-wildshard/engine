@@ -29,7 +29,7 @@ const errors = [];
 const at = (p) => join(ROOT, p.replace(/\/$/, ''));
 const manifest = JSON.parse(readFileSync(at(MANIFEST), 'utf8'));
 
-/** the repo's files: git's list when this is a checkout, else a walk (the Vercel gate's export has no .git) */
+/** the repo's files: git's list when this is a checkout, else a walk (an exported tree has no .git) */
 function listFiles(dir) {
   try {
     return execFileSync('git', ['ls-files', '-z', '--', dir], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })

@@ -37,7 +37,7 @@ const ROOT = resolvePath(new URL('..', import.meta.url).pathname);
 const argv = process.argv.slice(2);
 const flag = (name, d) => { const a = argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : d; };
 const WS = flag('ws', 'ws://127.0.0.1:9231/devtools/page/1');
-const URL_GAME = flag('url', 'https://wildshard-singleplayer.vercel.app/?chunk=nalati-grasslands');
+const URL_GAME = flag('url', 'https://play.wildshard.io/?chunk=nalati-grasslands');
 const TAG = flag('tag', `reading-${new Date().toISOString().slice(0, 16).replaceAll(/[:T]/g, '')}`);
 const FPS_S = Number(flag('fps', '0'));
 const SETTLE = Number(flag('settle', '8')) * 1000;

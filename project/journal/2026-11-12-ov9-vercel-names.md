@@ -9,3 +9,4 @@
   are gone; `--host=workers` is the only value. Red first: a CLI usage test for any other `--host`.
 - Commit order: the page-release commit went in first; the origins commit's commit lane timed out once on a loaded machine.
 - Product sha: `readBuiltShardfile` takes the CI product fast path only when `WS_TEST_PRODUCTS_SHA` equals `GITHUB_SHA` (the checkout ci-checks already checks), not the old host's commit env; hover-contract and nightly stop setting it (buildIdentity reads WS_BUILD_ID only since OV3). Red first: two vitest cases and the Python prepared-build test.
+- Dev tools default to https://play.wildshard.io instead of the old vercel.app address; comments that described the old host's behaviour now describe the page host or Cloudflare.

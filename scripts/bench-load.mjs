@@ -10,7 +10,7 @@
 //
 //   pnpm bench                     # wifi,4g × cold,warm at 4× CPU on a fresh build
 //   pnpm bench:ci                  # same, exit code = number of budget rows over
-//   pnpm bench -- --url=https://wildshard-singleplayer.vercel.app   # live site, no build
+//   pnpm bench -- --url=https://play.wildshard.io   # live site, no build
 //   pnpm bench -- --compare progress/bench/a.json progress/bench/b.json
 import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';

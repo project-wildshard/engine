@@ -53,4 +53,4 @@ beside the client, a listen server).
 - `src/commons/`
 - shared assets (public/assets/{gpu,tex,music,sfx,hdri,models,baked}) and highway/centre art
 - Measured cut (ENGINE-CUT.md): 10 imports to cut, 36k LOC of browser-only logic to wire into the server tick, 17k of client loading to rewrite, 14-19k LOC to split.
-- After this move singleplayer no longer ships; the game deploys from here (Vercel `wildshard-singleplayer`).
+- After this move singleplayer no longer ships; the game deploys from here (Cloudflare Workers `wildshard-play`, OFF-VERCEL).

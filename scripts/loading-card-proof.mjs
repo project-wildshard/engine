@@ -101,7 +101,7 @@ function recordBars() {
 }
 
 const remote=option('base');
-if(remote!==undefined&&remote!=='https://wildshard-singleplayer.vercel.app')throw new Error('Remote proof requires the real production origin');
+if(remote!==undefined&&remote!=='https://play.wildshard.io')throw new Error('Remote proof requires the real production origin');
 if(remote!==undefined){
   const response=await fetch(`${remote}/version.json`,{cache:'no-store'}),version=await response.json();
   if(!response.ok||version.build!==option('expect-build-id')||version.saveEpoch!==1)throw new Error('Unexpected production build or save epoch');

@@ -3,7 +3,7 @@
 // carried builds (MF2, deploy-chunks.json) brought in. With --gate (PZ4, build:game runs it on the split page) it refuses a
 // page that holds content, or one past PAGE_LIMITS.
 //
-//   node scripts/page-size.mjs <dist | .vercel/output/static> [--json] [--gate]
+//   node scripts/page-size.mjs <dist> [--json] [--gate]
 //
 // Kinds: code (`b/`), shell (the documents, worker, root JSON, fonts, icons), runtime (what boot needs from the engine:
 // `assets/physics/`, `basis/`), engine art (every other `assets/` file, the trailers, the crossroads rig), shard content
@@ -80,7 +80,7 @@ export function classify(path, shards) {
   return namesShard(owner, shards) ? { kind: 'shard content', part: 'S7' } : { kind: 'engine art' };
 }
 
-/** Every file under a page root, following links (a Vercel output can link back into dist).
+/** Every file under a page root, following links (a packaged output can link back into dist).
  * @param {string} root @returns {{path: string, bytes: number}[]} */
 function files(root) {
   /** @type {{path: string, bytes: number}[]} */ const rows = [];
@@ -122,7 +122,7 @@ function add(into, bytes, carried) {
  * @returns {{dir: string, carriedBuilds: number | undefined, total: Tally, kinds: Record<string, Tally>, parts: Record<string, Tally>}} */
 export function pageSize(dir) {
   const root = resolve(dir);
-  if (!existsSync(join(root, 'index.html'))) throw new Error(`page-size: ${root} holds no index.html; give a built page (dist or .vercel/output/static)`);
+  if (!existsSync(join(root, 'index.html'))) throw new Error(`page-size: ${root} holds no index.html; give a built page (dist)`);
   const shards = shardNames(root), carried = carriedPaths(root);
   const total = tally();
   /** @type {Record<string, Tally>} */ const kinds = Object.fromEntries(KINDS.map(kind => [kind, tally()]));
@@ -185,7 +185,7 @@ export function formatPageSize(report) {
 
 function main() {
   const args = process.argv.slice(2), json = args.includes('--json'), gate = args.includes('--gate'), dir = args.find(arg => !arg.startsWith('--'));
-  if (dir === undefined) throw new Error('usage: node scripts/page-size.mjs <dist | .vercel/output/static> [--json] [--gate]');
+  if (dir === undefined) throw new Error('usage: node scripts/page-size.mjs <dist> [--json] [--gate]');
   const report = pageSize(dir);
   console.log(json ? JSON.stringify(report, null, 2) : formatPageSize(report));
   if (!gate) return;

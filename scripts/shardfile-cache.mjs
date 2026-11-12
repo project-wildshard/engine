@@ -1,6 +1,6 @@
 // Fast proofs (Jake 2026-10-15, "make each proof quick and cheap"): a shardfile product is rebuilt only when a file it
-// can read changed. Opt-in (`build-shardfiles.mjs --reuse`, used by serve-build.sh and `pnpm build:proof`); the push gate,
-// CI and Vercel run the plain `pnpm build`, which rebuilds every shard before warming this cache.
+// can read changed. Opt-in (`build-shardfiles.mjs --reuse`, used by serve-build.sh and `pnpm build:proof`); the push gate
+// and CI run the plain `pnpm build`, which rebuilds every shard before warming this cache.
 //
 // The default compiler records its actual Node reads and native Vite inputs in
 // shardfile-inputs.mjs. This module stores immutable products and accepts the

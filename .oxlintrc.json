@@ -143,7 +143,7 @@
       "rules": { "typescript/parameter-properties": "error" }
     },
     {
-      // Node-side tooling: build scripts, the Vite configs and plugin, the Vercel functions in api/, the drafts site's tools.
+      // Node-side tooling: build scripts, the Vite configs and plugin, the old functions in api/, the drafts site's tools.
       "files": ["scripts/**", "src/shards/*/generators/**/*.mjs", "src/shards/*/bake/**/*.mjs", "src/shards/*/blender/**/*.mjs", "vite/**", "vite.config.ts", "vitest.config.ts", "api/**", "api-tests/**", "lint/**", "drafts/tools/**", "drafts/test/**", "drafts/vite.config.ts", "admin/tools/**", "admin/test/**", "admin/vite.config.ts"],
       "env": { "node": true },
       "rules": {

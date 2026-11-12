@@ -83,7 +83,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgDat
   const stopped = room => new Promise(resolve => { room.on('exit', resolve); room.kill('SIGTERM'); setTimeout(resolve, 8000); });
   /** @param {import('node:child_process').ChildProcess} room */
   const exited = room => new Promise(resolve => { room.on('exit', resolve); setTimeout(resolve, 15_000); });
-  /** Vercel's half of a deploy: the page's origin serves this build from now on. @param {string} built */
+  /** The page host's half of a deploy: the page's origin serves this build from now on. @param {string} built */
   const serve = async built => {
     const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(PAGE_PORT)], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
     for (let tries = 0; tries < 100 && !(await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`).then(found => found.ok).catch(() => false)); tries++) await sleep(100);

@@ -5,7 +5,7 @@
 // budgets/shard-size-baseline.json's numbers came from this; its `method` says how to redo them from the baseline commit.
 //
 //   node scripts/shard-wire-meter.mjs --root <built checkout> --shard <slug> --tier phone|desktop --out <file.json>
-//     [--flow select|grid] [--upstream https://wildshard-singleplayer.vercel.app] [--settle ms] [--timeout ms] [--shot file.jpg]
+//     [--flow select|grid] [--upstream https://play.wildshard.io] [--settle ms] [--timeout ms] [--shot file.jpg]
 //     [--last <slug>]   a returning player whose last pick was <slug>, with nothing stored yet
 //     [--dwell ms]      time on the title before the tap
 import { spawn } from 'node:child_process';

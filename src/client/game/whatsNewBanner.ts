@@ -18,7 +18,7 @@ declare const __BUILD_ID__: string; // vite.config.ts define; absent under Node
 /** the running build's id (`<sha>-<stamp>`), '' under a unit test */
 export function runningBuild(): string { return typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : ''; }
 
-/** `<sha>-<stamp>` → the 7-character commit (the stamp when a Vercel CLI build has no git checkout), the build pill's rule
+/** `<sha>-<stamp>` → the 7-character commit (the stamp when a build has no git checkout), the build pill's rule
  *  (src/client/engine/ui/buildCheck.ts). A world build's id is the full commit; Jake 2026-11-10: "show the short commit, not
  *  this long ass thing". One commit rebuilt keeps one id, so a redeploy of the same build stays hidden */
 export function shortBuild(id: string): string {

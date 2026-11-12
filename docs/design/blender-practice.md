@@ -106,7 +106,7 @@ version, and they check geometry digests rather than bytes where the
 exporter isn't byte-stable.
 
 **Why the GLB is committed, not built in CI.**
-- Vercel and GitHub Actions have no Blender, Metal GPU, TRELLIS or local
+- Cloudflare and GitHub Actions have no Blender, Metal GPU, TRELLIS or local
   caches.
 - A Cycles bake takes minutes of GPU time.
 - Some inputs aren't reproducible bit for bit. A TRELLIS.2 decode
@@ -345,7 +345,7 @@ changes a shipped pixel. Item 7 rides the approved waves.
 - Repo: `scripts/blender/`, `scripts/img2mesh/README.md`,
   `scripts/practice/build_dummies.sh`, `src/dev/nd-lab/grapple/`,
   `art/nine-dragon-stack/round-13-viewmodel-rig/README.md`,
-  `.gitattributes`, `.vercelignore`.
+  `.gitattributes`.
 - Git: `7a339ed2` (the viewmodel lab deleted), `5d8feae0` (the lab
   added), `609f4242` (the Blender yurt dropped).
 - Measured: `.blend` sizes in `~/ml/img2mesh/out/dummy-e285/work/`;
