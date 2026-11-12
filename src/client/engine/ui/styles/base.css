@@ -37,6 +37,9 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
    the whole HUD up under the finger (the release smoke's HOVER tap, 2026-10-29). clip clips the same and can never scroll. */
 #hud { position: fixed; inset: 0 0 auto; height: var(--ws-vh, 100%); pointer-events: none; font-family: var(--ws-mono); color: var(--ws-text); user-select: none; overflow: clip; }
 #hud * { box-sizing: border-box; }
+/* MOBILE-KEYBOARD MK3 (J297): a phone's keyboard is up (viewport.ts marks it): the canvas and the HUD fit the visible band above
+   it, less the docked chat (--ws-vh is the fitted height), from the band's top, as Safari may pan the page under the keyboard */
+html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top, 0px); }
 /* FC14 (G911): the phone's HUD glass is flat. A backdrop blur re-samples the live canvas under every chip, disc and panel
    each frame the world draws; a desktop keeps it */
 #hud.touch, #hud.touch * { -webkit-backdrop-filter: none; backdrop-filter: none; }

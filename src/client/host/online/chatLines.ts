@@ -6,6 +6,13 @@ import { CHAT_FADE_MS, CHAT_FRESH_MS, CHAT_KEPT, CORNER_MARKS, cornerOpen, corne
 
 /** Lines the calm corner can show at once (only fresh ones show there). Room chat is for a sitting of two (Q88). */
 const SHOWN = 6;
+/** MOBILE-KEYBOARD MK2 (meta, J297; Jake, 2026-11-12 17:44 Cancún: "move the whole chat to be just above the keyboard. And then
+ *  also fix the top of it"). While a phone's keyboard is up (`data-ws-keyboard`, viewport.ts) the open chat docks on it, full
+ *  width and compact: the input and the last few lines, no head, no voice rows (the accessory bar's Done or a tap outside
+ *  ends it). The game fits the band above (`data-ws-kb-reserve`, the dock and its gap). Half the band at most, so a landscape
+ *  phone keeps some world. */
+const DOCK_PX = 150, DOCK_GAP_PX = 6;
+export function chatDock(bandHeight: number): number { return Math.round(Math.min(DOCK_PX, bandHeight / 2)); }
 /** A14 (Jake, 2026-11-10: "move the chat bar to just above the bottom HUD, bottom left, directly above MOVE"; QA row 15: "when the
  *  menu is open, can we just hide the chat and the audio?"). On a touch screen the row sits over MOVE as wide as MOVE, above the
  *  stick's SPRINT tag and first hint, with the voice tip and the lines over it (voiceUi.ts appends the mic and the tip; `order`
@@ -50,6 +57,9 @@ const CSS = `
 #ws-chat[data-touch]{left:calc(env(safe-area-inset-left,0px) + 68px);width:min(calc(45vw - 76px),300px);max-height:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap) - 190px)}
 #ws-chat[data-touch][data-open]{width:min(calc(100vw - 84px),440px);height:calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px)}
 }
+html[data-ws-keyboard] #ws-chat[data-open]{top:calc(var(--ws-kb-bottom) - ${String(DOCK_GAP_PX)}px);bottom:auto;transform:translateY(-100%);left:calc(env(safe-area-inset-left,0px) + 6px);width:calc(100vw - 12px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:var(--ws-chat-dock,${String(DOCK_PX)}px);max-height:none;padding:6px;gap:4px;border-radius:10px}
+html[data-ws-keyboard] #ws-chat[data-open]>[data-head],html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-peers,html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-tip{display:none}
+html[data-ws-keyboard] #ws-chat[data-open]>[data-lines]{gap:2px}
 `;
 /** What stands at a keyboard page's bottom left, which the corner sits over: the coins, a steed's row, the health readout, and
  *  on a desktop the Developer alerts (perf.css). Measured, because a steed's row or a many-line alert has no fixed height. */
@@ -96,11 +106,18 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
 
   let open = false;
   /** The keyboard's top, on a phone: the open chat ends above it (the layout viewport doesn't shrink for it on iOS). */
+  const root = document.documentElement;
   const fit = (): void => {
     const view = typeof visualViewport === 'undefined' ? null : visualViewport;
     if (view === null) return;
     box.style.setProperty('--ws-chat-vv', `${String(Math.round(view.height + view.offsetTop))}px`);
+    // MK2: the dock's height, and what the game leaves it above the keyboard (only read while a keyboard is up)
+    const dock = chatDock(view.height);
+    box.style.setProperty('--ws-chat-dock', `${String(dock)}px`);
+    const reserve = String(dock + DOCK_GAP_PX);
+    if (root.dataset['wsKbReserve'] !== reserve) root.dataset['wsKbReserve'] = reserve;
   };
+  scope.onDispose(() => { delete root.dataset['wsKbReserve']; });
   const toBottom = (): void => { list.scrollTop = list.scrollHeight; };
   const corner = (event: CornerEvent): void => {
     const next = cornerOpen(open, event);
@@ -110,13 +127,17 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
     // the open chat keeps Escape for itself (InputService lets it be), from its input or any of its buttons
     box.toggleAttribute('data-ws-own-escape', open);
     const focused = document.activeElement;
-    if (open) { fit(); toBottom(); } else if (focused instanceof HTMLElement && box.contains(focused)) focused.blur();
+    if (open) { fit(); toBottom(); } else {
+      delete root.dataset['wsKbReserve'];
+      if (focused instanceof HTMLElement && box.contains(focused)) focused.blur();
+    }
   };
   scope.listen(field, 'focus', () => { corner('focus'); });
   scope.listen(close, 'click', () => { corner('close'); });
   // Escape on a focused Mute or Report button (the input's own Escape is handled below, where its keys stop)
   scope.listen(box, 'keydown', event => { if (open && event instanceof KeyboardEvent && event.key === 'Escape') { event.preventDefault(); corner('close'); } });
-  if (typeof visualViewport !== 'undefined' && visualViewport !== null) scope.listen(visualViewport, 'resize', () => { if (open) fit(); });
+  // the dock follows the keyboard as it opens or turns, the newest line in view (a pan alone moves it through CSS)
+  if (typeof visualViewport !== 'undefined' && visualViewport !== null) scope.listen(visualViewport, 'resize', () => { if (open) { fit(); toBottom(); } });
   place(box); scope.interval(PLACE_EVERY_MS, () => { place(box); });
   // in play only (QA 2026-11-11): the page's state marks decide, as they change; leaving play closes an open chat
   let shown = false;

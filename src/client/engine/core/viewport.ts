@@ -13,8 +13,81 @@ import { pageScope } from '../../../shared/engine/app/resources';
  * dropping `viewport-fit=cover` (the page starts below the status bar and runs to the bottom edge) cures it for good. So
  * this is plain innerHeight again; the module stays as the one place to change should WebKit need another workaround.
  */
+/** The game's height while a keyboard is up (MK3, below); null without one. */
+let fitted: number | null = null;
 export function viewportHeight(): number {
-  return window.innerHeight;
+  return fitted ?? window.innerHeight;
+}
+
+/**
+ * MOBILE-KEYBOARD MK1+MK3 (meta, J297; Jake, 2026-11-12 17:44 Cancún: "detect when the keyboard is open … fit the rest of the
+ * game in the remaining pixels"). iOS Safari never shrinks the layout viewport (innerHeight, 100dvh) for its keyboard, nor
+ * supports `interactive-widget` or `env(keyboard-inset-*)`: only `visualViewport` shrinks, and Safari may pan the page
+ * (`offsetTop`). While a keyboard is up the page carries `data-ws-keyboard` on <html>, `--ws-kb-top` / `--ws-kb-bottom` (the
+ * visible band, layout px) and `--ws-vh` the game's fitted height; #game and #hud move to the band's top (base.css), the touch
+ * controls hide (touch.css) and an open chat docks on the keyboard (chatLines.ts). The chat says how much of the band it takes
+ * with `data-ws-kb-reserve` on <html> (a mark, as chatLines is outside the game's bundle).
+ */
+export interface ViewSample { readonly layoutHeight: number; readonly viewHeight: number; readonly viewTop: number; readonly scale: number; readonly reserve: number }
+export interface KeyboardFit { readonly open: boolean; readonly top: number; readonly bottom: number; readonly gameHeight: number }
+/** Less hidden than this is the URL bar or a safe area, not a keyboard (the smallest iPhone keyboard is ~260 pt). */
+export const KEYBOARD_MIN_PX = 120;
+/** The least the game keeps, so a landscape phone with the chat docked still draws a strip of world. */
+const MIN_GAME_PX = 80;
+export function keyboardFit(sample: ViewSample): KeyboardFit {
+  const { layoutHeight, viewHeight, viewTop, scale, reserve } = sample;
+  // a pinch zoom shrinks the visual viewport too; the game's page doesn't zoom, but a stuck zoom is not a keyboard
+  if (scale > 1.01 || layoutHeight - viewHeight < KEYBOARD_MIN_PX) return { open: false, top: 0, bottom: layoutHeight, gameHeight: layoutHeight };
+  const top = Math.max(0, Math.round(viewTop)), bottom = Math.round(viewTop + viewHeight);
+  return { open: true, top, bottom, gameHeight: Math.max(MIN_GAME_PX, bottom - top - Math.max(0, reserve)) };
+}
+
+let lastFit = '';
+/** The page's full height at this width. iOS 26 Safari shrinks innerHeight for the keyboard too (Simulator, iPhone 17 Pro: 714
+ *  → 501 while visualViewport is 377 tall and the page scrolled 213), so the keyboard is measured against the tallest page seen
+ *  at this width, not the current innerHeight. A rotation (a new width) starts again. */
+const tallest = new Map<number, number>();
+/** A field a phone's keyboard opens for. Only while one has focus can a short visual viewport be a keyboard: a desktop
+ *  window losing height (devtools, a dragged edge) never is (claude -p review MUST). */
+function typing(): boolean {
+  const field = document.activeElement;
+  if (field instanceof HTMLTextAreaElement) return true;
+  if (field instanceof HTMLInputElement) return !['button', 'checkbox', 'color', 'file', 'radio', 'range', 'reset', 'submit'].includes(field.type);
+  return field instanceof HTMLElement && field.isContentEditable;
+}
+let lastHeight: number | null = null;
+/** What `syncKeyboardView` reads of `visualViewport`. */
+export interface ViewLike { readonly height: number; readonly offsetTop: number; readonly scale: number }
+/** Read the keyboard and mark the page. Returns whether the fit changed; the game's own resize then runs (a window resize
+ *  event), so the canvas, camera and composer take the fitted height once per open and once per close. */
+export function syncKeyboardView(view: ViewLike | null | undefined): boolean {
+  const root = document.documentElement;
+  const reserve = Number(root.dataset['wsKbReserve'] ?? 0);
+  // per width, so a rotation with the keyboard up (and back) still knows the full page (review SHOULD)
+  const full = Math.max(tallest.get(window.innerWidth) ?? 0, window.innerHeight);
+  tallest.set(window.innerWidth, full);
+  const fit = view === null || view === undefined || !typing() ? null : keyboardFit({ layoutHeight: full, viewHeight: view.height, viewTop: view.offsetTop, scale: view.scale, reserve: Number.isFinite(reserve) ? reserve : 0 });
+  const open = fit?.open === true;
+  const key = open ? `${String(fit.top)}:${String(fit.bottom)}:${String(fit.gameHeight)}` : '';
+  const changed = key !== lastFit, wasOpen = lastFit !== '';
+  if (changed) {
+    lastFit = key;
+    fitted = open ? fit.gameHeight : null;
+    root.toggleAttribute('data-ws-keyboard', open);
+    if (open) { root.style.setProperty('--ws-kb-top', `${String(fit.top)}px`); root.style.setProperty('--ws-kb-bottom', `${String(fit.bottom)}px`); }
+    else { root.style.removeProperty('--ws-kb-top'); root.style.removeProperty('--ws-kb-bottom'); }
+    // iOS can leave the page panned after the keyboard closes; the game is back at top 0, so the page must be too
+    if (wasOpen && !open && (window.scrollY !== 0 || window.scrollX !== 0)) window.scrollTo(0, 0);
+  }
+  // --ws-vh is written on every look: iOS 26 restores innerHeight after the focus leaves, and the last word must be current
+  const height = viewportHeight(), px = `${String(height)}px`;
+  if (root.style.getPropertyValue('--ws-vh') !== px) root.style.setProperty('--ws-vh', px);
+  const moved = height !== lastHeight;
+  lastHeight = height;
+  // the game's resize (renderer, composer, shadows) runs only when the keyboard changed its height: a pan as the caret moves
+  // only moves the band, and a plain window resize already reached the game
+  if (changed && moved) window.dispatchEvent(new Event('resize'));
+  return changed;
 }
 
 let installed = false;
@@ -32,4 +105,18 @@ export function installViewport(): void {
   };
   sync();
   pageScope.listen(window, 'resize', sync);
+  // MK1: the keyboard shows only in visualViewport (resize as it opens or closes, scroll as Safari pans), and the open chat's
+  // reserve comes as a mark on <html>
+  const view = window.visualViewport;
+  if (view === null || view === undefined) return;
+  const keyboard = (): void => { syncKeyboardView(view); };
+  pageScope.listen(view, 'resize', keyboard);
+  pageScope.listen(view, 'scroll', keyboard);
+  pageScope.listen(window, 'resize', keyboard); // a rotation with the keyboard up changes the layout height too
+  // a field taking or leaving focus (focusout's new focus settles after the event)
+  pageScope.listen(document, 'focusin', keyboard);
+  pageScope.listen(document, 'focusout', () => { pageScope.timeout(0, keyboard); });
+  const marks = new MutationObserver(keyboard);
+  marks.observe(root, { attributes: true, attributeFilter: ['data-ws-kb-reserve'] });
+  pageScope.onDispose(() => { marks.disconnect(); });
 }

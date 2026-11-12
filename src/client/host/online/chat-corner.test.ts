@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
 import { CHAT_FADE_MS, CHAT_FRESH_MS, cornerOpen, cornerShown, lineLook } from './chatCorner';
-import { chatLines } from './chatLines';
+import { chatDock, chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
 import { voiceSettings } from '@wildshard/engine/ui/voiceSettings';
@@ -331,4 +331,25 @@ test('a voice peer takes the body the relay renames it to (the lead seat)', () =
   say({ k: 'roster', peers: [{ id: 'lead', name: 'Ann#4821', body: 'device-body' }] });
   say({ k: 'roster', peers: [{ id: 'lead', name: 'Ann#4821', body: 'actor.player' }] });
   expect(voice.roster.get('lead')?.body).toBe('actor.player');
+});
+
+// MOBILE-KEYBOARD MK2 (J297, Jake 2026-11-12 17:44 Cancún: "move the whole chat to be just above the keyboard"): the open chat
+// tells the game how much of the band over the keyboard its dock takes, and gives it back as it closes.
+test('the open chat reserves its dock over a phone keyboard, and gives it back on close', () => {
+  expect(chatDock(445)).toBe(150); // portrait: input and three lines
+  expect(chatDock(170)).toBe(85); // landscape: half the band, so the world keeps a strip
+  // Jake's iPhone 17 Pro with the keyboard up: 445 pt of the page still shows
+  vi.stubGlobal('visualViewport', Object.assign(new EventTarget(), { height: 445, offsetTop: 0, scale: 1 }));
+  try {
+    const { box, field } = corner();
+    const root = document.documentElement;
+    expect(root.dataset['wsKbReserve']).toBeUndefined();
+    field.dispatchEvent(new FocusEvent('focus'));
+    expect(open(box)).toBe(true);
+    expect(root.dataset['wsKbReserve']).toBe('156');
+    expect(box.style.getPropertyValue('--ws-chat-dock')).toBe('150px');
+    outside();
+    expect(open(box)).toBe(false);
+    expect(root.dataset['wsKbReserve']).toBeUndefined();
+  } finally { vi.unstubAllGlobals(); }
 });

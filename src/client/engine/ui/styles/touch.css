@@ -11,6 +11,9 @@
      --split   the MOVE | LOOK divider (TouchControls reads the MOVE zone's rect, so it follows)
      --atk     the ATTACK disc's and the LOOK pad's width                --disc    DODGE / JUMP / DIVE / SURFACE / AIM */
 .ws-touch { --safe: calc(max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px)) * 0.5); --bar-in: max(15vh, 104px); --bar: calc(var(--bar-in) + var(--safe)); --split: 45%; --disc: min(15vw, 84px); --atk: min(24vw, 112px); position: absolute; inset: 0; display: none; pointer-events: auto; touch-action: none; z-index: calc(var(--ws-layer-hud) + 5); }
+/* MOBILE-KEYBOARD MK4 (J297): while typing the touch controls step aside (Jake's screenshot: MOVE and ATTACK under the keyboard,
+   DODGE and JUMP over the world); they come back as the keyboard closes. Hidden, not removed: a held stick keeps its state. */
+html[data-ws-keyboard] .ws-touch { visibility: hidden; pointer-events: none; }
 /* iOS WebKit (E46): no gesture, selection, callout or drag lift on anything in the layer — a long press on ATTACK lifted a
    ghost copy of the disc and stole the touch (pointercancel), so the heavy never charged. #hud raises it over base.css's
    `#hud button { touch-action: manipulation }` (which still allows double-tap zoom around a button). TouchControls also
