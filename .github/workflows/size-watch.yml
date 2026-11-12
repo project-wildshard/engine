@@ -1,6 +1,6 @@
 # SHARD-SIZE row 8: what the build's size gate can't see. Nightly, measure production by the same meter that set the
 # baseline, and open or update one issue when a title passes 3 MB or a flow passes its book by 10 %.
-# Reads production and files an issue. No build, no deploy secret, no deploy step belongs here: deploys live in deploy.yml.
+# Reads production and files an issue. No build, no deploy secret, no deploy step belongs here: releases go through release.sh.
 name: size-watch
 
 on:
