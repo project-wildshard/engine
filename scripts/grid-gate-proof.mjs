@@ -67,7 +67,7 @@ try {
     if (index < 0) throw new Error(`No ${card} card`);
     // The deck's dot selects a card (a tap on an off-centre card lands on the captured track, as a swipe's end).
     await page.locator('.ws-menu-dots i').nth(index).click();
-    const selected = await page.evaluate(() => document.querySelector('.ws-menu-card.selected')?.getAttribute('data-i'));
+    const selected = await page.evaluate(() => { const shown = document.querySelector('.ws-menu-card.selected'); return shown instanceof HTMLElement ? shown.dataset.i : undefined; });
     note(`${name}: the ${card} card is selected`, selected === String(index), { selected });
     await page.locator('.ws-menu-play').click();
     // The guest's Name is asked once the page goes online; a page that stayed solo never asks.
