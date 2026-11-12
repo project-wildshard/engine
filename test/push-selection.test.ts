@@ -18,7 +18,12 @@ beforeAll(() => {
     // Prose mentions, the way AGENTS.md is named across engine: never a read.
     'scripts/e2e-paths.mjs': '// worktree tmp/e2e, never /tmp (AGENTS.md "Disk").\nexport const x=1;\n',
     'src/client/debugOptions.ts': '/** There are no URL switches (AGENTS.md "No URL switches, ever"). See docs/plans/note.md. */\nexport const y=1;\n',
-    // Real readers: a test reads CHANGELOG.md; a static check (pnpm check:parity) reads AGENTS.md.
+    // Real readers: a test reads docs/rules.md; a static check (pnpm check:parity) reads AGENTS.md; changelog.mjs, which
+    // vite.config.ts builds into the title screen, reads CHANGELOG.md.
+    'docs/rules.md': 'rule\n',
+    'test/rules.test.ts': "import {readFileSync} from 'node:fs';readFileSync('docs/rules.md','utf8');\n",
+    'docs/RAW.md': 'raw\n',
+    'src/raw.ts': "import raw from '../docs/RAW.md?raw';export default raw;\n",
     'scripts/changelog.mjs': "export const CHANGELOG_PATH = 'CHANGELOG.md';\n",
     'test/changelog.test.ts': "import {readFileSync} from 'node:fs';readFileSync('CHANGELOG.md','utf8');\n",
     'scripts/agent-parity.mjs': "import {join} from 'node:path';export const read=root=>join(root, 'AGENTS.md');\n",
@@ -40,13 +45,18 @@ test('a docs line in AGENTS.md or docs/** named only in prose skips the suite', 
   expect(push({ 'AGENTS.md': '# rules\n\n- docs-only pushes skip the shards\n' })).toMatchObject({ mode: 'docs', tests: [] });
 });
 
-test('a changelog edit runs the test that reads CHANGELOG.md, not the suite', () => {
-  expect(push({ 'CHANGELOG.md': '## v0.1.0 (2026-11-12)\n\n- First, better\n' })).toMatchObject({ mode: 'docs', tests: ['test/changelog.test.ts'] });
+test('a doc read only by tests runs those tests, not the suite', () => {
+  expect(push({ 'docs/rules.md': 'rule 2\n' })).toMatchObject({ mode: 'docs', tests: ['test/rules.test.ts'] });
+});
+
+test('a changelog edit runs full: the build and title proof read it through changelog.mjs', () => {
+  expect(push({ 'CHANGELOG.md': '## v0.1.0 (2026-11-12)\n\n- First, better\n' })).toMatchObject({ mode: 'full', reason: expect.stringMatching(/scripts\/changelog\.mjs/u) });
 });
 
 test('a doc read by code with no proven test edge still runs full', () => {
   expect(push({ 'docs/HOST-BAR.md': 'missing authority\n' })).toMatchObject({ mode: 'full', reason: expect.stringMatching(/src\/read-doc\.mjs/u) });
   expect(push({ 'docs/TEMPLATED.md': 'changed\n' })).toMatchObject({ mode: 'full', reason: expect.stringMatching(/src\/read-templated\.mjs/u) });
+  expect(push({ 'docs/RAW.md': 'changed\n' })).toMatchObject({ mode: 'full', reason: expect.stringMatching(/src\/raw\.ts/u) });
 });
 
 test('code beside a doc still selects by code', () => {

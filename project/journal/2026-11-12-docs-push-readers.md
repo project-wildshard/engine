@@ -10,3 +10,8 @@ Now a doc counts as read only where code names its path as a whole string litera
 segments, `${root}/docs/x.md`). Tests that read it run in the docs lane, locally and on ci through the new
 `docs_tests` output; agent-parity (AGENTS.md, CLAUDE.md) runs as `check:parity` in both docs lanes; the changelog
 check already runs on every push. Any other reader still runs full. Unit test: `test/push-selection.test.ts`.
+
+Review (claude -p): `scripts/changelog.mjs` is imported by vite.config.ts, which builds CHANGELOG.md into the
+title screen that `test/title-layout-browser.proof.mjs` checks, so it is no stand-in reader: a changelog push runs
+full again. Also: only vitest.config.ts's include globs count as reading tests, `?raw`, `=` and space-led paths
+count as reads, and `git diff --no-renames` stops a code-to-docs rename hiding its code side. Lint fix for main.

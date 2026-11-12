@@ -11,7 +11,7 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
     if(!/^[a-f0-9]{40}$/u.test(local??'')||!/^[a-f0-9]{40}$/u.test(remote??''))throw new Error('Invalid push range');
     if(/^0+$/u.test(local))continue;
     if(/^0+$/u.test(remote))return {mode:'full',files:[],reason:'new remote ref'};
-    for(const path of execFileSync('git',['diff','--name-only','-z',remote,local],{cwd,encoding:'utf8'}).split('\0').filter(Boolean))files.add(path);
+    for(const path of execFileSync('git',['diff','--name-only','--no-renames','-z',remote,local],{cwd,encoding:'utf8'}).split('\0').filter(Boolean))files.add(path);
   }
   const changed=[...files].sort();
   /** @type {string[]} */const inputs=[];
@@ -37,20 +37,21 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
 }
 
 /** Scripts that read a root doc against the real tree, and the docs-lane check that runs each (EV9). Both docs lanes
- * (.githooks/push-checks.mjs, scripts/ci-static.sh docs) run check:parity; pre-push and ci job 1 run the changelog
- * check on every push. */
-export const DOC_READER_CHECKS=Object.freeze({'scripts/agent-parity.mjs':'check:parity','scripts/changelog.mjs':'changelog check'});
-const vitestFile=/^(?:test\/.+\.test\.(?:ts|mjs)|src\/.+\.test\.ts)$/u;
+ * (.githooks/push-checks.mjs, scripts/ci-static.sh docs) run check:parity. Only a script nothing imports belongs here:
+ * scripts/changelog.mjs is not one (vite.config.ts builds CHANGELOG.md into the title screen), so a changelog push runs full. */
+export const DOC_READER_CHECKS=Object.freeze({'scripts/agent-parity.mjs':'check:parity'});
+/** vitest.config.ts's include globs; any other test file reading a doc (a node:test kit file) is an unknown reader. */
+const vitestFile=/^(?:test\/.+\.test\.(?:ts|mjs)|src\/(?:client|shared|server|cook)\/(?:engine|game|host)\/.+\.test\.ts|src\/client\/app\/.+\.test\.ts|src\/test\/(?:engine|game)\/.+\.test\.ts)$/u;
 
 /** Who reads a Markdown file: code that names its path as a whole string literal, or as a string's last path segments
- * (`${root}/docs/x.md`). Prose and comments (AGENTS.md "Disk") never read it. Reading tests run in the docs lane; a
+ * (`${root}/docs/x.md`, `--file=docs/x.md`, `cat docs/x.md`, `../docs/x.md?raw`). Prose and comments (AGENTS.md "Disk") never read it. Reading tests run in the docs lane; a
  * known script reader is covered by its docs-lane check; any other reader has no proven test edge, so the push runs full.
  * @param {string} file @param {string} cwd @returns {string[]|{reason:string}} */
 function markdownReaders(file,cwd){
-  const path=file.replace(/[.[\]()*+?{}|^$\\]/gu,'\\$&');
+  const path=file.replaceAll(/[.[\]()*+?{}|^$\\]/gu,String.raw`\$&`);
   let listed;
   try{
-    listed=execFileSync('git',['grep','-l','-E','-e',`['"\`/](\\./)?${path}['"\`]`,'--','src','test','scripts','lint','vite'],{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+    listed=execFileSync('git',['grep','-l','-E','-e',`['"\`/= ](\\./)?${path}([?#][^'"\`]*)?['"\`]`,'--','src','test','scripts','lint','vite'],{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']});
   }catch(error){
     if(error instanceof Error&&'status'in error&&error.status===1)return [];
     return {reason:`Cannot prove Markdown has no code consumers: ${file}`};
