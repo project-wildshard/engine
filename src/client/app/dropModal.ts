@@ -91,7 +91,9 @@ export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev:
   });
   scope.listen(dismiss, 'click', close);
   scope.onDispose(close);
-  mountUi(root, scope, options.parent);
+  // over the whole page, never inside the title's HUD band: the title's own cards would sit on top of it
+  const doc: { body: HTMLElement | null } = document;
+  mountUi(root, scope, options.parent ?? doc.body ?? document.documentElement);
   dismiss.focus({ preventScroll: true });
   return close;
 }
