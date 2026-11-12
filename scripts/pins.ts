@@ -5,7 +5,8 @@
 //   node scripts/pins.ts refresh            re-pin to the live heads (read only: GETs)
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
 //   node scripts/pins.ts install --ring 1   Ring 1: pinned Template 1 and Dunes, dependency Template 2, and server slices
-//   node scripts/pins.ts install --from-format blender-template  the frozen dependency product, without network or cook
+//   node scripts/pins.ts install --from-format <slug>  a frozen dependency product (blender-template, brasscap-mesa),
+//                                                      without network or cook
 //   node scripts/pins.ts slice              cut Ring 1's server slices from the pinned heads into test/pins/slices.json
 //   node scripts/pins.ts keep <dir>         copy every pinned and sliced tarball to <dir>, for the release that outlives J85
 //   node scripts/pins.ts status             what the tree holds against the pins
@@ -235,7 +236,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
   await prepareAssetDecoders();
-  if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly blender-template');
+  if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly one product: blender-template or brasscap-mesa');
   const formatSlug = source === 'format' ? only[0] : (source === 'ring' && only.includes('blender-template') ? 'blender-template' : undefined);
   const dependency = formatSlug === undefined ? undefined : (await import('./pin-format.ts')).formatTemplate(formatSlug);
   const trackedPins = source === 'format' ? [] : (readJson(PINS) as PinFile).shards;
