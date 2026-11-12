@@ -64,7 +64,7 @@ jobs:
       # (a paused host answers 503) warns instead of failing it. A release build still refuses.
       WS_PREVIOUS_DEPLOY_OPTIONAL: '1'
     steps:
-      - name: Start the job clock (each shard's five-minute budget includes this job's set-up, J193)
+      - name: Start the job clock (each shard's five-minute budget includes the set-up every job shares, J193)
         run: echo "WS_CI_SHARD_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -78,6 +78,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-exact-reuse.mjs ci.yml
+      # EV3c: the checks below run only in job 1 (the history scan alone is ~100 s), so its shards are not charged them;
+      # ci-pack.mjs takes WS_CI_JOB_OWN_MS off the job clock. They took tests (1)'s shards to 300 s on 132-142 s of tests.
+      - name: Start job 1's own-checks clock (not charged to its shards)
+        if: matrix.job == 1
+        run: echo "WS_CI_JOB_OWN_FROM_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - name: Enforce quarantine admission dates and the 48-hour cap
         if: matrix.job == 1
         run: node scripts/test-quarantine.mjs --check-history
@@ -96,6 +101,9 @@ jobs:
       - name: Require this version's changelog section (Jake, 2026-11-10)
         if: matrix.job == 1
         run: node scripts/changelog.mjs check --at="$GITHUB_SHA"
+      - name: Stop job 1's own-checks clock
+        if: matrix.job == 1
+        run: echo "WS_CI_JOB_OWN_MS=$(( $(date +%s%3N) - WS_CI_JOB_OWN_FROM_MS ))" >> "$GITHUB_ENV"
       - name: Classify from an actually green code-proving ancestor
         if: steps.reuse.outputs.reused != 'true'
         id: paths

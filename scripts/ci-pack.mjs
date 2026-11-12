@@ -24,7 +24,8 @@
 // then products and boundaries. A shard has the runner to itself, as its plan assumes: two at once on the 4-vCPU runner
 // pushed four files past the 60 s cap and failed a timing proof (run 42955579476, CI-JOB-PACKING-PLAN).
 // A shard's wall is charged its job's shared set-up (job start to ci-pack, plus pins), as when it was a job of its own;
-// work that belongs to other units isn't charged to it. Each unit's output goes to tmp/ci-pack/logs/<unit>.log and is
+// work that belongs to other units isn't charged to it, nor are the checks only one job runs (EV3c: job 1's history
+// scan, ~100 s, ci.yml's WS_CI_JOB_OWN_MS). Over the wall is AMBER and green; at twice it, red (J295, as a test file). Each unit's output goes to tmp/ci-pack/logs/<unit>.log and is
 // printed, grouped, when it ends. The job's report (units, seconds, exit codes, CPU busy share, peak memory) is
 // tmp/ci-pack/job-<i>.json. With GITHUB_OUTPUT set, `products=true` says this job ran Ring 1's products.
 import {spawn} from 'node:child_process';
@@ -32,6 +33,7 @@ import {createWriteStream,existsSync,mkdirSync,readFileSync,writeFileSync,append
 import {cpus,totalmem} from 'node:os';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {amberLine,judgeWall} from './test-amber.mjs';
 
 /** Seconds a unit takes alone on the hosted runner; only the packing reads them. TEST-SPEED TS2 (2026-11-11): re-measured
  * over 12 packed runs (42960973990 .. 42974435994): products grew from 205 to 347-384 s and set the long job. EV3b
@@ -162,13 +164,28 @@ function step(command){
   return new Promise(_resolve=>{const child=spawn(bin,args,{stdio:'inherit'});child.once('error',()=>_resolve(127));child.once('exit',code=>_resolve(code??1));});
 }
 
+/** The set-up a shard's wall is charged: job start to ci-pack less the checks only this job runs, plus pins. EV3c: job
+ * 1's own checks (the history scan, ~100 s) took its shards to 300 s on 132-142 s of tests (runs 43315974456,
+ * 43318910290). An unreadable clock charges nothing before ci-pack. Pure.
+ * @param {{jobStart:number,packStart:number,ownMs:number,pinsMs:number}} clock @returns {number} */
+export function sharedSetupMs({jobStart,packStart,ownMs,pinsMs}){
+  const before=Number.isSafeInteger(jobStart)&&jobStart>0&&jobStart<=packStart?packStart-jobStart:0;
+  return Math.max(0,before-(Number.isFinite(ownMs)&&ownMs>0?ownMs:0))+pinsMs;
+}
+
+/** Each shard's charged wall plus everything since the pack ended (the artifact upload), judged by J295's rule.
+ * @param {{ended:number,units:Pick<UnitResult,'name'|'charged'|'ended'>[]}} report @param {number} now */
+export const wallVerdicts=(report,now)=>report.units.filter(unit=>unit.name.startsWith('shard:'))
+  .map(unit=>judgeWall(unit.name.slice(6),unit.ended-unit.charged+(now-report.ended),SHARD_LIMIT_MS));
+
 /** J193 after the upload: each shard's charged wall plus everything since the pack ended, as the old last step did.
- * @param {number} job @param {number} [now] */
+ * An overrun under twice the wall is AMBER and passes; at twice it, red (J295). @param {number} job @param {number} [now] */
 export function checkWalls(job,now=Date.now()){
   /** @type {{ended:number,units:UnitResult[]}} */const report=JSON.parse(readFileSync(`tmp/ci-pack/job-${job}.json`,'utf8'));
-  const over=report.units.filter(unit=>unit.name.startsWith('shard:')).map(unit=>({name:unit.name,ms:unit.ended-unit.charged+(now-report.ended)})).filter(row=>row.ms>=SHARD_LIMIT_MS);
-  for(const row of over)console.error(`::error file=scripts/ci-pack.mjs,title=CI_SHARD_BUDGET_EXCEEDED::${row.name} used ${row.ms} ms against ${SHARD_LIMIT_MS} ms, its job's set-up and the artifact upload included`);
-  return over.length===0;
+  const verdicts=wallVerdicts(report,now),run=process.env.GITHUB_RUN_ID;
+  for(const row of verdicts.filter(verdict=>verdict.level==='amber'))console.error(`::warning file=scripts/ci-pack.mjs,title=AMBER shard over its wall (J295)::${amberLine(row,run)}; its job's shared set-up and the artifact upload included`);
+  for(const row of verdicts.filter(verdict=>verdict.level==='red'))console.error(`::error file=scripts/ci-pack.mjs,title=CI_SHARD_BUDGET_EXCEEDED::${row.file} used ${row.ms} ms against ${SHARD_LIMIT_MS} ms, red: ${row.why}. ${amberLine(row,run)}`);
+  return verdicts.every(verdict=>verdict.level!=='red');
 }
 
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
@@ -186,7 +203,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
     console.log(`ci-pack: job ${job} of ${jobs}, ${cpus().length} CPUs, ${Math.round(totalmem()/2**20)} MB: ${mine.map(unit=>unit.name).join(' ')}`);
     if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,`products=${String(mine.some(unit=>unit.name==='products'))}\n`);
     const began=Date.now(),probe=sampler(),jobStart=Number(process.env.WS_CI_SHARD_STARTED_MS??began);
-    let setupMs=Number.isSafeInteger(jobStart)&&jobStart>0&&jobStart<=began?began-jobStart:0;
+    let setupMs=sharedSetupMs({jobStart,packStart:began,ownMs:Number(process.env.WS_CI_JOB_OWN_MS??0),pinsMs:0});
     /** @type {UnitResult[]} */
     const results=[];
     /** @type {{phase:string,started:number,ended:number}[]} */

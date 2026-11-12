@@ -82,3 +82,9 @@ export function nextLedger(previous,files,options){
   }
   return next;
 }
+
+/** A shard's five-minute wall (J193) under the same rule (EV3c, J295): over it is AMBER, at `redFactor` times it red, and
+ * the job stays green on an amber. No streak: shard numbers change with every plan, so a wall amber can't be followed
+ * from run to run; the files that made it slow carry their own. Pure.
+ * @param {string} shard @param {number} ms @param {number} budget @param {typeof AMBER} [limits] @returns {Verdict} */
+export const judgeWall=(shard,ms,budget,limits=AMBER)=>judgeFile(`shard-${shard}-wall`,ms,budget,undefined,0,limits);

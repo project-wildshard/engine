@@ -5,5 +5,9 @@ export const UNIT_SECONDS:Readonly<Record<'static'|'e2e'|'plan-proofs'|'quaranti
 export function runUnits(shards:number,kinds:readonly string[],shardSeconds?:(index:number)=>number):Unit[];
 /** Longest first onto the least-loaded job; with more than one job, products takes the last job to itself (EV3). */
 export function packUnits(units:readonly Unit[],jobs:number):Unit[][];
-/** J193 after the upload: whether every shard's charged wall stayed under the five-minute budget. */
+/** The set-up a shard's wall is charged: job start to ci-pack less the checks only this job runs, plus pins (EV3c). */
+export function sharedSetupMs(clock:{jobStart:number;packStart:number;ownMs:number;pinsMs:number}):number;
+/** Each shard's charged wall, the artifact upload included, judged by J295's rule: AMBER over the wall, red at 2x. */
+export function wallVerdicts(report:{ended:number;units:readonly {name:string;charged:number;ended:number}[]},now:number):import('./test-amber.mjs').AmberVerdict[];
+/** J193 after the upload: false only when a shard's charged wall reached twice the five-minute budget (J295). */
 export function checkWalls(job:number,now?:number):boolean;
