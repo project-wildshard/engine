@@ -72,7 +72,8 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
 }, 120_000);
 
 /** Taken on engine main 2887bd63, before the first change; re-taken for TE-ENG7, whose `animal.species` adds one
- *  initial text to every creature spawn (an empty one for Nalati's native bodies). */
-const EXPECTED = '7c78d2eb90c1963f88c200018e683a5929524d58b622747ff21cd7d53250d601';
+ *  initial text to every creature spawn (an empty one for Nalati's native bodies). Re-taken for ENG-18: three far bots
+ *  of this bare resident fell through to y -300 for ever; its fall net now puts them back at the spawn. */
+const EXPECTED = '5857ce77a0faf690b61a775431a1750f337cdad285a36846b96d9ba6878c3b2e';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. */
 const EXPECTED_ROOM = 'dd6192e4f181950610894ea2d8377dcb19c9fd87730e361e440b3d70a92b0fb6';
