@@ -39,7 +39,7 @@ import type { ShardContext } from "../plugin/context";
 import type { ShardPlayHost } from '../../../shared/game/shard/runtime';
 import { installDeclaredPlumbing } from '../shard/declaredPlumbing';
 import { declaredProductCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
-import { installDeclaredTargets } from '../shard/declaredTargets';
+import { installDeclaredTargets, spentUses } from '../shard/declaredTargets';
 import { installDeclaredTalks } from './declaredTalks';
 import { mountDeclaredUi } from '../shard/declaredUi';
 import type { ClientScriptViewTarget } from "../plugin/ui";
@@ -565,7 +565,7 @@ export class ShardfileClient {
     // SR11 (C9): the server burns the lantern; its owned lines are what this page's runtime shows, since it never steps.
     const mirrored = (source.targets.itemFields ?? []).flatMap(row => {
       const field = source.state.player.find(entry => entry.id === row.fieldId), item = items.runtimes.get(row.item);
-      return field === undefined || item === undefined || field.privacy === 'host' ? [] : [{ item, name: field.name, property: row.property }];
+      return field === undefined || item === undefined || field.privacy === 'host' || row.property === 'taken' ? [] : [{ item, name: field.name, property: row.property }];
     });
     if (mirrored.length > 0) ctx.system({ id: 'shardfile.item-lines', phase: 'update', run: () => {
       if (wirePage.client === null) return;
@@ -583,7 +583,9 @@ export class ShardfileClient {
       });
       if (source.plumbing.input.some(row => row.when !== undefined)) ctx.system({ id: 'declared.input.conditions', phase: 'input', before: ['engine.input.contexts'], run: plumbing.update });
     }
-    installDeclaredTargets(source.targets, { panels: tiles.props?.panels ?? new Map(), colliders, read, scene, interactables: runtime.interactables, scope: ctx.scope, system: ctx.system });
+    installDeclaredTargets(source.targets, { panels: tiles.props?.panels ?? new Map(), colliders, read, scene, interactables: runtime.interactables, scope: ctx.scope, system: ctx.system,
+      // TE-ENG6: a use that can no longer run drops its prompt: its `unless` condition holds, or its rack's lever is in hand.
+      spent: spentUses(source, { read, taken: item => levers.some(lever => lever.row.id === item && lever.taken) }) });
     // TE-ENG3: a quest-giver from rows. The server keeps each player's node and says it as an owned line; answers go by name.
     if ((source.targets.talks?.length ?? 0) > 0) {
       if (presentation === null) throw new Error('Missing talk presentation module');

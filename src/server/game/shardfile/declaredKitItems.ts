@@ -128,8 +128,10 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
   host.onStep('items.declared-kit', dt => { for (const id of pressed.keys()) if (!host.players.has(id)) pressed.delete(id); seats.step(dt); }, { ...seats.adapter, joined: true });
   if (fields.length > 0) publishOwned(host, 'items.declared-kit', (id, out) => {
     const player = host.players.get(id); if (player === undefined) return;
-    const { runtimes } = seats.of(player);
+    const { runtimes, levers: held } = seats.of(player);
     for (const field of fields) {
+      // TE-ENG6: a kit.lever's take as a player field, so a panel can hide the rack's own copy once this player holds it.
+      if (field.property === 'taken') { const seat = held.get(field.item); if (seat !== undefined) out.set(field.name, Number(seat.taken)); continue; }
       const runtime = runtimes.get(field.item); if (runtime === undefined) continue;
       out.set(field.name, field.property === 'fuel' ? Math.round(runtime.remainingFuel * FUEL_STEPS) / FUEL_STEPS : Number(runtime.lightOn));
     }

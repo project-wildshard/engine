@@ -1,0 +1,42 @@
+{
+ "_note": "TE-ENG6: Mossgate's hut door and brazier A as sharddev's Template rows declare them, A spent by its own lit condition.",
+ "interactions": [
+  {
+   "at": [
+    0,
+    1.1497007649658288,
+    -9
+   ],
+   "id": "template.door.use",
+   "label": "Open hut door",
+   "radius": 3,
+   "scene": "template.door.toggle"
+  },
+  {
+   "at": [
+    -6.8,
+    1.8533241941554273,
+    -1.4
+   ],
+   "id": "template.brazier-a.use",
+   "label": "Light brazier A",
+   "radius": 2.5,
+   "scene": "template.brazier-a.light",
+   "unless": "template.brazier-a.lit"
+  }
+ ],
+ "conditions": [
+  {
+   "equals": 1,
+   "fieldId": 101,
+   "id": "template.door.open",
+   "scope": "shared"
+  },
+  {
+   "equals": 1,
+   "fieldId": 102,
+   "id": "template.brazier-a.lit",
+   "scope": "shared"
+  }
+ ]
+}

@@ -119,3 +119,22 @@ test('a rows-only lever: taken at its rack, six rounds that land, then a reload 
   for (const name of Object.values(LINES)) expect(line(again.sim, name)).toBe(before.get(name) ?? 0);
   sim.dispose(); again.sim.dispose();
 });
+
+// TE-ENG6: a kit.lever's take as a player field (`itemFields` property `taken`), so a panel can hide the rack's own rifle.
+test('a rows-only lever projects its take to a player field', async () => {
+  const input = await withLever(), ports = { rapier: input.rapier, quest: { fact: () => undefined, coins: () => undefined } };
+  const sim = createShardfileSim(input.shard, input.assets, ports), TAKEN = 'fixture.lever.taken';
+  const shard: Shardfile = { ...input.shard, state: { ...input.shard.state, player: [...input.shard.state.player, { id: 301, name: TAKEN, type: 'bool', privacy: 'owner', default: false }] },
+    targets: { ...input.shard.targets, itemFields: [...(input.shard.targets.itemFields ?? []), { item: LEVER, fieldId: 301, property: 'taken' }] } };
+  const kit = installDeclaredKitItems(sim.host, shard, sim.itemHooks), player = sim.host.players.get(PLAYER);
+  if (kit === null || player === undefined) throw new Error('The fixture declares kit items');
+  tick(sim, kit);
+  expect(line(sim, TAKEN)).toBe(0);
+  const [rx, , rz] = fixture.interaction.at;
+  player.position.set(rx + 1, player.position.y, rz); player.motor.resetAt(player.position);
+  expect(kit.scene(PLAYER, fixture.interaction.id)).toBe(true);
+  tick(sim, kit);
+  expect(line(sim, TAKEN)).toBe(1);
+  expect(line(sim, 'template.lantern.lit')).toBe(line(sim, 'template.lantern.lit')); // the lantern's own projections are untouched
+  sim.dispose();
+});
