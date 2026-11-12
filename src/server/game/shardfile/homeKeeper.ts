@@ -85,6 +85,9 @@ export interface HomeKeeperSpec {
   readonly policy: (kind: string, actor: AnimalSim, claim: (actor: AnimalSim) => boolean, stream: Rng) => KeptPolicy;
   /** A declared death plane: first on every tick, a live body under it dies by the fall pipeline (`killBelowWorld`). */
   readonly killY?: number;
+  /** Homes that are a held boss's body (SERVER-PARITY HS3): the plane never kills one, since its fight ends on blows and a
+   *  death pays its victory. One under the plane goes back to its home's anchor, alive and unpaid. */
+  readonly held?: readonly string[];
   /** Where a drawn body stands, asked after its six draws instead of the host's ground at install: the floor under its
    *  home and whether that floor is a structure (the body's `levelGround`); a flyer still flies its altitude over it. */
   readonly place?: (id: string) => { readonly y: number; readonly structure: boolean };
@@ -136,7 +139,7 @@ export function installHomeKeeper(host: SimHost, spec: HomeKeeperSpec, saved?: R
   const row = spec.boss, made = row === undefined ? null : recipe(row.id, row.kind, row.at, row.yaw);
   const boss: Body | null = row === undefined || made === null ? null : { id: row.id, kind: row.kind, actor: null, brain: null, recipe: made.recipe, range: made.range };
   const bodies: readonly Body[] = boss === null ? homes : [...homes, boss];
-  const homeCount = homes.length, bodyCount = bodies.length, think = spec.think, banded = 'bands' in think;
+  const homeCount = homes.length, bodyCount = bodies.length, think = spec.think, banded = 'bands' in think, held = new Set(spec.held);
   const every = 'bands' in think ? 0 : think.every, thinkDt = 'bands' in think ? 0 : think.dt, world = spec.killY === undefined ? undefined : { killY: spec.killY };
   if ('bands' in think) host.useBodyBands(think.bands);
   const materialize = (body: Body, next: SimSpawn): AnimalSim => {
@@ -155,7 +158,12 @@ export function installHomeKeeper(host: SimHost, spec: HomeKeeperSpec, saved?: R
   host.events.on('actor.died', ({ actor }) => { const home = homes.find(h => h.actor?.combatActor() === actor); if (home) home.wait = home.respawn; }, host.scope);
   host.onStep(step, dt => {
     // A boss's fight ends on blows, never on the plane: its flight follows a player down, and a fall would pay it out unstruck.
-    if (world !== undefined) for (let i = 0; i < homeCount; i++) { const a = bodies[i]?.actor; if (a?.alive === true) killBelowWorld(a, world, host.combat); }
+    // A held boss is a home body: under the plane it goes back to its anchor, never dies of it (HS3).
+    if (world !== undefined) for (let i = 0; i < homeCount; i++) {
+      const home = homes[i], a = home?.actor; if (home === undefined || a?.alive !== true) continue;
+      if (!held.has(home.id)) killBelowWorld(a, world, host.combat);
+      else if (a.position.y < world.killY) { const { at, yaw } = home.recipe; a.place(at.x, at.z, yaw, at.y); }
+    }
     spec.beforeStep?.(homes);
     if (lateDue) { lateDue = false; for (let i = 0; i < homeCount; i++) { const home = homes[i]; if (home?.late === true) respawn(home); } }
     for (let i = 0; i < bodyCount; i++) { const a = bodies[i]?.actor; if (a && holders.has(a) && (!a.alive || a.attackPhase < 0)) holders.delete(a); }

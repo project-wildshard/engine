@@ -135,12 +135,23 @@ export function installBossOwnerRow(host: SimHost, input: unknown, ports: BossOw
   const record = row.record === undefined ? undefined : bossFlagRecord(host.flags, row.record);
   const saved = record?.saved ?? row.saved ?? { defeated: false, rewardTaken: false, kills: 0 };
   const persist = record?.persist ?? (() => undefined);
+  // HS3: a held boss's victory files and pays for a death a blow dealt, never for a fall (`env.fall`; a player's melee is
+  // `env` too, tagged `actor.player`). The body's final damage (the pipeline's `applyDamage`, after every rule) says which
+  // killed it in the tick the brain sees the death; `actor.died` is queued and could come too late.
+  let fell = false, unearned = false;
+  if (owner.kind === 'held') {
+    const actor = owner.actor.combatActor(), base = actor.applyDamage;
+    actor.applyDamage = req => { const killed = base(req); if (killed) fell = req.sourceTags.includes('env.fall'); return killed; };
+    host.scope.onDispose(() => { actor.applyDamage = base; });
+  }
   const victory = (): void => {
-    if (row.victory.once && host.flags.has(row.victory.flag)) return;
+    unearned = fell; fell = false;
+    if (unearned || (row.victory.once && host.flags.has(row.victory.flag))) return;
     host.flags.set(row.victory.flag); ports.fact(row.victory.fact, row.actor);
     if (row.reward.when === 'victory') pay();
   };
   const reward = row.reward.when === 'claim' ? () => {
+    if (unearned) return;
     saved.rewardTaken = true; persist(saved); pay();
   } : undefined;
   if (profile.pattern === 'spawned' && owner.kind === 'spawned') {
@@ -177,7 +188,8 @@ export function installSpeciesEncounter(host: SimHost, population: SpeciesHomesS
   if (pattern === 'spawned' ? population.boss?.id !== row.actor : !population.homes.some(home => home.id === row.actor)) {
     throw new Error('Encounter owner must belong to its declared species population');
   }
-  const keeper = installSpeciesHomes(host, population, saved);
+  // A held boss is one of the homes: the keeper's death plane must not kill (and so pay) it (HS3).
+  const keeper = installSpeciesHomes(host, pattern === 'held' ? { ...population, held: [...population.held ?? [], row.actor] } : population, saved);
   let body: BossOwnerBody;
   if (pattern === 'spawned') {
     if (keeper.boss === null) throw new Error('Declared spawned encounter has no keeper');
