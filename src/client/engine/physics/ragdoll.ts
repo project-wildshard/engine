@@ -10,8 +10,10 @@
  *   capsule per leg (the knee stays as it died). Limits are in the bones' own angle space: a bone's bind rotation is
  *   identity, so a body's rotation relative to its parent body IS the bone's local rotation, the angles Animal.ts poses.
  *   A roll torque on the torso (the righting bias, RIGHT_KP) lays it down on its nearest side, legs out, never on its back.
- * - **rigid** (a flat custom rig: the crab): one box body that carries the whole mesh — the hit throws and flips it —
- *   while the species' own keyframed death still folds the limbs.
+ * - **rigid** (a custom rig with no upright capsule: the crab, Brasscap's Wyrm and bandits): one box body that carries the
+ *   whole mesh — the hit throws and tumbles it — while the species' own keyframed death (or skin `die` clip) still folds
+ *   the limbs. An upright spring (UP_KP) lays it down on its base: the clip owns the corpse's pose, so the box never
+ *   comes to rest on its head or back (TE-ENG11: the Wyrm landed upside down).
  * - **upright** (a standing custom rig: the monkey, the drowned sailor, the captain): one ball at the feet with its
  *   rotations locked — it falls off the deck or out of the palm crown and slides with the hit, and the species' keyframed
  *   death does the kneel and the topple, as before.
@@ -89,6 +91,13 @@ const SHIN_DAMP = 10;
  * to MAX_T 17-28 → 1-7; the torso's fastest turn after the first second 448 → 164-194 °/s — it lies down, isn't flipped.
  */
 const RIGHT_KP = 3, RIGHT_KD = 0.6, RIGHT_SLOW = 0.8, RIGHT_BAND = [0.35, 0.08] as const;
+/**
+ * The rigid build's upright spring (TE-ENG11): a tilt torque that turns the box's up axis onto the ground's normal, UP_KP
+ * per radian of tilt scaled by its weight × its largest half extent (enough to tip it over an edge from its head), and a
+ * damper at UP_ZETA of critical on the tilt rate. Yaw stays free. A third of its strength while the body moves faster
+ * than RIGHT_SLOW m/s, so the throw and the tumble in the air stay the hit's; it lands and rolls onto its base.
+ */
+const UP_KP = 3, UP_ZETA = 0.9;
 
 type Limits3 = readonly [readonly [number, number], readonly [number, number], readonly [number, number]];
 interface End { bone: string; offset?: readonly [number, number, number] }
@@ -177,6 +186,8 @@ export class Ragdoll {
   private age = 0; private quietT = 0; private sinceStep = 0;
   /** the righting bias: the whole ragdoll's weight × half width (N·m per unit gain), the side it falls to on a tie (+1: left side up) */
   private rightScale = 0; private rightSide = 1;
+  /** the rigid build's upright spring: N·m per radian of tilt and N·m per rad/s of tilt rate (0 for the other builds) */
+  private upK = 0; private upD = 0;
 
   private readonly system: Ragdolls;
   constructor(system: Ragdolls, spec: RagdollSpec) {
@@ -220,6 +231,12 @@ export class Ragdoll {
         world.createCollider(collider(R.ColliderDesc.cuboid(d.halfWidth * s, d.bodyY * 0.5 * s, Math.max(d.bodyHalfLen, d.bodyRadius) * s).setTranslation(0, d.bodyY * 0.6 * s, 0), 5), body);
       }
       this.parts.push({ bone: spec.root, body, prevP: _p.clone(), prevQ: _q.clone(), curP: _p.clone(), curQ: _q.clone() });
+      if (rigid) {
+        const reach = Math.max(d.halfWidth, d.bodyY * 0.6, Math.max(d.bodyHalfLen, d.bodyRadius)) * s;
+        const inertia = body.principalInertia(), I = Math.max(inertia.x, inertia.y, inertia.z);
+        this.upK = UP_KP * body.mass() * 9.81 * reach;
+        this.upD = UP_ZETA * 2 * Math.sqrt(this.upK * I);
+      }
       return;
     }
 
@@ -331,6 +348,7 @@ export class Ragdoll {
     this.quietT = fastest < QUIET_V ? this.quietT + dt : 0;
     const settled = asleep || this.quietT >= QUIET_T || this.age >= MAX_T;
     if (!settled && this.build === 'quadruped') this.right(fastest);
+    if (!settled && this.build === 'rigid') this.upright(fastest);
     const alpha = settled ? 1 : THREE.MathUtils.clamp(alphaClock !== null ? alphaClock() : this.sinceStep / FIXED_STEP, 0, 1);
     this.write(alpha);
     this.fastest = fastest;
@@ -373,6 +391,38 @@ export class Ragdoll {
     const rate = f.x * av.x + f.y * av.y + f.z * av.z;
     const tau = this.rightScale * w * (RIGHT_KP * e - RIGHT_KD * rate);
     b.addTorque({ x: f.x * tau, y: f.y * tau, z: f.z * tau }, false);
+  }
+
+  /**
+   * The rigid build's upright spring (UP_KP): set the box's tilt torque for the fixed steps until the next pose(). It turns
+   * the body's up axis onto the ground's normal under it (straight up off the ground or on a miss); on its head the turn
+   * goes over its forward axis.
+   */
+  private upright(fastest: number): void {
+    const part = this.parts[0];
+    if (part === undefined || this.upK === 0) return;
+    const b = part.body;
+    b.resetTorques(false);
+    const t = b.translation(), r = b.rotation();
+    _q.set(r.x, r.y, r.z, r.w);
+    const hit = castRay(this.system.physics, t, DOWN, 3);
+    const n = _b.set(0, 1, 0);
+    if (hit !== null && hit.normal.y > 0.3) n.set(hit.normal.x, hit.normal.y, hit.normal.z);
+    const u = _a.set(0, 1, 0).applyQuaternion(_q);
+    const axis = _c.crossVectors(u, n);
+    const sin = axis.length(), cos = u.dot(n);
+    const tilt = Math.atan2(sin, cos);
+    if (b.isSleeping() && tilt < 0.05) return;
+    if (sin > 1e-4) axis.divideScalar(sin);
+    else if (cos < 0) axis.set(1, 0, 0).applyQuaternion(_q);   // on its head: over the box's side axis
+    else axis.set(0, 0, 0);
+    const av = b.angvel();
+    // the tilt rate: the spin less its yaw about the normal
+    const yaw = av.x * n.x + av.y * n.y + av.z * n.z;
+    const wx = av.x - n.x * yaw, wy = av.y - n.y * yaw, wz = av.z - n.z * yaw;
+    const w = 1 - (2 / 3) * THREE.MathUtils.smoothstep(fastest, RIGHT_SLOW * 0.5, RIGHT_SLOW * 1.5);
+    const k = this.upK * w * tilt, dmp = this.upD * w;
+    b.addTorque({ x: axis.x * k - wx * dmp, y: axis.y * k - wy * dmp, z: axis.z * k - wz * dmp }, tilt > 0.05);
   }
 
   private write(alpha: number): void {
