@@ -7,17 +7,14 @@
 // restored cell and a save made on the road all take one path. The road and each cell's seams are the page's own strips, from
 // C2's grid pack, held near the player the way a native cell's solids are, so no save carries them.
 import { withOwner } from '@wildshard/engine/app/ownership';
-import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import type { LedgerBook } from '@wildshard/engine/net/ledgerBook';
 import type { ChatReports } from '@wildshard/engine/net/chat';
 import type { NetTickInput } from '@wildshard/engine/net/room';
-import { groups } from '@wildshard/engine/physics/groups';
 import { NearColliders, solidReach } from '@wildshard/engine/physics/nearColliders';
 import { stripCollider } from '@wildshard/engine/physics/stripColliders';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
-import { createSimHost, type SimHost, type SimLevel } from '@wildshard/engine/sim';
+import { createSimHost, type SimHost } from '@wildshard/engine/sim';
 import { bootTask, bootWork } from '@wildshard/engine/boot/timing';
-import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
 import { questBooks } from '@wildshard/engine/quest/players';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
@@ -32,11 +29,11 @@ import { gridRecovery } from '@wildshard/engine/game/grid/recovery';
 import { GridRoom } from '@wildshard/engine/game/grid/room';
 import { commandsOf, GridNetRooms } from '@wildshard/engine/game/grid/roomNet';
 import { GridSimulation } from '@wildshard/engine/game/grid/simulation';
-import { HOST_PROBE } from '@wildshard/engine/game/plugin/simulation';
 import { landedBy } from '@wildshard/engine/combat/damageBook';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
-import { FALL_FLOOR, openCellWorld, type CellWorld, type CellWorldOptions } from './cellWorld';
+import { openCellWorld, type CellWorld, type CellWorldOptions } from './cellWorld';
+import { addCellWalls, ROAD } from './roadWorld';
 import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
 import { cellDocuments, CONTINUATION, ContinuationSlots, SITE, siteDocuments, type SavedContinuation, type SavedSite } from './continuation';
 import { ledgerFilings } from './ledgerFilings';
@@ -44,15 +41,8 @@ import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 
 /** Worlds the worker holds beside the road, and so what a crossroads costs a phone (E5.2b, J68): the one its player stands in. */
 export const STANDALONE_RESIDENTS = 1;
-/** Ground under the whole grid, far below the road's strips, and a player's pace on them. */
-const ROAD_HALF_SIZE = 2000, ROAD_SPEED = 8;
 /** A capsule's stand above its ground: one set down touching it cannot leave. */
 const ROAD_SKIN = 0.02;
-/** A cell wall's thickness and half its height. */
-const WALL = 0.5, WALL_HEIGHT = 30;
-/** How far out from a cell's edge its wall stands. */
-const WALL_OFF = 2;
-const ROAD: SimLevel = { version: SIM_API_VERSION, id: 'grid-road', seed: 1, ground: { size: ROAD_HALF_SIZE * 2, height: FALL_FLOOR }, player: { at: { x: 0, y: 0, z: 0 }, yaw: 0, speed: ROAD_SPEED }, entities: [], quests: [], weapon: HOST_PROBE };
 
 /** What the grid needs of its host. */
 export interface GridServerOptions {
@@ -93,19 +83,6 @@ function holdStrips(host: SimHost, meshes: readonly GridCollisionStrip['mesh'][]
   for (const mesh of meshes) {
     near.hold({ x: mesh.origin.x, z: mesh.origin.z, reach: solidReach(mesh.positions), make: physics => withOwner(host.scope, () => stripCollider(physics, mesh)) });
   }
-}
-/**
- * A wall around every cell in the road's own world, as the page's readiness walls are while a cell loads. A player stops just short of
- * a cell until its world is ready and the crossing takes them in, 6 m out at most; the road never runs on under a cell's own
- * hills, where a late hand-off would set them down inside one. A cell's terrain can end in a bank above road level at its very edge,
- * and a capsule set down touching that bank stays stuck in it, so the wall stands clear of it.
- */
-function addCellWalls(road: SimHost, cells: readonly GridCell[]): void {
-  const { R, world } = road.physics, reach = CHUNK_HALF + WALL_OFF + WALL / 2, long = reach + WALL / 2;
-  withOwner(road.scope, () => {
-    for (const { origin } of cells) for (const [x, z, hx, hz] of [[reach, 0, WALL / 2, long], [-reach, 0, WALL / 2, long], [0, reach, long, WALL / 2], [0, -reach, long, WALL / 2]] as const)
-      world.createCollider(R.ColliderDesc.cuboid(hx, WALL_HEIGHT, hz).setTranslation(origin.x + x, WALL_HEIGHT, origin.z + z).setCollisionGroups(groups('WORLD')));
-  });
 }
 /** The one client this worker serves is on the wire as the host's own player. A room with more players keeps this seat. */
 const SESSION_PLAYER = 'actor.player';

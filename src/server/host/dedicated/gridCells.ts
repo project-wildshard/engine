@@ -28,8 +28,14 @@ function gridNames(): GridNames {
 export function cellName(name: string): string { const { shards, cells } = gridNames(); return shards.has(name) ? name : cells.get(name) ?? name; }
 /** The shard a cell runs: its pack, its stores and its save rows. */
 export function cellShard(cell: string): string { return gridNames().shards.get(cell) ?? cell; }
+/** GC15: a worker's road is named for the first cell on its row, so the door finds its worker, and it is in nobody's place row. */
+const ROAD = 'road@';
+/** The road of the worker whose row starts with `first`. */
+export function roadName(first: string): string { return `${ROAD}${first}`; }
+/** Whether a name is a worker's road, and the cell whose worker hosts it. */
+export function roadHome(name: string): string | null { return name.startsWith(ROAD) ? name.slice(ROAD.length) : null; }
 /** The frame id a cell's rows go out in: its place in the catalogue after the road's 0, as a grid page numbers them (`GridNetRooms`). */
-export function cellFrame(cell: string): number { return gridNames().frames.get(cell) ?? UNPLACED_FRAME; }
+export function cellFrame(cell: string): number { return roadHome(cell) !== null ? 0 : gridNames().frames.get(cell) ?? UNPLACED_FRAME; }
 /**
  * The cells a server opens, from `WORLD_CELLS`. `grid` opens every grid cell whose shard the release names, the home cell (0, 0) first
  * because a player with no save lands in the first. A list names cells by instance or slug, in its own order. Unknown or doubled

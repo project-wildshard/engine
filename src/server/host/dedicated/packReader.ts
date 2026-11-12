@@ -8,7 +8,8 @@ import { join } from 'node:path';
 import { brotliDecompressSync } from 'node:zlib';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
-import { readServerProduct, type ServerRead } from '../standalone/serverProduct';
+import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
+import { readGridCollisionPack, readServerProduct, type ServerRead } from '../standalone/serverProduct';
 
 /** What a reader counts, so a boot can say where its bytes came from. */
 export interface PackReads { fetched: number; fetchedBytes: number; cached: number; refused: number }
@@ -56,6 +57,10 @@ export function packRead(options: PackReaderOptions, reads: PackReads): ServerRe
     finally { await rm(parked, { force: true }); }
     return body;
   };
+}
+/** GC15: the road's strips, from its build's grid pack. */
+export function readPackGrid(build: string, options: PackReaderOptions, reads: PackReads): Promise<readonly GridCollisionStrip[]> {
+  return readGridCollisionPack(new URL('shards/', options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
 }
 /** One shard's server inputs, through its build's book. */
 export function readPackProduct(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads): Promise<HeadlessRuntimeInput> {

@@ -58,10 +58,14 @@ async function serverBook(root: string, build: string, read: ServerRead): Promis
 }
 
 /** C2: the road's collision from this build's grid pack: nothing a page reads, and no shard's. */
-export async function fetchGridCollision(base: string): Promise<readonly GridCollisionStrip[]> {
-  const root = new URL(base, globalThis.location.href).href, { grid } = await serverBook(root, workerBuild(), serverBytes);
+export function fetchGridCollision(base: string): Promise<readonly GridCollisionStrip[]> {
+  return readGridCollisionPack(new URL(base, globalThis.location.href).href, workerBuild(), serverBytes);
+}
+/** C2, GC15: the road's collision from `build`'s grid pack beside `root`, through any reader: a page's worker or a dedicated room's. */
+export async function readGridCollisionPack(root: string, build: string, read: ServerRead): Promise<readonly GridCollisionStrip[]> {
+  const { grid } = await serverBook(root, build, read);
   if (grid === undefined) return [];
-  const body = await serverBytes(besideShard(grid.url, root), grid.url), file = (path: string): Uint8Array => {
+  const body = await read(besideShard(grid.url, root), grid.url), file = (path: string): Uint8Array => {
     const bytes = serverPackFile(grid, body, path);
     if (bytes === undefined) throw new Error(`Missing server input ${path}`);
     return bytes;

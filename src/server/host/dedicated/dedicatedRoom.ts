@@ -24,6 +24,10 @@ import { LEFT } from './socketPump';
 import type {PlaytestHit} from './playtest';
 import { cellFrame, cellName } from './gridCells';
 import {hitHistoryOf} from '@wildshard/engine/combat/rewind';
+import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
+import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
+import { buildStrips } from '../standalone/roadWorld';
+import { crossedTo, type CrossArrival, type CrossTarget } from './crossing';
 
 /** A fresh seat's step aside from the spawn, in metres, in turn. */
 const SPAWN_ASIDE: readonly number[] = [0, 1, -1, 0.5, -0.5];
@@ -50,13 +54,22 @@ interface Seat {
   dirtyAt: number | null; savedAt: number;
   /** What a checkpoint watches: the stand they go back to, and their quest book. */
   stand: unknown; version: number;
+  /** GC15: the room this seat last asked to cross into, and on which tick. */
+  asked?: string; askedAt?: number;
 }
+/** GC15: the worker's road a cell opens onto: its name, the grid that places both, and the seams the cell's own world builds. */
+export interface DedicatedRoomRoad { readonly name: string; readonly assembly: GridAssembly; readonly seams: readonly GridCollisionStrip['mesh'][] }
 /** How a room is built. */
 export interface DedicatedRoomOptions {
   /** The shard it runs: its pack, its stores and its save rows. */
   readonly slug: string; readonly build: string;
   /** GO3: the grid instance this room is, which names it everywhere else and numbers its frames. Left out, the shard's own grid cell. */
   readonly cell?: string;
+  /**
+   * GC15 (`WORLD_CROSSING=worker`): this worker's road, which the cell opens onto instead of standing inside its lone walls. Its seam
+   * strips are built into the cell's world, and a seat whose feet leave the cell asks the door to cross onto the road.
+   */
+  readonly road?: DedicatedRoomRoad;
   /** Stamped on every grant id, so a restarted room can't repeat one (E7.4). */
   readonly bootId: string;
   readonly input: HeadlessRuntimeInput;
@@ -74,7 +87,7 @@ const LOOT_ROW = 'loot:';
 const portableEntity = (entity: string, body: string): string => entity === body ? 'player' : entity.startsWith(`${body}:`) ? entity.slice(body.length + 1) : entity;
 
 /** One cell's room. */
-export class DedicatedRoom {
+export class DedicatedRoom implements CrossTarget {
   readonly net: NetRoom;
   readonly host: SimHost;
   readonly cell: CellWorld;
@@ -122,7 +135,7 @@ export class DedicatedRoom {
       if (seat === undefined) throw new Error(`No seat for ${body}`);
       return seat;
     };
-    const cell = await openCellWorld({ instance: options.cell ?? cellName(slug) }, input, undefined, { saves, lone: true, wholeSolids: true, pageless: true,
+    const cell = await openCellWorld({ instance: options.cell ?? cellName(slug) }, input, undefined, { saves, lone: options.road === undefined, wholeSolids: true, pageless: true,
       owned: body => seated(body).store.slots,
       profiles: {
         read: identity => seats.get(identity)?.store.rewards.read(slug).players[identity] ?? null,
@@ -136,6 +149,7 @@ export class DedicatedRoom {
         const seat = bodies.get(body);
         return seat === undefined ? null : seat.store.facts(source, slug)(name, portableEntity(entity, body));
       } });
+    if (options.road !== undefined) buildStrips(cell.host, options.road.seams);
     return new DedicatedRoom(options, cell, seats, bodies, playerRefusals);
   }
   /** Where a new client should load, what a player with no save stands on. */
@@ -219,27 +233,35 @@ export class DedicatedRoom {
    * socket never closes. False when they do not stand in the target after: either nothing moved (`holds` here is still true), or the
    * target refused the body it had just made, and the seat is gone from both.
    */
-  handOver(device: string, target: DedicatedRoom, entry: SeatEntry, at: ResumeAt): boolean {
+  handOver(device: string, target: CrossTarget, entry: SeatEntry, at: ResumeAt): boolean {
     const seat = this.seats.get(device), transport = seat?.transport ?? null;
-    if (seat === undefined || transport === null || seat.client === null || !this.net.live(seat.client) || target === this || target.seats.has(device)) return false;
-    const { previous, ...current } = entry;
-    let arrived = target.place(current, transport, at), recovered = false;
-    if (typeof arrived === 'string' && previous !== undefined) { arrived = target.place({ ...current, doc: previous.doc, recovery: previous.recovery }, transport, at); recovered = typeof arrived !== 'string'; }
+    if (seat === undefined || transport === null || seat.client === null || !this.net.live(seat.client) || target === this || target.holds(device)) return false;
+    const arrived = target.admit(entry, transport, at);
     if (typeof arrived === 'string') return false;
-    if (recovered) target.options.post({ kind: 'recovered', device, seq: entry.seq });
     mountedPlayerOf(this.host, seat.body)?.dismount();
     this.write(seat, 'cross');
     seat.closeOff?.(); seat.closeOff = null; seat.transport = null;
     const client = this.net.handOff(seat.client, target.net, target.sim.playerOf(arrived.body));
     seat.client = null;
     this.release(seat);
-    target.settle(arrived);
-    // A link that dropped on the way is a link that dropped there: the seat holds, as any closed link's does.
-    if (client === null) target.closed(arrived, transport, 'crossed');
-    else target.bind(arrived, transport, client);
-    target.write(arrived, 'cross');
-    target.flushRefusals();
-    return target.seats.get(device) === arrived;
+    return arrived.land(client);
+  }
+  /** GC15: a crossing seat's body here, from the door's read of its save on this shard (the previous copy if that one won't import). */
+  admit(entry: SeatEntry, transport: Transport, at: ResumeAt): CrossArrival | string {
+    const { previous, ...current } = entry, { device } = entry;
+    let arrived = this.place(current, transport, at), recovered = false;
+    if (typeof arrived === 'string' && previous !== undefined) { arrived = this.place({ ...current, doc: previous.doc, recovery: previous.recovery }, transport, at); recovered = typeof arrived !== 'string'; }
+    if (typeof arrived === 'string') return arrived;
+    if (recovered) this.options.post({ kind: 'recovered', device, seq: entry.seq });
+    const seat = arrived;
+    return { body: seat.body, land: client => {
+      this.settle(seat);
+      // A link that dropped on the way is a link that dropped here: the seat holds, as any closed link's does.
+      if (client === null) this.closed(seat, transport, 'crossed'); else this.bind(seat, transport, client);
+      this.write(seat, 'cross');
+      this.flushRefusals();
+      return this.seats.get(device) === seat;
+    } };
   }
   private refused(entry: SeatEntry, transport: Transport, hello: () => void, reason: string): void {
     const { previous, ...current } = entry;
@@ -345,6 +367,22 @@ export class DedicatedRoom {
     if (this.host.state.tick % CHECK_TICKS === 0) this.check(this.options.now());
     this.net.tick();
     this.flushRefusals();
+    this.trigger();
+  }
+  /** GC15 (the GC15a list's item 3): a linked seat whose feet left this cell asks the door to cross onto the worker's road. */
+  private trigger(): void {
+    const { road } = this.options;
+    if (road === undefined) return;
+    const here = road.assembly.cell(this.name), { tick } = this.host.state;
+    for (const seat of this.seats.values()) {
+      const player = this.host.players.get(seat.body);
+      if (seat.transport === null || player === undefined) continue;
+      const crossed = crossedTo(road.assembly, here, player.position);
+      if (crossed === undefined || crossed.cell !== null) { delete seat.asked; continue; }
+      if (seat.asked === road.name && tick - (seat.askedAt ?? 0) < CHECK_TICKS) continue;
+      seat.asked = road.name; seat.askedAt = tick;
+      this.crossing(seat.device, road.name, { ...crossed.at, yaw: player.yaw });
+    }
   }
   /** Holds that ran out, and checkpoints that are due (E7.4). */
   private check(now: number): void {

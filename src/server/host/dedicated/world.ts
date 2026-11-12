@@ -26,7 +26,7 @@ import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
 import { workerTable } from './workerTable';
-import { cellName, cellShard } from './gridCells';
+import { cellName, cellShard, roadHome } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAddress, type TrustProxy } from './doorTrust';
 
@@ -265,8 +265,10 @@ export class World {
   }
   /** Everyone in the grid or on their way: the cap counts all of them, whichever cell they stand in (J182). */
   private get taken(): number { return this.seated.size + this.pending.size; }
+  /** The worker a cell runs on, or (GC15) whose road a name is. */
+  private linkOf(slug: string): WorkerLink | undefined { return this.links.get(roadHome(slug) ?? slug); }
   private link(slug: string): WorkerLink {
-    const link = this.links.get(slug);
+    const link = this.linkOf(slug);
     if (link === undefined) throw new Error(`No worker has ${slug}`);
     return link;
   }
@@ -338,14 +340,15 @@ export class World {
   }
   /**
    * GC15: a seat's feet left cell `from` for `to`. On the same worker the door reads their save on `to`'s shard and orders the move, which
-   * keeps the seat and the socket. Between workers nothing moves yet (GC15 (3): `exportPlayer`/`importPlayer` and re-pointing the socket).
+   * keeps the seat and the socket. A cell and its worker's road (`WORLD_CROSSING`) cross the same way, with no save to read for the road. Between workers nothing moves yet (GC15 (3): `exportPlayer`/`importPlayer` and re-pointing the socket).
    */
   private async crossing(from: string, device: string, to: string, at: ResumeAt): Promise<void> {
-    const link = this.links.get(to), name = this.names.get(device);
-    if (link === undefined || link !== this.links.get(from) || this.seated.get(device) !== from || name === undefined || this.draining || this.crossings.has(device)) return;
+    const link = this.linkOf(to), name = this.names.get(device);
+    if (link === undefined || link !== this.linkOf(from) || this.seated.get(device) !== from || name === undefined || this.draining || this.crossings.has(device)) return;
     this.crossings.add(device);
     try {
-      const saved = await this.options.saves.read(device, cellShard(to));
+      // The road keeps no progress: a seat walks onto it with nothing to read.
+      const saved: SavedPlayer = roadHome(to) === null ? await this.options.saves.read(device, cellShard(to)) : { doc: null, seq: 0 };
       if (this.seated.get(device) !== from || this.draining) { this.crossings.delete(device); return; }
       link.send({ kind: 'cross', from, to, at, device, name, body: bodyId(this.options.secret, device), doc: saved.doc, seq: saved.seq,
         ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) });

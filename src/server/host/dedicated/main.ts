@@ -65,11 +65,15 @@ const reports = new ServerReports({ build, channel: release.channel, telemetryUr
 const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: PlayerSaves = url === 'memory:' ? memoryPlayerSaves() : await openPlayerSaves(url, new URL('migrations/', import.meta.url), release.saveEpoch, log, issue => { reports.contract(issue); });
 const recordTag=setting('RECORD_TAG');
 const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
+// GC15: `WORLD_CROSSING=worker` opens each worker's road and lets a seat walk between the cells it hosts. Off unless set (GRID-CROSSING).
+const crossingSetting = setting('WORLD_CROSSING');
+if (crossingSetting !== undefined && crossingSetting !== 'worker') throw new Error(`WORLD_CROSSING=${crossingSetting}: only worker, or unset`);
+const crossing = crossingSetting === 'worker';
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, ...(hold === undefined ? {} : { holdMs: Number(hold) }),...(playtest===undefined?{}:{playtest:true}) };
+  const data: CellWorkerData = { slugs, build, origin, cache, ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(crossing ? { crossing } : {}),...(playtest===undefined?{}:{playtest:true}) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },
@@ -111,7 +115,7 @@ stop = (code): void => { void (async (): Promise<void> => {
   process.exit(written ? code : 1);
 })(); };
 await new Promise<void>(resolve => { server.listen(port, host, resolve); });
-log({ at: 'server.listening', host, port, build, cells, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
+log({ at: 'server.listening', host, port, build, cells, crossing, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
 // The door keeps Rapier only to read a new build's packs, so this costs no worker a tick.
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, wasm = new URL('rapier.wasm', import.meta.url), rapier = async (): Promise<Awaited<ReturnType<typeof loadRapier>>> => loadRapier(await readFile(wasm));
 // The bundle and its packs reach disk before anyone hears a countdown, so the move costs a restart and no download. A bad hash stops here, with
