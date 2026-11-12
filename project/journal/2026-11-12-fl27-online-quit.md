@@ -7,3 +7,4 @@
   fresh link when its link closes `stalled` (a heard quit closes plainly, 1000 -> `closed`).
 - The redial case now waits for the page to report `reconnecting`, so it tests the path it names. A new case plants the race (close
   and quit in one turn): red 3/3 without the fix at the same assertion as CI, green with it.
+- J206 Codex: one MUST folded: a retry always dials a fresh link (a fresh quit link that itself closed `stalled` was never marked down, so the retry reused it).

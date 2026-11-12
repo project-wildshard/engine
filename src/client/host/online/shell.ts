@@ -147,7 +147,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       redial.dispose();
       const say = (again: boolean): Promise<void> => {
         let quitting = link;
-        if (quitting === null || down) { quitting = new WebSocketTransport(config.socket); link = quitting; down = false; client.rejoin(quitting); }
+        // A retry always dials: the link it follows is closed, whether or not `hear` was watching it.
+        if (quitting === null || down || !again) { quitting = new WebSocketTransport(config.socket); link = quitting; down = false; client.rejoin(quitting); }
         const gone = new Promise<void>(resolve => { quitting.onClose(reason => { if (again && reason === 'stalled') void say(false).then(resolve); else resolve(); }); });
         quitting.control('ready', new Uint8Array([LEAVE_FLAG]).buffer);
         return gone;
