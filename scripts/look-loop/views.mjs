@@ -32,6 +32,7 @@ const CAMS = resolvePath(flags.cameras), OUT = resolvePath(flags.out);
 const TAG = str(flags.tag, ''), EXTRA = str(flags.query, ''), BASE = str(flags.url, 'http://127.0.0.1:4173').replace(/\/$/u, '');
 const SETTLE = Number(str(flags.settle, '4')) * 1000, TIMEOUT = Number(str(flags.timeout, '300')) * 1000;
 const only = str(flags.anchor, '').split(',').filter(Boolean);
+if (TAG !== '' && !/^[a-z0-9][a-z0-9-]*$/u.test(TAG)) throw new Error(`--tag=${TAG}: lowercase letters, digits and - only (targets.py reads it back)`);
 const DEF = parseCameraFile(JSON.parse(readFileSync(CAMS, 'utf8')));
 const unknown = only.filter(id => !DEF.anchors.some(a => a.id === id));
 if (unknown.length > 0) throw new Error(`--anchor: no anchor ${unknown.join(', ')} in ${CAMS}`);
@@ -112,7 +113,8 @@ try {
       console.error(`[${g.mode}] ${url} ready in ${((Date.now() - t0) / 1000).toFixed(0)} s${errors.length > 0 ? `; page errors: ${errors.join(' | ')}` : ''}`);
       const groundY = new Map();
       for (const a of anchors) if (!a.cameras) groundY.set(a.id, await page.evaluate(groundAt, a.P));
-      const resolved = resolveMissing(DEF, a => groundY.get(a.id) ?? 0);
+      // only the anchors this run measured: an unselected anchor stays unresolved for its own first run
+      const resolved = resolveMissing({ ...DEF, anchors }, a => { const y = groundY.get(a.id); if (y === undefined) throw new Error(`no ground height for ${a.id}`); return y; });
       if (resolved.length > 0) { writeFileSync(CAMS, `${JSON.stringify(DEF, null, 2)}\n`); console.error(`resolved ${resolved.join(', ')} into ${CAMS}`); }
       await page.evaluate(installPose);
       // god shots hide the HUD: every element but the world canvas and the minimap

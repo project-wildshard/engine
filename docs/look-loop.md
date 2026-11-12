@@ -242,9 +242,11 @@ and models come before the LUT: a LUT can bring every region's ΔE00
 down on a frame that still looks empty (Driftwood: palette on target,
 parity ~70 %). Then:
 
-1. Capture without the LUT, same cameras: Debug ▸ Look ▸ Learned LUT
-   Off (the `learnedLut: "off"` setting in the cameras file's
-   `settings`), `--tag=nolut`.
+1. Capture without the LUT, same cameras, `--tag=nolut`. Engine has no
+   LUT-off switch today: a shard with no `public/assets/lut/<slug>.bin`
+   gets no LUT pass, so shoot a build without that file (the first fit,
+   or a candidate build with it removed). Never fit on frames shot
+   through the old LUT.
 2. Fit:
 
    ```bash
