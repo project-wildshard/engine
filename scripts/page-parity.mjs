@@ -4,13 +4,12 @@
 //   node scripts/page-parity.mjs <old> <new> [--identity]
 //   node scripts/page-parity.mjs https://play.wildshard.io https://<version>-wildshard-play.<subdomain>.workers.dev
 //
-// It asks both hosts for a fixed list of 30 URLs, one or more for each header rule in public/_headers (and so in
-// vercel.json), and compares status, cache-control, content-type, content-encoding, clear-site-data and location, and
+// It asks both hosts for a fixed list of 30 URLs, one or more for each header rule in public/_headers, and compares status, cache-control, content-type, content-encoding, clear-site-data and location, and
 // the decoded body of every 200 (sha256), so a part brotli-encoded twice or a redirect elsewhere is a difference. Hashed names
 // come from the old host's own files (index.html, sw.js, asset-index.json, deploy-chunks.json, the spawn books), so
 // both hosts must serve the same build. Any difference exits 1: J272 answer 3, parity blocks a cutover. `server` and
 // the approved COOP/COEP headers are not compared, so they never block.
-// A redirect's or a 404's content type is not compared (Vercel says text/plain, Workers nothing).
+// A redirect's or a 404's content type is not compared (the old host said text/plain, Workers nothing).
 // `--identity` asks without compression, for a local `wrangler dev`, which never compresses.
 
 import { createHash } from 'node:crypto';
@@ -86,7 +85,7 @@ let differences = 0;
 for (const path of list) {
   const [before, after] = await Promise.all([get(oldBase, path), get(newBase, path)]);
   const value = (/** @type {Map<string, string>} */ answer, /** @type {string} */ field) => answer.get(field) ?? '-';
-  // A redirect or a 404 has no body to type: Vercel says text/plain, Workers says nothing. Only its content type is skipped.
+  // A redirect or a 404 has no body to type: the old host said text/plain, Workers says nothing. Only its content type is skipped.
   const status = Number(value(before, 'status'));
   const bodiless = status === Number(value(after, 'status')) && (status === 404 || (status >= 300 && status < 400));
   const differ = FIELDS.filter(field => !(bodiless && field === 'content-type') && value(before, field) !== value(after, field));

@@ -1,3 +1,4 @@
+export const EXPORT_IGNORE:string;
 export function exportTree(root:string,sha:string):{tree:string;cleanup:()=>void};
 export function serve(tree:string,sha:string,built?:boolean):Promise<{url:string;close:()=>void}>;
 export function previewReady(url:string,timeoutMs?:number):Promise<boolean>;

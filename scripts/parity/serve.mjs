@@ -8,11 +8,16 @@ import { createServer } from 'node:net';
 import { get } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
+/** What an exported tree leaves out: paths no build reads (gitignore syntax, every pattern anchored with `/`). The old
+ *  host's upload-ignore file said this until OFF-VERCEL OV9 deleted it; the list is that file's patterns. */
+export const EXPORT_IGNORE=`${['/node_modules','/dist','/progress','/sources','/art','/docs','/api-tests','/.git','/ios','/android',
+  '/dist-native','/dist-drafts','/.native-build','/test/parity','/coverage/'].join('\n')}\n`;
+
 /** @param {string} root @param {string} sha */
 export function exportTree(root, sha) {
   const dir=realpathSync(mkdtempSync(join(tmpdir(),'wildshard-parity-'))), ign=join(dir,'ign'); mkdirSync(ign); // canonical (E432)
   execFileSync('git',['init','-q',ign]);
-  const patterns=execFileSync('git',['show',`${sha}:.vercelignore`],{cwd:root,encoding:'utf8'}); writeFileSync(join(dir,'ignore'),patterns);
+  writeFileSync(join(dir,'ignore'),EXPORT_IGNORE);
   const paths=execFileSync('git',['ls-tree','-r','--name-only',sha],{cwd:root,encoding:'utf8',maxBuffer:64*1024**2}).trim().split('\n');
   const ignored=execFileSync('git',['-C',ign,'-c',`core.excludesFile=${join(dir,'ignore')}`,'check-ignore','--no-index','--stdin'],{input:paths.join('\n'),encoding:'utf8',maxBuffer:64*1024**2}).trim().split('\n');
   const excluded=new Set(ignored), keep=paths.filter((p)=>p.startsWith('test/parity/') || !excluded.has(p));
@@ -37,7 +42,7 @@ export function previewReady(url, timeoutMs=1000) {
 export async function serve(tree,sha,built=false) {
   if(!built)buildTree(tree,sha);
   const port=await freePort();
-  // the host's plain preview server serves any tree's built bytes with that tree's vercel.json headers (D24)
+  // the host's plain preview server serves any tree's built bytes with that tree's _headers (D24)
   const server=fileURLToPath(new URL('../preview-server.mjs',import.meta.url));
   const child=spawn(process.execPath,[server,'--root',tree,'--host','127.0.0.1','--port',String(port)],{cwd:tree,stdio:['ignore','pipe','pipe'],detached:true});
   let startup='';child.stdout.on('data',(chunk)=>{startup+=String(chunk);});child.stderr.on('data',(chunk)=>{startup+=String(chunk);});
@@ -53,7 +58,7 @@ export function readJson(path) {return existsSync(path) ? JSON.parse(readFileSyn
 /** Content identity excludes harness / baseline / non-build documents, but includes every other exported build input.
  * @param {string} root @param {string} sha */
 export function runtimeTree(root,sha) {
-  const patterns=execFileSync('git',['show',`${sha}:.vercelignore`],{cwd:root,encoding:'utf8'});
+  const patterns=EXPORT_IGNORE;
   const entries=execFileSync('git',['ls-tree','-r',sha],{cwd:root,encoding:'utf8',maxBuffer:16*1024**2}).trim().split('\n');
   const temp=mkdtempSync(join(tmpdir(),'parity-key-'));
   try {

@@ -1,12 +1,12 @@
 // The game page's Worker (meta OFF-VERCEL-PLAN OV1, J272). Static assets serve everything; `run_worker_first` sends
-// only `/`, `/index.html` and the spawn parts here, where this does what vercel.json did:
-// - `?doctor` (any value) on the page goes 307 to `/doctor/?sw=0`, keeping the rest of the query as written, as Vercel's
-//   `permanent: false` redirect did (`/?x=1&doctor` → `/doctor/?x=1&doctor&sw=0`; OV2's parity check against play);
+// only `/`, `/index.html` and the spawn parts here, where this does what the old host's config did:
+// - `?doctor` (any value) on the page goes 307 to `/doctor/?sw=0`, keeping the rest of the query as written, as the old
+//   host's `permanent: false` redirect did (`/?x=1&doctor` → `/doctor/?x=1&doctor&sw=0`; OV2's parity check against play);
 // - otherwise the page itself, with `Cache-Control: no-store`;
 // - a `.pack.br` spawn part goes out as its stored q11 bytes with `Content-Encoding: br` (DL15). OV2 measured that
 //   `_headers` can't do it: the runtime brotli-encodes the stored bytes a second time. `encodeBody: "manual"` sends them
 //   as they are. Its other headers (cache, content type) still come from `_headers` via the assets.
-// `/index.html` is served as `/`: Vercel answered it 200, and the assets' default HTML handling would 307 it to `/`.
+// `/index.html` is served as `/`: the old host answered it 200, and the assets' default HTML handling would 307 it to `/`.
 // A path with no asset also reaches the Worker; it goes straight back to the assets, untouched, to 404.
 
 interface Fetcher {
@@ -20,7 +20,7 @@ interface Env {
 
 const SW = /^sw(?:=|$)/u
 
-/** Vercel's destination: the request's query pairs as written, any `sw` dropped, then `sw=0`. */
+/** The doctor's destination: the request's query pairs as written, any `sw` dropped, then `sw=0`. */
 function doctor(search: string): string {
   const kept = search.replace(/^\?/u, '').split('&').filter((pair): boolean => pair !== '' && !SW.test(pair))
   return `/doctor/?${[...kept, 'sw=0'].join('&')}`
@@ -54,7 +54,7 @@ async function page(request: Request, url: URL, env: Env): Promise<Response> {
   const asset = await env.ASSETS.fetch(new Request(new URL('/', url), request))
   const response = new Response(asset.body, asset)
   response.headers.set('cache-control', 'no-store')
-  // OV6: the Cloudflare edge's assets say `text/html` (local wrangler dev adds the charset); Vercel said this.
+  // OV6: the Cloudflare edge's assets say `text/html` (local wrangler dev adds the charset); the old host said this.
   response.headers.set('content-type', 'text/html; charset=utf-8')
   return response
 }

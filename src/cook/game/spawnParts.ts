@@ -215,9 +215,9 @@ parentPort.on('message', body => parentPort.postMessage(zlib.brotliCompressSync(
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 /** What the build's part encoding did (its report line). */
 export interface SpawnPartEncoding {readonly parts: number; readonly rawBytes: number; readonly wireBytes: number; readonly encoded: number}
-/** DL15 (BP6 / DS5): each part's q11 Brotli body, which vercel.json and the preview server serve as-is with
- * `Content-Encoding: br`. On 40bc516d5c that is 1.0 to 6.2 MB less on the wire per Runtime packs entry than Vercel's
- * on-the-fly q3 (sp-x2), at about 1 MB/s of encoder time cold; parts keep their names across builds (DL18), so each
+/** DL15 (BP6 / DS5): each part's q11 Brotli body, which the page's Worker (pages/worker.ts) and the preview server serve
+ * as-is with `Content-Encoding: br`. On 40bc516d5c that is 1.0 to 6.2 MB less on the wire per Runtime packs entry than the
+ * page host's on-the-fly q3 (sp-x2), at about 1 MB/s of encoder time cold; parts keep their names across builds (DL18), so each
  * encoding is kept by its body's sha256 in `cacheDir`, and a kept one is used only after it decodes to that body
  * (bounded by the body's own length). */
 export interface PartEncoder {

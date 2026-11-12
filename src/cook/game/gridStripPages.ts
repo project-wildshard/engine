@@ -16,7 +16,7 @@ import { GRID_STRIP_FEATURE_KINDS, decodeCompiledGridLook, gridStripPageKey, par
 import { seamMeshSteps, type SeamGeometryChannels } from '../../shared/game/grid/seamGeometry';
 import { BrotliSizeCache } from './brotliSizeCache.mjs';
 
-// What a deploy sends for these bytes, Vercel's on-the-fly Brotli.
+// What a deploy sends for these bytes, the page host's on-the-fly Brotli.
 const wireSizes = new BrotliSizeCache(process.env['WILDSHARD_WIRE_SIZE_CACHE'] ?? resolve(homedir(), '.cache/wildshard/gen/served-bytes/1'));
 const servedBytes = (bytes: Uint8Array): number => wireSizes.bytes(bytes);
 

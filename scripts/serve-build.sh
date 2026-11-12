@@ -325,7 +325,7 @@ link_tree() {
 link_tree "$SRC/public" "$OUT"
 
 # The host's plain preview server (D24: was `vite preview` with vite/preview.ts) serves any tree's already-built bytes
-# with that tree's vercel.json headers, so older pinned trees need nothing of their own.
+# with that tree's _headers, so older pinned trees need nothing of their own.
 PREVIEW_SERVER="$REPO/scripts/preview-server.mjs"
 cd "$SRC" || exit 1
 # A tool runner retires its process group when the calling command exits. nohup ignores HUP, but stays in that

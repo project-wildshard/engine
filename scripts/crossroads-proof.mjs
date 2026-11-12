@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // E5.2b: build the crossroads proof page (test/crossroads) with the server bytes of the four cells at its corner. It never ships
-// with the game. `--out` is a folder Vercel or the smoke can serve as it stands.
+// with the game. `--out` is a folder a static host or the smoke can serve as it stands (its `_headers` says no-store).
 //
 //   node scripts/crossroads-proof.mjs [--out=tmp/crossroads/site] [--products=out]
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,5 +28,5 @@ await build({ configFile: false, root: join(ROOT, 'test/crossroads'), base: '/',
 for (const slug of CROSSROADS) copyServerProduct(join(products, slug), join(out, 'shards', slug));
 mkdirSync(join(out, 'assets/physics'), { recursive: true });
 cpSync(join(ROOT, 'public/assets/physics/rapier.wasm'), join(out, 'assets/physics/rapier.wasm'));
-writeFileSync(join(out, 'vercel.json'), `${JSON.stringify({ headers: [{ source: '/(.*)', headers: [{ key: 'Cache-Control', value: 'no-store' }] }] }, null, 2)}\n`);
+writeFileSync(join(out, '_headers'), '/*\n  Cache-Control: no-store\n');
 console.info(`crossroads proof: ${out}`);

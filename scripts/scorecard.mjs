@@ -1046,7 +1046,7 @@ function exportTree(ref) {
 }
 
 async function startPreview(distDir, port) {
-  // this checkout's plain preview server (D24), with the export's own vercel.json; node itself, so a kill frees the port
+  // this checkout's plain preview server (D24), with the export's own _headers; node itself, so a kill frees the port
   const root = resolvePath(distDir, '..');
   let listening = false, exited = null;
   const p = spawn(process.execPath, [join(ROOT, 'scripts/preview-server.mjs'), '--root', root, '--port', String(port), '--outDir', distDir], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });

@@ -1,7 +1,8 @@
-# Workers static assets headers (meta OFF-VERCEL-PLAN OV2, J272): one rule for each vercel.json header rule, in order,
-# plus the version-URL noindex and two content types Vercel added by itself.
-# Cloudflare applies every matching rule and joins a repeated header with a comma, so a rule that overrides a broader
-# one first detaches it (`! Name`). Vercel let the later rule win; the detach gives the same result.
+# Workers static assets headers (meta OFF-VERCEL-PLAN OV2, J272): one rule for each of the old host's header rules
+# (frozen in test/fixtures/page-header-rules.json), in order, plus the version-URL noindex and the content types the old
+# host added by itself. Cloudflare applies every matching rule and joins a repeated header with a comma, so a rule that
+# overrides a broader one first detaches it (`! Name`). The old host let the later rule win; the detach gives the same
+# result. scripts/preview-server.mjs replays this file for local runs.
 # pages/worker.ts answers / and /index.html itself and sets their no-store; the two rules below keep the list whole.
 # test/page-headers.test.ts serves this file with wrangler dev and checks every rule.
 
@@ -63,7 +64,7 @@
 /*.webmanifest
   Content-Type: application/manifest+json; charset=utf-8
 
-# Not in vercel.json: what Vercel sent on its own, so page-parity.mjs finds no difference (OV2). Wrangler would say
+# Not in the old host's rules: what it sent on its own, so page-parity.mjs finds no difference (OV2). Wrangler would say
 # `application/json` and `text/javascript; charset=utf-8`.
 /*.json
   Content-Type: application/json; charset=utf-8
@@ -71,7 +72,7 @@
 /*.js
   Content-Type: application/javascript; charset=utf-8
 
-# OV6: the Cloudflare edge says `text/css` (local wrangler dev adds the charset); Vercel said this.
+# OV6: the Cloudflare edge says `text/css` (local wrangler dev adds the charset); the old host said this.
 /*.css
   Content-Type: text/css; charset=utf-8
 
@@ -116,7 +117,7 @@
   ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
 
-# vercel.json also sent Content-Encoding: br here. pages/worker.ts adds it: from this file the runtime would brotli the
+# The old host also sent Content-Encoding: br here. pages/worker.ts adds it: from this file the runtime would brotli the
 # stored bytes a second time (OV2 measured it).
 /assets/spawn/parts/*.pack.br
   Content-Type: application/octet-stream

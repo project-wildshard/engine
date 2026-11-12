@@ -24,26 +24,27 @@ function wire(url: URL, headers: Record<string, string> = {}, method = 'GET'): P
   });
 }
 
-// OFF-VERCEL OV2 (J272): the pages Workers serve dist with public/_headers. Every vercel.json header rule must give the
-// same answer from wrangler dev (pages/wrangler.jsonc, pages/worker.ts and a dist that holds _headers as the build
-// copies it), until vercel.json goes in OV12. vercel.json lets the later rule win; _headers detaches (`! Name`).
+// OFF-VERCEL OV2 (J272): the pages Workers serve dist with public/_headers. test/fixtures/page-header-rules.json is the
+// old host's header rules, frozen when the page moved (OV9): every rule must give the same answer from wrangler dev
+// (pages/wrangler.jsonc, pages/worker.ts and a dist that holds _headers as the build copies it). In the frozen rules the
+// later rule wins per header; _headers detaches (`! Name`) to say the same.
 
-/** vercel.json `source` → RegExp: literal text, `(.*)` and `(a|b)` groups, `\\.` a literal dot (the forms it uses). */
-function vercelSource(source: string): RegExp {
+/** A frozen rule's `source` → RegExp: literal text, `(.*)` and `(a|b)` groups, `\\.` a literal dot (the forms it uses). */
+function ruleSource(source: string): RegExp {
   const parts = source.split(/(\(\.\*\)|\([a-z|]+\))/u);
   const body = parts.map(part => part === '(.*)' ? '.*' : /^\([a-z|]+\)$/u.test(part) ? part
     : part.replaceAll('\\.', '.').replaceAll(/[.*+?^${}()|[\]\\/]/gu, '\\$&')).join('');
   return new RegExp(`^${body}$`, 'u');
 }
 
-interface VercelRule { readonly source: string; readonly headers: readonly { readonly key: string; readonly value: string }[] }
-const RULES = (JSON.parse(readFileSync('vercel.json', 'utf8')) as { headers: VercelRule[] }).headers;
+interface HeaderRule { readonly source: string; readonly headers: readonly { readonly key: string; readonly value: string }[] }
+const RULES = JSON.parse(readFileSync('test/fixtures/page-header-rules.json', 'utf8')) as HeaderRule[];
 
-/** What vercel.json sends for a path: every matching rule, the later one winning per header. */
-function vercelHeaders(path: string, hit: Set<number>): Map<string, string> {
+/** What the frozen rules send for a path: every matching rule, the later one winning per header. */
+function ruleHeaders(path: string, hit: Set<number>): Map<string, string> {
   const out = new Map<string, string>();
   RULES.forEach((rule, index) => {
-    if (!vercelSource(rule.source).test(path)) return;
+    if (!ruleSource(rule.source).test(path)) return;
     hit.add(index);
     for (const { key, value } of rule.headers) out.set(key.toLowerCase(), value);
   });
@@ -116,23 +117,23 @@ function served(): string {
   return page.base;
 }
 
-test('wrangler dev with _headers answers every vercel.json header rule the same', async () => {
+test('wrangler dev with _headers answers every frozen header rule the same', async () => {
   const hit = new Set<number>();
   for (const path of PATHS) {
-    const expected = vercelHeaders(path, hit);
+    const expected = ruleHeaders(path, hit);
     // identity: the stored part must still say br; everything else is compared unencoded.
     const response = await wire(new URL(path, served()), { 'accept-encoding': 'identity' });
     expect(response.status, path).toBe(200);
     for (const header of COMPARED) {
       const want = expected.get(header);
-      // Without a vercel.json Content-Type, both hosts guess it from the extension; the parity script compares those.
+      // Without a rule's Content-Type, both hosts guess it from the extension; the parity script compares those.
       if (want === undefined && header === 'content-type') continue;
-      // Vercel sent a text type with `; charset=utf-8` it was not told to add; _headers says it too (page-parity.mjs).
+      // The old host sent a text type with `; charset=utf-8` it was not told to add; _headers says it too (page-parity.mjs).
       const got = header === 'content-type' ? response.headers[header]?.replace(/; charset=utf-8$/u, '') : response.headers[header];
       expect(got, `${path} ${header}`).toBe(want);
     }
   }
-  expect([...hit].sort((a, b) => a - b), 'every vercel.json header rule is exercised').toEqual(RULES.map((_, index) => index));
+  expect([...hit].sort((a, b) => a - b), 'every frozen header rule is exercised').toEqual(RULES.map((_, index) => index));
 }, 60_000);
 
 test('a spawn part goes out as its stored bytes with Content-Encoding: br, whatever the client accepts', async () => {
@@ -152,13 +153,13 @@ test('a spawn part goes out as its stored bytes with Content-Encoding: br, whate
   expect([missing.status, missing.headers['content-encoding']]).toEqual([404, undefined]);
 }, 30_000);
 
-test('JSON and JavaScript carry the content types Vercel sent', async () => {
+test('JSON and JavaScript carry the content types the old host sent', async () => {
   const types = await Promise.all(['/version.json', '/b/04e1/main-Ab_3.js', '/manifest.webmanifest'].map(async path =>
     (await wire(new URL(path, served()))).headers['content-type']));
   expect(types).toEqual(['application/json; charset=utf-8', 'application/javascript; charset=utf-8', 'application/manifest+json; charset=utf-8']);
 }, 30_000);
 
-test('the page: no-store, ?doctor 307 as Vercel answered, a missing chunk 404 with no HTML', async () => {
+test('the page: no-store, ?doctor 307 as the old host answered, a missing chunk 404 with no HTML', async () => {
   for (const path of ['/', '/index.html']) {
     const response = await wire(new URL(path, served()));
     expect([response.status, response.headers['cache-control'], response.headers['content-type']])
@@ -187,7 +188,7 @@ test('a Range request gets the whole file, 200', async () => {
   expect([response.status, response.bytes.length, response.headers['content-range']]).toEqual([200, 4096, undefined]);
 }, 30_000);
 
-// The local preview server (scripts/preview-server.mjs) still replays vercel.json for `pnpm preview` and e2e.
+// The local preview server (scripts/preview-server.mjs) replays the build's _headers for `pnpm preview` and e2e.
 
 test('encoded responses follow file changes and concurrent readers receive complete bodies', async () => {
   mkdirSync(resolve('tmp'), { recursive: true });
@@ -214,7 +215,8 @@ test('encoded responses follow file changes and concurrent readers receive compl
 test('binary preview transport keeps exact quality-3 bytes, headers, ranges and HEAD semantics', async () => {
   mkdirSync(resolve('tmp'), { recursive: true });
   const root = mkdtempSync(resolve('tmp/preview-binary-'));
-  writeFileSync(join(root, 'vercel.json'), readFileSync('vercel.json'));
+  mkdirSync(join(root, 'dist'));
+  copyFileSync(resolve('public/_headers'), join(root, 'dist/_headers'));
   const file = `shardfiles/driftwood-isle/blobs/bin/${'b'.repeat(64)}.bin`;
   const body = Buffer.from(Uint8Array.from({ length: 256 * 1024 }, (_, index) => (index * 31 + (index >>> 8)) & 255));
   mkdirSync(dirname(join(root, 'dist', file)), { recursive: true });
@@ -269,13 +271,14 @@ test('binary preview transport keeps exact quality-3 bytes, headers, ranges and 
   }
 }, 20_000);
 
-// DL15 (sp-x9's review of 36550ecc1b): a part is served as its q11 body with Content-Encoding: br (the vercel.json rule
-// now replays), decoded without that header for a client that refuses br, and a missing or broken part is an error
+// DL15 (sp-x9's review of 36550ecc1b): a part is served as its q11 body with Content-Encoding: br (as the page's Worker
+// sends it), decoded without that header for a client that refuses br, and a missing or broken part is an error
 // response, never the page's fallback or a crashed server.
 test('spawn parts: br as-is, gzip for gzip-only clients, decoded for identity, 404 and 500 instead of the fallback', async () => {
   mkdirSync(resolve('tmp'), { recursive: true });
-  const root = mkdtempSync(resolve('tmp/vercel-parts-'));
-  writeFileSync(join(root, 'vercel.json'), readFileSync('vercel.json'));
+  const root = mkdtempSync(resolve('tmp/preview-parts-'));
+  mkdirSync(join(root, 'dist'));
+  copyFileSync(resolve('public/_headers'), join(root, 'dist/_headers'));
   const raw = Buffer.alloc(4096, 7), encoded = brotliCompressSync(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } });
   const good = `assets/spawn/parts/${'a'.repeat(16)}.pack.br`, broken = `assets/spawn/parts/${'b'.repeat(16)}.pack.br`;
   mkdirSync(join(root, 'dist/assets/spawn/parts'), { recursive: true });

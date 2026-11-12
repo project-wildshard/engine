@@ -9,7 +9,7 @@ import type {} from './shardPrefetch'; // Window.__ws_prefetch, for a program th
  *   gone   every Cache Storage cache (the worker's ws-immutable / ws-static-* / ws-shell-*, and any other), the service
  *          worker's registration, the KTX2 "set complete" markers (`ktx2set:*`, src/client/engine/boot/shardPrefetch.ts — so Auto
  *          boots with images again, E157 B), and the origin's HTTP cache (`/clear-cache.json` answers with
- *          `Clear-Site-Data: "cache"`, vercel.json: the worker's fetches go through the HTTP cache, and the immutable
+ *          `Clear-Site-Data: "cache"`, public/_headers: the worker's fetches go through the HTTP cache, and the immutable
  *          `/assets/**` year would otherwise answer the "cold" load from disk) and, with a content base (PAGE-SIZE PZ10),
  *          the content origin's too: its own `/clear-cache.json` carries the same header (a zone rule on
  *          packs.wildshard.io), since whether the page's header reaches another origin's entries is browser-specific;
@@ -49,7 +49,7 @@ export interface ClearReport {
 const REPORT_KEY = 'clearDownloads.report';
 /** the localStorage keys that are download bookkeeping, not the player's */
 
-/** the file whose response carries `Clear-Site-Data: "cache"` (vercel.json); `?sw=0` so no worker answers it */
+/** the file whose response carries `Clear-Site-Data: "cache"` (public/_headers); `?sw=0` so no worker answers it */
 const CLEAR_HTTP_URL = '/clear-cache.json?sw=0';
 
 export async function storageUsed(): Promise<number | null> {

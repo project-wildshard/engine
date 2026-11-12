@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // D24 (G799: no Vite plugins): serve a finished build the way production does, as a plain Node server. It replaces
-// `vite preview` and its two plugins (the vercel.json header replay and Rapier's brotli copy), and keeps what the
+// `vite preview` and its two plugins (the header replay, now of `_headers`, and Rapier's brotli copy), and keeps what the
 // preview server did that callers rely on: encoded files, weak ETags with 304s, byte ranges, `.html`
 // rewrites, index.html for any missing path a page or fetch asks for, and localhost CORS.
 //
@@ -35,12 +35,42 @@ const telemetryDirectory = resolve(option('telemetry-dir', fileURLToPath(new URL
 if (telemetryDirectory === outDir || telemetryDirectory.startsWith(outDir + sep)) throw new Error('preview-server: telemetry must be outside the served build');
 const receiveTelemetry = await createPreviewTelemetrySink(telemetryDirectory);
 
-/** `vercel.json` `source` → RegExp. Only the forms the file uses: literal paths and `(.*)` groups (Vercel's
- *  path-to-regexp escapes everything else, `.` included). The rules replay in order; the last match wins per header. */
-// A source's `\.` is a literal dot (vercel.json escapes it); it becomes a plain dot before the rest is escaped.
-const sourceRegex = source => new RegExp(`^${source.split('(.*)').map(s => s.replaceAll(String.raw`\.`, '.').replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join('(.*)')}/?$`);
-const vercel = join(root, 'vercel.json');
-const rules = existsSync(vercel) ? (JSON.parse(readFileSync(vercel, 'utf8')).headers ?? []).map(rule => ({ re: sourceRegex(rule.source), headers: rule.headers })) : [];
+/** The build's `_headers` (public/_headers, which the build copies into dist; else the tree's own public/_headers), read
+ *  the way the page's Workers static assets read it: a line at the left margin opens a rule for a path, an indented
+ *  `Name: value` adds a header, `! Name` detaches one an earlier matching rule set, `#` starts a comment. In a path `*` is
+ *  a splat (any characters, `/` included) and `:name` one segment. The rules replay in order; a header two rules set is
+ *  joined with a comma, as Workers join it. A rule for an absolute URL (the version-URL noindex) is for a workers.dev
+ *  host, never this local server, so it is skipped. */
+function headerRules(text) {
+  const rules = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    if (!/^\s/u.test(line)) {
+      const pattern = trimmed.startsWith('/') ? trimmed.split(/(\*|:[A-Za-z]\w*)/u).map(part => part === '*' ? '.*'
+        : part.startsWith(':') ? '[^/]+' : part.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`)).join('') : null;
+      rules.push({ re: pattern === null ? null : new RegExp(`^${pattern}$`, 'u'), ops: [] });
+      continue;
+    }
+    const rule = rules.at(-1);
+    if (rule === undefined) throw new Error(`preview-server: _headers has a header before any path: ${trimmed}`);
+    if (trimmed.startsWith('!')) { rule.ops.push({ name: trimmed.slice(1).trim() }); continue; }
+    const colon = trimmed.indexOf(':');
+    if (colon <= 0) throw new Error(`preview-server: _headers line is not \`Name: value\`: ${trimmed}`);
+    rule.ops.push({ name: trimmed.slice(0, colon).trim(), value: trimmed.slice(colon + 1).trim() });
+  }
+  return rules.filter(rule => rule.re !== null);
+}
+const headersFile = [join(outDir, '_headers'), join(root, 'public/_headers')].find(file => existsSync(file));
+const rules = headersFile === undefined ? [] : headerRules(readFileSync(headersFile, 'utf8'));
+/** Every `_headers` rule that matches the path, in order. */
+function replayHeaders(pathname, res) {
+  for (const rule of rules) if (rule.re.test(pathname)) for (const op of rule.ops) {
+    if (op.value === undefined) { res.removeHeader(op.name); continue; }
+    const previous = res.getHeader(op.name);
+    res.setHeader(op.name, previous === undefined ? op.value : `${String(previous)}, ${op.value}`);
+  }
+}
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
   '.webmanifest': 'application/manifest+json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg',
@@ -52,7 +82,7 @@ const type = file => TYPES[extname(file).toLowerCase()] ?? 'application/octet-st
 // Production also encodes binary scene/pack/mesh payloads, not just text.
 const COMPRESSIBLE = /text|javascript|\/json|xml|svg|manifest|octet-stream|wasm|gltf|ktx2/u;
 const LOCAL_ORIGIN = /^https?:\/\/(?:(?:[^:]+\.)?localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/u;
-// Vercel's CDN brotli-compresses application/wasm (~836 KB for Rapier's 3.29 MB); answer the way production does
+// The production edge brotli-compresses application/wasm (~836 KB for Rapier's 3.29 MB); answer the way production does
 const RAPIER = join(outDir, 'assets/physics/rapier.wasm');
 const rapierBr = existsSync(RAPIER) ? brotliCompressSync(readFileSync(RAPIER), { params: { [zlib.BROTLI_PARAM_QUALITY]: 11 } }) : null;
 const encodedFiles = createEncodedFileCache();
@@ -131,7 +161,7 @@ const server = createServer((req, res) => {
   if (worker || publicRead) res.setHeader('Access-Control-Allow-Origin', '*');
   else if (origin !== undefined && LOCAL_ORIGIN.test(origin)) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
   if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
-  for (const rule of rules) if (rule.re.test(pathname)) for (const header of rule.headers) res.setHeader(header.key, header.value);
+  replayHeaders(pathname, res);
   if (pathname === '/api/telemetry') { void receiveTelemetry(req, res); return; }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.statusCode = 405; res.end(); return; }
 
@@ -152,8 +182,8 @@ const server = createServer((req, res) => {
   const compressible = COMPRESSIBLE.test(type(file)) && stat.size >= 1024;
   if (compressible) varyEncoding(res);
   if (req.headers['if-none-match'] === etag) { res.statusCode = 304; res.end(); return; }
-  // Production (vercel.json) sends a part as-is with Content-Encoding: br. A client that refuses br (http Safari)
-  // gets the decoded body without that header (the replayed rule set it), so local runs never see raw Brotli bytes.
+  // Production (pages/worker.ts) sends a part as-is with Content-Encoding: br. A client that refuses br (http Safari)
+  // gets the decoded body without that header, so local runs never see raw Brotli bytes.
   if (part) {
     varyEncoding(res);
     const accepted = encodingQuality(acceptEncoding, 'br') > 0;

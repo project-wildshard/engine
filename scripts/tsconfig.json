@@ -567,7 +567,6 @@
     "worker-client-play.mjs",
     "worker-client-proof.mjs",
     "worker-client-saves.mjs",
-    "worker-proof-page.mjs",
     "**/*.test.*"
   ],
   "files": [

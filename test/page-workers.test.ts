@@ -72,7 +72,7 @@ function assets(seen: string[]): Env {
   } } };
 }
 
-test('?doctor on the page goes 307 to the doctor without the service worker, as Vercel did', async () => {
+test('?doctor on the page goes 307 to the doctor without the service worker, as the old host did', async () => {
   // Play's answers, 11-11: the query stays as written, any sw goes, sw=0 comes last.
   const want: Record<string, string> = { '/?doctor': '/doctor/?doctor&sw=0', '/?doctor=1': '/doctor/?doctor=1&sw=0',
     '/index.html?doctor': '/doctor/?doctor&sw=0', '/?x=1&doctor': '/doctor/?x=1&doctor&sw=0', '/?doctor&sw=1': '/doctor/?doctor&sw=0' };
@@ -91,7 +91,7 @@ test('the page comes from the assets with no-store, /index.html as /', async () 
     const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), assets(seen));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8'); // OV6: what Vercel sent; the edge's assets drop the charset
+    expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8'); // OV6: what the old host sent; the edge's assets drop the charset
     expect(response.headers.get('etag')).toBe('"page"');
     expect(await response.text()).toBe('<!doctype html>');
     expect(seen).toEqual(['/']);

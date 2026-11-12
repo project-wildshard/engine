@@ -1,5 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The preview fixture writes and removes only its owned ./tmp directory.
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned static HTTP fixture.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
@@ -62,7 +62,7 @@ test('worker updates revalidate unchanged bytes and fetch a changed script in fu
   mkdirSync(resolve('tmp'), { recursive: true });
   const root = mkdtempSync(resolve('tmp/pwa-update-'));
   mkdirSync(join(root, 'dist'));
-  writeFileSync(join(root, 'vercel.json'), readFileSync('vercel.json'));
+  copyFileSync(resolve('public/_headers'), join(root, 'dist/_headers'));
   const file = join(root, 'dist/sw.js'), original = 'self.version = "first";';
   writeFileSync(file, original);
   const scripts = workerScripts(original);
