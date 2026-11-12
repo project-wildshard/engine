@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import * as v from 'valibot';
@@ -155,7 +155,7 @@ export async function productVerdict(tarball: Uint8Array, out: string): Promise<
     {hash: bytes => createHash('sha256').update(bytes).digest('hex')});
   // S11: a deploy's added shard serves its KTX2 targets itself, or the build already holds them.
   assertKtx2TableTargets({paths: () => files.keys(), read: path => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path}`); return bytes; }},
-    url => !url.split('/').includes('..') && existsSync(join(out, url)));
+    url => { const file = join(out, url); return !url.split('/').includes('..') && existsSync(file) && statSync(file).isFile(); });
   const revision = /__WS_SHARDFILE_VALIDATOR__="([a-f0-9]{64})"/u.exec(readFileSync(join(out, 'index.html'), 'utf8'))?.[1];
   if (revision === undefined) throw new Error('No validator stamped on the build');
   const receipt = files.get('validation.json'), index = files.get('shard.json');

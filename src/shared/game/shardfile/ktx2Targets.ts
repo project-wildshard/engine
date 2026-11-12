@@ -20,7 +20,9 @@ function parse(bytes: Uint8Array, path: string): unknown {
   catch { throw new Error(`KTX2 table: ${path} is not JSON`); }
 }
 
-/** Every target the table names, in document order. A key is a source URL, never a target. */
+/** Every target the table names, in document order. A key is a source URL, never a target. Every shape the table takes
+ *  (`GPU_FILES`, `pageModeKtx2` args, a bare tier map) holds only tier maps, so a `/`-string value is a target; an argument
+ *  that is a `/`-path but no target would need this walk narrowed to the tier maps. */
 export function ktx2TableTargets(table: unknown): readonly string[] {
   const targets: string[] = [];
   const walk = (value: unknown): void => {
