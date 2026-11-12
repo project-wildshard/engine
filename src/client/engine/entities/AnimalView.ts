@@ -139,10 +139,17 @@ export class Animal extends AnimalSim {
    *  local copy re-armed the white flash every frame on a corpse (TE-ENG9). The rise counts from the low point, not the
    *  last row: an interpolated rise at a high frame rate moves less than the threshold per frame. */
   private rowFlinchLow = 0;
+  /** The last row's hp, null before the first: a body that comes into view already hurt took no blow this page saw. */
+  private rowHp: number | null = null;
   override showRow(row: Parameters<AnimalSim['showRow']>[0], dt: number): void {
     const hit = row.flinch > this.rowFlinchLow + 0.05, died = this.alive && !row.alive;
+    // REMOTE-PLAYERS RP1: a fall in the row's hp is a blow, whoever landed it, so every page in range shows the bar draining
+    // (Combat.ts reads `lastHitT`). Only this page's own hits reach the pipeline that sets it offline.
+    const struck = this.rowHp !== null && row.hp < this.rowHp;
     this.rowFlinchLow = hit ? row.flinch : Math.min(this.rowFlinchLow, row.flinch);
+    this.rowHp = row.hp;
     super.showRow(row, dt);
+    if (struck) this.lastHitT = this.hitTime();
     if (hit) this.hitFlash();
     if (died) { this.deathT = 0; this.deathSide = 1; }
   }
