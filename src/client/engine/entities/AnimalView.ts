@@ -130,13 +130,14 @@ export class Animal extends AnimalSim {
   get simulationBound(): boolean { return this.externalSimulation !== null || this.rowDriven; }
   /** A wire row stands this body (`showRow`): no decision or step of its own, only its pose. */
   rowDriven = false;
-  /** The last row's flinch. A blow is a rise in the wire's own flinch: the local copy decays every frame (the pose law,
-   *  a custom rig's ragdoll) while a dead body's row keeps its last flinch, so comparing against the local copy re-armed
-   *  the white flash every frame on a corpse (TE-ENG9). */
-  private rowFlinch = 0;
+  /** The rows' lowest flinch since the last blow. A blow is a rise in the wire's own flinch: the local copy decays every
+   *  frame (the pose law, a custom rig's ragdoll) while a dead body's row keeps its last flinch, so comparing against the
+   *  local copy re-armed the white flash every frame on a corpse (TE-ENG9). The rise counts from the low point, not the
+   *  last row: an interpolated rise at a high frame rate moves less than the threshold per frame. */
+  private rowFlinchLow = 0;
   override showRow(row: Parameters<AnimalSim['showRow']>[0], dt: number): void {
-    const hit = row.flinch > this.rowFlinch + 0.05, died = this.alive && !row.alive;
-    this.rowFlinch = row.flinch;
+    const hit = row.flinch > this.rowFlinchLow + 0.05, died = this.alive && !row.alive;
+    this.rowFlinchLow = hit ? row.flinch : Math.min(this.rowFlinchLow, row.flinch);
     super.showRow(row, dt);
     if (hit) this.hitFlash();
     if (died) { this.deathT = 0; this.deathSide = 1; }

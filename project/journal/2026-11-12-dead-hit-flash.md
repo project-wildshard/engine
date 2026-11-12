@@ -16,3 +16,6 @@
 - Test: `src/client/engine/entities/dead-hit-flash.test.ts`, red before:
   a body killed in its flash is back at its base emissive within 0.5 s
   and stays there; a live body still flashes on a second blow.
+- Codex review MUST: a per-frame rising edge misses an interpolated rise at
+  240 FPS (40/63 to 1 over two ticks is under 0.05 a frame). The rise now
+  counts from the rows' low point since the last blow; a test covers it.

@@ -60,3 +60,19 @@ test('a live row-driven body still flashes on each new blow, not between them', 
   flinch = 1; show(); // a second blow on a still-flinching body
   expect(fur.emissive.getHex()).not.toBe(base);
 });
+
+test('an interpolated rise flashes at a high frame rate, where each frame rises less than the threshold', () => {
+  const { animal, fur } = rowBody();
+  const base = fur.emissive.getHex(), dt = 1 / 240;
+  let t = 0;
+  const frame = (flinch: number): void => { animal.showRow(row(flinch, true), dt); animal.update(dt, t, true); t += dt; };
+  for (let i = 0; i < 240; i++) frame(40 / 63); // a still-flinching body, its row held between ticks
+  expect(fur.emissive.getHex()).toBe(base);
+  let flashed = false;
+  for (let i = 1; i <= 8; i++) { // the wire's 40/63 to 1 interpolated over two 30 Hz ticks: under 0.05 a frame
+    animal.showRow(row(40 / 63 + (1 - 40 / 63) * i / 8, true), dt);
+    flashed ||= fur.emissive.getHex() !== base;
+    animal.update(dt, t, true); t += dt;
+  }
+  expect(flashed).toBe(true);
+});
