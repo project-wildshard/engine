@@ -4,7 +4,8 @@ import { admitHeldRecipe } from './heldRecipe';
 import { createClientChannels, bindClientChannelInputs } from '../../../shared/game/plugin/channels';
 import { readBorrowedOwner, type BorrowedOwnerPath } from '../../../shared/game/plugin/borrowed';
 import { createClientScene, createHeldMeleeBinding, type ClientScene, type ClientScenePorts } from './scene';
-import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, CylinderGeometry, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, SphereGeometry, Vector2, Vector3, MathUtils } from "three";
+import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, ConeGeometry, CylinderGeometry, TorusGeometry, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, SphereGeometry, Vector2, Vector3, MathUtils } from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { RangedAction, stepActionClock } from "@wildshard/engine/combat/Firearm";
 import { leverProfile, type LeverProfile } from "../../../shared/game/shardfile/items";
 import { blocks } from "@wildshard/engine/blocks";
@@ -28,7 +29,7 @@ type App = LevelContext['app'];
  * declared colour and the shade side a step darker.
  */
 export const ITEM_VIEW_LIFT = 0.5;
-/** A lit lantern shows a warm glowing band round its body, so the toggle shows by day (playtest round 3: LANTERN showed nothing). */
+/** A lit lantern shows a warm glowing core in its glass (a band round a GLB body), so the toggle shows by day (playtest round 3: LANTERN showed nothing). */
 const LANTERN_LIT = 0xffc46a;
 /** On a portrait screen a held item's view sits at most this share of the half-frame from the centre (its depth's). */
 const IN_FRAME = 0.7;
@@ -61,14 +62,37 @@ function itemMesh(ports: ItemFamilyPorts): Group {
   }
   const recipe = ports.view.recipe;
   if (recipe === 'kit.rifle') return rifleMesh(ports);
-  if (!['kit.whip', 'kit.sword', 'kit.lantern'].includes(recipe)) throw new Error(`Unresolved item view ${recipe}`);
+  if (recipe === 'kit.lantern') return lanternMesh(ports);
+  if (!['kit.whip', 'kit.sword'].includes(recipe)) throw new Error(`Unresolved item view ${recipe}`);
   const model = new Group();
   const material = new MeshStandardMaterial({ color: ports.view.colour, flatShading: true, emissive: ports.view.colour, emissiveIntensity: ITEM_VIEW_LIFT });
   const sword = recipe === 'kit.sword' ? buildSword('iron') : null;
-  const geometry = sword?.sword ?? (recipe === 'kit.whip' ? new CylinderGeometry(0.025, 0.04, 0.8, 6) : new BoxGeometry(0.12, 0.18, 0.12));
+  const geometry = sword?.sword ?? new CylinderGeometry(0.025, 0.04, 0.8, 6);
   sword?.arms.dispose(); model.add(new Mesh(geometry, material));
   model.position.set(...ports.view.position); model.rotation.set(...ports.view.rotation);
   ports.scope.onDispose(() => { model.removeFromParent(); geometry.dispose(); material.dispose(); });
+  return model;
+}
+/** The lantern's glass, a warm pane that reads as glass unlit; the lit glow core covers it (DeclaredLantern). */
+const LANTERN_GLASS = 0xf1dcaa;
+/**
+ * opus-greybox: a lantern's stand-in when its row names no GLB. It was a bare 12 × 18 × 12 cm box, which read as a grey
+ * placeholder cube at the view's lower left in every first-person frame. Now a lantern: a base, four corner posts, a top
+ * plate, a pyramid roof and a carry ring in the row's colour (one merged draw), round a glass core (one draw).
+ */
+function lanternMesh(ports: ItemFamilyPorts): Group {
+  const model = new Group();
+  const part = (geometry: BufferGeometry, x: number, y: number, z: number): BufferGeometry => geometry.translate(x, y, z);
+  const pieces = [part(new BoxGeometry(0.12, 0.022, 0.12), 0, -0.075, 0), part(new BoxGeometry(0.11, 0.02, 0.11), 0, 0.07, 0),
+    part(new ConeGeometry(0.08, 0.045, 4).rotateY(Math.PI / 4), 0, 0.1025, 0), part(new TorusGeometry(0.035, 0.005, 4, 10, Math.PI), 0, 0.125, 0),
+    ...[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx = 0, sz = 0]) => part(new BoxGeometry(0.016, 0.13, 0.016), sx * 0.048, 0, sz * 0.048))];
+  const frame = mergeGeometries(pieces, false); for (const piece of pieces) piece.dispose();
+  const pane = new BoxGeometry(0.08, 0.12, 0.08);
+  const metal = new MeshStandardMaterial({ color: ports.view.colour, flatShading: true, emissive: ports.view.colour, emissiveIntensity: ITEM_VIEW_LIFT });
+  const glass = new MeshStandardMaterial({ color: LANTERN_GLASS, flatShading: true, emissive: LANTERN_GLASS, emissiveIntensity: ITEM_VIEW_LIFT, roughness: 0.2 });
+  model.add(new Mesh(frame, metal), new Mesh(pane, glass));
+  model.position.set(...ports.view.position); model.rotation.set(...ports.view.rotation);
+  ports.scope.onDispose(() => { model.removeFromParent(); frame.dispose(); pane.dispose(); metal.dispose(); glass.dispose(); });
   return model;
 }
 /** TE-ENG2: a lever's stand-in when its row names no GLB: a barrel and a stock in the row's colour, the muzzle at the barrel's end. */
@@ -301,8 +325,9 @@ class DeclaredLantern extends Tool {
     if (spec.action === null) throw new Error('Declared lantern requires its toggle action');
     this.id = `tool.${row.id.slice(5)}`; this.actions = [spec.action]; this.spec = spec; this.ports = ports;
     this.model = itemMesh(ports);
-    // the lit band: its own unlit material, shown only while the lantern burns (the body's material is never changed)
-    const band = new BoxGeometry(0.13, 0.07, 0.13), glow = new MeshBasicMaterial({ color: LANTERN_LIT });
+    // the lit core: its own unlit material over the glass, shown only while the lantern burns (the body's material is never
+    // changed); a row's GLB lantern has no stand-in glass, so its core stays the old band round the body
+    const band = ports.view.asset === undefined ? new BoxGeometry(0.085, 0.124, 0.085) : new BoxGeometry(0.13, 0.07, 0.13), glow = new MeshBasicMaterial({ color: LANTERN_LIT });
     this.flame = new Mesh(band, glow); this.flame.visible = false; this.model.add(this.flame);
     ports.scope.onDispose(() => { band.dispose(); glow.dispose(); });
     this.light = new PointLight(0xffe1aa, 0, 8); this.model.add(this.light);
