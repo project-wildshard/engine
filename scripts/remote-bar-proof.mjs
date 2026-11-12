@@ -35,7 +35,10 @@ const nearest = (page, to) => page.evaluate(spot => {
   return body === undefined ? null : { x: body.position.x, z: body.position.z, away: Math.hypot(body.position.x - player.position.x, body.position.z - player.position.z), kind: body.kind, hp: body.hp, maxHp: body.maxHp, lastHitT: body.lastHitT, now: performance.now() };
 }, to);
 /** Jake's shown bars: their label and fill. @param {import('playwright').Page} page */
-const bars = page => page.evaluate(() => [...document.querySelectorAll('.ws-combat-hp.show')].map(el => ({ kind: el.querySelector('.ws-combat-hp-kind')?.textContent ?? '', fill: ((fill) => (fill instanceof HTMLElement ? fill.style.transform : ''))(el.querySelector('.ws-combat-hp-fill')) })));
+const bars = page => page.evaluate(() => [...document.querySelectorAll('.ws-combat-hp.show')].map(el => {
+  const fill = el.querySelector('.ws-combat-hp-fill');
+  return { kind: el.querySelector('.ws-combat-hp-kind')?.textContent ?? '', fill: fill instanceof HTMLElement ? fill.style.transform : '' };
+}));
 /** Look near a spot, OFF it by `side` radians, so it is on screen but not under the crosshair. @param {import('playwright').Page} page @param {{ x: number, z: number }} at @param {number} side */
 const lookNear = (page, at, side) => page.evaluate(([x, z, off]) => { const { player } = /** @type {any} */ (window).__wildshard.world; player.yaw = Math.atan2(-(x - player.position.x), -(z - player.position.z)) + off; player.pitch = -0.12; player.touchMove.y = 0; }, [at.x, at.z, side]);
 /** @param {import('playwright').Page} page */

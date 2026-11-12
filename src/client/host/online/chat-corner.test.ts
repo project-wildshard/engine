@@ -353,3 +353,28 @@ test('the open chat reserves its dock over a phone keyboard, and gives it back o
     expect(root.dataset['wsKbReserve']).toBeUndefined();
   } finally { vi.unstubAllGlobals(); }
 });
+
+// MOBILE-KEYBOARD MK5 (J297, Jake 2026-11-12 17:44 Cancún: "fix the top of it"): after Done closes the phone keyboard the chat
+// stays open, and it stood as a tall fixed panel with its few lines at the bottom and an empty dark top. Without the keyboard
+// the open chat on a phone sizes to its lines: its bottom edge stays where it was, its height is what the lines need, and the
+// old tall size is only its ceiling (in portrait and in landscape).
+test('MK5: the open chat on a phone without a keyboard sizes to its lines, no empty top', () => {
+  const { box } = corner();
+  box.dataset['touch'] = '';
+  const sheet = [...document.head.querySelectorAll('style')].map(style => style.textContent).find(text => text.includes('#ws-chat')) ?? '';
+  const rules = (selector: string, within = sheet): string[] => [...within.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].filter(match => match[1]?.trim() === selector).map(match => match[2] ?? '');
+  const landscape = /@media \(orientation:landscape\)\{([\s\S]*?\})\s*\}/u.exec(sheet)?.[1] ?? '';
+  expect(landscape).not.toBe('');
+  for (const [where, within] of [['portrait', sheet], ['landscape', landscape]] as const) {
+    const touchOpen = rules('#ws-chat[data-touch][data-open]', within).join(';');
+    expect(touchOpen, where).not.toMatch(/(^|;)height:(?!auto)/u);
+  }
+  const portrait = rules('#ws-chat[data-touch][data-open]').join(';');
+  // bottom-anchored at the old panel's bottom, the content's own height, the old height as its most
+  expect(portrait).toMatch(/(^|;)height:auto/u);
+  expect(portrait).toMatch(/transform:translateY\(-100%\)/u);
+  expect(portrait).toMatch(/max-height:var\(--ws-chat-open-h\)/u);
+  expect(portrait).toMatch(/top:calc\([^;]*var\(--ws-chat-open-h\)\)/u);
+  // the keyboard dock still wins while the keyboard is up: a fixed compact height
+  expect(rules(`html[data-ws-keyboard] #ws-chat[data-open]`).join(';')).toMatch(/height:var\(--ws-chat-dock/u);
+});

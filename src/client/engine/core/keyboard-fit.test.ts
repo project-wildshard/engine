@@ -98,3 +98,37 @@ test('iOS 26 shrinks innerHeight with the keyboard: still a keyboard, measured a
   expect(syncKeyboardView(view)).toBe(true);
   expect(root.dataset['wsKeyboard']).toBeUndefined();
 });
+
+// MK5 (meta MOBILE-KEYBOARD; the real game in the iOS 26 Simulator, iPhone 17 Pro, 2026-11-12): after Done the focus leaves at
+// once, while innerHeight is still the keyboard's 503; iOS restores it to 714 ~450 ms later with only a visualViewport resize
+// and scroll, never a window resize. The game had fitted 503 on close and stayed there: a short canvas over a dark band.
+test('MK5: the game re-fits when iOS gives innerHeight back after the keyboard closes, with no window resize', () => {
+  const view = { height: 714, offsetTop: 0, scale: 1 };
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 402 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 714 });
+  root.dataset['wsKbReserve'] = '156';
+  syncKeyboardView(view);
+  const fits: number[] = [];
+  const game = (): void => { fits.push(viewportHeight()); };
+  window.addEventListener('resize', game);
+  try {
+    const field = typeIn();
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 503 });
+    view.height = 377; view.offsetTop = 211;
+    syncKeyboardView(view);
+    expect(fits).toEqual([221]);
+    field.blur(); // Done: the keyboard is still animating away, innerHeight still short
+    syncKeyboardView(view);
+    expect(root.dataset['wsKeyboard']).toBeUndefined();
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 714 });
+    view.height = 714; view.offsetTop = 0;
+    syncKeyboardView(view); // the visualViewport resize: the only event iOS sends
+    expect(fits.at(-1)).toBe(714);
+    expect(root.style.getPropertyValue('--ws-vh')).toBe('714px');
+    // a window resize the game hears itself (a rotation, a desktop window) is not told twice
+    const before = fits.length;
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 600 });
+    syncKeyboardView(view, true);
+    expect(fits.length).toBe(before);
+  } finally { window.removeEventListener('resize', game); Object.defineProperty(window, 'innerHeight', { configurable: true, value: 714 }); }
+});

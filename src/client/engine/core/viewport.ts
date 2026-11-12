@@ -59,8 +59,9 @@ let lastHeight: number | null = null;
 /** What `syncKeyboardView` reads of `visualViewport`. */
 export interface ViewLike { readonly height: number; readonly offsetTop: number; readonly scale: number }
 /** Read the keyboard and mark the page. Returns whether the fit changed; the game's own resize then runs (a window resize
- *  event), so the canvas, camera and composer take the fitted height once per open and once per close. */
-export function syncKeyboardView(view: ViewLike | null | undefined): boolean {
+ *  event), so the canvas, camera and composer take the fitted height once per open and once per close. `heard`: this look comes
+ *  from a window resize, which the game hears itself. */
+export function syncKeyboardView(view: ViewLike | null | undefined, heard = false): boolean {
   const root = document.documentElement;
   const reserve = Number(root.dataset['wsKbReserve'] ?? 0);
   // per width, so a rotation with the keyboard up (and back) still knows the full page (review SHOULD)
@@ -82,14 +83,19 @@ export function syncKeyboardView(view: ViewLike | null | undefined): boolean {
   // --ws-vh is written on every look: iOS 26 restores innerHeight after the focus leaves, and the last word must be current
   const height = viewportHeight(), px = `${String(height)}px`;
   if (root.style.getPropertyValue('--ws-vh') !== px) root.style.setProperty('--ws-vh', px);
-  const moved = height !== lastHeight;
+  // the first look: the game sized itself as it started, so only a keyboard opening on it moves anything (review SHOULD)
+  const moved = lastHeight === null ? changed : height !== lastHeight;
   lastHeight = height;
-  // the game's resize (renderer, composer, shadows) runs only when the keyboard changed its height: a pan as the caret moves
-  // only moves the band, and a plain window resize already reached the game
-  if (changed && moved) window.dispatchEvent(new Event('resize'));
+  // the game's resize (renderer, composer, shadows) runs only when its height moved: a pan as the caret moves only moves the
+  // band, and a window resize already reached the game unless the keyboard changed with it. MK5 (iOS 26 Simulator, the real
+  // game): after Done, innerHeight comes back 503 -> 714 ~450 ms after the focus left, with a visualViewport resize and no
+  // window resize, so a look that is not a window resize tells the game whenever the height moved
+  if (moved && (changed || !heard)) window.dispatchEvent(new Event('resize'));
   return changed;
 }
 
+/** A second look after a rotation or a close, once iOS has settled its viewport (the research's ~120 ms, with margin). */
+const SETTLE_MS = 150;
 let installed = false;
 /** publish the height as `--ws-vh` (base.css sizes #game and #hud with it) and keep it current */
 export function installViewport(): void {
@@ -112,10 +118,12 @@ export function installViewport(): void {
   const keyboard = (): void => { syncKeyboardView(view); };
   pageScope.listen(view, 'resize', keyboard);
   pageScope.listen(view, 'scroll', keyboard);
-  pageScope.listen(window, 'resize', keyboard); // a rotation with the keyboard up changes the layout height too
+  // a rotation with the keyboard up changes the layout height too (the game hears this one itself); WebKit 297779 can report a
+  // wrong visualViewport mid-rotation, so look again once it has settled
+  pageScope.listen(window, 'resize', event => { if (event.isTrusted) { syncKeyboardView(view, true); pageScope.timeout(SETTLE_MS, keyboard); } });
   // a field taking or leaving focus (focusout's new focus settles after the event)
   pageScope.listen(document, 'focusin', keyboard);
-  pageScope.listen(document, 'focusout', () => { pageScope.timeout(0, keyboard); });
+  pageScope.listen(document, 'focusout', () => { pageScope.timeout(0, keyboard); pageScope.timeout(SETTLE_MS, keyboard); });
   const marks = new MutationObserver(keyboard);
   marks.observe(root, { attributes: true, attributeFilter: ['data-ws-kb-reserve'] });
   pageScope.onDispose(() => { marks.disconnect(); });

@@ -28,7 +28,10 @@ export function chatDock(bandHeight: number): number { return Math.round(Math.mi
  *  QA row 43 (chatCorner.ts): the corner is calm. Only the input and the mic stay; a line shows as it is said and fades after
  *  5 s, and lets taps through to the game. Focusing the input opens the chat (`data-open`): a larger panel with the history,
  *  each line's Report, and the players on voice with their mute (voiceUi.ts). A tap outside it, its ×, Escape or an empty
- *  Enter closes it. It is not a modal: the game runs on, and a tap outside reaches the game as well as closing the chat. */
+ *  Enter closes it. It is not a modal: the game runs on, and a tap outside reaches the game as well as closing the chat.
+ *  MOBILE-KEYBOARD MK5 (Jake, 2026-11-12: "fix the top of it"): with no keyboard up (after Done, or before it opens) the open
+ *  chat on a phone sizes to its lines. Its bottom edge stays where the tall panel's was and its old height is only a ceiling,
+ *  so a few lines never sit under an empty dark top. */
 const CSS = `
 #ws-chat{--ws-chat-bar:calc(max(15vh,104px) + max(env(safe-area-inset-bottom,0px),var(--ws-home,0px)) * .5);--ws-chat-gap:46px;--ws-chat-lift:132px;position:fixed;left:8px;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + var(--ws-chat-lift));max-height:calc(100vh - var(--ws-chat-lift) - 120px);z-index:900;width:min(56vw,260px);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;font:500 13px/1.3 system-ui,sans-serif;color:#fff;pointer-events:none}
 #ws-chat>[data-head]{display:none}
@@ -52,10 +55,11 @@ const CSS = `
 #ws-chat[data-open] [data-lines]:empty::before{content:'No messages yet. Say hello.';margin-top:auto;color:#7d8d9c;font-size:12px;padding:2px 6px}
 #ws-chat[data-touch]{top:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap));bottom:auto;transform:translateY(-100%);left:calc(env(safe-area-inset-left,0px) + 8px);width:calc(45vw - 16px);max-height:calc(var(--ws-vh,100vh) * .54 - var(--ws-chat-bar) - var(--ws-chat-gap) - 103px)}
 :root:has(.ws-touch .ws-touch-disc.at-lean-l.show) #ws-chat[data-touch]{--ws-chat-gap:calc(min(15vw,84px) + 18px)}
-#ws-chat[data-touch][data-open]{top:calc(env(safe-area-inset-top,0px) + 56px);bottom:auto;transform:none;max-height:none;width:calc(100vw - 16px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:min(calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px),calc(var(--ws-vh,100vh) * .52))}
+#ws-chat[data-touch][data-open]{--ws-chat-open-h:min(calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px),calc(var(--ws-vh,100vh) * .52));top:calc(env(safe-area-inset-top,0px) + 56px + var(--ws-chat-open-h));bottom:auto;transform:translateY(-100%);height:auto;max-height:var(--ws-chat-open-h);width:calc(100vw - 16px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))}
+#ws-chat[data-touch][data-open]>#ws-voice-peers{max-height:calc(var(--ws-chat-open-h) * .4)}
 @media (orientation:landscape){
 #ws-chat[data-touch]{left:calc(env(safe-area-inset-left,0px) + 68px);width:min(calc(45vw - 76px),300px);max-height:calc(var(--ws-vh,100vh) - var(--ws-chat-bar) - var(--ws-chat-gap) - 190px)}
-#ws-chat[data-touch][data-open]{width:min(calc(100vw - 84px),440px);height:calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px)}
+#ws-chat[data-touch][data-open]{--ws-chat-open-h:calc(var(--ws-chat-vv,var(--ws-vh,100vh)) - env(safe-area-inset-top,0px) - 68px);width:min(calc(100vw - 84px),440px)}
 }
 html[data-ws-keyboard] #ws-chat[data-open]{top:calc(var(--ws-kb-bottom) - ${String(DOCK_GAP_PX)}px);bottom:auto;transform:translateY(-100%);left:calc(env(safe-area-inset-left,0px) + 6px);width:calc(100vw - 12px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));height:var(--ws-chat-dock,${String(DOCK_PX)}px);max-height:none;padding:6px;gap:4px;border-radius:10px}
 html[data-ws-keyboard] #ws-chat[data-open]>[data-head],html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-peers,html[data-ws-keyboard] #ws-chat[data-open]>#ws-voice-tip{display:none}
