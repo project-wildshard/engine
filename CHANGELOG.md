@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.13 (2026-11-12)
+
+- The Template has its new Mossgate look, and Pine Hollow is on its second version.
+- Falling through the ground catches you and puts you back on solid footing.
+- Other players move more smoothly online, and walking Signal Dunes' slopes no longer snaps you back.
+- The rope bridge holds when you cross it online.
+- Nine Dragon and Nalati load all their files again, and the HUD's ready card sits in the middle of the screen.
+
 ## v0.1.12 (2026-11-12)
 
 - The game's pages now load from Cloudflare.
