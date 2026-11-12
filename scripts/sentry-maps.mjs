@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SENTRY-TRIAGE S5 (meta docs/plans/SENTRY-TRIAGE-PLAN.md, J238): give a built page its Sentry release and upload the hidden
 // source maps the build wrote (vite.config.ts `sourcemap: 'hidden'`) straight to Sentry, before the deploy strips them, so
-// an event's frames read `src/...ts:line`. The maps never reach the CDN: preview.yml and the release lane still strip them.
+// an event's frames read `src/...ts:line`. The maps never reach the CDN: page-release.mjs strips them after this.
 //
 //   node scripts/sentry-maps.mjs dist --environment preview|staging|production
 //

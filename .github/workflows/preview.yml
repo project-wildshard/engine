@@ -1,16 +1,15 @@
 # SHELL-CUTOVER SC1 (meta docs/plans/multi-repo/SHELL-CUTOVER-PLAN.md; J172, J209, J210): preview.wildshard.io is the
 # solo build of engine's newest green main. Once an hour the newest green main `ci` run's commit builds the game with no world stamp
-# (the solo preview: no __WS_WORLD__, so the in-page server runs) and deploys it, prebuilt, as the production deployment
-# of the Vercel project that owns preview.wildshard.io (wildshard-singleplayer). Vercel builds nothing: GitHub does.
-# One run at a time; the deploy step then checks preview.wildshard.io serves this build.
-# Vercel spend (meta VERCEL-SPEND-PLAN): an hour whose newest green main changed no client input since the live preview's commit deploys
-# nothing; the deploy is --prebuilt (built here, on GitHub; the project is on the basic machine); superseded deployments
-# are pruned after (scripts/prune-deployments.mjs, repo-kit's shared copy).
+# (the solo preview: no __WS_WORLD__, so the in-page server runs).
+# OFF-VERCEL OV6 (meta docs/plans/OFF-VERCEL-PLAN.md; J272, J274): the page is the Cloudflare Worker wildshard-play-preview
+# (pages/wrangler.jsonc --env preview), released by scripts/page-release.mjs in its four phases: build, upload (a
+# version, never deployed), check (the version URL's bytes equal the local build), go-live (`wrangler versions deploy`,
+# then preview.wildshard.io must serve this build). Workers dedupes assets by hash, so an hour uploads only changed files.
+# An hour whose newest green main changed no client input since the live preview's commit releases nothing.
 name: preview
 
 on:
-  # Hourly, not per push (Vercel spend: at most 24 deploys a day, and an hour whose newest green main changed no client
-  # input since the live preview deploys nothing)
+  # Hourly, not per push (J274: preview stays hourly at :17)
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
@@ -29,16 +28,11 @@ concurrency:
   group: preview
   cancel-in-progress: true
 
-env:
-  # The project that owns preview.wildshard.io. Ids are not secrets (API-SERVER-CD does the same); the token is.
-  PREVIEW_PROJECT_ID: prj_kpQ8mTayyeOpTmH1kLDTp11laeE7
-  VERCEL_CLI: vercel@59.11.2
-  WILDSHARD_CATALOGUE: test/pins/catalogue.json
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The build is about 20 minutes; a warm upload is minutes, a cold one (about 2 GB, OV6) must fit the 1-hour upload token
+    timeout-minutes: 75
     steps:
       - name: The newest green main
         id: pick
@@ -60,8 +54,8 @@ jobs:
         id: changed
         run: |
           live=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
-          # every input of the client build: the game's code, its shards (the pins), the build tooling and the lockfile
-          inputs=(src/client src/shared types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts vercel.json)
+          # every input of the client build: the game's code, its shards (the pins), the build tooling, the lockfile and the page host
+          inputs=(src/client src/shared types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts pages scripts/page-release scripts/page-release.mjs)
           if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null && git diff --quiet "$live" HEAD -- "${inputs[@]}"; then
             echo "preview.wildshard.io already serves $live, and no client input changed since: no deploy"
             echo "deploy=false" >> "$GITHUB_OUTPUT"
@@ -73,59 +67,13 @@ jobs:
         uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - name: Build the solo game
+      # SENTRY-TRIAGE S5: the Workers host's package step sends the hidden maps to Sentry (release wildshard@<version>,
+      # dist the build) with node scripts/sentry-maps.mjs dist --environment preview, then strips every map from dist/
+      # (PZ1, OV4): a Sentry outage or a missing token never stops the preview, and no map reaches the CDN.
+      # The Cloudflare token reaches wrangler only through the environment; page-release.mjs redacts it from all output.
+      - name: Release preview.wildshard.io on Workers
         if: steps.changed.outputs.deploy == 'true'
-        run: |
-          node scripts/pins.ts install
-          node scripts/gen.mjs --inputs-only
-          python3 scripts/heavy-lane.py build -- node scripts/build-app.mjs
-          node scripts/check-devserver.mjs dist
-      # SENTRY-TRIAGE S5: the hidden maps go to Sentry (release wildshard@<version>, dist the build), never to the CDN;
-      # the next step strips them. A Sentry outage or a missing token never stops the preview.
-      - name: Upload the source maps to Sentry
-        if: steps.changed.outputs.deploy == 'true'
-        continue-on-error: true
-        timeout-minutes: 5
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: node scripts/sentry-maps.mjs dist --environment preview
-      - name: Prepare the prebuilt folder
-        if: steps.changed.outputs.deploy == 'true'
-        run: |
-          find dist/assets dist/b -name '*.map' -print0 2>/dev/null | xargs -0 rm -f
-          if find dist/assets dist/b -name '*.map' 2>/dev/null | grep -q .; then echo '::error::source maps left in the deploy'; exit 1; fi
-          # vercel.json's headers and redirects (?doctor) stay; the folder is already built
-          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('vercel.json','utf8')); c.buildCommand=''; c.framework=null; c.outputDirectory='.'; fs.writeFileSync('dist/vercel.json', JSON.stringify(c, null, 2))"
-          mkdir -p dist/.vercel
-          printf '{"projectId":"%s","orgId":"%s"}' "$PREVIEW_PROJECT_ID" "$VERCEL_ORG_ID" > dist/.vercel/project.json
-          node -p "'build ' + require('./dist/version.json').build"
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      - name: Deploy to preview.wildshard.io, prebuilt
-        if: steps.changed.outputs.deploy == 'true'
-        working-directory: dist
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_PREVIEW_TOKEN }} # the long-lived raynos-projects token (CLI login tokens expire in 8 h)
-        run: |
-          npx --yes "$VERCEL_CLI" pull --yes --environment=production --scope raynos-projects --token "$VERCEL_TOKEN"
-          npx --yes "$VERCEL_CLI" build --prod --scope raynos-projects --token "$VERCEL_TOKEN"
-          npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --yes --scope raynos-projects --token "$VERCEL_TOKEN"
-      - name: preview.wildshard.io serves this build
-        if: steps.changed.outputs.deploy == 'true'
-        run: |
-          want=$(node -p "require('./dist/version.json').build")
-          for _ in $(seq 1 24); do
-            got=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).build)}catch{console.log('')}})" || true)
-            [ "$got" = "$want" ] && { echo "preview.wildshard.io serves $got"; exit 0; }
-            sleep 5
-          done
-          echo "::error::preview.wildshard.io serves '$got', not $want"; exit 1
-      # Every deployment is a full copy billed as storage, and Vercel's retention doesn't clear them (VERCEL-SPEND-PLAN).
-      # Keeps the live, the aliased and the newest five; a failure only warns.
-      - name: Prune superseded deployments
-        if: steps.changed.outputs.deploy == 'true' && !cancelled()
-        continue-on-error: true
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_PREVIEW_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        run: node scripts/prune-deployments.mjs --project "$PREVIEW_PROJECT_ID"
+        run: node scripts/page-release.mjs preview build,upload,check,go-live --host=workers

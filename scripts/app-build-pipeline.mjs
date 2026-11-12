@@ -255,9 +255,12 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     process.env.WS_PREVIOUS_DEPLOY_ORIGIN ??
     (release ? channelOrigin(process.env.WS_CHANNEL) : undefined);
   // ci.yml's test build opts in: an unreachable production (a 5xx, a network error) is no previous deploy there.
-  // A release build never does, so it still refuses rather than ship without the kept graphs.
+  // A staging or production release never does, so it still refuses rather than ship without the kept graphs.
+  // The hourly solo preview (OFF-VERCEL OV6) does: its first Workers release replaced a paused host that answered 503,
+  // and a missed hour costs an open preview tab a reload, never a player's world.
   const optional =
-    process.env.WS_PREVIOUS_DEPLOY_OPTIONAL === "1" && process.env.WS_RELEASE !== "1";
+    (process.env.WS_PREVIOUS_DEPLOY_OPTIONAL === "1" && process.env.WS_RELEASE !== "1") ||
+    process.env.WS_CHANNEL === "preview";
   console.log(
     "Previous deploy chunks:",
     await carryPreviousDeploy(outDir, {

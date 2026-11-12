@@ -49,8 +49,8 @@ node scripts/page-release.mjs preview build,upload,check,go-live
 
 A comma list runs the phases in order and stops at the first failure.
 `--host` picks the page host. Staging and production stay on `vercel`
-until their cutover (OFF-VERCEL OV7, OV8); preview is `workers` only
-(the Vercel preview is still `preview.yml`'s own deploy until OV6).
+until their cutover (OFF-VERCEL OV7, OV8); preview is `workers` only,
+and `preview.yml` runs it hourly for the newest green main (OV6).
 Preview is the solo game: no release file, no packs and no gate, so
 its `check` compares bytes and its `go-live` moves the alias.
 
@@ -225,7 +225,8 @@ Before stripping the page's source maps for the deploy, run
 `wildshard@<version>`, uploads the hidden maps under the build id as
 dist, and records the deploy (SENTRY-TRIAGE S5). It reads
 `SENTRY_AUTH_TOKEN`, else `~/.config/wildshard/sentry-auth-token`, and
-uploads nothing without one. `preview.yml` runs it for every preview.
+uploads nothing without one. The Workers host's `package` step runs it
+for every channel, then strips the maps.
 
 ## Local proof
 

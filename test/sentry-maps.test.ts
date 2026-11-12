@@ -8,6 +8,7 @@ import { mapRoots, SENTRY_CLI, sentryMapPlan, sentryToken } from '../scripts/sen
 import { browserErrorDist, browserErrorRelease } from '../src/client/engine/telemetry/browserErrors';
 import { WILDSHARD_IDENTITY } from '../src/client/game/identity';
 import preview from '../.github/workflows/preview.yml?raw';
+import workersHost from '../scripts/page-release/hosts/workers.mjs?raw';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -64,13 +65,13 @@ test('the token comes from the environment first, then the private file, else no
   expect(sentryToken({}, join(dir, 'absent'))).toBe('');
 });
 
-test('preview uploads its maps with the pinned CLI before it strips them, and a failed upload never stops the deploy', () => {
-  const upload = preview.indexOf('node scripts/sentry-maps.mjs dist --environment preview');
-  const strip = preview.indexOf("-name '*.map'");
-  expect(upload).toBeGreaterThan(0);
-  expect(upload).toBeLessThan(strip);
-  const step = preview.slice(preview.lastIndexOf('- name:', upload), upload);
-  expect(step).toContain('continue-on-error: true');
+test('preview releases through the Workers host, which sends the maps before it strips them, with the Sentry token', () => {
+  expect(preview).toContain('node scripts/page-release.mjs preview build,upload,check,go-live --host=workers');
+  const step = preview.slice(preview.lastIndexOf('- name:', preview.indexOf('scripts/page-release.mjs preview')));
   expect(step).toContain('SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}');
+  expect(step).toContain('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
+  const upload = workersHost.indexOf("'scripts/sentry-maps.mjs', 'dist', '--environment'");
+  expect(upload).toBeGreaterThan(0);
+  expect(upload).toBeLessThan(workersHost.indexOf('stripSourceMaps(dist)'));
   expect(SENTRY_CLI).toMatch(/^@sentry\/cli@\d+\.\d+\.\d+$/u);
 });

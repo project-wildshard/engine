@@ -40,7 +40,7 @@ export function vercelHost({token, exec = runRedacted, fetch: get = fetch}) {
   /** @param {import('../flow.mjs').HostContext} context */
   const project = context => {
     const found = context.channel.channel === 'preview' ? undefined : PROJECTS[context.channel.channel];
-    if (found === undefined) throw new Error(`the Vercel host has no ${context.channel.channel} project (preview.yml deploys preview): use --host workers`);
+    if (found === undefined) throw new Error(`the Vercel host has no ${context.channel.channel} project (preview is on Workers since OFF-VERCEL OV6): use --host workers`);
     return found;
   };
   /** @param {import('../flow.mjs').HostContext} context */

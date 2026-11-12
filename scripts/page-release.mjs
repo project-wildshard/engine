@@ -26,7 +26,7 @@ const args = process.argv.slice(2);
 const flag = (/** @type {string} */ name) => args.find(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
 const value = (/** @type {string} */ name) => flag(name)?.split('=').slice(1).join('=');
 /** Each channel stays on Vercel until its cutover row flips it (OFF-VERCEL OV6 preview, OV7 staging, OV8 production).
- * Preview was never on this script's Vercel host (preview.yml deploys it there itself), so it has only workers. */
+ * Preview was never on this script's Vercel host, so it has only workers (preview.yml runs it hourly since OV6). */
 const DEFAULT_HOSTS = /** @type {const} */ ({preview: 'workers', staging: 'vercel', production: 'vercel'});
 const [channel, phaseList] = args.filter(arg => !arg.startsWith('--'));
 const hostName = value('host') ?? (channel !== undefined && Object.hasOwn(DEFAULT_HOSTS, channel) ? DEFAULT_HOSTS[/** @type {keyof typeof DEFAULT_HOSTS} */ (channel)] : undefined);
@@ -35,7 +35,7 @@ if (channel === undefined || phaseList === undefined || (hostName !== 'workers' 
   process.exit(2);
 }
 if (channel === 'preview' && hostName === 'vercel') {
-  console.error('preview has no Vercel host here (preview.yml deploys it there): use --host=workers');
+  console.error('preview has no Vercel host: use --host=workers');
   process.exit(2);
 }
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
