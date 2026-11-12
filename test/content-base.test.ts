@@ -137,3 +137,15 @@ test('the solo server worker reads its book and parts from the base it is handed
   bank({});
   expect(contentURL('/shardfiles/driftwood-isle/')).toBe('/shardfiles/driftwood-isle/');
 });
+
+test('on the content base the spawn download moves content only: code and rapier stay with the page', async () => {
+  bank({contentBase: CDN});
+  const files = [['/shardfiles/mixed/blobs/bin/c.bin', 'test'], ['/b/build/entry.js', 'code'], ['/assets/physics/rapier.wasm', 'wasm']].map(([url, body]) => ({url, bytes: 4, body}));
+  const hashes = await Promise.all(files.map(async file => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(file.body))), byte => byte.toString(16).padStart(2, '0')).join('')));
+  const text = JSON.stringify({version: 1, shard: 'mixed', tier: 'phone', flow: 'client', totalBytes: 12, files: files.map((file, at) => ({url: file.url, bytes: 4, hash: hashes[at]}))});
+  const fetched: string[] = [];
+  const job = downloadSpawnManifest({url: '/assets/spawn/mixed-1234567890abcdef.json', bytes: text.length, totalBytes: 12, files: 3}, {cached: () => Promise.resolve(undefined),
+    fetch: url => { fetched.push(url); const path = new URL(url).pathname; return Promise.resolve(new Response(path.endsWith('.json') ? text : files.find(file => file.url === path)?.body ?? '')); }}, document.baseURI, CDN);
+  await job.ready;
+  expect(fetched.sort()).toEqual([`${CDN}assets/spawn/mixed-1234567890abcdef.json`, `${CDN}shardfiles/mixed/blobs/bin/c.bin`, `${page()}assets/physics/rapier.wasm`, `${page()}b/build/entry.js`].sort());
+});

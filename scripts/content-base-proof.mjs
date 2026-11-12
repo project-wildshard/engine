@@ -116,6 +116,9 @@ try {
       serverBook, serverParts, preflights: cdn.filter(entry => entry.method === 'OPTIONS').length, cookies: cdn.filter(entry => entry.cookie && entry.origin !== undefined).length,
       // CSS background art (the title cards): a stylesheet image is a no-cors read, which no fetch layer can make CORS
       noCors: cdn.filter(entry => entry.method === 'GET' && entry.origin !== pageOrigin).map(entry => entry.path),
+      // listed, not failed: a stylesheet image sends the cookies its host has. Here both origins share 127.0.0.1's jar; on
+      // play.wildshard.io the page sets no cookie packs.wildshard.io would get.
+      noCorsCookies: cdn.filter(entry => entry.cookie && entry.origin === undefined).length,
       pageShardContent: ownContent, pageEngineArt: [...new Set(otherContent)].slice(0, 20), pageEngineArtCount: otherContent.length, errors: errors.slice(0, 8) };
     results.push(row);
     if (booted.frames === 0) failures.push(`${slug}: no worker client frame`);

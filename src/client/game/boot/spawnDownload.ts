@@ -546,9 +546,10 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 received = 0;
                 // The page/cache identity stays local. Every loose member of
                 // this manifest lives beside its parts, including authored mounts.
+                // PZ3: on the content base only content moves; code and rapier stay with the page (a J138 home holds all of it).
                 const source = new URL(url), page = new URL(base);
-                const target = source.origin === page.origin
-                  ? new URL(source.pathname + source.search, packs).href : url;
+                const target = source.origin !== page.origin ? url : packs === contentBase() ? contentURL(url)
+                  : new URL(source.pathname + source.search, packs).href;
                 return ports.fetch(target, signal, init);
               },
             }, controller.signal, size => {
