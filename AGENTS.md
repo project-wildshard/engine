@@ -25,13 +25,18 @@ Git hygiene
       `plan/<slug>` as often as you like. Land with `scripts/land.mjs` (below) only when the plan is complete, at a
       major milestone, or once a day for a multi-day plan. Never land per row. `node scripts/worktree.mjs reap`
       removes worktrees whose branch has landed (never unlanded, dirty or busy ones).
- - Mode 1's pre-push is the full gate: static checks plus the related Vitest files (all of them when the diff touches
-   `package.json`, the lockfile or the harness). Expect 3 to 4 min and about 2,000 CPU-s, and one push per checkout at
-   a time (the `full-test` lease is per checkout). It refuses while anything in the checkout is dirty or untracked
-   (`Push target requires a clean checked tree`), and `git pull --rebase` refuses while another lane has an unstaged
-   edit. So until meta WORKTREE-LAND row WL11 lands, the coordinator runs one mode-1 code lane at a time here. If
-   another lane's edit still blocks your pull or push, wait and retry; never stash, restore or commit its files. If
-   the pre-push regenerates a `*.generated.ts` your change feeds, commit it with your change.
+ - Mode 1's pull is `node scripts/main-pull.mjs`, not `git pull --rebase` (which refuses while any lane has an
+   unstaged edit here). It replays your commits onto origin/main and moves only the paths main changes; if one of
+   those is another lane's uncommitted edit it stops and names it: wait and run it again, never stash, restore or
+   commit its files (BUILD-MAX EV1, meta WL11).
+ - Mode 1's pre-push gates the pushed commit in a clean copy (`tmp/push-gate/<sha>-<pid>`, about 5 s,
+   `scripts/push-gate-copy.mjs`), so other lanes' dirty and untracked files neither refuse your push nor reach the
+   checks (EV1). It runs the split gate (EV2, J288): static checks plus the related Vitest files, browser, timing
+   and slow files left to main's hosted `ci`, about 70 s. The hook then starts main-watch on your SHA; on `MAIN RED`
+   you fix forward at once (J249). The switches, one line each: `CLEAN_COPY` in `scripts/push-gate-copy.mjs` and
+   `MAIN_PUSH_SPLIT` in `scripts/push-local-split.mjs`. A tag or release push keeps the full gate. If the gate
+   regenerates a `*.generated.ts` your change feeds, it names the file: run `pnpm gen:inputs` and commit it with
+   your change.
  - Pushing `plan/<slug>` (mode 2) runs the split pre-push: static checks and the related Vitest files locally; the
    full suite, browser and timing tests run in hosted CI.
  - `--force-with-lease` only on your own `plan/*` branch after a rebase (land does this itself); never force main.

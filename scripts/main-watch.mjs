@@ -3,8 +3,9 @@
 // coordinator assigns the fix if the lander is gone.
 //
 //   node scripts/main-watch.mjs                     judge every finished main ci run not judged yet (tick or by hand)
-//   node scripts/main-watch.mjs --follow=<sha> [--lane=<name>] [--pane=<herdr pane>]
-//                                                   wait until <sha> has a verdict, then judge (land starts this)
+//   node scripts/main-watch.mjs --follow=<sha> [--lane=<name>] [--pane=<herdr pane>] [--after-push=<s>]
+//                                                   wait until <sha> has a verdict, then judge (land starts this;
+//                                                   a mode-1 main pre-push starts it with --after-push, EV2)
 //
 // The verdict for a SHA is the newest completed main `ci` run that isn't cancelled and whose SHA is that SHA or a
 // descendant of it. A cancelled run is superseded when a later main run exists, never red; with no later run,
@@ -211,9 +212,24 @@ export async function follow(io,options){
   return [];
 }
 
+/** EV2: wait until origin/main contains `sha` (a hand push started this from its pre-push, before git pushed).
+ * False when it never arrives: the push lost a race or was refused, and nothing is reported.
+ * @param {{tip:()=>string,contains:(a:string,d:string)=>boolean}} io @param {string} sha @param {number} waitMs
+ * @param {number} [pollMs] */
+export async function reached(io,sha,waitMs,pollMs=10_000){
+  const deadline=Date.now()+waitMs;
+  for(;;){
+    try{if(io.contains(sha,io.tip()))return true;}catch{/* A failed fetch retries. */}
+    if(Date.now()+pollMs>deadline)return false;
+    await setTimeout(pollMs);
+  }
+}
+
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   const arg=(/** @type {string} */name)=>process.argv.find(row=>row.startsWith(`--${name}=`))?.slice(name.length+3);
-  const io=liveIo(),sha=arg('follow');
+  const io=liveIo(),sha=arg('follow'),afterPush=Number(arg('after-push')??'0');
+  // EV2: the pre-push starts a follow before git pushes; follow only once the SHA is on main, else quit quietly.
+  if(sha!==undefined&&afterPush>0&&!await reached(io,sha,afterPush*1000))process.exit(0);
   const verdicts=sha===undefined?sweep(io):await follow(io,{sha,lane:arg('lane'),pane:arg('pane')});
   for(const verdict of verdicts)process.stdout.write(`main-watch ${verdict.kind} ${short(verdict.run.head_sha)} run ${verdict.run.id}\n`);
 }

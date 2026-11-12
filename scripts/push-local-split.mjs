@@ -28,17 +28,28 @@ export function pushedRefs(refs){
   .filter(([,local])=>!/^0+$/u.test(local??'')).map(([,local,remote,base])=>({local:local??'',remote:remote??'',base:base??''}));
 }
 
-/** The split is for a `plan/*` branch push (J240: its branch CI must be green
- * before land fast-forwards main). Land's own main push has its own lane
- * (WS_LAND_MAIN_PUSH, LS3). A hand push to main, a tag, a release and hosted
- * CI itself keep the complete local gate.
- * @param {NodeJS.ProcessEnv} env @param {string|undefined} refs */
-export function splitRequested(env,refs=env.WS_PUSH_REFS){
+/** BUILD-MAX EV2 (J288, meta WORKTREE-LAND WL13): the switch. true: a hand push of main (J290's mode 1, from the
+ * canonical checkout) runs the split gate, like a plan branch; main's own hosted `ci` runs the full suite, browser
+ * and timing files, main-watch reports its verdict, and a red is fixed forward at once (J249). false: a main push
+ * runs the complete local gate again. Turning it off is this one line. */
+export const MAIN_PUSH_SPLIT=true;
+export const MAIN_REF='refs/heads/main';
+
+/** True when the push updates main. @param {string|undefined} refs */
+export function mainPushed(refs){return pushedRefs(refs).some(row=>row.remote===MAIN_REF);}
+
+/** The split is for a `plan/*` branch push (J240: its branch CI must be
+ * green before land fast-forwards main) and, with MAIN_PUSH_SPLIT, for a
+ * main push (EV2). Land's own main push has its own lane (WS_LAND_MAIN_PUSH,
+ * LS3). A tag, a release, any other branch and hosted CI itself keep the
+ * complete local gate.
+ * @param {NodeJS.ProcessEnv} env @param {string|undefined} refs @param {boolean} [mainSplit] */
+export function splitRequested(env,refs=env.WS_PUSH_REFS,mainSplit=MAIN_PUSH_SPLIT){
  if(env.CI||env.GITHUB_ACTIONS)return false;
  // No refs (a release check) or any tag/other branch keeps the complete gate.
  const pushed=pushedRefs(refs);
  if(pushed.length===0)return false;
- return pushed.every(row=>PLAN_REF.test(row.remote));
+ return pushed.every(row=>PLAN_REF.test(row.remote)||(mainSplit&&row.remote===MAIN_REF));
 }
 
 /** LAND-SIMPLIFY LS3 (J258): land's own main push, by the kind land marked it, or null for every other push,

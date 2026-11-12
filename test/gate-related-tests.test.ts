@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real owned Git fixtures and a real log file.
 import {join, resolve} from 'node:path';
-import {BROWSER_TESTS, LOCAL_FILE_SECONDS, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
+import {BROWSER_TESTS, LOCAL_FILE_SECONDS, MAIN_PUSH_SPLIT, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, mainPushed, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
 import {provesCode} from '../scripts/ci-proof-jobs.mjs';
 import { capRelated, productReaderTests, scriptScenarioTests, QUICK_TESTS, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
 
@@ -84,18 +84,27 @@ mkdirSync('tmp', {recursive: true});
 const scratch = mkdtempSync(resolve('tmp/push-split-'));
 afterAll(() => rmSync(scratch, {recursive: true, force: true}));
 
-it('only plan branch pushes ask for the split', () => {
+it('plan branch pushes and, with EV2\'s switch, main pushes ask for the split', () => {
   expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(true);
   expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}\nrefs/heads/plan/bar ${b} refs/heads/plan/bar ${a}`)).toBe(true);
-  expect(splitRequested({}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(false);
-  expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}\nrefs/heads/main ${a} refs/heads/main ${b}`)).toBe(false);
+  // EV2 (J288): a hand push of main splits too; MAIN_PUSH_SPLIT=false restores its complete local gate.
+  expect(MAIN_PUSH_SPLIT).toBe(true);
+  expect(splitRequested({}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(true);
+  expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}\nrefs/heads/main ${a} refs/heads/main ${b}`)).toBe(true);
+  expect(splitRequested({}, `refs/heads/main ${a} refs/heads/main ${b}`, false)).toBe(false);
+  expect(splitRequested({}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}\nrefs/heads/main ${a} refs/heads/main ${b}`, false)).toBe(false);
+  // A release pushes main with its tag: the tag keeps the complete gate.
+  expect(splitRequested({}, `refs/heads/main ${a} refs/heads/main ${b}\nrefs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBe(false);
+  expect(mainPushed(`refs/heads/main ${a} refs/heads/main ${b}`)).toBe(true);
+  expect(mainPushed(`refs/heads/plan/foo ${a} refs/heads/plan/foo ${b}`)).toBe(false);
+  expect(mainPushed(`(delete) ${zero} refs/heads/main ${a}`)).toBe(false);
   expect(splitRequested({}, `refs/tags/v1.0.0 ${a} refs/tags/v1.0.0 ${zero}`)).toBe(false);
   expect(splitRequested({}, `refs/heads/feature/x ${a} refs/heads/feature/x ${zero}`)).toBe(false);
   // Deleting a plan branch pushes nothing to check.
   expect(splitRequested({}, `(delete) ${zero} refs/heads/plan/foo ${a}`)).toBe(false);
   expect(splitRequested({}, '')).toBe(false);
-  // LS3: land's main push has its own lane; the retired driver flag splits nothing.
-  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/main ${a} refs/heads/main ${b}`)).toBe(false);
+  // LS3: land's main push has its own lane; the retired driver flag changes nothing.
+  expect(splitRequested({WS_PUSH_POST_CI: '1'}, `refs/heads/main ${a} refs/heads/main ${b}`, false)).toBe(false);
   // Hosted CI never runs a split of itself.
   expect(splitRequested({CI: 'true'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);
   expect(splitRequested({GITHUB_ACTIONS: 'true'}, `refs/heads/plan/foo ${a} refs/heads/plan/foo ${zero}`)).toBe(false);

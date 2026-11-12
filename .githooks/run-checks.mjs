@@ -43,7 +43,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   const {PUSH_PROFILE,SPLIT_PROFILE}=await import('../scripts/push-budget.mjs');
   const {pushSelection}=await import('../scripts/push-selection.mjs');
   const {capturePushTree,readPushProof}=await import('../scripts/push-proof-cache.mjs');
-  const {landMainMode,planBaseRefs,splitRequested}=await import('../scripts/push-local-split.mjs');
+  const {landMainMode,mainPushed,planBaseRefs,splitRequested}=await import('../scripts/push-local-split.mjs');
   const env = pushEnvironment(Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))));
   // LAND-SIMPLIFY LS3 (J249, J258): land marks its own main push. History, secrets, size, the changelog and
   // AGENTS.md already ran above in pre-push. `exact` is the SHA branch CI proved: nothing more runs. `carried` is
@@ -59,24 +59,57 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
     const {landMainChecks}=await import('./push-checks.mjs');
     process.exit(await landMainChecks(env));
   }
+  // BUILD-MAX EV2 (J288, WL13): a main push from the canonical checkout runs the split gate too
+  // (scripts/push-local-split.mjs MAIN_PUSH_SPLIT); main's own CI runs the full suite and main-watch reports it.
   const split=splitRequested(env);
-  const context=capturePushTree(split?SPLIT_PROFILE:PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,pushSelection(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS));
-  // Outgoing history/secrets have already passed in pre-push. Reusing a proved
-  // tree starts no heavy work, so it must not wait behind a later full suite.
-  if(proof!==null){
-    console.error(`  - exact-tree green reuse before lease: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
-    process.exit(0);
+  // BUILD-MAX EV1 (WL11): the gate checks the pushed commit in a clean copy of it (scripts/push-gate-copy.mjs), so
+  // another lane's work in progress in this checkout neither refuses the push nor leaks into the checks.
+  for(const key of Object.keys(process.env))if(key.startsWith('GIT_'))Reflect.deleteProperty(process.env,key);
+  const {copyReason,makeGateCopy,pushedCommit}=await import('../scripts/push-gate-copy.mjs');
+  const sha=pushedCommit(root,env.WS_PUSH_REFS),why=copyReason(root,sha,env);
+  let copy=null;
+  if(why!==null&&sha!==null){
+    console.error(`  - gate in a clean copy of ${sha.slice(0,10)}: ${why}`);
+    copy=makeGateCopy(root,sha,{env});
   }
-  // A miss owns the lane before generation/static work too.
-  const observation=process.argv[3]==='--release-observation'?['--observation-kind','release']:[];
-  const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--checkout-scope', ...observation, '--', process.execPath, '.githooks/push-checks.mjs'],
-    { cwd: pkgDir, env: { ...env, WS_PUSH_GATE_PROFILE: 'full-v1', WS_CPU_ADMISSION: '1' }, stdio: 'inherit' });
-  process.on('SIGINT', () => child.kill('SIGINT'));
-  process.on('SIGTERM', () => child.kill('SIGTERM'));
-  const code = await new Promise(resolveCode => {
-    child.once('error', error => { console.error(error); resolveCode(1); });
-    child.once('close', value => resolveCode(value ?? 1));
-  });
+  const gateRoot=copy?.path??pkgDir;
+  let code=1;
+  try{
+    const context=capturePushTree(split?SPLIT_PROFILE:PUSH_PROFILE,env,gateRoot),proof=context===null?null:readPushProof(context,pushSelection(split?planBaseRefs(env.WS_PUSH_REFS,gateRoot):env.WS_PUSH_REFS,gateRoot));
+    // Outgoing history/secrets have already passed in pre-push. Reusing a proved
+    // tree starts no heavy work, so it must not wait behind a later full suite.
+    if(proof!==null){
+      console.error(`  - exact-tree green reuse before lease: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
+      code=0;
+    }else{
+      // A miss owns the lane before generation/static work too.
+      const observation=process.argv[3]==='--release-observation'?['--observation-kind','release']:[];
+      const child = spawn('python3', ['scripts/heavy-lane.py', 'full-test', '--checkout-scope', ...observation, '--', process.execPath, '.githooks/push-checks.mjs'],
+        { cwd: gateRoot, env: { ...env, PWD: gateRoot, WS_PUSH_GATE_PROFILE: 'full-v1', WS_CPU_ADMISSION: '1' }, stdio: 'inherit' });
+      process.on('SIGINT', () => child.kill('SIGINT'));
+      process.on('SIGTERM', () => child.kill('SIGTERM'));
+      code = await new Promise(resolveCode => {
+        child.once('error', error => { console.error(error); resolveCode(1); });
+        child.once('close', value => resolveCode(value ?? 1));
+      });
+    }
+    // A gate that regenerated a tracked file (gen:inputs) fails on the copy's dirt; name it, since the copy goes.
+    if(code!==0&&copy!==null){
+      const {checkedTreeDirt}=await import('../scripts/push-proof-cache.mjs');
+      const dirt=checkedTreeDirt(copy.path);
+      if(dirt.length>0)console.error(`  !! the gate changed ${dirt.length} file(s) in the copy; regenerate them in your checkout (pnpm gen:inputs) and commit them with your change:\n${dirt.slice(0,10).map(line=>`     ${line}`).join('\n')}`);
+    }
+  }finally{copy?.remove();}
+  // EV2: a green split main push hands main's verdict to main-watch, as land does (LS5). It waits for this SHA to
+  // reach origin/main and quits quietly if the push never lands (a lost race).
+  if(code===0&&split&&sha!==null&&mainPushed(env.WS_PUSH_REFS)&&process.env.WS_MAIN_WATCH!=='0'&&existsSync(join(root,'scripts/main-watch.mjs'))){
+    const lane=process.env.WS_LANE_NAME??'',pane=process.env.HERDR_PANE_ID??'';
+    try{
+      spawn(process.execPath,[join(root,'scripts/main-watch.mjs'),`--follow=${sha}`,'--after-push=300',...(lane===''?[]:[`--lane=${lane}`]),...(pane===''?[]:[`--pane=${pane}`])],
+        {cwd:root,env:process.env,detached:true,stdio:'ignore'}).unref();
+      console.error(`  - main-watch follows ${sha.slice(0,10)} once it reaches main; main's ci runs the full suite (J249: a red is fixed forward at once)`);
+    }catch(error){console.error(`  !! main-watch not started (${error instanceof Error?error.message:String(error)}); run node scripts/main-watch.mjs by hand`);}
+  }
   process.exit(code);
 }
 

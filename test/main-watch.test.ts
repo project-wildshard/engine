@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { follow, judge, landers, liveIo, paneFor, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { follow, judge, landers, liveIo, paneFor, reached, sweep, verdictFor } from '../scripts/main-watch.mjs';
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/main-watch-'));
@@ -140,4 +140,14 @@ test('a dead owner\'s lock is taken; a live one is waited for', () => {
   sweep(io);
   expect(existsSync(`${io.state}.lock`)).toBe(false);
   expect(w.receipts[0]).toMatch(/^started:/u);
+});
+
+test('EV2: a pre-push follow waits for its SHA to reach main, and quits when the push never lands', async () => {
+  let tip = sha('old');
+  const io = { tip: () => tip, contains: (ancestor: string, descendant: string) => ancestor === descendant };
+  const waiting = reached(io, sha('new'), 60, 5);
+  tip = sha('new');
+  expect(await waiting).toBe(true);
+  expect(await reached({ tip: () => sha('old'), contains: () => false }, sha('lost'), 20, 5)).toBe(false);
+  expect(await reached({ tip: () => { throw new Error('offline'); }, contains: () => true }, sha('x'), 10, 5)).toBe(false);
 });

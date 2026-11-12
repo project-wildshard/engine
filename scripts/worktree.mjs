@@ -128,7 +128,7 @@ function convertedPaths(tree,paths){
 /** Clone into `tree` each tracked file the canonical checkout holds clean with the same blob and mode, then keep only
  * clones whose raw bytes hash to their blob and whose mode matches. @param {string} canonical @param {string} tree
  * @returns {number} files kept */
-function cloneTrackedFiles(canonical,tree){
+export function cloneTrackedFiles(canonical,tree){
  const source=stagedBlobs(canonical),target=stagedBlobs(tree);
  // Hidden edits count as dirty: modified, deleted, staged, assume-unchanged (lowercase tag) or skip-worktree (S).
  const dirty=new Set(nul(git(canonical,['ls-files','-z','--modified','--deleted'])));
