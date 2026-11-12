@@ -16,7 +16,8 @@
 //               job's set-up and pins; the other units pack over the rest. Packed after job 1's shards, it made job 1
 //               the long pole (p50 12.6 min against 9.1).
 //   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products: report-only (J186), so non-blocking.
-//               It installs Ring 1's pins and Chromium itself and builds its own tree, so it needs no other unit: ci.yml
+//               It needs the full pins (its Ring 1 cook reads raw tarballs only `pnpm pins` fetches, run 43303094170),
+//               then installs Ring 1's and Chromium itself and builds its own tree, so it needs no other unit: ci.yml
 //               runs it as its own non-blocking job from t=0 (EV3b; after products in job 6 it took that job to 13.7
 //               min). Packed with products, it still follows products into products' job
 // Phases run in order: before pins (up to C units at once), `pnpm pins && pnpm gen:inputs`, the shards ONE AT A TIME,
@@ -42,8 +43,6 @@ const FOLLOWS=Object.freeze(/** @type {Record<string,string>} */({boundaries:'pr
 /** Units that take the last job to themselves (with their followers) when a run has more than one (EV3). */
 const OWN_JOB=new Set(['products']);
 const NONBLOCKING=new Set(['quarantine','boundaries']);
-/** Units that install the pins they need themselves, so a job of only these skips the full `pnpm pins`. */
-const OWN_PINS=new Set(['boundaries']);
 const SHARD_LIMIT_MS=300_000;
 /** @typedef {{name:string,phase:number,seconds:number,blocking:boolean}} Unit */
 /** @typedef {{name:string,phase:number,blocking:boolean,started:number,charged:number,ended:number,seconds:number,code:number}} UnitResult */
@@ -191,7 +190,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
     const timed=async(/** @type {string} */phase,/** @type {()=>Promise<void>} */work)=>{const started=Date.now();await work();phases.push({phase,started,ended:Date.now()});};
     await timed('before-pins',async()=>{results.push(...await runPhase(mine.filter(unit=>unit.phase===0),concurrency,logs,0));});
     let pinsCode=0;
-    if(mine.some(unit=>unit.phase>=2&&!OWN_PINS.has(unit.name)))await timed('pins',async()=>{const started=Date.now();pinsCode=await step(['bash','-c','pnpm pins && pnpm gen:inputs']);setupMs+=Date.now()-started;});
+    if(mine.some(unit=>unit.phase>=2))await timed('pins',async()=>{const started=Date.now();pinsCode=await step(['bash','-c','pnpm pins && pnpm gen:inputs']);setupMs+=Date.now()-started;});
     if(pinsCode!==0)console.log('::error title=pins::pnpm pins && pnpm gen:inputs failed; no test unit ran');
     else{
       await timed('tests',async()=>{results.push(...await runPhase(mine.filter(unit=>unit.phase===2),1,logs,setupMs));});

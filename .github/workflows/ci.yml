@@ -9,7 +9,7 @@ name: ci
 # shards (after that job's own set-up and pins); jobs 1-5 pack everything else. Run after job 1's shards, products
 # made job 1 the long pole.
 # EV3b (2026-11-12): boundaries (report-only cook-to-play, J186) is 223-338 s, and after products it made `tests (6)` the
-# long pole at 13.7 min. It needs nothing products makes (its own Ring 1 pins, Chromium and build), so it is its own
+# long pole at 13.7 min. It needs nothing products makes (full pins, then its own Ring 1, Chromium and build): its own
 # non-blocking `boundaries` job from t=0, like quarantine.
 on:
   # J240: a plan worktree pushes plan/<slug>; scripts/land.mjs waits for this
@@ -321,8 +321,11 @@ jobs:
       - id: code
         if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
+      # The full pins, as the tests shares: the Ring 1 cook reads raw tarballs only `pnpm pins` fetches.
       - if: steps.code.outputs.run == 'true'
         uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
       - id: playwright
         if: steps.code.outputs.run == 'true'
         run: echo "version=$(node -p "require('./package.json').devDependencies.playwright")" >> "$GITHUB_OUTPUT"
