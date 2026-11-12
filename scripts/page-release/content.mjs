@@ -204,8 +204,8 @@ export async function sampleContent({dir, store, count, origins, log, sleep = de
   const files = scanContent(dir), set = contentSet(files);
   /** @type {Record<string, number>} */ const checked = {};
   for (const kind of KIND_NAMES) {
-    const pool_ = files.filter(file => file.kind === kind), picked = [];
-    while (picked.length < Math.min(count, pool_.length)) {
+    const pool_ = files.filter(file => file.kind === kind), picked = [], want = Math.min(count, pool_.length);
+    while (picked.length < want) {
       const [file] = pool_.splice(randomInt(pool_.length), 1);
       if (file !== undefined) picked.push(file);
     }
