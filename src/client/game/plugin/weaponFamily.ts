@@ -39,13 +39,14 @@ const IN_FRAME = 0.7;
  * IN_FRAME of the half-width the camera sees at its depth; landscape keeps the declared pose. The model's parent is the
  * camera's viewmodel root.
  */
-function keepInFrame(model: Group, at: readonly [number, number, number]): void {
+function keepInFrame(model: Group, at: readonly [number, number, number], shift = 0): void {
   const camera = model.parent?.parent;
   let x = at[0];
   if (camera instanceof PerspectiveCamera && camera.aspect < 1) {
     const half = Math.abs(at[2]) * Math.tan(MathUtils.degToRad(camera.fov) / 2) * camera.aspect * IN_FRAME;
     x = Math.sign(x) * Math.min(Math.abs(x), half);
   }
+  x += shift; // a swing's own travel, off the kept rest
   if (model.position.x !== x) model.position.x = x;
 }
 
@@ -177,6 +178,37 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
 }
 /** The page's lever, if this weapon is one. */
 export function declaredLever(weapon: unknown): (Weapon & DeclaredLeverHandle) | null { return weapon instanceof DeclaredLever ? weapon : null; }
+/** A held melee swing's offset off the row's rest pose: x, y, z in metres, then turns about x, y, z in radians (TE-ENG4). */
+type SwingPose = readonly [number, number, number, number, number, number];
+/** A swing: its shortest length in seconds, and its poses at their share of it; the last is the rest. */
+interface SwingArc { readonly seconds: number; readonly keys: readonly (readonly [number, SwingPose])[] }
+const REST_POSE: SwingPose = [0, 0, 0, 0, 0, 0];
+/** A light strike: a short cock to the right, the sweep across and down to the left (the strike lands as it starts), the recovery. */
+const LIGHT_SWING: SwingArc = { seconds: 0.32, keys: [[0.18, [0.05, 0.05, 0.02, 0.25, 0, -0.85]], [0.5, [-0.24, -0.1, -0.12, -0.85, 0, 1.25]], [1, REST_POSE]] };
+/** A heavy strike: the blade raised back over the shoulder, the chop forward and down, a slower recovery. */
+const HEAVY_SWING: SwingArc = { seconds: 0.5, keys: [[0.3, [-0.02, 0.12, 0.08, 0.85, 0, -0.2]], [0.56, [-0.06, -0.16, -0.2, -1.6, 0, 0.15]], [1, REST_POSE]] };
+/**
+ * The pose `u` (0 to 1) through an arc that starts from `from` (the pose a strike caught the blade in, so a strike mid-swing never
+ * pops), eased between keys. `side` -1 mirrors it (a backhand): x, and the turns about y and z, change sign.
+ */
+function swingPose(arc: SwingArc, u: number, from: readonly number[], side: number, out: number[]): void {
+  let k0 = 0, a: readonly number[] = from;
+  for (const [k1, key] of arc.keys) {
+    if (u <= k1) {
+      const s = k1 > k0 ? MathUtils.smoothstep(u, k0, k1) : 1;
+      for (let i = 0; i < 6; i++) { const b = (key[i] ?? 0) * (i === 0 || i === 4 || i === 5 ? side : 1), was = a[i] ?? 0; out[i] = was + (b - was) * s; }
+      return;
+    }
+    k0 = k1; a = key.map((value, i) => value * (i === 0 || i === 4 || i === 5 ? side : 1));
+  }
+  out.fill(0);
+}
+/**
+ * A declared melee weapon (`kit.melee`): the row's light and heavy strikes through the item runtime, on the wire the server's.
+ * TE-ENG4: its held model swings on each strike (a light sweep across, a heavy chop down; a light strike during a light swing
+ * comes back as a backhand), started by the press on the wire, by a charged hold's release, or off it by the runtime's `fire`.
+ * Only this player's view swings: another player's figure holds a stock blade, and no strike reaches it on the wire.
+ */
 class DeclaredMelee extends Weapon {
   readonly model: Group;
   readonly state: WeaponState = { ammo: undefined, magazine: 0, reserve: 0, loaded: true, reloading: false, reloadProgress: 0, ads: false };
@@ -187,27 +219,41 @@ class DeclaredMelee extends Weapon {
   /** On the wire the server's runtime keeps the cooldown; this one only spares it presses it would refuse. */
   private cooling = 0;
   private readonly origin = new Vector3(); private readonly direction = new Vector3();
+  /** TE-ENG4: seconds into the swing (-1: at rest), its arc, side and length, the pose it started from and this frame's. */
+  private swingT = -1; private arc: SwingArc = LIGHT_SWING; private side = 1; private swingSeconds = LIGHT_SWING.seconds;
+  private readonly from: number[] = [0, 0, 0, 0, 0, 0]; private readonly offset: number[] = [0, 0, 0, 0, 0, 0];
+  /** Seconds the hold has been down, and off the wire the strike the runtime's next `fire` is. */
+  private heldFor = 0; private nextHeavy = false;
+  /** The heavy charge a hold has built, which fills the touch ATTACK disc's ring. */
+  override get charge(): number { return this.held ? Math.min(1, this.heldFor / this.spec.charge) : 0; }
   get adsHeld(): boolean { return this.held; }
   set adsHeld(on: boolean) {
-    const held = this.enabled && on;
+    const held = this.enabled && on, charged = this.held && !held && this.heldFor >= this.spec.charge;
+    if (held !== this.held) this.heldFor = 0;
     // SR11 (C8): on the wire the server holds the charge and strikes on its release; this page's runtime never steps.
-    if (this.wire !== null) { this.held = held; this.wire.hold(held); return; }
+    if (this.wire !== null) {
+      this.held = held; this.wire.hold(held);
+      if (charged && this.cooling <= 0) { this.cooling = this.spec.heavy.cooldown; this.swing(true); }
+      return;
+    }
+    if (charged) this.nextHeavy = true;
     this.held = held; this.ports.runtime.hold(this.held, this.ports.aim(), this.enabled);
   }
   constructor(row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
     super(row); this.ports = ports; this.spec = spec; this.model = itemMesh(ports); this.setAimSource(ports.aim);
     ports.runtime.observe(ports.scope, (phase, contact) => {
-      if (phase === 'fire') this.onFire?.();
+      if (phase === 'fire') { this.swing(this.nextHeavy); this.onFire?.(); }
       if (phase === 'hit' && contact !== undefined) this.onHit?.(contact.kind, contact.headshot, contact.killed);
     });
   }
   override install(ctx: EquipContext): void {
     super.install(ctx); ctx.scope.onDispose(() => { this.ports.scope.dispose(); });
     this.ports.input.bind('attack', () => { this.tryFire(); }, ctx.scope, () => this.enabled);
-    this.ports.input.bind('heavy', () => { if (!this.pressWire(true)) this.ports.runtime.queue(2, this.ports.aim()); }, ctx.scope, () => this.enabled);
+    this.ports.input.bind('heavy', () => { if (!this.pressWire(true)) { this.nextHeavy = true; this.ports.runtime.queue(2, this.ports.aim()); } }, ctx.scope, () => this.enabled);
   }
   tryFire(): void {
     if (!this.enabled || this.pressWire(false)) return;
+    this.nextHeavy = false;
     this.aimRay(this.origin, this.direction); this.ports.runtime.queue(1, { origin: this.origin, direction: this.direction });
   }
   /** SR11 (C8): a press goes to the server, which strikes with this item's own runtime and aim. False: no wire, the page's runtime takes it. */
@@ -215,13 +261,31 @@ class DeclaredMelee extends Weapon {
     if (this.wire === null) return false;
     if (this.cooling > 0) return true;
     this.cooling = (heavy ? this.spec.heavy : this.spec.light).cooldown;
-    this.wire.press(false, heavy); this.onFire?.();
+    this.wire.press(false, heavy); this.swing(heavy); this.onFire?.();
     return true;
+  }
+  /** Start the held model's swing for a strike, from wherever the last one left it. */
+  private swing(heavy: boolean): void {
+    this.side = !heavy && this.swingT >= 0 && this.arc === LIGHT_SWING ? -this.side : 1;
+    this.arc = heavy ? HEAVY_SWING : LIGHT_SWING;
+    this.swingSeconds = Math.max(this.arc.seconds, (heavy ? this.spec.heavy : this.spec.light).cooldown);
+    for (let i = 0; i < 6; i++) this.from[i] = this.offset[i] ?? 0;
+    this.swingT = 0;
   }
   update(dt: number, _t: number): void {
     this.cooling = Math.max(0, this.cooling - dt);
+    if (this.held) this.heldFor += dt;
+    const o = this.offset;
+    if (this.swingT >= 0) {
+      this.swingT += dt;
+      const u = Math.min(1, this.swingT / this.swingSeconds);
+      if (u < 1) swingPose(this.arc, u, this.from, this.side, o); else { o.fill(0); this.swingT = -1; }
+    }
+    const [x, y, z] = this.ports.view.position, [rx, ry, rz] = this.ports.view.rotation;
     this.model.visible = this.enabled || this.holster > 0;
-    keepInFrame(this.model, this.ports.view.position);
+    this.model.position.set(x, y + (o[1] ?? 0), z + (o[2] ?? 0));
+    this.model.rotation.set(rx + (o[3] ?? 0), ry + (o[4] ?? 0), rz + (o[5] ?? 0));
+    keepInFrame(this.model, this.ports.view.position, o[0] ?? 0);
   }
 }
 class DeclaredLantern extends Tool {
