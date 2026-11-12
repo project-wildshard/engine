@@ -125,6 +125,9 @@ export class UiLayers {
     // (a node bake's stub document has no documentElement, app.ts)
     const root = !this.mirrorMenu || typeof document === 'undefined' ? null : (document.documentElement as HTMLElement | null | undefined) ?? null;
     if (root !== null) { if (this.menuOpen) root.dataset['wsMenu'] = 'open'; else delete root.dataset['wsMenu']; }
+    // QA 2026-11-11 (Jake: "don't show microphone and chat on the loading screen"): <html data-ws-covered> while a loading card
+    // covers the world (`holdCovered`). The app state is already `play` under a READY / PLAY card, so the corner reads both.
+    if (root !== null) { if (this.covers.size > 0) root.dataset['wsCovered'] = 'loading'; else delete root.dataset['wsCovered']; }
     this.changed?.();
     for(const update of this.observers)update();
   }

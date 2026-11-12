@@ -2,6 +2,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import type { ChatBox } from './chatLines';
+import { cornerShown } from './chatCorner';
 import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './voice';
 import { voiceTalkKey, voiceTalkKeys } from '@wildshard/engine/ui/voiceSettings';
 
@@ -12,7 +13,8 @@ import { voiceTalkKey, voiceTalkKeys } from '@wildshard/engine/ui/voiceSettings'
 // one row each, that glows as they talk and mutes on a tap, so per-player mute is never lost.
 // QA row 6 (Jake, 2026-11-10: "B to talk doesnt seem to give any feedback"): every press says what happened. Turning voice
 // off says so for a moment, a tip the player closed comes back on the next press, a browser with no voice says that, and B
-// under an open menu does nothing, because the mic it would open is hidden there (QA row 15).
+// out of play (the loading card, the title, an open menu) does nothing, because the mic it would open is hidden there (QA row 15,
+// QA 2026-11-11). The first-time tip's 15 s start when the corner first shows, so it is not spent under the loading card.
 // Only online worlds say anything: a single-player page has no voice and B there stays silent (Jake, 2026-11-10: "we
 // don't have to show a banner in single player about there being no voice chat … Just don't do that").
 // VOICE-POLISH V10, V11: the key is the `voice.talk` binding (B unless rebound in Controls ▸ Key bindings, a mouse side button
@@ -63,14 +65,14 @@ function deniedHelp(): string {
 }
 /** Whether a key is the talk key: its code, or a sided key bound either side (`Shift` for `ShiftLeft`). */
 const isTalkKey = (code: string): boolean => { const keys = voiceTalkKeys(); return keys.includes(code) || keys.includes(code.replace(/(?:Left|Right)$/u, '')); };
-/** A press of the talk key that is meant for voice: not typed into a field, not a repeat, not a shortcut, and not under an open menu. */
+/** A press of the talk key that is meant for voice: not typed into a field, not a repeat, not a shortcut, and only in play. */
 function voiceKey(event: KeyboardEvent): boolean {
   const target = event.target as HTMLElement | null;
   const self = event.code.replace(/(?:Left|Right)$/u, '');
   // A shortcut is not a press, unless the modifier held is the talk key itself (talk on Alt).
   if (!isTalkKey(event.code) || event.repeat || (event.ctrlKey && self !== 'Control') || (event.metaKey && self !== 'Meta') || (event.altKey && self !== 'Alt')) return false;
   if (target !== null && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/u.test(target.tagName))) return false;
-  return document.documentElement.dataset['wsMenu'] === undefined;
+  return cornerShown(document.documentElement.dataset);
 }
 /** A browser with no WebRTC or no mic API: no mic button, and B says why for a moment. */
 function noVoice(scope: Scope, chat: ChatBox): void {
@@ -95,7 +97,8 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
   heading.dataset['title'] = ''; heading.textContent = 'On voice · tap to mute'; peers.append(heading);
   chat.form.append(button); chat.box.append(tip, peers);
   const touch = touchFirst(), act = (): string => touch ? 'Tap the mic' : `${voice.mode === 'hold' ? 'Hold' : 'Press'} ${voiceTalkKey()}`;
-  let dismissed = '', firstUntil = voicePrefs.read().seen ? 0 : diagnosticNow() + FIRST_TIP_MS, aloneUntil = 0, offUntil = 0, was: VoiceState = voice.state;
+  // the first-time tip's clock starts when the corner first shows (NaN: not yet)
+  let dismissed = '', firstUntil = voicePrefs.read().seen ? 0 : Number.NaN, aloneUntil = 0, offUntil = 0, was: VoiceState = voice.state;
   const seen = (): void => { voicePrefs.write({ seen: true }); firstUntil = 0; };
   // A press is a fresh question: whatever it leads to shows, even a tip the player closed before (a second "blocked").
   const pressed = (): void => { seen(); dismissed = ''; voice.toggle(); };
@@ -104,13 +107,14 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
   const press = (): void => { seen(); dismissed = ''; voice.press(); };
   listenPage(scope, 'keydown', event => { if (voiceKey(event)) press(); }, { capture: true });
   listenPage(scope, 'keyup', event => { if (isTalkKey(event.code)) voice.release(); }, { capture: true });
-  listenPage(scope, 'pointerdown', event => { if (event instanceof PointerEvent && event.pointerType === 'mouse' && isTalkKey(`Mouse${String(event.button)}`) && document.documentElement.dataset['wsMenu'] === undefined) press(); }, { capture: true });
+  listenPage(scope, 'pointerdown', event => { if (event instanceof PointerEvent && event.pointerType === 'mouse' && isTalkKey(`Mouse${String(event.button)}`) && cornerShown(document.documentElement.dataset)) press(); }, { capture: true });
   listenPage(scope, 'pointerup', event => { if (event instanceof PointerEvent && event.pointerType === 'mouse' && isTalkKey(`Mouse${String(event.button)}`)) voice.release(); }, { capture: true });
   scope.listen(window, 'blur', () => { voice.release(); });
   scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') voice.release(); });
 
   const tipFor = (): { key: string; text: string; tone: 'ok' | 'bad' } | null => {
     const others = [...voice.roster.values()], now = diagnosticNow();
+    if (Number.isNaN(firstUntil) && chat.shown()) firstUntil = now + FIRST_TIP_MS;
     const { state } = voice;
     if (state === 'asking') return { key: 'asking', text: 'Allow the microphone when your browser asks.', tone: 'ok' };
     if (state === 'joining') return { key: 'joining', text: 'Joining voice…', tone: 'ok' };

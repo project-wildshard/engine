@@ -2,7 +2,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import type { NetClient } from '@wildshard/engine/net/client';
-import { CHAT_FADE_MS, CHAT_FRESH_MS, CHAT_KEPT, cornerOpen, lineLook, type CornerEvent } from './chatCorner';
+import { CHAT_FADE_MS, CHAT_FRESH_MS, CHAT_KEPT, CORNER_MARKS, cornerOpen, cornerShown, lineLook, type CornerEvent } from './chatCorner';
 
 /** Lines the calm corner can show at once (only fresh ones show there). Room chat is for a sitting of two (Q88). */
 const SHOWN = 6;
@@ -15,8 +15,9 @@ const SHOWN = 6;
  *  ~23:15 Cancún: "fix the position of chat and microphones in desktop mode too"; it sat top left under the quest chip):
  *  over what stands there (the coins, a steed's row, the health readout, a desktop's Developer alerts), measured (`place`).
  *  The open chat keeps at least 240 px: in a short window it drops over those, as an open chat does on a phone.
- *  The touch HUD's place follows the touch HUD itself (`#hud.touch`), so Settings' Touch controls on a mouse get it too. Any menu or panel over the world hides it all
- *  (`data-ws-menu` on the root, src/client/engine/ui/layers.ts); voice stays connected.
+ *  The touch HUD's place follows the touch HUD itself (`#hud.touch`), so Settings' Touch controls on a mouse get it too. It shows
+ *  only in play (`cornerShown`, chatCorner.ts): the boot, the loading card (even at READY / PLAY), the title, pause and any menu
+ *  or panel over the world hide it all (`data-away`); voice stays connected.
  *  QA row 43 (chatCorner.ts): the corner is calm. Only the input and the mic stay; a line shows as it is said and fades after
  *  5 s, and lets taps through to the game. Focusing the input opens the chat (`data-open`): a larger panel with the history,
  *  each line's Report, and the players on voice with their mute (voiceUi.ts). A tap outside it, its ×, Escape or an empty
@@ -33,7 +34,7 @@ const CSS = `
 @keyframes ws-chat-in{from{opacity:0;transform:translateY(4px)}}
 #ws-chat:not([data-open]) [data-lines]>[data-look=fading]{opacity:0;transition:opacity ${String(CHAT_FADE_MS)}ms ease-in}
 #ws-chat:not([data-open]) [data-lines]>[data-look=gone],#ws-chat:not([data-open]) [data-lines] button,#ws-chat:not([data-open])>#ws-voice-peers{display:none}
-:root[data-ws-menu] #ws-chat{display:none}
+#ws-chat[data-away]{display:none}
 #ws-chat[data-open]{--ws-chat-open-lift:min(var(--ws-chat-lift),calc(100vh - 264px - env(safe-area-inset-top,0px)));bottom:calc(env(safe-area-inset-bottom,0px) + max(8px,var(--ws-chat-open-lift)));z-index:950;pointer-events:auto;justify-content:flex-start;gap:8px;width:min(calc(100vw - 16px),440px);height:min(calc(100vh - max(8px,var(--ws-chat-open-lift)) - 24px - env(safe-area-inset-top,0px)),560px);max-height:none;padding:8px;box-sizing:border-box;border:1px solid rgba(143,227,255,.35);border-radius:12px;background:rgba(6,12,22,.92);box-shadow:0 10px 32px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 #ws-chat[data-open]>[data-head]{order:0;display:flex;align-items:center;gap:8px;flex:none;padding:0 2px 0 4px;color:#9fb3c8;font:700 11px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase}
 #ws-chat[data-open]>[data-head] button{margin-left:auto;width:32px;height:32px;border:1px solid rgba(143,227,255,.3);border-radius:8px;background:rgba(8,14,24,.7);color:#dff6ff;font:400 20px/1 system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -77,8 +78,8 @@ function place(box: HTMLElement): void {
 const REPORT = 'flex:none;margin-left:auto;padding:0 6px;border:0;background:none;color:#8fe3ff;font:inherit;font-size:11px;cursor:pointer';
 const FIELD = 'pointer-events:auto;flex:1;min-width:0;width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid rgba(143,227,255,.5);border-radius:6px;background:rgba(9,22,36,.94);color:#fff;font:16px/1.2 system-ui,sans-serif';
 
-/** The chat box's parts, so voice can sit in its row (J218), and whether it is open (QA row 43). */
-export interface ChatBox { readonly box: HTMLElement; readonly form: HTMLFormElement; readonly isOpen: () => boolean }
+/** The chat box's parts, so voice can sit in its row (J218), whether it is open (QA row 43), and whether it shows (in play only). */
+export interface ChatBox { readonly box: HTMLElement; readonly form: HTMLFormElement; readonly isOpen: () => boolean; readonly shown: () => boolean }
 /** E7.6 (Q88): room chat, with a report on every line someone else said. The input takes a phone's own keyboard, at 16 px so iOS doesn't zoom.
  *  `hold` (FM4) takes a line typed while the link is down: it shows as unsent and goes out in order when the link is back. */
 export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement = document.body, hold?: (text: string, send: (text: string) => void, drop: () => void) => boolean): ChatBox {
@@ -117,6 +118,17 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
   scope.listen(box, 'keydown', event => { if (open && event instanceof KeyboardEvent && event.key === 'Escape') { event.preventDefault(); corner('close'); } });
   if (typeof visualViewport !== 'undefined' && visualViewport !== null) scope.listen(visualViewport, 'resize', () => { if (open) fit(); });
   place(box); scope.interval(PLACE_EVERY_MS, () => { place(box); });
+  // in play only (QA 2026-11-11): the page's state marks decide, as they change; leaving play closes an open chat
+  let shown = false;
+  const follow = (): void => {
+    shown = cornerShown(document.documentElement.dataset);
+    box.toggleAttribute('data-away', !shown);
+    if (!shown && open) corner('close');
+  };
+  follow();
+  const marks = new MutationObserver(follow);
+  marks.observe(document.documentElement, { attributes: true, attributeFilter: [...CORNER_MARKS] });
+  scope.onDispose(() => { marks.disconnect(); });
   // a tap anywhere else closes it, and still reaches the game: nothing here stops it (not a modal)
   listenPage(scope, 'pointerdown', event => {
     if (!open) return;
@@ -172,5 +184,5 @@ export function chatLines(scope: Scope, client: NetClient, parent: HTMLElement =
     }
     said(row); add(row);
   }));
-  return { box, form, isOpen: () => open };
+  return { box, form, isOpen: () => open, shown: () => shown };
 }

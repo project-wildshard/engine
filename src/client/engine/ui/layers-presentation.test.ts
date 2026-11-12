@@ -37,3 +37,13 @@ test('QA row 15: <html data-ws-menu> marks a menu or panel over the world, so th
     layers.push('hud',{...view(),embedded:true},scope);expect(root.dataset['wsMenu']).toBeUndefined();
   }finally{scope.dispose();delete root.dataset['wsMenu'];}
 });
+test('QA 2026-11-11: <html data-ws-covered> marks a loading card over the world, so the chat corner stays away until it leaves',()=>{
+  const layers=new UiLayers(undefined,true),other=new UiLayers(),scope=new Scope('layers-covered'),root=document.documentElement;
+  try{
+    expect(root.dataset['wsCovered']).toBeUndefined();
+    const card=scope.child('card');layers.holdCovered(card);expect(root.dataset['wsCovered']).toBe('loading');
+    other.refresh();expect(root.dataset['wsCovered']).toBe('loading');
+    card.dispose();expect(root.dataset['wsCovered']).toBeUndefined();
+    other.holdCovered(scope.child('other'));expect(root.dataset['wsCovered']).toBeUndefined();
+  }finally{scope.dispose();delete root.dataset['wsCovered'];}
+});

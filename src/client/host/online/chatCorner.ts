@@ -27,3 +27,20 @@ export function cornerOpen(open: boolean, event: CornerEvent): boolean {
   if (event === 'focus') return true;
   return (event === 'inside' || event === 'sent') && open;
 }
+
+// QA 2026-11-11 (Jake, iPhone, ~21:06 Cancún: "lol don't show microphone and chat on the loading screen"): the mic, the input and
+// the mic tip stood over the loading card's READY rows and its SETTINGS button. The corner is for players in the world, so it
+// shows only in play, decided from the page's own state marks on <html> (this module is outside the game's bundle):
+// `data-ws-state` (App.setState), `data-ws-menu` (a menu or panel over the world) and `data-ws-covered` (the loading card,
+// src/client/engine/ui/layers.ts). The state turns `play` while the card still holds its READY / PLAY, so the cover counts too.
+
+/** The app states that stand in the world. Boot, title, loading, paused, error and a capture do not. */
+const IN_WORLD: ReadonlySet<string> = new Set(['play', 'explore', 'practice', 'playground', 'dead']);
+/** The page's marks on <html> the corner reads (`document.documentElement.dataset`). */
+export interface PageMarks { readonly wsState?: string; readonly wsMenu?: string; readonly wsCovered?: string }
+/** Whether the chat corner (its input, the mic and the mic's tip) shows: in the world, with no menu over it and no loading card. */
+export function cornerShown(marks: PageMarks): boolean {
+  return marks.wsState !== undefined && IN_WORLD.has(marks.wsState) && marks.wsMenu === undefined && marks.wsCovered === undefined;
+}
+/** The marks `cornerShown` reads, as attribute names, for a MutationObserver. */
+export const CORNER_MARKS: readonly string[] = ['data-ws-state', 'data-ws-menu', 'data-ws-covered'];

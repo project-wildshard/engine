@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
-import { CHAT_FADE_MS, CHAT_FRESH_MS, cornerOpen, lineLook } from './chatCorner';
+import { CHAT_FADE_MS, CHAT_FRESH_MS, cornerOpen, cornerShown, lineLook } from './chatCorner';
 import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
@@ -10,8 +10,10 @@ import { voiceSettings } from '@wildshard/engine/ui/voiceSettings';
 
 interface Said { line: number; from: number; name: string; text: string }
 const owners: Scope[] = [];
-beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'] }); });
-afterEach(() => { for (const owner of owners.splice(0)) owner.dispose(); vi.useRealTimers(); document.body.replaceChildren(); });
+const marks = document.documentElement.dataset;
+// the corner shows only in play (QA 2026-11-11 loading HUD): these tests stand in the world unless they say otherwise
+beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'] }); marks['wsState'] = 'play'; });
+afterEach(() => { for (const owner of owners.splice(0)) owner.dispose(); vi.useRealTimers(); document.body.replaceChildren(); delete marks['wsState']; delete marks['wsMenu']; delete marks['wsCovered']; });
 
 /** The real chat corner and voice controls over a stub link: what it says, what it reports, who is on voice. */
 function corner(peers: readonly VoicePeer[] = []): { box: HTMLElement; field: HTMLInputElement; say: (said: Said) => void; sent: string[]; reported: number[]; muted: [string, boolean][] } {
@@ -31,6 +33,45 @@ function corner(peers: readonly VoicePeer[] = []): { box: HTMLElement; field: HT
 const look = (box: HTMLElement): (string | undefined)[] => [...box.querySelectorAll<HTMLElement>('[data-lines] > *')].map(row => row.dataset['look']);
 const open = (box: HTMLElement): boolean => box.dataset['open'] !== undefined;
 const outside = (): void => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); };
+
+/** Whether the corner shows: `data-away` is the corner's own mark, and the mic and its tip sit inside it. */
+const away = (box: HTMLElement): boolean => box.dataset['away'] !== undefined;
+const settle = (): Promise<void> => Promise.resolve();
+
+test('QA 2026-11-11 (Jake: "don\'t show microphone and chat on the loading screen"): the corner shows only in play', async () => {
+  for (const [state, menu, covered, shown] of [['boot', false, false, false], ['title', false, false, false], ['loading', false, true, false],
+    ['play', false, true, false], ['play', true, false, false], ['paused', true, false, false], ['error', false, false, false],
+    ['play', false, false, true], ['explore', false, false, true], ['practice', false, false, true], ['playground', false, false, true]] as const) {
+    expect(cornerShown({ ...(state === undefined ? {} : { wsState: state }), ...(menu ? { wsMenu: 'open' } : {}), ...(covered ? { wsCovered: 'loading' } : {}) }), `${state} menu=${String(menu)} covered=${String(covered)}`).toBe(shown);
+  }
+  expect(cornerShown({})).toBe(false);
+  // the page as the loading card's READY / PLAY leaves it: the state is already play, the card still covers the world
+  marks['wsState'] = 'loading'; marks['wsCovered'] = 'loading';
+  const { box } = corner();
+  expect(away(box)).toBe(true);
+  marks['wsState'] = 'play'; await settle();
+  expect(away(box)).toBe(true);
+  delete marks['wsCovered']; await settle();
+  expect(away(box)).toBe(false);
+  marks['wsMenu'] = 'open'; await settle();
+  expect(away(box)).toBe(true);
+  delete marks['wsMenu']; marks['wsState'] = 'title'; await settle();
+  expect(away(box)).toBe(true);
+});
+
+test('QA 2026-11-11: the mic tip\'s first 15 s start when the corner first shows, and B does nothing on the loading card', async () => {
+  localStorage.clear();
+  marks['wsState'] = 'loading'; marks['wsCovered'] = 'loading';
+  const { voice, tip, press } = voiceCorner('off');
+  press();
+  expect(voice.toggles).toBe(0);
+  vi.advanceTimersByTime(20_000);
+  marks['wsState'] = 'play'; delete marks['wsCovered']; await settle();
+  vi.advanceTimersByTime(1000);
+  expect(tip()).toBe('Press B (or click the mic) to talk with players here.');
+  press();
+  expect(voice.toggles).toBe(1);
+});
 
 test('QA row 43: a line is fresh for 5 s, fades, then is gone from the calm corner', () => {
   expect(lineLook(0, 0)).toBe('fresh');
