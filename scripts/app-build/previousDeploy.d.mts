@@ -9,3 +9,5 @@ export function carryPreviousDeploy(directory: string, options?: {
   /** a CI test build: a 5xx or network failure fetching the origin's manifest warns and carries nothing (a release refuses) */
   readonly optional?: boolean;
 }): Promise<{current: number; builds: number; carried: number; bytes: number}>;
+/** OFF-VERCEL OV3: the origin a release carries from, by WS_CHANNEL (unset: production). Throws on another channel. */
+export function channelOrigin(channel: string | undefined): string;
