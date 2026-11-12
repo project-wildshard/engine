@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const GAME_HOST = 'https://wildshard-singleplayer.vercel.app';
+const GAME_HOST = 'https://api.wildshard.io'; // API-CLOUDFLARE AC11: the api-server Worker
 
 /** A value from `root`'s `.env.local`, or null.
  * @param {string} key @param {string} [root] */

@@ -17,6 +17,8 @@
 import {createHash, createPublicKey, verify} from 'node:crypto';
 
 export const PACKS_ORIGIN = 'https://packs.wildshard.io';
+/** Where every channel's page sends `/api/{errors,telemetry,inbox}` (API-CLOUDFLARE AC11). */
+export const API_ORIGIN = 'https://api.wildshard.io';
 /** E7_RELEASE_PUBLIC_KEY (engine variable), SPKI DER as hex: the box's RELEASE_PUBLIC_KEY and the pages' key. */
 export const RELEASE_PUBLIC_KEY = '302a300506032b657003210012e17122631777e2a6ad68e2fb4883d856def46f812aa9a3e49d701ed44ad17b';
 export const PHASES = /** @type {const} */ (['build', 'upload', 'check', 'go-live']);
@@ -247,6 +249,8 @@ export function buildEnv(channel, deps) {
   const common = {
     WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: 'test/pins/catalogue.json',
     WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin, WS_RELEASE: '1', WS_CHANNEL: channel.channel,
+    // API-CLOUDFLARE AC11: errors, telemetry and the inbox go to the api-server Worker on every channel.
+    VITE_API_ORIGIN: API_ORIGIN,
   };
   // Preview is the solo game: no release file, so the build stamps no world (app-build-pipeline.mjs E7.2d).
   return channel.solo ? common

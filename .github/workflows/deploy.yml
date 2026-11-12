@@ -68,6 +68,8 @@ permissions:
 
 env:
   WILDSHARD_CATALOGUE: test/pins/catalogue.json
+  # API-CLOUDFLARE AC11: the page calls errors, telemetry and the inbox on the api-server Worker, not its own host.
+  VITE_API_ORIGIN: https://api.wildshard.io
   # C4 reports each command's own failure; no peer-job polling or cancellation.
   GH_TOKEN: ${{ github.token }}
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -381,8 +383,6 @@ jobs:
           node scripts/check-devserver.mjs dist
           test -f .vercel/output/config.json
           test -f .vercel/output/static/version.json
-          test -f .vercel/output/functions/api/inbox.func/.vc-config.json
-          test -f .vercel/output/functions/api/errors.func/.vc-config.json
           node --input-type=module <<'NODE'
           import {readFileSync} from 'node:fs';
           import {matchesCommit} from './scripts/deploy-version.mjs';
@@ -490,7 +490,7 @@ jobs:
           DEPLOY_EXPECTED_BUILD: ${{ steps.staged.outputs.build }}
         run: |
           node "$RUNNER_TEMP/deploy-version.mjs" verify
-          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'x-review-password: invalid' https://wildshard-singleplayer.vercel.app/api/inbox)
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'x-review-password: invalid' https://api.wildshard.io/api/inbox)
           test "$code" = 401 || { echo "::error::/api/inbox returned HTTP $code, expected 401"; exit 1; }
 
       - name: Record verified production history

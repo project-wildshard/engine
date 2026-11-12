@@ -73,6 +73,15 @@ async function until(page, faults, condition, label, deadline, observe) {
   throw new Error(`Boot deadline: ${label}; ${JSON.stringify(await page.evaluate(bootObservation))}`);
 }
 
+/** API-CLOUDFLARE AC11: a release page posts to `api.wildshard.io`, another origin, so a stubbed answer (and its
+ * preflight) carries CORS, or the page logs a CORS error. The smoke never reaches the real API.
+ * @param {import('playwright').Route} route @param {number} [status] */
+export function answerApi(route, status = 204) {
+  return route.fulfill({ status, body: '', headers: {
+    'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, x-review-password' } });
+}
+
 /** Preserve the original report behind a static-preview transport failure, including lifecycle diagnostics.
  * @param {string} url @param {string} method @param {string|null} body @returns {unknown} */
 export function bootErrorReport(url, method, body) {
@@ -385,15 +394,21 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   // Static dist has no serverless API. Acknowledge telemetry and recorded nonfatal lifecycle diagnostics only.
   let telemetryPosts = 0;
   await context.route('**/api/telemetry', async route => {
-    if (route.request().method() !== 'POST') { await route.continue(); return; }
-    telemetryPosts++; await route.fulfill({ status: 204 });
+    const method = route.request().method();
+    if (method === 'OPTIONS') { await answerApi(route); return; }
+    if (method !== 'POST') { await route.continue(); return; }
+    telemetryPosts++; await answerApi(route);
   });
   let gridNavigationIntent = false, gridNavigationObserved = false;
   await context.route('**/api/errors', async route => {
     const request = route.request();
+    if (request.method() === 'OPTIONS') { await answerApi(route); return; }
     const report = bootErrorReport(request.url(), request.method(), request.postData());
-    if (bootLifecycleDiagnostic(report, gridNavigationObserved)) { await route.fulfill({ status: 204 }); return; }
-    await route.continue();
+    if (bootLifecycleDiagnostic(report, gridNavigationObserved)) { await answerApi(route); return; }
+    // Same-origin, the static server answers (the old transport failure); cross-origin it would be the real API.
+    const from = request.headers()['origin'];
+    if (from === undefined || from === new URL(request.url()).origin) { await route.continue(); return; }
+    await answerApi(route, 404);
   });
   const page = await context.newPage();
   /** @type {import('playwright').CDPSession | null} */ let stallProfile = null;

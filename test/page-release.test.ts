@@ -134,6 +134,7 @@ test('the build bakes the channel release file from packs.wildshard.io', async (
     expect(seen[0]?.['WS_RELEASE']).toBe('1');
     expect(seen[0]?.['WS_CHANNEL']).toBe(channel);
     expect(seen[0]?.['WS_PREVIOUS_DEPLOY_ORIGIN']).toBe(channel === 'production' ? 'https://play.wildshard.io' : 'https://staging.wildshard.io');
+    expect(seen[0]?.['VITE_API_ORIGIN']).toBe('https://api.wildshard.io');
   }
 });
 
@@ -266,6 +267,7 @@ test('preview is the solo game: no release file, no packs, no gate, and the alia
   expect(seen[0]?.['WILDSHARD_RELEASE_URL']).toBeUndefined();
   expect(seen[0]?.['WS_CHANNEL']).toBe('preview');
   expect(seen[0]?.['WS_PREVIOUS_DEPLOY_ORIGIN']).toBe('https://preview.wildshard.io');
+  expect(seen[0]?.['VITE_API_ORIGIN']).toBe('https://api.wildshard.io');
   expect(lines.some(line => line.includes('solo, no gate'))).toBe(true);
 });
 
