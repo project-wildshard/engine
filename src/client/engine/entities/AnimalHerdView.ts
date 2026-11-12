@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { app } from '../app/runtime';
+import { pageScope } from '../../../shared/engine/app/resources';
+import { shaderPatchTextures } from '../render/shaderPatches';
 import type { TickRate } from '../../../shared/engine/app/scheduler';
 import { TIER, TIER_CONFIG } from '../core/tier';
 import { worldTime } from '../../../shared/engine/core/time';
@@ -144,6 +146,31 @@ interface FarRig extends FarMember {
  * The page's half of the herds (P1-E4.3): rigs, the far and shadow batches, fur shells, draw distance, blood and the
  * debug capsules. AnimalManager.ts decides; this draws. It holds no decision and no gameplay random stream.
  */
+/** GC16 (GRID-CROSSING): a parked warm rig (DL24) borrows its level's materials and textures but sits on the page scene,
+ *  so on the grid it outlived the cell that owns them: walking out of Driftwood freed the captain's coat, and the next
+ *  cell's entry preparation, which walks hidden roots too, met the freed texture ('lost its allocation after mip
+ *  retirement') and held the player at Sunscar's edge. The rig leaves the scene the moment anything it draws with is
+ *  freed. Returns the release for a rig its owner takes out first. */
+export function leaveWithResources(rig: THREE.Object3D): () => void {
+  const resources = new Set<THREE.Material | THREE.Texture>();
+  const texture = (value: unknown): void => { if (value instanceof THREE.Texture) resources.add(value); };
+  rig.traverse(object => {
+    const held: unknown = Reflect.get(object, 'material');
+    for (const candidate of Array.isArray(held) ? held : [held]) {
+      if (!(candidate instanceof THREE.Material)) continue;
+      const material: THREE.Material = candidate;
+      resources.add(material);
+      for (const value of Object.values(material)) texture(value);
+      for (const value of shaderPatchTextures(material)) texture(value);
+      const uniforms: unknown = Reflect.get(material, 'uniforms');
+      if (typeof uniforms === 'object' && uniforms !== null) for (const uniform of Object.values(uniforms)) if (typeof uniform === 'object' && uniform !== null) texture(Reflect.get(uniform, 'value'));
+    }
+  });
+  const lease = pageScope.child('creature-warm-rig');
+  for (const resource of resources) lease.listenOnceEmitter(resource, 'dispose', () => { rig.removeFromParent(); lease.dispose(); });
+  return () => { lease.dispose(); };
+}
+
 export class AnimalHerdView implements RowBodiesDraw {
   /** the animals' own world-matrix pass: a still, far animal's bones are not recomputed (animalMatrices.ts) */
   readonly group: AnimalGroup = new AnimalGroup();
@@ -205,6 +232,7 @@ export class AnimalHerdView implements RowBodiesDraw {
 
   /** DL24 (J198): one hidden rig per model a row can ask for, so the boot's first-frame warm draws build its programs */
   private warmRigs: THREE.Group | null = null;
+  private readonly warmLeases: (() => void)[] = [];
   /**
    * DL24 (J198, "warm shaders before control"): a body the server spawns after control (Far Reach's, 153 m out, 13 s
    * in, at boost) built its rig's program in that frame: 390-406 ms on the Simulator. Each prepared model gets one rig
@@ -216,6 +244,7 @@ export class AnimalHerdView implements RowBodiesDraw {
    */
   stageWarmRigs(models: readonly AnimalModel[]): void {
     this.warmRigs?.removeFromParent();
+    for (const release of this.warmLeases.splice(0)) release();
     const group = new THREE.Group();
     group.name = 'creature-warm'; group.visible = false;
     for (const model of new Set(models)) {
@@ -223,6 +252,8 @@ export class AnimalHerdView implements RowBodiesDraw {
         const { mesh } = this.factory.instantiate(model, 0.5);
         attachShadowCaster(mesh);
         group.add(mesh);
+        // GC16: on the page scene, it outlives its level; it leaves when its level frees what it draws with
+        this.warmLeases.push(leaveWithResources(mesh));
       } catch (error) { console.warn(`[warm] creature rig ${model.kind}:${model.variant} not parked`, error); }
     }
     this.scene.add(group);
