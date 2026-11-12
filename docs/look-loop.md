@@ -109,6 +109,11 @@ round re-shoots exactly those cameras.**
 - Move a DIAG camera by hand in the file when the landmark would not
   fit, and write down why in `about`.
 - For Jake's phone, also shoot at 402×874 @3 (`fp.viewport`).
+- A landscape FP shot (a desktop 3:2 target) sets `fp.tier` to
+  `desktop`: only the phone tier is a touch iPhone context, and a
+  phone viewport must be portrait. A landscape touch phone sits
+  behind the game's rotate page with the frame loop stopped, which is
+  how two Mossgate runs hung 150 to 300 s (fixed by opus-viewsfix).
 - Yaw faces `(−sin yaw, −cos yaw)` in x / z: yaw 0 faces −z.
 - Cell order on every sheet: row 1 FP front / left / right, row 2 FP
   back / TOP / DIAG front, row 3 DIAG left / right / back.

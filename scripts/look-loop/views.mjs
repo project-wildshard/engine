@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // views.mjs: the look loop's capture (docs/look-loop.md, step 2). Per anchor of a cameras.json it shoots the nine
 // fixed cameras and writes a 3x3 sheet:
-//   1-4  first person at P: FRONT / LEFT / RIGHT / BACK. Phone tier, iPhone 16 Pro UA and touch, fp.viewport @ fp.dpr, HUD on
+//   1-4  first person at P: FRONT / LEFT / RIGHT / BACK. fp.viewport @ fp.dpr, HUD on; fp.tier phone (the default) is an
+//        iPhone 16 Pro (UA, touch) and must be portrait, any other tier a desktop context
 //   5    TOP, straight down on P with the front heading image-up. god.tier, god.viewport @1, HUD hidden, god.fovV
 //   6-9  DIAG front / left / right / back, up and out, looking at P
 // The first run resolves each anchor's cameras (ground height from the live heightfield) and writes them back into the
@@ -19,8 +20,8 @@ import { resolve as resolvePath, join } from 'node:path';
 import { chromium, devices } from 'playwright';
 import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
-import { developerSettings, harnessPins, hideDeveloperOverlays } from '../debug-settings.mjs';
-import { captureName, parseCameraFile, parseFlags, resolveMissing } from './cameras.mjs';
+import { NAME_ASKED, developerSettings, harnessPins, hideDeveloperOverlays, saveFixture } from '../debug-settings.mjs';
+import { captureName, contextOptions, parseCameraFile, parseFlags, resolveMissing } from './cameras.mjs';
 
 const flags = parseFlags(process.argv.slice(2), ['cameras', 'out', 'anchor', 'tag', 'query', 'url', 'settle', 'timeout', 'help']);
 if (flags.help || typeof flags.cameras !== 'string' || typeof flags.out !== 'string') {
@@ -93,8 +94,8 @@ const shots = new Map();
 try {
   const iphone = devices['iPhone 16 Pro'];
   const groups = [
-    { mode: 'fp', tier: DEF.fp.tier, query: DEF.fp.query, ctx: { userAgent: iphone.userAgent, isMobile: true, hasTouch: true, deviceScaleFactor: DEF.fp.dpr, viewport: { width: DEF.fp.viewport[0], height: DEF.fp.viewport[1] } } },
-    { mode: 'god', tier: DEF.god.tier, query: DEF.god.query, ctx: { deviceScaleFactor: 1, viewport: { width: DEF.god.viewport[0], height: DEF.god.viewport[1] } } },
+    { mode: 'fp', tier: DEF.fp.tier, query: DEF.fp.query, ctx: contextOptions(DEF, 'fp', iphone) },
+    { mode: 'god', tier: DEF.god.tier, query: DEF.god.query, ctx: contextOptions(DEF, 'god', iphone) },
   ];
   for (const g of groups) {
     const ctx = await browser.newContext(g.ctx);
@@ -102,13 +103,20 @@ try {
       await developerSettings(ctx, { tier: g.tier, volume: 0, ...DEF.settings });
       await ctx.addInitScript(hideDeveloperOverlays);
       await harnessPins(ctx, { seed: 357 });
+      await saveFixture(ctx, NAME_ASKED); // a page with a world asks for the Name before it joins (MP2.4); a capture never answers it
       const page = await ctx.newPage();
       const errors = [];
       page.on('pageerror', e => errors.push(e.message.slice(0, 200)));
       const url = `${BASE}/?${[DEF.query, g.query, EXTRA].filter(Boolean).join('&')}`;
       const t0 = Date.now();
       await page.goto(url, { waitUntil: 'load' });
-      await page.waitForFunction(() => Boolean(window.__wildshard?.world?.hud?.entered && !document.querySelector('.ws-load') && window.__wildshard.world.game.frameGate()), undefined, { timeout: TIMEOUT, polling: 1000 });
+      try {
+        await page.waitForFunction(() => Boolean(window.__wildshard?.world?.hud?.entered && !document.querySelector('.ws-load') && window.__wildshard.world.game.frameGate()), undefined, { timeout: TIMEOUT, polling: 1000 });
+      } catch (error) {
+        // name what holds the frame gate, so a stuck load says why instead of only timing out
+        const why = await page.evaluate(() => ({ entered: Boolean(window.__wildshard?.world?.hud?.entered), loading: Boolean(document.querySelector('.ws-load')), paused: Boolean(window.__wildshard?.world?.hud?.paused), rotatePage: matchMedia('(orientation: landscape) and (pointer: coarse) and (min-aspect-ratio: 5/4)').matches, namePrompt: Boolean(document.querySelector('#ws-name-box')) })).catch(() => ({}));
+        throw new Error(`[${g.mode}] ${url} not ready in ${TIMEOUT / 1000} s: ${JSON.stringify(why)}`, { cause: error });
+      }
       if (await page.evaluate(() => window.__wildshard.world.hud.paused)) await page.keyboard.press('Escape');
       console.error(`[${g.mode}] ${url} ready in ${((Date.now() - t0) / 1000).toFixed(0)} s${errors.length > 0 ? `; page errors: ${errors.join(' | ')}` : ''}`);
       const groundY = new Map();

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the look loop's Python checks (ΔE00, globbing, target jobs).
 import { spawnSync } from 'node:child_process';
-import { captureName, facing, parseCameraFile, parseFlags, resolveCameras, resolveMissing, SHOTS, yawTo } from '../scripts/look-loop/cameras.mjs';
+import { captureName, contextOptions, facing, parseCameraFile, parseFlags, resolveCameras, resolveMissing, SHOTS, yawTo } from '../scripts/look-loop/cameras.mjs';
 
 const file = () => parseCameraFile({
   query: 'chunk=_template', fp: { viewport: [390, 844] }, god: { viewport: [1600, 900], topUp: 40, diagUp: 18, diagOut: 24, lookAhead: 8 },
@@ -53,4 +53,21 @@ test('the Python side: CIEDE2000 reference pairs, capture globbing, seed-mode ta
   const run = spawnSync('python3', ['scripts/look-loop/test_look_loop.py'], { encoding: 'utf8', timeout: 30000 });
   expect(run.stderr).toMatch(/OK/u);
   expect(run.status).toBe(0);
+});
+
+// opus-viewsfix: LF1-0 and LF1-3's desktop 1400x933 FP shots hung 150-300 s on the ready wait. The FP context was always an
+// iPhone (UA, isMobile, touch), so a landscape viewport matched RotateGate's (pointer: coarse) landscape query: the rotate
+// page covered the game and frameGate() stayed false for good.
+test('a desktop FP tier gets a desktop context, never a touch phone the rotate page would cover', () => {
+  const phone = { userAgent: 'iPhone UA', isMobile: true, hasTouch: true };
+  const desk = parseCameraFile({ fp: { viewport: [1400, 933], dpr: 1, tier: 'desktop' }, god: { viewport: [1600, 900] }, anchors: [{ id: 'a', P: { x: 0, z: 0 }, faceTo: { x: 0, z: 1 } }] });
+  expect(contextOptions(desk, 'fp', phone)).toEqual({ deviceScaleFactor: 1, viewport: { width: 1400, height: 933 } });
+  expect(contextOptions(desk, 'god', phone)).toEqual({ deviceScaleFactor: 1, viewport: { width: 1600, height: 900 } });
+  expect(contextOptions(file(), 'fp', phone)).toEqual({ ...phone, deviceScaleFactor: 3, viewport: { width: 390, height: 844 } });
+});
+
+test('a phone FP tier must be portrait: a landscape touch phone is gated by the rotate page', () => {
+  expect(() => parseCameraFile({ fp: { viewport: [1400, 933] }, god: { viewport: [1600, 900] }, anchors: [{ id: 'a', P: { x: 0, z: 0 }, faceTo: { x: 0, z: 1 } }] })).toThrow(/portrait/u);
+  expect(() => parseCameraFile({ fp: { viewport: [844, 390], tier: 'phone' }, god: { viewport: [1600, 900] }, anchors: [{ id: 'a', P: { x: 0, z: 0 }, faceTo: { x: 0, z: 1 } }] })).toThrow(/portrait/u);
+  expect(parseCameraFile({ fp: { viewport: [402, 874], tier: 'phone' }, god: { viewport: [1600, 900] }, anchors: [{ id: 'a', P: { x: 0, z: 0 }, faceTo: { x: 0, z: 1 } }] }).fp.tier).toBe('phone');
 });

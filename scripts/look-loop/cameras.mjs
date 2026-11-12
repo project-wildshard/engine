@@ -14,7 +14,7 @@ const anchor = v.looseObject({
   name: v.optional(v.string()), P: xz, faceTo: xz,
   groundY: v.optional(finite), cameras: v.optional(v.pipe(v.array(camera), v.length(9))),
 });
-const file = v.looseObject({
+const file = v.pipe(v.looseObject({
   about: v.optional(v.string()),
   /** the build's query for both contexts, e.g. `chunk=<slug>&mute=1&skipintro=1&nolock=1&sw=0` */
   query: v.optional(v.string(), ''),
@@ -27,7 +27,12 @@ const file = v.looseObject({
   }),
   anchors: v.pipe(v.array(anchor), v.minLength(1),
     v.check(list => new Set(list.map(a => a.id)).size === list.length, 'anchor ids must be unique')),
-});
+}), v.check(f => f.fp.tier !== 'phone' || !rotateGated(f.fp.viewport),
+  'a phone FP viewport must be portrait (narrower than 5:4): the game covers a landscape touch phone with its rotate page and stops the frame loop; use fp.tier "desktop" for a landscape shot'));
+
+/** RotateGate.ts's query, `(orientation: landscape) and (pointer: coarse) and (min-aspect-ratio: 5/4)`, for a touch viewport.
+ * @param {readonly [number, number]} viewport */
+const rotateGated = ([w, h]) => w * 4 >= h * 5;
 
 /** Admit a cameras.json; defaults are Pine Hollow's (topUp 90, diagUp 45, diagOut 55, god fov 72°, FP pitch -0.06).
  * @param {unknown} value */
@@ -73,6 +78,17 @@ export function resolveMissing(def, groundAt) {
     done.push(a.id);
   }
   return done;
+}
+
+/** Playwright context options for a group. Only a phone tier FP context is a phone (the device's UA, isMobile, touch at
+ * fp.dpr); every other tier is a plain desktop context. A touch context with a landscape viewport would sit behind the
+ * game's rotate page forever (frameGate() false), which is how LF1-0 and LF1-3's desktop FP shots hung.
+ * @param {ReturnType<typeof parseCameraFile>} def @param {'fp' | 'god'} mode
+ * @param {{userAgent: string, isMobile: boolean, hasTouch: boolean}} phone e.g. Playwright's devices['iPhone 16 Pro'] */
+export function contextOptions(def, mode, phone) {
+  const g = mode === 'fp' ? def.fp : def.god, dpr = mode === 'fp' ? def.fp.dpr : 1;
+  const base = { deviceScaleFactor: dpr, viewport: { width: g.viewport[0], height: g.viewport[1] } };
+  return mode === 'fp' && def.fp.tier === 'phone' ? { userAgent: phone.userAgent, isMobile: phone.isMobile, hasTouch: phone.hasTouch, ...base } : base;
 }
 
 /** A capture's file name; targets.py and palette-delta.py find frame n by `capture-<n>-*` / `mockup-<n>-*`.
