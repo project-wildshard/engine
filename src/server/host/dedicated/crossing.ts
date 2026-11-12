@@ -23,6 +23,8 @@ export interface CrossTarget {
   /** Make the body first, at `at` in this room's frame; the reason when it can't, with nothing left behind. */
   admit: (entry: SeatEntry, transport: Transport, at: ResumeAt) => CrossArrival | string;
 }
+/** Feet the grid can place: a body gone to NaN is skipped, never thrown on, so one bad body can't end its worker. */
+export function finite(feet: Readonly<GridPoint>): boolean { return Number.isFinite(feet.x) && Number.isFinite(feet.y) && Number.isFinite(feet.z); }
 /** Where a seat's feet have walked: a cell (`cell`) or the road (null), and where they stand in its frame. */
 export interface Crossed { readonly cell: GridCell | null; readonly at: GridPoint }
 

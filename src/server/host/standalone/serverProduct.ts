@@ -58,8 +58,10 @@ async function serverBook(root: string, build: string, read: ServerRead): Promis
 }
 
 /** C2: the road's collision from this build's grid pack: nothing a page reads, and no shard's. */
-export function fetchGridCollision(base: string): Promise<readonly GridCollisionStrip[]> {
-  return readGridCollisionPack(new URL(base, globalThis.location.href).href, workerBuild(), serverBytes);
+export async function fetchGridCollision(base: string): Promise<readonly GridCollisionStrip[]> {
+  // Async so a bad base rejects, as it always did, rather than throwing.
+  const strips = await readGridCollisionPack(new URL(base, globalThis.location.href).href, workerBuild(), serverBytes);
+  return strips;
 }
 /** C2, GC15: the road's collision from `build`'s grid pack beside `root`, through any reader: a page's worker or a dedicated room's. */
 export async function readGridCollisionPack(root: string, build: string, read: ServerRead): Promise<readonly GridCollisionStrip[]> {

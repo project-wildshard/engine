@@ -152,6 +152,8 @@ export class World {
   private readonly drains = new Map<number, () => void>();
   /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered. */
   private readonly crossings = new Set<string>();
+  /** GC15: devices whose source said `left` while their crossing was in flight: applied if the crossing is abandoned before `cross`. */
+  private readonly leftCrossing = new Set<string>();
   private asked = 0;
   private draining = false;
   private grace: { readonly endsAt: number; readonly build: string } | null = null;
@@ -182,7 +184,7 @@ export class World {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
     // GO7: a late `left` from the cell a goto moved them out of must not unseat them (or free their Name) in the new one.
     // GC15: a crossing's source lets the seat go before `crossed` says where it went: the seat stays counted until then.
-    else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.crossings.has(news.device)) return; if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
+    else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.crossings.has(news.device)) { if (this.seated.get(news.device) === from) this.leftCrossing.add(news.device); return; } if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
     // A voice is named for the body its cell seated (a room's first seat is its lead body), from the cell they now stand in.
     else if (news.kind === 'seated') { const { device, body, slug: from } = news; if (this.seated.get(device) === from) this.voiceBodies.get(device)?.(body); }
     else if (news.kind === 'refused') this.refuse(news.reason);
@@ -196,7 +198,7 @@ export class World {
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
     else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
     else if (news.kind === 'crossed') {
-      this.crossings.delete(news.device);
+      this.crossings.delete(news.device); this.leftCrossing.delete(news.device);
       // A moved seat stands in the target, on the same link; one the target refused after the source let it go is in neither.
       if (this.seated.get(news.device) === news.from) {
         if (news.moved) { this.seated.set(news.device, news.to); this.names.set(news.device, news.name); this.voiceBodies.get(news.device)?.(news.body); }
@@ -349,10 +351,15 @@ export class World {
     try {
       // The road keeps no progress: a seat walks onto it with nothing to read.
       const saved: SavedPlayer = roadHome(to) === null ? await this.options.saves.read(device, cellShard(to)) : { doc: null, seq: 0 };
-      if (this.seated.get(device) !== from || this.draining) { this.crossings.delete(device); return; }
+      if (this.seated.get(device) !== from || this.draining) { this.abandon(device, from); return; }
       link.send({ kind: 'cross', from, to, at, device, name, body: bodyId(this.options.secret, device), doc: saved.doc, seq: saved.seq,
         ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) });
-    } catch (error) { this.crossings.delete(device); this.options.log({ at: 'cell.cross-refused', device, from, to, reason: String(error) }); }
+    } catch (error) { this.abandon(device, from); this.options.log({ at: 'cell.cross-refused', device, from, to, reason: String(error) }); }
+  }
+  /** A crossing that never reached its worker: a `left` the source said meanwhile counts now. */
+  private abandon(device: string, from: string): void {
+    this.crossings.delete(device);
+    if (this.leftCrossing.delete(device) && this.seated.get(device) === from) { this.seated.delete(device); this.names.delete(device); }
   }
   /** GO7: a page Shard select sent to a cell this world opens is seated there; otherwise where the player last stood, else the first. */
   private cellFor(last: string | null, goto: string | null = null): string {

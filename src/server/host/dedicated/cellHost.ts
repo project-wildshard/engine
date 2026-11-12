@@ -115,10 +115,10 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     await wake(cell); post({ kind: 'found', id, held: cell.room.holds(device), spawn: cell.room.spawn });
   };
   const seat = async (cell: Cell | RoadRoom, order: Extract<CellOrder, { kind: 'seat' }>): Promise<void> => {
+    // The transport starts its port: made before a wake, a close on the way would reach nobody.
+    if (!(cell instanceof RoadRoom) && cell.waking !== null) await cell.waking;
     const transport = new SeatTransport(order.port), hello = (): void => { transport.deliver('reliable', order.hello); };
-    if (cell instanceof RoadRoom) { cell.seat(order, transport, hello); return; }
-    if (cell.waking !== null) await cell.waking;
-    cell.room.seat(order, transport, hello);
+    if (cell instanceof RoadRoom) cell.seat(order, transport, hello); else cell.room.seat(order, transport, hello);
   };
   /** GC15: a seat walks from one of this worker's cells into another, or onto or off its road, the target woken first if it slept long enough to start over. */
   const cross = async (order: Extract<CellOrder, { kind: 'cross' }>): Promise<void> => {
@@ -133,7 +133,12 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const handle = (order: CellOrder): void => {
     if (order.kind === 'close') { dispose(); return; }
     // MP4.1: a line from the world reaches each awake cell here but the one that said it. A cell asleep or starting over hears nothing.
-    if (order.kind === 'chat') { const source = cells.get(order.from); if (ready) for (const cell of cells.values()) if (cell !== source && cell.waking === null && cell.room.taken > 0) cell.room.net.hear(order.line); return; }
+    if (order.kind === 'chat') {
+      const source = cells.get(order.from);
+      if (ready) for (const cell of cells.values()) if (cell !== source && cell.waking === null && cell.room.taken > 0) cell.room.net.hear(order.line);
+      if (ready && road !== undefined && road.name !== order.from && road.taken > 0) road.net.hear(order.line);
+      return;
+    }
     if (!ready) { fail(new Error('A worker was told something before it booted')); return; }
     if (order.kind === 'drain') { clock?.pause(); for (const { room } of cells.values()) room.drain(); road?.drain(); post({ kind: 'drained' }); return; }
     if (order.kind === 'cross') { cross(order).catch(fail); return; }
@@ -149,10 +154,11 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     if (options.road !== undefined && first !== undefined) crossing = { name: roadName(first), assembly: new GridAssembly({ developer: false, devserver: false }), strips: await options.road() };
     for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), waking: null }); }
     if (crossing !== undefined && rapier !== undefined) {
-      const { name, assembly, strips } = crossing;
+      const { name, assembly, strips } = crossing, begun = diagnosticNow();
       road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells.filter(cell => !cells.has(cell.instance)), strips), hosts: instance => cells.has(instance),
         now: options.roomNow ?? diagnosticNow, post: news => { post({ ...news, slug: name }); }, reports: { file: report => { post({ kind: 'report', slug: name, report }); } },
         ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }) });
+      post({ kind: 'cell', slug: name, ms: diagnosticNow() - begun });
       options.roaded?.(road);
     }
     ready = true; readAt = diagnosticNow();

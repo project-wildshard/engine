@@ -12,17 +12,24 @@ import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { LEAD_SEAT } from '../standalone/cellWorld';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
-import { crossedTo, type CrossArrival, type CrossTarget } from './crossing';
+import { crossedTo, finite, type CrossArrival, type CrossTarget } from './crossing';
+import { FallFloor } from '../standalone/fallFloor';
 import { LEFT } from './socketPump';
 
 /** How often a seat whose crossing is asked for asks again, and how often holds are looked at, in ticks. */
 const ASK_TICKS = 30;
+/**
+ * Below this a body has left the road's strips: it goes back to the last strip it stood on. The road's ground lies far below, and
+ * the walls round other workers' cells stand from 0 m up, so a body down there could walk under them.
+ */
+const ROAD_FLOOR = -60;
 
 interface RoadSeat {
   readonly device: string; readonly name: string; readonly body: string;
   transport: Transport | null; client: number | null; closeOff: (() => void) | null; holdEnds: number | null;
   /** The cell this seat last asked to cross into, and on which tick. */
   asked: string | null; askedAt: number;
+  readonly fall: FallFloor;
 }
 export interface RoadRoomOptions {
   /** `roadName(first cell on this worker)`. */
@@ -68,7 +75,7 @@ export class RoadRoom implements CrossTarget {
     const player = this.host.addPlayer(entry.body, at, at.yaw);
     player.netName = entry.name;
     player.resetPose(at, at.yaw);
-    const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0 };
+    const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0, fall: new FallFloor(ROAD_FLOOR, true, at) };
     this.seats.set(entry.device, seat);
     return { body: seat.body, land: client => {
       if (client === null) this.closed(seat, transport, 'crossed'); else this.bind(seat, transport, client);
@@ -78,7 +85,8 @@ export class RoadRoom implements CrossTarget {
   /** A held seat's player dials again. The door only seats here a device this road holds. */
   seat(entry: SeatEntry, transport: Transport, hello: () => void): void {
     const seat = this.seats.get(entry.device);
-    if (seat === undefined) { transport.close('stalled'); return; }
+    // Its hold ran out on the way here: the door still counts it, so say it left.
+    if (seat === undefined) { transport.close('stalled'); this.options.post({ kind: 'left', device: entry.device, seats: this.seats.size }); return; }
     const old = seat.transport;
     seat.transport = transport; seat.holdEnds = null;
     old?.close('replaced');
@@ -117,7 +125,10 @@ export class RoadRoom implements CrossTarget {
     this.host.removePlayer(seat.body);
     this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });
   }
-  private step(inputs: readonly NetTickInput[]): void { this.host.step(commandsOf(inputs)); }
+  private step(inputs: readonly NetTickInput[]): void {
+    this.host.step(commandsOf(inputs));
+    for (const seat of this.seats.values()) { const player = this.host.players.get(seat.body); if (player !== undefined) seat.fall.step(player, () => undefined); }
+  }
   /** One fixed tick: holds that ran out, the world, then each linked seat's feet. */
   tick(): void {
     const { tick } = this.host.state, now = this.options.now();
@@ -125,7 +136,7 @@ export class RoadRoom implements CrossTarget {
     this.net.tick();
     for (const seat of this.seats.values()) {
       const player = this.host.players.get(seat.body);
-      if (seat.transport === null || player === undefined) continue;
+      if (seat.transport === null || player === undefined || !finite(player.position)) continue;
       const crossed = crossedTo(this.options.assembly, null, player.position);
       const to = crossed?.cell?.instance ?? null;
       if (crossed === undefined || to === null || !this.options.hosts(to)) { seat.asked = null; continue; }

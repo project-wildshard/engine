@@ -24,13 +24,16 @@ import { LEFT } from './socketPump';
 import type {PlaytestHit} from './playtest';
 import { cellFrame, cellName } from './gridCells';
 import {hitHistoryOf} from '@wildshard/engine/combat/rewind';
+import { floorBelow } from '@wildshard/engine/physics/query';
 import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { buildStrips } from '../standalone/roadWorld';
-import { crossedTo, type CrossArrival, type CrossTarget } from './crossing';
+import { crossedTo, finite, type CrossArrival, type CrossTarget } from './crossing';
 
 /** A fresh seat's step aside from the spawn, in metres, in turn. */
 const SPAWN_ASIDE: readonly number[] = [0, 1, -1, 0.5, -0.5];
+/** GC15: how far above a crossing's arrival its ground is looked for (a bank, not a roof), and how far above that ground it stands. */
+const ARRIVAL_LIFT = 8, ARRIVAL_SKIN = 0.05;
 /** How often a seat's clean checkpoints are looked for, in ticks. */
 const CHECK_TICKS = 30;
 /** E7.4: a change waits this long for more of its kind, and a seated player writes this often whatever happens. */
@@ -173,6 +176,8 @@ export class DedicatedRoom implements CrossTarget {
   /** The lead's body leaves the world, and its seat stays for the systems bound to it. `removePlayer` refuses it. */
   /** Seats taken since this world began. */
   private joined = 0;
+  /** GC15: bodies a crossing set down that haven't had a tick yet. A world that slept has no scene queries until it steps. */
+  private readonly arriving = new Set<string>();
   private parkLead(): void { const { lead } = this; lead.motor.setEnabled(false); this.host.parked.add(lead.id); }
   private unparkLead(): void { const { lead } = this; this.host.parked.delete(lead.id); lead.motor.setEnabled(true); }
 
@@ -254,6 +259,7 @@ export class DedicatedRoom implements CrossTarget {
     if (typeof arrived === 'string') return arrived;
     if (recovered) this.options.post({ kind: 'recovered', device, seq: entry.seq });
     const seat = arrived;
+    this.arriving.add(seat.body);
     return { body: seat.body, land: client => {
       this.settle(seat);
       // A link that dropped on the way is a link that dropped here: the seat holds, as any closed link's does.
@@ -348,10 +354,21 @@ export class DedicatedRoom implements CrossTarget {
     this.shop.step(accepted);
     netWorldInput(routes, accepted); netBuys(routes, accepted);
     cell.step(accepted);
+    this.standArrivals();
     // The page used to catch a fall, on its own body. The server's world has nothing below it, so it would fall for ever.
     for (const seat of this.seats.values()) {
       const player = host.players.get(seat.body);
       if (player !== undefined) seat.fall.step(player, () => { host.combat.fall(player.health, player.position, { kind: 'out-of-world', label: '' }); });
+    }
+  }
+  /** The road can run lower than a cell's edge: a crossing's body set down inside the bank would fall out of the world. It stands on the top. */
+  private standArrivals(): void {
+    for (const body of this.arriving) {
+      this.arriving.delete(body);
+      const player = this.host.players.get(body);
+      if (player === undefined || !finite(player.position)) continue;
+      const { x, y, z } = player.position, top = floorBelow(this.host.physics, x, z, y + ARRIVAL_LIFT, ARRIVAL_LIFT * 2);
+      if (top !== undefined && top > y + ARRIVAL_SKIN) player.resetPose({ x, y: top + ARRIVAL_SKIN, z }, player.yaw);
     }
   }
   private filings(): readonly LedgerFiling[] {
@@ -376,7 +393,7 @@ export class DedicatedRoom implements CrossTarget {
     const here = road.assembly.cell(this.name), { tick } = this.host.state;
     for (const seat of this.seats.values()) {
       const player = this.host.players.get(seat.body);
-      if (seat.transport === null || player === undefined) continue;
+      if (seat.transport === null || player === undefined || !finite(player.position)) continue;
       const crossed = crossedTo(road.assembly, here, player.position);
       if (crossed === undefined || crossed.cell !== null) { delete seat.asked; continue; }
       if (seat.asked === road.name && tick - (seat.askedAt ?? 0) < CHECK_TICKS) continue;

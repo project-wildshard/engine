@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { CHUNK_HALF } from '../src/shared/engine/core/config';
+import { floorBelow } from '../src/shared/engine/physics/query';
 import type { NetTravel } from '../src/shared/engine/net/messages';
 import { cellFrame, roadName } from '../src/server/host/dedicated/gridCells';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
@@ -47,17 +48,29 @@ test('feet past Driftwood\'s edge cross onto the road, and feet inside Far Reach
   await vi.waitFor(() => { const now = road.bodyOf('device:a')?.position; expect(Math.hypot((now?.x ?? from.x) - from.x, (now?.z ?? from.z) - from.z)).toBeGreaterThan(1); }, { timeout: 10_000 });
   a.thumb = (): ReturnType<RoomBot['thumb']> => ({ ...forward(), steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 } });
   // Into Far Reach, 10 m past its north edge: the road hands the seat in, standing in Far Reach's own frame.
-  // From above its ground: a body set down under a cell's terrain falls out of the world and respawns.
-  onRoad?.resetPose({ x: 0, y: 80, z: -PITCH + CHUNK_HALF - 10 }, 0);
+  // Far Reach is sky islands: the first ground in from its north edge. From 3 m under it, as a road lower than a cell's edge bank
+  // would arrive, the body must stand on the top, not fall out of the world and respawn.
+  // A world that never stepped has no scene queries yet: B stands in Far Reach, so it has.
+  saves.write({ player: 'device:b', name: 'B', shard: SOUTH, cell: SOUTH, build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  const b = bot(bench.url, 'bench', 'device:b', 'B');
+  expect(await b.arrived()).toBe(true);
+  await vi.waitFor(() => { expect(south.holds('device:b')).toBe(true); });
+  const spot = Array.from({ length: 24 }, (_, row) => CHUNK_HALF - 10 - row * 10).flatMap(z => [0, 40, -40, 80, -80].map(x => ({ x, z, ground: floorBelow(south.host.physics, x, z, 400, 800) }))).find(row => row.ground !== undefined);
+  if (spot?.ground === undefined) throw new Error('Far Reach has ground near its north edge');
+  const { ground } = spot;
+  onRoad?.resetPose({ x: spot.x, y: ground - 3, z: -PITCH + spot.z }, 0);
   await vi.waitFor(() => { expect(a.client.latest?.cell).toBe(cellFrame(SOUTH)); }, { timeout: 10_000 });
   expect(road.holds('device:a')).toBe(false);
   expect(south.holds('device:a')).toBe(true);
-  expect(Math.abs((south.bodyOf('device:a')?.position.z ?? 0) - (CHUNK_HALF - 10)), 'local to Far Reach').toBeLessThan(3);
+  expect(Math.abs((south.bodyOf('device:a')?.position.z ?? 0) - spot.z), 'local to Far Reach').toBeLessThan(3);
+  await new Promise(resolve => { setTimeout(resolve, 500); });
+  expect(Math.abs((south.bodyOf('device:a')?.position.z ?? 0) - spot.z), 'it stands there, not respawned after a fall').toBeLessThan(3);
+  expect(south.bodyOf('device:a')?.position.y ?? -Infinity).toBeGreaterThan(ground - 1);
   expect(a.closed).toBeNull();
   expect(travels.map(({ from: left, to }) => [left, to])).toEqual([[cellFrame(HOME), 0], [0, cellFrame(SOUTH)]]);
   expect(bench.lines.filter(line => line['at'] === 'cell.crossed').map(line => [line['from'], line['to'], line['moved']])).toEqual([[HOME, ROAD, true], [ROAD, SOUTH, true]]);
   await vi.waitFor(async () => { expect(await saves.where('device:a')).toBe(SOUTH); });
-  expect(bench.world.health()).toMatchObject({ players: 1 });
+  expect(bench.world.health()).toMatchObject({ players: 2 });
   expect(bench.crashes).toEqual([]);
 });
 

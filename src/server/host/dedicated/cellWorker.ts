@@ -20,7 +20,12 @@ const { slugs, build, origin, cache, holdMs,playtest, crossing } = workerData as
 if (port === null) throw new Error('A cell runs in a worker');
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
 const rapier = await loadRapier(await readFile(new URL('rapier.wasm', import.meta.url)));
-runCells(port as unknown as CellPort, { slugs, build, bootId: () => randomBytes(4).toString('hex'), memory: () => process.memoryUsage(), closed: () => { process.exit(0); }, ...(holdMs === undefined ? {} : { holdMs }),...(playtest===undefined?{}:{playtest}),...(crossing === true ? { road: () => readPackGrid(build, { origin, cache }, reads) } : {}),
+runCells(port as unknown as CellPort, { slugs, build, bootId: () => randomBytes(4).toString('hex'), memory: () => process.memoryUsage(), closed: () => { process.exit(0); }, ...(holdMs === undefined ? {} : { holdMs }),...(playtest===undefined?{}:{playtest}),...(crossing === true ? { road: async () => {
+    // A build whose server book has no grid pack gives a road with no strips: this line says so before anyone falls through it.
+    const strips = await readPackGrid(build, { origin, cache }, reads);
+    console.info(JSON.stringify({ at: 'road.pack', strips: strips.length, ...reads }));
+    return strips;
+  } } : {}),
   load: async slug => {
     const input = await readPackProduct(slug, build, rapier, { origin, cache }, reads);
     console.info(JSON.stringify({ at: 'cell.pack', slug, ...reads }));
