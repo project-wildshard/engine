@@ -123,6 +123,13 @@ export class WirePage {
   }
   /** Past this world's first frame. Until then a flag that rises only says where a save stood. */
   get settled(): boolean { const cell = this.client?.latest?.cell; return cell !== undefined && this.seeded === cell; }
+  private readonly settles = new Set<() => void>();
+  /** Run `then` once, at this world's first frame, after its flags are mirrored: now, if that frame is in. Returns its cancel. */
+  whenSettled(then: () => void): () => void {
+    if (this.settled) { then(); return () => undefined; }
+    this.settles.add(then);
+    return () => { this.settles.delete(then); };
+  }
   /** This page's books follow the server's: its quests read where a save stood only from the world's first frame (`settled`). */
   following = false;
   /** Every flag book this page makes from now on follows the server's. */
@@ -241,6 +248,7 @@ export class WirePage {
     if (this.seeded !== client.latest.cell) {
       this.seeded = client.latest.cell;
       for (const feed of this.feeds.values()) feed.settle();
+      for (const then of this.settles) { this.settles.delete(then); then(); }
       for (const word of this.skyWords.values()) this.say(word);
       this.skyWords.delete('force');
       return;

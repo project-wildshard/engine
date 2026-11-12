@@ -61,14 +61,23 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     if (probing !== null && host.state.tick % 2 === 0) { post({ kind: 'probed', id: probing, tick: host.state.tick, tickMs, rows: probeRows(host) }); probing = null; }
   };
 
-  // TE-ENG8: progress is saved as it moves (a flag, a public field, a grant), so a reload a second later keeps it. The save
-  // starts outside the tick, as the page's own `save` does.
-  const changed = new ProgressSaves(() => new Promise<void>(resolve => {
-    scope.timeout(0, () => { void (grid === undefined ? Promise.resolve() : grid.save().then(() => undefined, fail)).finally(resolve); });
-  }));
+  // One save at a time, whoever asks (the page, or progress): a capture, its writes, the page's answer and the slot that
+  // answer makes good go together, so two saves never race for the alternating slots.
+  let queue: Promise<unknown> = Promise.resolve();
+  const saveWorld = (): Promise<{ readonly tick: number; readonly durable: boolean }> => {
+    const run = queue.then(() => grid === undefined ? { tick: 0, durable: false } : grid.save());
+    queue = run.catch(() => undefined);
+    return run;
+  };
+  // TE-ENG8: progress is saved as it moves (a flag, a public field, a grant, a crossing), so a reload a moment later keeps
+  // it. The save starts outside the tick, as the page's own `save` does.
+  const changed = new ProgressSaves(async () => {
+    await new Promise<void>(resolve => { scope.timeout(0, resolve); });
+    try { return (await saveWorld()).durable; } catch (error) { fail(error); return false; }
+  });
   const progress = (server: StandaloneGrid): void => {
     const now = diagnosticNow();
-    if (watch.look(server.host, book.filed)) changed.moved(now);
+    changed.moved(now, watch.look(server.host, book.filed));
     changed.poll(now);
   };
 
@@ -86,6 +95,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     const { restored } = server;
     if (restored?.ledger !== undefined) book.restore(restored.ledger);
     server.connect(new WorkerLoopback(game));
+    watch.look(server.host, book.filed); // where the world stands before its first tick: what that tick moves is progress
     if (options.harness !== undefined) options.harness.onmessage = (event: MessageEvent<unknown>): void => { const [port] = event.ports; if (isHarnessJoin(event.data) && port !== undefined) server.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) server.raise(event.data.flag); else if (isHarnessMove(event.data)) server.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) server.place(event.data); else if (isHarnessHits(event.data)) server.hardHits(event.data.hits); else if (isHarnessGod(event.data)) server.bossGod(); };
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; },
       step: () => { try { server.tick(); progress(server); } catch (error) { fail(error); } } });
@@ -96,7 +106,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
 
   const save = async (id: number): Promise<void> => {
     if (grid === undefined) { refused++; post({ kind: 'saved', id, tick: 0, ok: false }); return; } // nothing is saved, and the asker hears so
-    const { tick, durable } = await grid.save(); // J-ledger rule: a save counts only once the real storage has it (§6.3.3)
+    const { tick, durable } = await saveWorld(); // J-ledger rule: a save counts only once the real storage has it (§6.3.3)
     post({ kind: 'saved', id, tick, ok: durable });
   };
 
