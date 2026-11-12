@@ -54,7 +54,7 @@ import { neighbourEdges } from '../../../shared/game/grid/readinessEdges';
 import { DEVSERVER, gridMode } from './menu';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
-import { stepRingsUntil } from './loadingRings';
+import { bootSteppedTiles } from './loadingRings';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { PageResidency } from './pageResidency';
 import { PlatformRenderResidency } from './renderResidency';
@@ -1039,17 +1039,20 @@ export class GridSession {
   attach(page: LiveGridPage): LiveGridSession {
     if (this.live !== null) throw new Error('The grid session already has its live crossing');
     if (this.host.residency === undefined) throw new Error('Grid session requires the early page residency owner');
+    // GO7: a home entered before the page loop (Template's data cell, Signal Dunes' client page) waits on its ring tiles
+    // in loading step `home`, and only the loop's late frame steps them: every entry through this steps them until it runs
+    const tiles = bootSteppedTiles(this.clientTiles, { frames: () => this.lateFrames,
+      step: () => { if (!this.host.scope.disposed) { const at = this.world(); this.rings.step({ x: at.x, z: at.z, vx: 0, vz: 0 }); } },
+      // a left page never wakes the wait: its entry's release settles it
+      wait: () => new Promise<void>(resolve => { if (!this.host.scope.disposed) this.host.scope.timeout(16, resolve); }) });
     this.live = new LiveGridSession({ assembly: this.assembly, home: this.home, physics: this.host.physics, scope: this.host.scope, walls: this.walls, strips: this.strips, initialStripBytes: this.initialStripBytes,
       prepareStrips: cell => Math.max(Math.abs(cell.cell[0] - this.home.cell[0]), Math.abs(cell.cell[1] - this.home.cell[1])) <= 1 ? Promise.resolve() : this.prepareOuterStrips(), allocator: this.allocator,
-      residency: this.host.residency.home(), tiles: this.clientTiles, lightingSettled: () => { this.prelinkViews(); }, backgroundReady: () => this.host.backgroundReady?.() !== false,
+      residency: this.host.residency.home(), tiles, lightingSettled: () => { this.prelinkViews(); }, backgroundReady: () => this.host.backgroundReady?.() !== false,
       ...(this.admitNeighbour === undefined ? {} : { prepareDataTiles: async (cell: GridCell, scope: Scope, start: { readonly x: number; readonly z: number }) => {
         await this.admitNeighbour?.(cell, true);
         // GO7: an initial data home (template-2 from Shard select) waits on these tiles in loading step `home`, before the
-        // page loop steps the rings: step them here until it does
-        await stepRingsUntil(this.clientTiles.enterOffered(cell.instance, scope, start), { frames: () => this.lateFrames,
-          step: () => { if (!this.host.scope.disposed) { const at = this.world(); this.rings.step({ x: at.x, z: at.z, vx: 0, vz: 0 }); } },
-          // a left page never wakes the wait: its entry's release settles it
-          wait: () => new Promise<void>(resolve => { if (!this.host.scope.disposed) this.host.scope.timeout(16, resolve); }) });
+        // page loop steps the rings: the boot registration steps them until it does
+        await tiles.enterOffered(cell.instance, scope, start);
       }, prepareNeighbourTiles: async (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal) => {
         const owner = this.host.scope.child(`grid.tile-approach.${cell.instance}`);
         const release = (): void => { owner.dispose(); };

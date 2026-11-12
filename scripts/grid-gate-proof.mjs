@@ -3,8 +3,10 @@
 // MS5.1's Caddy do (every plain HTTP request a 404 with no CORS; only the socket upgrade passes). The server runs WORLD_CELLS=grid
 // over Driftwood and the template, and the page must still learn the world hosts the grid: Shard select opens the deck, the Template
 // shard card enters the grid at the template's cell (GO7), the page boots past the loading card's `server` step on the world and the
-// player walks; then a second phone does the same from the Driftwood card and is seated in Driftwood.
-//   scripts/browser-lane.sh node scripts/grid-gate-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json>
+// player walks; then a second phone does the same from the Driftwood card and is seated in Driftwood, and a third from the Signal Dunes
+// card (a client-page home, the deck's stall at loading step `home`). `--legs=` picks others: sky (Sky Reach) is a spot check. The
+// Open Plots have no deck card, so none of them is ever a page's first home from Shard select.
+//   scripts/browser-lane.sh node scripts/grid-gate-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--legs=template,driftwood,dunes]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { connect } from 'node:net';
@@ -16,6 +18,13 @@ import { openRig, WORLD_PORT } from './online-rig.mjs';
 
 const [dist = '', relativeWork = ''] = process.argv.slice(2), work = relativeWork === '' ? '' : absolute(relativeWork), keyFile = process.argv[4] ?? '';
 if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-gate-proof.mjs <dist> <work> <key.json>');
+/** Each leg: the deck's card, and the grid slug it seats you in. Driftwood is the rig's home cell. */
+const LEGS = /** @type {Record<string, { card: string, slug: string }>} */ ({
+  template: { card: 'Template shard', slug: '_template' }, driftwood: { card: 'Driftwood Isle', slug: 'driftwood-isle' },
+  dunes: { card: 'Signal Dunes', slug: 'sunscar-dunes' }, sky: { card: 'Sky Reach', slug: 'far-reach' },
+});
+const legs = (process.argv.find(arg => arg.startsWith('--legs='))?.slice(7) ?? 'template,driftwood,dunes').split(',');
+for (const name of legs) if (LEGS[name] === undefined) throw new Error(`No leg ${name}: ${Object.keys(LEGS).join(', ')}`);
 const DOOR_PORT = 18795, shots = join(work, 'shots');
 mkdirSync(shots, { recursive: true });
 /** @type {{ step: string, ok: boolean, detail?: unknown }[]} */
@@ -35,7 +44,7 @@ door.on('upgrade', (request, socket, head) => {
 });
 await new Promise(resolve => { door.listen(DOOR_PORT, '127.0.0.1', () => { resolve(null); }); });
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: 'driftwood-isle', more: ['_template'], cells: 'grid', socket: `ws://127.0.0.1:${String(DOOR_PORT)}/` });
+const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: 'driftwood-isle', more: legs.map(name => LEGS[name]?.slug ?? '').filter(slug => slug !== 'driftwood-isle'), cells: 'grid', socket: `ws://127.0.0.1:${String(DOOR_PORT)}/` });
 let code = 1, browser = /** @type {import('playwright').Browser | null} */ (null);
 try {
   browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
@@ -51,7 +60,13 @@ try {
    *  @param {import('playwright').Browser} launched @param {string} card @param {string} cell @param {string} name */
   const leg = async (launched, card, cell, name) => {
     const context = await launched.newContext(phone), page = await context.newPage(), errors = /** @type {string[]} */ ([]), stepsSeen = new Set();
+    // a leg that stops still closes its phone (Codex): a failed page left open skews the legs after it
+    try {
     page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
+    // the page's own console, for the leg that stops: what it waited on
+    const lines = /** @type {string[]} */ ([]);
+    page.on('console', line => { if (line.type() === 'warning' || line.type() === 'error') lines.push(`${line.type()} ${line.text().slice(0, 400)}`); });
+    context.on('close', () => { writeFileSync(join(work, `${name}-console.log`), `${lines.join('\n')}\n`); });
     // MG5: a phone's first PLAY skips the deck by design; a returning device opens it.
     await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
     // The template card is Developer's (its placement is hidden in the public catalogue), as in online-rig's pages.
@@ -63,7 +78,8 @@ try {
     note(`${name}: Shard select opens the deck`, true);
     // By the card's own name: "Blender Template" (off the grid) also says template.
     const index = await page.evaluate(wanted => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes(wanted)), card);
-    note(`${name}: the deck holds the ${card} card`, index >= 0, { index });
+    const cards = index >= 0 ? undefined : await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].map(row => (row.textContent ?? '').slice(0, 40)));
+    note(`${name}: the deck holds the ${card} card`, index >= 0, { index, ...cards === undefined ? {} : { cards } });
     if (index < 0) throw new Error(`No ${card} card`);
     // The deck's dot selects a card (a tap on an off-centre card lands on the captured track, as a swipe's end).
     await page.locator('.ws-menu-dots i').nth(index).click();
@@ -91,14 +107,16 @@ try {
     note(`${name}: the player walks`, walked > 1, { before, after, walked });
     await page.screenshot({ path: join(shots, `${name}-online.png`) });
     note(`${name}: no page errors`, errors.length === 0, errors);
-    await context.close();
+    } finally { await context.close().catch(() => undefined); }
   };
   // The template cell runs `_template` (MS7: WORLD_CELLS=grid opens it), and Driftwood is the home cell.
   /** @type {{ grid: { cells: { instance: string, slug: string }[] } }} */
   const catalogue = JSON.parse(readFileSync(join(dist, 'catalogue.json'), 'utf8'));
-  const templateCell = catalogue.grid.cells.find(row => row.slug === '_template')?.instance ?? '?';
-  await leg(browser, 'Template shard', templateCell, 'template');
-  await leg(browser, 'Driftwood Isle', 'driftwood-isle', 'driftwood');
+  for (const name of legs) {
+    const { card, slug } = LEGS[name] ?? { card: '', slug: '' };
+    // one leg's stop is its own FAIL; the next leg still runs
+    await leg(browser, card, catalogue.grid.cells.find(row => row.slug === slug)?.instance ?? '?', name).catch((/** @type {unknown} */ error) => { note(`${name}: the leg ran`, false, String(error)); });
+  }
   code = steps.every(step => step.ok) ? 0 : 1;
 } finally {
   writeFileSync(join(work, 'grid-gate-proof.json'), `${JSON.stringify({ steps, code }, null, 2)}\n`);

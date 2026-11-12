@@ -1,3 +1,5 @@
+import type { ClientTileRegistration } from '../shardfile/tileContent';
+
 /** The ports `stepRingsUntil` needs: the page loop's late-frame count, one ring step, and one turn's wait. */
 export interface LoadingRingPorts {
   /** Late frames the page loop has run (each steps the rings itself); any at all ends the stepping here. */
@@ -24,4 +26,24 @@ export async function stepRingsUntil<T>(entry: Promise<T>, ports: LoadingRingPor
     ports.step();
   }
   return result;
+}
+
+/** GO7, Signal Dunes: a client-page home (sunscar-dunes, entered from the deck) enters its tiles from its regional presentation,
+ *  through the registration's `enter` (regionalWorld.ts), and the home waits on that render readiness in loading step `home` just
+ *  as a data home waits on `enterOffered`. The page hands its regions this registration: every entry steps the rings until the
+ *  page loop runs, and in play (the loop running) it adds nothing. Entries waiting together share one pump (Codex: one each
+ *  stepped the one streamer twice a turn, two upload budgets before the first frame). */
+export function bootSteppedTiles(registration: ClientTileRegistration, ports: LoadingRingPorts): ClientTileRegistration {
+  let waiting = 0, drained: (() => void) | undefined;
+  const stepped = <T>(entry: Promise<T>): Promise<T> => {
+    if (ports.frames() !== 0) return entry;
+    // the first waiting entry starts the pump; it runs until every entry waiting on it has settled
+    if (waiting++ === 0) void stepRingsUntil(new Promise<void>(resolve => { drained = resolve; }), ports);
+    const settle = (): void => { if (--waiting === 0) drained?.(); };
+    void entry.then(settle, settle);
+    return entry;
+  };
+  return { ...registration,
+    enter: (instance, entry, scope, start) => stepped(registration.enter(instance, entry, scope, start)),
+    enterOffered: (instance, scope, start) => stepped(registration.enterOffered(instance, scope, start)) };
 }

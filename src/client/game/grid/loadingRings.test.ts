@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { stepRingsUntil } from './loadingRings';
+import { bootSteppedTiles, stepRingsUntil } from './loadingRings';
 
 // GO7: Shard select's Template card boots a grid page whose initial home is a data cell (template-2). Its entry pins its
 // spawn tiles on the page's ring streamer and waits for them in the loading step `home`, before the page loop runs, and the
@@ -47,4 +47,47 @@ test('a refused entry keeps its error, and the stepping stops', async () => {
   await expect(stepRingsUntil(entry, { frames: () => 0, step: () => { steps++; }, wait: later })).rejects.toBe(refused);
   const after = steps; await later(); await later();
   expect(steps).toBe(after);
+});
+
+// GO7, Signal Dunes: a client-page home (sunscar-dunes) enters its tiles from its regional presentation, through the page's
+// registration's `enter` (regionalWorld.ts), not `enterOffered`: the same wait in `home`, and nothing stepped it either.
+test('every entry through the page registration steps the rings until the loop runs: enter as well as enterOffered', async () => {
+  let steps = 0, frames = 0;
+  /** the streamer's waiting entries: each publishes on its third step */
+  const waiting = new Set<{ at: number; publish: () => void }>();
+  const step = (): void => { steps++; for (const entry of waiting) if (steps >= entry.at) { waiting.delete(entry); entry.publish(); } };
+  const published = (): Promise<void> => new Promise(resolve => { waiting.add({ at: steps + 3, publish: resolve }); });
+  const registration = { owns: () => false, dispose: () => undefined, offer: () => undefined,
+    enter: () => published().then(() => ({ fine: new Set<string>(), refresh: () => Promise.resolve() })), enterOffered: published };
+  const stepped = bootSteppedTiles(registration, { frames: () => frames, step, wait: later });
+  const scope = {} as Parameters<typeof stepped.enter>[2];
+  await expect(stepped.enter('sunscar-dunes', {} as Parameters<typeof stepped.enter>[1], scope, { x: 0, z: 0 })).resolves.toMatchObject({ fine: new Set() });
+  expect(steps).toBe(3);
+  await stepped.enterOffered('template-2', scope, { x: 0, z: 0 });
+  expect(steps).toBe(6);
+  // in play the loop steps them: an entry through the registration adds none
+  frames = 1;
+  const inPlay = stepped.enterOffered('far-reach', scope, { x: 0, z: 0 });
+  await later(); await later();
+  expect(steps).toBe(6);
+  step(); step(); step(); await inPlay;
+});
+
+test('entries waiting together share one pump: one ring step a turn, however many wait', async () => {
+  let steps = 0, turns = 0;
+  const waiting = new Set<{ at: number; publish: () => void }>();
+  const step = (): void => { steps++; for (const entry of waiting) if (steps >= entry.at) { waiting.delete(entry); entry.publish(); } };
+  const published = (after: number): Promise<void> => new Promise(resolve => { waiting.add({ at: steps + after, publish: resolve }); });
+  const registration = { owns: () => false, dispose: () => undefined, offer: () => undefined,
+    enter: () => published(5).then(() => ({ fine: new Set<string>(), refresh: () => Promise.resolve() })), enterOffered: () => published(3) };
+  const stepped = bootSteppedTiles(registration, { frames: () => 0, step, wait: async () => { turns++; await later(); } });
+  const scope = {} as Parameters<typeof stepped.enter>[2], start = { x: 0, z: 0 };
+  await Promise.all([stepped.enter('sunscar-dunes', {} as Parameters<typeof stepped.enter>[1], scope, start), stepped.enterOffered('template-2', scope, start)]);
+  expect(steps).toBe(5);
+  expect(steps).toBeLessThanOrEqual(turns);
+  // drained, the pump stops; a later entry starts its own
+  await later(); await later();
+  expect(steps).toBe(5);
+  await stepped.enterOffered('far-reach', scope, start);
+  expect(steps).toBe(8);
 });
