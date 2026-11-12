@@ -14,24 +14,38 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const Bundle = v.strictObject({ code: v.string(), modules: v.array(v.string()) });
 const Saved = v.strictObject({ key: v.string(), bundle: Bundle, seal: v.string() });
 const SKIPPED = new Set(['node_modules', '.git', '.worktrees', 'tmp', '.cache']);
+const SOURCE = /\.(?:[cm]?[jt]sx?|json|glsl|wgsl)$/u;
 /** @param {string} directory @returns {string[]} */
 const entries = directory => { try { return readdirSync(directory); } catch { return []; } };
 /** @param {string} directory @param {string} file */
 const fileDigest = (directory, file) => {
-  try { return digest(readFileSync(resolve(directory, file)).toString('base64')); } catch { return 'missing'; }
+  try { return digest(readFileSync(resolve(directory, file))); } catch { return 'missing'; }
 };
-/** A git checkout is HEAD plus the bytes of every changed or untracked file.
+/** @param {string} directory @param {string} file */
+const statDigest = (directory, file) => {
+  const stats = statSync(resolve(directory, file), { throwIfNoEntry: false });
+  return stats === undefined ? 'missing' : `${stats.size}:${stats.mtimeMs}`;
+};
+// A shard's own git hook may run the CLI with GIT_DIR or GIT_INDEX_FILE set; never let them aim at the linked checkout.
+const gitEnvironment = () => Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')));
+/** @param {string} directory @param {string[]} args */
+const gitText = (directory, args) => execFileSync('git', ['-C', directory, ...args], { encoding: 'utf8', env: gitEnvironment(), maxBuffer: 64 << 20 });
+/** A git checkout is HEAD, the bytes of changed tracked files, and the size and
+ * mtime of untracked and individually ignored source files (generated code).
  * @param {string} directory @returns {string|undefined} */
 function gitDigest(directory) {
-  let head, status;
+  let head, status, ignored;
   try {
-    const top = execFileSync('git', ['-C', directory, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
-    if (realpathSync(top) !== directory) return undefined;
-    head = execFileSync('git', ['-C', directory, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-    status = execFileSync('git', ['-C', directory, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--no-renames'], { encoding: 'utf8', maxBuffer: 64 << 20 });
+    if (realpathSync(gitText(directory, ['rev-parse', '--show-toplevel']).trim()) !== directory) return undefined;
+    head = gitText(directory, ['rev-parse', 'HEAD']).trim();
+    status = gitText(directory, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--no-renames']);
+    ignored = gitText(directory, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory']);
   } catch { return undefined; }
-  const changed = status.split('\0').filter(line => line.length > 3).map(line => `${line}\0${fileDigest(directory, line.slice(3))}`);
-  return digest(JSON.stringify([head, changed.sort()]));
+  const kept = (/** @type {string} */ file) => !file.endsWith('/') && !file.split('/').some(part => SKIPPED.has(part));
+  const changed = status.split('\0').filter(line => line.length > 3 && kept(line.slice(3)))
+    .map(line => `${line}\0${line.startsWith('??') ? statDigest(directory, line.slice(3)) : fileDigest(directory, line.slice(3))}`);
+  const generated = ignored.split('\0').filter(file => kept(file) && SOURCE.test(file)).map(file => `!! ${file}\0${statDigest(directory, file)}`);
+  return digest(JSON.stringify([head, [...changed, ...generated].sort()]));
 }
 /** Anything else is every file's path, size and modification time.
  * @param {string} directory @returns {string} */
@@ -63,9 +77,9 @@ export function linkedSources(root) {
     for (const name of names.filter(entry => !entry.startsWith('.')).sort()) {
       let real;
       try { real = realpathSync(resolve(modules, name)); } catch { continue; }
-      if (!statSync(real).isDirectory() || real.split(sep).includes('node_modules') || found.has(real)) continue;
-      if (real === own || real.startsWith(own + sep)) continue;
-      found.set(real, '');
+      if (!statSync(real).isDirectory() || real.split(sep).includes('node_modules')) continue;
+      // Root's own receipts and an already-keyed checkout (a workspace package inside it) need no second walk.
+      if ([own, ...found.keys()].some(known => real === known || real.startsWith(known + sep))) continue;
       found.set(real, gitDigest(real) ?? treeDigest(real));
       visit(real);
     }
@@ -85,7 +99,8 @@ export async function authorBundleCached(root, recipe, compile, cacheRoot = shar
     .sort(([left], [right]) => left.localeCompare(right)));
   // Receipts skip node_modules, so the installed format's real path (it names the commit) stands for its bytes.
   const format = resolve(root, 'node_modules/@wildshard/format');
-  const args = ['author-bundle/5', root, JSON.stringify(environment), existsSync(format) ? realpathSync(format) : '', JSON.stringify(linkedSources(root)), ...recipe];
+  const linked = JSON.stringify(linkedSources(root));
+  const args = ['author-bundle/5', root, JSON.stringify(environment), existsSync(format) ? realpathSync(format) : '', linked, ...recipe];
   const namespace = digest(JSON.stringify(args)), directory = resolve(cacheRoot, '.author-bundles', namespace);
   /** @param {string} key */
   const used = key => {
@@ -111,7 +126,7 @@ export async function authorBundleCached(root, recipe, compile, cacheRoot = shar
     await captureProductInputs(root, receipt, async () => { bundle = v.parse(Bundle, await compile()); });
     if (bundle === undefined) throw new Error('Author compiler produced no bundle');
     const captured = productInputKey(root, receipt, args, new InputHashMemo(root));
-    if (captured === undefined) throw new Error('Author compiler inputs changed');
+    if (captured === undefined || JSON.stringify(linkedSources(root)) !== linked) throw new Error('Author compiler inputs changed');
     writeFileSync(temporary, JSON.stringify({ key: captured, bundle, seal: digest(JSON.stringify(bundle)) }));
     renameSync(temporary, resolve(directory, `${captured}.json`));
     publishProductInputs(receipts, receipt, captured);

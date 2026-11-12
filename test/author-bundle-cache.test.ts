@@ -101,3 +101,19 @@ test.each([['a git checkout',true],['a plain directory',false]])('an edit in a l
   expect((await f.run()).reused).toBe(false);expect(f.calls()).toBe(2);
   expect((await f.run()).reused).toBe(true);
 });
+
+test('a linked git checkout keys on new untracked files and HEAD moves too',async()=>{
+  const f=linkedFixture(true),linked=resolve(f.file,'../..');
+  await f.run();
+  writeFileSync(resolve(linked,'src/added.ts'),'export const added=1;');
+  expect((await f.run()).reused).toBe(false);
+  execFileSync('git',['-C',linked,'add','-A'],{stdio:'ignore'});
+  execFileSync('git',['-C',linked,'-c','user.name=t','-c','user.email=t@t','commit','-qm','next','--no-verify'],{stdio:'ignore'});
+  expect((await f.run()).reused).toBe(false);
+  expect((await f.run()).reused).toBe(true);
+});
+
+test('a linked edit during compilation publishes no bundle',async()=>{
+  const f=linkedFixture(false);
+  await expect(authorBundleCached(f.root,['racing'],async()=>{const bundle=await f.compile();writeFileSync(f.file,'export const sdk=333;');return bundle;},f.cache)).rejects.toThrow('Author compiler inputs changed');
+});
