@@ -35,7 +35,7 @@ const nearest = (page, to) => page.evaluate(spot => {
   return body === undefined ? null : { x: body.position.x, z: body.position.z, away: Math.hypot(body.position.x - player.position.x, body.position.z - player.position.z), kind: body.kind, hp: body.hp, maxHp: body.maxHp, lastHitT: body.lastHitT, now: performance.now() };
 }, to);
 /** Jake's shown bars: their label and fill. @param {import('playwright').Page} page */
-const bars = page => page.evaluate(() => [...document.querySelectorAll('.ws-combat-hp.show')].map(el => ({ kind: el.querySelector('.ws-combat-hp-kind')?.textContent ?? '', fill: /** @type {HTMLElement | null} */ (el.querySelector('.ws-combat-hp-fill'))?.style.transform ?? '' })));
+const bars = page => page.evaluate(() => [...document.querySelectorAll('.ws-combat-hp.show')].map(el => ({ kind: el.querySelector('.ws-combat-hp-kind')?.textContent ?? '', fill: ((fill) => (fill instanceof HTMLElement ? fill.style.transform : ''))(el.querySelector('.ws-combat-hp-fill')) })));
 /** Look near a spot, OFF it by `side` radians, so it is on screen but not under the crosshair. @param {import('playwright').Page} page @param {{ x: number, z: number }} at @param {number} side */
 const lookNear = (page, at, side) => page.evaluate(([x, z, off]) => { const { player } = /** @type {any} */ (window).__wildshard.world; player.yaw = Math.atan2(-(x - player.position.x), -(z - player.position.z)) + off; player.pitch = -0.12; player.touchMove.y = 0; }, [at.x, at.z, side]);
 /** @param {import('playwright').Page} page */
@@ -78,7 +78,7 @@ try {
   for (let tries = 0; tries < 20 && after.length === 0; tries++) { await jake.page.waitForTimeout(150); after = await bars(jake.page); struck = await nearest(jake.page, target); }
   note('Jake\'s page saw the blow on that creature', struck !== null && struck.hp < struck.maxHp && struck.now - struck.lastHitT < 4000, struck);
   // Combat.ts writes `scaleX(f.toFixed(3))`: below full is any 0.xxx. The bar must carry the struck creature's kind.
-  const drained = after.find(bar => /scaleX\(0\.\d+\)/u.test(bar.fill) && struck !== null && bar.kind.replace(/\s+/gu, '').toLowerCase().includes(struck.kind.toLowerCase()));
+  const drained = after.find(bar => /scaleX\(0\.\d+\)/u.test(bar.fill) && struck !== null && bar.kind.replaceAll(/\s+/gu, '').toLowerCase().includes(struck.kind.toLowerCase()));
   note('Jake sees its health bar, below full, though Jimmy struck it', drained !== undefined, after);
   await jake.page.screenshot({ path: join(shots, '2-jake-sees-jimmys-hit.png') });
   await jimmy.page.screenshot({ path: join(shots, '3-jimmy-swinging.png') });
