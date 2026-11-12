@@ -9,6 +9,13 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.11 (2026-11-11)
+
+- Picking the Template card on Shard select takes you to the Template's spot in the shared world again.
+- Signal Dunes and Sky Reach no longer stop at the "home" loading step when you pick them from Shard select.
+- The game's pages now load from Cloudflare.
+- Boss health bars show the same shield for you and everyone else in the room.
+
 ## v0.1.10 (2026-11-11)
 
 - Game files now come straight from Cloudflare's CDN.
