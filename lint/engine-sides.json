@@ -76,6 +76,7 @@
     "src/client/engine/boot/contentBase.ts": "client",
     "src/client/engine/boot/contentRead.ts": "client",
     "src/client/engine/boot/download.ts": "client",
+    "src/client/engine/boot/dropNotice.ts": "client",
     "src/client/engine/boot/earlyPrograms.ts": "client",
     "src/client/engine/boot/extras.ts": "client",
     "src/client/engine/boot/filePolicy.ts": "client",

@@ -29,6 +29,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { markBootHandledError } from '@wildshard/engine/boot/bootTrace';
 import { setBootCatalog } from '@wildshard/engine/boot/catalog';
 import { setAliveSource, type AliveInfo } from '@wildshard/engine/boot/lastEnd';
+import { PLAYING, markDropStep, noteDropError } from '@wildshard/engine/boot/dropNotice';
 import { consumeTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { reportError } from '@wildshard/engine/core/errorReport';
 import { pageSeed } from '@wildshard/engine/core/rng';
@@ -112,11 +113,13 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
       return { cap: 1, levels: [{ id: selected, running: true, textureMB: memoryMB }] };
     };
     app.levelAdapters.residentMemory = memory;
+    markDropStep({ step: PLAYING });
     setAliveSource((): AliveInfo<PageMode> => ({ slug: selected, resident: `${selected} (playing) ~${Math.round(memory(60_000).levels[0]?.textureMB ?? 0)} MB`, mode }));
   } catch (error) {
     options.residency?.dispose(); // Pre-bootstrap failures have no consumers; runShardLoad disposes allocated ones first.
     if (options.recovery !== undefined) throw error; // the root returns a consumed recovery to the renderer-free title
     markBootHandledError();
+    noteDropError(error);
     if (!session.fatalShown) showError(error instanceof Error ? `${error.name}: ${error.message}` : String(error), error instanceof Error ? error.stack ?? '' : '');
   }
 }

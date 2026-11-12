@@ -19,6 +19,7 @@ import { saveStorage } from '../saves/slots';
 import { ErrorReporter, safeUrl, sendReport } from '../core/errorReport';
 import { countReload, recentReloads } from '../core/reloadGuard';
 import { markReload } from './lastEnd';
+import { recordDrop } from './dropNotice';
 
 
 declare const __BUILD_ID__: string; // vite.config.ts define
@@ -82,7 +83,9 @@ function failed(error: unknown): void {
   detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   report(error);
   if (recentReloads().length === 0 && !retriedThisSession()) {
-    // the common case (a build the host no longer serves): one automatic recovery, no tap and no card (RL4)
+    // the common case (a build the host no longer serves): one automatic recovery, no tap and no card (RL4). The reload
+    // lands on the title: the drop modal there says why (Jake, 11-12: "where's my error modal at?")
+    recordDrop({ reason: 'The game hit an error while starting, so it reloaded to recover.', error });
     void recover();
     return;
   }

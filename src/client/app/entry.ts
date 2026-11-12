@@ -34,6 +34,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { bootRoute, onlineTitleFirst } from './bootRoute';
 import { pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
+import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
 
@@ -56,6 +57,8 @@ const task = (): Promise<void> => new Promise((resolve) => { entryScope.timeout(
 // fetch, which never gets here, reloads by itself; anything after this is guardBoot's)
 document.documentElement.dataset['booted'] = '';
 startPageServices();
+// The drop notice (Jake, 11-12): this page's errors and GPU loss ride the breadcrumb a title after a crash reads.
+installDropNotes();
 // C3: the build's catalogue, inlined in this document: no read before the first paint.
 installInlineCatalogue(document);
 const titleRows = withCatalogueHeads(readTitleRows(document));
@@ -147,6 +150,8 @@ async function enterPage(): Promise<unknown> {
   return (gridRecoveryRefused() || (titleOnly && document.getElementById('ws-shardfile') === null)) ? showPageTitle() : (async () => {
     // DL21 (E526): the static card runs its clock from the tap and names the code wait until Loading adopts it.
     const chunk = search.get('chunk'); if (chunk !== null) startShellClock(entryScope, chunk);
+    // the drop notice's breadcrumb: a world page, from its first step, so a crash or a silent title names where it stood
+    if (chunk !== null) markDropStep({ world: chunk, name: findTitleManifest(chunk)?.name ?? chunk, step: 'Start' });
     const tables = prepareBootImports(bootTask('app:tables-import-and-prepare', () => import('./assetTables').then(module => module.prepareAssetTables())));
     try {
       const [tier, menu, spawn] = await bootTask('app:tier-menu-download-imports', () => Promise.all([import('@wildshard/engine/core/tier'),
@@ -192,8 +197,28 @@ async function showPageTitle(refusal = ''): Promise<void> {
   });
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
+  showDropOnTitle();
   startTitleLowPowerProbe(); // Jake (11-10): the shown title, once idle, reads Low Power Mode for the tab (boot/lowPower.ts)
   void startTitleWarmup(import('@wildshard/engine/boot/earlyPrograms'), entryScope, window);
+}
+
+/**
+ * The drop modal (Jake, 2026-11-12): a title the player did not ask for says why, once. Plain words for everyone, the real error
+ * with Developer on; every drop also goes to Sentry where the page reports there (src/client/engine/boot/dropNotice.ts).
+ */
+function showDropOnTitle(): void {
+  const drop = takeDrop(lastEnd());
+  if (drop === null) return;
+  void (async () => {
+    const [{ showDropModal }, { isDev }, { captureBrowserError }] = await Promise.all([import('./dropModal'), import('@wildshard/engine/core/devMode'),
+      import('@wildshard/engine/telemetry/browserErrors')]);
+    const error = new Error(`${drop.what}: ${drop.reason}`);
+    if (drop.stack !== '') error.stack = drop.stack;
+    captureBrowserError(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: true,
+      diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end } });
+    const abrupt = previousBootLine();
+    showDropModal(drop, entryScope, { dev: isDev(), ...(abrupt === '' ? {} : { extra: [abrupt] }) });
+  })();
 }
 
 export const entered: Promise<unknown> = enterPage();
@@ -229,6 +254,7 @@ export async function start(): Promise<void> {
       return;
     }
     clearGridRecovery();
+    recordDrop({ reason: 'The world could not be restored after the last session ended, so the game went back to the title.', error });
     history.replaceState(history.state, '', new URL('/', location.origin));
     document.documentElement.classList.add('title-first');
     await showPageTitle();

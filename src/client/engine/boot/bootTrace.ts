@@ -3,6 +3,7 @@ import { saveStorage } from '../saves/slots';
 /** A small durable breadcrumb for an enabled level boot. A terminated WebContent process cannot run a final handler. */
 import { deliverBrowserError } from '../telemetry/browserErrors';
 import type { ProgressView } from './plan';
+import { markDropStep } from './dropNotice';
 
 declare const __BUILD_ID__: string;
 
@@ -230,6 +231,8 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
 
   /** Persist only stage changes and coarse first-frame progress, never every boot-plan paint. */
   function recordBootProgress(view: ProgressView): void {
+    // the drop notice's breadcrumb names the card's step on every world boot, traced or not
+    if (view.label !== '') markDropStep({ step: view.done ? 'Load complete' : view.label });
     if (current === null) return;
     if (current.status !== 'in_progress') return;
     // Arrival can open Explore before the loader emits its final progress notification.

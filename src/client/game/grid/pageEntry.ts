@@ -1,3 +1,4 @@
+import { recordDrop } from '@wildshard/engine/boot/dropNotice';
 import { beginNavigationShell } from '@wildshard/engine/boot/shell';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { registerBeforeReload, type LastEnd } from '@wildshard/engine/boot/lastEnd';
@@ -83,7 +84,12 @@ function reentryAllowed(now: number): boolean {
 export function reenterGrid(instance: string): void {
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
   // A cell this build has no page for, or a seat that keeps moving: the title, never a loop of entries.
-  if (cell === undefined || target === undefined || !reentryAllowed(Date.now())) { location.replace(new URL(location.pathname, location.origin)); return; }
+  if (cell === undefined || target === undefined || !reentryAllowed(Date.now())) {
+    // the drop modal on that title says why (Jake, 11-12: Blender Template "go straight to main menu" with no word)
+    recordDrop({ reason: cell === undefined || target === undefined ? `The world server seated you in ${cell?.slug ?? instance}, a place this build can't open, so the game went back to the title.`
+      : 'The world server kept moving your seat, so the game stopped re-entering and went back to the title.', code: instance });
+    location.replace(new URL(location.pathname, location.origin)); return;
+  }
   pageGridIntents().set({ instance: cell.instance, slug: target.slug });
   travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
 }
