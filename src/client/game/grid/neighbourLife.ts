@@ -42,7 +42,8 @@ interface CellLife {
 
 /** A static view of one skin: the factory's bone layout (positions relative to the parent), bound once. */
 function skinMesh(skin: ClientSkin): { mesh: SkinnedMesh; bones: Record<string, Bone> } {
-  const mesh = new SkinnedMesh(skin.geometry, skin.material()), bones: Record<string, Bone> = {}, list: Bone[] = [];
+  // TE-ENG10: a skin's mapped parts draw its geometry's groups 1..n in their own look materials
+  const mesh = new SkinnedMesh(skin.geometry, skin.parts.length === 0 ? skin.material() : [skin.material(), ...skin.parts.map((part) => part())]), bones: Record<string, Bone> = {}, list: Bone[] = [];
   for (const def of skin.bones) {
     const parent = def.parent === null ? null : skin.bones.find((b) => b.name === def.parent) ?? null;
     const bone = new Bone();

@@ -18,3 +18,9 @@
 - Cost: one more draw per rig per mapped material, plus one more shadow draw
   per cascade where the rig casts. A skin without the map is unchanged.
 - Test `src/client/game/shardfile/skin-parts.test.ts` (red before, green after).
+- Codex review, four MUSTs fixed: primitives whose same channel differs in
+  encoding merge as floats; neighbour cells (`neighbourLife.ts`) draw the parts
+  too; a fading corpse keeps each part material whole (a clone dropped the
+  emissive family's shader patch); a graph look material is refused as a part
+  by the format (shardfile 0916c10), since an unlit graph ignores the emissive
+  port the flash writes.

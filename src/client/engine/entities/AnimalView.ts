@@ -92,6 +92,8 @@ export class Animal extends AnimalSim {
   private flashBaseI = 1;
   /** TE-ENG10: the rig's part materials, each flashed with the body and returned to its own base (an unlit glow by colour) */
   private flashParts: { readonly colour: THREE.Color; readonly base: THREE.Color; readonly intensity: { emissiveIntensity: number } | null; readonly baseI: number }[] = [];
+  /** the rig's own part materials (TE-ENG10), kept whole through a fade: a clone would drop their family shader patch */
+  private parts: ReadonlySet<THREE.Material> = new Set();
   private flash = 0;
   private bones: Record<string, THREE.Bone>;
   private readonly bBody: THREE.Bone;
@@ -223,6 +225,7 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     this.jointPose=this.custom?null:new QuadrupedRigPose(rig.bones);
     const fur = rig.materials[0];
     if (fur !== undefined && fur !== model.hard) { this.flashMat = fur; this.flashBase.copy(fur.emissive); this.flashBaseI = fur.emissiveIntensity; }
+    this.parts = new Set(rig.parts);
     for (const part of rig.parts ?? []) {
       const emissive: unknown = Reflect.get(part, 'emissive'), colour: unknown = Reflect.get(part, 'color'), lit = emissive instanceof THREE.Color;
       const flashed = lit ? emissive : colour instanceof THREE.Color ? colour : null; if (flashed === null) continue;
@@ -510,7 +513,11 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
     // give this mesh its own transparent materials (hard + eye are shared per model); the body from this animal's own
     // material, which a `sharedBody` look keeps as its port while the rig draws the model's one body
     const mats = this.mesh.material as THREE.Material[];
-    this.fadeMats = mats.map((m, i) => { const c = (i === 0 && this.flashMat !== null ? this.flashMat : m).clone(); c.transparent = true; c.depthWrite = true; this.prepareMaterial?.(c); return c; });
+    // a part material is this rig's own (TE-ENG10): it fades as itself, keeping its family patch (an emissive's intensity)
+    this.fadeMats = mats.map((m, i) => {
+      if (this.parts.has(m)) { if (!m.transparent) { m.transparent = true; m.needsUpdate = true; } return m; }
+      const c = (i === 0 && this.flashMat !== null ? this.flashMat : m).clone(); c.transparent = true; c.depthWrite = true; this.prepareMaterial?.(c); return c;
+    });
     // the fur clone loses its rim patch; a plain transparent fade is fine for 1.5 s
     this.mesh.material = this.fadeMats;
   }

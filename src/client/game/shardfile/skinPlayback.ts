@@ -9,7 +9,7 @@
  *   const skin = await loadSkin(bytes, row, binding, material);   // admitted, bound, posed at the clip's first frame
  *   skin.play('walk'); skin.update(dt);                            // per frame, as the engine's rigs do
  */
-import type { BufferGeometry, Material, Object3D, SkinnedMesh } from 'three';
+import { Float32BufferAttribute, type BufferGeometry, type Material, type Object3D, type SkinnedMesh } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { bindRig, prepareRigLoader, type ClipName, type RigInstance } from '@wildshard/engine/anim/rig';
 import { AnimMachine } from '@wildshard/engine/anim/machine';
@@ -54,6 +54,18 @@ function mergePrimitives(meshes: readonly SkinnedMesh[], parts: readonly string[
   for (const name of parts) if (!meshes.some((mesh) => materialName(mesh) === name)) throw new Error(`skin ${id}: no GLB material ${name}`);
   if (meshes.length === 1 && parts.length === 0) return 1;
   const ordered = [...meshes].sort((a, b) => slot(a) - slot(b));
+  // the format admits the same channels in different encodings (a primitive's byte joints beside another's shorts):
+  // a channel whose encodings differ merges as plain floats (three's getComponent undoes a normalized encoding)
+  if (meshes.length > 1) for (const name of Object.keys(first.geometry.attributes)) {
+    const attributes = meshes.map((mesh) => mesh.geometry.getAttribute(name));
+    const same = attributes.every((attribute) => attribute.array.constructor === attributes[0]?.array.constructor && attribute.normalized === attributes[0].normalized);
+    if (same) continue;
+    for (const mesh of meshes) {
+      const attribute = mesh.geometry.getAttribute(name), floats = new Float32Array(attribute.count * attribute.itemSize);
+      for (let i = 0; i < attribute.count; i++) for (let k = 0; k < attribute.itemSize; k++) floats[i * attribute.itemSize + k] = attribute.getComponent(i, k);
+      mesh.geometry.setAttribute(name, new Float32BufferAttribute(floats, attribute.itemSize));
+    }
+  }
   const merged: BufferGeometry | null = meshes.length === 1 ? first.geometry.clone() : mergeGeometries(ordered.map((mesh) => mesh.geometry), false);
   if (merged === null) throw new Error(`skin ${id}: skin primitives differ in their channels`);
   merged.clearGroups();

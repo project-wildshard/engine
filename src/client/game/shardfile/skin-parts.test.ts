@@ -13,7 +13,7 @@ import type { AnimalModel, AnimalRig } from '@wildshard/engine/entities/AnimalFa
 const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 /** A two-joint skinned GLB: a body quad in `Body`, and (with `glow`) a head triangle in its own primitive and material. */
-function skinGlb(glow: boolean): Uint8Array {
+function skinGlb(glow: boolean, mixed = false): Uint8Array {
   const chunks: Buffer[] = [], views: object[] = [], accessors: object[] = [];
   let at = 0;
   const add = (data: ArrayBufferView, accessor: Record<string, unknown>): number => {
@@ -33,11 +33,13 @@ function skinGlb(glow: boolean): Uint8Array {
   const times = add(new Float32Array([0, 1]), { componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [1] });
   const moves = add(new Float32Array([0, 1, 0, 0, 1.1, 0]), { componentType: 5126, count: 2, type: 'VEC3' });
   const attributes = { POSITION: position, NORMAL: normal, JOINTS_0: joints, WEIGHTS_0: weights };
+  // the same channel in another encoding: the part's joints as shorts beside the body's bytes
+  const shorts = mixed ? add(new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]), { componentType: 5123, count: 5, type: 'VEC4' }) : joints;
   const json = {
     asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0, 1] }],
     nodes: [{ name: 'test.glow', mesh: 0, skin: 0 }, { name: 'body', children: [2] }, { name: 'head', translation: [0, 1, 0] }],
     skins: [{ joints: [1, 2], inverseBindMatrices: binds }],
-    meshes: [{ name: 'test.glow', primitives: [{ attributes, indices: body, material: 0 }, ...(glow ? [{ attributes, indices: head, material: 1 }] : [])] }],
+    meshes: [{ name: 'test.glow', primitives: [{ attributes, indices: body, material: 0 }, ...(glow ? [{ attributes: { ...attributes, JOINTS_0: shorts }, indices: head, material: 1 }] : [])] }],
     materials: [{ name: 'Body' }, ...(glow ? [{ name: 'Glow' }] : [])],
     animations: [{ name: 'idle', channels: [{ sampler: 0, target: { node: 2, path: 'translation' } }], samplers: [{ input: times, output: moves, interpolation: 'LINEAR' }] }],
     accessors, bufferViews: views, buffers: [{ byteLength: at }],
@@ -50,9 +52,9 @@ function skinGlb(glow: boolean): Uint8Array {
   return new Uint8Array(Buffer.concat([header, jh, text, bh, bin]));
 }
 
-async function loaded(glow: boolean, materials?: Record<string, string>) {
+async function loaded(glow: boolean, materials?: Record<string, string>, mixed = false) {
   await prepareGlbCost();
-  const glb = skinGlb(glow), cost = parseGlbData(glb), file = sha(glb);
+  const glb = skinGlb(glow, mixed), cost = parseGlbData(glb), file = sha(glb);
   const skin = new TextEncoder().encode(JSON.stringify({
     row: { id: 'test.glow', file, family: 'toon', rig: { skeleton: 'test.glow', joints: [['body', 'head']], clips: ['idle'], sockets: ['body', 'head'] },
       cost: { decoded: cost.decoded, gpu: cost.gpu, triangles: cost.triangles, draws: cost.draws } },
@@ -92,6 +94,13 @@ test('a skin with no map stays one material and one group, even over two GLB mat
   }
 });
 
+test('primitives whose same channel differs in encoding still merge', async () => {
+  const { skin } = await loaded(true, { Glow: 'test.eye' }, true);
+  expect(skin.geometry.groups.map((group) => [group.start, group.count, group.materialIndex])).toEqual([[0, 6, 0], [6, 3, 1]]);
+  const joints = skin.geometry.getAttribute('skinIndex');
+  expect(joints.getX(4)).toBe(1); // the head vertex keeps its joint
+});
+
 test('a mapped name the GLB does not draw is refused', async () => {
   await expect(loaded(true, { Gullet: 'test.eye' })).rejects.toThrow(/Gullet/u);
 });
@@ -128,4 +137,8 @@ test('a hit flashes every material of the rig, its glowing parts too, and each r
   expect([fur.emissiveIntensity, lit.emissiveIntensity]).toEqual(intensities);
   animal.setDrawLod(2); // the far LOD never folds a glowing part into the body
   expect(animal.mesh.material).toEqual([fur, eye, lit]);
+  animal.fadeOut(); // a fade keeps each part whole (a clone would drop its family shader patch), now transparent
+  const faded = animal.mesh.material as THREE.Material[];
+  expect(faded[1]).toBe(eye); expect(faded[2]).toBe(lit); expect(eye.transparent).toBe(true);
+  expect(faded[0]).not.toBe(fur);
 });
