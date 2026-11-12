@@ -17,3 +17,7 @@
   NaN feet skipped rather than thrown on, a `left` said mid-crossing applied if the crossing is abandoned, a stale road seat order
   says `left`, world chat reaches the road. Left: the reading and `/health` don't count the road; a held seat back on the road
   gets no `resume`.
+- CI (and a loaded Mac) caught the Far Reach arrival: Far Reach is sky islands, and the first ground under its north edge is a bottom
+  plane below its fall floor, so a body arriving at road height there dies and respawns at the spawn. The test now arrives beside B,
+  and the bank lift has its own test, road back into Driftwood from 3 m under its ground (red without the lift). For the page walk:
+  walking off the road into Far Reach at road height may be this same death; Pine Hollow or Sunscar is the safer first neighbour.
