@@ -1120,7 +1120,9 @@ export class GridSession {
     if (view) this.viewStep();
     const inside = this.assembly.at(at.x, at.z), active = this.live === null ? this.home.instance : this.live.live.current();
     // GC2: online, prediction on the rim of a cell the server still walls (C5) is not a departure
-    const presence = cellPresence(inside, active, active !== null && this.live?.serverHolds(active) === true);
+    const held = active !== null && this.live?.serverHolds(active) === true, origin = held ? this.assembly.cell(active).origin : null;
+    const past = origin === null ? Infinity : Math.max(Math.abs(at.x - origin.x), Math.abs(at.z - origin.z)) - CHUNK_HALF;
+    const presence = cellPresence(inside, active, held, past);
     if (presence.kind === 'leave') gridCells.leave();
     else if (presence.kind === 'enter') gridCells.enter({ instance: presence.instance, slug: presence.slug });
   }

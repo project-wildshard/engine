@@ -10,3 +10,6 @@
 - Fix: `cellPresence.ts`. On a wire, feet off every interior while the server still holds the body in the current cell keep
   it entered; the frame gate (`LiveGridSession.frameReady`) enters the current cell itself when the feet are back inside it
   with its hooks never entered. Real online crossings stay MP1.6 / GC15.
+- Review (claude -p, no MUST): folded the SHOULD that `keep` had no end. It now holds only within `HELD_RIM` 20 m past the
+  held cell's edge, so a stalled link that lets prediction run on still leaves. The other SHOULD (the gate fires `onEnter`
+  outside the fixed step) checked: the listeners are `hybrid.enter` (async activation) and `gridHud`'s accent.

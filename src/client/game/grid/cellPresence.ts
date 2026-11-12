@@ -9,12 +9,16 @@
 export type CellPresence = { readonly kind: 'enter'; readonly instance: string; readonly slug: string } | { readonly kind: 'leave' } | { readonly kind: 'keep' };
 interface CellRef { readonly instance: string; readonly slug: string }
 
+/** How far past a held cell's edge the feet may run and still be prediction on its rim, in metres: ~6 m was seen at boost on
+ *  staging; past this the page is no longer where the server has it (a stalled link), and it leaves as it always did. */
+export const HELD_RIM = 20;
+
 /** `inside`: the cell whose interior holds the feet (undefined on the road or a rim); `active`: the crossing's current cell;
- *  `held`: the server still has this client in `active`. Feet off every interior while the server holds the body in the cell
- *  are prediction on the rim, not a departure: keep it entered. */
-export function cellPresence(inside: CellRef | undefined, active: string | null, held: boolean): CellPresence {
+ *  `held`: the server still has this client in `active`; `past`: metres the feet stand past `active`'s edge. Feet just off its
+ *  interior while the server holds the body in the cell are prediction on the rim, not a departure: keep it entered. */
+export function cellPresence(inside: CellRef | undefined, active: string | null, held: boolean, past: number): CellPresence {
   if (inside !== undefined && inside.instance === active) return { kind: 'enter', instance: inside.instance, slug: inside.slug };
-  return inside === undefined && active !== null && held ? { kind: 'keep' } : { kind: 'leave' };
+  return inside === undefined && active !== null && held && past <= HELD_RIM ? { kind: 'keep' } : { kind: 'leave' };
 }
 
 /** Whether the frame gate enters `current` itself: the feet are in its interior, it has entered hooks to run, and the page has
