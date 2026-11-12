@@ -81,4 +81,15 @@ describe('model contract after client relocation', () => {
     expect(checkModels({ [file]: `${draw} ${draw}` }).violations)
       .toEqual([expect.stringContaining('2 ×')]);
   });
+
+  it('still enforces a supplied shard\'s named places with no source in this checkout', () => {
+    const file = 'src/shards/driftwood-isle/generators/discovery.ts';
+    expect(checkModels({ [file]: "const DRIFTWOOD_PLACES = [{ id: 'cove' }];" }).violations)
+      .toEqual([expect.stringContaining("the named place 'cove' has no set")]);
+  });
+
+  // TEST-COVERAGE row 11: the rules hold on the real tree, so a new hand-rolled draw or stray defineModel fails CI.
+  it('holds on the real engine tree', () => {
+    expect(checkModels().violations).toEqual([]);
+  });
 });

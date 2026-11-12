@@ -27,10 +27,11 @@
  *
  *   node scripts/check-models.mjs            # the report + the rules
  *   node scripts/check-models.mjs --quiet    # the rules only
- * test/shards/driftwood-isle/models-contract.test.ts runs the rules in vitest, so CI and the pre-push gate enforce them.
+ * test/model-contract-paths.test.ts runs the rules on the real tree in vitest, so CI's full suite enforces them
+ * (TEST-COVERAGE row 11). Test files are fixtures, not shipped code, and are not read.
  */
 import { shardFolders } from './shard-folders.mjs';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -44,7 +45,8 @@ function sources(dir = join(ROOT, 'src')) {
     if (name === 'node_modules') continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...sources(p));
-    else if (name.endsWith('.ts') && !name.endsWith('.d.ts')) out.push(relative(ROOT, p).split('\\').join('/'));
+    // TEST-COVERAGE row 11: the contract governs shipped code; a test's fixture draw is not a world thing
+    else if (name.endsWith('.ts') && !name.endsWith('.d.ts') && !name.endsWith('.test.ts')) out.push(relative(ROOT, p).split('\\').join('/'));
   }
   return out;
 }
@@ -79,7 +81,21 @@ export const DONE = {
     'src/client/game/boss/encounterView.ts': { why: 'Moved from Nalati: a cloud body\'s puffs (one row-sized draw) and an encounter site\'s empty stand-in for a variant no site wears; the sites themselves are placed through place()', counts: { InstancedMesh: 2 } },
     'src/client/game/practice/course.ts': { why: 'The existing riding and grapple practice rooms share one row-owned registration; no shard world content', counts: { 'registry add with object': 1 } },
     'src/client/game/weapons/heldPolearm.ts': { why: '90b6eb13ce: the held spear retains its original single thrown-javelin draw; the empty placeholder allocation is retired', counts: { InstancedMesh: 1 } },
-    'src/client/game/shardfile/worldSceneBatch.ts': { why: 'G483: one declared world-scene batch of fixed LOD instances, drawn instanced (E271 / E272: no multi-draw) and registered as one world piece; bounded rows own capacity and material, never shard drawing callbacks', counts: { 'registry add with object': 1 } },
+    'src/client/game/shardfile/worldSceneBatch.ts': { why: 'G483: one declared world-scene batch of fixed LOD instances, drawn instanced (E271 / E272: no multi-draw) and registered as one world piece; bounded rows own capacity and material, never shard drawing callbacks. Its `merge: true` copies fold into one geometry at their near LOD', counts: { 'registry add with object': 1, mergeGeometries: 1 } },
+    // TEST-COVERAGE row 11: draws the lift imported (1a9fdc62) or added since, declared at their current counts so the
+    // real tree holds and the next one fails
+    'src/client/engine/player/firstPersonArms.ts': { why: "the player's own first-person arms, merged into one geometry: the player, not a thing in the world", counts: { mergeGeometries: 1 } },
+    'src/client/engine/render/graph/glslMaterial.ts': { why: "an instanced mesh's outline hull, mirroring the mesh it outlines: a material effect, never a new world thing", counts: { InstancedMesh: 1 } },
+    'src/client/engine/render/lookLight.ts': { why: 'look.light pools of light (85944cce, behind Debug): an effect', counts: { InstancedMesh: 1 } },
+    'src/client/game/ambient/crowdDraw.ts': { why: 'the ambient crowd draw from admitted rows: a population, like the flock in posedInstances', counts: { InstancedMesh: 1 } },
+    'src/client/game/ambient/foragerDraw.ts': { why: 'the native forager population, one draw over its owner rows: a population, not placed world', counts: { InstancedMesh: 1 } },
+    'src/client/game/loot/CoinMotion.ts': { why: 'loot coins in flight to the player: an effect, like CoinBurst', counts: { InstancedMesh: 1 } },
+    'src/client/game/plugin/scene.ts': { why: "a plugin scene's declared instanced nodes, built from admitted scene data; the shard's data owns what is drawn", counts: { InstancedMesh: 1 } },
+    'src/client/game/plugin/weaponFamily.ts': { why: "a declared weapon family's held frame merged from primitives: held gear, not a thing in the world", counts: { mergeGeometries: 1 } },
+    'src/client/game/population/projection.ts': { why: "a population's projectile volley: an effect", counts: { InstancedMesh: 1 } },
+    'src/client/game/quest/figures.ts': { why: "G571: a quest page's placed kit figures, built from admitted kit rows; the still part registers once as world", counts: { 'registry add with object': 1 } },
+    'src/client/game/shardfile/sceneInstances.ts': { why: "a shard's admitted instanced scene rows, one draw per row: world drawn from data, like bakedKinds", counts: { InstancedMesh: 1 } },
+    'src/client/game/shardfile/slabLibrary.ts': { why: "an admitted storage chunk's one-instance draw, kept in the chunk's channel layout: world drawn from data", counts: { InstancedMesh: 1 } },
     'src/client/game/shardfile/clientForestPage.ts': { why: "G571: a forest page's cave lights (the interior's shaft and drips) added as world, without colliders, as Pine's landmarks did", counts: { 'registry add with object': 1 } },
     'src/client/game/weather/forest.ts': { why: 'Weather particles and puddles are effects; the retained instance draw follows the prepared weather rows.', counts: { InstancedMesh: 1 } },
     'src/client/game/shardfile/worldSceneWeld.ts': { why: 'Frozen Z2 instances hydrate declared capacity and matrix rows as Scope-owned native draws; no procedural shard content', counts: { InstancedMesh: 1 } },
@@ -165,6 +181,15 @@ const MODEL_RELOCATIONS = new Map([
   ['nalati-grasslands', 'generators/gear.ts', 'gear.ts'],
 ].map(([slug, source, name]) => [`src/shards/${slug}/${source}`, `src/shards/${slug}/models/${name}`]));
 const modelPath = file => MODEL_RELOCATIONS.get(file) ?? MODEL_RELOCATIONS.get(`${file}.ts`) ?? file;
+/**
+ * TEST-COVERAGE row 11: after the lift (J88) a shard's models arrive as admitted data, and these literal engine hosts
+ * define them from it. Each is a literal file with its reason; no directory gains an exemption, and ids keep their rules.
+ */
+export const DATA_MODEL_HOSTS = {
+  'src/client/game/quest/figures.ts': "G571: a quest page's kit figure cards, defined from the admitted kit catalogue",
+  'src/client/game/shardfile/forestPage.ts': "a forest page's ground-cover kinds, each defined as a model from the admitted forest field rows",
+  'src/client/game/shardfile/sceneDressing.ts': "a shard's dressing models, defined from its admitted scene rows",
+};
 const SHARD_FILE = /^src\/shards\/([^/]+)\//;
 /** Pine Hollow's remaining generic world builders retain their report area after the move. */
 const PINE_WORLD = /^src\/(?:client|cook|server|shared)\/engine\/world\/(Cabin|Undergrowth|Props)\.ts$/;
@@ -202,6 +227,8 @@ export const NAMED_PLACES = {
   'pine-hollow': [{ file: 'src/shards/pine-hollow/generators/layout.ts', list: 'PINE_HOLLOW_POIS' }, { file: 'src/shards/pine-hollow/generators/placeSets.ts', list: 'PINE_HOLLOW_QUEST_PLACES', optional: true }],
   'nine-dragon-stack': [{ file: 'src/shards/nine-dragon-stack/generators/places.ts', list: 'NINE_DRAGON_PLACES' }],
 };
+/** a shard whose source lives in this checkout; engine holds none since the lift (J88), only pinned products */
+const hasSource = (slug) => existsSync(join(ROOT, 'src', 'shards', slug));
 /** the shards whose every named place must have its set (the rest are reported) */
 export const PLACES_ENFORCED = primaryFolders();
 
@@ -225,6 +252,7 @@ const placeSlug = (s) => s.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-').replaceA
 function namedPlaceSets(texts, whole, strip) {
   const named = new Map(), problems = [];
   for (const [shard, lists] of Object.entries(NAMED_PLACES)) {
+    if (whole && !hasSource(shard)) continue; // TEST-COVERAGE row 11: its source and its lists live in its own repo
     const ids = [];
     let read = false;
     for (const l of lists) {
@@ -286,7 +314,7 @@ export function checkModels(files) {
     // Recognize them only inside the existing model contract, not elsewhere.
     const calls = (code.match(/\bdefineModel(?:<[^(]*>)?\(/g) ?? []).length - (/export function defineModel/.test(code) ? 1 : 0)
       + (inShardModels ? (code.match(/\b(?:defineGeometryModel|modelCatalogue|defineSpecimenCatalogue)(?:<[^(]*>)?\(/g) ?? []).length : 0);
-    if (calls > 0 && !inShardModels && !inShared) violations.push(`${file}: defineModel outside src/client/engine/models/ and src/shards/<slug>/models/`);
+    if (calls > 0 && !inShardModels && !inShared && !(file in DATA_MODEL_HOSTS)) violations.push(`${file}: defineModel outside src/client/engine/models/ and src/shards/<slug>/models/`);
     if (inShardModels && calls === 0) violations.push(`${file}: a file in a models folder that defines no model`);
     for (const id of defines) {
       const want = inShardModels ? `${inShardModels[1]}/` : 'shared/';
