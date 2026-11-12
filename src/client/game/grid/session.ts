@@ -54,6 +54,7 @@ import { neighbourEdges } from '../../../shared/game/grid/readinessEdges';
 import { DEVSERVER, gridMode } from './menu';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
+import { stepRingsUntil } from './loadingRings';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { PageResidency } from './pageResidency';
 import { PlatformRenderResidency } from './renderResidency';
@@ -358,6 +359,8 @@ export class GridSession {
   private roadTiles: RoadTileBacking | null = null;
   private readonly roadBudget: { readonly view: () => RoadViewCost | null; readonly resident: () => RoadResident };
   private readonly life: NeighbourLife;
+  /** Late frames the page loop has run; `stepRingsUntil` steps the rings only while it has not. */
+  private lateFrames = 0;
   private readonly admitNeighbour: ((cell: GridCell, required?: boolean) => Promise<void>) | undefined;
   private readonly admitNeighbourRender: ((cell: GridCell) => Promise<boolean>) | undefined;
   /** G222 playtest #7: each neighbour's declared doors and gates, shown exactly when its region has them standing */
@@ -822,7 +825,7 @@ export class GridSession {
     };
     // the one late system (play.ts binds every onLate to game.grid.frame): the ring tiles' static-matrix checks run in it too
     let ringStep: (() => void) | undefined;
-    host.frame?.onLate((dt) => { this.viewStep(); this.life.late(dt); this.panels.late(); bands(); frame?.frame(); ringStep?.(); });
+    host.frame?.onLate((dt) => { this.lateFrames++; this.viewStep(); this.life.late(dt); this.panels.late(); bands(); frame?.frame(); ringStep?.(); });
     const tiles = neighbourTiles(host.scope, async (tile) => { await host.prepareTile?.(tile); },
       (tile, retiredRoots) => { this.tileGhosts.retired(tile.key, retiredRoots); }, host.frame === undefined ? undefined : step => { ringStep = step; }),
       tileCost = clientRingCatalogue(tiles.instances);
@@ -1041,7 +1044,12 @@ export class GridSession {
       residency: this.host.residency.home(), tiles: this.clientTiles, lightingSettled: () => { this.prelinkViews(); }, backgroundReady: () => this.host.backgroundReady?.() !== false,
       ...(this.admitNeighbour === undefined ? {} : { prepareDataTiles: async (cell: GridCell, scope: Scope, start: { readonly x: number; readonly z: number }) => {
         await this.admitNeighbour?.(cell, true);
-        await this.clientTiles.enterOffered(cell.instance, scope, start);
+        // GO7: an initial data home (template-2 from Shard select) waits on these tiles in loading step `home`, before the
+        // page loop steps the rings: step them here until it does
+        await stepRingsUntil(this.clientTiles.enterOffered(cell.instance, scope, start), { frames: () => this.lateFrames,
+          step: () => { if (!this.host.scope.disposed) { const at = this.world(); this.rings.step({ x: at.x, z: at.z, vx: 0, vz: 0 }); } },
+          // a left page never wakes the wait: its entry's release settles it
+          wait: () => new Promise<void>(resolve => { if (!this.host.scope.disposed) this.host.scope.timeout(16, resolve); }) });
       }, prepareNeighbourTiles: async (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal) => {
         const owner = this.host.scope.child(`grid.tile-approach.${cell.instance}`);
         const release = (): void => { owner.dispose(); };

@@ -622,6 +622,7 @@
     "src/client/game/grid/intent.ts": "client",
     "src/client/game/grid/live.ts": "client",
     "src/client/game/grid/liveSession.ts": "client",
+    "src/client/game/grid/loadingRings.ts": "client",
     "src/client/game/grid/mapAtlas.ts": "client",
     "src/client/game/grid/mapFrame.ts": "client",
     "src/client/game/grid/memoryRows.ts": "client",
