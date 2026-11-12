@@ -48,7 +48,7 @@ node scripts/page-release.mjs production build|upload|check|go-live --after-stag
 
 | Phase | Does | Never |
 | --- | --- | --- |
-| `build` | `pnpm build:game` with `WS_BUILD_ID=<sha>` and `WILDSHARD_RELEASE_URL=https://packs.wildshard.io/releases/<channel>.json` (PACKS-CDN PC3), then the host's packaging. Checks the output names this build, this channel's release file and key, and not the other channel's file. | uploads |
+| `build` | `pnpm build:game` with `WS_BUILD_ID=<sha>`, `WS_RELEASE=1`, `WS_CHANNEL=<channel>` (old builds carry from the channel's own domain, OFF-VERCEL OV3) and `WILDSHARD_RELEASE_URL=https://packs.wildshard.io/releases/<channel>.json` (PACKS-CDN PC3), then the host's packaging. The build fails above 90,000 files or any file over 25 MiB (Workers static-asset limits; source maps not counted). Checks the output names this build, this channel's release file and key, and not the other channel's file. | uploads |
 | `upload` | The server book and parts to the packs bucket, parts first and the book last, each read back through `packs.wildshard.io` with the channel page's `Origin` (CORS). Existing objects must have the same bytes. Each read adds a fresh query, because the CDN caches 404s. Then the page, unaliased. | moves the alias |
 | `check` | The uploaded page's `version.json` and `index.html` equal the local build; the packs answer with CORS; then waits (`--wait=<minutes>`, 45) until the signed release file names this build, epoch and channel socket and the channel's tailnet `/health` shows this build at that serial. | moves the alias |
 | `go-live` | Re-reads the signed file and `/health` and refuses unless they still match, then moves the alias (last) and waits for the domain to serve the build. | runs without a fresh match |
