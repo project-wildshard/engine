@@ -226,9 +226,13 @@ export function flakyFiles(directory,jobNames){
     if(shardReport===null||typeof shardReport!=='object'||!('files'in shardReport)||!Array.isArray(shardReport.files))return null;
     // An unhandled error outside any test file is not a flaky file.
     if('errorCount'in shardReport&&shardReport.errorCount!==0)return null;
+    // J295: a file red on time (2x its budget, or amber on main too long) is a hang or an ignored amber, never a
+    // flake to re-run away; a file merely over budget is amber and green, so it is never named here.
+    if('budget'in shardReport&&shardReport.budget!==null&&typeof shardReport.budget==='object'&&'red'in shardReport.budget
+      &&(!Array.isArray(shardReport.budget.red)||shardReport.budget.red.length>0))return null;
     for(const file of shardReport.files){
      if(file===null||typeof file!=='object'||typeof file.file!=='string')return null;
-     if(file.state==='failed'||(typeof file.durationMs==='number'&&file.durationMs>60_000)){files.add(file.file);named++;}
+     if(file.state==='failed'){files.add(file.file);named++;}
     }
    }
    if(named===0)return null;

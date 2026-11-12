@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { follow, judge, landers, liveIo, paneFor, reached, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { parseAmber } from '../scripts/test-amber.mjs';
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/main-watch-'));
@@ -22,10 +23,10 @@ const replay = [
 const order = ['0f24422e', '7257ca53', '6363b3f3', '652afa6c', 'aaaa1111', 'bbbb2222'].map(sha);
 const contains = (ancestor: string, descendant: string): boolean => order.indexOf(ancestor) <= order.indexOf(descendant);
 
-interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string }
+interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string> }
 const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   repo: 'project-wildshard/engine', state: join(scratch, `${name}.json`),
-  runs: () => world.runs, failed: () => ['tests (3)'], tip: () => world.tip,
+  runs: () => world.runs, failed: () => ['tests (3)'], ambers: id => parseAmber(world.ambers?.[id] ?? ''), tip: () => world.tip,
   commits: (from, to) => order.slice(from === null ? 0 : order.indexOf(from) + 1, order.indexOf(to) + 1).reverse(),
   contains, receipts: () => world.log, receipt: line => { world.receipts.push(line); },
   panes: () => [{ pane_id: 'w1:p2', label: 'engine plan/red-plan' }, { pane_id: 'w1:p3', cwd: '/x/engine/.worktrees/other' }],
@@ -150,4 +151,22 @@ test('EV2: a pre-push follow waits for its SHA to reach main, and quits when the
   expect(await waiting).toBe(true);
   expect(await reached({ tip: () => sha('old'), contains: () => false }, sha('lost'), 20, 5)).toBe(false);
   expect(await reached({ tip: () => { throw new Error('offline'); }, contains: () => true }, sha('x'), 10, 5)).toBe(false);
+});
+
+test('J295: a green run carrying AMBER files gives one main AMBER receipt per file; a red run or a clean green gives none', () => {
+  const w = world(replay), io = fake('amber', w);
+  sweep(io);
+  w.runs = [...replay, run(42970000009, 'aaaa1111', 'success', 50), run(42970000010, 'bbbb2222', 'success', 52)];w.tip = sha('bbbb2222');
+  // As the annotations come back: the tests job's warning and the timings job's copy of the same file.
+  const line = 'AMBER file=test/slow.test.ts ms=61443 budget=60000 run=42970000009 streak=0 why=first_amber';
+  w.ambers = { 42970000009: `${line}\n${line}\nAMBER file=test/other.test.ts ms=70000 budget=60000 run=42970000009 streak=2 why=x` };
+  sweep(io);sweep(io);
+  const amber = w.receipts.filter(row => row.startsWith('main AMBER'));
+  expect(amber.map(row => row.split(' (')[0])).toEqual(['main AMBER aaaa111100 test/slow.test.ts 61443/60000', 'main AMBER aaaa111100 test/other.test.ts 70000/60000']);
+  expect(amber[0]).toContain('run 42970000009; J295');
+  expect(w.receipts.filter(row => row.startsWith('main green'))).toHaveLength(2);
+  // Unreadable annotations never stop the sweep: the green is reported and the AMBER check says it couldn't look.
+  w.runs = [...w.runs, run(42970000011, 'bbbb2222', 'success', 54)];w.receipts.length = 0;
+  sweep({ ...io, ambers: () => { throw new Error('HTTP 502'); } });
+  expect(w.receipts).toEqual([expect.stringMatching(/^main green bbbb222200/u), 'main AMBER bbbb222200 unknown (run 42970000011; its annotations were unreadable: HTTP 502)']);
 });

@@ -564,6 +564,7 @@
     "../scripts/pin-assets.ts",
     "../scripts/pin-format.ts",
     "../scripts/engine-ci-plan.ts",
+    "../scripts/engine-ci-budget.ts",
     "../pages/worker.ts"
   ]
 }

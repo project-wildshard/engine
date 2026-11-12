@@ -14,6 +14,7 @@ import {existsSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,renameSync,rmS
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {nextLedger,readLedger} from './test-amber.mjs';
 
 export const TIMINGS_FILE='timings.json';
 /** The measured median file (1,255 Linux CI files, run 42966259441), for a file the table doesn't hold. */
@@ -21,7 +22,8 @@ export const DEFAULT_SECONDS=0.3;
 /** How long a local table counts as fresh before worktree new refreshes it. */
 export const LOCAL_MAX_AGE_MS=24*60*60*1000;
 
-/** @typedef {{version:1,run:string,sha:string,measuredAt:number,full:Record<string,number>,ring1:Record<string,number>}} Timings */
+/** `amber` is J295's ledger of files over their budget on main (scripts/test-amber.mjs).
+ * @typedef {{version:1,run:string,sha:string,measuredAt:number,full:Record<string,number>,ring1:Record<string,number>,amber?:import('./test-amber.mjs').AmberLedger}} Timings */
 
 /** Where the table lives: WS_TIMINGS_DIR, else tmp/timings on CI, else the machine's cache.
  * @param {NodeJS.ProcessEnv} [env] */
@@ -42,6 +44,8 @@ export function readTimings(env=process.env){
   try{
     const value=JSON.parse(readFileSync(file,'utf8'));
     if(value?.version!==1||typeof value.run!=='string'||typeof value.sha!=='string'||!weightTable(value.full)||!weightTable(value.ring1))return null;
+    // A table from before J295 reads as no file amber yet; a broken entry is dropped.
+    value.amber=readLedger(value.amber);
     return /** @type {Timings} */(value);
   }catch{return null;}
 }
@@ -67,9 +71,10 @@ const walk=directory=>readdirSync(directory,{withFileTypes:true}).flatMap(entry=
 
 /** Merge one run's shard reports (engine-ci-budget/2) into the previous table. A passed file takes its
  * measured seconds; a file the run's plan holds but didn't measure keeps its old value; a file outside
- * the plan's inventory leaves the ring.
+ * the plan's inventory leaves the ring. Every measured file, whatever its state, also moves J295's amber ledger.
  * @param {Timings|null} previous @param {string} directory a run's downloaded engine-ci-* artifacts
- * @returns {{timings:Timings,measured:number}|null} null when the directory holds no plan */
+ * @returns {{timings:Timings,measured:number,amber:string[]}|null} null when the directory holds no plan; `amber` is
+ * the run's AMBER lines */
 export function collectTimings(previous,directory){
   const files=existsSync(directory)?walk(directory):[];
   const planFile=files.find(path=>path.endsWith('/engine-ci/plan.json'));
@@ -78,16 +83,23 @@ export function collectTimings(previous,directory){
   const key=plan.ring==='1'?'ring1':'full',inventory=new Set(/** @type {string[]} */(plan.files));
   /** @type {Record<string,number>} */const measured={};
   let run='',measuredAt=0;
+  /** @type {{file:string,durationMs:number}[]} */const timed=[];/** @type {Set<string>} */const amber=new Set();
   for(const path of files.filter(name=>/\/engine-ci\/shard-\d+-(?:native|ordinary)\.json$/u.test(name))){
     const report=JSON.parse(readFileSync(path,'utf8'));
     if(report?.schema!=='engine-ci-budget/2'||!Array.isArray(report.files))continue;
     run=String(report.run??run);measuredAt=Math.max(measuredAt,Number(report.endedAt)||0);
-    for(const row of report.files)if(row?.state==='passed'&&typeof row.durationMs==='number'&&inventory.has(row.file))measured[row.file]=Math.round(row.durationMs)/1000;
+    for(const row of report.files){
+      if(typeof row?.durationMs!=='number'||typeof row.file!=='string')continue;
+      timed.push({file:row.file,durationMs:row.durationMs});
+      if(row.state==='passed'&&inventory.has(row.file))measured[row.file]=Math.round(row.durationMs)/1000;
+    }
+    for(const line of Array.isArray(report.budget?.amber)?report.budget.amber:[])if(typeof line==='string')amber.add(line);
   }
   const old=previous?.[key]??{},next=/** @type {Record<string,number>} */({});
   for(const file of [...inventory].sort()){const seconds=measured[file]??old[file];if(seconds!==undefined)next[file]=seconds;}
   /** @type {Timings} */const base=previous??{version:1,run:'',sha:'',measuredAt:0,full:{},ring1:{}};
-  return {timings:{...base,run:run||base.run,sha:String(plan.sha),measuredAt:measuredAt||Date.now(),[key]:next},measured:Object.keys(measured).length};
+  const ledger=nextLedger(base.amber,timed,{run,at:measuredAt||Date.now(),inventory:key==='full'?inventory:null});
+  return {timings:{...base,run:run||base.run,sha:String(plan.sha),measuredAt:measuredAt||Date.now(),[key]:next,amber:ledger},measured:Object.keys(measured).length,amber:[...amber]};
 }
 
 /** @param {NodeJS.ProcessEnv} env @returns {(args:string[])=>string} */
@@ -123,7 +135,8 @@ export function fetchTimings(env=process.env,options={}){
       try{gh(['run','download',String(id),'-R',repo,'-p','engine-ci-*','-D',work]);}catch(error){if(options.strict)throw error;continue;}
       const result=collectTimings(null,work);
       if(result===null||result.measured===0)continue;
-      writeTimings(result.timings,env);return String(id);
+      // A rebuilt table starts J295's ledger afresh: one fetched run (maybe a plan branch's) is no main streak.
+      writeTimings({...result.timings,amber:{}},env);return String(id);
     }finally{rmSync(work,{recursive:true,force:true});}
   }
   return null;
@@ -141,6 +154,10 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
   const output=(/** @type {string} */line)=>{if(process.env.GITHUB_OUTPUT)writeFileSync(process.env.GITHUB_OUTPUT,`${line}\n`,{flag:'a'});};
   if(command==='collect'&&directory!==undefined){
     const result=collectTimings(readTimings(),resolve(directory));
+    // J295: name this run's AMBER files on the run itself too (a main run that reused its plan-branch run has no
+    // tests of its own to say so), where main-watch reads them for its `main AMBER` receipt.
+    // One annotation for them all: GitHub keeps only 10 warnings a step.
+    if((result?.amber.length??0)>0)console.log(`::warning title=AMBER test files over budget (J295)::${result?.amber.join('%0A')}`);
     if(result===null||result.measured===0){console.log('test-timings: no measured shard reports; table unchanged');output('measured=false');}
     else{const file=writeTimings(result.timings);console.log(`test-timings: ${result.measured} files measured by run ${result.timings.run}; ${file}`);output('measured=true');}
   }else if(command==='fetch'&&process.argv.includes('--if-stale')&&!timingsStale()){

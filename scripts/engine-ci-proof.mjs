@@ -19,7 +19,7 @@ try{
   const result=spawnSync(process.execPath,[resolve('node_modules/vitest/vitest.mjs'),'run','--root',work,'--config',join(work,'vitest.config.mjs')],{
     cwd:work,env:{...process.env,WS_CI_TIMINGS:report,TMPDIR:work,NODE_COMPILE_CACHE:join(work,'compile-cache')},encoding:'utf8',timeout:10000});
   if(result.error)throw result.error;
-  assert.notEqual(result.status,0,boundary?'Real failed/unhandled cases must fail the runner':'An actual file over the configured budget must fail the runner');
+  assert.notEqual(result.status,0,boundary?'Real failed/unhandled cases must fail the runner':'An actual file at 2x the configured budget or more must fail the runner (J295: under 2x is AMBER)');
   /** @type {{schema:string,errorCount:number,files:{state:string,errorCount:number,durationMs:number,caseCounts:{total:number,passed:number,failed:number,skipped:number,pending:number},cases:{name:string,state:string,mode:string}[]}[]}} */
   const actual=JSON.parse(readFileSync(report,'utf8'));assert.equal(actual.files.length,1);assert.equal(actual.files[0].state,boundary?'failed':'passed');assert.ok(actual.files[0].durationMs>1);
   if(cases){

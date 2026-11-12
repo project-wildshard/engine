@@ -109,15 +109,18 @@ When land stops (each seen on 2026-11-10/11):
  - `main push of <sha> failed and main did not move`: the static main pre-push refused (lint or TypeScript on the
    rebased tree). Its failing check is printed above; fix forward.
  - `hosted CI is red for <sha>`: the stop names the blocking jobs; `quarantine (n)` reds never block. If main's
-   run of the same tests is red too, it isn't yours: wait for main's fix, then run land again. A one-off timing
-   miss (a file over the 60 s cap, not your code): `gh run rerun <id> --failed`, then run land again. Otherwise
-   fix forward on the branch.
+   run of the same tests is red too, it isn't yours: wait for main's fix, then run land again. A file over its
+   60 s budget is AMBER, not red (J295): a `::warning::`, green. It is red only at 2x (120 s) or after it has been
+   amber on main for 24 h or 12 main runs (thresholds in `scripts/test-amber.mjs`); fix that file, never rerun
+   it away. Otherwise fix forward on the branch.
  - `no hosted ci run … after 5 min`: run `gh auth status` first (a failing `gh api` looks like pending CI). Then
    check GitHub Actions: `ci.yml` must run on `plan/**`.
  - `hosted CI … not finished after 60 min`: run land again; it picks up the same SHA's runs.
  - `HEAD moved …`: you committed while land waited. Run land again to land the new HEAD.
  - `main kept moving: 5 tries`: each try lost the race to another push (the `moved` lines). Run land again.
  - A `MAIN RED` message from main-watch: main is red for everyone. Fix forward in a new worktree at once.
+ - A `main AMBER <sha> <file> <ms>/<budget>` receipt (J295): main is green, but that file is over its budget. The
+   coordinator hands it out as a queue-skipping fix row the same day, before it turns red.
 
 Never:
 

@@ -926,7 +926,7 @@ describe('TS10 flaky strikes', () => {
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-ordinary.json'), JSON.stringify({ files: [{ file: 'test/red.test.ts', state: 'failed', durationMs: 5 }] }));
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: false }));
     job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'boundaries', blocking: false, code: 1 }]);
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts', 'test/slow.test.ts']);
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts']);
     // Anything but test files keeps it red: another failed job, a red static unit, a shard over its wall, no report.
     expect(flakyFiles(root, ['tests (2) (failure)', 'quarantine-check (failure)'])).toBeNull();
     expect(flakyFiles(root, ['tests (5) (failure)'])).toBeNull();
@@ -936,7 +936,10 @@ describe('TS10 flaky strikes', () => {
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: true }));
     expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: false }));
-    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts', 'test/slow.test.ts']);
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts']);
+    // J295: an amber file (61 s, passed) is green, never a flake; a file red on time is never re-run away.
+    writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-native.json'), JSON.stringify({ budget: { red: ['RED file=test/hang.test.ts ms=130000 budget=60000'] }, files: [{ file: 'test/hang.test.ts', state: 'passed', durationMs: 130_000 }] }));
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-ordinary.json'), JSON.stringify({ errorCount: 1, files: [{ file: 'test/red.test.ts', state: 'failed', durationMs: 5 }] }));
     expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
     const quarantine = join(root, 'quarantine.json');

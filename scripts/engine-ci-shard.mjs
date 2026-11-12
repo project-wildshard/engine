@@ -17,8 +17,9 @@ for(const phase of /** @type {const} */ (['native','ordinary'])){
   if(plan.ring==='1')env.WILDSHARD_RING='1';else Reflect.deleteProperty(env,'WILDSHARD_RING');
   const result=spawnSync('python3',['scripts/heavy-lane.py','full-test','--',process.execPath,'scripts/vitest-tmp.ts','run','--config','scripts/engine-ci.config.ts','--reporter=default','--reporter=./scripts/engine-ci-budget.ts'],{env,stdio:'inherit',timeout:300000});
   if(result.error!==undefined||result.status!==0)failed=true;
-  const measured=v.parse(v.object({files:v.array(v.object({file:v.string(),durationMs:v.number()}))}),JSON.parse(readFileSync(report,'utf8')));
-  if(measured.files.some(file=>file.durationMs>60_000))failed=true;
+  // J295: the reporter judged each file; only a red one (2x its budget, or amber on main too long) fails the shard.
+  const measured=v.parse(v.object({budget:v.object({red:v.array(v.string())}),files:v.array(v.object({file:v.string(),durationMs:v.number()}))}),JSON.parse(readFileSync(report,'utf8')));
+  if(measured.budget.red.length>0)failed=true;
   const actual=measured.files.map(file=>file.file).sort(),expected=[...shard[phase]].sort();
   if(JSON.stringify(actual)!==JSON.stringify(expected))throw new Error('Executed shard membership differs from its exact plan');
 }
