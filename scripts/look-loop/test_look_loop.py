@@ -80,5 +80,54 @@ class Files(unittest.TestCase):
         self.assertIn('Warm toon.', plain[0]['prompt'])
 
 
+class FakeRun:
+    """a codex run that is still going until stopped"""
+    def __init__(self): self.pid, self.returncode, self.stopped = 0, None, False
+    def poll(self): return self.returncode
+
+
+class Batch(unittest.TestCase):
+    def test_two_job_batch_collects_both_pngs(self):
+        """poll() end to end on a fake 2-job batch: each run logs its session id, its PNG lands in the fake
+        generated_images folder, poll copies it into `work`, writes the job's out and stops the run"""
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            root = Path(d); gen, work = root / 'gen', root / 'work'
+            gen.mkdir(); work.mkdir()
+            jobs = [{'id': f'{n}-shot', 'out': str(root / f'mockup-{n}-shot.jpg')} for n in (1, 2)]
+            queue, running, failed, started, stopped = list(jobs), {}, [], [], []
+
+            def start(j):
+                sid = f'0000000{len(started)}-aaaa-bbbb'
+                log = work / f"{j['id']}.log"
+                log.write_text(f'session id: {sid}\n')
+                (gen / sid).mkdir(); (gen / sid / 'image.png').write_bytes(b'png-' + j['id'].encode())
+                running[j['id']] = (FakeRun(), log, j); started.append(j['id'])
+
+            def stop(p): p.stopped = True; stopped.append(p)
+            real = TG.to_jpeg
+            TG.to_jpeg = lambda png, out: Path(out).write_bytes(Path(png).read_bytes())  # no Pillow on hosted CI
+            try:
+                TG.poll(queue, running, failed, __import__('time').time(), 30, 1, start, stop, work, gen=gen, tick=0, settle=0)
+            finally:
+                TG.to_jpeg = real
+            self.assertEqual(started, ['1-shot', '2-shot'])  # parallel 1: the second starts after the first lands
+            self.assertEqual((failed, running, queue), ([], {}, []))
+            self.assertEqual(len(stopped), 2)
+            for j in jobs:
+                self.assertEqual(Path(j['out']).read_bytes(), b'png-' + j['id'].encode())
+                self.assertTrue((work / f"{j['id']}.png").is_file())
+
+    def test_a_run_that_exits_without_an_image_fails(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            work = Path(d); running, failed = {}, []
+
+            def start(j):
+                log = work / 'x.log'; log.write_text('no session\n')
+                p = FakeRun(); p.returncode = 1; running[j['id']] = (p, log, j)
+            TG.poll([{'id': 'x', 'out': str(work / 'x.jpg')}], running, failed, __import__('time').time(), 30, 2,
+                    start, lambda p: None, work, gen=work / 'gen', tick=0, settle=0)
+            self.assertEqual((failed, running), (['x'], {}))
+
+
 if __name__ == '__main__':
     unittest.main()
