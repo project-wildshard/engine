@@ -80,19 +80,6 @@ if (args.join(' ') === '--debug files') {
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
 
-test('CI runs one complete type and typed-lint job with verified inputs', () => {
-  const workflow=readFileSync('.github/workflows/deploy.yml','utf8');
-  const job=workflow.split('\n  typecheck-lint:')[1]?.split('\n  prepare:')[0]??'';
-  expect(job).not.toContain('strategy:');expect(job).not.toContain('matrix.');
-  expect(job).not.toContain('lint:fast');expect(job).not.toContain('--shard=');
-  expect(job).toContain('python3 scripts/ci-products.py unpack');
-  expect(job).toContain('python3 scripts/ci-fail-fast.py -- /usr/bin/time -v bash scripts/typecheck-lint.sh');
-  const body=readFileSync('scripts/typecheck-lint.sh','utf8');
-  expect(body.match(/pnpm exec npr tsc -b tsconfig\.layers\.json --builders 1/gu)).toHaveLength(1);
-  expect(body.match(/pnpm run lint:typed --threads=4/gu)).toHaveLength(1);
-  expect(body).toContain('wait "$typecheck_pid"');expect(body).toContain('wait "$typed_lint_pid"');
-});
-
 test('the combined CI command overlaps both checks and drains each failure',()=>{
  mkdirSync('tmp',{recursive:true});const root=mkdtempSync(resolve('tmp/combined-type-lint-'));
  try{

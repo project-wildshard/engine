@@ -52,5 +52,4 @@ test('workflow cache keys hash only committed sources that exist', () => {
     .filter(path => /^(?:src|scripts|test|lint)\//u.test(path));
   expect(sources.length).toBeGreaterThan(0);
   for (const path of sources) expect(existsSync(path), path).toBe(true);
-  expect(readFileSync('.github/workflows/deploy.yml', 'utf8')).not.toContain('checked Basis compiler');
 });

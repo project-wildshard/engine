@@ -110,18 +110,6 @@ test.each(['state', 'pixels'] as const)('a stuck %s read refuses within the unch
 
 test('the Explorer leg retains every primary, including Signal and Developer-only rows, once', () => {
   expect(explorerCases(catalogue)).toEqual(['driftwood-isle','nine-dragon-stack','sunscar-dunes','_template','open-plot-alien-plain']);
-  const workflow = readFileSync('.github/workflows/deploy.yml','utf8');
-  const journeys=workflow.split('\n  journeys:\n')[1]?.split('\n  boot-verdict:\n')[0];
-  if(journeys===undefined)throw new Error('Missing browser journey');
-  expect(workflow).not.toContain('\n  phone-route:\n');
-  const parts=/part: \[([^\]]+)\]/u.exec(journeys)?.[1]?.split(',').map(part=>part.trim());
-  if(parts===undefined)throw new Error('Missing browser journey matrix');
-  expect(parts).toEqual(['explorer','boot-public','developer-webkit','grid-chromium']);
-  expect(new Set(parts).size).toBe(parts.length);expect(parts).not.toContain('phone-route');
-  expect(journeys).not.toContain('continue-on-error:');
-  expect(workflow).toContain(`if: \${{ !cancelled() && steps.inputs.outcome == 'success' && matrix.part == 'explorer' }}`);
-  expect(workflow).toContain('run: node scripts/parity/explorer-smoke.mjs --case-group=all');
-  expect(workflow).toContain('needs: [prepare, typecheck-lint, behaviour, native-escape, journeys, stage-prebuilt]');
 });
 
 test('missing, failed, duplicate and black card frames refuse with their real model identity', () => {

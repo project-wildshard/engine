@@ -61,7 +61,7 @@ export function closedComponentSources(root, input) {
       const shader = path.endsWith('.glsl'), lines = shader ? shaderCodeLines(source) : codeLines(source, path);
       if (lines > 0) sources.push({ path, kind: shader ? 'additional-glsl' : 'runtime-ts', lines });
     }
-    // G480 holds for art/ too. deploy.yml skips an art-only commit, so prepare's full gate can't see it: the push gate has to.
+    // G480 holds for art/ too: an art-only commit must still meet the push gate.
     for (const path of globSync(`src/shards/${shard}/art/**/*.json`, { cwd: root })) {
       const lines = rawShaderLines(readFileSync(resolve(root, path), 'utf8'), path);
       if (lines > 0) failures.push(`${shard}: CLOSED art ${path} has ${lines} custom lines`);

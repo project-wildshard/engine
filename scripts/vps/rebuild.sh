@@ -432,7 +432,7 @@ if [ "$COOK_READY" = 0 ]; then
   else say 'cannot verify' "$COOK_ENV (needs sudo)"; fi
 fi
 
-# The checkout: CI's sparse set, at the tag, installed once per commit (deploy.yml's cook step does the same). No package's
+# The checkout: CI's sparse set, at the tag, installed once per commit. No package's
 # install script runs as root here; the cook needs none.
 org_git() { env GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=url.https://github.com/project-wildshard/.insteadOf GIT_CONFIG_VALUE_0=git@github.com:project-wildshard/ \
   GIT_CONFIG_KEY_1=url.https://github.com/project-wildshard/.insteadof GIT_CONFIG_VALUE_1=ssh://git@github.com/project-wildshard/ "$@"; }

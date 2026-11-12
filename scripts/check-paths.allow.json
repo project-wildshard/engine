@@ -275,11 +275,6 @@
     "why": "E357 F6m: synthetic source path in an isolated test fixture/assertion; not a checkout path and must retain its spelling."
   },
   {
-    "path": "src/shared/engine/saves/store.ts",
-    "file": "scripts/deploy-pin.mjs",
-    "why": "E357 F6m: git show path on an historical commit; intentionally absent until F10."
-  },
-  {
     "path": "src/shards/${shard}",
     "file": "scripts/parity.mjs",
     "why": "E357 F6m: git diff pathspec template for destination shards."

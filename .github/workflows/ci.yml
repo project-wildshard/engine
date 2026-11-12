@@ -52,7 +52,7 @@ jobs:
     env:
       WS_TEST_QUARANTINE: blocking
       WS_CI_PLAN: tmp/engine-ci/plan.json
-      # Ring 1's build here is a test build, never shipped (deploy.yml builds its own): a paused or failing production
+      # Ring 1's build here is a test build, never shipped (release.sh builds its own): a paused or failing production
       # (Vercel's spend cap answers 503) warns instead of failing it. A release build still refuses.
       WS_PREVIOUS_DEPLOY_OPTIONAL: '1'
     steps:

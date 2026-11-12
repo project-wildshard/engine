@@ -4,7 +4,7 @@
 // budgets/shard-size-baseline.json holds the ceilings, the measured old numbers, how they were measured and how to
 // change them on purpose. I12's older check read a tier selection, so Pine passed at 67 MB while phones took 111.
 //
-//   node scripts/shard-size-gate.mjs [dist]             refuse growth (scripts/build-app.mjs runs this, deploy.yml after `bake`)
+//   node scripts/shard-size-gate.mjs [dist]             refuse growth (scripts/build-app.mjs runs this)
 //   node scripts/shard-size-gate.mjs [dist] --cooks-after   the build of a deploy whose cook adds shards: a row may still be missing
 //   node scripts/shard-size-gate.mjs [dist] --ratchet   lower the ceilings of shards that shrank, in the baseline file
 //   node scripts/shard-size-gate.mjs --folders <root>   print each shard folder's size by bucket, for a re-measure

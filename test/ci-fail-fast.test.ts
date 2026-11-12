@@ -1,6 +1,4 @@
 import { expect, test } from 'vitest';
-// oxlint-disable-next-line import/no-nodejs-modules -- Exercise owned CI process groups without GitHub or builds.
-import { spawnSync } from 'node:child_process';
 
 // oxlint-disable-next-line import/no-nodejs-modules -- The owned fixture proves sibling cancellation without app work.
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -8,11 +6,6 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runChecks } from '../scripts/ci-checks.mjs';
 
-
-test('CI commands retain independent verdicts and clean up owned interruptions', () => {
-  const result = spawnSync('python3', ['test/test_ci_fail_fast.py'], { encoding: 'utf8', timeout: 10000 });
-  expect(result.status, result.stderr).toBe(0);
-});
 
 test('a first parallel check failure cancels its owned sibling before a later side effect', async () => {
   const directory = mkdtempSync('tmp/ci-peer-');

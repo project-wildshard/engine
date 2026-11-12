@@ -111,6 +111,6 @@ test('a workflow pnpm that packageManager would make action-setup throw on is re
 });
 
 test('only the files it reads make a push run it', () => {
-  for (const path of ['pnpm-lock.yaml', 'package.json', 'src/game/package.json', '.github/workflows/deploy.yml']) expect(isFormatLockInput(path)).toBe(true);
-  for (const path of ['src/client/game/boot.ts', 'docs/package.json.md', '.github/deploy-pin.json']) expect(isFormatLockInput(path)).toBe(false);
+  for (const path of ['pnpm-lock.yaml', 'package.json', 'src/game/package.json', '.github/workflows/ci.yml']) expect(isFormatLockInput(path)).toBe(true);
+  for (const path of ['src/client/game/boot.ts', 'docs/package.json.md', '.github/actions/README.md']) expect(isFormatLockInput(path)).toBe(false);
 });

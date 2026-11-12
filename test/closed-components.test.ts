@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Tiny isolated source trees exercise the actual guard.
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths only.
 import { dirname, join } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Small disposable fixtures.
@@ -63,7 +63,7 @@ test('erased JSON declarations stay zero while executable JSON-suffix files rema
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('source checks read art JSON, because an art-only commit never reaches prepare', () => {
+test('source checks read art JSON, so an art-only commit still meets the push gate', () => {
   mkdirSync('tmp',{recursive:true});
   const root=mkdtempSync(join('tmp','art-json-'));
   const put=(path:string,source:string):void=>{mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),source);};
@@ -72,8 +72,6 @@ test('source checks read art JSON, because an art-only commit never reaches prep
     expect(closedComponentSources(root,{})).toEqual([]);
     put('src/shards/far-reach/art/round-1/cameras.json',JSON.stringify({ url:'tier=desktop' }));
     expect(closedComponentSources(root,{})).toEqual([expect.stringContaining('CLOSED art src/shards/far-reach/art/round-1/cameras.json')]);
-    const workflow=readFileSync(new URL('../.github/workflows/deploy.yml',import.meta.url),'utf8');
-    expect(workflow).toContain("- 'src/shards/*/art/**'");
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
 
@@ -101,19 +99,6 @@ test('Nine rejects regrowth in all nine zero components after G614', () => {
   }
 });
 
-
-test('CI enforces the complete closed-component guard after products and before publication', () => {
-  const workflow = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
-  const products = workflow.slice(workflow.indexOf('\n  prepare:\n'), workflow.indexOf('\n  behaviour:\n'));
-  const build = products.indexOf('node scripts/gen.mjs --reuse');
-  const guard = products.indexOf('run: python3 scripts/ci-fail-fast.py -- node scripts/check-closed-components.mjs\n');
-  const publish = products.indexOf('python3 scripts/ci-products.py pack\n');
-  expect(build).toBeGreaterThanOrEqual(0);
-  expect(guard).toBeGreaterThan(build);
-  expect(publish).toBeGreaterThan(guard);
-  expect(products.match(/node scripts\/check-closed-components\.mjs/gu)).toHaveLength(1);
-  expect(products).not.toContain('check-closed-components.mjs --source-only');
-});
 
 test('new, native and Sky shard folders are structurally frozen without policy rows',()=>{
   mkdirSync('tmp',{recursive:true});
