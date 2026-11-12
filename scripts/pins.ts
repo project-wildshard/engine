@@ -41,6 +41,7 @@ import { excludePublished } from './pins-exclude.mjs';
 import { dropManifest, folderName, insideTree, lockPins, mountPath, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
+import { assertKtx2TableTargets } from '../src/shared/game/shardfile/ktx2Targets.ts';
 
 interface Pin { readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number }
 interface PinFile { readonly api: string; readonly shards: readonly Pin[] }
@@ -260,7 +261,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     insideTree(root, dirname(path));
     rmSync(path, { force: true });
   }
-  const shared = tracked(), published = new Map<string, string>();
+  const shared = tracked(), published = new Map<string, string>(), publicUrls = new Set(publicAssets.map(asset => asset.url));
   const publish = (url: string, body: Uint8Array): void => {
     if (!mountPath(url)) throw new Error(`A pin publishes ${url}, outside public/`);
     const hash = digest(body), held = published.get(url);
@@ -284,6 +285,8 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
         { read: (path, maximum) => { const body = fileNamed(path); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => files.keys() },
         { hash: digest },
       );
+      // S11: every target of the KTX2 table is in the product, a tracked engine file or a pinned public asset.
+      assertKtx2TableTargets({ paths: () => files.keys(), read: fileNamed }, url => shared.has(`public${url}`) || publicUrls.has(url));
     } catch (error) {
       failed++;
       console.error(`refused ${pin.slug}: ${error instanceof Error ? error.message : String(error)}`);

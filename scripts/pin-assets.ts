@@ -10,8 +10,8 @@ import * as v from 'valibot';
 const hex = (length: number) => v.pipe(v.string(), v.regex(new RegExp(`^[a-f0-9]{${length}}$`, 'u')));
 const Asset = v.strictObject({
   slug: v.pipe(v.string(), v.regex(/^[a-z0-9_-]+$/u)),
-  url: v.pipe(v.string(), v.regex(/^\/assets\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\.(?:jpg|webp|png|glb|gltf)$/u)),
-  file: v.string(), sha256: hex(64), bytes: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(4_000_000)),
+  url: v.pipe(v.string(), v.regex(/^\/assets\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\.(?:jpg|webp|png|glb|gltf|ktx2)$/u)),
+  file: v.string(), sha256: hex(64), bytes: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(8_000_000)),
   remote: v.optional(v.literal(true)),
   source: v.strictObject({repo: v.union([v.pipe(v.string(), v.regex(/^shard-[a-z0-9-]+$/u)),v.literal('Raynos/project-wildshard-singleplayer')]), commit: hex(40), path: v.string(), blob: hex(40)}),
 });

@@ -1,0 +1,17 @@
+# KTX2 table targets (meta SENTRY-TRIAGE S11)
+
+- Phones were 404ing on KTX2 table targets: Pine Hollow rev 1 (81 files, fixed by rev 2) and Nine Dragon
+  (`/assets/gpu/nine-dragon/lab/organic/scroll.phone-580f21aa.ktx2` and 17 more). New rule
+  `src/shared/game/shardfile/ktx2Targets.ts`: every target of `discovery.json` `native.ktx2` (any shape: `GPU_FILES`,
+  `pageModeKtx2` shard and grid, both tiers) is a `mounts/` file, a `cook.json` row over a held file, a
+  `/shardfiles/<slug>/` product file, or an engine file. `pins.ts install` and the deploy's `productVerdict` refuse
+  otherwise, naming the first missing target. It lives in engine, not format's `validateShardfileProduct`: the table is
+  engine's discovery data, and format doesn't know it.
+- Red first: `test/ktx2-table-targets.test.ts`; rev 1 `0e246ab0` is refused at
+  `antler-king-rig.phone.rigged-4aa793ec.glb (81 of 321)`, rev 2 `1c334833` admitted (both from the pin cache).
+- Nine Dragon's cause: its pinned head (`ea45516a`) names 22 GPU files and carries 4. The other 18 were encoded in
+  singleplayer (`95489b45ea`, E224-E227) and retired from it in `77fba04170` without ever reaching shard-nine-dragon or
+  the upload. Nalati's head lacks 48 the same way (its GLB stand-ins, which fell back quietly). Both are fixed in engine
+  as remote pinned public assets (`test/pins/assets.json`, 66 rows, from singleplayer `deb62916` and shard-nalati
+  `200fd47`), so `pins.ts install` publishes them; the asset schema now takes `.ktx2` and up to 8 MB (Nalati's
+  panorama is 6.6 MB). A shard-side rev that mounts them retires those rows.

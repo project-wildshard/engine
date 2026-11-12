@@ -145,6 +145,930 @@
       }
     },
     {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/cards-7ecab075.ktx2",
+      "file": "test/pins/assets/7ecab075d678057af14dfd474b5588581259e1513b671107d18315ebbb786b7c.ktx2",
+      "sha256": "7ecab075d678057af14dfd474b5588581259e1513b671107d18315ebbb786b7c",
+      "bytes": 2382717,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/cards-7ecab075.ktx2",
+        "blob": "13685e05415f2411e6013234251c26451313fa77"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/balbal-cb303eb6.glb",
+      "file": "test/pins/assets/cb303eb669fdd603362b0a036dc0e23d7d06146f2b42e049622fb4854b8a89ad.glb",
+      "sha256": "cb303eb669fdd603362b0a036dc0e23d7d06146f2b42e049622fb4854b8a89ad",
+      "bytes": 1089928,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/balbal-cb303eb6.glb",
+        "blob": "7d4cba16cf8fa1f4897868d2caa44a6a1685a0eb"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/balbal.phone-50749fab.glb",
+      "file": "test/pins/assets/50749fabe2d8a3217f8c7b1c1ce0789a1f15935bf94f4869deb5b60555d82b2a.glb",
+      "sha256": "50749fabe2d8a3217f8c7b1c1ce0789a1f15935bf94f4869deb5b60555d82b2a",
+      "bytes": 321820,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/balbal.phone-50749fab.glb",
+        "blob": "365f9c635247e31c2061f632bb0b74c090d3a2f8"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/boulder-1-6296d74d.glb",
+      "file": "test/pins/assets/6296d74d64f94705f5592cf5a6a7024908317d261bee64ce36a46ff25934ae3d.glb",
+      "sha256": "6296d74d64f94705f5592cf5a6a7024908317d261bee64ce36a46ff25934ae3d",
+      "bytes": 903932,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/boulder-1-6296d74d.glb",
+        "blob": "088b603ce51bbc96a7e7ebf7e212a734150a9629"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/boulder-1.phone-0d074f9b.glb",
+      "file": "test/pins/assets/0d074f9b60719dbd0a23208a69fe30af6d029d78fe4c2fff22a501c9b5c2c126.glb",
+      "sha256": "0d074f9b60719dbd0a23208a69fe30af6d029d78fe4c2fff22a501c9b5c2c126",
+      "bytes": 255588,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/boulder-1.phone-0d074f9b.glb",
+        "blob": "b85f2adb6e967b2579c1730e12eb0c68ae387836"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/boulder-2-a4768ed7.glb",
+      "file": "test/pins/assets/a4768ed7a4879596a5d96b19ded850735731ca6fbd8ac3622fa3b92e56a9c018.glb",
+      "sha256": "a4768ed7a4879596a5d96b19ded850735731ca6fbd8ac3622fa3b92e56a9c018",
+      "bytes": 800420,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/boulder-2-a4768ed7.glb",
+        "blob": "221ea94ec379b14c2f722833358b03cf704893ad"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/boulder-2.phone-41952ece.glb",
+      "file": "test/pins/assets/41952ece031dbbab1ad1e39923e1bf4edaa28d3f0ad61d7511e8cddc786e9324.glb",
+      "sha256": "41952ece031dbbab1ad1e39923e1bf4edaa28d3f0ad61d7511e8cddc786e9324",
+      "bytes": 247380,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/boulder-2.phone-41952ece.glb",
+        "blob": "5f113f83acae27c19a522a56934583d5a516ba83"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/boulder-3-b1629ee1.glb",
+      "file": "test/pins/assets/b1629ee19ad77afb679ece6866e309f9190450e48a0cc7632bc65e5d51d23547.glb",
+      "sha256": "b1629ee19ad77afb679ece6866e309f9190450e48a0cc7632bc65e5d51d23547",
+      "bytes": 721024,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/boulder-3-b1629ee1.glb",
+        "blob": "7840cf1ff3af7918b677bb3a4951e33109412f93"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/boulder-3.phone-30c6a4d3.glb",
+      "file": "test/pins/assets/30c6a4d3511f27382f8bb6ca867307db7bd89f8f8933a94204f9df641114380e.glb",
+      "sha256": "30c6a4d3511f27382f8bb6ca867307db7bd89f8f8933a94204f9df641114380e",
+      "bytes": 228900,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/boulder-3.phone-30c6a4d3.glb",
+        "blob": "7432ffa864db8cf7c2606df0b2df9ccb81974f06"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/cauldron-fdd6388a.glb",
+      "file": "test/pins/assets/fdd6388a571aaed1aa4abf2241fedf7ec5cbb54208613e91d5458b987bbc0b7e.glb",
+      "sha256": "fdd6388a571aaed1aa4abf2241fedf7ec5cbb54208613e91d5458b987bbc0b7e",
+      "bytes": 1115724,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/cauldron-fdd6388a.glb",
+        "blob": "7bb39fe3817969cc67c4e6ddc1f0aebccd5f0341"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/cauldron.phone-a7195e76.glb",
+      "file": "test/pins/assets/a7195e76b5e1e648d0aae9e9e6b3838916e118ae28a64f7df9db3b59dfed90ab.glb",
+      "sha256": "a7195e76b5e1e648d0aae9e9e6b3838916e118ae28a64f7df9db3b59dfed90ab",
+      "bytes": 323676,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/cauldron.phone-a7195e76.glb",
+        "blob": "22d4f9ce454157eb8c5808775bad63f49adb6f77"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/chest-13c2a857.glb",
+      "file": "test/pins/assets/13c2a857e4bb4775b7d2da30776d61928de102ff11637ba5b120940bdf379e0c.glb",
+      "sha256": "13c2a857e4bb4775b7d2da30776d61928de102ff11637ba5b120940bdf379e0c",
+      "bytes": 1174440,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/chest-13c2a857.glb",
+        "blob": "fa488da05d7b04ee96c91bbd2edea6c4d9b03dbc"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/chest.phone-03f50a15.glb",
+      "file": "test/pins/assets/03f50a159fa31a460b1266de2f68214620a15f82bfc1859044c16bc4089c765b.glb",
+      "sha256": "03f50a159fa31a460b1266de2f68214620a15f82bfc1859044c16bc4089c765b",
+      "bytes": 328492,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/chest.phone-03f50a15.glb",
+        "blob": "38fddfee9e6be5cf34b39973a7d97ce4cde5f4bf"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/horse-saddled.horse.camp-black.coat-206ca071.ktx2",
+      "file": "test/pins/assets/206ca07184a0528695e879426bf29a6ba82bdc1431d80ae714d9a6d34f36f649.ktx2",
+      "sha256": "206ca07184a0528695e879426bf29a6ba82bdc1431d80ae714d9a6d34f36f649",
+      "bytes": 1038479,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/horse-saddled.horse.camp-black.coat-206ca071.ktx2",
+        "blob": "e8e576f5b155e56b0034e30568f70cddca42920d"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/horse-wild.horse.bay.coat-8dcf7bda.ktx2",
+      "file": "test/pins/assets/8dcf7bdaccd470080d815acb6ea4a34b404b5d1022e78f4eef5e65ab75b00ea1.ktx2",
+      "sha256": "8dcf7bdaccd470080d815acb6ea4a34b404b5d1022e78f4eef5e65ab75b00ea1",
+      "bytes": 1068796,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/horse-wild.horse.bay.coat-8dcf7bda.ktx2",
+        "blob": "5c568baff8ffec57437f6e665001299972fe10b4"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/horse-wild.horse.black.coat-1c9095ac.ktx2",
+      "file": "test/pins/assets/1c9095aca9d652a31285a542139abc1a6b0a85ceeab97465322289f0d7fba8fd.ktx2",
+      "sha256": "1c9095aca9d652a31285a542139abc1a6b0a85ceeab97465322289f0d7fba8fd",
+      "bytes": 875422,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/horse-wild.horse.black.coat-1c9095ac.ktx2",
+        "blob": "1ea95396cf01dfe4be56f9137c17630af9dff7e8"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/horse-wild.horse.chestnut.coat-be6c85dc.ktx2",
+      "file": "test/pins/assets/be6c85dcb11d08030b2003c418026fca7ee346f11ad4ecba67022d0ce4eb2b53.ktx2",
+      "sha256": "be6c85dcb11d08030b2003c418026fca7ee346f11ad4ecba67022d0ce4eb2b53",
+      "bytes": 1093395,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/horse-wild.horse.chestnut.coat-be6c85dc.ktx2",
+        "blob": "7057075f1d8c5a258ffbfea499fc219d54cb7c40"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/horse-wild.horse.foal-bay.coat-aadef851.ktx2",
+      "file": "test/pins/assets/aadef851229326c614541036b77c6020d2ec56dcef89fc2798251e5e293108c9.ktx2",
+      "sha256": "aadef851229326c614541036b77c6020d2ec56dcef89fc2798251e5e293108c9",
+      "bytes": 1199394,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/horse-wild.horse.foal-bay.coat-aadef851.ktx2",
+        "blob": "86820a5b1d7bcb39f02a3a05e874eeb0868b3288"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/horse-wild.horse.foal-chestnut.coat-ad3a458f.ktx2",
+      "file": "test/pins/assets/ad3a458f3c2a4ca7ed32c178fa1488e0c84bd1ded00c90a71c02c3d91b0b80f3.ktx2",
+      "sha256": "ad3a458f3c2a4ca7ed32c178fa1488e0c84bd1ded00c90a71c02c3d91b0b80f3",
+      "bytes": 1202377,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/horse-wild.horse.foal-chestnut.coat-ad3a458f.ktx2",
+        "blob": "23b38bfc4d34084c570c4ae7d5dd097528b1e798"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/horse-wild.horse.grey.coat-77cdda62.ktx2",
+      "file": "test/pins/assets/77cdda624ca73d3225a9b580cd1e819b53b823fb88050f7f1dfdf38244e676d7.ktx2",
+      "sha256": "77cdda624ca73d3225a9b580cd1e819b53b823fb88050f7f1dfdf38244e676d7",
+      "bytes": 1106904,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/horse-wild.horse.grey.coat-77cdda62.ktx2",
+        "blob": "6965c758fc208a5cf054e4362e6080a49f742ac1"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/wolf.kokbori.kokbori.coat-604a75c6.ktx2",
+      "file": "test/pins/assets/604a75c6126a3dcf75a95eec61b6aaa46fc2b17f96771af642f786f1d3b2c6b6.ktx2",
+      "sha256": "604a75c6126a3dcf75a95eec61b6aaa46fc2b17f96771af642f786f1d3b2c6b6",
+      "bytes": 1065541,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/wolf.kokbori.kokbori.coat-604a75c6.ktx2",
+        "blob": "7d212036e99d98c97cb61209cea4d6a803b7fb85"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/wolf.wolf.alpha.coat-dc3e2703.ktx2",
+      "file": "test/pins/assets/dc3e2703bb9e57426bcabf91d3f447c70b0ea064ca7cda10794be67dd03e00f7.ktx2",
+      "sha256": "dc3e2703bb9e57426bcabf91d3f447c70b0ea064ca7cda10794be67dd03e00f7",
+      "bytes": 1031315,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/wolf.wolf.alpha.coat-dc3e2703.ktx2",
+        "blob": "5ae71c1317e010a1059fc09e06e99396830e9799"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/wolf.wolf.dark.coat-89ee57f0.ktx2",
+      "file": "test/pins/assets/89ee57f0f2dc3c4540a2a44977dc1b1740eba28b8729348ed3133abdb2941d5e.ktx2",
+      "sha256": "89ee57f0f2dc3c4540a2a44977dc1b1740eba28b8729348ed3133abdb2941d5e",
+      "bytes": 978141,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/wolf.wolf.dark.coat-89ee57f0.ktx2",
+        "blob": "4e7e54eaca75bad74f229fa2add2d82e38f5e31e"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/wolf.wolf.scout.coat-2c93efa3.ktx2",
+      "file": "test/pins/assets/2c93efa3ee74a14cea61e099ac43d5c239850c89d76cf98383567019d547e923.ktx2",
+      "sha256": "2c93efa3ee74a14cea61e099ac43d5c239850c89d76cf98383567019d547e923",
+      "bytes": 1101573,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/wolf.wolf.scout.coat-2c93efa3.ktx2",
+        "blob": "01fe934f3466b60ac555d1c38463244cec582b5f"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/coats/wolf.wolf.tawny.coat-c57490b5.ktx2",
+      "file": "test/pins/assets/c57490b5382e2da113174aee6c1573de17c1dc6ab601caad6ecaf20d2df4da93.ktx2",
+      "sha256": "c57490b5382e2da113174aee6c1573de17c1dc6ab601caad6ecaf20d2df4da93",
+      "bytes": 1114078,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/coats/wolf.wolf.tawny.coat-c57490b5.ktx2",
+        "blob": "f752dfecfc87b34ae5654708447a37fed4dbc01e"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/eagle-9a037bcf.glb",
+      "file": "test/pins/assets/9a037bcf22055fe72beb26d2aebdba17c218f4236fa6cf8e4c9f50dc78035412.glb",
+      "sha256": "9a037bcf22055fe72beb26d2aebdba17c218f4236fa6cf8e4c9f50dc78035412",
+      "bytes": 1220560,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/eagle-9a037bcf.glb",
+        "blob": "418c0d797d386b0be4ac3df14dab069eb2897181"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/eagle.phone-9cc6d893.glb",
+      "file": "test/pins/assets/9cc6d8931ab7e59f8058494c0c767f156dcb070f20dff49d5e5a1572ff6157a3.glb",
+      "sha256": "9cc6d8931ab7e59f8058494c0c767f156dcb070f20dff49d5e5a1572ff6157a3",
+      "bytes": 385600,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/eagle.phone-9cc6d893.glb",
+        "blob": "8d7970005ad2318fe41624ac0f0be834a32f3405"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/firewood-302f771e.glb",
+      "file": "test/pins/assets/302f771e4869924468cc084b71eb8c33464c89f8b07e9021ac9dc3894d47203a.glb",
+      "sha256": "302f771e4869924468cc084b71eb8c33464c89f8b07e9021ac9dc3894d47203a",
+      "bytes": 1217600,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/firewood-302f771e.glb",
+        "blob": "46608405198631b229b0869d40d6576dc52ad03f"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/firewood.phone-8f6c5ff6.glb",
+      "file": "test/pins/assets/8f6c5ff6e8db90b32bed77110229c24e5c01d08d5e48547535269b3167e54aff.glb",
+      "sha256": "8f6c5ff6e8db90b32bed77110229c24e5c01d08d5e48547535269b3167e54aff",
+      "bytes": 345772,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/firewood.phone-8f6c5ff6.glb",
+        "blob": "7b514c55a5663893a4f071ae3477caa1a0a18fcc"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/horse-saddled-7d23b4e6.glb",
+      "file": "test/pins/assets/7d23b4e6e67a9f89d295249351096c85017b627864196dde90968b8e8b3b3397.glb",
+      "sha256": "7d23b4e6e67a9f89d295249351096c85017b627864196dde90968b8e8b3b3397",
+      "bytes": 1287688,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/horse-saddled-7d23b4e6.glb",
+        "blob": "07254b4ce8c28ffc76d2430574b4079a185f09b7"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/horse-saddled.phone-2162ba68.glb",
+      "file": "test/pins/assets/2162ba68a8612dd9fbef2c69b4aa7ca65e5141bee3ffcac69b9da115b5207d34.glb",
+      "sha256": "2162ba68a8612dd9fbef2c69b4aa7ca65e5141bee3ffcac69b9da115b5207d34",
+      "bytes": 426628,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/horse-saddled.phone-2162ba68.glb",
+        "blob": "73620981545fabd795cf486b635f636e98674d94"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/kokpar-rider-4fafcc67.glb",
+      "file": "test/pins/assets/4fafcc672f2f5fb6b6cc64a4c96c987325b335a551267f2cfb6956960ead3bd7.glb",
+      "sha256": "4fafcc672f2f5fb6b6cc64a4c96c987325b335a551267f2cfb6956960ead3bd7",
+      "bytes": 1362328,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/kokpar-rider-4fafcc67.glb",
+        "blob": "2f3ad6a143837416e8fa3fdca419b271547d286c"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/kokpar-rider.phone-f30fba97.glb",
+      "file": "test/pins/assets/f30fba971e8ffc8515995f5d79806ab13788838c1fbe9967f78f87f1623df036.glb",
+      "sha256": "f30fba971e8ffc8515995f5d79806ab13788838c1fbe9967f78f87f1623df036",
+      "bytes": 451256,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/kokpar-rider.phone-f30fba97.glb",
+        "blob": "0ffb966c753d9a5af09449a435ebf9f7b11e5192"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/kumis-churn-b95cc91a.glb",
+      "file": "test/pins/assets/b95cc91a887fbea54cefb932cee55f7ed4cc62fb3e8b7c5ba16aa3a77fb17d0a.glb",
+      "sha256": "b95cc91a887fbea54cefb932cee55f7ed4cc62fb3e8b7c5ba16aa3a77fb17d0a",
+      "bytes": 1142856,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/kumis-churn-b95cc91a.glb",
+        "blob": "b12a73f36985bf3a6a6b4e14299fd65b896e6ffe"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/kumis-churn.phone-891924df.glb",
+      "file": "test/pins/assets/891924dfe7acb787e8f12c88e6cfe5bf93c065eae16734015fca7ece5c16309d.glb",
+      "sha256": "891924dfe7acb787e8f12c88e6cfe5bf93c065eae16734015fca7ece5c16309d",
+      "bytes": 323992,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/kumis-churn.phone-891924df.glb",
+        "blob": "3a14b31b3a64d8b79c5233b7eacd31203a68a3b2"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/saddle-ac77f0ee.glb",
+      "file": "test/pins/assets/ac77f0eef8d2cbacae3dbdde506f8b57a1a316e66cb8445795537bfc2a7d3765.glb",
+      "sha256": "ac77f0eef8d2cbacae3dbdde506f8b57a1a316e66cb8445795537bfc2a7d3765",
+      "bytes": 1173956,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/saddle-ac77f0ee.glb",
+        "blob": "1351e794171613ee8034153cfad60a398a146d70"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/saddle.phone-7a54d62b.glb",
+      "file": "test/pins/assets/7a54d62bdcd26e7cc55470f2ef8650bb2629827b6c0b06cc5f9054ead5ae7198.glb",
+      "sha256": "7a54d62bdcd26e7cc55470f2ef8650bb2629827b6c0b06cc5f9054ead5ae7198",
+      "bytes": 336284,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/saddle.phone-7a54d62b.glb",
+        "blob": "a14656186c72b621331e3b4b7e0d2fafdaf67499"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/snow-lotus-eb9210a0.glb",
+      "file": "test/pins/assets/eb9210a0358ef10a3b1b4b109454213430bbc90160ea2447abd32270955916e3.glb",
+      "sha256": "eb9210a0358ef10a3b1b4b109454213430bbc90160ea2447abd32270955916e3",
+      "bytes": 1234788,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/snow-lotus-eb9210a0.glb",
+        "blob": "5de72e1e0135ece65ee39f6ba86437bb3474b963"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/snow-lotus.phone-0dc236c0.glb",
+      "file": "test/pins/assets/0dc236c0fb86ad83f7e2b6140e18f0f7a961f6e478e0104c10acdd7b7c93468a.glb",
+      "sha256": "0dc236c0fb86ad83f7e2b6140e18f0f7a961f6e478e0104c10acdd7b7c93468a",
+      "bytes": 359768,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/snow-lotus.phone-0dc236c0.glb",
+        "blob": "c57d898837a64c1152b0a30ba8f2fac81f9bb37a"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/watchtower-136b3cbd.glb",
+      "file": "test/pins/assets/136b3cbdca6dfef14e112a800c6aca1bb7ff619aa8610d79282f702fa4cfc541.glb",
+      "sha256": "136b3cbdca6dfef14e112a800c6aca1bb7ff619aa8610d79282f702fa4cfc541",
+      "bytes": 1195796,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/watchtower-136b3cbd.glb",
+        "blob": "2a04960cd8e9cd4e680a3e267cd4841daadbdb2b"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/models/watchtower.phone-cc619fab.glb",
+      "file": "test/pins/assets/cc619fab2ebc20bad4cedfbb8d1560907ad6e9acc3b5554ac9c83d64ec1a86f7.glb",
+      "sha256": "cc619fab2ebc20bad4cedfbb8d1560907ad6e9acc3b5554ac9c83d64ec1a86f7",
+      "bytes": 369684,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/models/watchtower.phone-cc619fab.glb",
+        "blob": "0c17bdf75d82cb01db4232ae30d7d003772f01b6"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/panorama-68be07b4.ktx2",
+      "file": "test/pins/assets/68be07b470c7b938429c6a26a0363b80b6c409f6a39a84e38cb6105f8c5ab986.ktx2",
+      "sha256": "68be07b470c7b938429c6a26a0363b80b6c409f6a39a84e38cb6105f8c5ab986",
+      "bytes": 6645912,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/panorama-68be07b4.ktx2",
+        "blob": "b3892b98b36c67a8ea3eb0c459e8381e9690d7d4"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/tex/felt-0339ff02.ktx2",
+      "file": "test/pins/assets/0339ff0200c1e3566c4501d374186d17c7e007d44a116634a877af7289cc3950.ktx2",
+      "sha256": "0339ff0200c1e3566c4501d374186d17c7e007d44a116634a877af7289cc3950",
+      "bytes": 1246772,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/tex/felt-0339ff02.ktx2",
+        "blob": "f141dc1daab94111028bf5aebf3d04b558a9804f"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/tex/gravel-36f5a6ed.ktx2",
+      "file": "test/pins/assets/36f5a6edc7a9b68a4676467f81773f541a29ed0a92705d8372cfd9589d4ef825.ktx2",
+      "sha256": "36f5a6edc7a9b68a4676467f81773f541a29ed0a92705d8372cfd9589d4ef825",
+      "bytes": 1351353,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/tex/gravel-36f5a6ed.ktx2",
+        "blob": "bf068d12feb886ae937eff2d13d2ad1dc16afb58"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/tex/meadow-b08abfdc.ktx2",
+      "file": "test/pins/assets/b08abfdce521cdbffbce7dae7477f2bcfc06d6d429dba4eeab63b774dafd138c.ktx2",
+      "sha256": "b08abfdce521cdbffbce7dae7477f2bcfc06d6d429dba4eeab63b774dafd138c",
+      "bytes": 1352519,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/tex/meadow-b08abfdc.ktx2",
+        "blob": "bfe587b9a33de26cdd975b6792bdee2f2b170f15"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/tex/path-963acd29.ktx2",
+      "file": "test/pins/assets/963acd2973797b98194a6e6787daa08a4891d36a8684a9e24ce40729fd411806.ktx2",
+      "sha256": "963acd2973797b98194a6e6787daa08a4891d36a8684a9e24ce40729fd411806",
+      "bytes": 1340076,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/tex/path-963acd29.ktx2",
+        "blob": "1878ba248dfdd06e7558f139300c98eb105f9416"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/tex/rock-36d460b4.ktx2",
+      "file": "test/pins/assets/36d460b4109909f21b8d9642c0a664e7efe10e742691137eb8c748f5d44eb0d3.ktx2",
+      "sha256": "36d460b4109909f21b8d9642c0a664e7efe10e742691137eb8c748f5d44eb0d3",
+      "bytes": 1351310,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/tex/rock-36d460b4.ktx2",
+        "blob": "65de0f229d4c5f3644e082d999343abb4e82c923"
+      }
+    },
+    {
+      "slug": "nalati-grasslands",
+      "url": "/assets/gpu/nalati/tex/snow-d56ac357.ktx2",
+      "file": "test/pins/assets/d56ac357d003060c01aa4f573ff12a7b1966bbe11bb712b99b5cc142c63d3b42.ktx2",
+      "sha256": "d56ac357d003060c01aa4f573ff12a7b1966bbe11bb712b99b5cc142c63d3b42",
+      "bytes": 1278689,
+      "remote": true,
+      "source": {
+        "repo": "shard-nalati",
+        "commit": "200fd476c5f603c54951bb2d98fb127e12fba34b",
+        "path": "public/assets/gpu/nalati/tex/snow-d56ac357.ktx2",
+        "blob": "dee653f175445382fe533d8399d49086f482825f"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/lab/organic/scroll-6995996d.ktx2",
+      "file": "test/pins/assets/6995996d0e2c876d008bb686673a1828d597322299d69ca2068641eaacfa36dc.ktx2",
+      "sha256": "6995996d0e2c876d008bb686673a1828d597322299d69ca2068641eaacfa36dc",
+      "bytes": 4233971,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/lab/organic/scroll-6995996d.ktx2",
+        "blob": "0c06fe8852d8104fab56c97237d2ec42d31bb14b"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/lab/organic/scroll.phone-580f21aa.ktx2",
+      "file": "test/pins/assets/580f21aa41f5fcc4d216d5b3bde8fc3f20fc4363018957e608b8855dbd60c6f5.ktx2",
+      "sha256": "580f21aa41f5fcc4d216d5b3bde8fc3f20fc4363018957e608b8855dbd60c6f5",
+      "bytes": 1100047,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/lab/organic/scroll.phone-580f21aa.ktx2",
+        "blob": "d86cb8aeb6428f758b863070003c897bc294d7a8"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/arm-r-maps-f6ec1be7.ktx2",
+      "file": "test/pins/assets/f6ec1be7ec5078ed7f4b244dc5d127e9731f34c7bfa941c0798f44b89ab24166.ktx2",
+      "sha256": "f6ec1be7ec5078ed7f4b244dc5d127e9731f34c7bfa941c0798f44b89ab24166",
+      "bytes": 233378,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/arm-r-maps-f6ec1be7.ktx2",
+        "blob": "60b92efcfff61679eafadcf7409086ccb8524081"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/arm-r-maps.phone-2816edf9.ktx2",
+      "file": "test/pins/assets/2816edf925f7d6202920a73600d77dd3d9cad8d759e3473fee9882174fa9d03a.ktx2",
+      "sha256": "2816edf925f7d6202920a73600d77dd3d9cad8d759e3473fee9882174fa9d03a",
+      "bytes": 85952,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/arm-r-maps.phone-2816edf9.ktx2",
+        "blob": "fb36885ac3c64d74972a47e67bec4c1de1c2f0ed"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/arm-r-nrm-a78efc78.ktx2",
+      "file": "test/pins/assets/a78efc788eb8f8c6fe27bac853d465ac00f6a6341b0c735d84e10dc503942102.ktx2",
+      "sha256": "a78efc788eb8f8c6fe27bac853d465ac00f6a6341b0c735d84e10dc503942102",
+      "bytes": 977484,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/arm-r-nrm-a78efc78.ktx2",
+        "blob": "028d7b2e781e7ef653f3c14390fffae8d7fd7725"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/arm-r-nrm.phone-1fa8943d.ktx2",
+      "file": "test/pins/assets/1fa8943d01c5715af79263de4e38dcdb86efc4ee80d6b00f217dc2647558aa1f.ktx2",
+      "sha256": "1fa8943d01c5715af79263de4e38dcdb86efc4ee80d6b00f217dc2647558aa1f",
+      "bytes": 268721,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/arm-r-nrm.phone-1fa8943d.ktx2",
+        "blob": "97aec157e1d95d5386fb72adc25b341ba45b8390"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/fist-l-maps-72e5d379.ktx2",
+      "file": "test/pins/assets/72e5d3794b909c524f30394508823ed9bf6f478f451715210e3715f038b1cf5e.ktx2",
+      "sha256": "72e5d3794b909c524f30394508823ed9bf6f478f451715210e3715f038b1cf5e",
+      "bytes": 235294,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/fist-l-maps-72e5d379.ktx2",
+        "blob": "3be7e7ecc15681b5a3bfbc3cb1094820c8df763f"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/fist-l-maps.phone-1d475e8f.ktx2",
+      "file": "test/pins/assets/1d475e8f36775a8253dd080dc94063dd74baeb1485869e552ba7956e02e1f362.ktx2",
+      "sha256": "1d475e8f36775a8253dd080dc94063dd74baeb1485869e552ba7956e02e1f362",
+      "bytes": 89355,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/fist-l-maps.phone-1d475e8f.ktx2",
+        "blob": "1db798e169837cef9e14bcda6c782c15dc2e327b"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/fist-l-nrm-1486311c.ktx2",
+      "file": "test/pins/assets/1486311c9f7dc382a37989c6a73527078c096ec2ec53a5d3c4c69ae6db973c55.ktx2",
+      "sha256": "1486311c9f7dc382a37989c6a73527078c096ec2ec53a5d3c4c69ae6db973c55",
+      "bytes": 1147594,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/fist-l-nrm-1486311c.ktx2",
+        "blob": "f36d28d294f50037477642a6a2bad96a4f799e03"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/fist-l-nrm.phone-92fb64b8.ktx2",
+      "file": "test/pins/assets/92fb64b85ee3e19eb437acaf41e9acfbc6e40d2c6b83ff5c198b3630271e8a5c.ktx2",
+      "sha256": "92fb64b85ee3e19eb437acaf41e9acfbc6e40d2c6b83ff5c198b3630271e8a5c",
+      "bytes": 306107,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/fist-l-nrm.phone-92fb64b8.ktx2",
+        "blob": "6694a727e8a0578b86a1f0296b333541b368f472"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/gauntlet-maps-bd5c98f6.ktx2",
+      "file": "test/pins/assets/bd5c98f67bd069279bf66b745e346d27b17c8b05bd4ef61702a7862c0935ad84.ktx2",
+      "sha256": "bd5c98f67bd069279bf66b745e346d27b17c8b05bd4ef61702a7862c0935ad84",
+      "bytes": 639171,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/gauntlet-maps-bd5c98f6.ktx2",
+        "blob": "e8c29d4f58a10adaca401f722e4e292adcbc9222"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/gauntlet-maps.phone-1be17999.ktx2",
+      "file": "test/pins/assets/1be179996c44149d89eb5a62c4cb423da594b12a1f217dd18ce77f13d399c8a7.ktx2",
+      "sha256": "1be179996c44149d89eb5a62c4cb423da594b12a1f217dd18ce77f13d399c8a7",
+      "bytes": 228540,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/gauntlet-maps.phone-1be17999.ktx2",
+        "blob": "0750748f4729a93c8ef17c2bb0ed73377b599f26"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/gauntlet-nrm-b6a9ff02.ktx2",
+      "file": "test/pins/assets/b6a9ff02f9f152679787105ca0150c7865ab6d53fc29d4beb2b6640bb0ddf761.ktx2",
+      "sha256": "b6a9ff02f9f152679787105ca0150c7865ab6d53fc29d4beb2b6640bb0ddf761",
+      "bytes": 4144630,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/gauntlet-nrm-b6a9ff02.ktx2",
+        "blob": "492d557af9ebe9d10afa65aebe7f4a280e1d2aef"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/gauntlet-nrm.phone-f8d1632c.ktx2",
+      "file": "test/pins/assets/f8d1632c1fb2fdfff9702cba84ad72667eccd6dfe318f682c3b1da8e61c11f96.ktx2",
+      "sha256": "f8d1632c1fb2fdfff9702cba84ad72667eccd6dfe318f682c3b1da8e61c11f96",
+      "bytes": 1091461,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/gauntlet-nrm.phone-f8d1632c.ktx2",
+        "blob": "a8751d8e82d62677bf99f8cb9013bfbd188d7f22"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/hand-r-maps-9f246ed0.ktx2",
+      "file": "test/pins/assets/9f246ed03b8877102525a351f25c1f4d96a40fd6265317ddf4a929a2f836fcc5.ktx2",
+      "sha256": "9f246ed03b8877102525a351f25c1f4d96a40fd6265317ddf4a929a2f836fcc5",
+      "bytes": 236325,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/hand-r-maps-9f246ed0.ktx2",
+        "blob": "caaf46dc2b6f3ffb5f525b29879aead6b541aafe"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/hand-r-maps.phone-0e260f80.ktx2",
+      "file": "test/pins/assets/0e260f80f9d56d64f55c3dd868c3eaf049b97e8270680ce03ca5facb3dfb4625.ktx2",
+      "sha256": "0e260f80f9d56d64f55c3dd868c3eaf049b97e8270680ce03ca5facb3dfb4625",
+      "bytes": 91361,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/hand-r-maps.phone-0e260f80.ktx2",
+        "blob": "668328d3f42f5f17841aa10457656df2fe818df3"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/hand-r-nrm-7f97d7d4.ktx2",
+      "file": "test/pins/assets/7f97d7d4d0fcef8a0324e7bd50c26bdb0fac0b084630992c6eed78e379bba3c4.ktx2",
+      "sha256": "7f97d7d4d0fcef8a0324e7bd50c26bdb0fac0b084630992c6eed78e379bba3c4",
+      "bytes": 1139252,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/hand-r-nrm-7f97d7d4.ktx2",
+        "blob": "1eaaa18b6acefa6d562c98a9f8a8f0dae66bf648"
+      }
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "url": "/assets/gpu/nine-dragon/viewmodel/hand-r-nrm.phone-aa4d7ff1.ktx2",
+      "file": "test/pins/assets/aa4d7ff17b15aa29d2f6e8f23024e5a1fc4387d465fe8f18584bcfbc211bcea6.ktx2",
+      "sha256": "aa4d7ff17b15aa29d2f6e8f23024e5a1fc4387d465fe8f18584bcfbc211bcea6",
+      "bytes": 305925,
+      "remote": true,
+      "source": {
+        "repo": "Raynos/project-wildshard-singleplayer",
+        "commit": "deb62916f4f735c94026371bbc7aaf611bd042aa",
+        "path": "public/assets/gpu/nine-dragon/viewmodel/hand-r-nrm.phone-aa4d7ff1.ktx2",
+        "blob": "c33d2c8355412d8466b9109222e7cf0f8f87230f"
+      }
+    },
+    {
       "slug": "driftwood-isle",
       "url": "/assets/horizon/driftwood-isle-day.webp",
       "file": "test/pins/assets/0875cfd4786d9e3b927cf669fedad173a38922e9d99e624ed6590ce58f7bf25d.webp",
