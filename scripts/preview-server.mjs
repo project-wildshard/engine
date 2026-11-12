@@ -38,7 +38,8 @@ const receiveTelemetry = await createPreviewTelemetrySink(telemetryDirectory);
 /** The build's `_headers` (public/_headers, which the build copies into dist; else the tree's own public/_headers), read
  *  the way the page's Workers static assets read it: a line at the left margin opens a rule for a path, an indented
  *  `Name: value` adds a header, `! Name` detaches one an earlier matching rule set, `#` starts a comment. In a path `*` is
- *  a splat (any characters, `/` included) and `:name` one segment. The rules replay in order; a header two rules set is
+ *  a splat (any characters, `/` included) and `:name` one segment; a value's `:splat` and `:name` take what they matched.
+ *  The rules replay in order; a header two rules set is
  *  joined with a comma, as Workers join it. A rule for an absolute URL (the version-URL noindex) is for a workers.dev
  *  host, never this local server, so it is skipped. */
 function headerRules(text) {
@@ -47,8 +48,8 @@ function headerRules(text) {
     const trimmed = line.trim();
     if (trimmed === '' || trimmed.startsWith('#')) continue;
     if (!/^\s/u.test(line)) {
-      const pattern = trimmed.startsWith('/') ? trimmed.split(/(\*|:[A-Za-z]\w*)/u).map(part => part === '*' ? '.*'
-        : part.startsWith(':') ? '[^/]+' : part.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`)).join('') : null;
+      const pattern = trimmed.startsWith('/') ? trimmed.split(/(\*|:[A-Za-z]\w*)/u).map(part => part === '*' ? '(?<splat>.*)'
+        : part.startsWith(':') ? `(?<${part.slice(1)}>[^/]+)` : part.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`)).join('') : null;
       rules.push({ re: pattern === null ? null : new RegExp(`^${pattern}$`, 'u'), ops: [] });
       continue;
     }
@@ -65,10 +66,16 @@ const headersFile = [join(outDir, '_headers'), join(root, 'public/_headers')].fi
 const rules = headersFile === undefined ? [] : headerRules(readFileSync(headersFile, 'utf8'));
 /** Every `_headers` rule that matches the path, in order. */
 function replayHeaders(pathname, res) {
-  for (const rule of rules) if (rule.re.test(pathname)) for (const op of rule.ops) {
-    if (op.value === undefined) { res.removeHeader(op.name); continue; }
-    const previous = res.getHeader(op.name);
-    res.setHeader(op.name, previous === undefined ? op.value : `${String(previous)}, ${op.value}`);
+  for (const rule of rules) {
+    const match = rule.re.exec(pathname);
+    if (match === null) continue;
+    const groups = match.groups;
+    for (const op of rule.ops) {
+      if (op.value === undefined) { res.removeHeader(op.name); continue; }
+      const value = op.value.replaceAll(/:([A-Za-z]\w*)/gu, (text, name) => groups?.[name] ?? text);
+      const previous = res.getHeader(op.name);
+      res.setHeader(op.name, previous === undefined ? value : `${String(previous)}, ${value}`);
+    }
   }
 }
 
