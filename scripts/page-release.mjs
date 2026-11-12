@@ -45,7 +45,7 @@ const build = git(['rev-parse', 'HEAD'], root);
 const secrets = [];
 let token = '';
 /** The Vercel token is read on first use; Cloudflare's comes only from CLOUDFLARE_API_TOKEN (else wrangler's login). */
-const cloudflareToken = process.env['CLOUDFLARE_API_TOKEN'];
+const cloudflareToken = process.env.CLOUDFLARE_API_TOKEN;
 if (cloudflareToken !== undefined && cloudflareToken !== '') secrets.push(cloudflareToken);
 const redact = (/** @type {string} */ text) => secrets.reduce((out, secret) => secret === '' ? out : out.split(secret).join('<token>'), text);
 const log = (/** @type {string} */ line) => console.log(redact(line));

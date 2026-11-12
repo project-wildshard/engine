@@ -34,8 +34,9 @@ const VERSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * @param {string} url @param {string} id @param {string} worker
  */
 export function isVersionUrl(url, id, worker) {
-  const escaped = worker.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  return new RegExp(`^https://${id.slice(0, 8)}-${escaped}\\.[a-z0-9-]+\\.workers\\.dev$`, 'u').test(url);
+  // Worker names and version ids are [a-z0-9-] only, so neither needs escaping inside the pattern.
+  if (!/^[a-z0-9-]+$/u.test(worker) || !VERSION_ID.test(id)) return false;
+  return new RegExp(`^https://${id.slice(0, 8)}-${worker}\\.[a-z0-9-]+\\.workers\\.dev$`, 'u').test(url);
 }
 
 /**

@@ -7,7 +7,8 @@ import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync}
 import {join, resolve} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
 import {CHANNELS, CHECKED_DOCUMENTS, PHASES, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
-import {PROJECTS, runRedacted} from '../scripts/page-release/hosts/vercel.mjs';
+import {PROJECTS} from '../scripts/page-release/hosts/vercel.mjs';
+import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 
 const build = 'a'.repeat(40);

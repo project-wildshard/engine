@@ -1,7 +1,5 @@
 import type {PageHost} from '../flow.mjs';
-import {runRedacted} from '../redact.mjs';
-
-export {runRedacted};
+import type {runRedacted} from '../redact.mjs';
 
 export const SCOPE: string;
 export const TEAM: string;

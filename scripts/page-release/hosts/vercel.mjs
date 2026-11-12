@@ -12,8 +12,6 @@ import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {runRedacted} from '../redact.mjs';
 
-export {runRedacted};
-
 export const SCOPE = 'raynos-projects';
 export const TEAM = 'team_HPUh311dFa6AoKlBNtS9Oiph';
 /** @type {Record<'staging'|'production', {projectName: string, projectId: string, host: RegExp}>} */
