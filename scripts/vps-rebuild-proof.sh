@@ -4,7 +4,7 @@
 # own architecture (arm64): under Rosetta's amd64, systemd's own services (journald, tmpfiles, PostgreSQL's unit) fail to start.
 #   bash scripts/vps-rebuild-proof.sh [--keep]     needs Docker; writes tmp/vps-rebuild-proof/<stamp>/; removes its container
 # What is stubbed, and why: `tailscale` (joining a tailnet is Jake's, so a stub plays a logged-in node and records the
-# Serve/Funnel routes Phase 2 asks for), and the cook worker's API (a local catalogue of one pinned shardfile, so the box
+# tailnet-only Serve routes Phase 2 asks for), and the cook worker's API (a local catalogue of one pinned shardfile, so the box
 # cooks for real into a folder and writes no R2 object). api.wildshard.io resolves to nothing inside the box, so the
 # servers' records never reach it. The servers pull the real signed releases and bundles, read-only, as a fresh VPS would.
 # The runs, in order: --check; a first run that waits for Tailscale; `tailscale up`; a run that does Phase 2 and waits for
@@ -81,6 +81,8 @@ if (command === 'ip') { console.log(args.includes('-4') ? '100.64.0.9' : 'fd7a:1
 if (command === 'serve' && args[1] === 'status') { console.log(JSON.stringify(serve)); process.exit(0); }
 const target = args.at(-1);
 if (command === 'serve' && flag('http')) { route(flag('http'), 'HTTP', target, false); process.exit(0); }
+if (command === 'serve' && flag('https')) { route(flag('https'), 'HTTPS', target, false); process.exit(0); }
+// MS8: setup.sh makes no Funnel route; one here would be drift and fail setup's next guard, as on the box.
 if (command === 'funnel' && flag('https')) { route(flag('https'), 'HTTPS', target, true); process.exit(0); }
 console.error(`stub: unhandled ${args.join(' ')}`); process.exit(2);
 EOF
