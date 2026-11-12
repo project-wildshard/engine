@@ -51,7 +51,7 @@ export class ItemRuntime {
   private lit = false;
   private held = false;
   private chargeTime = 0;
-  private readonly observers = new Set<(phase: 'fire' | 'hit' | 'light', contact?: ItemContact) => void>();
+  private readonly observers = new Set<(phase: 'fire' | 'hit' | 'light', contact?: ItemContact, heavy?: boolean) => void>();
   private pending: ItemState['pending'] = [];
   private readonly origin = new Vector3();
   private readonly direction = new Vector3();
@@ -68,12 +68,13 @@ export class ItemRuntime {
     this.spec = structuredClone(spec); this.ports = ports;
   }
   /** Scoped presentation/event observers; retiring a view leaves authoritative item state intact. */
-  observe(scope: Scope, run: (phase: 'fire' | 'hit' | 'light', contact?: ItemContact) => void): void {
+  observe(scope: Scope, run: (phase: 'fire' | 'hit' | 'light', contact?: ItemContact, heavy?: boolean) => void): void {
     if (scope.disposed) return;
     this.observers.add(run); scope.onDispose(() => { this.observers.delete(run); });
   }
-  private notify(phase: 'fire' | 'hit' | 'light', contact?: ItemContact): void {
-    this.ports.changed?.(this, phase); for (const observer of this.observers) observer(phase, contact);
+  /** `heavy`: on `fire`, whether the strike that started was the heavy one (a held view swings to match, TE-ENG4). */
+  private notify(phase: 'fire' | 'hit' | 'light', contact?: ItemContact, heavy?: boolean): void {
+    this.ports.changed?.(this, phase); for (const observer of this.observers) observer(phase, contact, heavy);
   }
   get remainingFuel(): number { return this.fuel; }
   get lightOn(): boolean { return this.lit; }
@@ -114,7 +115,7 @@ export class ItemRuntime {
     }
   }
   private strike(attack: ItemAttack, aim: AimCommand): void {
-    this.cooldown = attack.cooldown; this.notify('fire');
+    this.cooldown = attack.cooldown; this.notify('fire', undefined, this.spec.kind === 'weapon' && attack === this.spec.heavy);
     this.origin.copy(aim.origin); this.direction.copy(aim.direction).normalize();
     const target = this.ports.targets().filter((entry) => {
       if (!entry.hittable || entry.actor === this.ports.actor) return false;

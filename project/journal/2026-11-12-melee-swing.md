@@ -14,3 +14,7 @@ stock blade and its row carries no strike. Pine's and Driftwood's native swords 
 Test `test/declared-melee-view.test.ts` (Mossgate's row): red before, green after. Preview: Mossgate (sharddev
 `77634b3` packed) in headless Chromium at 402x874 touch and 1280x800, real taps, clicks and a held ATTACK; no console
 errors. Sheet in meta's `template-e2e-v3/progress/te-eng4-swing.jpg`.
+
+Codex review, two MUSTs, applied: off the wire `ItemRuntime`'s `fire` now tells its observers whether the strike was the
+heavy one (the view swung the last input, not the strike the runtime took), and a charged hold cut short by a swap or
+stow no longer shows a chop. Its SHOULD (an EquipmentService case) is covered by a disable-then-release case in the test.

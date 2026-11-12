@@ -222,13 +222,14 @@ class DeclaredMelee extends Weapon {
   /** TE-ENG4: seconds into the swing (-1: at rest), its arc, side and length, the pose it started from and this frame's. */
   private swingT = -1; private arc: SwingArc = LIGHT_SWING; private side = 1; private swingSeconds = LIGHT_SWING.seconds;
   private readonly from: number[] = [0, 0, 0, 0, 0, 0]; private readonly offset: number[] = [0, 0, 0, 0, 0, 0];
-  /** Seconds the hold has been down, and off the wire the strike the runtime's next `fire` is. */
-  private heldFor = 0; private nextHeavy = false;
+  /** Seconds the hold has been down. */
+  private heldFor = 0;
   /** The heavy charge a hold has built, which fills the touch ATTACK disc's ring. */
   override get charge(): number { return this.held ? Math.min(1, this.heldFor / this.spec.charge) : 0; }
   get adsHeld(): boolean { return this.held; }
   set adsHeld(on: boolean) {
-    const held = this.enabled && on, charged = this.held && !held && this.heldFor >= this.spec.charge;
+    // a release the player made: a swap or stow disables the weapon first, and the server drops that charge
+    const held = this.enabled && on, charged = this.enabled && !on && this.held && this.heldFor >= this.spec.charge;
     if (held !== this.held) this.heldFor = 0;
     // SR11 (C8): on the wire the server holds the charge and strikes on its release; this page's runtime never steps.
     if (this.wire !== null) {
@@ -236,24 +237,22 @@ class DeclaredMelee extends Weapon {
       if (charged && this.cooling <= 0) { this.cooling = this.spec.heavy.cooldown; this.swing(true); }
       return;
     }
-    if (charged) this.nextHeavy = true;
     this.held = held; this.ports.runtime.hold(this.held, this.ports.aim(), this.enabled);
   }
   constructor(row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
     super(row); this.ports = ports; this.spec = spec; this.model = itemMesh(ports); this.setAimSource(ports.aim);
-    ports.runtime.observe(ports.scope, (phase, contact) => {
-      if (phase === 'fire') { this.swing(this.nextHeavy); this.onFire?.(); }
+    ports.runtime.observe(ports.scope, (phase, contact, heavy) => {
+      if (phase === 'fire') { this.swing(heavy === true); this.onFire?.(); }
       if (phase === 'hit' && contact !== undefined) this.onHit?.(contact.kind, contact.headshot, contact.killed);
     });
   }
   override install(ctx: EquipContext): void {
     super.install(ctx); ctx.scope.onDispose(() => { this.ports.scope.dispose(); });
     this.ports.input.bind('attack', () => { this.tryFire(); }, ctx.scope, () => this.enabled);
-    this.ports.input.bind('heavy', () => { if (!this.pressWire(true)) { this.nextHeavy = true; this.ports.runtime.queue(2, this.ports.aim()); } }, ctx.scope, () => this.enabled);
+    this.ports.input.bind('heavy', () => { if (!this.pressWire(true)) this.ports.runtime.queue(2, this.ports.aim()); }, ctx.scope, () => this.enabled);
   }
   tryFire(): void {
     if (!this.enabled || this.pressWire(false)) return;
-    this.nextHeavy = false;
     this.aimRay(this.origin, this.direction); this.ports.runtime.queue(1, { origin: this.origin, direction: this.direction });
   }
   /** SR11 (C8): a press goes to the server, which strikes with this item's own runtime and aim. False: no wire, the page's runtime takes it. */

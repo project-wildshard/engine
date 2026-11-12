@@ -80,6 +80,11 @@ test('the held kit.melee sword swings on each strike, light across and heavy dow
   // A tap of the hold, short of the charge, is no strike.
   weapon.adsHeld = true; watch(weapon, rest, 0.1); weapon.adsHeld = false;
   expect(watch(weapon, rest, 0.4).moved).toBe(0);
+  // A charged hold cut short by a swap or stow: equipment disables the weapon, then clears the hold; the server drops that
+  // charge, so no chop shows.
+  weapon.adsHeld = true; watch(weapon, rest, row.charge + 0.05); weapon.enabled = false; weapon.adsHeld = false;
+  expect(watch(weapon, rest, 0.4).moved).toBe(0);
+  weapon.enabled = true;
 
   // Off the wire the page's runtime strikes, and its `fire` phase swings the model.
   weapon.wire = null;
@@ -88,5 +93,11 @@ test('the held kit.melee sword swings on each strike, light across and heavy dow
   runtime.step(1, FRAME);
   expect(watch(weapon, rest, 0.2).sweep).toBeGreaterThan(0.8);
   expectRest(watch(weapon, rest, 1).end, rest);
+  // Off the wire the strike the runtime takes is the one that swings: a heavy then a light in one tick chops (the light is
+  // refused by the heavy's cooldown).
+  handlers.get('heavy')?.(); weapon.tryFire(); runtime.step(2, 0.2); // past the last strike's cooldown
+  const first = watch(weapon, rest, 0.4);
+  expect(first.chop).toBeGreaterThan(1);
+  expect(first.sweep).toBeLessThan(0.5);
   scope.dispose();
 });
