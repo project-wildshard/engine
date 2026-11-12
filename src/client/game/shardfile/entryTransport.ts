@@ -94,10 +94,18 @@ export function installEntryTransport(): void {
   const table: unknown = JSON.parse(bank);
   if (typeof table !== 'object' || table === null) return;
   const entries: unknown = Reflect.get(table, 'entryDownloads');
-  // PZ3: content reads go to the bank's content base, an origin (same origin when empty); jobs keep their page URLs (J138)
-  const named: unknown = Reflect.get(table, 'contentBase'), content = typeof named === 'string' && named !== '' ? new URL(named).origin : location.origin;
-  const onContent = (path: string): string => content === location.origin ? path : new URL(path, content).href;
-  const pageName = (url: string): string => { const at = new URL(url, location.href); return at.origin === content ? new URL(at.pathname + at.search, location.href).href : at.href; };
+  // PZ3: content reads go to the bank's content base (same origin when empty); jobs keep their page URLs (J138). PZ13: the
+  // base may have a folder (`content/<set>/`) that mirrors page paths, so a page path goes under it and comes back out.
+  const named: unknown = Reflect.get(table, 'contentBase'), base = typeof named === 'string' && named !== '' ? new URL(named) : null;
+  const onContent = (path: string): string => {
+    const at = new URL(path, location.href);
+    return base === null || at.origin !== location.origin ? path : new URL(`.${at.pathname}${at.search}`, base).href;
+  };
+  const pageName = (url: string): string => {
+    const at = new URL(url, location.href);
+    if (base === null || at.origin !== base.origin || !at.pathname.startsWith(base.pathname)) return at.href;
+    return new URL(at.pathname.slice(base.pathname.length - 1) + at.search, location.href).href;
+  };
   if (typeof entries !== 'object' || entries === null) return;
   const tier = /iPhone|iPad|Android/iu.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 ? 'phone' : 'desktop';
   const pair: unknown = Reflect.get(entries, selected);

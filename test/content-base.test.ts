@@ -43,8 +43,9 @@ const SET = 'https://packs.example.test/content/0123456789abcdef/';
 test('the bank names a content set path, and still refuses a query, a relative base and another scheme', () => {
   expect(readContentBase('https://packs.wildshard.io/content/609da07f7448e19d/')).toBe('https://packs.wildshard.io/content/609da07f7448e19d/');
   for (const bad of ['https://packs.wildshard.io/content/609da07f7448e19d/?a', 'https://packs.wildshard.io/content/609da07f7448e19d/#a', 'content/609da07f7448e19d/', '/content/609da07f7448e19d/',
-    'ftp://packs.wildshard.io/content/609da07f7448e19d/', 'https://u:p@packs.wildshard.io/content/609da07f7448e19d/', 'https://packs.wildshard.io/content/609da07f7448e19d']) expect(() => readContentBase(bad)).toThrow(/contentBase/u);
-  for (const bad of ['https://packs.wildshard.io/content/609da07f7448e19d/?a', '/content/609da07f7448e19d/', 'ftp://packs.wildshard.io/content/609da07f7448e19d/', 'https://packs.wildshard.io/content/609da07f7448e19d']) expect(() => stampContentBase(DOCUMENT, bad)).toThrow(/content base/u);
+    'ftp://packs.wildshard.io/content/609da07f7448e19d/', 'https://u:p@packs.wildshard.io/content/609da07f7448e19d/', 'https://packs.wildshard.io/content/609da07f7448e19d',
+    'https://packs.wildshard.io/content/609da07f7448e19d/?', 'https://packs.wildshard.io/content/609da07f7448e19d/#']) expect(() => readContentBase(bad)).toThrow(/contentBase/u);
+  for (const bad of ['https://packs.wildshard.io/content/609da07f7448e19d/?a', 'https://packs.wildshard.io/content/609da07f7448e19d/?', 'https://packs.wildshard.io/content/609da07f7448e19d/#', '/content/609da07f7448e19d/', 'ftp://packs.wildshard.io/content/609da07f7448e19d/', 'https://packs.wildshard.io/content/609da07f7448e19d']) expect(() => stampContentBase(DOCUMENT, bad)).toThrow(/content base/u);
 });
 
 test('a set path keeps its path: content goes under it and comes back to its page URL', () => {
@@ -60,6 +61,12 @@ test('a set path keeps its path: content goes under it and comes back to its pag
   expect(pageURL('https://packs.example.test/content/fedcba9876543210/shardfiles/a/b.bin')).toBe('https://packs.example.test/content/fedcba9876543210/shardfiles/a/b.bin');
   expect(shardPackBase('driftwood-isle')).toBe(SET);
   expect(titleAssetURL('/assets/title/main-crossroads-square.jpg').startsWith(`${SET}assets/title/main-crossroads-square-`)).toBe(true);
+  // a base on the page's own origin under a content path moves a URL once, never again (review)
+  const own = `${page()}assets/content/0123456789abcdef/`;
+  bank({contentBase: own});
+  const once = contentURL('/assets/spawn/packs-b.json');
+  expect(once).toBe(`${own}assets/spawn/packs-b.json`);
+  expect(contentURL(once)).toBe(once);
 });
 
 test('the boot tables are read from the content base', async () => {

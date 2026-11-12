@@ -5,6 +5,7 @@
  * @param {string} html @param {string} base an http(s) URL with a folder path, or '' */
 export function stampContentBase(html, base) {
   if (base !== '') {
+    if (/[?#]/u.test(base)) throw new Error(`Invalid content base: ${base}`);
     let url;
     try { url = new URL(base); } catch { throw new Error(`Invalid content base: ${base}`); }
     if (!/^https?:$/u.test(url.protocol) || !url.pathname.endsWith('/') || url.search !== '' || url.hash !== '' || url.username !== '' || url.password !== '') throw new Error(`Invalid content base: ${base}`);

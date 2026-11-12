@@ -19,7 +19,9 @@ const pageBase = (): string => typeof document === 'undefined' ? location.href :
  *  hash, credentials, a relative base, another scheme or a path not ending in `/` is a broken build. */
 export function readContentBase(value: unknown): string {
   if (value === undefined || value === null || value === '') return '';
+  // a bare `?` or `#` parses to an empty search or hash, and a path joined after it would land in the query (review)
   if (typeof value !== 'string') throw new Error('Invalid contentBase in the boot bank');
+  if (/[?#]/u.test(value)) throw new Error(`Invalid contentBase in the boot bank: ${value}`);
   let url: URL;
   try { url = new URL(value); } catch { throw new Error(`Invalid contentBase in the boot bank: ${value}`); }
   if ((url.protocol !== 'https:' && url.protocol !== 'http:') || !url.pathname.endsWith('/') || url.search !== '' || url.hash !== '' || url.username !== '' || url.password !== '') {
@@ -52,8 +54,10 @@ export function isContentPath(path: string): boolean {
  *  content on the page's origin and the bank names a base. Anything else, and every URL with no base, comes back as is. */
 export function contentURL(url: string, base: string = contentBase()): string {
   if (base === '') return url;
-  const page = new URL(pageBase()), address = new URL(url, page);
+  const page = new URL(pageBase()), address = new URL(url, page), root = new URL(base);
   if (address.origin !== page.origin || !isContentPath(address.pathname)) return url;
+  // a base on the page's own origin under a content path: a URL already in its folder is not moved again (review)
+  if (root.origin === page.origin && root.pathname !== '/' && address.pathname.startsWith(root.pathname)) return url;
   return new URL(`.${address.pathname}${address.search}`, base).href;
 }
 

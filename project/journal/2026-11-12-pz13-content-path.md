@@ -11,3 +11,7 @@
 - Proof: `content-base-proof.mjs --set=<16 hex>` serves `dist-content/` under `/content/<set>/` (404 outside it) and fails
   on any page-origin 404. On the split build, Driftwood and Pine boot solo, zero 404s on either origin, no preflight;
   the origin-only run still passes.
+- Review (one `codex exec`): three MUST. A bare `?` or `#` passed both validators (empty search/hash), now refused; a base on
+  the page's own origin under a content path was moved twice, now a URL already in its folder stays; the third was a stale
+  tree (fixed by rebasing on main). The SHOULD on `entryTransport.ts` (its bootstrap dropped the folder) is fixed too; the
+  test-order note stays a comment.
