@@ -1,0 +1,20 @@
+// TE-ENG1 fixture: a rows-only boss decision on the raw v1 ABI (one state slot, no params).
+// Start: the tell field up, the guard shut, the slam on the player, a timer. Timer: the tell down, the core open, the
+// declared guard (GUARD), a second timer. Timer: the core shut, the guard shut. Rebuild with build.mjs.
+const IO: i32 = 16384, ST: i32 = 16448, IN: i32 = 16456, OUT: i32 = 17224;
+function cmd(i: i32, op: f64, target: f64, a: f64, b: f64): void {
+  const at = OUT + i * 40; store<f64>(at, op); store<f64>(at + 8, target); store<f64>(at + 16, a); store<f64>(at + 24, b); store<f64>(at + 32, 0);
+}
+export function ws_abi(): i32 { return 1; }
+export function ws_init(lo: i32, hi: i32): void {}
+export function ws_io(): i32 { return 16384; }
+export function ws_handle(): i32 {
+  const n = i32(load<f64>(IO + 32)), step = load<f64>(ST);
+  let timer = false;
+  for (let i = 0; i < n; i++) if (load<f64>(IN + i * 48) == 3) timer = true;
+  if (step == 0) { cmd(0, 4, 0, 110, 1); cmd(1, 15, 0, 4, 1); cmd(2, 2, 1, 1, 2147483647); cmd(3, 8, 0, 1, 1.2); store<f64>(ST, 1); return 4; }
+  if (!timer) return 0;
+  if (step == 1) { cmd(0, 4, 0, 110, 0); cmd(1, 4, 0, 111, 1); cmd(2, 15, 0, 4, GUARD); cmd(3, 8, 0, 1, 1.5); store<f64>(ST, 2); return 4; }
+  if (step == 2) { cmd(0, 4, 0, 111, 0); cmd(1, 15, 0, 4, 1); store<f64>(ST, 3); return 2; }
+  return 0;
+}

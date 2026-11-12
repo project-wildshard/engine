@@ -98,6 +98,15 @@ export class DeclaredScriptWorld extends ScriptWorld {
     const index = this.declaration.shared.findIndex(field => field.name === name);
     return this.declaration.shared[index]?.privacy === 'public' ? this.shared[index] : undefined;
   }
+  /** A trusted host write of one public numeric shared field (a decision's scene field, TE-ENG1). Same bounds as a
+   *  script's state effect; panels, colliders and the room's state row read it like any other shared value. */
+  writePublicShared(id: number, value: number): void {
+    const index = this.declaration.shared.findIndex(field => field.id === id), field = this.declaration.shared[index];
+    if (field?.privacy !== 'public' || !valid(field, value)) throw new Error('Undeclared or invalid state field');
+    if (Object.is(this.shared[index], value)) return;
+    this.shared = this.shared.slice(); this.shared[index] = value;
+    this.views.clear(); this.declaredContent++; this.declaredRevision++;
+  }
   /** Every public shared field: what any player may see, so what a room sends. */
   publicShared(): readonly { readonly name: string; readonly value: number }[] {
     return this.declaration.shared.flatMap((field, index) => field.privacy === 'public' ? [{ name: field.name, value: this.shared[index] ?? field.default }] : []);

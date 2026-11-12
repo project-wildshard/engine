@@ -3,6 +3,7 @@ import { Vector3 } from 'three';
 import { BossBrain, type BossSaved, type BossPresentation } from '../../../shared/engine/ai/BossBrain';
 import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
 import type { SimHost, SimValue } from '../sim';
+import type { DamageRequest } from '../../../shared/engine/combat/pipeline';
 import { BossContenders } from './bossContenders';
 import { NO_MOMENTS, publishEncounter } from '../../../shared/engine/sim/encounterRows';
 
@@ -19,7 +20,17 @@ export interface PhaseEncounterPorts { saved: BossSaved; persist: (saved: BossSa
 const finite = v.pipe(v.number(), v.finite(), v.minValue(0));
 const natural = v.pipe(finite, v.integer());
 const continuation = v.strictObject({ state: v.picklist(['dormant', 'armed', 'intro', 'fight', 'beat', 'victory']), phase: natural, checkpoint: natural, attempts: natural, t: finite, skipT: finite, short: v.boolean(), saved: v.strictObject({ defeated: v.boolean(), rewardTaken: v.boolean(), kills: natural }) });
-const checkpointSchema = v.strictObject({ contract: v.string(), boss: continuation, shield: v.boolean(), engaged: v.exactOptional(natural) });
+const checkpointSchema = v.strictObject({ contract: v.string(), boss: continuation, shield: v.boolean(), engaged: v.exactOptional(natural), guard: v.exactOptional(v.picklist([1, 2, 3])) });
+/** TE-ENG1: an encounter's damage window, set by its decision as `Do.encounter(ENCOUNTER_GUARD_VERB, guard)`. Which hits on
+ *  the body land: `open` every hit (the default), `shut` none, `melee` only melee hits (`dmg.melee`: sword, spear),
+ *  `ranged` only the others (shots, arrows). Reset to `open` at every checkpoint reset and at victory. */
+export const ENCOUNTER_GUARD: Readonly<{ open: 0; shut: 1; melee: 2; ranged: 3 }> = Object.freeze({ open: 0, shut: 1, melee: 2, ranged: 3 });
+export const ENCOUNTER_GUARD_VERB = 4;
+function guardAdmits(guard: number, request: DamageRequest): boolean {
+  if (guard === ENCOUNTER_GUARD.open) return true;
+  if (guard === ENCOUNTER_GUARD.shut) return false;
+  return request.sourceTags.includes('dmg.melee') === (guard === ENCOUNTER_GUARD.melee);
+}
 /** Renderer-free boss presentation records; the real declared panel can implement exactly the same ports. */
 export function silentBossPresentation(): BossPresentation {
   let shown = false;
@@ -30,6 +41,7 @@ export function silentBossPresentation(): BossPresentation {
 export class PhaseEncounter {
   readonly boss: BossBrain;
   private shield = false;
+  private guard = 0;
   private readonly spec: PhaseEncounterSpec;
   private readonly contract: string;
   private readonly actor: AnimalSim;
@@ -49,7 +61,7 @@ export class PhaseEncounter {
     this.boss = new BossBrain({ id: spec.id, name: spec.name, title: spec.title, retryTitle: spec.retry, intro: spec.intro, introShort: spec.introShort,
       phases: spec.phases.map((p) => ({ at: p.at, name: p.name, caption: p.caption })), reward: {} }, {
       inArena: (point) => point.distanceTo(focus) < spec.arena.radius,
-      reset: (index) => { const value = spec.phases[index]; if (!value) throw new Error('Missing checkpoint'); actor.hp = actor.maxHp * value.at; actor.alive = true; actor.cancelAttack(); sim.strikes.get(actor.entityId)?.cancel(); actor.setMotion(actor.yaw, 0, 4); },
+      reset: (index) => { const value = spec.phases[index]; if (!value) throw new Error('Missing checkpoint'); actor.hp = actor.maxHp * value.at; actor.alive = true; actor.cancelAttack(); sim.strikes.get(actor.entityId)?.cancel(); actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; },
       seal: () => undefined, intro: () => focus, begin: () => undefined, enterPhase: () => undefined,
       update: (_dt, _t, fighting) => {
         if (decisionOwned) return;
@@ -58,7 +70,7 @@ export class PhaseEncounter {
         if (fighting && actor.alive && foe.health.alive) sim.startStrike(actor.entityId, foe.id);
       }, get hpFrac() { return actor.hp / actor.maxHp; }, get shielded() { return false; }, get dead() { return !actor.alive; },
       clampHp: (fraction) => { actor.hp = actor.maxHp * fraction; }, setInvulnerable: (on) => { this.shield = on; },
-      victory: () => { actor.setMotion(actor.yaw, 0, 4); }, rewardPoint: () => focus,
+      victory: () => { actor.setMotion(actor.yaw, 0, 4); this.guard = ENCOUNTER_GUARD.open; }, rewardPoint: () => focus,
       respawnPoint: () => ({ pos: new Vector3(...spec.respawn.at), yaw: spec.respawn.yaw }),
     }, { events: sim.events, player: party.player, lockInput: () => undefined, respawn: party.respawn,
       skipHeld: () => false, faceToward: () => undefined, spawnReward: ports.reward, persist: (value) => { ports.persist({ ...value }); },
@@ -67,7 +79,7 @@ export class PhaseEncounter {
       if (request === null) return null;
       if (this.boss.state === 'intro' && request.source !== 'env' && sim.players.has(request.source.id)) return null;
       if (request.target !== actor.combatActor()) return request;
-      if (this.shield || this.boss.state !== 'fight') return null;
+      if (this.shield || this.boss.state !== 'fight' || !guardAdmits(this.guard, request)) return null;
       const next = this.spec.phases[this.boss.phase + 1];
       // A large hit cannot skip a checkpoint or kill through the next phase threshold.
       const scaled = party.scaled(request);
@@ -77,16 +89,16 @@ export class PhaseEncounter {
     sim.events.on('actor.died', ({ actor: dead }) => { if (sim.players.size > 1) party.fell(dead.id, this.boss); else if (sim.players.has(dead.id)) this.boss.onPlayerDeath(); }, sim.scope);
     sim.onStep(`encounter.${spec.id}`, (_dt) => { party.observe(this.boss); this.boss.update(1 / 60, sim.clock.now); }, { snapshot: () => this.snapshot(), restore: (value) => { this.restore(value); } });
     sim.scope.onDispose(() => { this.boss.disarm(); }); this.boss.arm();
-    publishEncounter(sim, spec.id, () => ({ ...NO_MOMENTS, kind: spec.kind === 'boss' ? 'boss' : 'elite', state: this.boss.state, hp: actor.hp / actor.maxHp, phase: this.boss.phase, shield: this.shield, body: actor.entityId }));
+    publishEncounter(sim, spec.id, () => ({ ...NO_MOMENTS, kind: spec.kind === 'boss' ? 'boss' : 'elite', state: this.boss.state, hp: actor.hp / actor.maxHp, phase: this.boss.phase, shield: this.shield || this.guard === ENCOUNTER_GUARD.shut, body: actor.entityId }));
   }
   /** Damage modification and phase transitions use the existing shared combat/clock; no raw health callback is authored. */
-  snapshot(): SimValue { const { engaged } = this.party; return JSON.stringify({ contract: this.contract, boss: this.boss.snapshot(), shield: this.shield, ...(engaged === 0 ? {} : { engaged }) }); }
+  snapshot(): SimValue { const { engaged } = this.party; return JSON.stringify({ contract: this.contract, boss: this.boss.snapshot(), shield: this.shield, ...(engaged === 0 ? {} : { engaged }), ...(this.guard === 0 ? {} : { guard: this.guard }) }); }
   /** Restore does not grant rewards or persist again; presentation is refreshed from the recovered phase. */
   restore(value: SimValue): void {
     if (typeof value !== 'string') throw new Error('Invalid encounter snapshot');
     const input: unknown = JSON.parse(value), saved = v.parse(checkpointSchema, input);
     if (saved.contract !== this.contract) throw new Error('Incompatible encounter snapshot');
-    this.boss.restore(saved.boss); this.shield = saved.shield; this.party.restoreEngaged(saved.engaged ?? 0);
+    this.boss.restore(saved.boss); this.shield = saved.shield; this.guard = saved.guard ?? ENCOUNTER_GUARD.open; this.party.restoreEngaged(saved.engaged ?? 0);
     this.presentation.hideBar(); this.presentation.hideNameCard(); this.presentation.hideReward();
     if (this.boss.state === 'fight' || this.boss.state === 'beat') {
       const phase = this.spec.phases[this.boss.phase];
@@ -97,7 +109,13 @@ export class PhaseEncounter {
   /** Explicit death/checkpoint hook for a host that resolves death before its queued notification. */
   retry(): boolean { return this.boss.onPlayerDeath(); }
   /** Read-only batch validation; the DecisionHost commits only after every command passes. */
-  validateDecision(verb: number, value: number): void { this.boss.validateDecision(verb, value); }
-  /** Apply on the next fixed step through the current checkpoint/reward owner. */
-  applyDecision(verb: number, value: number): void { this.boss.applyDecision(verb, value); }
+  validateDecision(verb: number, value: number): void {
+    if (verb !== ENCOUNTER_GUARD_VERB) { this.boss.validateDecision(verb, value); return; }
+    if (!Number.isSafeInteger(value) || value < ENCOUNTER_GUARD.open || value > ENCOUNTER_GUARD.ranged) throw new Error('Invalid encounter guard');
+  }
+  /** Apply on the next fixed step through the current checkpoint/reward owner; the guard is this encounter's own. */
+  applyDecision(verb: number, value: number): void {
+    this.validateDecision(verb, value);
+    if (verb === ENCOUNTER_GUARD_VERB) this.guard = value; else this.boss.applyDecision(verb, value);
+  }
 }

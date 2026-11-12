@@ -45,6 +45,9 @@ export interface DecisionRuntime extends Pick<SimHost, 'scope' | 'events' | 'phy
   /** Existing encounter state of borrowed bodies, read without creating an encounter. */
   readonly borrowedControls?: ReadonlyMap<string, { readonly fighting: boolean; readonly phase: number; readonly calm?: boolean; readonly leanField?: string }>;
   onStep: (id: string, run: () => void, adapter?: SimStateAdapter, phase?: 'beforeBodies' | 'afterBodies') => () => void;
+  /** TE-ENG1: the scene lane's public shared fields. `field` on target 0 writes one, so a decision (a boss's windup,
+   *  its open core) drives the panels and colliders that read it. Absent without a scene lane: the command refuses. */
+  readonly scene?: { readonly write: (field: number, value: number) => void };
 }
 /** The player a host's scripts deal with: the one its body turned to. Its id stays the script's one player handle. */
 export function focusPlayer(host: SimHost): DecisionRuntime['player'] {
@@ -52,8 +55,8 @@ export function focusPlayer(host: SimHost): DecisionRuntime['player'] {
   return { id, position: host.playerFocus, get yaw() { return host.focusedPlayer.yaw; }, get health() { return host.focusedPlayer.health; }, get motor() { return host.focusedPlayer.motor; } };
 }
 /** A host's decision runtime: its scripts deal with the player nearest the body that runs them. */
-export function decisionRuntime(host: SimHost): DecisionRuntime {
-  return { scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, groundHeightAt: (x, z) => host.groundHeightAt(x, z), player: focusPlayer(host),
+export function decisionRuntime(host: SimHost, scene?: DecisionRuntime['scene']): DecisionRuntime {
+  return { ...(scene === undefined ? {} : { scene }), scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, groundHeightAt: (x, z) => host.groundHeightAt(x, z), player: focusPlayer(host),
     state: host.state, slots: host.slots, entities: host.entities, strikes: host.strikes,
     registerStrikeCatalogue: (id, specs) => { host.registerStrikeCatalogue(id, specs); }, startDeclaredStrike: (source, target, strike) => host.startDeclaredStrike(source, target, strike),
     onStep: (id, run, adapter, phase) => host.onStep(id, run, adapter, phase) };
@@ -327,6 +330,10 @@ export class ShardDecisions {
     if (body !== null) apply.push(() => { body.commit(); });
     for (const [op, target, a, b] of commands) {
       if (op === 8 || (op >= SCRIPT_V1_COMMANDS['body.spawn'] && op <= SCRIPT_V1_COMMANDS['body.retire'])) continue; // Timers are the DecisionHost's transaction, not another clock.
+      if (op === 4 && target === 0) {
+        const scene = requireValue(this.sim.scene, 'scene field owner'); this.validateField(a, b);
+        apply.push(() => { scene.write(a, b); }); continue;
+      }
       if (op === 1 || op === 2 || op === 3 || op === 4) {
         const name = this.owned(target, context), actor = requireValue(this.sim.entities.get(name), 'actor');
         if (op === 3) { apply.push(() => this.stop(target)); continue; }

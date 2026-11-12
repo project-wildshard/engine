@@ -425,7 +425,8 @@ export class DecisionHost {
     if (op === SCRIPT_V1_COMMANDS['collider.enabled']) {
       check(target === 0 && (b === 0 || b === 1) && command[4] === 0, 'collider arguments'); this.id(row, 'colliders', a); return;
     }
-    if (ownedCommands.has(op)) check(row.owners.has(target), 'command ownership');
+    // TE-ENG1: `field` on target 0 writes the scene's public shared field (panels and colliders read it), never an actor's.
+    if (ownedCommands.has(op) && !(op === 4 && target === 0)) check(row.owners.has(target), 'command ownership');
     else if (target !== 0) { this.actor(row, target); check(playerCommands.has(op) || row.players.has(target) || row.owners.has(target), 'command ownership'); }
     if (op === 1 || op === 2) { this.id(row, op === 1 ? 'moves' : 'strikes', a); if (b !== 0) this.actor(row, b); }
     if (op === 4) this.id(row, 'fields', a);
@@ -438,7 +439,7 @@ export class DecisionHost {
     if (op === 12) this.id(row, 'cues', a);
     if (op === 13) this.id(row, 'channels', a);
     if (op === 14) this.id(row, 'impulses', a);
-    if (op === 15) check(target === 0 && integer(a, 1, 3), 'encounter verb');
+    if (op === 15) check(target === 0 && integer(a, 1, 4), 'encounter verb');
     if (op === 16) this.id(row, 'weather', a);
   }
   private named(row: BindingState, values: Float64Array): Slots {

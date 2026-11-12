@@ -2,7 +2,7 @@ import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { parseNativeLoadoutRow, type NativeLoadoutRowSchema } from '@wildshard/format/nativeItems';
 import { borrowedDecisionAuthority } from '../shardfile/borrowedDecisions';
-import { decisionRuntime, focusPlayer, ShardDecisions } from '../shardfile/decisions';
+import { decisionRuntime, focusPlayer, ShardDecisions, type DecisionRuntime } from '../shardfile/decisions';
 import { WorldTargetHost } from '../../../shared/game/shardfile/worldTargets';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseWorldTargets, worldTargetRules } from '@wildshard/format/worldTargets';
@@ -407,6 +407,10 @@ export function prepareShardfileSimRestore(shard: Shardfile, assets: ReadonlyMap
 }
 /** Replace a private Object.entries snapshot value, preserving its tuple and
  * the downstream native observation validation rather than making a second pair. */
+/** TE-ENG1: a decision's scene field writes the scene lane's public shared state; no lane, no port. */
+function sceneFields(lane: ScriptLanePort | undefined): DecisionRuntime['scene'] {
+  return lane === undefined ? undefined : { write: (field, value) => { lane.world.writePublicShared(field, value); } };
+}
 function observationValue(entry: [string, unknown], value: boolean): asserts entry is [string, boolean] { entry[1] = value; }
 
 /** Reinstall matching adapters into a fresh standalone restore host; restoring skips collider allocation and stepping. */
@@ -635,7 +639,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     const decisionActors = new Set(decisionRows.flatMap(row => Object.values(row.actors)));
     const decisionEncounters = new Set(shard.encounters.filter(row => decisionActors.has(row.entity)).map(row => row.id));
     const encounters = installDeclaredEncounters(host, shard.encounters, ports.encounters ?? (() => ({ saved: { defeated: false, rewardTaken: false, kills: 0 }, persist: () => undefined, reward: () => undefined })), ports.hud, decisionEncounters);
-    const decisions = decisionRows.length === 0 ? undefined : new ShardDecisions(decisionRuntime(host), shard, assets, ports.sections ?? new Map(), encounters, quest, movers, ports.quest?.fact, ports.restoring ?? false, ports.navigation, ports.scriptDisabled);
+    const decisions = decisionRows.length === 0 ? undefined : new ShardDecisions(decisionRuntime(host, sceneFields(lane)), shard, assets, ports.sections ?? new Map(), encounters, quest, movers, ports.quest?.fact, ports.restoring ?? false, ports.navigation, ports.scriptDisabled);
     // All individual/custom aliases and encounter recipes have admitted successfully before setup draws or group work.
     const groups = preparedGroups.install(ports.restoring ?? false);
     if (!host.embedded && !ports.restoring) host.physics.step();
