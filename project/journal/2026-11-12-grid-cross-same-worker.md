@@ -6,3 +6,7 @@
 - Surprise: `workerTable(cells, 1)` still opens two workers when two dedicated cells are named. Staging's 2 workers put Nalati alone on
   worker 0, so Driftwood → Nalati is cross-worker; Driftwood → Far Reach, Pine Hollow and Sunscar are same-worker.
 - Not wired yet: nothing posts `crossing`. The worker needs the road (its strips, `addCellWalls`) and a per-seat crossing driver first.
+- Review (one-shot `claude -p`): 2 MUSTs folded. A hello mid-crossing now closes `retry` (the door can't ask either cell), and the
+  door keeps the seat counted through the source's `left` until `crossed` says moved, stayed, or gone. `NetRoom.live` is checked
+  before anything moves, so a not-yet-welcomed link stays where it is. SHOULDs folded: `recovered` on a previous-doc arrival, the
+  voice body renamed. Voice still routes by the seating cell (next lane).

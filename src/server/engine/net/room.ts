@@ -215,6 +215,8 @@ export class NetRoom {
    * Null: nobody follows them. Their client left, or never said hello, and any link it still has is closed: a player's
    * feet can cross with no one holding them, and that may not end either room.
    */
+  /** Whether this client said hello and was welcomed: only such a client can be handed off (GC15 checks before it moves anything). */
+  live(id: number): boolean { return this.clients.find(entry => entry.id === id)?.state === 'live'; }
   handOff(id: number, to: NetRoom, player: NetPlayer): number | null {
     const client = this.clients.find(entry => entry.id === id);
     if (client === undefined) return null;

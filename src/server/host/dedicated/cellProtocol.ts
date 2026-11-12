@@ -59,6 +59,6 @@ export type WorkerNews =
   | { readonly kind: 'reading'; readonly reading: WorkerReading }
   | { readonly kind: 'cell'; readonly slug: string; readonly ms: number }
   | { readonly kind: 'drained' }
-  /** GC15: a `cross` order's end. Moved, the seat and its link are in `to` and `from` has let it go; else it stands in `from` still. */
-  | { readonly kind: 'crossed'; readonly device: string; readonly name: string; readonly from: string; readonly to: string; readonly moved: boolean }
+  /** GC15: a `cross` order's end. Moved, the seat and its link are in `to` (as `body`) and `from` has let it go; else it `stays` in `from`, or neither holds it. */
+  | { readonly kind: 'crossed'; readonly device: string; readonly name: string; readonly body: string; readonly from: string; readonly to: string; readonly moved: boolean; readonly stays: boolean }
   | (RoomNews & { readonly slug: string });

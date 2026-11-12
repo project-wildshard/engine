@@ -146,6 +146,8 @@ export class DedicatedRoom {
   get holding(): number { let held = 0; for (const seat of this.seats.values()) if (seat.transport === null) held++; return held; }
   /** Whether this device already holds a seat here. */
   holds(device: string): boolean { return this.seats.has(device); }
+  /** The body id a device's seat has here. */
+  bodyId(device: string): string | undefined { return this.seats.get(device)?.body; }
   /** The body a device stands in. */
   bodyOf(device: string): PlayerSim | undefined { const seat = this.seats.get(device); return seat === undefined ? undefined : this.host.players.get(seat.body); }
 
@@ -214,15 +216,17 @@ export class DedicatedRoom {
    * GC15 (MP1.6 inside a worker): this seat walks into `target`, a cell on the same worker. A body is made there first, from `entry` (the
    * door's read of their save on that shard) standing at `at`; only then is their save here written, their body here let go and their
    * link handed over with `NetRoom.handOff` (`travel`, then the target's welcome and full frame), so the seat is held throughout and the
-   * socket never closes. False: nothing moved, and they stand here still.
+   * socket never closes. False when they do not stand in the target after: either nothing moved (`holds` here is still true), or the
+   * target refused the body it had just made, and the seat is gone from both.
    */
   handOver(device: string, target: DedicatedRoom, entry: SeatEntry, at: ResumeAt): boolean {
     const seat = this.seats.get(device), transport = seat?.transport ?? null;
-    if (seat === undefined || transport === null || seat.client === null || target === this || target.seats.has(device)) return false;
+    if (seat === undefined || transport === null || seat.client === null || !this.net.live(seat.client) || target === this || target.seats.has(device)) return false;
     const { previous, ...current } = entry;
-    let arrived = target.place(current, transport, at);
-    if (typeof arrived === 'string' && previous !== undefined) arrived = target.place({ ...current, doc: previous.doc, recovery: previous.recovery }, transport, at);
+    let arrived = target.place(current, transport, at), recovered = false;
+    if (typeof arrived === 'string' && previous !== undefined) { arrived = target.place({ ...current, doc: previous.doc, recovery: previous.recovery }, transport, at); recovered = typeof arrived !== 'string'; }
     if (typeof arrived === 'string') return false;
+    if (recovered) target.options.post({ kind: 'recovered', device, seq: entry.seq });
     mountedPlayerOf(this.host, seat.body)?.dismount();
     this.write(seat, 'cross');
     seat.closeOff?.(); seat.closeOff = null; seat.transport = null;

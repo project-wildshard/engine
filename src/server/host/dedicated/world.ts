@@ -181,7 +181,8 @@ export class World {
   private heard(index: number, news: WorkerNews): void {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
     // GO7: a late `left` from the cell a goto moved them out of must not unseat them (or free their Name) in the new one.
-    else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
+    // GC15: a crossing's source lets the seat go before `crossed` says where it went: the seat stays counted until then.
+    else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.crossings.has(news.device)) return; if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
     // A voice is named for the body its cell seated (a room's first seat is its lead body), from the cell they now stand in.
     else if (news.kind === 'seated') { const { device, body, slug: from } = news; if (this.seated.get(device) === from) this.voiceBodies.get(device)?.(body); }
     else if (news.kind === 'refused') this.refuse(news.reason);
@@ -196,8 +197,11 @@ export class World {
     else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
     else if (news.kind === 'crossed') {
       this.crossings.delete(news.device);
-      // The source's `left` came first and let the device go; a moved seat now stands in the target, on the same link.
-      if (news.moved && !this.seated.has(news.device)) { this.seated.set(news.device, news.to); this.names.set(news.device, news.name); }
+      // A moved seat stands in the target, on the same link; one the target refused after the source let it go is in neither.
+      if (this.seated.get(news.device) === news.from) {
+        if (news.moved) { this.seated.set(news.device, news.to); this.names.set(news.device, news.name); this.voiceBodies.get(news.device)?.(news.body); }
+        else if (!news.stays) { this.seated.delete(news.device); this.names.delete(news.device); }
+      }
       this.options.log({ at: 'cell.crossed', index, device: news.device, from: news.from, to: news.to, moved: news.moved });
     }
   }
@@ -292,6 +296,8 @@ export class World {
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
     const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
+    // GC15: a seat mid-crossing is in neither cell for the door to ask: the client dials again in a moment.
+    if (this.crossings.has(device)) { end.close('retry'); return; }
     if (holding !== undefined) {
       // MP2.4: a body the room holds keeps the Name it was seated with; a new Name is claimed on the next fresh join, never here,
       // so the reservation and what everyone reads can't part.

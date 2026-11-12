@@ -102,7 +102,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     await wake(to);
     if (from.waking !== null) await from.waking;
     const moved = from.room.handOver(entry.device, to.room, entry, at);
-    post({ kind: 'crossed', device: entry.device, name: entry.name, from: fromSlug, to: toSlug, moved });
+    post({ kind: 'crossed', device: entry.device, name: entry.name, from: fromSlug, to: toSlug, moved, stays: from.room.holds(entry.device), body: moved ? to.room.bodyId(entry.device) ?? entry.body : entry.body });
   };
   const handle = (order: CellOrder): void => {
     if (order.kind === 'close') { dispose(); return; }
