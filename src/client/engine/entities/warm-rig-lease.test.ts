@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { BufferGeometry, CompressedTexture, Group, Mesh, MeshBasicMaterial, Scene, ShaderMaterial } from 'three';
+import { BufferGeometry, CompressedTexture, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Scene, ShaderMaterial, WebGLRenderTarget } from 'three';
 import { leaveWithResources } from './AnimalHerdView';
 
 const texture = (): CompressedTexture => new CompressedTexture([{ data: new Uint8Array(16), width: 4, height: 4 }], 4, 4);
@@ -26,4 +26,15 @@ test('a released rig keeps no listener on what it borrowed', () => {
   release();
   coat.dispose(); material.dispose();
   expect(rig.parent).toBe(warm);
+});
+
+test('a page render target (PMREM, a shadow map) never takes a rig out', () => {
+  const page = new WebGLRenderTarget(4, 4), coat = texture(), material = new MeshStandardMaterial({ map: coat, envMap: page.texture });
+  const warm = new Group(), rig = new Mesh(new BufferGeometry(), material);
+  const list = new Mesh(new BufferGeometry(), new ShaderMaterial({ uniforms: { layers: { value: [texture(), coat] } } }));
+  warm.add(rig, list); leaveWithResources(rig); leaveWithResources(list);
+  page.dispose();
+  expect(rig.parent).toBe(warm);
+  coat.dispose();
+  expect(rig.parent).toBeNull(); expect(list.parent).toBeNull();
 });

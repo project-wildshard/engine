@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { app } from '../app/runtime';
-import { pageScope } from '../../../shared/engine/app/resources';
 import { shaderPatchTextures } from '../render/shaderPatches';
+import { pageScope } from '../../../shared/engine/app/resources';
 import type { TickRate } from '../../../shared/engine/app/scheduler';
 import { TIER, TIER_CONFIG } from '../core/tier';
 import { worldTime } from '../../../shared/engine/core/time';
@@ -142,18 +142,18 @@ interface FarRig extends FarMember {
   mask: number | null;
 }
 
-/**
- * The page's half of the herds (P1-E4.3): rigs, the far and shadow batches, fur shells, draw distance, blood and the
- * debug capsules. AnimalManager.ts decides; this draws. It holds no decision and no gameplay random stream.
- */
 /** GC16 (GRID-CROSSING): a parked warm rig (DL24) borrows its level's materials and textures but sits on the page scene,
  *  so on the grid it outlived the cell that owns them: walking out of Driftwood freed the captain's coat, and the next
  *  cell's entry preparation, which walks hidden roots too, met the freed texture ('lost its allocation after mip
- *  retirement') and held the player at Sunscar's edge. The rig leaves the scene the moment anything it draws with is
- *  freed. Returns the release for a rig its owner takes out first. */
+ *  retirement') and held the player at Sunscar's edge. The rig leaves the scene the moment one of its materials, or a
+ *  texture they hold (fields, uniforms, patch samplers), is freed. Render-target textures (PMREM, shadow maps) are the page's, replaced
+ *  while the level lives, so they never take a rig out. Returns the release for a rig its owner takes out first. */
 export function leaveWithResources(rig: THREE.Object3D): () => void {
   const resources = new Set<THREE.Material | THREE.Texture>();
-  const texture = (value: unknown): void => { if (value instanceof THREE.Texture) resources.add(value); };
+  const texture = (value: unknown): void => {
+    if (Array.isArray(value)) { for (const item of value) texture(item); return; }
+    if (value instanceof THREE.Texture && !value.isRenderTargetTexture) resources.add(value);
+  };
   rig.traverse(object => {
     const held: unknown = Reflect.get(object, 'material');
     for (const candidate of Array.isArray(held) ? held : [held]) {
@@ -171,6 +171,10 @@ export function leaveWithResources(rig: THREE.Object3D): () => void {
   return () => { lease.dispose(); };
 }
 
+/**
+ * The page's half of the herds (P1-E4.3): rigs, the far and shadow batches, fur shells, draw distance, blood and the
+ * debug capsules. AnimalManager.ts decides; this draws. It holds no decision and no gameplay random stream.
+ */
 export class AnimalHerdView implements RowBodiesDraw {
   /** the animals' own world-matrix pass: a still, far animal's bones are not recomputed (animalMatrices.ts) */
   readonly group: AnimalGroup = new AnimalGroup();
