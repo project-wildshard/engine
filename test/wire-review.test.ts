@@ -71,8 +71,9 @@ test('spawn text projects by field id: a sender with an extra text field first s
   const extra = { ...animal, fields: [{ id: 99, name: 'extra', node: { kind: 'text' as const, maxBytes: 255 }, send: 'initial' as const }, ...animal.fields] };
   const classes = WIRE_CLASSES.map(entry => (entry === animal ? extra : entry));
   const reader = new WireFrameReader({ classTables: encodeClassTables(classes), rideLawTables: RIDES }, () => 2, OWNER);
-  // The sender's text order is extra (99), kind (19), variant (20), rarity (21); this build's is kind, variant, rarity.
-  expect(reader.text(2, ['shiny', 'boar', 'brown', 'common'])).toEqual(['boar', 'brown', 'common']);
+  // The sender's text order is extra (99), kind (19), variant (20), rarity (21); this build's is kind, variant, rarity,
+  // species (24), which this sender lacks, so it reads its default: an older server's boar (TE-ENG7).
+  expect(reader.text(2, ['shiny', 'boar', 'brown', 'common'])).toEqual(['boar', 'brown', 'common', '']);
 });
 
 test('a welcome whose tables this build cannot project closes as `reload`, never hanging unwelcomed', () => {

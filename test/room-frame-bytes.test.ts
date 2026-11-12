@@ -71,7 +71,8 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
   expect(await roomDigest(true)).toBe(EXPECTED_ROOM);
 }, 120_000);
 
-/** Taken on engine main 2887bd63, before the first change. */
-const EXPECTED = '1c8a02607a75ce36d93b687de9c546d42501bd8c753073c3914bfd2ed72a7057';
-/** Taken on engine main f03e8341, before the second change. */
-const EXPECTED_ROOM = '27a23181be099ad966c17ef06a8000d84fd19e2863ac262ee7fb40dee1cb08b4';
+/** Taken on engine main 2887bd63, before the first change; re-taken for TE-ENG7, whose `animal.species` adds one
+ *  initial text to every creature spawn (an empty one for Nalati's native bodies). */
+const EXPECTED = '7c78d2eb90c1963f88c200018e683a5929524d58b622747ff21cd7d53250d601';
+/** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. */
+const EXPECTED_ROOM = 'dd6192e4f181950610894ea2d8377dcb19c9fd87730e361e440b3d70a92b0fb6';
