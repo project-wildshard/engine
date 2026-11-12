@@ -5,3 +5,4 @@ export function splitRoomsHealthLines<T extends PageLine & { name?: string }>(li
 export function playerNameSource(name: string): string;
 export function isPlayerName(shown: string, name: string): boolean;
 export function chatLinePattern(name: string, text: string): RegExp;
+export function guardStagingSockets(allowed: string): void;

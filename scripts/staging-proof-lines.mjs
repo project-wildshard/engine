@@ -68,3 +68,18 @@ export function isPlayerName(shown, name) { return new RegExp(playerNameSource(n
 
 /** A chat line as everyone reads it: the sender's Name, tagged or not, then the text. @param {string} name @param {string} text */
 export function chatLinePattern(name, text) { return new RegExp(`${quote(name)}(?:#[1-9]\\d{3})?: ${quote(text)}`, 'u'); }
+
+/** J205 in the page: an init script that refuses, before native construction, every WebSocket but the staging door, `allowed`
+ *  (the signed staging release's socket origin). The door's own path only, with no query or exactly `?chunk=<cell>` (GO7: a page
+ *  Shard select sent to a cell dials the door so, shell.ts gotoSocket). Admitted sockets use the untouched browser transport.
+ *  Self-contained: Playwright sends its source to the page (`context.addInitScript(guardStagingSockets, allowed)`).
+ *  @param {string} allowed */
+export function guardStagingSockets(allowed) {
+  const Native = globalThis.WebSocket;
+  globalThis.WebSocket = new Proxy(Native, { construct(target, args, newTarget) {
+    const url = new URL(String(args[0]), globalThis.location.href), keys = [...url.searchParams.keys()];
+    const query = keys.length === 0 || (keys.length === 1 && /^[a-z0-9_-]+$/u.test(url.searchParams.get('chunk') ?? ''));
+    if (url.origin !== allowed || url.pathname !== '/' || url.hash !== '' || !query) throw new Error(`J205 refused a non-staging socket ${url.origin}${url.pathname}${url.search}`);
+    return Reflect.construct(target, args, newTarget);
+  } });
+}

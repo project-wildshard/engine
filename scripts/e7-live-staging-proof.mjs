@@ -4,7 +4,7 @@ import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from 'playwright';
 import {KEYCHAIN_ARGS} from './chromium-keychain.mjs';
 import {saveFixture} from './debug-settings.mjs';
-import {chatLinePattern,playerNameSource,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
+import {chatLinePattern,guardStagingSockets,playerNameSource,roomsHealthURL,splitRoomsHealthLines} from './staging-proof-lines.mjs';
 
 const [base,build,key,engine]=process.argv.slice(2);
 assert.equal(new URL(base).origin,'https://staging.wildshard.io','J205 requires the isolated staging page');
@@ -27,18 +27,8 @@ try{
  /** @param {string} name */
  const enter=async name=>{
   const context=await browser.newContext({...devices['iPhone 16 Pro'],deviceScaleFactor:2});
-  await context.addInitScript(allowed=>{
-   const Native=globalThis.WebSocket;
-   // Refuse before native construction. Successful sockets use the untouched
-   // browser transport, TLS and protocol; no relay or fake frames are installed.
-   globalThis.WebSocket=new Proxy(Native,{construct(target,args,newTarget){
-    const url=new URL(String(args[0]),location.href);
-    // GO7: a page Shard select sent to a cell dials the same door with `?chunk=<cell>` (shell.ts gotoSocket); nothing else.
-    const search=[...url.searchParams.keys()];
-    if(url.origin!==allowed||url.pathname!=='/'||url.hash||!(search.length===0||(search.length===1&&/^[a-z0-9_-]+$/u.test(url.searchParams.get('chunk')??''))))throw new Error(`J205 refused a non-staging socket ${url.origin}${url.pathname}${url.search}`);
-    return Reflect.construct(target,args,newTarget);
-   }});
-  },socket);
+  // Refuse before native construction; admitted sockets use the untouched browser transport, TLS and protocol.
+  await context.addInitScript(guardStagingSockets,socket);
   await saveFixture(context,{scope:'device',key:'devMode',data:true});
   await saveFixture(context,{scope:'global',key:'settings',data:{music:false,sfx:false,volume:0},merge:true});
   const page=await context.newPage();opened.push({page,context,name});

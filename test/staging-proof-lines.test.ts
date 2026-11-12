@@ -1,6 +1,6 @@
 // The staging proofs excuse exactly MS7 D7's rooms /health lines and read MP2.4 tagged Names (scripts/staging-proof-lines.mjs).
 import { describe, expect, it } from 'vitest';
-import { chatLinePattern, isPlayerName, isRoomsHealthLine, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from '../scripts/staging-proof-lines.mjs';
+import { chatLinePattern, guardStagingSockets, isPlayerName, isRoomsHealthLine, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from '../scripts/staging-proof-lines.mjs';
 
 const health = 'https://rooms-staging.wildshard.io/health';
 
@@ -87,5 +87,32 @@ describe('tagged Names (MP2.4)', () => {
     expect(line.test('Agent C g1mh B#4821: agent proof chromium 04e1e71')).toBe(true);
     expect(line.test('Agent C g1mh B: agent proof chromium 04e1e71')).toBe(true);
     expect(line.test('Agent C g1mh A#4821: agent proof chromium 04e1e71')).toBe(false);
+  });
+});
+
+describe('the live proof refuses every socket but the staging door (J205)', () => {
+  // The page's WebSocket under the guard: a stand-in that records what was dialled.
+  const dial = (allowed: string, href: string): string => {
+    const saved = { ws: globalThis.WebSocket, location: Reflect.get(globalThis, 'location') };
+    const opened: string[] = [];
+    class FakeSocket { constructor(url: string) { opened.push(url); } }
+    Reflect.set(globalThis, 'WebSocket', FakeSocket);
+    Reflect.set(globalThis, 'location', { href: 'https://staging.wildshard.io/?chunk=driftwood-isle' });
+    try {
+      guardStagingSockets(allowed);
+      try { new globalThis.WebSocket(href); } catch (error) { return String(error); }
+      return opened.length === 1 ? 'opened' : 'not opened';
+    } finally { Reflect.set(globalThis, 'WebSocket', saved.ws); Reflect.set(globalThis, 'location', saved.location); }
+  };
+  const staging = 'wss://rooms-staging.wildshard.io';
+  it('admits the staging door, bare or with one GO7 chunk', () => {
+    for (const href of [staging, `${staging}/`, `${staging}/?chunk=driftwood-isle`, `${staging}/?chunk=template-2`]) expect(dial(staging, href)).toBe('opened');
+  });
+  it('refuses production and every other host, with and without ?chunk=', () => {
+    for (const host of ['wss://rooms.wildshard.io', 'wss://play.wildshard.io', 'wss://preview.wildshard.io', 'wss://staging.wildshard.io', 'ws://127.0.0.1:8787'])
+      for (const suffix of ['', '/', '/?chunk=driftwood-isle']) expect(dial(staging, `${host}${suffix}`)).toMatch(/J205 refused/u);
+  });
+  it('refuses any other path or query on the staging door', () => {
+    for (const href of [`${staging}/x`, `${staging}/?chunk=a&x=1`, `${staging}/?x=1`, `${staging}/?chunk=`, `${staging}/?chunk=A/B`, `${staging}/#h`]) expect(dial(staging, href)).toMatch(/J205 refused/u);
   });
 });
