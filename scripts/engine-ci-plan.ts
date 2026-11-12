@@ -99,7 +99,13 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
     plan=build(median);selected=plan.curve.at(-1);
     console.log(`::warning title=Unmeasured test files::${unknown.length} file(s) have no clock yet (${unknown.slice(0,5).join(', ')}${unknown.length>5?', …':''}); planned at the ${median.toFixed(1)} s median on all ${maxShards} shards. Main's next run measures them.`);
   }
-  if(selected===undefined)throw new Error('No shard count meets 90% gain with 20% five-minute headroom; optimize the measured floor');
+  // J295: a floor over the bar is AMBER, not red. One slower measured run (43309009626's table) threw here and failed
+  // every share before a test ran. Plan the fastest shard count instead, and name the heaviest measured files to cut.
+  if(selected===undefined){
+    selected=plan.curve.reduce((best,row)=>row.seconds<best.seconds?row:best);
+    const heavy=Object.entries(baseline).filter(([file])=>files.includes(file)).sort(([,a],[,b])=>b-a).slice(0,5).map(([file,seconds])=>`${file} ${seconds.toFixed(0)} s`);
+    console.log(`::warning title=AMBER shard floor::No shard count meets 90% gain with 20% five-minute headroom; planned ${String(selected.count)} shards at ${selected.seconds.toFixed(0)} s. Optimize the measured floor: ${heavy.join(', ')}`);
+  }
   const {shards,curve}=plan;
   return {version:1,sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),ring,files:[...files],inventoryHash:digest(files),
     unknown,count:selected.count,setupSeconds,factor,curve,shards:shards(selected.count),timings:measured?'measured':'default'};

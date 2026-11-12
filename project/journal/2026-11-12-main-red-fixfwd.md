@@ -18,3 +18,11 @@
   moored movers on the server, so driftwood-isle and sunscar-dunes step
   new bodies. With HS2's two files reverted the old chains match; the
   new chains are recorded for darwin and linux (CI's prefixes match).
+- Run 43311635198 (aabe750f) then failed all six shares in the planner:
+  it read run 43309009626's table, measured on a slow runner (3,043
+  file-seconds against 2,931 on the green f1bb557f run), so 15 shards
+  floored at 256 s, over the 240 s bar, and `engine-ci-plan.ts` threw.
+  No file grew past its budget: the bar is just tight. A floor over the
+  bar is now AMBER (J295): the planner takes its fastest shard count and
+  warns, naming the five heaviest files. The next table (43310707036)
+  plans 13 shards at 229 s.
