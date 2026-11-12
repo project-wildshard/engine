@@ -15,25 +15,36 @@
 Git hygiene
 
  - Small Commit early & often.
- - Plan work goes in its own worktree, never on main (J240): `.worktrees/<slug>` on branch `plan/<slug>`.
-   Make it from the canonical checkout with `node scripts/worktree.mjs new <slug>`: it branches from origin/main,
-   installs offline and clones identical pins in seconds. Run `node scripts/worktree.mjs reap` to remove worktrees
-   whose branch has landed (it never touches unlanded, dirty or busy ones).
- - Pushing `plan/<slug>` runs the split pre-push: static checks and the related Vitest files locally; the full suite,
-   browser and timing tests run in hosted CI.
- - Land from the worktree with `WS_LANE_NAME=<lane> node scripts/land.mjs`: it pushes the branch, waits for that exact
-   SHA's hosted `ci` and `ring-1` to go green, rebases onto main and fast-forwards main. On red or a conflict, fix
-   forward on the branch and run it again.
+ - Two ways to work, no in-between (J290, Jake 2026-11-12, replaces J240's per-row landing). The lane's brief names
+   the mode; a unit with no mode named is mode 1 if it is one row or one fix, else ask the coordinator.
+   1. **Small or urgent unit** (one row, one fix, a queue-jumper): work and commit straight on `main` in the canonical
+      checkout (`~/projects/games/wildshard/engine`), by pathspec. Then `git pull --rebase origin main` and a plain
+      `git push origin main` through the normal pre-push. No worktree, no land.
+   2. **A whole plan or half a plan:** its own worktree, `node scripts/worktree.mjs new <slug>` (`.worktrees/<slug>`
+      on `plan/<slug>`, from origin/main, offline install, pins cloned, about 5 s). Commit there and push
+      `plan/<slug>` as often as you like. Land with `scripts/land.mjs` (below) only when the plan is complete, at a
+      major milestone, or once a day for a multi-day plan. Never land per row. `node scripts/worktree.mjs reap`
+      removes worktrees whose branch has landed (never unlanded, dirty or busy ones).
+ - Mode 1's pre-push is the full gate: static checks plus the related Vitest files (all of them when the diff touches
+   `package.json`, the lockfile or the harness). Expect 3 to 4 min and about 2,000 CPU-s, and one push per checkout at
+   a time (the `full-test` lease is per checkout). It refuses while anything in the checkout is dirty or untracked
+   (`Push target requires a clean checked tree`), and `git pull --rebase` refuses while another lane has an unstaged
+   edit. So until meta WORKTREE-LAND row WL11 lands, the coordinator runs one mode-1 code lane at a time here. If
+   another lane's edit still blocks your pull or push, wait and retry; never stash, restore or commit its files. If
+   the pre-push regenerates a `*.generated.ts` your change feeds, commit it with your change.
+ - Pushing `plan/<slug>` (mode 2) runs the split pre-push: static checks and the related Vitest files locally; the
+   full suite, browser and timing tests run in hosted CI.
  - `--force-with-lease` only on your own `plan/*` branch after a rebase (land does this itself); never force main.
- - The canonical checkout stays on main. Docs and release pushes from there are a plain `git push origin main`
-   through the normal pre-push (the shared push queue is gone, LAND-SIMPLIFY LS7).
+ - The canonical checkout stays on main. Mode-1 code, docs and release pushes from there are a plain
+   `git push origin main` through the normal pre-push (the shared push queue is gone, LAND-SIMPLIFY LS7).
  - Use pre-commit & pre-push git hooks for keeping checks/quality/lints etc.
  - Push often after every commit.
  - Every meaningful commit writes a journal into project/journal, the why & informal.
 
-Landing from a worktree (LAND-SIMPLIFY, J240/J249/J258; meta `docs/plans/WORKTREE-LAND-STANDARD-PLAN.md`)
+Landing from a worktree (mode 2; J290, LAND-SIMPLIFY J249/J258; meta `docs/plans/WORKTREE-LAND-STANDARD-PLAN.md`)
 
- - When: every code change. Never land from `tmp/`, a scratchpad or a private clone.
+ - When: a mode-2 plan only, at completion, at a major milestone, or once a day for a multi-day plan (J290); never
+   once per row. Never land from `tmp/`, a scratchpad or a private clone.
  - Start: from the canonical checkout, `node scripts/worktree.mjs new <slug>`, then `cd .worktrees/<slug>`.
    Commit there by pathspec as usual. One plan, one worktree, one `plan/<slug>` branch.
  - Land: `WS_LANE_NAME=<lane> node scripts/land.mjs` from the worktree. Options: `--timeout=MIN` (CI wait, 60),
@@ -100,8 +111,9 @@ When land stops (each seen on 2026-11-10/11):
 
 Never:
 
- - push main by hand from a worktree (`git push origin HEAD:main`): code lands only through land; the canonical
-   checkout's docs and release pushes are the one plain `git push origin main`;
+ - push main from a worktree (`git push origin HEAD:main`): a worktree's commits reach main only through land; the
+   one plain `git push origin main` is from the canonical checkout (mode-1 code, docs, releases);
+ - make a worktree and run land for a single row or fix (J290): that is mode 1, straight on main;
  - force main, or force anything but your own `plan/*` branch (land does it);
  - `--no-verify`, `SKIP_*`, `ALLOW_*` or `WS_LAND_MAIN_PUSH` by hand (land sets it on its own main push);
  - commit in the canonical checkout off main, or in someone else's worktree; remove a worktree by hand (`reap`).
