@@ -5,7 +5,7 @@ import { createClientChannels, bindClientChannelInputs } from '../../../shared/g
 import { readBorrowedOwner, type BorrowedOwnerPath } from '../../../shared/game/plugin/borrowed';
 import { createClientScene, createHeldMeleeBinding, type ClientScene, type ClientScenePorts } from './scene';
 import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, CylinderGeometry, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, SphereGeometry, Vector2, Vector3, MathUtils } from "three";
-import { RangedAction } from "@wildshard/engine/combat/Firearm";
+import { RangedAction, stepActionClock } from "@wildshard/engine/combat/Firearm";
 import { leverProfile, type LeverProfile } from "../../../shared/game/shardfile/items";
 import { blocks } from "@wildshard/engine/blocks";
 import type { WorldContactDispatcher } from "@wildshard/engine/combat/contactWeapon";
@@ -147,16 +147,17 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
   }
   mirror(rounds: number, reserve: number, reloading: boolean, taken: boolean): void {
     if (taken && !this.taken) this.taken = true;
-    this.store.reserve = reserve;
-    // At rest both sides agree, or the server's count stands; mid-cycle the page's own count leads for a beat.
+    // At rest both sides agree, or the server's count stands, rounds and reserve together; mid-cycle or mid-reload the page's own
+    // count leads (a reserve taken early would end the page's reload a round short).
     const { act } = this;
-    if (act.phase !== 'idle' || reloading || act.rounds === rounds) { this.apart = 0; return; }
+    if (act.phase !== 'idle' || reloading || act.rounds === rounds && this.store.reserve === reserve) { this.apart = 0; return; }
     this.apart += 1;
     if (this.apart < APART_FRAMES) return;
-    act.chambered = rounds > 0; act.tube = Math.min(act.tubeMax, Math.max(0, rounds - 1)); this.apart = 0;
+    act.chambered = rounds > 0; act.tube = Math.min(act.tubeMax, Math.max(0, rounds - 1)); this.store.reserve = reserve; this.apart = 0;
   }
   update(dt: number, _t: number): void {
-    for (const event of this.act.events(dt, false)) if (event === 'reloadEnd') this.onReloadEnd?.();
+    // On the wire the cycle steps once per command sent, so it chambers on the tick the server's does (P1-E6).
+    stepActionClock(dt, this.wire, seconds => { for (const event of this.act.events(seconds, false)) if (event === 'reloadEnd') this.onReloadEnd?.(); });
     this.sync();
     const [x, y, z] = this.ports.view.position, [rx, ry, rz] = this.ports.view.rotation;
     this.kick *= Math.exp(-dt * 14); this.flashT = Math.max(0, this.flashT - dt);

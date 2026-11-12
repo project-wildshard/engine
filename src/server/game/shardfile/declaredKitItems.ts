@@ -13,6 +13,7 @@ import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import { ItemRuntime, type ItemHook, type ItemState, type ItemTarget } from '@wildshard/engine/combat/items';
 import { RangedAction } from '@wildshard/engine/combat/Firearm';
 import { worldHit } from '@wildshard/engine/physics/query';
+import { shotRandom, shotSpread } from '@wildshard/engine/combat/shotSpread';
 import type { AimCommand } from '@wildshard/engine/input/commands';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
@@ -147,9 +148,11 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
     return lever === undefined || seat === undefined ? undefined : { seat, row: lever.row, profile: lever.profile };
   };
   // A round leaves from where the server stands this player, along the page's look, and stops at the first body or wall.
-  const eyeAt = new Vector3(), along = new Vector3(), end = new Vector3();
+  const eyeAt = new Vector3(), along = new Vector3(), end = new Vector3(), across = new Vector3();
   const hitscan = (player: PlayerSim, row: LeverRow, profile: LeverProfile, direction: AimCommand['direction'], seq: number): void => {
     eyeAt.set(player.position.x, player.position.y + EYE, player.position.z); along.set(direction.x, direction.y, direction.z).normalize();
+    // The row's hip spread, drawn from the command's own seq as Pine's rounds are (P1-E5.3-E4), so a replay lands the same.
+    if (profile.spreadHip > 0) shotSpread(along, profile.spreadHip * (Math.PI / 180), shotRandom(seq), { radius: profile.spreadRadius, axisScale: 1 }, across);
     const wall = worldHit(host.physics, eyeAt, end.copy(eyeAt).addScaledVector(along, profile.range), 0);
     const hit = nativeRangedHit([...host.entities.values()], eyeAt, along, wall === null ? profile.range : wall.distance), body = hit?.body ?? null;
     if (hit === null || body === null) return;

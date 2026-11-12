@@ -31,7 +31,7 @@ test('the held lever: locked, a tube on the HUD, presses on the wire, the server
   expect(lever.row.ui.melee).toBe(false);
   const sent: string[] = [];
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Only the calls a lever makes are recorded.
-  lever.wire = { press: () => { sent.push('press'); }, reload: () => { sent.push('reload'); } } as unknown as WeaponWire;
+  lever.wire = { press: () => { sent.push('press'); }, reload: () => { sent.push('reload'); }, steps: () => 1 } as unknown as WeaponWire;
 
   // On its rack: hidden, no ammo strip, every press refused.
   lever.update(1 / 60, 0);

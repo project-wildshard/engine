@@ -80,6 +80,8 @@ export function declaredKitSlots(rows: readonly { readonly id: string; readonly 
 /** A lever's numbers, admitted from its row's `firearm` profile: the tube (magazine), the per-round reload and the cycle. */
 export interface LeverProfile {
   readonly magazine: number; readonly reserve: number; readonly reload: number; readonly range: number; readonly autoReload: number;
+  /** Hip-fire spread in degrees (the declared lever has no aim-down-sights), and its radial law. */
+  readonly spreadHip: number; readonly spreadRadius: 'linear' | 'sqrt';
   readonly lever: { readonly cycleDelay: number; readonly cycleTime: number; readonly reloadIn: number; readonly reloadOut: number; readonly ejectAt: number; readonly cockAt: number; readonly autoReloadClose: number };
 }
 /** Admit a `kit.lever` row's profile: a firearm with `action: "lever"`, `reloadMode: "perRound"` and its `lever` block. */
@@ -88,7 +90,7 @@ export function leverProfile(row: { readonly id: string; readonly profile?: unkn
   if (p?.family !== 'firearm' || p.action !== 'lever' || p.reloadMode !== 'perRound' || p.lever === undefined) throw new Error(`Lever ${row.id} needs a firearm profile with action lever, reloadMode perRound and a lever block`);
   const { magazine, reserve, reload, range, autoReload, lever } = p;
   if (!Number.isInteger(magazine) || magazine < 2 || magazine > 64 || reload <= 0 || range <= 0 || range > 1000) throw new RangeError(`Lever ${row.id} has an invalid profile`);
-  return { magazine, reserve, reload, range, autoReload, lever: { cycleDelay: lever.cycleDelay, cycleTime: lever.cycleTime, reloadIn: lever.reloadIn, reloadOut: lever.reloadOut, ejectAt: lever.ejectAt, cockAt: lever.cockAt, autoReloadClose: lever.autoReloadClose } };
+  return { magazine, reserve, reload, range, autoReload, spreadHip: p.spreadHip, spreadRadius: p.spreadRadius, lever: { cycleDelay: lever.cycleDelay, cycleTime: lever.cycleTime, reloadIn: lever.reloadIn, reloadOut: lever.reloadOut, ejectAt: lever.ejectAt, cockAt: lever.cockAt, autoReloadClose: lever.autoReloadClose } };
 }
 /** The owned lines a lever's server seat publishes to its holder: rounds in the gun (tube and chamber), the reserve, a reload under
  *  way (0 or 1) and whether the player has taken it (0 or 1). A line at zero is dropped from `owned`, so absent reads as zero. */
