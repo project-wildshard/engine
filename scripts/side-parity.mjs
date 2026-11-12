@@ -82,7 +82,9 @@ export function ownerGroup(owner) {
 /** A body of flesh is a creature, a person or a player on either side, whatever its owner: an actor. */
 const groupOf = row => row.material === 'flesh' ? 'actor' : ownerGroup(row.owner);
 /** The key two colliders must share to match: owner group, material, sensor or solid. */
-const matchKey = row => `${row.sensor ? 'sensor:' : ''}${groupOf(row)}|${row.material ?? '-'}`;
+/** The match key `row` would have under the owner group `group`. */
+const keyAs = (row, group) => `${row.sensor ? 'sensor:' : ''}${group}|${row.material ?? '-'}`;
+const matchKey = row => keyAs(row, groupOf(row));
 /** The allow key: owner group, sensors apart. */
 const allowKey = row => `${row.sensor ? 'sensor:' : ''}${groupOf(row)}`;
 const near = (a, b, slack) => a.every((value, i) => Math.abs(value - b[i]) <= slack);
@@ -115,8 +117,12 @@ export const MEASURED_SHAPES = Object.freeze([0, 1, 2, 4, 6, 7, 9, 10, 11, 12, 1
  * A collider whose only match is the same shape under another owner or material is a solid both sides stand on, but its
  * owner or material drifted (a hit, a sound, an interaction reads those); that is one line per owner pair, and a lesser finding.
  * `allow` maps an allow key (owner, `sensor:` prefixed for a sensor) to why it may differ; it is skipped both ways.
+ * `same` (SS10) maps a server owner group to the page owner group that may name the same pieces (a gate named for its door,
+ * a bake's 150-collider chunk): a collider with no match under its own name may match one under that name, still one to
+ * one and by material and shape.
+ * A static page solid with no server match that lies inside a server edge wall (`edge`) is no finding: the wall stands there.
  */
-export function sideParityDiff(page, server, at, allow = {}, slack = 1) {
+export function sideParityDiff(page, server, at, allow = {}, { slack = 1, same = {} } = {}) {
   // without the page's player, the server-to-page half would check nothing and pass
   if (at === null || at.length !== 3) throw new Error('Side parity needs the page player position its half was recorded at');
   const index = rows => { const map = new Map(); for (const row of rows) { const key = matchKey(row); let list = map.get(key); if (list === undefined) map.set(key, list = []); list.push(row); } return map; };
@@ -131,9 +137,16 @@ export function sideParityDiff(page, server, at, allow = {}, slack = 1) {
   const check = (row, others, used, all, side) => {
     // one to one: each collider on the other side stands in for one collider here, so half a plank chain is a finding
     let best = null;
-    for (const other of others.get(matchKey(row)) ?? []) if (!used.has(other) && close(row, other) && (best === null || spread(row, other) < spread(row, best))) best = other;
+    // its own name first; then the other side's name for it that `same` declares (a page owner may have several server names)
+    const names = side === 'page' ? Object.keys(same).filter(name => same[name] === groupOf(row)) : Object.hasOwn(same, groupOf(row)) ? [same[groupOf(row)]] : [];
+    for (const key of [matchKey(row), ...names.map(name => keyAs(row, name))]) {
+      for (const other of others.get(key) ?? []) if (!used.has(other) && close(row, other) && (best === null || spread(row, other) < spread(row, best))) best = other;
+      if (best !== null) break;
+    }
     if (best !== null) { used.add(best); return; }
     const shape = all.find(other => close(row, other));
+    const inside = (outer, inner) => [0, 1, 2].every(i => inner[i] >= outer[i] - slack && inner[i + 3] <= outer[i + 3] + slack);
+    if (shape === undefined && side === 'page' && !row.sensor && !row.dynamic && all.some(other => other.material === 'edge' && !other.sensor && inside(other.box, row.box))) return;
     if (shape === undefined) { note(`${side}|${matchKey(row)}|${row.dynamic}`, row.box, (count, box) => side === 'page'
       ? `${describe(row)}: ${count} page collider(s) with no server match, e.g. [${box.join(', ')}]`
       : `${describe(row)}: ${count} server collider(s) near the page's player with no page match, e.g. [${box.join(', ')}]`); return; }

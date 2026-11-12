@@ -5,4 +5,4 @@ export function ownerGroup(owner: string | null): string;
 export function groupInventory(rows: readonly SideParityRow[]): Map<string, { count: number; materials: Set<string>; box: number[] }>;
 export const PAGE_DISC: number;
 export const MEASURED_SHAPES: readonly number[];
-export function sideParityDiff(page: readonly SideParityRow[], server: readonly SideParityRow[], at: readonly number[] | null, allow?: Readonly<Record<string, string>>, slack?: number): string[];
+export function sideParityDiff(page: readonly SideParityRow[], server: readonly SideParityRow[], at: readonly number[] | null, allow?: Readonly<Record<string, string>>, options?: { readonly slack?: number; readonly same?: Readonly<Record<string, string>> }): string[];

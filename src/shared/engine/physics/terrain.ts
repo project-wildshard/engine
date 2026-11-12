@@ -12,7 +12,7 @@ import { CHUNK_HALF, CHUNK_SIZE, TERRAIN_RES } from '../core/config';
 import { heightAt } from '../world/Heightfield';
 import type { Physics } from './Physics';
 import { groups } from './groups';
-import { tagCollider } from './surface';
+import { tagCollider, tagOf } from './surface';
 
 /** The mesh's vertex heights, row-major (index iz × res + ix), x and z from −size/2 to +size/2. */
 export function terrainGrid(res: number = TERRAIN_RES, size: number = CHUNK_SIZE): Float32Array {
@@ -126,13 +126,28 @@ export function cutTerrain(physics: Physics, cuts: readonly TerrainCut[]): numbe
   return changed;
 }
 
-/** Four walls a little inside the chunk edge — the chunk floats; there is nothing to walk onto. */
-export function addEdgeWalls(physics: Physics): Collider[] {
+/** Four walls a little inside the chunk edge — the chunk floats; there is nothing to walk onto. `reuse` (SERVER-PARITY SS10):
+ *  a wall the world already holds (a native bake's own copy of these walls) stands as that wall, tagged `edge`, not twice. */
+export function addEdgeWalls(physics: Physics, options: { readonly reuse?: boolean } = {}): Collider[] {
   const { R, world } = physics;
   const t = 1, reach = CHUNK_HALF - EDGE_WALL_INSET + t, lo = -60, hi = 400;
   const cy = (lo + hi) / 2, hy = (hi - lo) / 2, span = CHUNK_HALF + 2;
   const walls: [number, number, number, number][] = [[reach, 0, t, span], [-reach, 0, t, span], [0, reach, span, t], [0, -reach, span, t]];
+  const same = (a: number, b: number): boolean => Math.abs(a - b) < 1e-3;
+  const held = (x: number, z: number, hx: number, hz: number): Collider | undefined => {
+    let found: Collider | undefined;
+    if (options.reuse === true) world.forEachCollider(c => {
+      const material = tagOf(c)?.material;
+      if (found !== undefined || (material !== undefined && material !== 'edge') || c.isSensor() || !c.isEnabled() || c.collisionGroups() !== groups('WORLD')
+        || c.shapeType() !== R.ShapeType.Cuboid || c.parent()?.isDynamic() === true) return;
+      const at = c.translation(), h = c.halfExtents(), q = c.rotation();
+      if (h !== null && same(at.x, x) && same(at.y, cy) && same(at.z, z) && same(h.x, hx) && same(h.y, hy) && same(h.z, hz) && same(Math.abs(q.w), 1)) found = c;
+    });
+    return found;
+  };
   return walls.map(([x, z, hx, hz]) => {
+    const old = held(x, z, hx, hz);
+    if (old !== undefined) { if (tagOf(old) === undefined) tagCollider(old, 'edge'); return old; }
     const c = world.createCollider(R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, cy, z).setCollisionGroups(groups('WORLD')));
     tagCollider(c, 'edge');
     return c;

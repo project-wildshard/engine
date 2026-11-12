@@ -5,7 +5,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
-import { colliderInventory, MEASURED_SHAPES, sideParityDiff, SIDE_PARITY_SHARDS } from '../scripts/side-parity.mjs';
+import { colliderInventory, MEASURED_SHAPES, ownerGroup, sideParityDiff, SIDE_PARITY_SHARDS } from '../scripts/side-parity.mjs';
 import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 
 // SERVER-PARITY SS1 (meta docs/plans/SERVER-PARITY-PLAN.md). The page stands the player on colliders it builds live from the
@@ -16,7 +16,8 @@ import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 // test/side-parity.allow.json; a shard with a known open gap lists it under `known` with its plan row, so CI stays green while
 // the row is open and goes red if the gap changes or closes unrecorded.
 
-interface Allow { readonly owners: Readonly<Record<string, string>>; readonly shards: Readonly<Record<string, { readonly row?: string; readonly owners?: Readonly<Record<string, string>>; readonly known?: readonly string[] }>> }
+interface Same { readonly page: string; readonly why: string }
+interface Allow { readonly owners: Readonly<Record<string, string>>; readonly shards: Readonly<Record<string, { readonly row?: string; readonly owners?: Readonly<Record<string, string>>; readonly same?: Readonly<Record<string, Same>>; readonly known?: readonly string[] }>> }
 const page = JSON.parse(readFileSync('test/side-parity.page.json', 'utf8')) as { at: Record<string, readonly number[] | null>; shards: Record<string, Parameters<typeof sideParityDiff>[0]> };
 const allow = JSON.parse(readFileSync('test/side-parity.allow.json', 'utf8')) as Allow;
 
@@ -31,6 +32,19 @@ test('a room without the rope chain is a finding that names the bridge (the pre-
   expect(() => sideParityDiff(rows, rows, null, allow.owners)).toThrow('page player position');
 });
 
+test('a server name the shard declares the same as the page\'s still needs its solids; a page solid inside an edge wall is the wall (SS10)', () => {
+  const box = (owner: string | null, material: string, b: readonly number[]) => ({ owner, material, sensor: false, dynamic: false, box: [...b], shape: 1 });
+  const at = [0, 0, 0], door = box('mill-door-bar', 'wood', [1, 0, 1, 2, 2, 2]), wall = box(null, 'edge', [249, -60, -252, 251, 400, 252]);
+  expect(sideParityDiff([door], [box('cabin-7-door-bar', 'wood', [1, 0, 1, 2, 2, 2])], at)).toHaveLength(2);
+  expect(sideParityDiff([door], [box('cabin-7-door-bar', 'wood', [1, 0, 1, 2, 2, 2])], at, {}, { same: { 'cabin-7-door-bar': 'mill-door-bar' } })).toEqual([]);
+  // the name is the same; the material and the shape still have to agree
+  expect(sideParityDiff([door], [box('cabin-7-door-bar', 'stone', [1, 0, 1, 2, 2, 2])], at, {}, { same: { 'cabin-7-door-bar': 'mill-door-bar' } })).not.toEqual([]);
+  expect(sideParityDiff([door], [box('cabin-7-door-bar', 'wood', [5, 0, 1, 6, 2, 2])], at, {}, { same: { 'cabin-7-door-bar': 'mill-door-bar' } })).not.toEqual([]);
+  // a deck's sill inside the server's edge wall, and one that pokes out of it
+  expect(sideParityDiff([wall, box('deck', 'stone', [249, 0, -4, 250, 3, 4])], [wall], at)).toEqual([]);
+  expect(sideParityDiff([wall, box('deck', 'stone', [245, 0, -4, 250, 3, 4])], [wall], at)).not.toEqual([]);
+});
+
 describe('side parity: the page and the room build the same gameplay colliders', { concurrent: false }, () => {
   for (const slug of SIDE_PARITY_SHARDS) test(slug, async () => {
     const rows = page.shards[slug];
@@ -43,7 +57,10 @@ describe('side parity: the page and the room build the same gameplay colliders',
       const server = colliderInventory(world.host.physics), own = allow.shards[slug];
       // a shape with no measured box (a compound, a half space) would match anything at its origin: refuse it on both sides
       expect([...new Set([...rows, ...server].map(row => row.shape))].filter(shape => !MEASURED_SHAPES.includes(shape))).toEqual([]);
-      const findings = sideParityDiff(rows, server, page.at[slug] ?? null, { ...allow.owners, ...own?.owners });
+      const same = Object.fromEntries(Object.entries(own?.same ?? {}).map(([server, row]) => [server, row.page]));
+      // a declared name stands only while both sides still use it: a renamed piece drops its line from the allow file
+      expect(Object.entries(same).filter(([name, as]) => !server.some(row => ownerGroup(row.owner) === name) || !rows.some(row => ownerGroup(row.owner) === as)), `${slug}: stale same names`).toEqual([]);
+      const findings = sideParityDiff(rows, server, page.at[slug] ?? null, { ...allow.owners, ...own?.owners }, { same });
       // WS_SIDE_PARITY_REPORT=<folder>: keep each shard's findings and server rows there, to read beside the page half
       const report = process.env['WS_SIDE_PARITY_REPORT'];
       if (report !== undefined) { mkdirSync(report, { recursive: true }); writeFileSync(`${report}/${slug}.json`, JSON.stringify({ findings, server }, null, 1)); }

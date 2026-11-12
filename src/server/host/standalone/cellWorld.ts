@@ -86,8 +86,8 @@ const leadSeat = (host: SimHost): PlayerSim => {
 const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor => new FallFloor(input.product === undefined
   ? shardFallFloor(input.shard.manifest?.bounds?.floor) : shardPlayArea(input.shard.manifest?.bounds, input.product), lone, host.level.player.at);
 
-/** A lone cell has the walls a shard's own page stands inside. */
-function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics); }); }
+/** A lone cell has the walls a shard's own page stands inside; a native bake that holds them already keeps its own (SS10). */
+function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics, { reuse: true }); }); }
 
 /** A cell with no native plan: a data shard, which any host can run from its output. */
 async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], lone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
