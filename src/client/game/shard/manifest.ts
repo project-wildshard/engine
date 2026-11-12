@@ -1,4 +1,5 @@
 import type { Scope } from '@wildshard/engine/app/scope';
+import type { TerrainLattice } from '@wildshard/engine/physics/terrain';
 import { inflateScalarBlocks,readScalarChannel,readScalarLattice,ScalarLatticeBindings } from '@wildshard/engine/world/scalarChannel';
 import { readFileInputs } from '../../../shared/game/shardfile/fileInputs';
 import { ScalarLatticeSchema,ScalarTripletSchema,type ScalarLatticeRows,type ScalarTripletRows } from '@wildshard/format/scalarChannel';
@@ -518,8 +519,8 @@ export interface ShardManifest {
   card: { thumb: string; portrait: string; landscape: string };
   /** landscape terrain, a structure-first world, or both; every shard supplies at least one */
   ground: {
-    paths?: 'plugin'; terrain: ChunkTerrain; structures?: true | ChunkStructures; water?: readonly WaterBody[]; tiled?: true }
-    | { paths?: 'plugin'; terrain?: ChunkTerrain; structures: true | ChunkStructures; water?: readonly WaterBody[]; tiled?: true };
+    paths?: 'plugin'; terrain: ChunkTerrain; structures?: true | ChunkStructures; water?: readonly WaterBody[]; tiled?: true; collider?: TerrainLattice }
+    | { paths?: 'plugin'; terrain?: ChunkTerrain; structures: true | ChunkStructures; water?: readonly WaterBody[]; tiled?: true; collider?: TerrainLattice };
   /** the PBR ground's texture sets; omitted by a shard that loads none (the low-poly Driftwood, E318) */
   assets?: ChunkAssets;
   assetGlobs?: readonly string[];

@@ -27,7 +27,7 @@ export function toLevelSpec(manifest: ShardManifest, product?: ShardProduct): Le
     ...(manifest.debugOptions === undefined ? {} : { debugOptions: manifest.debugOptions }),
     ...(manifest.blender === undefined ? {} : { blender: manifest.blender }),
     ground: { ...(manifest.ground.paths === undefined ? {} : { paths: manifest.ground.paths }), ...(manifest.ground.terrain === undefined ? {} : { terrain: manifest.ground.terrain }),
-      ...(manifest.ground.tiled === undefined ? {} : { tiled: true }),
+      ...(manifest.ground.tiled === undefined ? {} : { tiled: true }), ...(manifest.ground.collider === undefined ? {} : { collider: manifest.ground.collider }),
       ...(manifest.ground.structures === undefined ? {} : { structures: true }), ...(manifest.ground.water === undefined ? {} : { water: manifest.ground.water }) },
     spawn: manifest.spawn,
     sky: manifest.sky, atmosphere: manifest.atmosphere, grade: manifest.grade,

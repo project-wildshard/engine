@@ -59,7 +59,7 @@ import type { LevelSpec } from '@wildshard/engine/level/spec';
 import { prepareWorldLook, type LookStrategy } from '@wildshard/engine/render/look';
 import { compileOffscreenPass } from '@wildshard/engine/render/precompile';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
-import { addTerrain, resampleTerrain } from '@wildshard/engine/physics/terrain';
+import { addLevelTerrain, addTerrain, resampleTerrain } from '@wildshard/engine/physics/terrain';
 import { applySkin, type SkinDef } from '@wildshard/engine/player/Skins';
 import { SkyRig } from '@wildshard/engine/world/skyRig';
 import { loadCarriedLUT, loadLUT } from '@wildshard/engine/boot/bakedApi';
@@ -330,8 +330,13 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
         if (left()) throw new Error('Regional world left while loading its required ground');
       }
       // The real ground of the region's level, sampled from its own bound heightfield (never the home's).
-      const groundGrid = await timeClientPreparation(identity, 'native.ground-grid', () => slicedTerrainGrid((rows) => frame.run(app, rows), left));
-      frame.run(app, () => { addTerrain(host.physics, groundGrid); });
+      // A declared page collides on its server's own collider lattice (NET-LAG NL10); any other level samples its bound heightfield.
+      const declared = level.ground.collider;
+      if (declared !== undefined) frame.run(app, () => { addLevelTerrain(host.physics, declared); });
+      else {
+        const groundGrid = await timeClientPreparation(identity, 'native.ground-grid', () => slicedTerrainGrid((rows) => frame.run(app, rows), left));
+        frame.run(app, () => { addTerrain(host.physics, groundGrid); });
+      }
       ports.install?.(host, request);
       await checkpoint();
       if (left()) throw new Error('Regional world left while building its collision');

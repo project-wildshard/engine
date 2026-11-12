@@ -32,7 +32,7 @@ export function toColumnMajor(grid: Float32Array, res: number): Float32Array {
 /** Inner faces of the edge walls sit here; with the player's 0.4 m capsule the centre stops 1.2 m inside the chunk. */
 export const EDGE_WALL_INSET = 0.8;
 
-interface Ground { collider: Collider; grid: Float32Array; res: number; size: number }
+interface Ground { collider: Collider; grid: Float32Array; res: number; size: number; declared?: true }
 const grounds = new WeakMap<Physics, Ground>();
 
 function buildGround(physics: Physics, grid: Float32Array, res: number, size: number): Collider {
@@ -50,14 +50,31 @@ export function addTerrain(physics: Physics, grid: Float32Array = terrainGrid(),
   return collider;
 }
 
+/** A terrain collider lattice centred on the chunk: row-major heights (index iz × res + ix), x and z from −size/2 to +size/2. */
+export interface TerrainLattice { readonly grid: Float32Array; readonly res: number; readonly size: number }
+
+/**
+ * The level's terrain collider. A level that declares its collider lattice (a declared page: the shard's baked collider, the
+ * ground the server walks) gets that lattice, sample for sample, and keeps it: a page sampled at its own TERRAIN_RES² lattice
+ * stands centimetres off the server's on a dune, and every acked step corrects (NET-LAG NL10, Signal Dunes' 257² collider).
+ * Any other level samples TERRAIN_RES² from the bound heightfield, as before.
+ */
+export function addLevelTerrain(physics: Physics, lattice?: TerrainLattice): Collider {
+  if (lattice === undefined) return addTerrain(physics);
+  const collider = addTerrain(physics, lattice.grid, lattice.res, lattice.size), g = grounds.get(physics);
+  if (g !== undefined) g.declared = true;
+  return collider;
+}
+
 /**
  * Resample the terrain collider from the live heightfield (the same lattice it was built on): a level look's painter that
  * bound its own ground after the collider was added (`Terrain.groundBound`, a grid region builds its collider first) moves
- * the collision onto that ground. Returns false when this world has no terrain collider. Cuts made before are not replayed.
+ * the collision onto that ground. Returns false when this world has no terrain collider, or when its collider is a declared
+ * lattice (`addLevelTerrain`): that one is the server's ground and stays it. Cuts made before are not replayed.
  */
 export function resampleTerrain(physics: Physics): boolean {
   const g = grounds.get(physics);
-  if (!g) return false;
+  if (!g || g.declared === true) return false;
   const grid = terrainGrid(g.res, g.size);
   physics.world.removeCollider(g.collider, false);
   g.collider = buildGround(physics, grid, g.res, g.size); g.grid = grid;

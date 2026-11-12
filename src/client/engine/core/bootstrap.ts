@@ -25,7 +25,7 @@ import { setActiveBodies, setActivePhysics } from '../physics/active';
 import { loadNavmesh } from '../physics/navmeshLoad';
 import { setRagdollClock } from '../physics/ragdoll';
 import { Bodies, BODY_CAP } from '../../../shared/engine/physics/bodies';
-import { addEdgeWalls, addTerrain } from '../../../shared/engine/physics/terrain';
+import { addEdgeWalls, addLevelTerrain } from '../../../shared/engine/physics/terrain';
 import { addPiece } from '../../../shared/engine/physics/pieces';
 import type { WorldRegistry } from '../world/registry';
 import { installPhysicsDebug } from '../physics/debug';
@@ -102,7 +102,7 @@ export async function bootstrap(step: StepRunner, level: LevelSpec, inputContext
     const ph = new Physics(await rapier);
     await navmesh;
     withOwner(game.levelScope, () => {
-      if (needsTerrainCollider(level)) addTerrain(ph); // a structure-first shard walks on its built floors only
+      if (needsTerrainCollider(level)) addLevelTerrain(ph, level.ground.collider); // a structure-first shard walks on its built floors only
       if (level.boundary?.walls !== false) addEdgeWalls(ph); // a level inside a platform grid: the platform owns its edge
     });
     p.detail(`${ph.world.colliders.len()} colliders`);

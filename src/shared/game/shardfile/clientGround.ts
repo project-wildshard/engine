@@ -7,6 +7,7 @@ import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { splatTerrainOf } from '@wildshard/format/splatTerrain';
 import { outputDescriptor } from './outputDescriptor';
+import type { TerrainLattice } from '@wildshard/engine/physics/terrain';
 
 /** Keep temporary byte readers outside the context retained by height/normal/water callbacks. */
 function samplingQueries(profile: NonNullable<NonNullable<Shardfile['terrain']>['sampling']>, assets: ReadonlyMap<string, Uint8Array>, nativeDatum?: number) {
@@ -54,12 +55,26 @@ export function clientGround(source: Shardfile, assets: ReadonlyMap<string, Uint
     waterLevel: () => source.water.find((row) => row.kind === 'sea')?.level ?? -250, trails: [], cabinSites: [], pond: null };
 }
 
+/**
+ * The shard's admitted terrain collider as the page's collider lattice: the server installs exactly these samples
+ * (`prepareRuntimeWorld` → `addBakedTerrainCollider`), so the page predicts on them too (NET-LAG NL10). Undefined when the
+ * shard declares none or its tile is not the whole chunk centred on the origin (the page's terrain collider always is).
+ */
+export function colliderLattice(source: Pick<Shardfile, 'terrain'>, assets: ReadonlyMap<string, Uint8Array>): TerrainLattice | undefined {
+  const bytes = source.terrain === null ? undefined : assets.get(source.terrain.collider);
+  if (bytes === undefined) return undefined;
+  const data = decodeTerrainTile(bytes);
+  if (data.colours !== undefined || data.x !== -data.size / 2 || data.z !== -data.size / 2) return undefined;
+  return { grid: data.heights, res: data.resolution, size: data.size };
+}
+
 /** Native pages keep the recipe's real terrain collision policy at both entry points.
- * Structure floors omit a terrain collider; sampled terrain uses the normal level bootstrap. */
-export function clientPageGround(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>): { paths: 'plugin'; terrain: TerrainField; structures?: true; tiled?: true } {
+ * Structure floors omit a terrain collider; sampled terrain collides on the server's own collider lattice. */
+export function clientPageGround(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>): { paths: 'plugin'; terrain: TerrainField; structures?: true; tiled?: true; collider?: TerrainLattice } {
   const plan = parseNativeRuntimePlan(outputDescriptor(source)?.sections.get('sim/runtime-plan'));
   const tiled = source.props !== null && source.props.tiles.length > 0 && splatTerrainOf(source.props) !== undefined;
-  return { paths: 'plugin', terrain: clientGround(source, assets), ...(plan.recipe.terrain === 'none' ? { structures: true } : {}), ...(tiled ? { tiled: true } : {}) };
+  const collider = plan.recipe.terrain === 'collider' ? colliderLattice(source, assets) : undefined;
+  return { paths: 'plugin', terrain: clientGround(source, assets), ...(plan.recipe.terrain === 'none' ? { structures: true } : {}), ...(tiled ? { tiled: true } : {}), ...(collider === undefined ? {} : { collider }) };
 }
 
 /** A props-bound native transition already replaces its whole splat mesh with tiles.
