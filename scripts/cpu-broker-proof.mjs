@@ -55,7 +55,7 @@ try{
  const within=(promise,ms,what)=>Promise.race([promise,pause(ms).then(()=>{throw new Error(`${what}: no grant within ${ms} ms`);})]);
  const alive=(/** @type {number} */ pid)=>{try{process.kill(pid,0);return true;}catch{return false;}};
  const statePath=join(root,'queue.json');
- const sleeper=spawn('sleep',['60'],{stdio:'ignore'});owners.push(/** @type {number} */ (sleeper.pid));
+ const sleeper=spawn('sleep',['60'],{stdio:'ignore'});owners.push(sleeper.pid);
  const gone=spawn('true',[],{stdio:'ignore'});await new Promise(resolve=>{gone.once('exit',resolve);});
  const seeded=JSON.parse(readFileSync(statePath,'utf8'));
  seeded.cpuActive.push({token:'dead-holder',pid:sleeper.pid,holder:gone.pid,owner:process.pid,repo:a,slots:2,ticket:-1});
@@ -68,11 +68,11 @@ try{
  /** Start an owner holding 'all'; orphaned ones are reparented to pid 1 by a shell that exits at once.
   * @param {string} name @param {string} repo @param {{orphan?:boolean,busy?:boolean}} how @returns {Promise<{owner:number,broker:number}>} */
  const own=async(name,repo,how)=>{
-  const ready=join(work,`${name}.json`),env={...process.env,ROOT:root,REPO:repo,READY:ready,BUSY:how.busy===true?'1':'0'};
+  const readyFile=join(work,`${name}.json`),env={...process.env,ROOT:root,REPO:repo,READY:readyFile,BUSY:how.busy===true?'1':'0'};
   if(how.orphan===true)spawn('sh',['-c',`"${process.execPath}" "${ownerFile}" </dev/null >/dev/null 2>&1 &`],{env,stdio:'ignore'});
   else spawn(process.execPath,[ownerFile],{env,stdio:'ignore'});
-  const began=Date.now();while(!existsSync(ready)&&Date.now()-began<10_000)await pause(20);
-  const started=JSON.parse(readFileSync(ready,'utf8'));owners.push(started.owner);return started;
+  const since=Date.now();while(!existsSync(readyFile)&&Date.now()-since<10_000)await pause(20);
+  const started=JSON.parse(readFileSync(readyFile,'utf8'));owners.push(started.owner);return started;
  };
  const worktree=join(work,'worktree');mkdirSync(worktree);
  const removed=await own('removed',worktree,{});rmSync(worktree,{recursive:true,force:true});
