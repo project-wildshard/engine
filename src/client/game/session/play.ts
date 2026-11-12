@@ -39,6 +39,7 @@ import type { LoadStage } from '../shard/load';
 import type { StagedBoot, SessionState, KitPorts } from './context';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 import { resolveLevelBounds } from '../../../shared/game/shard/runtime';
+import { declaredPlayArea } from '@wildshard/engine/game/shardfile/playArea';
 import { SkinLocker } from '../cosmetics/locker';
 import { BagMenu } from '../bag/tabs';
 import { equipmentEntry, toolEntries } from '../bag/equipment';
@@ -210,6 +211,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // every play has fall recovery (ENG-18): a level without authored bounds, Driftwood, gets a fall floor; in the grid the horizontal check is the grid's
   const authoredBounds = resolveLevelBounds(game.level.bounds, boot.runtime.hooks);
   const bounds = playBounds(authoredBounds, grid !== null);
+  // SS6b: in the grid the home cell's floor is read at the player's x/z, by the rule its room reads (`fallFloor.ts`'s `shardPlayArea`)
+  const homeArea = declaredPlayArea(game.level.bounds, ctx.product);
 
   let kills = 0, swimHold = false;
   // SF28 (G87 / G104): the big item cards wear the shard's declared accent (in the grid, the cell's: grid/gridHud.ts)
@@ -233,7 +236,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   gridLive = grid?.attach({ traveller: player, health: playerHealth, equipment: weapons, events: app.events,
     runtimePage: () => boot.context === undefined || boot.runtime.play === null ? null : { world, play: boot.runtime.play, context: boot.context, ...(ctx.enteredEquipment === undefined ? {} : { equipment: ctx.enteredEquipment }) },
     onSafeZone: () => { app.effects?.clearHarmful(playerHealth); },
-    saves: app.saves, ...(authoredBounds === undefined ? {} : { homeFallFloor: authoredBounds.floor }), checkpoint: legacyHomeCheckpoint(() => boot.runtime.play), catalogue: [],
+    saves: app.saves, ...(homeArea === undefined ? {} : { homeFloorAt: homeArea.floorAt }), checkpoint: legacyHomeCheckpoint(() => boot.runtime.play), catalogue: [],
     setPhysics: (physics) => { world.physics = physics; app.physics = physics; },
     onFixedPre: (fn) => { game.onFixed('pre', fn, 'game.grid.live.pre'); }, onFixedPost: (fn) => { game.onFixed('post', fn, 'game.grid.live.post'); },
     onInput: (fn) => { game.onInput(fn, 'game.grid.origin.restore'); }, onUpdate: (fn) => { game.onUpdate(fn, 'game.grid.origin'); } }) ?? null;

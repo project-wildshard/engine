@@ -6,7 +6,7 @@ import type { SimHost } from '../src/server/engine/sim';
 import type { PlayerSim } from '../src/server/engine/sim/playerSim';
 import { floorBelow } from '../src/shared/engine/physics/query';
 import { playBounds } from '../src/client/engine/world/bounds';
-import { FALL_FLOOR, shardPlayArea } from '../src/server/host/standalone/fallFloor';
+import { FALL_FLOOR, RESIDENT_FALL_GRACE, shardPlayArea } from '../src/server/host/standalone/fallFloor';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { serverInput } from './fixtures/dedicated/roomBench';
 
@@ -29,13 +29,15 @@ const REPROS: readonly { readonly slug: string; readonly at: readonly [number, n
   { slug: DUNES, at: [-14, -140], move: { moveX: 0, moveZ: -1 }, ticks: 3000 },
   { slug: SKY, at: [-60.8, -135.3], move: { moveX: 0, moveZ: 0 }, ticks: 900 },
 ];
-/** The floor a fall net holds at (x, z). A room's is the page's own area (SS6: Sky Reach's `player.enter` floor −8, under its
- *  manifest's 12); a bare resident's is still the manifest's. */
-const floorOf = async (slug: string, room: boolean, x: number, z: number): Promise<number> => {
-  const input = await serverInput(slug), authored = input.shard.manifest?.bounds;
-  return room ? shardPlayArea(authored, input.product).floorAt(x, z) : authored?.floor ?? -Infinity;
+/** The floor a fall net holds at (x, z): the page's own area for a room and a bare resident alike (SS6/SS6b: Sky Reach's
+ *  `player.enter` floor −8, under its manifest's 12). */
+const floorOf = async (slug: string, x: number, z: number): Promise<number> => {
+  const input = await serverInput(slug);
+  return shardPlayArea(input.shard.manifest?.bounds, input.product).floorAt(x, z);
 };
 
+/** A fast fall's speed, metres a second: what a body covers in a net's grace under the floor. */
+const FALL_SPEED = 60;
 /** Step `ticks` times; the lowest the player got and how many times it was put back. */
 function run(step: () => void, player: PlayerSim, ticks: number): { lowest: number; resets: number } {
   const resets = player.resets;
@@ -44,10 +46,12 @@ function run(step: () => void, player: PlayerSim, ticks: number): { lowest: numb
   return { lowest, resets: player.resets - resets };
 }
 /** The repro's input, then the hard case: the player is dropped under the ground at the repro's spot, with nothing below. */
-async function fallsAndRecovers(slug: string, host: SimHost, player: PlayerSim, step: (move: Move) => void, room: boolean): Promise<void> {
+/** `grace`: the seconds the net lets a body fall under the floor first (a bare resident's `RESIDENT_FALL_GRACE`, a room's 0). SS6b
+ *  put Sky Reach's resident on the page's floor (−8, not 12): the drop reaches it falling, so the grace carries it further down. */
+async function fallsAndRecovers(slug: string, host: SimHost, player: PlayerSim, step: (move: Move) => void, grace: number): Promise<void> {
   const repro = REPROS.find(row => row.slug === slug);
   if (repro === undefined) throw new Error(`No repro for ${slug}`);
-  const floor = await floorOf(slug, room, repro.at[0], repro.at[1]);
+  const floor = await floorOf(slug, repro.at[0], repro.at[1]);
   run(() => { step({ moveX: 0, moveZ: 0 }); }, player, 2); // a world's colliders answer queries after its first step
   standAt(player, host, repro.at[0], repro.at[1]);
   const walked = run(() => { step(repro.move); }, player, repro.ticks);
@@ -58,7 +62,7 @@ async function fallsAndRecovers(slug: string, host: SimHost, player: PlayerSim, 
   player.resetPose({ x, y: y - 6, z }, 0);
   const dropped = run(() => { step({ moveX: 0, moveZ: 0 }); }, player, 900);
   expect(dropped.resets, `${slug}: the drop is caught`).toBeGreaterThan(0);
-  expect(dropped.lowest, `${slug}: caught at the floor`).toBeGreaterThan(floor - 10);
+  expect(dropped.lowest, `${slug}: caught at the floor`).toBeGreaterThan(floor - 10 - grace * FALL_SPEED);
   expect(player.position.y, `${slug}: back above the floor`).toBeGreaterThan(floor);
   // Sky Reach's step wisp nudges an idle player, so the last firm ground may be a few metres off the drop.
   expect(Math.hypot(player.position.x - x, player.position.z - z), `${slug}: back near where it last stood`).toBeLessThan(6);
@@ -70,7 +74,7 @@ for (const { slug } of REPROS) {
     closers.push(() => { resident.dispose(); });
     const { host } = resident, player = [...host.players.values()][0];
     if (player === undefined) throw new Error('No player');
-    await fallsAndRecovers(slug, host, player, move => { resident.step([{ kind: 'player', ...move, yaw: 0 }]); }, false);
+    await fallsAndRecovers(slug, host, player, move => { resident.step([{ kind: 'player', ...move, yaw: 0 }]); }, RESIDENT_FALL_GRACE);
   });
 
   test(`ENG-18 online: a net room catches a fall off ${slug}`, { timeout: 120_000 }, async () => {
@@ -87,7 +91,7 @@ for (const { slug } of REPROS) {
     tick({ moveX: 0, moveZ: 0 });
     const player = room.bodyOf(device);
     if (player === undefined) throw new Error('No body');
-    await fallsAndRecovers(slug, room.host, player, tick, true);
+    await fallsAndRecovers(slug, room.host, player, tick, 0);
   });
 }
 

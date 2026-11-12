@@ -84,6 +84,9 @@ import type { ClientTileRegistration } from '../shardfile/tileContent';
 import { createRegionalWorldFoundation, hangCellDataSky, resolveRegionalRuntimeTextures } from './regionalWorld';
 import { regionalDataCellBytes } from './runtimeCost';
 import { resolveLevelBounds } from '../../../shared/game/shard/runtime';
+import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
+import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { Bounds } from '@wildshard/engine/level/spec';
 
 /** The cached metadata claim and its later constructor enter the same immutable
  * texture policy. Fresh inputs remain borrowed only by actual construction. */
@@ -117,8 +120,10 @@ export interface LiveGridPage {
   /** Optional polled storage readiness. Pending never grants permission; true is followed by a fresh local/native checkpoint. */
   readonly crossingSaveReady?: (instance: string) => GridCheckpointResult;
   /** Page-owned script notices; regional scripts never construct another HUD. */
-  /** The home runtime's resolved higher fall floor; neighbour floors come from their own declarations. */
-  readonly homeFallFloor?: number;
+  /** SS6b: the home cell's declared fall floor at a cell-local x/z (`declaredPlayArea(...).floorAt`, the rule its room reads),
+   *  read on every check: a floor read once at the spawn said 25 all over Nine Dragon, where its room says −20 past 200 m.
+   *  Neighbour floors come from their own declarations. */
+  readonly homeFloorAt?: (x: number, z: number) => number;
   /** Profile rewards are restricted to the platform's admitted catalogue. */
   readonly catalogue: readonly LedgerCatalogueItem[];
   /** Clear harmful player effects when fixed-step feet cross the cell edge into the safe zone. */
@@ -198,6 +203,14 @@ async function disposeInSteps(region: PreparedRegionalRuntime['region']): Promis
     if (diagnosticNow() - stretch >= WORK_SLICE_MS) { await slice.yield(); stretch = diagnosticNow(); }
   }
 }
+
+/** SS6b: each region product's declared play area, read once (the grid asks every fixed step). */
+const regionAreas = new WeakMap<ShardProduct, { readonly area: PlayArea | undefined }>();
+const regionArea = (product: ShardProduct, authored: Bounds | undefined): PlayArea | undefined => {
+  let held = regionAreas.get(product);
+  if (held === undefined) { held = { area: declaredPlayArea(authored, product) }; regionAreas.set(product, held); }
+  return held.area;
+};
 
 const regionTransferWalls = (shell: RegionShell, radius: number): TransferWalls => new TransferWalls(() => shell.physics, [{ x: 0, z: 0 }], radius, 'exit', shell.scope);
 /** The live crossing for one grid page; disposed with the level scope. */
@@ -916,10 +929,12 @@ export class LiveGridSession {
     // The entry can be at road level while its asynchronous world hook is still installing its bounds.
     // Like regional input/gameplay, authored recovery must wait for that entered installation.
     if (runtime !== undefined && (active.instance !== cell.instance || !active.ready)) return -CHUNK_HALF;
-    const authored = findShard(cell.slug)?.bounds;
+    const authored = findShard(cell.slug)?.bounds, x = feet.x - cell.origin.x, z = feet.z - cell.origin.z; // the cell's own x/z
+    // SS6b: a home or region with a product reads its floor at the player's x/z by the rule its room reads (`declaredPlayArea`)
+    const product = runtime?.resident.product;
     const declared = runtime === undefined
-      ? cell.instance === this.ports.home.instance ? this.page.homeFallFloor : authored?.floor
-      : resolveLevelBounds(authored, runtime.resident.runtime.hooks)?.floor;
+      ? cell.instance === this.ports.home.instance ? this.page.homeFloorAt?.(x, z) : authored?.floor
+      : product === undefined ? resolveLevelBounds(authored, runtime.resident.runtime.hooks)?.floor : regionArea(product, authored)?.floorAt(x, z);
     return Math.max(-CHUNK_HALF, declared ?? -CHUNK_HALF);
   }
 

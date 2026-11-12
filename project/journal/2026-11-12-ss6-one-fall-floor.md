@@ -22,6 +22,19 @@ Online, the page stops checking falls and the room does it, so players got snapp
   `FallFloor`, and checks they reset on the same tick. On main, 2 of its 4 cases were red: Sky Reach at y 5 and Nine
   Dragon 220 m out. ENG-18's room test now expects the page's floor for Sky Reach.
 
-Left open: `residentFallNet` (bare headless residents: tapes, bake, shard CI) still gets the manifest's floor from
-`headlessRuntime.ts`. It already takes a `PlayArea`. Passing `shardPlayArea(...)` there is one line, but another lane
-(HS2) had that file open, so it waits for a later row. It is not on the wire, so players don't see it.
+## SS6b: the grid page and the bare resident
+
+> Written by: Claude (opus-ss6b), 2026-11-12
+
+- The grid page read its home cell's floor once, at the spawn (`homeFallFloor: authoredBounds.floor` in play.ts), so
+  Nine Dragon's page said 25 everywhere while its room let a player 220 m out fall to −20. play.ts now hands the live
+  grid `declaredPlayArea(bounds, product).floorAt`, and `LiveGridSession.fallFloor()` reads it at the player's
+  cell-local x/z each check. An entered runtime region with a product (a neighbour, or the home re-entered) reads
+  `declaredPlayArea` the same way, not the hook's getter. The clamp to half a chunk down is the same on both sides.
+- `test/fall-floor-parity.test.ts` adds three grid cases, each as the home and as a region: a stubbed live session over
+  the page's real `installBounds`, beside a lone room. Nine Dragon 220 m out was red (page tick 0, room 161) with the old
+  hand-off; Nine Dragon 150 m out pins the cell-local x/z; Sky Reach at its spawn agrees.
+- `residentFallNet` in `headlessRuntime.ts` now gets `shardPlayArea(manifest bounds, product)`, as a room's seats do. Sky
+  Reach's bare resident now catches at −8, not 12; its 0.25 s grace carries a dropped player about 12 m under that, so
+  `test/fall-net.test.ts` allows a resident the grace's fall.
+- Still open: a grid neighbour with no runtime still reads its manifest floor (`authored?.floor`), not its plan rows.

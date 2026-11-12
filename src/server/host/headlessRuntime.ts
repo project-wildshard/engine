@@ -21,7 +21,7 @@ import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { NetTickAct } from '@wildshard/engine/net/acts';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { netInteractCommands, netRide, netTickCommands } from '../../shared/host/standalone/netInput';
-import { residentFallNet, shardFallFloor } from './standalone/fallFloor';
+import { residentFallNet, shardPlayArea } from './standalone/fallFloor';
 import { installPersonalLoot, personalCoinTable, personalItemTable } from '@wildshard/engine/game/loot/personal';
 import { installRoomRespawn } from '@wildshard/engine/game/roomRespawn';
 import type { GrappleTickContext } from '@wildshard/engine/game/grapple/native';
@@ -258,7 +258,7 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
   if (plan.economy !== undefined) installRoomLoot(host, plan.economy, context);
   const lead = leadPlayer(host);
   // ENG-18: a room catches its seats' falls itself (cellWorld's FallFloor); a resident alone catches its own, or nobody does.
-  const caught = world?.room === true ? null : residentFallNet(host, shardFallFloor(preparation.shard.manifest?.bounds?.floor), host.level.player.at);
+  const caught = world?.room === true ? null : residentFallNet(host, shardPlayArea(preparation.shard.manifest?.bounds, preparation.product), host.level.player.at);
   const routes = actRoutes(host), held = routes.launcher;
   routes.launcher = (slot, reload, fire) => launcherTakes(nativeRangedItem(host, slot)?.kind, reload, fire) || held?.(slot, reload, fire) === true;
   const lend = (input: readonly HeadlessCommand[]): void => {
