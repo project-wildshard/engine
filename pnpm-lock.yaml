@@ -776,18 +776,18 @@ packages:
     resolution: {integrity: sha512-rbto/mF/SGERxEgYOek7Xm6B9b+y+mVoo+f4b2LymYO8zM1b7uB5nHuhVMTP2hxdzgxvGiZYGxGIaMvL5y180Q==}
 
   '@wildshard/format@https://codeload.github.com/project-wildshard/shardfile/tar.gz/672820370d7c49ef83f8531f04f0f685dc965ae0':
-    resolution: {gitHosted: true, integrity: sha512-+PStazrrL0iUTQb/Lff1cf4UBav4VAs1PdDCt5NuHDRuZbS+7VbcP6VXnmEJgk685zVWQ5QIn/xxCGYKjg+AzA==, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/672820370d7c49ef83f8531f04f0f685dc965ae0}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/672820370d7c49ef83f8531f04f0f685dc965ae0}
     version: 0.4.2
     engines: {node: '>=24.18.0'}
     hasBin: true
 
   '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire':
-    resolution: {gitHosted: true, path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
+    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
     version: 0.0.0
     hasBin: true
 
   '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576#path:/packages/wire':
-    resolution: {gitHosted: true, path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576}
+    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/a51f56fbe54197b879fa309a1b1946df7384d576}
     version: 0.0.0
     hasBin: true
 
