@@ -7,6 +7,8 @@ import {join, relative, resolve} from 'node:path';
 export const MAX_ASSET_FILES = 90_000;
 export const MAX_ASSET_BYTES = 25 * 1024 * 1024;
 const MAP = /\.map(?:\.(?:gz|br))?$/u;
+/** @param {number} bytes */
+const mib = bytes => `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 
 /**
  * Count the files a Workers upload of `directory` would carry, and find the largest.
@@ -52,9 +54,6 @@ export function assertAssetLimits(directory) {
 /** @param {ReturnType<typeof measureAssets>} measured @returns {string} */
 export const describeAssetLimits = measured =>
   `${measured.files} files (limit ${MAX_ASSET_FILES}), largest ${measured.largest.path} at ${mib(measured.largest.bytes)} (limit ${mib(MAX_ASSET_BYTES)}), ${measured.maps} source maps left out`;
-
-/** @param {number} bytes */
-const mib = bytes => `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
   const directory = process.argv[2] ?? 'dist';
