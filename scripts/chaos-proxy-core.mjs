@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { createServer, request as httpRequest } from 'node:http'
 import { createServer as createTlsServer } from 'node:https'
+import { connect } from 'node:net'
 import { resolve as absolute, join } from 'node:path'
 
 import { WebSocket, WebSocketServer } from 'ws'
@@ -21,6 +22,35 @@ const MAX_BODY = 128 * 1024,
   MAX_QUEUE = 8 * 1024 * 1024,
   MAX_METADATA = 2 * 1024 * 1024,
   MAX_PENDING = 1024
+/** macOS lets a 127.0.0.1 bind shadow a 0.0.0.0, :: or default-host listener
+ * on the same port, so EADDRINUSE alone cannot protect an occupant. Anything
+ * that already answers on loopback owns the port.
+ * @param {number} port */
+async function refuseOccupiedLoopback(port) {
+  const answered = await new Promise((resolve, reject) => {
+    const probe = connect({ host: '127.0.0.1', port })
+    probe.setTimeout(1000)
+    probe.once('connect', () => {
+      probe.destroy()
+      resolve(true)
+    })
+    probe.once('timeout', () => {
+      probe.destroy()
+      resolve(true)
+    })
+    probe.once('error', error => {
+      probe.destroy()
+      if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ECONNREFUSED')
+        resolve(false)
+      else reject(error)
+    })
+  })
+  if (answered)
+    throw Object.assign(
+      new Error(`listen EADDRINUSE: 127.0.0.1:${port} already answers`),
+      { code: 'EADDRINUSE' },
+    )
+}
 /** A cancellable absolute deadline. Node otherwise wraps delays above its
  * signed 32-bit timer range to approximately one millisecond.
  * @param {number} deadline */
@@ -862,6 +892,7 @@ export async function openChaosProxy(options) {
     server.on('clientError', (_error, socket) => {
       socket.destroy()
     })
+    if (port !== 0) await refuseOccupiedLoopback(port)
     await new Promise((resolve, reject) => {
       server.once('error', reject)
       server.listen(port, '127.0.0.1', () => {

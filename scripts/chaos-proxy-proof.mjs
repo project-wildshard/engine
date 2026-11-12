@@ -657,6 +657,58 @@ await test(
 )
 
 await test(
+  'wildcard occupants keep their port; loopback is never taken over',
+  { timeout: 3000 },
+  async () => {
+    const work = mkdtempSync('tmp/fm2/wildcard-')
+    try {
+      // macOS lets a 127.0.0.1 bind shadow a wildcard listener on the same
+      // port; loopback clients would then reach the proxy, not the occupant.
+      for (const host of ['0.0.0.0', '::', undefined]) {
+        const occupied = createServer((_request, response) => {
+          response.end('wildcard still owned')
+        })
+        if (host === undefined) occupied.listen(0)
+        else occupied.listen(0, host)
+        await once(occupied, 'listening')
+        const address = occupied.address()
+        assert.ok(address !== null && typeof address !== 'string')
+        try {
+          const folder = join(
+            work,
+            String(host ?? 'default').replaceAll(':', '_'),
+          )
+          const taken = spawnSync(
+            process.execPath,
+            [
+              'scripts/chaos-proxy.mjs',
+              `--work=${absolute(folder)}`,
+              `--page-port=${address.port}`,
+              '--world-port=0',
+            ],
+            { encoding: 'utf8', timeout: 2000 },
+          )
+          assert.notEqual(taken.status, 0, `took over ${host ?? 'default'}`)
+          assert.equal(taken.stdout, '')
+          assert.match(taken.stderr, /EADDRINUSE/u)
+          assert.equal(existsSync(join(folder, 'control.token')), false)
+          assert.equal(
+            await (await fetch(`http://127.0.0.1:${address.port}`)).text(),
+            'wildcard still owned',
+          )
+        } finally {
+          occupied.closeAllConnections()
+          occupied.close()
+          await once(occupied, 'close')
+        }
+      }
+    } finally {
+      rmSync(work, { recursive: true })
+    }
+  },
+)
+
+await test(
   'healing cancels long timers and parent EOF releases owned listeners',
   { timeout: 5000 },
   async () => {
