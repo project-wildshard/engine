@@ -1,4 +1,5 @@
 import { prelinkGridViews } from './prelinkViews';
+import { cellPresence } from './cellPresence';
 import type { RoadTileBacking } from './roadTileBacking';
 import { roadTileWriter } from './roadTileWriter';
 import { bootWaits, waitFor, type BootWait } from '@wildshard/engine/boot/waits';
@@ -1118,8 +1119,10 @@ export class GridSession {
     this.softWalls.step();
     if (view) this.viewStep();
     const inside = this.assembly.at(at.x, at.z), active = this.live === null ? this.home.instance : this.live.live.current();
-    if (inside === undefined || inside.instance !== active) gridCells.leave();
-    else gridCells.enter({ instance: inside.instance, slug: inside.slug });
+    // GC2: online, prediction on the rim of a cell the server still walls (C5) is not a departure
+    const presence = cellPresence(inside, active, active !== null && this.live?.serverHolds(active) === true);
+    if (presence.kind === 'leave') gridCells.leave();
+    else if (presence.kind === 'enter') gridCells.enter({ instance: presence.instance, slug: presence.slug });
   }
 
   /** Tile streaming T5.3 (G775): the entered cell's resident L0 tiles (key j * 8 + i) and its origin from the home cell,

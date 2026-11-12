@@ -581,7 +581,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   const exploreMode: ExploreMode = exploreParam === 'world' || exploreParam === 'model' || exploreParam === 'sets' ? exploreParam : 'hub';
   hud.onExplore = () => { void openExplore('hub'); };
   // Not a frame is rendered or ticked while the menu is up: hud.entered is the gate.
-  game.frameGate = () => ((hud.entered && !hud.paused) || exploring()) && !feedbackHeld && !app.ui.still && !rotateGated() && !shardCompleteUp() && (gridLive?.gameplayReady() ?? true); // Entered runtime installation finishes before another input or gameplay tick.
+  game.frameGate = () => ((hud.entered && !hud.paused) || exploring()) && !feedbackHeld && !app.ui.still && !rotateGated() && !shardCompleteUp() && (gridLive?.frameReady() ?? true); // Entered runtime installation finishes before another input or gameplay tick.
   if (menuFirst) { weapons.setEnabled(false); weapons.visible = false; perf.setActive(false); audio.worldMuted = true; hud.showIntro(enter); }
   else if (arrival?.mode === 'explore') { weapons.setEnabled(false); weapons.visible = false; perf.setActive(false); hud.setOnEnter(enter); } // Explore ▸ Practice enters through it without the title: no handler left the weapon off and the DODGE disc dead (E285)
   else { hud.markEntered(enter); weapons.setEnabled(!nolock || params.has('skipintro')); }

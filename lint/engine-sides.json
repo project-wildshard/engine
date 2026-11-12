@@ -605,6 +605,7 @@
     "src/client/game/grid/cellClip.ts": "client",
     "src/client/game/grid/cellCover.ts": "client",
     "src/client/game/grid/cellLoading.ts": "client",
+    "src/client/game/grid/cellPresence.ts": "client",
     "src/client/game/grid/cellScreens.ts": "client",
     "src/client/game/grid/copyIdentity.ts": "client",
     "src/client/game/grid/copyLayout.ts": "client",

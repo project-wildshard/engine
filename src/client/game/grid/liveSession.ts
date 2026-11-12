@@ -56,6 +56,7 @@ import type { LedgerCatalogueItem } from '../../../shared/game/ledger';
 import { installGridHoverSpeed } from '../../../shared/game/grid/rules';
 import { installGridTravellerCombat } from '../../../shared/game/grid/travellerCombat';
 import { gridHomeSim, gridCells, type GridHomeSimulation } from '../plugin/context';
+import { gateEnters } from './cellPresence';
 import { findShard } from '../shard/registry';
 import { gridPostCosts, gridShardfileProduct, prioritizeGridProduct, type GridProductMetadata } from './products';
 import { preparationAdmission, type GridAdmissionMetadata } from './preparationAdmission';
@@ -810,6 +811,18 @@ export class LiveGridSession {
   }
   /** G555: the entered runtime hooks' timings (the one running and those finished), for the cell loading screen. */
   hookTimings(): ReturnType<HybridRuntimeSession['timings']> { return this.hybrid.timings(); }
+  /** GC2: the server still has this client in `instance` (an online cell is still walled, C5). */
+  serverHolds(instance: string): boolean { return this.wire !== null && this.wire.site() === instance; }
+
+  /** The frame gate (`play.ts`). Feet back in the current cell's interior with its hooks never entered (an online rim, a
+   *  correction landing between fixed steps) would shut the gate on hooks only an entry starts, and the fixed step that
+   *  enters never runs behind a shut gate: enter here (GC2). */
+  frameReady(): boolean {
+    const current = this.live.current(), feet = this.live.worldFeet(), cell = this.ports.assembly.at(feet.x, feet.z);
+    if (cell !== undefined && gateEnters(current, cell.instance, gridCells.cell?.instance ?? null, current !== null && this.runtimeRegions.has(current))) gridCells.enter({ instance: cell.instance, slug: cell.slug });
+    return this.gameplayReady();
+  }
+
   /** Admission opens the strip first; hooks freeze gameplay only after the committed traveller reaches the interior. */
   gameplayReady(): boolean {
     const current = this.live.current();
