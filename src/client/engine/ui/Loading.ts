@@ -463,9 +463,10 @@ export class Loading {
     const current = timeline.rows.find(row => row.key === timeline.current);
     const currentGap = timeline.gaps.find(row => row.state === 'on');
     setData(this.root, 'step', current?.key ?? 'gap');
-    if (current !== undefined) set(this.els.suFact, this.configured
-      ? engineString('s_af18899b96b3', [current.number, timeline.rows.length, current.label, current.detail ? engineString('s_614cafefe4f0', [current.detail]) : ''])
-      : `${current.label}${current.detail ? ` · ${current.detail}` : ''}`);
+    // Jake (2026-11-12): "You can't have a progress bar, say 2 out of 31, and then still say 80%." Load's percent is
+    // measured-cost credit (J204), not a step count, so its head names the step and prints no ratio ("step 15 / 20" sat
+    // beside 81.4, "World data 6 / 10" beside 10.1); the step's own counts stay on its row below.
+    if (current !== undefined) set(this.els.suFact, current.label);
     else set(this.els.suFact, currentGap?.label ?? 'Final activation');
     const shown: (LoadingRow | LoadingGap)[] = [];
     for (const gap of timeline.gaps) if (gap.after === null) shown.push(gap);

@@ -299,10 +299,10 @@ it('does not invent a one-step total before the actual path is declared', () => 
     loading.setPath({ id: 'shardfile', steps: [{ key: 'modules', label: 'Modules', weight: 1 },
       { key: 'admission', label: 'Product admission', weight: 1 }, { key: 'world', label: 'World', weight: 1 }] });
     now = 700; vi.advanceTimersByTime(100);
-    expect(fact()).toContain('step 1 / 3');
+    expect(fact()).toBe('Modules'); // Jake (2026-11-12): no step ratio beside a measured-cost percent
     loading.paintAdmission({ phase: 'product', detail: 'Reading files', bytesRead: 0, bytesTotal: 10, filesDone: 0, filesTotal: 1 });
     now = 1000; vi.advanceTimersByTime(100);
-    expect(fact()).toContain('step 2 / 3');
+    expect(fact()).toBe('Product admission');
   } finally { loading.scope.dispose(); }
 });
 

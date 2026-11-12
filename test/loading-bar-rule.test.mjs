@@ -37,7 +37,7 @@ test('J188: labels, unrelated counters and an unearned initial bar do not earn p
 });
 
 test('J188: phase-specific earned fractions pass and decreases or false denominators fail', () => {
-  const log=[row(0,'start',0),row(10,'start',25,{source:{kind:'start',done:1,total:3,bytes:0,byteTotal:100}}),
+  const log=[row(0,'start',0),row(10,'start',25,{source:{kind:'start',done:1,total:3,bytes:25,byteTotal:100}}),
     row(20,'download',50,{source:{kind:'download',done:50,total:100}}),
     row(30,'load',25,{source:{kind:'load',configured:true,rows:[{state:'on',fraction:.5},{state:'todo'}]}}),
     row(40,'load',30,{source:{kind:'load',configured:true,rows:[{state:'on',fraction:.5},{state:'todo'}]}}),

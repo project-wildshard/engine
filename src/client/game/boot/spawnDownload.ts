@@ -1,6 +1,6 @@
 import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
-import { bootMark,bootProgress,bootTiming } from '@wildshard/engine/boot/timing';
+import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engine/boot/timing';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 
@@ -328,7 +328,8 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   let wireArriving = 0;
   const arrive = (file: {readonly url: string; readonly bytes: number; readonly wireBytes: number}, received: number): void => {
     const next = file.bytes > 0 ? Math.floor(Math.min(1, received / file.bytes) * file.wireBytes) : 0, was = arriving.get(file.url) ?? 0;
-    if (next !== was) { arriving.set(file.url, next); wireArriving += next - was; }
+    // never lower: a retried part re-reads from its start, and the head and its percent (one ratio) must not step back
+    if (next > was) { arriving.set(file.url, next); wireArriving += next - was; }
   };
   const landed = (url: string): void => { wireArriving -= arriving.get(url) ?? 0; arriving.delete(url); };
   let partCounts: {parts: number; failed: number; fallbackFiles: number; fetched: number} | undefined;
@@ -625,7 +626,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           for (let attempt = 1; ; attempt++) {
             try { await read(attempt === 1 ? undefined : {cache: 'reload'}); break; } catch (failure) {
               counts.failed++;
-              for (const [index] of order) { const file = files[index]; if (file !== undefined) landed(file.url); }
+              // a retry keeps its members' arriving share (arrive never lowers it); only the last failure drops it
+              const last = attempt >= PART_READS || controller.signal.aborted;
+              if (last) for (const [index] of order) { const file = files[index]; if (file !== undefined) landed(file.url); }
               controller.signal.throwIfAborted();
               if (attempt >= PART_READS) throw failure; // the job's failure answers every read still waiting
               if (attempt > 1) { await partPause(); controller.signal.throwIfAborted(); }
@@ -964,7 +967,9 @@ const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1);
 export function paintSpawnDownload(download: SpawnDownload, root: HTMLElement): () => void {
   const timing=bootTiming();if(timing!==undefined)(timing.work??={}).download=download.snapshot;
   return download.subscribe(row => {
-    const percent = row.complete ? 100 : row.progressKnown === false || row.totalBytes === 0 ? null : Math.min(99, Math.floor(row.completedBytes / row.totalBytes * 100));
+    // Jake (2026-11-12): the percent is the ratio the head prints, never a second measure (engine boot/timing.ts downloadShown)
+    const shown = downloadShown(row);
+    const percent = row.complete ? 100 : row.progressKnown === false || shown.total === 0 ? null : Math.min(99, Math.floor(shown.done / shown.total * 100));
     root.dataset['download'] = percent === null ? '' : String(percent); root.dataset['entryDownloadBytes'] = String(row.totalBytes);
     root.dataset['declaredBytes'] = String(row.totalBytes); root.dataset['pendingBytes'] = String(row.totalBytes - row.completedBytes);
     root.dataset['cachedBytes'] = String(row.cachedBytes);
@@ -979,7 +984,7 @@ export function paintSpawnDownload(download: SpawnDownload, root: HTMLElement): 
     const text = row.wire ?? row;
     // LS2: the card's one size number, as Loading's loadingDownloadText writes it once it adopts this download
     if (fact !== null) fact.textContent = row.complete ? `${mb(Math.max(0, text.completedBytes - text.cachedBytes))} MB downloaded, ${mb(text.cachedBytes)} MB from cache`
-      : `${mb(text.completedBytes)} of ${mb(text.totalBytes)} MB`;
+      : `${mb(shown.done)} of ${mb(shown.total)} MB`;
     if (pct !== null) pct.textContent = percent === null ? '—' : String(percent);
     if (bar !== null) bar.style.width = `${percent ?? 0}%`;
   });

@@ -73,3 +73,24 @@ export function endBootOperation(operation: string): void {
     if (entry?.operation === operation && entry.end === null) { timing.end(entry.id, 'complete'); return; }
   }
 }
+
+/** Jake (2026-11-12, v0.1.13 on LTE): "You can't have a progress bar, say 2 out of 31, and then still say 80%." The
+ * Download head prints one ratio, and its percent and bar are that same ratio (J188: real numbers only). Encoded wire
+ * sizes when the build declares them (what the link actually carries), else decoded content sizes. No imports: the
+ * title's early painter (src/client/game/boot/spawnDownload.ts) and Loading share it, beside the producer shape above. */
+export interface DownloadMeasureRow {
+  readonly wire?: {readonly totalBytes: number; readonly completedBytes: number; readonly arrivingBytes?: number};
+  readonly totalBytes: number; readonly completedBytes: number; readonly complete: boolean;
+}
+/** The two numbers the head prints while the download is open: done of total, in bytes. */
+export function downloadShown(row: DownloadMeasureRow): {readonly done: number; readonly total: number} {
+  const wire = row.wire;
+  if (wire !== undefined) return {done: Math.min(wire.totalBytes, wire.completedBytes + (wire.arrivingBytes ?? 0)), total: wire.totalBytes};
+  return {done: row.completedBytes, total: row.totalBytes};
+}
+/** The head's ratio as a fraction; 1 is kept for the closed operation, so a full byte count reads 99.9 until it closes. */
+export function downloadShownFraction(row: DownloadMeasureRow): number {
+  if (row.complete) return 1;
+  const {done, total} = downloadShown(row);
+  return total === 0 ? 0 : Math.min(0.999, done / total);
+}

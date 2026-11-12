@@ -565,8 +565,9 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
         // LS6: the destination's own art from the first frame (a grid tap resumes elsewhere than its page's shard); ARRIVAL_ART's rule
         if (typeof found?.art === 'string' && /^(?:\/(?!\/)[\w./-]+\.(?:jpg|png|webp))?$/u.test(found.art)) document.documentElement.style.setProperty('--ws-load-portrait', found.art === '' ? 'none' : 'url("' + found.art + '")');
         const paint = () => { const s = (performance.now() - start) / 1000; clock.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + (s % 60).toFixed(1).padStart(4, '0'); };
-        // LS2/LS3: Start's bar takes one share per completed LS1 boundary of START_STEPS (src/client/engine/boot/shell.ts),
-        // never time; one additional share counts completed code body bytes from the compiler inventory.
+        // Jake (2026-11-12): "You can't have a progress bar, say 2 out of 31, and then still say 80%." Start's head prints
+        // one ratio and its percent and bar are that ratio (J188): code body bytes of the compiler inventory, held under
+        // 100 until Loading adopts the card; with no inventory, the completed LS1 boundaries of START_STEPS (shell.ts).
         const steps = ['app:document-and-module-graph', 'app:page-entry-import', 'app:tables-import-and-prepare', 'app:tier-menu-download-imports', 'app:three-import', 'app:main-import', 'app:selected-discovery'];
         const startFact = field('stFact'), startPct = field('stPct'), startBar = field('stBar');
         // Compiler-owned decoded body sizes, not transfer sizes or a timing estimate.
@@ -579,14 +580,11 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
           const received = new Map();
           for (const row of t.resources) if (row.realm === 'page' && modules.has(row.url) && row.decodedBodySize > 0) received.set(row.url, Math.min(modules.get(row.url), row.decodedBodySize));
           const moduleBytes = [...received.values()].reduce((sum, bytes) => sum + bytes, 0);
-          const fraction = moduleTotal > 0 ? (done.length + moduleBytes / moduleTotal) / (steps.length + 1) : done.length / steps.length;
-          const pct = String(Math.floor(fraction * 100));
+          const shown = moduleTotal > 0 ? [moduleBytes, moduleTotal] : [done.length, steps.length];
+          const pct = String(Math.min(99, Math.floor(shown[0] / shown[1] * 100)));
           if (startPct.textContent !== pct) { startPct.textContent = pct; startBar.style.width = pct + '%'; }
-          let files = 0, bytes = 0; for (const r of t.resources) if (r.realm === 'page') { files++; bytes += r.transferSize || 0; }
-          if (moduleTotal > 0) {
-            startFact.textContent = received.size + ' / ' + modules.size + ' code files · ' + (moduleBytes / 1e6).toFixed(1) + ' / ' + (moduleTotal / 1e6).toFixed(1) + ' MB';
-            card.dataset.startBytes = String(moduleBytes); card.dataset.startTotalBytes = String(moduleTotal); card.dataset.startFiles = String(received.size);
-          } else if (files > 0) startFact.textContent = files + ' files · ' + (bytes / 1e6).toFixed(1) + ' MB';
+          startFact.textContent = moduleTotal > 0 ? (moduleBytes / 1e6).toFixed(1) + ' of ' + (moduleTotal / 1e6).toFixed(1) + ' MB' : done.length + ' of ' + steps.length + ' steps';
+          if (moduleTotal > 0) { card.dataset.startBytes = String(moduleBytes); card.dataset.startTotalBytes = String(moduleTotal); card.dataset.startFiles = String(received.size); }
           card.dataset.step = 'start.' + (steps.find(op => !done.includes(op)) || 'hand-off');
         };
         paint(); startPaint(); const tick = setInterval(() => { if (card.hasAttribute('data-shell')) { paint(); startPaint(); } else clearInterval(tick); }, 100);

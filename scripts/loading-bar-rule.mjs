@@ -56,8 +56,8 @@ function earned(source) {
     if (source.adopted === true) return 100;
     if (!valid(source.done) || !valid(source.total) || !valid(source.bytes) || !valid(source.byteTotal)
       || source.done > source.total || source.bytes > source.byteTotal || source.total === 0) return null;
-    return Math.floor(100 * (source.done + (source.byteTotal > 0 ? source.bytes / source.byteTotal : 0))
-      / (source.total + (source.byteTotal > 0 ? 1 : 0)));
+    // Jake (2026-11-12): Start's percent is the ratio its head prints: code bytes, else boundaries; 100 waits for adoption
+    return Math.min(99, Math.floor(100 * (source.byteTotal > 0 ? source.bytes / source.byteTotal : source.done / source.total)));
   }
   if (source.kind === 'download') {
     if (!valid(source.done) || !valid(source.total) || source.done > source.total) return null;

@@ -1,4 +1,5 @@
 import { formatMB } from './plan';
+import { downloadShown, downloadShownFraction } from '../../../shared/engine/boot/timing';
 
 /** Disk-prefetch facts supplied by the application; they never credit transport bytes. */
 export interface LoadingPrefetchSnapshot {
@@ -22,16 +23,15 @@ export interface LoadingDownloadSnapshot {
    *  watch (src/client/engine/boot/stuckStep.ts), never shown as downloaded. */
   readonly streamedBytes?: number;
 }
-export function loadingDownloadFraction(row: LoadingDownloadSnapshot): number {
-  return row.complete ? 1 : row.totalBytes === 0 ? 0 : Math.min(0.999, row.completedBytes / row.totalBytes);
-}
+/** The Download percent: the same ratio its head prints (engine boot/timing.ts downloadShown). */
+export function loadingDownloadFraction(row: LoadingDownloadSnapshot): number { return downloadShownFraction(row); }
 const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1);
 /** LS2's one size number on the Download head: what arrived of the whole, then the cache split once it closes. */
 export function loadingDownloadText(row: LoadingDownloadSnapshot): string {
-  const text = row.wire ?? row;
   // DL21: wire bytes still arriving count as they stream (decoded reads already credit per chunk)
-  if (!row.complete && text.totalBytes === 0) return 'Waiting';
-  return row.complete ? loadingCacheText(row) : `${mb(text.completedBytes + (row.wire?.arrivingBytes ?? 0))} of ${mb(text.totalBytes)} MB`;
+  const {done, total} = downloadShown(row);
+  if (!row.complete && total === 0) return 'Waiting';
+  return row.complete ? loadingCacheText(row) : `${mb(done)} of ${mb(total)} MB`;
 }
 /** "2.2 MB downloaded, 20.9 MB from cache": the network's share and the cache's share of the same bytes. */
 export function loadingCacheText(row: LoadingDownloadSnapshot): string {

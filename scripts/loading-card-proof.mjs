@@ -54,7 +54,10 @@ function recordBars() {
     if(bar==='start')return start();
     if(bar==='download'){
       const row=t?.work?.download?.();
-      return row===undefined?undefined:{kind:'download',done:row.completedBytes,total:row.totalBytes,complete:row.complete,known:row.progressKnown!==false,inline:!(t?.entries??[]).some(entry=>entry.operation==='app:loading-adopt')};
+      // the head's own ratio (engine src/shared/engine/boot/timing.ts downloadShown): wire sizes when the build declares them
+      if(row===undefined)return undefined;
+      const wire=/** @type {{totalBytes:number,completedBytes:number,arrivingBytes?:number}|undefined} */(Reflect.get(row,'wire'));
+      return {kind:'download',done:wire===undefined?row.completedBytes:Math.min(wire.totalBytes,wire.completedBytes+(wire.arrivingBytes??0)),total:wire===undefined?row.totalBytes:wire.totalBytes,complete:row.complete,known:row.progressKnown!==false,inline:!(t?.entries??[]).some(entry=>entry.operation==='app:loading-adopt')};
     }
     if(bar==='load'){
       const row=t?.work?.load?.();

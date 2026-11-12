@@ -699,7 +699,6 @@ export const ENGINE_STRINGS = {
   "s_c0951c6055b1": "⟦0⟧:⟦1⟧",
   "s_51b784eb9dd6": "⟦0⟧ s",
   "s_dd0d06d0c0aa": "▸ ⟦0⟧",
-  "s_af18899b96b3": "step ⟦0⟧ / ⟦1⟧ · ⟦2⟧⟦3⟧",
   "s_387d49323b0f": "nothing declared",
   "s_9efb7c208f96": "⟦0⟧ / ⟦1⟧ · ⟦2⟧ / ⟦3⟧ files⟦4⟧",
   "s_bf5e849564ae": "⟦0⟧ · ⟦1⟧%",
