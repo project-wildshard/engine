@@ -9,6 +9,9 @@ import {prefetchEntryReads} from '../src/client/game/grid/entryReadPrefetch';
 import {readServerProduct} from '../src/server/host/standalone/serverProduct';
 import type {Rapier} from '../src/shared/engine/physics/rapier';
 import {installAssetTables} from '../src/shared/engine/boot/tables';
+import {readAssetTables} from '../src/client/app/assetTables';
+import {titleAssetURL} from '../src/client/game/titleAssets';
+import {stampContentBase} from '../scripts/app-build/contentBase.mjs';
 
 const CDN = 'https://packs.example.test/';
 const page = (): string => new URL('/', document.baseURI).href;
@@ -19,13 +22,88 @@ function bank(fields: Record<string, unknown>): void {
   document.head.append(script);
 }
 installAssetTables({bytes: {}, versions: {'/assets/pine-hollow/v.jpg': 'abcd1234'}, music: {}, sfx: {}, packs: {}});
+const DOCUMENT = `<head><link rel="apple-touch-startup-image" href="/assets/title/launch-1.png" /><script>
+      // BEGIN TITLE URLS
+      const titleAssetURLs = {"/assets/title/hero.jpg":"/assets/title/hero-1.jpg"};
+      // END TITLE URLS
+      const portrait = titleAssetURLs['/assets/title/' + shard];
+</script><style>.ws-launch-hero { background: url('/assets/title/hero-1.jpg') center; }</style>
+<script type="application/json" id="boot-module-files">{"common":[]}</script></head>`;
 afterEach(() => { document.getElementById('boot-module-files')?.remove(); releaseSpawnMembers(); setSpawnPacks(false); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 test('the bank names an origin or nothing', () => {
   expect(readContentBase(undefined)).toBe('');
   expect(readContentBase('')).toBe('');
   expect(readContentBase('https://packs.wildshard.io')).toBe('https://packs.wildshard.io/');
-  for (const bad of ['https://packs.wildshard.io/shards/', 'ftp://x.test/', 'https://x.test/?a', '/relative/', 7]) expect(() => readContentBase(bad)).toThrow(/contentBase/u);
+  for (const bad of ['https://packs.wildshard.io/content/0123456789abcdef', 'ftp://x.test/', 'https://x.test/?a', '/relative/', 7]) expect(() => readContentBase(bad)).toThrow(/contentBase/u);
+});
+
+// PAGE-SIZE PZ13: PZ2's layout puts a build's content under `content/<set>/`, so a base is an origin with that path
+const SET = 'https://packs.example.test/content/0123456789abcdef/';
+test('the bank names a content set path, and still refuses a query, a relative base and another scheme', () => {
+  expect(readContentBase('https://packs.wildshard.io/content/609da07f7448e19d/')).toBe('https://packs.wildshard.io/content/609da07f7448e19d/');
+  for (const bad of ['https://packs.wildshard.io/content/609da07f7448e19d/?a', 'https://packs.wildshard.io/content/609da07f7448e19d/#a', 'content/609da07f7448e19d/', '/content/609da07f7448e19d/',
+    'ftp://packs.wildshard.io/content/609da07f7448e19d/', 'https://u:p@packs.wildshard.io/content/609da07f7448e19d/', 'https://packs.wildshard.io/content/609da07f7448e19d']) expect(() => readContentBase(bad)).toThrow(/contentBase/u);
+  for (const bad of ['https://packs.wildshard.io/content/609da07f7448e19d/?a', '/content/609da07f7448e19d/', 'ftp://packs.wildshard.io/content/609da07f7448e19d/', 'https://packs.wildshard.io/content/609da07f7448e19d']) expect(() => stampContentBase(DOCUMENT, bad)).toThrow(/content base/u);
+});
+
+test('a set path keeps its path: content goes under it and comes back to its page URL', () => {
+  bank({contentBase: SET});
+  expect(contentURL('/shardfiles/driftwood-isle/')).toBe(`${SET}shardfiles/driftwood-isle/`);
+  expect(contentURL('/assets/spawn/parts/0123456789abcdef.pack.br')).toBe(`${SET}assets/spawn/parts/0123456789abcdef.pack.br`);
+  expect(contentURL('/assets/boot-tables-01234567.json')).toBe(`${SET}assets/boot-tables-01234567.json`);
+  expect(contentURL('/assets/title/main-crossroads-square-24abf23d2606ae3f.jpg')).toBe(`${SET}assets/title/main-crossroads-square-24abf23d2606ae3f.jpg`);
+  expect(versionedUrl('/assets/pine-hollow/v.jpg')).toBe(`${SET}assets/pine-hollow/v.jpg?v=abcd1234`);
+  for (const stays of ['/assets/physics/rapier.wasm', '/b/build/standalone/shell.js']) expect(contentURL(stays)).toBe(stays);
+  expect(pageURL(`${SET}shardfiles/driftwood-isle/shard.json?v=1`)).toBe(`${page()}shardfiles/driftwood-isle/shard.json?v=1`);
+  // the same origin outside the set is not this page's content
+  expect(pageURL('https://packs.example.test/content/fedcba9876543210/shardfiles/a/b.bin')).toBe('https://packs.example.test/content/fedcba9876543210/shardfiles/a/b.bin');
+  expect(shardPackBase('driftwood-isle')).toBe(SET);
+  expect(titleAssetURL('/assets/title/main-crossroads-square.jpg').startsWith(`${SET}assets/title/main-crossroads-square-`)).toBe(true);
+});
+
+test('the boot tables are read from the content base', async () => {
+  bank({contentBase: SET});
+  const asked: string[] = [];
+  await readAssetTables({url: '/assets/boot-tables-01234567.json', bytes: 2, sha256: `01234567${'0'.repeat(56)}`}, url => { asked.push(url); return Promise.resolve(new Response('{}')); }).catch(() => undefined);
+  expect(asked).toEqual([`${SET}assets/boot-tables-01234567.json`]);
+});
+
+test('the stamp names a set path and points the document title art at it', () => {
+  const html = stampContentBase(DOCUMENT, SET), bankText = /id="boot-module-files">([^<]+)</u.exec(html)?.[1] ?? '{}';
+  expect(JSON.parse(bankText)).toEqual({common: [], contentBase: SET});
+  expect(html).toContain(`href="${SET}assets/title/launch-1.png"`);
+  expect(html).toContain(`url('${SET}assets/title/hero-1.jpg')`);
+  // the logical names (the lookup keys) stay; only the URLs they name move
+  expect(html).toContain(`const titleAssetURLs = {"/assets/title/hero.jpg":"${SET}assets/title/hero-1.jpg"};`);
+  expect(html).toContain(`titleAssetURLs['/assets/title/' + shard]`);
+  // no base: the document keeps its page URLs
+  const same = stampContentBase(DOCUMENT, '');
+  expect(same).toContain('href="/assets/title/launch-1.png"');
+  expect(same).toContain(`const titleAssetURLs = {"/assets/title/hero.jpg":"/assets/title/hero-1.jpg"};`);
+});
+
+test('the spawn download reads its manifest and parts under a set path', async () => {
+  bank({contentBase: SET});
+  const file = {url: '/shardfiles/setted/blobs/bin/b.bin', bytes: 4, hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'};
+  const text = JSON.stringify({version: 1, shard: 'setted', tier: 'phone', flow: 'client', files: [file], totalBytes: 4,
+    parts: [{url: '/assets/spawn/parts/0123456789abcdef.pack.br', bytes: 4, hash: file.hash, members: [[0, 0]]}]});
+  const fetched: string[] = [];
+  const job = downloadSpawnManifest({url: '/assets/spawn/setted-1234567890abcdef.json', bytes: text.length, totalBytes: 4, files: 1}, {cached: () => Promise.resolve(undefined),
+    fetch: url => { fetched.push(url); return Promise.resolve(new Response(new URL(url).pathname.endsWith('.json') ? text : 'test')); }}, document.baseURI, SET);
+  await job.ready.catch(() => undefined);
+  expect(fetched.length).toBeGreaterThan(1);
+  expect(fetched.filter(url => !url.startsWith(SET))).toEqual([]);
+});
+
+test('the solo server worker reads its book and parts under a set path', async () => {
+  bank({contentBase: SET});
+  const base = contentURL('/shardfiles/driftwood-isle/'), asked: string[] = [];
+  const book = JSON.stringify({book: 'server', build: 'b1', shards: {'driftwood-isle': {parts: [{url: '/assets/spawn/server/0123456789abcdef.pack.br', bytes: 1, hash: 'a'.repeat(64), files: [['shard.json', 0, 1, 'b'.repeat(64)]]}]}}});
+  await readServerProduct(base, () => 'b1', url => { asked.push(url.href); return Promise.resolve(url.pathname.endsWith('.json') ? new TextEncoder().encode(book) : new Uint8Array([123])); }, {} as Rapier).catch(() => undefined);
+  expect(asked[0]).toBe(`${SET}assets/spawn/server-b1.json`);
+  expect(asked.length).toBeGreaterThan(1);
+  expect(asked.filter(url => !url.startsWith(SET))).toEqual([]);
 });
 
 test('empty: every reader keeps the page URL', () => {
