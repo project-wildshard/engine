@@ -21,7 +21,7 @@ import { stampContentBase } from './app-build/contentBase.mjs';
 const option = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const set = option('set', '');
 if (set !== '' && !/^[a-f0-9]{16}$/u.test(set)) throw new Error(`--set takes 16 hex: ${set}`);
-const prefix = set === '' ? '' : `/content/${set}`;
+const setFolder = set === '' ? '' : `/content/${set}`;
 const sameOrigin = process.argv.includes('--same-origin'), dist = resolvePath(option('dist', 'dist')), slugs = option('slugs', 'driftwood-isle,pine-hollow').split(','), timeout = Number(option('browser-timeout', '240')) * 1000;
 if (!existsSync(resolvePath(dist, 'index.html'))) throw new Error(`${dist} has no built page: run pnpm build:game`);
 const build = JSON.parse(readFileSync(resolvePath(dist, 'version.json'), 'utf8')).build;
@@ -61,7 +61,7 @@ const listen = server => new Promise(resolve => { server.listen(0, '127.0.0.1', 
 
 /** @type {{path: string, slug: string, status: number}[]} */ const pageLog = [];
 /** @type {{path: string, origin: string|undefined, cookie: boolean, method: string, slug: string, status: number}[]} */ const contentLog = [];
-let current = '', contentOrigin = '';
+let current = '', contentOrigin = '', contentBase = '';
 const pageServer = createServer((request, response) => {
   const path = new URL(request.url ?? '/', 'http://x').pathname, row = { path, slug: current, status: 200 }; pageLog.push(row);
   if (path === '/' || path === '/index.html') {
@@ -77,7 +77,7 @@ const pageOrigin = await listen(pageServer);
 const contentServer = createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://x').pathname, origin = request.headers.origin;
   // the set's own folder mirrors page paths; anything outside it is not this build's content
-  const path = url.startsWith(`${prefix}/`) ? url.slice(prefix.length) : null, row = { path: path ?? url, origin, cookie: request.headers.cookie !== undefined, method: request.method ?? 'GET', slug: current, status: 200 };
+  const path = url.startsWith(`${setFolder}/`) ? url.slice(setFolder.length) : null, row = { path: path ?? url, origin, cookie: request.headers.cookie !== undefined, method: request.method ?? 'GET', slug: current, status: 200 };
   contentLog.push(row);
   /** @type {Record<string, string>} */
   const cors = origin === pageOrigin ? { 'access-control-allow-origin': origin, vary: 'Origin', 'access-control-expose-headers': 'ETag, Content-Length, Content-Range', 'cross-origin-resource-policy': 'cross-origin' } : { 'cross-origin-resource-policy': 'cross-origin' };
@@ -87,7 +87,7 @@ const contentServer = createServer((request, response) => {
   send(response, file, request.headers.range, cors);
 });
 contentOrigin = `${await listen(contentServer)}/`;
-const contentBase = `${contentOrigin}${prefix.slice(1)}${prefix === '' ? '' : '/'}`;
+contentBase = `${contentOrigin}${setFolder.slice(1)}${setFolder === '' ? '' : '/'}`;
 
 // shard content on the page origin: the product, programs, cooked spawn files, and each shard's art mounts (S1 to S7)
 const shards = new Set([...readdirSync(resolvePath(existsSync(resolvePath(contentDist, 'shardfiles')) ? contentDist : dist, 'shardfiles')), 'nalati', 'far-reach', 'nine-dragon', 'practice']);
