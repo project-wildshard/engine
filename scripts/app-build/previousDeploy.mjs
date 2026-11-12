@@ -105,6 +105,15 @@ function ownBuild(build) {
 /** @type {Readonly<Record<string, string>>} */
 const CHANNEL_ORIGINS = Object.freeze({production: 'https://play.wildshard.io', staging: 'https://staging.wildshard.io', preview: 'https://preview.wildshard.io'});
 
+/** Whether a 5xx or a network failure at the carried origin may mean "no previous builds" instead of failing the build.
+ * ci.yml's test build opts in (WS_PREVIOUS_DEPLOY_OPTIONAL=1); a staging or production release (WS_RELEASE=1) never
+ * does, so it never ships without the kept graphs. The hourly solo preview (OFF-VERCEL OV6) always does: its first
+ * Workers release replaced a paused host that answered 503, and a missed hour costs an open preview tab a reload.
+ * @param {Readonly<Record<string, string | undefined>>} env @returns {boolean} */
+export function previousDeployOptional(env) {
+  return (env.WS_PREVIOUS_DEPLOY_OPTIONAL === '1' && env.WS_RELEASE !== '1') || env.WS_CHANNEL === 'preview';
+}
+
 /** OFF-VERCEL OV3: a release carries the kept builds from its own channel's domain, never a vercel.app address. A main
  * push on CI names no channel and builds what production ships, so it carries from production.
  * @param {string | undefined} channel  WS_CHANNEL

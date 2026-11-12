@@ -20,7 +20,7 @@ import {
 } from "./app-build/outputProducts.mjs";
 import { stampBuildDocuments } from "./app-build/buildIdentity.mjs";
 import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
-import { carryPreviousDeploy, channelOrigin } from "./app-build/previousDeploy.mjs";
+import { carryPreviousDeploy, channelOrigin, previousDeployOptional } from "./app-build/previousDeploy.mjs";
 import { assertAssetLimits, describeAssetLimits } from "./app-build/assetLimits.mjs";
 import { buildValidationReceipts } from "./app-build/validationReceipts.mjs";
 import { shardfileValidationRevision } from "./shardfile-validation-revision.mjs";
@@ -254,13 +254,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   const previousOrigin =
     process.env.WS_PREVIOUS_DEPLOY_ORIGIN ??
     (release ? channelOrigin(process.env.WS_CHANNEL) : undefined);
-  // ci.yml's test build opts in: an unreachable production (a 5xx, a network error) is no previous deploy there.
-  // A staging or production release never does, so it still refuses rather than ship without the kept graphs.
-  // The hourly solo preview (OFF-VERCEL OV6) does: its first Workers release replaced a paused host that answered 503,
-  // and a missed hour costs an open preview tab a reload, never a player's world.
-  const optional =
-    (process.env.WS_PREVIOUS_DEPLOY_OPTIONAL === "1" && process.env.WS_RELEASE !== "1") ||
-    process.env.WS_CHANNEL === "preview";
+  // ci.yml's test build and the solo preview may meet an unreachable origin; a staging or production release refuses.
+  const optional = previousDeployOptional(process.env);
   console.log(
     "Previous deploy chunks:",
     await carryPreviousDeploy(outDir, {

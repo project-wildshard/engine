@@ -3,7 +3,7 @@ import {spawnSync} from 'node:child_process';
 
 /**
  * Run a child with its output captured, then print it with every secret replaced. Throws on a non-zero exit.
- * @param {string} file @param {string[]} args @param {{cwd: string, env: NodeJS.ProcessEnv}} options @param {string[]} secrets
+ * @param {string} file @param {string[]} args @param {{cwd: string, env: NodeJS.ProcessEnv, timeout?: number}} options @param {string[]} secrets
  * @returns {string} stdout, redacted
  */
 export function runRedacted(file, args, options, secrets) {

@@ -31,8 +31,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # The build is about 20 minutes; a warm upload is minutes, a cold one (about 2 GB, OV6) must fit the 1-hour upload token
-    timeout-minutes: 75
+    # Under the hourly cadence (the next run cancels this one): the build is about 20 minutes and a warm upload a few.
+    # The one cold upload (about 2.4 GB) ran by hand in OV6.
+    timeout-minutes: 55
     steps:
       - name: The newest green main
         id: pick
@@ -54,8 +55,8 @@ jobs:
         id: changed
         run: |
           live=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
-          # every input of the client build: the game's code, its shards (the pins), the build tooling, the lockfile and the page host
-          inputs=(src/client src/shared types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts pages scripts/page-release scripts/page-release.mjs)
+          # every input of the client build: the game's code (the solo page bundles the server worker), its shards (the pins), the build tooling, the lockfile and the page host
+          inputs=(src/client src/shared src/server types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts pages scripts/page-release scripts/page-release.mjs)
           if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null && git diff --quiet "$live" HEAD -- "${inputs[@]}"; then
             echo "preview.wildshard.io already serves $live, and no client input changed since: no deploy"
             echo "deploy=false" >> "$GITHUB_OUTPUT"

@@ -5,7 +5,7 @@ import {join, resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the production manifest/body HTTP path locally.
 import {createServer} from 'node:http';
 import {expect, test} from 'vitest';
-import {carryPreviousDeploy, channelOrigin} from '../scripts/app-build/previousDeploy.mjs';
+import {carryPreviousDeploy, channelOrigin, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
 import {KEEP_PROMOTED} from '../scripts/prune-deployments.mjs';
 
 test('a deploy carries the kept builds unchanged, but never one past the prune, nor a map', async () => {
@@ -219,4 +219,12 @@ test('a release carries from its own channel, never a vercel.app address (OFF-VE
   const pipeline = readFileSync('scripts/app-build-pipeline.mjs', 'utf8');
   expect(pipeline).not.toMatch(/vercel\.app|VERCEL_ENV/u);
   expect(pipeline).toContain('process.env.WS_RELEASE === "1"');
+});
+
+test('only a test build or the solo preview may treat an unreachable origin as no previous builds', () => {
+  expect(previousDeployOptional({WS_PREVIOUS_DEPLOY_OPTIONAL: '1'})).toBe(true);
+  expect(previousDeployOptional({WS_RELEASE: '1', WS_CHANNEL: 'preview'})).toBe(true);
+  expect(previousDeployOptional({WS_RELEASE: '1', WS_CHANNEL: 'staging', WS_PREVIOUS_DEPLOY_OPTIONAL: '1'})).toBe(false);
+  expect(previousDeployOptional({WS_RELEASE: '1', WS_CHANNEL: 'production', WS_PREVIOUS_DEPLOY_OPTIONAL: '1'})).toBe(false);
+  expect(previousDeployOptional({})).toBe(false);
 });

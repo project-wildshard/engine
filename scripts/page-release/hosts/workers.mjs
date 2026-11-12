@@ -27,6 +27,7 @@ export const WORKERS = {
   production: {env: '', worker: 'wildshard-play'},
 };
 const MAP = /\.map(?:\.(?:gz|br))?$/u;
+const SENTRY_TIMEOUT_MS = 5 * 60_000;
 const VERSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 /**
@@ -92,7 +93,8 @@ export function workersHost({token, exec = runRedacted, fetch: get = fetch, log 
       const dist = join(context.root, 'dist');
       // SENTRY-TRIAGE S5: the hidden maps go to Sentry, never to the CDN. A Sentry outage never stops a release.
       try {
-        process.stdout.write(exec('node', ['scripts/sentry-maps.mjs', 'dist', '--environment', context.channel.channel], {cwd: context.root, env: env()}, secrets()));
+        // Five minutes at most, as preview.yml's own step had: a stalled upload never eats the release's budget.
+        process.stdout.write(exec('node', ['scripts/sentry-maps.mjs', 'dist', '--environment', context.channel.channel], {cwd: context.root, env: env(), timeout: SENTRY_TIMEOUT_MS}, secrets()));
       } catch (error) {
         log(`warning: source maps not sent to Sentry (${error instanceof Error ? error.message : String(error)}); stripping them anyway`);
       }
