@@ -61,7 +61,8 @@ export interface TerrainLattice { readonly grid: Float32Array; readonly res: num
  */
 export function addLevelTerrain(physics: Physics, lattice?: TerrainLattice): Collider {
   if (lattice === undefined) return addTerrain(physics);
-  const collider = addTerrain(physics, lattice.grid, lattice.res, lattice.size), g = grounds.get(physics);
+  // a copy: the level spec's lattice is shared by every entry of this level
+  const collider = addTerrain(physics, Float32Array.from(lattice.grid), lattice.res, lattice.size), g = grounds.get(physics);
   if (g !== undefined) g.declared = true;
   return collider;
 }
@@ -97,11 +98,12 @@ interface TerrainCut { x: number; z: number; hw: number; hd: number; yaw: number
  * Push the physics heightfield down inside `cuts` (PHYSICS P4): where the drawn terrain pokes up through a walk-in
  * space (the sea cave's floor), the collision ground must not — the space's own colliders are the floor there. Grid
  * vertices inside a cut (grown by one cell, so no triangle still reaches in) are clamped to `below`; the heightfield
- * collider is rebuilt once. The drawn terrain is untouched. Returns the vertices changed.
+ * collider is rebuilt once. The drawn terrain is untouched. A declared lattice (`addLevelTerrain`) is never cut. Returns the vertices changed.
  */
 export function cutTerrain(physics: Physics, cuts: readonly TerrainCut[]): number {
   const g = grounds.get(physics);
-  if (!g || cuts.length === 0) return 0;
+  // a declared lattice is the server's collider, which the server never cuts: cutting it here would part them again (NL10)
+  if (!g || g.declared === true || cuts.length === 0) return 0;
   const { grid, res, size } = g, d = size / (res - 1), half = size / 2;
   let changed = 0;
   for (const c of cuts) {

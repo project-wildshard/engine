@@ -35,6 +35,7 @@ test('Signal Dunes: the page predicts on the server\'s ground, sample for sample
   // The page: its declared ground, bound as the page binds it, and its level terrain collider as bootstrap and the grid add it.
   const ground = clientPageGround(shard, assets), page = new Physics(R);
   disposers.push(() => { page.dispose(); });
+  // bound as the page binds it, so the test also holds if the page ever falls back to sampling the heightfield
   const level = { id: shard.identity.slug, ground } as unknown as LevelSpec;
   configureLevel(level);
   disposers.push(bindHeightfield(new HeightfieldBinding(level)));
