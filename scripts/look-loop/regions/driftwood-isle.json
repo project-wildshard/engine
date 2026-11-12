@@ -1,0 +1,25 @@
+{
+ "shard": "driftwood-isle",
+ "about": "The E43 loop's colour regions: the 9 spawn-cove cameras of art/driftwood-isle/round-4-remaster/README.md. regions: material -> [[frame, [x0, y0, x1, y1]]] in normalised image coordinates, the same for the mockup and the capture. filters: material -> [hue lo, hue hi (deg), min sat, min value, max value], or a shadow of another material: its lit pixels' median luma x below, value over vmin, excluding the excludeHue [lo, hi, min sat] band. fitWeights: fit-lut.py's per-material pair weight (default 1).",
+ "regions": {
+  "shallow water": [[5, [0.1, 0.62, 0.9, 0.95]], [6, [0.05, 0.62, 0.95, 0.95]], [7, [0.55, 0.35, 0.95, 0.95]], [9, [0.05, 0.12, 0.95, 0.3]]],
+  "deep water": [[7, [0.45, 0.0, 1.0, 0.07]], [8, [0.0, 0.0, 0.55, 0.07]], [9, [0.0, 0.0, 1.0, 0.07]]],
+  "sand": [[5, [0.05, 0.05, 0.95, 0.45]], [7, [0.1, 0.45, 0.5, 0.95]], [9, [0.1, 0.45, 0.9, 0.95]]],
+  "sand shadow": [[5, [0.05, 0.05, 0.95, 0.45]], [7, [0.1, 0.45, 0.5, 0.95]], [9, [0.1, 0.45, 0.9, 0.95]]],
+  "grass": [[6, [0.05, 0.12, 0.95, 0.38]]],
+  "foliage": [[7, [0.0, 0.45, 0.2, 0.95]], [9, [0.25, 0.55, 0.6, 0.95]]],
+  "sky zenith": [[2, [0.02, 0.12, 0.35, 0.2]], [3, [0.02, 0.12, 0.35, 0.2]]],
+  "sky horizon": [[2, [0.02, 0.4, 0.35, 0.46]], [3, [0.02, 0.4, 0.35, 0.46]]]
+ },
+ "filters": {
+  "shallow water": [160, 205, 0.25, 0.35, 1.0],
+  "deep water": [195, 245, 0.35, 0.15, 1.0],
+  "sand": [18, 55, 0.15, 0.5, 1.0],
+  "sand shadow": {"shadowOf": "sand", "below": 0.72, "vmin": 0.12, "excludeHue": [65, 160, 0.25]},
+  "grass": [65, 160, 0.3, 0.35, 1.0],
+  "foliage": [65, 160, 0.35, 0.12, 1.0],
+  "sky zenith": [190, 240, 0.3, 0.3, 1.0],
+  "sky horizon": [185, 235, 0.12, 0.4, 1.0]
+ },
+ "fitWeights": {"sand shadow": 0.6, "sky zenith": 0.5, "sky horizon": 0.5}
+}

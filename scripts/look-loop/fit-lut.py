@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""fit-lut.py — fit a shard's learned colour LUT (DRIFTWOOD-REMASTER X1; any shard since PINE-HOLLOW-REMASTER PH-0.3)
-from its mockup loop's frames.
+"""fit-lut.py: fit a shard's learned 33³ colour LUT from its look loop's frames (docs/look-loop.md, step 6).
 
-  python3 scripts/fit-lut.py [--shard <slug>] [--regions <json>] <mockup dir> '<pre-LUT captures>/{n}.png' [out.bin] [pred dir]
-  python3 scripts/fit-lut.py art/driftwood-isle/round-4-remaster '<pre-LUT captures>/{n}.png' public/assets/lut/driftwood-isle.bin
+  python3 scripts/look-loop/fit-lut.py --shard <slug> <mockup dir> '<no-LUT dir>/nolut-capture-{n}-*.jpg' [out.bin] [pred dir]
+  python3 scripts/look-loop/fit-lut.py --regions <json> <mockup dir> '<pattern>' public/assets/lut/<slug>.bin
 
---shard defaults to driftwood-isle; out.bin to public/assets/lut/<shard>.bin (src/client/engine/world/lut.ts loads it for that shard;
-a shard with no file gets no LUT pass); the regions to src/shards/<shard>/art/palette-regions.json; the predicted frames go to
-/tmp unless a pred dir is given.
+Regions as palette-delta.py (--regions, else scripts/look-loop/regions/<slug>.json). out.bin defaults to engine's
+public/assets/lut/<shard>.bin, which src/client/engine/world/lut.ts loads for that shard (a shard with no file gets no
+LUT pass); the predicted frames go to ./tmp/look-loop/pred unless a pred dir is given.
 
-The input captures must be pre-LUT reference frames from the fitting archive, with the shard's loop cameras (Driftwood:
-art/driftwood-isle/round-4-remaster/README.md). Mockups and captures are not pixel-aligned (the mockups are
-recompositions), so the fit is per material, not per pixel:
-1. for every region of the shard's palette-regions JSON (same rectangles, same material filters) each capture pixel gets a
+The input captures must be frames shot with the LUT off, from the loop cameras. Mockups and captures are not
+pixel-aligned (the mockups are recompositions), so the fit is per material, not per pixel:
+1. for every region of the regions JSON (same rectangles, same material filters) each capture pixel gets a
    target by Reinhard transfer in CIELAB — its offset from the capture's mean, scaled by the ratio of the spreads
    (clamped 0.7–1.4), re-centred on the mockup's mean — giving (source, target) colour pairs;
 2. a coarse identity lattice (7³, low weight) and the grey axis (weight `greyAnchor`, default 3) anchor every colour the regions never see (the sword,
@@ -39,7 +37,7 @@ N = 33
 SIGMA = 0.08
 LAMBDA = 2.0
 MAX_MOVE = 0.22
-ROOT = HERE.parent
+ROOT = HERE.parent.parent
 
 
 def srgb_to_lab_arr(rgb):
@@ -64,7 +62,7 @@ def lab_to_srgb_arr(lab):
 
 def pairs(mock_dir, game_pat, rng, cfg):
     mocks = {n: Image.open(next(mock_dir.glob(f'mockup-{n}-*.jpg'))) for n in PD.frames(cfg)}
-    games = {n: Image.open(game_pat.format(n=n)) for n in PD.frames(cfg) if Path(game_pat.format(n=n)).exists()}
+    games = {n: Image.open(f) for n in PD.frames(cfg) if (f := PD.frame_path(game_pat, n))}
     src, dst, wt = [], [], []
     for mat, regs in cfg['regions'].items():
         m_all = [PD.select(mat, PD.pixels(mocks[n], r), cfg) for n, r in regs if n in games]
@@ -118,7 +116,7 @@ def apply(lut, img):
 def main(argv=None):
     ap = PD.arg_parser("fit a shard's 33³ colour LUT from its mockup loop")
     ap.add_argument('out', nargs='?', default=None, help='the LUT (default public/assets/lut/<shard>.bin)')
-    ap.add_argument('pred_dir', nargs='?', default='/tmp', help='where the predicted frames go (default /tmp)')
+    ap.add_argument('pred_dir', nargs='?', default='tmp/look-loop/pred', help='where the predicted frames go (default ./tmp/look-loop/pred)')
     a = ap.parse_args(argv)
     cfg = PD.load_config(a.shard, a.regions)
     mock_dir, game_pat = Path(a.mock_dir), a.game_pat
@@ -130,8 +128,8 @@ def main(argv=None):
     pred_dir = Path(a.pred_dir)
     pred_dir.mkdir(parents=True, exist_ok=True)
     for n in PD.frames(cfg):
-        p = Path(game_pat.format(n=n))
-        if p.exists(): apply(lut, Image.open(p)).save(pred_dir / f'pred-{n}.png')
+        p = PD.frame_path(game_pat, n)
+        if p: apply(lut, Image.open(p)).save(pred_dir / f'pred-{n}.png')
     print('predicted after the LUT:'); PD.report(mock_dir, str(pred_dir / 'pred-{n}.png'), cfg)
     rgba = np.concatenate([np.transpose(lut, (2, 1, 0, 3)).reshape(-1, 3), np.ones((N ** 3, 1))], 1)   # → [b][g][r]
     out_path.parent.mkdir(parents=True, exist_ok=True)

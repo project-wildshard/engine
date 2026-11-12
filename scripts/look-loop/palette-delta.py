@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""palette-delta.py — a mockup loop's colour check, per shard (E43, DRIFTWOOD-REMASTER look track; any shard since
-PINE-HOLLOW-REMASTER PH-0.3).
+"""palette-delta.py: the look loop's colour check (docs/look-loop.md, step 5). Any shard.
 
 Samples the MEAN colour of the same regions in each mockup frame and its in-game capture and prints mockup vs game per
-region with CIEDE2000 ΔE. The regions belong to a shard's loop cameras and live in src/shards/<shard>/art/palette-regions.json
-(Driftwood: the 9 E43 spawn-cove cameras, art/driftwood-isle/round-4-remaster/README.md).
+region with CIEDE2000 ΔE. It is information, not a pass bar: it shows which region is furthest from the target and
+whether a round moved it.
 
-  python3 scripts/palette-delta.py [--shard driftwood-isle] [--regions <json>] <mockup dir> '<captures>/ingame-{n}.jpg'
-  python3 scripts/palette-delta.py art/driftwood-isle/round-4-remaster 'art/driftwood-isle/round-6-loop/ingame-{n}.jpg'
+  python3 scripts/look-loop/palette-delta.py --shard <slug> <mockup dir> '<captures>/capture-{n}-*.jpg'
+  python3 scripts/look-loop/palette-delta.py --regions <shard repo>/art/look/regions.json <mockup dir> '<dir>/r2-capture-{n}-*.jpg'
 
---shard defaults to driftwood-isle; --regions defaults to that file, else scripts/palette-regions/<shard>.json. Mockups are
-<mockup dir>/mockup-<n>-*.jpg, n = the frames the regions name (1..9 for Driftwood).
+--regions names a regions JSON; else --shard <slug> reads scripts/look-loop/regions/<slug>.json. Mockups are
+<mockup dir>/mockup-<n>-*.jpg (targets.py's names), n = the frames the regions name (1..9 per zone; zones concatenate,
+1-9, 10-18, ...). The capture pattern takes {n} and may hold one `*` (views.mjs names frames capture-<n>-<id>.jpg).
 
-Regions are fixed rectangles in normalised image coordinates per camera, the same for the mockup and the capture;
+Regions are fixed rectangles in normalised image coordinates per frame, the same for the mockup and the capture;
 inside each rectangle only the pixels that belong to the material count (a hue / saturation / value filter), so a
 palm or a HUD panel crossing the rectangle does not pollute the sand's mean. A material's mean is over every rectangle
-it has, in every frame. A shadow material (Driftwood's `sand shadow`) is its rectangles' pixels darker than a share
-(72 %) of the lit material's median.
+it has, in every frame. A shadow material is its rectangles' pixels darker than a share (`below`, e.g. 0.72) of the lit
+material's median.
 """
 import argparse
 import json
@@ -28,15 +28,20 @@ import numpy as np
 from PIL import Image
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_SHARD = 'driftwood-isle'
 
 
-def load_config(shard=DEFAULT_SHARD, path=None):
-    """a shard's regions / filters / fit weights (its folder's art/palette-regions.json, or `path`)"""
-    own = HERE.parent / 'src' / 'shards' / shard / 'art' / 'palette-regions.json'
-    p = Path(path) if path else own if own.exists() else HERE / 'palette-regions' / f'{shard}.json'
+def regions_path(shard=None, path=None):
+    """`path` when given, else scripts/look-loop/regions/<shard>.json"""
+    if path: return Path(path)
+    if not shard: sys.exit('palette-delta: pass --regions <json> or --shard <slug>')
+    return HERE / 'regions' / f'{shard}.json'
+
+
+def load_config(shard=None, path=None):
+    """a shard's regions / filters / fit weights"""
+    p = regions_path(shard, path)
     if not p.exists():
-        sys.exit(f'palette-delta: no regions for {shard} ({p}); write one for the shard\'s loop cameras')
+        sys.exit(f'palette-delta: no regions at {p}; write one for the loop cameras (docs/look-loop.md, step 5)')
     cfg = json.loads(p.read_text())
     return {'regions': {m: [(n, tuple(r)) for n, r in regs] for m, regs in cfg['regions'].items()},
             'filters': cfg['filters'], 'weights': cfg.get('fitWeights', {}), 'greyAnchor': cfg.get('greyAnchor', 3.0)}
@@ -44,10 +49,10 @@ def load_config(shard=DEFAULT_SHARD, path=None):
 
 def arg_parser(desc):
     ap = argparse.ArgumentParser(description=desc)
-    ap.add_argument('--shard', default=DEFAULT_SHARD, help='the shard slug (default driftwood-isle)')
-    ap.add_argument('--regions', default=None, help='a regions JSON (default the shard\'s art/palette-regions.json)')
+    ap.add_argument('--shard', default=None, help='the shard slug: reads scripts/look-loop/regions/<slug>.json')
+    ap.add_argument('--regions', default=None, help='a regions JSON (overrides --shard)')
     ap.add_argument('mock_dir', help='the mockup folder (mockup-<n>-*.jpg)')
-    ap.add_argument('game_pat', help="the captures, a path with {n} (1..9)")
+    ap.add_argument('game_pat', help='the captures, a path with {n} and at most one * (capture-{n}-*.jpg)')
     return ap
 
 
@@ -85,7 +90,7 @@ def select(mat, px, cfg):
         excluded = (H >= elo) & (H <= ehi) & (S > esat)
         return px[(lum < f['below'] * med) & (V > f['vmin']) & ~excluded]
     lo, hi, smin, vmin, vmax = f[:5]
-    smax = f[5] if len(f) > 5 else 1.0   # an optional 6th: max saturation (a grey material: Pine Hollow's rock)
+    smax = f[5] if len(f) > 5 else 1.0   # an optional 6th: max saturation (a grey material, e.g. rock)
     return px[(H >= lo) & (H <= hi) & (S >= smin) & (S <= smax) & (V >= vmin) & (V <= vmax)]
 
 
@@ -127,15 +132,24 @@ def ciede2000(l1, l2):
     return math.sqrt((dLp / Sl) ** 2 + (dCp / Sc) ** 2 + (dHp / Sh) ** 2 + Rt * (dCp / Sc) * (dHp / Sh))
 
 
+def frame_path(pat, n):
+    """the file a capture pattern names for frame n, or None. One `*` in the file name globs; two matches refuse"""
+    p = Path(pat.format(n=n))
+    if '*' not in p.name: return p if p.exists() else None
+    hits = sorted(p.parent.glob(p.name))
+    if len(hits) > 1: sys.exit(f'palette-delta: {len(hits)} files match {p}; make the pattern unique (a --tag prefix)')
+    return hits[0] if hits else None
+
+
 def frames(cfg):
-    """the frame numbers the regions use (Driftwood: 1..9; Pine Hollow's three-zone loop: 1..27)"""
+    """the frame numbers the regions use (one zone: 1..9; a three-zone loop: 1..27)"""
     return sorted({n for regs in cfg['regions'].values() for n, _ in regs})
 
 
 def report(mock_dir, game_pat, cfg):
     mock_dir = Path(mock_dir)
     mocks = {n: Image.open(next(mock_dir.glob(f'mockup-{n}-*.jpg'))) for n in frames(cfg)}
-    games = {n: Image.open(game_pat.format(n=n)) for n in frames(cfg) if Path(game_pat.format(n=n)).exists()}
+    games = {n: Image.open(f) for n in frames(cfg) if (f := frame_path(game_pat, n))}
     rows, worst = [], 0.0
     for mat, regs in cfg['regions'].items():
         acc = {'m': [], 'g': []}
