@@ -47,6 +47,7 @@
     "agent-sync.mjs",
     "goldens/capture.mjs",
     "goldens/native-residency.mjs",
+    "look-loop/views.mjs",
     "inbox-pull.mjs",
     "../test/actor-projection-v2.test.ts",
     "../test/animal-model-preparation.test.ts",
