@@ -6,7 +6,10 @@
 // share a host, so they share cookies: the content origin must never see one (CORS with no credentials). The SW's side is
 // PZ10, so the journey runs with the service worker off.
 //
-//   node scripts/content-base-proof.mjs [--dist=dist] [--slugs=driftwood-isle,pine-hollow] [--browser-timeout=240]
+// PAGE-SIZE PZ13: `--set=<16 hex>` serves the content under `/content/<set>/` (PZ2's R2 layout) and stamps that base; the
+// content origin answers 404 outside it. Every 404 on the page origin fails the run: a split page reads nothing there.
+//
+//   node scripts/content-base-proof.mjs [--dist=dist] [--set=<16 hex>] [--slugs=driftwood-isle,pine-hollow] [--browser-timeout=240]
 import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, resolve as resolvePath, sep } from 'node:path';
@@ -16,6 +19,9 @@ import { stampContentBase } from './app-build/contentBase.mjs';
 
 /** @param {string} name @param {string} fallback */
 const option = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
+const set = option('set', '');
+if (set !== '' && !/^[a-f0-9]{16}$/u.test(set)) throw new Error(`--set takes 16 hex: ${set}`);
+const prefix = set === '' ? '' : `/content/${set}`;
 const sameOrigin = process.argv.includes('--same-origin'), dist = resolvePath(option('dist', 'dist')), slugs = option('slugs', 'driftwood-isle,pine-hollow').split(','), timeout = Number(option('browser-timeout', '240')) * 1000;
 if (!existsSync(resolvePath(dist, 'index.html'))) throw new Error(`${dist} has no built page: run pnpm build:game`);
 const build = JSON.parse(readFileSync(resolvePath(dist, 'version.json'), 'utf8')).build;
@@ -53,32 +59,35 @@ function send(response, file, range, extra) {
 /** @param {import('node:http').Server} server @returns {Promise<string>} */
 const listen = server => new Promise(resolve => { server.listen(0, '127.0.0.1', () => { const address = server.address(); resolve(`http://127.0.0.1:${typeof address === 'object' && address !== null ? address.port : 0}`); }); });
 
-/** @type {{path: string, slug: string}[]} */ const pageLog = [];
-/** @type {{path: string, origin: string|undefined, cookie: boolean, method: string, slug: string}[]} */ const contentLog = [];
+/** @type {{path: string, slug: string, status: number}[]} */ const pageLog = [];
+/** @type {{path: string, origin: string|undefined, cookie: boolean, method: string, slug: string, status: number}[]} */ const contentLog = [];
 let current = '', contentOrigin = '';
 const pageServer = createServer((request, response) => {
-  const path = new URL(request.url ?? '/', 'http://x').pathname; pageLog.push({ path, slug: current });
+  const path = new URL(request.url ?? '/', 'http://x').pathname, row = { path, slug: current, status: 200 }; pageLog.push(row);
   if (path === '/' || path === '/index.html') {
     // a page cookie: the content origin shares this host, so a credentialed read would carry it there
-    response.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store', 'set-cookie': 'pz3=page; Path=/; SameSite=Lax' }).end(stampContentBase(readFileSync(resolvePath(dist, 'index.html'), 'utf8'), sameOrigin ? '' : contentOrigin));
+    response.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store', 'set-cookie': 'pz3=page; Path=/; SameSite=Lax' }).end(stampContentBase(readFileSync(resolvePath(dist, 'index.html'), 'utf8'), sameOrigin ? '' : contentBase));
     return;
   }
   const file = pageFileOf(path);
-  if (file === null) { response.writeHead(404).end(); return; }
+  if (file === null) { row.status = 404; response.writeHead(404).end(); return; }
   send(response, file, request.headers.range, {});
 });
 const pageOrigin = await listen(pageServer);
 const contentServer = createServer((request, response) => {
-  const path = new URL(request.url ?? '/', 'http://x').pathname, origin = request.headers.origin;
-  contentLog.push({ path, origin, cookie: request.headers.cookie !== undefined, method: request.method ?? 'GET', slug: current });
+  const url = new URL(request.url ?? '/', 'http://x').pathname, origin = request.headers.origin;
+  // the set's own folder mirrors page paths; anything outside it is not this build's content
+  const path = url.startsWith(`${prefix}/`) ? url.slice(prefix.length) : null, row = { path: path ?? url, origin, cookie: request.headers.cookie !== undefined, method: request.method ?? 'GET', slug: current, status: 200 };
+  contentLog.push(row);
   /** @type {Record<string, string>} */
   const cors = origin === pageOrigin ? { 'access-control-allow-origin': origin, vary: 'Origin', 'access-control-expose-headers': 'ETag, Content-Length, Content-Range', 'cross-origin-resource-policy': 'cross-origin' } : { 'cross-origin-resource-policy': 'cross-origin' };
   if (request.method === 'OPTIONS') { response.writeHead(204, { ...cors, 'access-control-allow-methods': 'GET, HEAD', 'access-control-allow-headers': 'Range' }).end(); return; }
-  const file = contentFileOf(path);
-  if (file === null) { response.writeHead(404, cors).end(); return; }
+  const file = path === null ? null : contentFileOf(path);
+  if (file === null) { row.status = 404; response.writeHead(404, cors).end(); return; }
   send(response, file, request.headers.range, cors);
 });
 contentOrigin = `${await listen(contentServer)}/`;
+const contentBase = `${contentOrigin}${prefix.slice(1)}${prefix === '' ? '' : '/'}`;
 
 // shard content on the page origin: the product, programs, cooked spawn files, and each shard's art mounts (S1 to S7)
 const shards = new Set([...readdirSync(resolvePath(existsSync(resolvePath(contentDist, 'shardfiles')) ? contentDist : dist, 'shardfiles')), 'nalati', 'far-reach', 'nine-dragon', 'practice']);
@@ -126,6 +135,8 @@ try {
       // listed, not failed: a stylesheet image sends the cookies its host has. Here both origins share 127.0.0.1's jar; on
       // play.wildshard.io the page sets no cookie packs.wildshard.io would get.
       noCorsCookies: cdn.filter(entry => entry.cookie && entry.origin === undefined).length,
+      pageMissing: pageLog.filter(entry => entry.slug === slug && entry.status === 404).map(entry => entry.path).slice(0, 20),
+      contentMissing: cdn.filter(entry => entry.status === 404).map(entry => entry.path).slice(0, 20),
       pageShardContent: ownContent, pageEngineArt: [...new Set(otherContent)].slice(0, 20), pageEngineArtCount: otherContent.length, errors: errors.slice(0, 8) };
     results.push(row);
     if (booted.frames === 0) failures.push(`${slug}: no worker client frame`);
@@ -133,13 +144,15 @@ try {
     if (row.cdnProduct === 0) failures.push(`${slug}: no product read from the content base`);
     if (!serverBook || serverParts === 0) failures.push(`${slug}: the server worker did not read its book and parts from the content base`);
     if (ownContent.length > 0) failures.push(`${slug}: ${ownContent.length} shard content reads on the page origin: ${ownContent.slice(0, 5).join(' ')}`);
+    if (row.pageMissing.length > 0) failures.push(`${slug}: ${row.pageMissing.length} 404s on the page origin: ${row.pageMissing.slice(0, 5).join(' ')}`);
     if (row.preflights > 0) failures.push(`${slug}: ${row.preflights} CORS preflights`);
     if (row.cookies > 0) failures.push(`${slug}: ${row.cookies} CORS content reads carried a cookie`);
-    const unexpected = row.noCors.filter(path => !/\/blobs\/image\/[a-f0-9]{64}\.(?:jpg|png|webp)$/u.test(path));
+    // PZ13: the document's title art (launch hero, loading portrait) is a CSS background too
+    const unexpected = row.noCors.filter(path => !/\/blobs\/image\/[a-f0-9]{64}\.(?:jpg|png|webp)$/u.test(path) && !/^\/assets\/title\/[^/]+\.(?:jpg|png)$/u.test(path));
     if (unexpected.length > 0) failures.push(`${slug}: no-cors content reads that are not card art: ${unexpected.slice(0, 5).join(' ')}`);
   }
 } finally {
   await browser.close(); pageServer.close(); contentServer.close();
 }
-console.log(JSON.stringify({ gate: 'content-base-proof', build, pageOrigin, contentOrigin, pass: failures.length === 0, results, failures }, null, 1));
+console.log(JSON.stringify({ gate: 'content-base-proof', build, pageOrigin, contentBase, pass: failures.length === 0, results, failures }, null, 1));
 process.exitCode = failures.length === 0 ? 0 : 1;

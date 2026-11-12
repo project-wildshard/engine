@@ -83,19 +83,6 @@ test('the stamp names a set path and points the document title art at it', () =>
   expect(same).toContain(`const titleAssetURLs = {"/assets/title/hero.jpg":"/assets/title/hero-1.jpg"};`);
 });
 
-test('the spawn download reads its manifest and parts under a set path', async () => {
-  bank({contentBase: SET});
-  const file = {url: '/shardfiles/setted/blobs/bin/b.bin', bytes: 4, hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'};
-  const text = JSON.stringify({version: 1, shard: 'setted', tier: 'phone', flow: 'client', files: [file], totalBytes: 4,
-    parts: [{url: '/assets/spawn/parts/0123456789abcdef.pack.br', bytes: 4, hash: file.hash, members: [[0, 0]]}]});
-  const fetched: string[] = [];
-  const job = downloadSpawnManifest({url: '/assets/spawn/setted-1234567890abcdef.json', bytes: text.length, totalBytes: 4, files: 1}, {cached: () => Promise.resolve(undefined),
-    fetch: url => { fetched.push(url); return Promise.resolve(new Response(new URL(url).pathname.endsWith('.json') ? text : 'test')); }}, document.baseURI, SET);
-  await job.ready.catch(() => undefined);
-  expect(fetched.length).toBeGreaterThan(1);
-  expect(fetched.filter(url => !url.startsWith(SET))).toEqual([]);
-});
-
 test('the solo server worker reads its book and parts under a set path', async () => {
   bank({contentBase: SET});
   const base = contentURL('/shardfiles/driftwood-isle/'), asked: string[] = [];
@@ -226,4 +213,18 @@ test('on the content base the spawn download moves content only: code and rapier
     fetch: url => { fetched.push(url); const path = new URL(url).pathname; return Promise.resolve(new Response(path.endsWith('.json') ? text : files.find(file => file.url === path)?.body ?? '')); }}, document.baseURI, CDN);
   await job.ready;
   expect(fetched.sort()).toEqual([`${CDN}assets/spawn/mixed-1234567890abcdef.json`, `${CDN}shardfiles/mixed/blobs/bin/c.bin`, `${page()}assets/physics/rapier.wasm`, `${page()}b/build/entry.js`].sort());
+});
+
+// last: the member layer keeps the first fetch it is installed over beneath it, and the stubbed tests above need theirs
+test('the spawn download reads its manifest and parts under a set path', async () => {
+  bank({contentBase: SET});
+  const file = {url: '/shardfiles/setted/blobs/bin/b.bin', bytes: 4, hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'};
+  const text = JSON.stringify({version: 1, shard: 'setted', tier: 'phone', flow: 'client', files: [file], totalBytes: 4,
+    parts: [{url: '/assets/spawn/parts/9f86d081884c7d65.pack.br', bytes: 4, hash: file.hash, members: [[0, 0]]}]});
+  const fetched: string[] = [];
+  const job = downloadSpawnManifest({url: '/assets/spawn/setted-1234567890abcdef.json', bytes: text.length, totalBytes: 4, files: 1}, {cached: () => Promise.resolve(undefined),
+    fetch: url => { fetched.push(url); return Promise.resolve(new Response(new URL(url).pathname.endsWith('.json') ? text : 'test')); }}, document.baseURI, SET);
+  await job.ready;
+  expect(fetched.length).toBeGreaterThan(1);
+  expect(fetched.filter(url => !url.startsWith(SET))).toEqual([]);
 });

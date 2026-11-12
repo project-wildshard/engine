@@ -105,7 +105,7 @@ test('concurrent entry callers await one complete read before synchronous tables
   const response = new Promise<Response>(resolve => { finish = resolve; });
   const shared = { ...f.data, packs: {} }, common = assetTableAsset(JSON.stringify(shared));
   const read = vi.fn(() => Promise.resolve(new Response(f.source))).mockImplementationOnce(() => response);
-  const globals: readonly (readonly [string, unknown])[] = [['document', { querySelector: () => null }], ['fetch', read],
+  const globals: readonly (readonly [string, unknown])[] = [['document', { querySelector: () => null, getElementById: () => null }], ['fetch', read],
     ['__BOOT_TABLE_ASSETS__', { common: common.address, all: f.asset.address, packs: { legacy: f.asset.address } }]];
   const originals = new Map(globals.map(([name]) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
   for (const [name, value] of globals) Reflect.defineProperty(globalThis, name, { value, configurable: true, writable: true });

@@ -43,17 +43,25 @@ function workerBuild(): string {
   if (build === undefined) throw new Error('The server worker runs outside a build folder');
   return build;
 }
+/** A book's page path (`/assets/spawn/…`) beside a shard's base. PAGE-SIZE PZ13: the base is `<root>shardfiles/<slug>/`, and
+ * `<root>` is the page's `/` or a content base's folder (`https://packs.wildshard.io/content/<set>/`), so the path goes
+ * under that root. A relative path, or a base outside `shardfiles/`, resolves as a URL, as it always did. */
+function besideShard(path: string, root: string): URL {
+  const base = new URL(root), at = base.pathname.lastIndexOf('/shardfiles/');
+  if (!path.startsWith('/') || path.startsWith('//') || at === -1) return new URL(path, base);
+  return new URL(`.${path}`, new URL(base.pathname.slice(0, at + 1), base));
+}
 /** This build's server book. */
 async function serverBook(root: string, build: string, read: ServerRead): Promise<ServerPackBook> {
   const path = serverPackBookPath(build);
-  return readServerPackBook(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read(new URL(`/${path}`, root), path))));
+  return readServerPackBook(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read(besideShard(`/${path}`, root), path))));
 }
 
 /** C2: the road's collision from this build's grid pack: nothing a page reads, and no shard's. */
 export async function fetchGridCollision(base: string): Promise<readonly GridCollisionStrip[]> {
   const root = new URL(base, globalThis.location.href).href, { grid } = await serverBook(root, workerBuild(), serverBytes);
   if (grid === undefined) return [];
-  const body = await serverBytes(new URL(grid.url, root), grid.url), file = (path: string): Uint8Array => {
+  const body = await serverBytes(besideShard(grid.url, root), grid.url), file = (path: string): Uint8Array => {
     const bytes = serverPackFile(grid, body, path);
     if (bytes === undefined) throw new Error(`Missing server input ${path}`);
     return bytes;
@@ -72,7 +80,7 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
     if (kept !== undefined) return Promise.resolve(kept);
     const waiting = opening.get(part.url);
     if (waiting !== undefined) return waiting;
-    const read = source(new URL(part.url, root), part.url, part.hash).then(bytes => { opened.set(part.url, new WeakRef(bytes)); return bytes; }).finally(() => { opening.delete(part.url); });
+    const read = source(besideShard(part.url, root), part.url, part.hash).then(bytes => { opened.set(part.url, new WeakRef(bytes)); return bytes; }).finally(() => { opening.delete(part.url); });
     opening.set(part.url, read);
     return read;
   };

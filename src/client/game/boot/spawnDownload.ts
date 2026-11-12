@@ -149,7 +149,8 @@ function installMemberLayer(): boolean {
       }
     }
     if (method !== 'GET' || own) return network(input, init);
-    const url = new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input, location.href);
+    // PZ13: a read of the content base's copy stands for its page URL, whatever folder the base has
+    const url = new URL(pageURL(new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input, location.href).href), location.href);
     if (!isContentOrigin(url.origin) || !url.pathname.startsWith('/shardfiles/')) return network(input, init);
     const held = await heldPartMember(url);
     if (held !== null) return held;
@@ -175,7 +176,7 @@ async function partTable(slug: string): Promise<PartMembers | null> {
   if (selected === null || typeof selected.cacheName !== 'string' || typeof caches === 'undefined') return null;
   const address = bookSelection(await readPacksBook(), slug, 'client', partTier, '000');
   if (address === null) return null;
-  const [response, code] = await Promise.all([downloadFetch()(new URL(address.url, selected.base)),
+  const [response, code] = await Promise.all([downloadFetch()(onPacks(address.url, selected.base)),
     address.code === undefined ? undefined : downloadFetch()(contentURL(new URL(address.code.url, document.baseURI).href))]);
   if (!response.ok || code?.ok === false) { void response.body?.cancel().catch(() => undefined); void code?.body?.cancel().catch(() => undefined); return null; }
   const manifest = joinSpawnManifest(readSpawnManifest(await response.json()), code === undefined ? undefined : readSpawnCodeList(await code.json())), files = new Map<string, {file: SpawnManifest['files'][number]; part: SpawnPart; offset: number}>();
@@ -189,7 +190,7 @@ function readMembersOf(part: SpawnPart, table: PartMembers): Promise<void> {
   const held = partReads.get(part.url);
   if (held !== undefined) return held;
   const read = (async () => {
-    const response = await downloadFetch()(new URL(part.url, table.base));
+    const response = await downloadFetch()(onPacks(part.url, table.base));
     if (!response.ok) throw new Error(`Spawn part unavailable: ${part.url}`);
     const body = new Uint8Array(await response.arrayBuffer()), store = await table.store;
     if (body.length !== part.bytes) throw new Error(`Spawn part size differs: ${part.url}`);
@@ -371,7 +372,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
     try {
       // OVERNIGHT 6e: the manifest and its code list, read together. The list is the build's own, read from the content base
       // (PZ3) or else the document's origin; the content may live on the packs home.
-      const manifestURL = new URL(address.url, packs).href, codeURL = address.code === undefined ? undefined : contentURL(new URL(address.code.url, base).href);
+      const manifestURL = onPacks(address.url, packs), codeURL = address.code === undefined ? undefined : contentURL(new URL(address.code.url, base).href);
       const readOne = async (url: string, expected: number): Promise<{bytes: Uint8Array; copy: Response | undefined}> => {
         const held = await ports.cached(url);
         controller.signal.throwIfAborted();
@@ -585,7 +586,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           }
           // One read of the part. A read after a failure starts over and skips what landed, so no member counts twice.
           const read = async (init: RequestInit | undefined): Promise<void> => {
-            const response = await ports.fetch(new URL(part.url, packs).href, controller.signal, init);
+            const response = await ports.fetch(onPacks(part.url, packs), controller.signal, init);
             if (!response.ok || response.body === null) throw new Error(`Spawn part unavailable: ${part.url}`);
             const body = new Uint8Array(part.bytes), reader = response.body.getReader();
             let at = 0, next = 0;
@@ -776,12 +777,18 @@ function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tie
   const roots = flow === 'grid' ? get(get(book, flow), mode) : get(book, flow), pair = get(get(roots, slug), tier);
   return pair === undefined ? null : readSpawnManifestAddress(pair);
 }
+/** A book's page path (`/assets/spawn/…`) on the packs base. The content base mirrors page paths under its own folder (PZ13:
+ * `content/<set>/`), so a path keeps that folder; a J138 home or the page resolves it as a URL path, as it always did. */
+function onPacks(path: string, packs: string): string {
+  const base = contentBase();
+  return base !== '' && packs === base && path.startsWith('/') && !path.startsWith('//') ? new URL(`.${path}`, base).href : new URL(path, packs).href;
+}
 /** J138: where a cooked shard's manifests and parts live, when the bake says it isn't this origin. Its files keep their
  * page URLs: a part delivers them, and the product reads them by those. */
 function packBase(home: unknown, slug: string): string {
   const shards = get(home, 'shards'), base = get(home, 'base');
   if (Array.isArray(shards) && shards.includes(slug) && typeof base === 'string') return base;
-  // PZ3: the content base, an origin, when the boot bank names one; else this page
+  // PZ3: the content base (an origin, or PZ13's `content/<set>/` on one) when the boot bank names one; else this page
   return contentBase() || document.baseURI;
 }
 /** Optional recorded programs use the cook's actual inventory. Null means the cook published no such file. */

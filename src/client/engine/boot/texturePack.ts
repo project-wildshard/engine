@@ -1,6 +1,6 @@
 import { ASSET_CACHE_NAME } from '../pwa/cacheNames';
 import { publishBootResponse } from './bootCache';
-import { contentURL, isContentOrigin } from './contentBase';
+import { contentURL, isContentOrigin, pageURL } from './contentBase';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { PackDef, PackPart, PackFile } from '../../../shared/engine/boot/tables';
 
@@ -171,8 +171,8 @@ export function demandTextureResponse(input: RequestInfo | URL, init: RequestIni
     || new Headers(request?.headers).keys().next().done === false
     || request !== undefined && (request.credentials !== 'same-origin' || request.cache !== 'default' || request.integrity !== ''
       || request.mode !== 'cors' || request.redirect !== 'follow' || request.referrerPolicy !== '')) return undefined;
-  let url: URL; try { url = new URL(value, location.href); } catch { return undefined; }
-  // PZ3: a read of the content base's copy is the same packed member
+  let url: URL; try { url = new URL(pageURL(new URL(value, location.href).href), location.href); } catch { return undefined; }
+  // PZ3: a read of the content base's copy is the same packed member (PZ13: by its page path, whatever the base's folder)
   if (!isContentOrigin(url.origin) || url.search !== '' || url.hash !== '') return undefined;
   for (const reader of readers) {
     const response = reader.read(url.pathname, net, init?.signal ?? request?.signal);
