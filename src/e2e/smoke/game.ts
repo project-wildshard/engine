@@ -96,6 +96,15 @@ async function enter(page: Page): Promise<void> {
   }
   await expect(developer).toHaveAttribute('aria-checked', 'true')
   await page.locator('.ws-main-select').click()
+  // MP2.4: a device's first PLAY asks its Name; Skip keeps the default (a later PLAY goes straight on)
+  const skip = page.locator('#ws-name-box [data-name=skip]')
+  await page
+    .locator('#ws-name-box, .ws-title-stack[data-screen="select"]')
+    .first()
+    .waitFor()
+  if ((await skip.count()) > 0) {
+    await skip.click()
+  }
   const cards = await page.locator('.ws-menu-card b').allTextContents()
   const index = cards.indexOf('Blender Template')
   expect(

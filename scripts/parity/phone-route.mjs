@@ -153,7 +153,8 @@ export async function phoneRoute(page, base, sha, out, route = 'full') {
     receipt.paint = /** @type {typeof receipt.paint} */ (await page.evaluate('window.__phoneRoutePaint'));
     receipt.steps.push('title'); await shot('title');
     await page.click('.ws-main-select');
-    await waitPhoneCondition(page, `document.querySelector('.ws-menu:not(.hide)')!==null`, 'SHARD SELECT', Date.now() + 10000);
+    // MP2.4: a fresh device's first PLAY asks its Name first; Skip keeps the default and SHARD SELECT opens
+    await waitPhoneCondition(page, `(document.querySelector('#ws-name-box [data-name=skip]')?.click(), document.querySelector('.ws-menu:not(.hide)')!==null)`, 'SHARD SELECT', Date.now() + 10000);
     receipt.steps.push('SHARD SELECT'); await shot('SHARD SELECT'); await page.click('.ws-menu-back');
     const gridDeadline = Date.now()+60000, gridURL = new URL(base); gridURL.search=''; gridURL.hash='';
     await enterPhoneGrid(page,gridURL.href,gridDeadline);

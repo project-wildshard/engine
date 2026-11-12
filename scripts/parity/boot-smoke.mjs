@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { browserPool, parallel } from './pool.mjs';
 import { registerCaptureTrace } from './capture-trace.mjs';
 import { serve } from './serve.mjs';
-import { saveFixture } from '../debug-settings.mjs';
+import { NAME_ASKED, saveFixture } from '../debug-settings.mjs';
 import { captureBootFrame } from './black-frame.mjs';
 import { observeTitleCapture } from './title-trace.mjs';
 import { gridBootWaitHistory } from './grid-boot-waits.mjs';
@@ -344,7 +344,7 @@ async function bootSignalRoad(page, faults, frames, deadline) {
 export async function discoverCatalogue(browser, base) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   try {
-    await saveFixture(context, { scope: 'device', key: 'devMode', data: false });
+    await saveFixture(context, { scope: 'device', key: 'devMode', data: false }); await saveFixture(context, NAME_ASKED);
     const page = await context.newPage(), url = new URL(base);
     for (const [key, value] of Object.entries({ tier: 'phone', touch: '1', mute: '1', nolock: '1', sw: '0' })) url.searchParams.set(key, value);
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -379,7 +379,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   if (configureContext !== null) await configureContext(context);
   // Both ordinary documents read the same device choice. Standalone proves the public default too.
-  await saveFixture(context, { scope: 'device', key: 'devMode', data: mode === 'grid' || developer });
+  await saveFixture(context, { scope: 'device', key: 'devMode', data: mode === 'grid' || developer }); await saveFixture(context, NAME_ASKED);
   // Existing probe permission for the one initial road pose; no scheduler or service is replaced.
   if (mode === 'grid') await context.addInitScript(() => { window.__wildshardHarness = { seed: 357, capture: null }; });
   // Static dist has no serverless API. Acknowledge telemetry and recorded nonfatal lifecycle diagnostics only.

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { devices, webkit } from 'playwright';
 import { browserPool } from './pool.mjs';
 import { serve } from './serve.mjs';
-import { saveFixture } from '../debug-settings.mjs';
+import { NAME_ASKED, saveFixture } from '../debug-settings.mjs';
 import { gridFloorDocumentIdentity, stageFloorGrid } from '../frame-floor-grid.mjs';
 import { installLegacyProbeAdapter } from './probe.mjs';
 
@@ -36,7 +36,7 @@ function entryDiagnostic() {
 async function run(browser, base, mode, out) {
   const context = await browser.newContext({ ...devices['iPhone 16 Pro'], serviceWorkers: 'block' });
   // These two catalogue entries are Developer-only; do not substitute the default shard when one is hidden.
-  await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+  await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); await saveFixture(context, NAME_ASKED);
   await context.addInitScript(installLegacyProbeAdapter);
   await context.addInitScript(() => { window.__wildshardHarness = { seed: 357, capture: null }; });
   const page = await context.newPage();

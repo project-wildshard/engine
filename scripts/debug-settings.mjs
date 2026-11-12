@@ -76,3 +76,5 @@ export function fixtureStorage(scope) {
 }
 /** @param {string} scope */
 export function fixtureStorageCode(scope) { return `(${fixtureStorage.toString()})(${JSON.stringify(scope)})`; }
+/** MP2.4: a device that has answered the Name prompt, so PLAY goes straight on (a harness that measures boot, not the prompt). */
+export const NAME_ASKED = /** @type {const} */ ({ scope: 'device', key: 'nameAsked', data: true });
