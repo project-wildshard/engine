@@ -15,7 +15,7 @@
 import {createHash} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
-import {assertAssetLimits, describeAssetLimits} from '../../app-build/assetLimits.mjs';
+import {assertAssetLimits, describeAssetLimits, measureAssets} from '../../app-build/assetLimits.mjs';
 import {CLOUDFLARE_ACCOUNT} from '../packs.mjs';
 import {runRedacted} from '../redact.mjs';
 
@@ -102,6 +102,9 @@ export function workersHost({token, exec = runRedacted, fetch: get = fetch, log 
     },
     upload(context) {
       const {worker: name} = worker(context);
+      // PAGE-SIZE PZ1: dist/ is the upload set itself, and no header hides a map on Workers. Never upload one.
+      const left = measureAssets(join(context.root, 'dist')).maps;
+      if (left > 0) throw new Error(`dist/ still holds ${left} source maps: run the build phase (it sends them to Sentry and strips them)`);
       const outputFile = join(context.root, 'tmp/page-release', `wrangler-${context.channel.channel}-${context.build}.ndjson`);
       mkdirSync(join(context.root, 'tmp/page-release'), {recursive: true});
       rmSync(outputFile, {force: true});

@@ -10,6 +10,7 @@ import {CHANNELS, CHECKED_DOCUMENTS, PHASES, RefusedError, runPhase, type Channe
 import {PROJECTS} from '../scripts/page-release/hosts/vercel.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
+import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
 const {publicKey, privateKey} = generateKeyPairSync('ed25519');
@@ -295,12 +296,15 @@ function workersRig(channel: Channel = 'staging') {
   const worker = {preview: 'wildshard-play-preview', staging: 'wildshard-play-staging', production: 'wildshard-play'}[channel];
   const url = `https://${versionId.slice(0, 8)}-${worker}.raynos.workers.dev`;
   const wrangler: {args: string[], secrets: string[], env: NodeJS.ProcessEnv}[] = [];
+  const uploadedMaps: number[] = [];
   let tag = build;
   const exec = (file: string, args: string[], options: {cwd: string, env: NodeJS.ProcessEnv}, secrets: string[]) => {
     if (file === 'node') return '';
     expect(file).toBe(join(root, 'node_modules/.bin/wrangler'));
     wrangler.push({args, secrets, env: options.env});
     if (args[0] === 'versions' && args[1] === 'upload') {
+      // The upload set is dist/ as wrangler sees it (pages/wrangler.jsonc assets.directory): no source map in it.
+      uploadedMaps.push(measureAssets(join(root, 'dist')).maps);
       const out = options.env['WRANGLER_OUTPUT_FILE_PATH'] ?? '';
       mkdirSync(join(out, '..'), {recursive: true});
       writeFileSync(out, `${JSON.stringify({type: 'wrangler-session', version: 1})}\n${JSON.stringify({type: 'version-upload', version: 1, worker_name: worker, version_id: versionId, preview_url: url})}\n`);
@@ -319,14 +323,15 @@ function workersRig(channel: Channel = 'staging') {
   deps.root = root;
   deps.host = host;
   deps.readFile = path => readFileSync(path);
-  return {deps, live, root, served, wrangler, url, setTag: (value: string) => { tag = value; }};
+  return {deps, live, root, served, wrangler, url, uploadedMaps, setTag: (value: string) => { tag = value; }};
 }
 
 const verbs = (calls: {args: string[]}[]) => calls.map(call => call.args.slice(0, 2).join(' '));
 
 test('the Workers host uploads a version, checks it, gates and deploys it last, with the token never in argv', async () => {
-  const {deps, root, wrangler} = workersRig('staging');
+  const {deps, root, wrangler, uploadedMaps} = workersRig('staging');
   await through(deps, 'go-live');
+  expect(uploadedMaps).toEqual([0]);
   expect(verbs(wrangler)).toEqual(['versions upload', 'versions view', 'versions view', 'versions deploy']);
   const [upload, , , deploy] = wrangler;
   expect(upload?.args).toEqual(['versions', 'upload', '--tag', build, '--message', 'v0.1.10', '--config', CONFIG, '--env', 'staging']);
@@ -395,4 +400,12 @@ test('a version URL belongs to its id and its Worker', () => {
   expect(isVersionUrl(`https://0123abcd-wildshard-play-staging.raynos.workers.dev`, versionId, 'wildshard-play')).toBe(false);
   expect(isVersionUrl(`https://ffffffff-wildshard-play.raynos.workers.dev`, versionId, 'wildshard-play')).toBe(false);
   expect(isVersionUrl(`https://0123abcd-wildshard-play.raynos.workers.dev.evil.example`, versionId, 'wildshard-play')).toBe(false);
+});
+
+test('the Workers upload refuses a dist/ that still holds a source map (PAGE-SIZE PZ1)', async () => {
+  const {deps, root, wrangler} = workersRig('staging');
+  await runPhase('build', deps);
+  writeFileSync(join(root, 'dist/assets/late.js.map'), '{}');
+  await expect(runPhase('upload', deps)).rejects.toThrow(/source maps/);
+  expect(verbs(wrangler)).toEqual([]);
 });
