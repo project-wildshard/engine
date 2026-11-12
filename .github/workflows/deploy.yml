@@ -68,8 +68,6 @@ permissions:
 
 env:
   WILDSHARD_CATALOGUE: test/pins/catalogue.json
-  # API-CLOUDFLARE AC11: the page calls errors, telemetry and the inbox on the api-server Worker, not its own host.
-  VITE_API_ORIGIN: https://api.wildshard.io
   # C4 reports each command's own failure; no peer-job polling or cancellation.
   GH_TOKEN: ${{ github.token }}
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -373,6 +371,7 @@ jobs:
           VERCEL_BUILD_TOKEN: ${{ secrets.VERCEL_BUILD_TOKEN }}
           VERCEL_GIT_COMMIT_SHA: ${{ steps.pin.outputs.sha }}
           DEPLOY_SHA: ${{ steps.pin.outputs.sha }}
+          VITE_API_ORIGIN: https://api.wildshard.io # AC11, as the prepare build
         run: |
           node "$RUNNER_TEMP/deploy-pin.mjs" check-live-floor "$DEPLOY_SHA"
           npm install --global vercel@59.11.2
@@ -711,6 +710,10 @@ jobs:
           if-no-files-found: error
 
       - name: Verify preparation, checks and build (parallel)
+        env:
+          # API-CLOUDFLARE AC11: the page calls errors, telemetry and the inbox on the api-server Worker, not its own
+          # host. Set on the build steps only: the unit tests read the unset default.
+          VITE_API_ORIGIN: https://api.wildshard.io
         run: |
           python3 scripts/ci-disk-census.py prepare-before-parallel
           trap 'python3 scripts/ci-disk-census.py prepare-after-parallel' EXIT
