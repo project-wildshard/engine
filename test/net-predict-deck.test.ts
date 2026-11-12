@@ -13,8 +13,8 @@ import { HostSide, loadCourseRapier, PageSide, type MotionScenario } from './fix
 
 // NET-LAG NL5 (Jake, 2026-11-12: "i fucking clipped through the rope bridge because of the lag lol"). The cause was the
 // server's: it built no rope chain (`net-server-rope-deck.test.ts`). This pins the page's half. The real Player and PlayerSim,
-// each with its own rope chain built as Driftwood builds its span (0.9 m segments, 5 cm half thickness, 0.85 m half width,
-// 14 kg), cross it `delay` ticks apart each way: with a chain on both sides they agree, and a correction that writes the
+// each with its own rope chain shaped as Driftwood's `ropeBridgeSegments` lays a span (not its baked facts: 0.9 m segments,
+// 5 cm half thickness, 0.85 m half width, 14 kg), cross it `delay` ticks apart each way: with a chain on both sides they agree, and a correction that writes the
 // server's feet up to 1 m under the page's planks (a server whose chain sags differently) replays back onto them, never under.
 let R: Rapier;
 beforeAll(async () => { R = await loadCourseRapier(); });

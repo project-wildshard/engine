@@ -18,3 +18,6 @@
   1 m under the planks replays back onto them (`net-predict-deck`).
 - Second commit: `test/net-predict-deck.test.ts` keeps the page half pinned
   (real Player and PlayerSim, a rope chain on each side, delays 3/6/9).
+- Review folds (one-shot `claude -p`, no MUST): one owner per rope deck or
+  refuse (a saved chain is found by owner); the room that came back from a
+  save walks the bridge; comments on the sections path and the test span.

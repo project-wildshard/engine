@@ -54,8 +54,12 @@ test('the room stands a walker on Driftwood\'s rope bridge, and a restore keeps 
     saved = snapshotSimHostBytes(resident.host);
   } finally { resident.dispose(); }
   const restored = await createTrustedHeadlessResident(input, saved, { room: true });
-  try { expect(planks(restored.host)).toBe(bodies); } finally { restored.dispose(); }
-  // a room saved before NL5 holds no planks: its restore builds them
+  try {
+    expect(planks(restored.host)).toBe(bodies);
+    // the saved planks, lent back to the motor, carry a walker
+    expect(runHeadlessJourney(restored.host, commands => { restored.step(commands); }, { ticks: 900, start: BRIDGE.start, points: BRIDGE.points, once: true }).complete).toBe(true);
+  } finally { restored.dispose(); }
+  // a room saved with no planks in its world (as before NL5; its adapter row is there, which `joined` makes optional) builds them
   const old = await createTrustedHeadlessResident(input, undefined, { room: true });
   try {
     const { world } = old.host.physics, chain = new Set<RigidBody>();

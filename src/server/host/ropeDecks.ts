@@ -42,7 +42,10 @@ export function ropeChainStages(product: ShardProduct | undefined): { readonly s
  * lends the saved bodies back to the motor as rideable, or builds them for a room saved before NL5 (`joined`: none in it).
  */
 export function installRopeDecks(host: SimHost, product: ShardProduct | undefined, coming: boolean): void {
-  for (const { stage, deck, facts } of ropeChainStages(product)) {
+  const stages = ropeChainStages(product), owners = stages.map(({ deck }) => JSON.stringify(deck.site.deck.owner));
+  // a saved chain is found by its planks' owner: two decks of one site would each find both chains
+  if (new Set(owners).size !== owners.length) throw new Error('Native rope decks need an owner each');
+  for (const { stage, deck, facts } of stages) {
     const rows = deck.site.deck;
     const build = (): void => {
       // The host's world owns the chain from here: it lives and is freed with the world, and nothing on the server reads its poses.

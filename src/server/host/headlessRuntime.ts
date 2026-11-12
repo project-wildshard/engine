@@ -174,6 +174,7 @@ export function headlessAssemblyPorts(rapier: Rapier, room?: boolean): NativeAss
 export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?: boolean): Promise<HeadlessRuntimePlan> {
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(provided.shard.identity.slug)) throw new Error('Invalid native product identity');
   await prepareAssetDecoders();
+  // NL5: rope decks come from the product's `client/plan`; a sections-only input (a data shard) has none to build
   let plan: HeadlessRuntimePlan, source = provided.shard, places: readonly PlaceArea[] = [], decks = provided.product;
   if (provided.sections !== undefined) {
     const declaration = parseNativeRuntimePlan(provided.sections.get('sim/runtime-plan'));
