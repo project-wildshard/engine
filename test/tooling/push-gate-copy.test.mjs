@@ -166,6 +166,15 @@ describe('push gate copy (EV1)', () => {
     git(other, ['commit', '-q', '-m', 'shared', '--', 'shared.mjs']);
     git(other, ['push', '-q', 'origin', 'main']);
     expect(() => mainPull(root)).toThrow(/shared\.mjs/u);
+    // An untracked file where main adds one is named as such.
+    writeFileSync(join(root, 'shared.mjs'), 'export const shared = 1;\n');
+    writeFileSync(join(root, 'added.mjs'), 'lane A\n');
+    writeFileSync(join(other, 'added.mjs'), 'export const added = 1;\n');
+    git(other, ['add', 'added.mjs']);
+    git(other, ['commit', '-q', '-m', 'added', '--', 'added.mjs']);
+    git(other, ['push', '-q', 'origin', 'main']);
+    expect(() => mainPull(root)).toThrow(/untracked files sit where main adds files, so nothing moved: added\.mjs/u);
+    writeFileSync(join(root, 'shared.mjs'), 'export const shared = ;\n');
     expect(git(root, ['rev-parse', 'HEAD'])).toBe(head);
     expect(readFileSync(join(root, 'shared.mjs'), 'utf8')).toBe('export const shared = ;\n');
   });

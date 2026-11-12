@@ -44,6 +44,7 @@ export function mainPull(cwd,{fetch=true,remote='origin'}={}){
  if(run(cwd,['merge-base','--is-ancestor',head,upstream]).status!==0){
   const own=git(cwd,['rev-list','--count',`${upstream}..refs/heads/main`]);
   const replayed=run(cwd,['replay','--ref-action=print','--onto',upstream,`${upstream}..refs/heads/main`]);
+  if(replayed.status!==0&&/merge commit/iu.test(replayed.stderr))throw new StopError(`your ${own} local commit(s) include a merge, which git replay cannot move; git pull --rebase origin main once no other lane has edits here`);
   if(replayed.status!==0)throw new StopError(`your ${own} commit(s) conflict with origin/main (${replayed.stderr.trim().split('\n').slice(0,4).join(' | ')}); when no other lane has edits here, git pull --rebase origin main and resolve`);
   const line=replayed.stdout.trim().split('\n').find(row=>row.startsWith('update refs/heads/main ')||row.startsWith('update-ref refs/heads/main '));
   const sha=line?.split(/\s+/u)[2]??'';
@@ -57,6 +58,10 @@ export function mainPull(cwd,{fetch=true,remote='origin'}={}){
  run(cwd,['update-index','-q','--refresh']);
  const moved=run(cwd,['read-tree','-m','-u',head,target]);
  if(moved.status!==0){
+  // The J206 review: a running git command and an untracked file in the way are not "uncommitted edits".
+  if(/index\.lock/u.test(moved.stderr))throw new StopError('another git command holds the index (index.lock); nothing moved, run this again');
+  const untracked=[...moved.stderr.matchAll(/^error: Untracked working tree file '([^']+)'/gmu)].map(match=>match[1]);
+  if(untracked.length>0)throw new StopError(`untracked files sit where main adds files, so nothing moved: ${untracked.join(', ')}; if they are another lane's, wait for its commit and run this again`);
   const files=[...moved.stderr.matchAll(/^error: Entry '([^']+)'/gmu)].map(match=>match[1]);
   throw new StopError(`uncommitted edits in paths main changes, so nothing moved${files.length===0?` (${moved.stderr.trim().split('\n')[0]})`:`: ${files.join(', ')}`}; if they are another lane's, wait for its commit and run this again`);
  }
