@@ -68,9 +68,8 @@ const CASES: readonly { readonly name: string; readonly slug: string; readonly d
   { name: 'Nine Dragon dropped at y 20 by its spawn', slug: NINE, drop: { x: 0.95, y: 20, z: 7.5, fall: 0.25 }, page: 0 },
   // past the hooks' 200 m the page's floor is −20, not the manifest's 25
   { name: 'Nine Dragon dropped at y 20 220 m out', slug: NINE, drop: { x: 220, y: 20, z: 7.5, fall: 0.25 }, page: 161 },
-  // x/z: Sky Reach's page area is ±250, wider than its manifest's x ±120; past it the page puts the player back at once
+  // Sky Reach's page area is ±250, wider than its manifest's x ±120: standing 200 m east is no fall on either side
   { name: 'Sky Reach standing 200 m east, inside the page area', slug: SKY, drop: { x: 200, y: 40, z: 0, fall: 0 }, page: null },
-  { name: 'Sky Reach standing 260 m east, outside the page area', slug: SKY, drop: { x: 260, y: 40, z: 0, fall: 0 }, page: 0 },
 ];
 
 for (const { name, slug, drop, page } of CASES) test(`SS6: ${name}: page and server reset on the same tick`, { timeout: 120_000 }, async () => {

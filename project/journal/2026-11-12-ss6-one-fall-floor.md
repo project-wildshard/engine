@@ -14,13 +14,13 @@ Online, the page stops checking falls and the room does it, so players got snapp
 - `src/shared/game/shardfile/playArea.ts` (new) picks the play area the page picks: runtime hooks over
   `player.enter` over the manifest, the same order the page installs them in. The page's runtime hooks now use its
   `outerFloor` rule too.
-- `FallFloor` takes a `PlayArea`, or a bare number for the road. A soft floor (a lone room) also takes back a player
-  past the area's x/z edge, as the page's lone `installBounds` does. A hard floor (a grid cell) leaves the edge to the
-  grid, as the page's grid does.
+- `FallFloor` takes a `PlayArea`, or a bare number for the road, and reads the floor at the player's x/z. It does not
+  enforce the area's x/z edge. A first cut did, and `test/standalone-grid-lone.test.ts` went red: a lone cell lets a
+  Dunes player walk past its ±200 area to the wall at 250. The page's offline x/z reset stays the page's for now.
 - `cellWorld` builds each seat's floor from `shardPlayArea(manifest bounds, product)`.
 - `test/fall-floor-parity.test.ts` steps the page's real feature installs and `installBounds` beside a lone room's
-  `FallFloor`, and checks they reset on the same tick. On main, 3 of its 5 cases were red: Sky Reach at y 5, Nine
-  Dragon 220 m out, and Sky Reach 260 m east. ENG-18's room test now expects the page's floor for Sky Reach.
+  `FallFloor`, and checks they reset on the same tick. On main, 2 of its 4 cases were red: Sky Reach at y 5 and Nine
+  Dragon 220 m out. ENG-18's room test now expects the page's floor for Sky Reach.
 
 Left open: `residentFallNet` (bare headless residents: tapes, bake, shard CI) still gets the manifest's floor from
 `headlessRuntime.ts`. It already takes a `PlayArea`. Passing `shardPlayArea(...)` there is one line, but another lane

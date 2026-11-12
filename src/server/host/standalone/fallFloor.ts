@@ -30,8 +30,8 @@ export const RESIDENT_FALL_GRACE = 0.25;
 
 type Body = Pick<PlayerSim, 'yaw' | 'led' | 'resetPose'> & { readonly position: { x: number; y: number; z: number }; readonly fall: { readonly grounded: boolean }; readonly board: { readonly on: boolean } };
 /** One cell's fall recovery. `soft` takes a player back; a hard floor is a death. `start` is where they go with no safe ground yet.
- *  A soft floor also takes back a player past its area's x/z edge, as the page's lone `installBounds` does; a hard one (a grid
- *  cell's) leaves the edge to the grid, as the page's grid does. */
+ *  The floor is the area's at the player's x/z. Its x/z edge is not enforced here: a lone cell's walls hold the player (P1-E3.9's
+ *  lone-cell test walks Dunes past its ±200 area to the wall at 250), so the page's offline x/z reset stays the page's. */
 export class FallFloor {
   private since = 0;
   private spot: { x: number; y: number; z: number } | null = null;
@@ -46,11 +46,6 @@ export class FallFloor {
   step(player: Body, die: () => void): void {
     if (player.led) { this.since = 0; this.air = 0; return; }
     const { position } = player, { area } = this;
-    if (this.soft && (position.x < area.x0 || position.x > area.x1 || position.z < area.z0 || position.z > area.z1)) {
-      this.since = 0; this.air = 0;
-      player.resetPose(this.spot ?? this.start, player.yaw);
-      return;
-    }
     if (position.y < area.floorAt(position.x, position.z) && !player.fall.grounded) { // a deck going down to the road carries its rider past it, standing
       this.since = 0; this.air += STEP_SECONDS;
       if (this.air < this.grace) return;
