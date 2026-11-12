@@ -51,7 +51,7 @@ import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
-import { earlyStandalone, hostsGrid, serverRoute } from './serverRoute';
+import { earlyStandalone, hostsGrid, opensShard, serverRoute } from './serverRoute';
 import { shardCell } from '../grid/oneWayIn';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
@@ -108,7 +108,7 @@ interface ShellModule { readonly startStandalone: (config: { slug: string; base:
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
-interface OnlineModule { readonly worldHostsGrid: (world: BuildWorld, hosts: (world: unknown) => boolean) => Promise<boolean>; readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
+interface OnlineModule { readonly worldHostsGrid: (world: BuildWorld, hosts: (world: unknown) => boolean) => Promise<boolean>; readonly worldWord: (world: BuildWorld) => Promise<unknown>; readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
 interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
@@ -330,8 +330,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   // GO4 gate: a grid page joins the world only once the world hosts the grid; until then, today's solo grid.
   const hosted = world !== undefined && page !== null && ports.grid !== null && (gotoHosted() || await bootTask('server:grid-hosted', async () => (await onlineModule()).worldHostsGrid(world, hostsGrid)));
-  // A one-shard page of a shard the grid doesn't place plays solo: the world opens only grid cells.
-  const placed = ports.grid !== null || shardCell(slug) !== undefined;
+  // A one-shard page joins only a world whose door names its shard (opus-route2): a shard the grid doesn't place, or one this world leaves
+  // closed (prod opens Driftwood alone), plays solo. Shard select's one-way-in read keeps the word a minute, so this rarely dials again.
+  const catalogued = ports.grid === null && shardCell(slug) !== undefined, asks = catalogued && world !== undefined && page !== null;
+  const placed = ports.grid !== null || opensShard(await (asks ? bootTask('server:opens-shard', async () => (await onlineModule()).worldWord(world)).catch(() => null) : null), slug, catalogued);
   const shell = await (world !== undefined && page !== null && serverRoute(world, page, { page: ports.grid !== null, hosted }, placed) === 'online' ? online(world, page) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
   // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held

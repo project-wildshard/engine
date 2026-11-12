@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- The rule is read where the page applies it.
 import { readFileSync } from 'node:fs';
-import { earlyStandalone, hostsGrid, serverRoute } from '../src/client/game/shardfile/serverRoute';
+import { earlyStandalone, hostsGrid, opensShard, serverRoute } from '../src/client/game/shardfile/serverRoute';
 import { shardCell } from '../src/client/game/grid/oneWayIn';
 
 // GO4 (QA row 13, "let's make it all the same"): an online build's grid page plays on the world, like a one-shard page.
@@ -27,8 +27,25 @@ test('a one-shard page of a shard the grid does not place plays solo on a build 
   expect([earlyStandalone(WORLD, false), earlyStandalone(WORLD, true)], 'the early server starts for the solo page only').toEqual([true, false]);
   expect([shardCell('blender-template'), shardCell('driftwood-isle')?.instance], 'the pinned catalogue: Brasscap off the grid, Driftwood on it').toEqual([undefined, 'driftwood-isle']);
   const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
-  expect(source, 'placed is the page grid catalogue\'s word').toMatch(/const placed = ports\.grid !== null \|\| shardCell\(slug\) !== undefined;/u);
   expect(source).toMatch(/earlyStandalone\([^\n]*, !options\.lone \|\| shardCell\(options\.slug\) !== undefined\)/u);
+});
+
+// opus-route2 (QA row 28, Jake 2026-11-12): prod's world opens Driftwood alone (`/health` table {"driftwood-isle":0}), so a one-shard
+// page of any other grid shard joined it, the door seated the device in Driftwood, and the page bounced. The door's world word now
+// names the shards it opens, and a one-shard page joins only a world that names its own; no word keeps the catalogue's answer.
+test('a one-shard page of a grid shard the world does not open plays in-page; one it opens joins; no word keeps today\'s route', () => {
+  const driftwoodOnly = { cells: 1, shards: ['driftwood-isle'] }, grid = { cells: 2, shards: ['driftwood-isle', 'nalati-grasslands'] };
+  const route = (word: unknown, slug: string): string => serverRoute(WORLD, STORAGE, { page: false, hosted: hostsGrid(word) }, opensShard(word, slug, shardCell(slug) !== undefined));
+  expect(route(driftwoodOnly, 'nalati-grasslands'), 'prod today: Nalati is not open, in-page').toBe('standalone');
+  expect(route(driftwoodOnly, 'driftwood-isle'), 'Driftwood is open: online').toBe('online');
+  expect(route(grid, 'nalati-grasslands'), 'a world that opens Nalati: online').toBe('online');
+  expect(route({ cells: 1 }, 'nalati-grasslands'), 'an older door with no list: the catalogue\'s answer').toBe('online');
+  expect(route(null, 'nalati-grasslands'), 'no answer (unreachable, stalled): the catalogue\'s answer').toBe('online');
+  expect(route(grid, 'blender-template'), 'off the grid: in-page whatever the word, its early server already runs').toBe('standalone');
+  expect([opensShard({ cells: 1, shards: 'driftwood-isle' }, 'driftwood-isle', true), opensShard({ cells: 1, shards: [1] }, '1', true)], 'nonsense is no word').toEqual([true, true]);
+  const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
+  expect(source, 'a one-shard page of a placed shard asks the door\'s word').toMatch(/const catalogued = ports\.grid === null && shardCell\(slug\) !== undefined, asks = catalogued && world !== undefined && page !== null;/u);
+  expect(source).toMatch(/opensShard\(await \(asks \? [^\n]*worldWord\(world\)[^\n]*, slug, catalogued\)/u);
 });
 
 test('a world hosts the grid when the door\'s world word counts more than the home cell', () => {

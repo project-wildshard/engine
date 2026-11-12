@@ -21,6 +21,18 @@ export function hostsGrid(world: unknown): boolean {
   return typeof cells === 'number' && cells > 1;
 }
 
+/** Whether a one-shard page of `slug` joins the world (`serverRoute`'s `placed`). The page's catalogue must place the shard (`catalogued`):
+ *  an off-grid page's early in-page server is already running. Then the door's world word decides: a world that names its open shards
+ *  and leaves this one out would seat the device in another cell, and the page would leave for the title (opus-route2, QA row 28: prod
+ *  opens Driftwood alone). No word (unreachable, stalled, a door older than the list) keeps the catalogue's answer. It does not seat
+ *  the page in its own cell: a one-shard page dials the bare address, so a world of several cells still seats it where the device last
+ *  stood (GO5); a one-cell world, prod's, has nowhere else to put it. */
+export function opensShard(word: unknown, slug: string, catalogued: boolean): boolean {
+  if (!catalogued) return false;
+  const shards = typeof word === 'object' && word !== null && 'shards' in word ? word.shards : null;
+  return !Array.isArray(shards) || !shards.every(shard => typeof shard === 'string') || shards.includes(slug);
+}
+
 /** Whether a page may start the in-page server before its Worker boot step. A build with a world never does: its pages join the world,
  *  except a one-shard page of a shard the grid doesn't place (`placed` false), which plays solo. */
 export function earlyStandalone(world: unknown, placed = true): boolean { return world === undefined || !placed; }

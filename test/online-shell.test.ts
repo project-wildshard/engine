@@ -3,7 +3,7 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { LinkState } from '../src/client/engine/net/redial';
 import { readSignedRelease } from '../src/client/host/online/release';
-import { connectOnline, worldHostsGrid, type OnlineShell } from '../src/client/host/online/shell';
+import { connectOnline, worldHostsGrid, worldWord, type OnlineShell } from '../src/client/host/online/shell';
 import { hostsGrid } from '../src/client/game/shardfile/serverRoute';
 // oxlint-disable-next-line import/no-nodejs-modules -- The release file's own origin.
 import { createServer, type Server } from 'node:http';
@@ -193,7 +193,7 @@ test('a quit said on a link the door has dropped, before the page hears the clos
 
 test('GO4 gate: a world with Driftwood alone does not host the grid; one with more cells does; an unreachable world answers no', { timeout: 60_000 }, async () => {
   const servers: Server[] = [];
-  const asked = async (cells: readonly string[]): Promise<boolean> => {
+  const asked = async (cells: readonly string[]): Promise<{ readonly hosts: boolean; readonly word: unknown }> => {
     const room = await roomBench({ cells, workers: 2 });
     // The rooms address as D7 has it (MS5.1): Caddy passes only the socket upgrade, so `/health` and everything else is a 404 with no
     // CORS. A gate that reads `/health` answers no here, and the grid page stays one-shard.
@@ -201,12 +201,16 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
     const { text, publicKey } = signedFile({ ...RELEASE, socket: room.url }), origin = createServer((_request, response) => { response.end(text); });
     servers.push(origin);
     await new Promise<void>(resolve => { origin.listen(0, '127.0.0.1', resolve); });
-    try { return await worldHostsGrid({ release: `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}/release.json`, key: publicKey }, hostsGrid); }
+    const config = { release: `http://127.0.0.1:${String((origin.address() as AddressInfo).port)}/release.json`, key: publicKey };
+    // The word first: worldHostsGrid then answers from the kept word, so the door is dialled once.
+    try { const word = await worldWord(config); return { hosts: await worldHostsGrid(config, hostsGrid), word }; }
     finally { await room.close(); }
   };
   try {
-    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid').toBe(false);
-    expect(await asked([SHARD, 'template-2']), 'the world hosts the grid').toBe(true);
+    // opus-route2 (QA row 28): the word names the shards the world opens, so a one-shard page of any other shard plays in-page.
+    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD] } });
+    expect(await asked([SHARD, 'template-2']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, '_template'] } });
+    expect(await worldWord({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, 500), 'unreachable: no word').toBeNull();
     expect(await worldHostsGrid({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'unreachable: solo').toBe(false);
     const stalled = createServer(() => undefined);
     servers.push(stalled);
@@ -214,6 +218,11 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
     const begun = performance.now();
     expect(await worldHostsGrid({ release: `http://127.0.0.1:${String((stalled.address() as AddressInfo).port)}/release.json`, key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'a stalled release file: solo').toBe(false);
     expect(performance.now() - begun, 'within the one deadline').toBeLessThan(1500);
+    // A page waits once (opus-route2 review): Shard select's one-way-in read heard nothing, so the one-shard page's own read of the same
+    // release answers at once instead of a second 3 s.
+    const again = performance.now();
+    expect(await worldWord({ release: `http://127.0.0.1:${String((stalled.address() as AddressInfo).port)}/release.json`, key: signedFile(RELEASE).publicKey }, 2000), 'the same page asks again').toBeNull();
+    expect(performance.now() - again, 'answered from the read that heard nothing').toBeLessThan(200);
     const { text, publicKey } = signedFile({ ...RELEASE, socket: `ws://127.0.0.1:${String((stalled.address() as AddressInfo).port)}/` }), origin = createServer((_request, response) => { response.end(text); });
     servers.push(origin);
     await new Promise<void>(resolve => { origin.listen(0, '127.0.0.1', resolve); });

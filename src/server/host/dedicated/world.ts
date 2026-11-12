@@ -254,9 +254,10 @@ export class World {
     // QA row 16: a clean quit counts from the first byte, not only once seated (`pumpSocket`'s own). A quit that lands while the door
     // still admits this link (in the same read as its `ready`, or before a held body is handed back) ends it with no seat and no hold.
     end.onControl((control, bytes) => { if (control === 'ready' && new Uint8Array(bytes)[0] === LEAVE_FLAG) { this.quits.add(end); end.close(LEFT); } });
-    // GO4: the door's first word, before any hello: how many cells it hosts. D7 keeps `/health` private on the rooms address, and a
-    // grid page asks this on a socket of its own (`worldHostsGrid`). No build, serial or player data.
-    end.control('world', new TextEncoder().encode(JSON.stringify({ cells: this.links.size } satisfies WorldWord)).buffer);
+    // GO4: the door's first word, before any hello: how many cells it hosts, and (opus-route2) the shard each runs, so a one-shard
+    // page joins only a world that opens its shard. D7 keeps `/health` private on the rooms address, and a
+    // grid page asks this on a socket of its own (`worldWord`). No build, serial or player data.
+    end.control('world', new TextEncoder().encode(JSON.stringify({ cells: this.links.size, shards: [...new Set([...this.links.keys()].map(cellShard))] } satisfies WorldWord)).buffer);
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
