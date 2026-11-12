@@ -40,8 +40,8 @@ export class Interpolator {
   private readonly blends = new Map<NetClass<never>, Blend>();
   private readonly classOf: (handle: number) => NetClass<never> | undefined;
   private newest = -1;
-  /** The ticks of the newest INTERP_SAMPLES frames heard, oldest first, and whether an older one has been let go. */
-  private readonly kept = new Float64Array(INTERP_SAMPLES);
+  /** The ticks of the newest `depth` frames heard, oldest first, and whether an older one has been let go. */
+  private readonly kept: Float64Array;
   private keptCount = 0;
   private full = false;
   /** Render frames drawn older than the buffer's oldest frame (NL2): the delay outran the buffer, so rows held. */
@@ -50,7 +50,9 @@ export class Interpolator {
   starved = 0;
   /** The handle not to buffer: this client's own character is predicted. */
   own: number | null = null;
-  constructor(classOf: (handle: number) => NetClass<never> | undefined) { this.classOf = classOf; }
+  /** Frames kept per row and per buffer: INTERP_SAMPLES, but in a test. */
+  private readonly depth: number;
+  constructor(classOf: (handle: number) => NetClass<never> | undefined, depth: number = INTERP_SAMPLES) { this.classOf = classOf; this.depth = depth; this.kept = new Float64Array(depth); }
 
   /** Take one decoded frame's true samples. A late frame still counts: its samples sort in by tick (§6.1). */
   push(frame: DecodedFrame): void {
@@ -138,7 +140,7 @@ export class Interpolator {
     let at = this.keptCount;
     while (at > 0 && (kept[at - 1] ?? 0) > tick) at--;
     if (at > 0 && kept[at - 1] === tick) return;
-    if (this.keptCount === INTERP_SAMPLES) {
+    if (this.keptCount === this.depth) {
       if (at === 0) return;
       kept.copyWithin(0, 1); this.keptCount--; at--; this.full = true;
     }
@@ -150,7 +152,7 @@ export class Interpolator {
     if (had !== undefined) return had;
     const cls = this.classOf(handle);
     if (cls === undefined || cls.position === null) return undefined; // a value with no place: it reads from the frame
-    const blend = this.blends.get(cls) ?? blendOf(cls), track = { blend, ticks: new Float64Array(INTERP_SAMPLES), values: new Float64Array(INTERP_SAMPLES * cls.row.length), count: 0 };
+    const blend = this.blends.get(cls) ?? blendOf(cls), track = { blend, ticks: new Float64Array(this.depth), values: new Float64Array(this.depth * cls.row.length), count: 0 };
     this.blends.set(cls, blend); this.tracks.set(handle, track);
     return track;
   }
@@ -162,7 +164,7 @@ function add(track: Track, tick: number, row: ArrayLike<number>): void {
   let at = track.count;
   while (at > 0 && (ticks[at - 1] ?? 0) > tick) at--;
   if (at > 0 && ticks[at - 1] === tick) return;
-  if (track.count === INTERP_SAMPLES) {
+  if (track.count === ticks.length) {
     if (at === 0) return;
     ticks.copyWithin(0, 1, track.count); values.copyWithin(0, width, track.count * width);
     track.count--; at--;

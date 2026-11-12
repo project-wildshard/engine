@@ -6,7 +6,10 @@ import { FIXED_STEP } from '../../../shared/engine/core/fixedStep';
 
 /** The delay a session starts on (J40): three 33 ms frames. */
 export const INTERP_START_MS = 100;
-/** The deepest the delay goes (NL2): six frames. The interpolator keeps two frames more, so rows never hold at its oldest. */
+/**
+ * The deepest the delay goes (NL2): six frames. The interpolator keeps two frames more, so rows never hold at its oldest. The
+ * server rewinds a blow at most REWIND_TICKS (`hitHistory.ts`, 200 ms), which this delay plus the round trip already passes.
+ */
 export const INTERP_MAX_MS = 200;
 /** The floor on the delay (J51). */
 export const INTERP_FLOOR_MS = 66;
@@ -18,12 +21,11 @@ const TICK_MS = FIXED_STEP * 1000, FRAME_MS = 2 * TICK_MS;
 const NUDGE = 0.01;
 /** A frame this far from the clock isn't drift: the server paused, or stalled. Take its word. */
 const SNAP_MS = 250;
-/** Frames handled this close together after a snap are one burst, a stall's backlog: its newest frame is now (NL2). */
-const BURST_MS = FRAME_MS / 2;
+
 /**
  * The rate the delay itself moves at. It rises at 2 %, since a late frame shows; it falls at 3 %, so a stall's rise is gone
- * within 10 s (NL2: at 1 % the delay sat at 140 to 270 ms for tens of seconds). Rows run 3 % fast while it falls, which
- * nobody sees.
+ * within 10 s (NL2: at 1 % the delay sat at 140 to 270 ms for tens of seconds). Rows run up to 4 % fast while it falls
+ * (the clock's own 1 % on top), which nobody sees.
  */
 const DELAY_FALLS = 3 * NUDGE, DELAY_RISES = 2 * NUDGE;
 
@@ -41,8 +43,8 @@ export class NetClock {
   private newest = -1;
   private filled = 0;
   private next = 0;
-  /** When the last snap, or the burst behind it, was handled. */
-  private burstMs = -Infinity;
+  /** When the clock last snapped. */
+  private snapMs = -Infinity;
   private readonly lateness = new Float64Array(JITTER_FRAMES);
   private readonly sorted = new Float64Array(JITTER_FRAMES);
 
@@ -55,11 +57,11 @@ export class NetClock {
     if (this.newest === -1) { this.newest = tick; this.anchorMs = nowMs; this.anchorTick = tick; return; }
     this.newest = tick;
     const estimate = this.serverTick(nowMs), errorMs = (tick - estimate) * TICK_MS, waitedMs = nowMs - this.anchorMs;
-    // A stall's backlog arrives as one burst, oldest first: the oldest snaps the clock back, and the rest of the burst carries
-    // it forward to the newest, which is now. Left at the oldest, the clock ran up to 250 ms behind, caught up at 1 %, and
-    // every frame meanwhile read as jitter (NL2).
-    if (errorMs > 0 && nowMs - this.burstMs < BURST_MS) { this.anchorTick = tick; this.anchorMs = nowMs; this.burstMs = nowMs; return; }
-    if (Math.abs(errorMs) > SNAP_MS) { this.anchorTick = tick; this.anchorMs = nowMs; this.rate = 1; this.filled = 0; this.next = 0; this.burstMs = nowMs; return; }
+    // A stall's backlog arrives as one burst, oldest first: the oldest snaps the clock back, and every frame ahead of the clock
+    // in the next SNAP_MS carries it forward, to the burst's newest, which is now. Left at the oldest, the clock ran up to 250 ms
+    // behind, caught up at 1 %, and every frame meanwhile read as jitter (NL2).
+    if (errorMs > 0 && nowMs - this.snapMs < SNAP_MS) { this.anchorTick = tick; this.anchorMs = nowMs; return; }
+    if (Math.abs(errorMs) > SNAP_MS) { this.anchorTick = tick; this.anchorMs = nowMs; this.rate = 1; this.filled = 0; this.next = 0; this.snapMs = nowMs; return; }
     this.anchorTick = estimate; this.anchorMs = nowMs;
     this.rate = 1 + Math.max(-NUDGE, Math.min(NUDGE, errorMs / 1000));
     this.lateness[this.next] = Math.abs(errorMs);
@@ -74,7 +76,7 @@ export class NetClock {
   /** What this client sees now, for the commands it sends (J50): the wire's 16 bits, and 0, which rewinds nothing, until a frame. */
   viewTick(nowMs: number): number { return this.started ? Math.max(0, Math.round(this.renderTick(nowMs))) & 0xffff : 0; }
   /** Drop the clock: the next frame starts it again. The delay stands, because the link does. */
-  reset(): void { this.newest = -1; this.rate = 1; this.filled = 0; this.next = 0; this.burstMs = -Infinity; }
+  reset(): void { this.newest = -1; this.rate = 1; this.filled = 0; this.next = 0; this.snapMs = -Infinity; }
 
   private adapt(waitedMs: number): void {
     const { sorted, lateness, filled } = this;
@@ -83,6 +85,6 @@ export class NetClock {
     this.jitterMs = held[Math.min(filled - 1, Math.floor(filled * 0.95))] ?? 0;
     this.targetMs = Math.min(Math.max(2 * FRAME_MS + this.jitterMs, INTERP_FLOOR_MS), INTERP_MAX_MS);
     const away = this.targetMs - this.delayMs, most = waitedMs * (away > 0 ? DELAY_RISES : DELAY_FALLS);
-    this.delayMs = Math.min(this.delayMs + Math.max(-most, Math.min(most, away)), INTERP_MAX_MS);
+    this.delayMs += Math.max(-most, Math.min(most, away));
   }
 }

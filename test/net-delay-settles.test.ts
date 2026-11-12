@@ -12,34 +12,35 @@ const seeded = (seed: number): (() => number) => { let a = seed; return () => { 
 const frameOf = (tick: number): DecodedFrame => ({ tick, baselineTick: 0, cell: 0, lastSeq: 0, owner: new Float64Array(0), ride: null, rows: new Map(), fresh: new Set() });
 
 interface Stall { readonly at: number; readonly ms: number }
-interface Run { readonly clock: NetClock; readonly lerp: Interpolator; readonly delays: readonly number[]; readonly heldAfter: (ms: number) => number; readonly starvedAfter: (ms: number) => number }
+/** `count` stalls of `ms`, one every `every` ms from `from`. */
+const stalling = (from: number, count: number, every: number, ms: number): Stall[] => Array.from({ length: count }, (_, index) => ({ at: from + index * every, ms }));
+interface Run { readonly clock: NetClock; readonly lerp: Interpolator; readonly delays: readonly number[]; readonly targets: readonly number[]; readonly delayAt: (ms: number) => number; readonly starvedAfter: (ms: number) => number }
 /**
  * `seconds` of 30 Hz frames, `jitter(sentMs)` late on the wire, held while the page stalls and then handled one after another
- * (~0.3 ms each); a render frame every 16.7 ms reads the render tick and asks the buffer whether it covers it.
+ * (~0.3 ms each); a render frame every 16.7 ms outside the stalls reads the render tick and asks the buffer whether it covers it.
  */
-function play(seconds: number, stalls: readonly Stall[], jitter: (sentMs: number) => number): Run {
-  const clock = new NetClock(), lerp = new Interpolator(() => undefined), arrivals: { tick: number; at: number }[] = [];
+function play(seconds: number, stalls: readonly Stall[], jitter: (sentMs: number) => number, depth = INTERP_SAMPLES): Run {
+  const clock = new NetClock(), lerp = new Interpolator(() => undefined, depth), arrivals: { tick: number; at: number }[] = [];
+  const stalled = (at: number): Stall | undefined => stalls.find(stall => at >= START + stall.at && at < START + stall.at + stall.ms);
   for (let frame = 0; frame < seconds * 30; frame++) {
-    const sent = frame * FRAME_MS;
-    let at = START + sent + WIRE_MS + jitter(sent);
-    for (const stall of stalls) if (at >= START + stall.at && at < START + stall.at + stall.ms) at = START + stall.at + stall.ms;
-    arrivals.push({ tick: frame * 2, at });
+    const sent = frame * FRAME_MS, at = START + sent + WIRE_MS + jitter(sent), stall = stalled(at);
+    arrivals.push({ tick: frame * 2, at: stall === undefined ? at : START + stall.at + stall.ms });
   }
   arrivals.sort((a, b) => a.at - b.at);
   let last = -Infinity;
   for (const arrival of arrivals) { if (arrival.at <= last) arrival.at = last + 0.3; last = arrival.at; }
-  const delays: number[] = [], heldAt: number[] = [], starvedAt: number[] = [];
+  const delays: number[] = [], targets: number[] = [], times: number[] = [], starvedAt: number[] = [];
   let next = 0;
   for (let now = START; now < START + seconds * 1000 + WIRE_MS; now += RENDER_MS) {
+    if (stalled(now) !== undefined) continue;
     for (let arrival = arrivals[next]; arrival !== undefined && arrival.at <= now; arrival = arrivals[++next]) { clock.arrival(arrival.tick, arrival.at); lerp.push(frameOf(arrival.tick)); }
     if (!clock.started) continue;
-    const { held, starved } = lerp;
+    const { starved } = lerp;
     lerp.cover(clock.renderTick(now));
-    if (lerp.held > held) heldAt.push(now - START);
     if (lerp.starved > starved) starvedAt.push(now - START);
-    delays.push(clock.delayMs);
+    delays.push(clock.delayMs); targets.push(clock.targetMs); times.push(now - START);
   }
-  return { clock, lerp, delays, heldAfter: ms => heldAt.filter(at => at >= ms).length, starvedAfter: ms => starvedAt.filter(at => at >= ms).length };
+  return { clock, lerp, delays, targets, delayAt: ms => delays[times.findIndex(at => at >= ms)] ?? Number.NaN, starvedAfter: ms => starvedAt.filter(at => at >= ms).length };
 }
 
 test('the buffer is deep enough for the deepest delay and two frames more', () => {
@@ -48,28 +49,39 @@ test('the buffer is deep enough for the deepest delay and two frames more', () =
 
 test('after a 1 s boot stall and a 325 ms stall burst, 10 s of clean 30 Hz settles the delay at 120 ms or under', () => {
   const rng = seeded(3), run = play(15, [{ at: 600, ms: 1000 }, { at: 3200, ms: 325 }], sent => sent < 5000 ? rng() * 20 : rng() * 4);
-  const peak = Math.max(...run.delays);
-  console.info(`NL2 stalls: delay peak ${peak.toFixed(0)} ms, after 10 s clean ${run.clock.delayMs.toFixed(0)} ms, jitter ${run.clock.jitterMs.toFixed(1)} ms, interpHeld ${run.lerp.held}, starved after ${run.starvedAfter(5000)}`);
+  console.info(`NL2 stalls: delay peak ${Math.max(...run.delays).toFixed(0)} ms, after 10 s clean ${run.clock.delayMs.toFixed(0)} ms, jitter ${run.clock.jitterMs.toFixed(1)} ms, interpHeld ${run.lerp.held}, starved after ${run.starvedAfter(5000)}`);
   expect(run.clock.delayMs).toBeLessThanOrEqual(120);
   expect(run.lerp.held).toBe(0);
   expect(run.starvedAfter(5000)).toBe(0);
-  expect(peak).toBeLessThanOrEqual(INTERP_MAX_MS);
 });
 
 test('stalls under the snap (200 to 240 ms, three in 4 s) settle too, inside the buffer', () => {
   const rng = seeded(5), run = play(15, [{ at: 1000, ms: 200 }, { at: 2500, ms: 200 }, { at: 4000, ms: 240 }], () => rng() * 20);
-  const peak = Math.max(...run.delays);
-  console.info(`NL2 sub-snap stalls: delay peak ${peak.toFixed(0)} ms, end ${run.clock.delayMs.toFixed(0)} ms, interpHeld ${run.lerp.held}`);
+  console.info(`NL2 sub-snap stalls: delay peak ${Math.max(...run.delays).toFixed(0)} ms, end ${run.clock.delayMs.toFixed(0)} ms, interpHeld ${run.lerp.held}`);
   expect(run.clock.delayMs).toBeLessThanOrEqual(120);
   expect(run.lerp.held).toBe(0);
-  expect(peak).toBeLessThanOrEqual(INTERP_MAX_MS);
 });
 
-test('a page that stalls 180 ms every 1.5 s holds its delay under the cap and inside the buffer', () => {
-  const rng = seeded(9), run = play(20, Array.from({ length: 13 }, (_, at) => ({ at: 500 + at * 1500, ms: 180 })), () => rng() * 30);
-  console.info(`NL2 repeated stalls: delay peak ${Math.max(...run.delays).toFixed(0)} ms, end ${run.clock.delayMs.toFixed(0)} ms, interpHeld ${run.lerp.held}`);
+test('a delay raised to the cap is under 100 ms 6 s after the link calms', () => {
+  // At 1 % it is not (158 ms at 6 s, 118 at 10 s): the jitter window takes 3 s to clear, then it falls 10 ms a second.
+  const rng = seeded(7), run = play(20, stalling(500, 12, 600, 230), () => rng() * 20), calm = 500 + 12 * 600;
+  console.info(`NL2 fall: delay at calm ${run.delayAt(calm).toFixed(0)} ms, 6 s later ${run.delayAt(calm + 6000).toFixed(0)} ms`);
+  expect(run.delayAt(calm)).toBeGreaterThanOrEqual(INTERP_MAX_MS - 10);
+  expect(run.delayAt(calm + 6000)).toBeLessThanOrEqual(100);
+});
+
+test('a page that stalls 240 ms every 0.4 s stops its delay at the cap, and the buffer holds it when the wire then speeds up', () => {
+  // At 8 s the path gets 60 ms shorter: frames arrive ahead of a clock that catches up at 1 %, so the render tick sits up to
+  // 260 ms behind the newest frame. Ten frames cover that; the old eight (233 ms) did not.
+  const faster = (sent: number): number => sent < 8000 ? 60 : 0, run = play(15, stalling(500, 35, 400, 240), faster);
+  console.info(`NL2 cap: delay peak ${Math.max(...run.delays).toFixed(0)} ms, target peak ${Math.max(...run.targets).toFixed(0)} ms, interpHeld ${run.lerp.held}`);
+  expect(Math.max(...run.targets)).toBe(INTERP_MAX_MS);
+  expect(Math.max(...run.delays)).toBeGreaterThan(INTERP_MAX_MS - 1);
   expect(Math.max(...run.delays)).toBeLessThanOrEqual(INTERP_MAX_MS);
   expect(run.lerp.held).toBe(0);
+  const shallow = play(15, stalling(500, 35, 400, 240), faster, 8); // the old depth: the delay at its cap outruns it
+  console.info(`NL2 cap at 8 frames: interpHeld ${shallow.lerp.held}`);
+  expect(shallow.lerp.held).toBeGreaterThan(0);
 });
 
 test('the interpolator counts a render tick older than its buffer as held, and one past its run-on as starved', () => {
@@ -83,4 +95,12 @@ test('the interpolator counts a render tick older than its buffer as held, and o
   lerp.cover(4 * INTERP_SAMPLES - 2); expect(lerp.held + lerp.starved).toBe(1);
   lerp.cover(4 * INTERP_SAMPLES + 10); expect(lerp.starved).toBe(1);
   lerp.clear(); lerp.cover(0); expect(lerp.held + lerp.starved).toBe(2);
+});
+
+test('a server pause with a bunched pair after it leaves the clock within a frame of true', () => {
+  const clock = new NetClock();
+  for (let frame = 0; frame < 150; frame++) clock.arrival(frame * 2, 5000 + frame * FRAME_MS);
+  const back = 5000 + 150 * FRAME_MS + 2000; // 2 s of nothing, then the server goes on from where it stopped
+  clock.arrival(300, back); clock.arrival(302, back + 5); // the second of a pair the wire bunched
+  expect(Math.abs(clock.serverTick(back + 5) - 302) * TICK_MS).toBeLessThanOrEqual(FRAME_MS);
 });

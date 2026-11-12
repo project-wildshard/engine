@@ -13,3 +13,7 @@
   `interpHeld` / `interpStarved`) count render frames the buffer missed.
 - Red first, `test/net-delay-settles.test.ts`: 1 s boot stall and a 325 ms
   burst, then 10 s clean, was delay 154 ms and 690 held frames; now 69 ms, 0.
+- Review folds (one-shot `claude -p`): every change now has a test that
+  fails without it (fall rate, cap, 10-frame depth: a wire 60 ms faster
+  under a capped delay held 35 render frames at 8), and the burst is timed
+  from the snap, not frame to frame, so slow listeners cannot split it.
