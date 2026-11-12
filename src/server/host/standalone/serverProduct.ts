@@ -67,7 +67,8 @@ export async function fetchGridCollision(base: string): Promise<readonly GridCol
 export async function readGridCollisionPack(root: string, build: string, read: ServerRead): Promise<readonly GridCollisionStrip[]> {
   const { grid } = await serverBook(root, build, read);
   if (grid === undefined) return [];
-  const body = await read(besideShard(grid.url, root), grid.url), file = (path: string): Uint8Array => {
+  // By its hash, as a product's parts are read: a dedicated room's `file:` origin holds the part still `br` (GC15).
+  const body = await read(besideShard(grid.url, root), grid.url, grid.hash), file = (path: string): Uint8Array => {
     const bytes = serverPackFile(grid, body, path);
     if (bytes === undefined) throw new Error(`Missing server input ${path}`);
     return bytes;

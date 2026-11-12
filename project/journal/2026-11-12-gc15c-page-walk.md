@@ -17,3 +17,6 @@ Also: the grid part is read by its hash, so a `file:` origin's `.pack.br` is und
 With the server open, the page leaves Driftwood for the road with no stop (one frame over 50 ms, 267 ms). It then stops 1 m inside
 Sunscar: the page's own preparation of Sunscar is blocked by `Compressed texture … lost its allocation after mip retirement`
 (`compressedTextureRetirement.ts`), and the player is held on the road. That is the next row.
+
+The rig commit: `server-origin.mjs` takes `--grid=<root>` (default the checkout, where the bake leaves
+`out/.app/grid-collision`), and `test/server-origin-grid.test.ts` reads the strips back through a dedicated room's pack reader.
