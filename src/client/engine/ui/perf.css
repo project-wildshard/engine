@@ -1,14 +1,18 @@
-/* frame meter (src/client/engine/ui/Perf.ts) — one small line top-right on desktop; on phones a compact pill on PAUSE's row that opens a
+/* frame meter (src/client/engine/ui/Perf.ts) — one small line top-left on desktop (QA row 13); on phones a compact pill on PAUSE's row that opens a
    details panel over the minimap (E47) */
 /* A14 (Jake, 2026-11-10: "the screen is chaotic"): the Developer dock (src/client/engine/ui/perfDock.ts), one row that holds the
    pill and the other readouts' small cards (the memory card); it takes no touch itself, its cards do */
-/* desktop: the strip under the bolts readout (game.css .ws-game-ammo, right / bottom 22 px), which nothing else holds; the top
-   edge is the boss bar's and the minimap's */
-.ws-perf-dock { position: fixed; right: 22px; bottom: calc(3px + env(safe-area-inset-bottom, 0px)); z-index: calc(var(--ws-layer-hud) + 55); display: flex; align-items: center; gap: 6px; pointer-events: none; }
+/* desktop, QA row 13 (Jake, 2026-11-12: "wheres my dev FPS and dev memory in staging on desktop lol"): the top-left corner, 12 px
+   in, the same place on the grid and in every shard. It sat 3 px off the bottom edge in 8 px type, where a desktop window's
+   rounded corner and edge swallowed it. Up here nothing else is drawn: the chat column (left 8 px) stops 120 px from the
+   top, VITALS and the coins sit bottom-left, the minimap, quest chip, toasts and the update pill keep the right, and the
+   dock stops 36 px short of the boss bar (top centre, min(58vw, 780px) wide), wrapping its long line instead of running under it */
+.ws-perf-dock { position: fixed; left: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); max-width: calc(50vw - min(29vw, 390px) - 36px); z-index: calc(var(--ws-layer-hud) + 55); display: flex; align-items: flex-start; gap: 6px; pointer-events: none; }
 .ws-perf-dock:empty { display: none; }
-.ws-perf { position: relative; display: flex; align-items: baseline; gap: 5px; margin: 0; padding: 2px 5px; border: 0; appearance: none; -webkit-appearance: none; pointer-events: none; font-family: var(--ws-mono); font-size: 8px; letter-spacing: 0.04em; line-height: 1; text-align: left; color: rgba(196, 220, 232, 0.55); background: rgba(6, 10, 18, 0.45); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ws-perf b { font-family: var(--ws-mono); font-weight: 500; font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.85); }
-.ws-perf b::after { content: ' fps'; font-size: 8px; font-weight: 400; color: rgba(196, 220, 232, 0.55); }
+.ws-perf { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; margin: 0; padding: 3px 6px; border: 0; appearance: none; -webkit-appearance: none; pointer-events: none; font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.04em; line-height: 1.25; text-align: left; color: rgba(196, 220, 232, 0.8); background: rgba(6, 10, 18, 0.6); font-variant-numeric: tabular-nums; white-space: normal; overflow-wrap: anywhere; }
+.ws-perf b { font-family: var(--ws-mono); font-weight: 500; font-size: 12px; line-height: 1.25; color: rgba(255, 255, 255, 0.92); white-space: nowrap; }
+.ws-perf b::after { content: ' fps'; font-size: 9px; font-weight: 400; color: rgba(196, 220, 232, 0.8); }
+.ws-perf .ws-perf-long { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; } /* a narrow window: 3 lines at most, never a column down into the chat */
 .ws-perf.slow b { color: #ffd27a; }
 .ws-perf.bad b { color: #ff7a6b; }
 .ws-perf.bad .ws-perf-ms, .ws-perf-live.bad span { color: #ff7a6b; }
@@ -31,13 +35,15 @@
   /* phone (E47): "59 fps 17 ms" in a glass pill the height of PAUSE, just right of it on the same row (PAUSE's 44 px hit
      area ends 6 px past its edge, the dock starts 8 px past it). A tap opens the panel; the pill never passes a touch on.
      A14: the memory card follows it on the row, which ends left of the minimap at 402 px */
-  .ws-perf-dock { left: 101px; right: auto; top: var(--ws-top); bottom: auto; gap: 5px; }
-  .ws-perf { height: 24px; box-sizing: border-box; align-items: center; gap: 4px; padding: 0 6px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 8.5px; letter-spacing: 0.03em; pointer-events: auto; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-tap-highlight-color: transparent; transition: border-color 0.12s, background 0.12s; }
+  .ws-perf-dock { left: 101px; right: auto; top: var(--ws-top); bottom: auto; max-width: none; align-items: center; gap: 5px; }
+  .ws-perf { height: 24px; box-sizing: border-box; flex-wrap: nowrap; align-items: center; gap: 4px; padding: 0 6px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); font-size: 8.5px; letter-spacing: 0.03em; line-height: 1; white-space: nowrap; pointer-events: auto; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-tap-highlight-color: transparent; transition: border-color 0.12s, background 0.12s; }
   .ws-perf::after { content: ''; position: absolute; inset: -10px -4px -10px 0; } /* ≥ 44 px hit target */
   .ws-perf * { pointer-events: none; }
   .ws-perf .ws-perf-long { display: none; }
   .ws-perf .ws-perf-ms { display: inline; color: var(--ws-text-dim); }
-  .ws-perf b { font-size: 10px; }
+  .ws-perf { color: rgba(196, 220, 232, 0.55); }
+  .ws-perf b { font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.85); }
+  .ws-perf b::after { font-size: 8px; color: rgba(196, 220, 232, 0.55); }
   .ws-perf.open { border-color: var(--ws-cyan); background: rgba(13, 27, 38, 0.92); }
   /* the details: dropped over the minimap (top-right), above everything; a tap on it or anywhere else closes it */
   .ws-perf-panel.open { position: fixed; right: 12px; top: var(--ws-top); z-index: calc(var(--ws-layer-hud) + 56); display: block; box-sizing: border-box; width: max(38vw, 176px); padding: 8px 10px 6px; background: rgba(6, 10, 18, 0.92); border: 1px solid var(--ws-cyan); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(143, 227, 255, 0.18); font-family: var(--ws-mono); font-size: 9.5px; line-height: 1.2; color: var(--ws-text); font-variant-numeric: tabular-nums; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -74,7 +80,7 @@
   .ws-perf-panel .ws-perf-ab.off { background: var(--ws-cyan); color: #06121a; }
 }
 /* A14: desktop has no panel (its line is click-through); the alerts and labels a phone keeps in the panel stand at the left,
-   over the coins and the health readout and under the chat (the top edge is the boss bar's), and the net block stays a
+   over the coins and the health readout and under the chat (the top edge is the boss bar's and the dock's), and the net block stays a
    phone's tap away */
 @media (min-width: 701px) and (pointer: fine) {
   .ws-perf-panel:has(.ws-perf-section:not([hidden]):not(.ws-perf-net)) { display: block; position: fixed; left: 12px; top: auto; bottom: calc(130px + env(safe-area-inset-bottom, 0px)); z-index: calc(var(--ws-layer-hud) + 55); width: min(420px, 36vw); max-height: 40vh; overflow-y: auto; pointer-events: none; }

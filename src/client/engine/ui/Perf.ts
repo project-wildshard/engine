@@ -6,7 +6,7 @@ import { viewportHeight } from '../core/viewport';
 import { engineString } from '../../../shared/engine/strings';
 import { saveStorage } from '../saves/slots';
 /**
- * Frame meter (A14: the Developer dock, perfDock.ts; bottom-right on desktop): completed draws per wall-clock second and the worst
+ * Frame meter (A14: the Developer dock, perfDock.ts; top-left on desktop, QA row 13): completed draws per wall-clock second and the worst
  * interval over three seconds; the details retain the game's frame p50 / p95,
  * draw calls and triangles from renderer.info, the tier and DPR.
  * Repainted at most twice a second and written to the DOM only when the text changed, so the meter

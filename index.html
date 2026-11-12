@@ -314,9 +314,16 @@ html, body { margin: 0; padding: 0; overflow: clip; height: 100%; background: #0
 .ws-load .ws-load-play { display: block; width: 100%; min-height: 48px; margin-top: 18px; border: 1px solid var(--ws-cyan); background: rgba(9, 22, 36, 0.88); color: var(--ws-cyan); font: 700 18px var(--ws-display); letter-spacing: 0.18em; cursor: pointer; touch-action: manipulation; }
 .ws-load .ws-load-play:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
 .ws-load[data-hold] .ws-load-head, .ws-load[data-hold] .ws-load-foot { flex-shrink: 0; }
-.ws-load[data-hold] .ws-load-body { min-height: 0; overflow-y: auto; align-items: flex-start; overscroll-behavior: contain; touch-action: pan-y; }
+.ws-load[data-hold] .ws-load-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 .ws-load[data-hold] .ws-load-panel { flex-shrink: 0; }
 .ws-load[data-hold] .ws-load-play { flex: none; align-self: center; width: calc(100% - 32px); max-width: 560px; margin: 8px 16px 14px; }
+/* QA row 11 (Jake, 2026-11-12: "lol screen alyout bug"): on desktop the ready card, COPY DIAGNOSTICS and PLAY are one centred
+   column with margins, the group centred between the wordmark and the foot. The hold body used to say align-items: flex-start
+   (meant for the scroll axis), which pinned the 560 px card and COPY flush to the left edge while PLAY sat alone at the bottom */
+@media (min-width: 701px) {
+  .ws-load[data-hold] .ws-load-body { flex: 0 1 auto; margin-top: auto; padding: 16px 32px 0; align-items: center; justify-content: flex-start; }
+  .ws-load[data-hold] .ws-load-play { margin: 16px auto auto; }
+}
 .ws-load::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(180deg, rgba(3, 8, 15, 0.62), rgba(3, 8, 15, 0.84) 54%, rgba(3, 8, 15, 0.93)), var(--ws-load-portrait); background-position: center; background-size: cover; pointer-events: none; }
 .ws-load::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(143, 227, 255, 0.025) 0 1px, transparent 1px 3px); pointer-events: none; }
 .ws-load .ws-load-head, .ws-load .ws-load-body, .ws-load .ws-load-foot, .ws-load .ws-load-play { position: relative; z-index: calc(var(--ws-layer-hud) + 1); }

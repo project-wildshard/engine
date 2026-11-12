@@ -18,7 +18,7 @@
 //   (riding) and -boost-on (a double tap of HOVER / H; on an older build, its BOOST button).
 //
 // The layout check (exit 1 with --check): no Developer surface (the dock's chips, a panel that shows unasked, BOOST, an alert)
-// overlaps the quest chip, PAUSE, the minimap, the crosshair, the chat or a touch control; the chat (its row, lines, voice tip and
+// overlaps the quest chip, PAUSE, the minimap, the crosshair, the chat or a touch control, or leaves the window (8 px clear of each edge, QA row 13); the chat (its row, lines, voice tip and
 // players) overlaps none of those; and the point at the mic's centre is the mic (elementFromPoint), so a phone's only way into voice can be tapped.
 // --menu also opens the BAG on phones and checks the chat row and the mic are gone while it is up and back when it closes (QA
 // row 15). A required surface missing or a page error fails too; a rotate-gated case is GATE, not PASS. Every other
@@ -172,6 +172,16 @@ const hit = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top 
 /** @param {Box[]} as @param {Box[]} bs */
 const pairs = (as, bs) => as.flatMap(a => bs.filter(b => b !== a && hit(a, b)).map(b => `${a.name} × ${b.name}`));
 
+/** QA row 13 (Jake, 2026-11-12: "wheres my dev FPS and dev memory in staging on desktop lol"): every Developer surface stands
+ * wholly inside the window, on a desktop at least {@link EDGE} px from each edge (a desktop window's rounded corners and its bottom edge
+ * swallowed a dock drawn 3 px off the bottom) */
+const EDGE = 8;
+/** the case's window, for {@link outside} */
+const view = { width: 0, height: 0, phone: false };
+/** @param {Box[]} bs */
+const outside = bs => { const e = view.phone ? 0 : EDGE; return bs.filter(b => b.left < e || b.top < e || b.right > view.width - e || b.bottom > view.height - e)
+  .map(b => `${b.name} is not inside the window (${String(Math.round(b.left))},${String(Math.round(b.top))} – ${String(Math.round(b.right))},${String(Math.round(b.bottom))} of ${String(view.width)}×${String(view.height)}, ${String(e)} px clear)`); };
+
 /** A phone held sideways: the game is portrait-only there, and its rotate gate covers the page (RotateGate.ts).
  * @param {import('playwright').Page} page */
 const rotateGate = page => page.evaluate(() => { const gate = document.querySelector('.ws-rotate'); return gate !== null && getComputedStyle(gate).display !== 'none' && gate.getBoundingClientRect().width > 0; });
@@ -261,6 +271,7 @@ for (const kind of browsers) {
   try {
     for (const size of sizes) {
       const [width = 0, height = 0] = size.split('x').map(Number), phone = Math.min(width, height) <= 500;
+      view.width = width; view.height = height; view.phone = phone; // a phone's dock is PAUSE's row, on PAUSE's 6 px line
       for (const mode of modes) {
         const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}`;
         const context = await browser.newContext(phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } });
@@ -270,6 +281,8 @@ for (const kind of browsers) {
         /** @type {string[]} */ const refused = [];
         context.on('request', request => { const url = new URL(request.url()); if (/^https?:$/u.test(url.protocol) && !OURS.test(url.hostname)) refused.push(url.origin); });
         try {
+          // the grid card waits behind the first-visit name prompt ("What should we call you?") until it is answered
+          await saveFixture(context, { scope: 'device', key: 'nameAsked', data: true });
           if (dev) { await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' }); }
           const page = await context.newPage();
           /** @type {string[]} */ const errors = [];
@@ -290,7 +303,7 @@ for (const kind of browsers) {
           const file = join(out, `${name}.png`);
           await page.screenshot({ path: file }); written.push(file);
           const b = await page.evaluate(boxes);
-          const problems = [...pairs(b.developer, [...b.guarded, ...b.chat]), ...pairs(b.chat, b.guarded)];
+          const problems = [...pairs(b.developer, [...b.guarded, ...b.chat]), ...pairs(b.chat, b.guarded), ...outside(b.developer)];
           // a check over nothing passes nothing: what it guards and what it moved must be on screen
           const named = new Set([...b.guarded, ...b.chat, ...b.developer].map(x => x.name.replace(/#\d+$/u, '')));
           for (const need of [...(phone ? ['PAUSE', 'touch bar'] : []), 'quest chip', 'minimap', 'chat row', ...(dev ? ['fps pill', 'memory card'] : [])])

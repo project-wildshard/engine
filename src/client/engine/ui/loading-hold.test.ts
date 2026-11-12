@@ -164,3 +164,26 @@ it.each(['after tap', 'during fade'] as const)('does not enter a disposed load %
   expect(enter).not.toHaveBeenCalled(); expect(refused).toHaveBeenCalledTimes(1);
   expect(refused.mock.calls[0]?.[0]).toMatchObject({ name: 'AbortError' });
 });
+
+// QA row 11 (Jake, 2026-11-12: "lol screen alyout bug"): on a desktop the held ready card sat flush against the left edge (the hold
+// body's align-items: flex-start), COPY DIAGNOSTICS under it, PLAY alone at the bottom centre. The real stylesheet, a desktop window:
+// the card, COPY and PLAY share one centred column with side margins, and the group sits between the wordmark and the foot.
+it('centres the held ready card, COPY and PLAY in one column with margins on a desktop', async () => {
+  // oxlint-disable-next-line import/no-nodejs-modules -- the real stylesheet's cascade, not a copy of it
+  const { readFileSync } = await import('node:fs');
+  const style = document.createElement('style'); style.textContent = readFileSync('src/client/engine/ui/loading.css', 'utf8');
+  document.head.append(style);
+  const view = (window as unknown as { happyDOM?: { setViewport: (size: { width: number; height: number }) => void } }).happyDOM;
+  view?.setViewport({ width: 2576, height: 1230 });
+  try {
+    setDev(true); setSetting('holdLoading', true);
+    const loading = ready(); void loading.done().catch(() => undefined);
+    const body = loading.root.querySelector<HTMLElement>('.ws-load-body'), play = loading.root.querySelector<HTMLElement>('.ws-load-play');
+    if (body === null || play === null) throw new Error('Missing the held body or PLAY');
+    const b = getComputedStyle(body), p = getComputedStyle(play);
+    expect(b.alignItems).toBe('center'); // not flex-start: the 560 px card and COPY are centred, never flush left
+    expect(Number.parseFloat(b.paddingLeft)).toBeGreaterThanOrEqual(16); expect(Number.parseFloat(b.paddingRight)).toBeGreaterThanOrEqual(16);
+    expect(b.marginTop).toBe('auto'); expect(p.marginBottom).toBe('auto'); // the card and PLAY are one group, centred together
+    expect(p.alignSelf).toBe('center'); expect(p.maxWidth).toBe('560px');
+  } finally { style.remove(); view?.setViewport({ width: 1024, height: 768 }); }
+});

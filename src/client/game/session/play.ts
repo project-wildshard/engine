@@ -142,7 +142,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   const weaponStrip = new WeaponStrip(weapons); // every shard's one swap control (E303 / E319): the SWAP ring + pie on touch, a hotbar on desktop
   const lockOn = new LockOn(game.camera); // sword lunge target brackets (meleeLock, Sword.ts)
   const speedLines = new SpeedLines(); // dodge / lunge edge streaks
-  const perf = new Perf(game); // frame meter top-right (?perf=0 hides)
+  const perf = new Perf(game); // frame meter: top-left on desktop, PAUSE's row on phones (?perf=0 hides)
   const minimap = new Minimap(); // circular minimap (Heightfield is installed by now)
   if (chunk.hud?.dayBadge === true) minimap.showDayBadge(); // the sun / moon on its rim (Nalati)
   const fullMap = new FullMap(minimap); // the menu's MAP tab (Menu.ts mounts it); tap the minimap / M to open
