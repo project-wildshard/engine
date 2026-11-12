@@ -478,6 +478,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/LOOK_LIGHT_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:session/'firstPlay.pending'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
