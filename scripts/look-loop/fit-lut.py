@@ -120,6 +120,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     cfg = PD.load_config(a.shard, a.regions)
     mock_dir, game_pat = Path(a.mock_dir), a.game_pat
+    if not a.out and not a.shard: ap.error('pass out.bin, or --shard <slug> for public/assets/lut/<slug>.bin')
     out_path = Path(a.out) if a.out else ROOT / 'public' / 'assets' / 'lut' / f'{a.shard}.bin'
     rng = np.random.default_rng(7)
     src, dst, wt = pairs(mock_dir, game_pat, rng, cfg)

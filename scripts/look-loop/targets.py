@@ -124,9 +124,25 @@ def run(jobs, work, *, parallel, timeout, model):
         print('started', j['id'], p.pid, flush=True)
 
     def stop(p):
-        try: os.killpg(p.pid, signal.SIGTERM)
-        except (ProcessLookupError, PermissionError): pass
+        """SIGTERM the run's process group, then SIGKILL it if it is still alive after 10 s"""
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try: os.killpg(p.pid, sig)
+            except (ProcessLookupError, PermissionError): return
+            try: p.wait(timeout=10); return
+            except subprocess.TimeoutExpired: continue
 
+    try:
+        poll(queue, running, failed, t0, timeout, parallel, start, stop)
+    finally:
+        for jid, (p, _, _) in list(running.items()):
+            print('stopped', jid, flush=True); stop(p); failed.append(jid)
+        running.clear()
+    failed += [j['id'] for j in queue]
+    return failed
+
+
+def poll(queue, running, failed, t0, timeout, parallel, start, stop):
+    """start jobs up to `parallel`, collect each PNG as it lands, until the queue drains or the batch times out"""
     while (queue or running) and time.time() - t0 < timeout:
         while queue and len(running) < parallel: start(queue.pop(0))
         time.sleep(10)
@@ -143,10 +159,7 @@ def run(jobs, work, *, parallel, timeout, model):
             if p.poll() is not None:
                 print(f'EXITED without image: {jid} rc={p.returncode} (see {log})', flush=True)
                 failed.append(jid); del running[jid]
-    for jid, (p, _, _) in running.items():
-        print('TIMEOUT', jid, flush=True); stop(p); failed.append(jid)
-    failed += [j['id'] for j in queue]
-    return failed
+    for jid in running: print('TIMEOUT', jid, flush=True)
 
 
 def sheet(out):
@@ -185,6 +198,7 @@ def main(argv=None):
     ap.add_argument('--dry-run', action='store_true')
     a = ap.parse_args(argv)
     style = Path(a.style_file).read_text().strip() if a.style_file else a.style
+    if a.parallel < 1: ap.error('--parallel must be at least 1')
     if not a.seed_mockup and not style:
         ap.error('pass --seed-mockup <approved mockup> or a --style paragraph')
     for f in [a.seed_mockup, *filter(None, a.refs.split(','))]:
