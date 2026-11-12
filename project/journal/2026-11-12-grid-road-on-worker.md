@@ -21,3 +21,5 @@
   plane below its fall floor, so a body arriving at road height there dies and respawns at the spawn. The test now arrives beside B,
   and the bank lift has its own test, road back into Driftwood from 3 m under its ground (red without the lift). For the page walk:
   walking off the road into Far Reach at road height may be this same death; Pine Hollow or Sunscar is the safer first neighbour.
+- The road test's "nothing changes" checks waited 500 ms of wall clock; they now wait for 60 ticks of the room, so a slow runner
+  waits longer instead of checking sooner (coordinator's note on the CI red).

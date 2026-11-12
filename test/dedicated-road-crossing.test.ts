@@ -14,6 +14,11 @@ import { RoomBot } from './fixtures/dedicated/roomBot';
 const HOME = 'driftwood-isle', SOUTH = 'far-reach', EAST = 'nalati-grasslands', CELLS = [HOME, SOUTH, EAST], ROAD = roadName(HOME);
 /** Staging's pitch: Far Reach's origin is this far south of Driftwood's. */
 const PITCH = 562.5;
+/** Wait for a room to step `ticks` more times: a slow runner waits longer, never checks sooner. */
+const ticks = async (room: { readonly host: { readonly state: { readonly tick: number } } }, count: number): Promise<void> => {
+  const from = room.host.state.tick;
+  await vi.waitFor(() => { expect(room.host.state.tick).toBeGreaterThanOrEqual(from + count); }, { timeout: 30_000 });
+};
 const forward = (): ReturnType<RoomBot['thumb']> => ({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: 0 });
 let bench: RoomBench | undefined;
 const bots: RoomBot[] = [];
@@ -62,7 +67,7 @@ test('feet past Driftwood\'s edge cross onto the road, and feet inside Far Reach
   expect(road.holds('device:a')).toBe(false);
   expect(south.holds('device:a')).toBe(true);
   expect(Math.abs((south.bodyOf('device:a')?.position.z ?? 0) - spot.z), 'local to Far Reach').toBeLessThan(3);
-  await new Promise(resolve => { setTimeout(resolve, 500); });
+  await ticks(south, 60);
   expect(Math.abs((south.bodyOf('device:a')?.position.z ?? 0) - spot.z), 'it stands there, not respawned after a fall').toBeLessThan(3);
   expect(a.closed).toBeNull();
   expect(travels.map(({ from: left, to }) => [left, to])).toEqual([[cellFrame(HOME), 0], [0, cellFrame(SOUTH)]]);
@@ -85,7 +90,7 @@ test('a body coming off the road below a cell\'s ground stands on it, not inside
   // Driftwood's origin is the world's: its frame and the road's agree.
   road.bodyOf('device:a')?.resetPose({ x: spawn.x + 4, y: ground - 3, z: spawn.z }, 0);
   await vi.waitFor(() => { expect(a.client.latest?.cell).toBe(cellFrame(HOME)); }, { timeout: 10_000 });
-  await new Promise(resolve => { setTimeout(resolve, 500); });
+  await ticks(home, 60);
   const stood = home.bodyOf('device:a')?.position;
   expect(Math.hypot((stood?.x ?? Infinity) - (spawn.x + 4), (stood?.z ?? Infinity) - spawn.z), 'where it crossed, not respawned').toBeLessThan(3);
   expect(stood?.y ?? -Infinity).toBeGreaterThan(ground - 1);
@@ -117,7 +122,7 @@ test('without WORLD_CROSSING a cell stays lone: feet past its edge cross nowhere
   if (home === undefined || body === undefined) throw new Error('Driftwood boots');
   expect(bench.road(ROAD)).toBeUndefined();
   body.resetPose({ x: 0, y: body.position.y, z: -(CHUNK_HALF + 3) }, body.yaw);
-  await new Promise(resolve => { setTimeout(resolve, 500); });
+  await ticks(home, 60);
   expect(home.holds('device:a')).toBe(true);
   expect(a.client.latest?.cell).toBe(cellFrame(HOME));
   expect(bench.lines.some(line => line['at'] === 'cell.crossed')).toBe(false);
