@@ -21,3 +21,13 @@
   held or done; `Status:` is refused), so the updated plan-gate test
   holds. `main-only.test.mjs` now matches the slimmer brief's
   `plan worktrees (n):` line.
+
+## v2.1.1 (lane opus-kit211b)
+
+- Stamped the agent layer from repo-kit `v2.1.1` (`b3bcce2`) with
+  `agent-sync --from` and `kit.mjs apply`: the tenth kit skill,
+  look-loop; the herdr guard checks command substitutions inside quotes
+  and lets printed text through; the sweep guard passes a merge that only
+  brings in upstream changes. The two hook tests follow the kit. Engine
+  never took `v2.1.0` (`plan/kit-v210` did not land); this supersedes it.
+  Engine's own skills and pinned variants are unchanged.
