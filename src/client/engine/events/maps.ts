@@ -1,6 +1,7 @@
 import type { AppState, Phase } from '../app/systems';
 import type { Vector3 } from 'three';
 import type { Actor, DamageDealt, DamageRequest, DeathCause } from '../../../shared/engine/combat/pipeline';
+import type { EffectId, EffectTarget } from '../../../shared/engine/combat/effects/types';
 
 export interface FaultEvent { source: string; message: string; phase?: Phase; limit?: number; error?: unknown }
 export interface EventMap {
@@ -12,6 +13,9 @@ export interface EventMap {
   'creature.signal': { name: string; x: number; z: number };
   'ai.windup': { actor: Actor; duration: number };
   'damage.dealt': DamageDealt;
+  /** A status took or left its target (src/shared/engine/combat/effects/EffectService.ts). */
+  'effect.applied': { target: EffectTarget; id: EffectId };
+  'effect.removed': { target: EffectTarget; id: EffectId };
   /** J105: a personal roll paid out; only `player` hears of it. */
   'reward.granted': { player: string; coins: number; body: string; item?: string };
   'actor.died': { actor: Actor; req: DamageRequest };

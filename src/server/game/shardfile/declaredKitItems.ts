@@ -1,7 +1,8 @@
 // SR11 (C8, C9): a data shard's declared kit melee and lantern on the server. Before the flip the page stepped each item's
 // runtime; the flip left that runtime queued and never stepped, so a data shard's player struck with the zero-damage
 // HOST_PROBE and the lantern never lit. Each player now holds their own runtimes here, fed by their wire: a press with its
-// aim, a held heavy, an equip by slot and a lantern scene. What the lantern burns reaches its owner as owned lines.
+// aim, a held heavy, an equip by slot and a lantern scene. What the lantern burns reaches its owner as owned lines. A blow's
+// status (the whip heavy's poison) goes to the room's status owner (`statusEffects.ts`, HS5).
 // TE-ENG2: a declared lever-action (`kit.lever`) is a seat here too: Pine's per-round cycle (`RangedAction.Cycle`) and a hitscan
 // along the wire's aim at any body the host holds, population, declared enemies or posts alike. It starts locked; an item scene
 // (a rack's prompt) takes it, and what it holds reaches its owner as owned lines (`leverLines`).
@@ -21,6 +22,7 @@ import { publishOwned } from '@wildshard/engine/sim/shardRows';
 import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, SERVER_KIT_FAMILIES, type LeverProfile } from '../../../shared/game/shardfile/items';
 import { playerSeats, type PlayerSeat } from '../plugin/playerSeats';
 import { nativeRangedHit } from '../plugin/nativeItems';
+import { installStatusEffects } from './statusEffects';
 
 /** The page's canonical eye above the feet (`Player.sampleAimCommand`). */
 const EYE = 1.68;
@@ -69,6 +71,8 @@ function isStates(value: unknown): value is Record<string, ItemState> { return t
 export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'items' | 'targets' | 'state'>, hooks: (player: string) => ReadonlyMap<string, ItemHook>): DeclaredKitItems | null {
   const rows = shard.items.rows.filter(row => SERVER_KIT_FAMILIES.has(row.family));
   if (rows.length === 0) return null;
+  // Before this owner's step, so a status put on by a blow ticks a full period later, as the page's did.
+  const status = installStatusEffects(host);
   const levers = new Map<string, { readonly row: LeverRow; readonly profile: LeverProfile; readonly lines: ReturnType<typeof leverLines> }>(rows.flatMap(row => row.kind === 'weapon' && row.family === LEVER_FAMILY ? [[row.id, { row, profile: leverProfile(row), lines: leverLines(row.id) }] as const] : []));
   const runtimeRows = rows.filter(row => !levers.has(row.id));
   // A scene a prompt runs is taken only near that prompt: a page may name the scene, but the server judges where its player stands.
@@ -94,8 +98,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
     const combat = { hit: (request: Parameters<SimHost['combat']['hit']>[0]): ReturnType<SimHost['combat']['hit']> => host.combat.hit({ ...request, attackSeq: pressed.get(player.id) ?? 0 }) };
     const own = hooks(player.id), runtimes = new Map(runtimeRows.map(row => [row.id, new ItemRuntime(row, {
       actor: player.health, combat, targets, hook: own.get(row.id) ?? null,
-      // Status effects have no server owner yet: the blow lands, its effect does not (the page's EffectService was its only one).
-      effect: () => undefined, active: () => player.health.alive,
+      // HS5: a blow's status (the whip heavy's poison) goes to the room's status owner, the page's EffectService on the server.
+      effect: (target, effect, source) => { status.apply(target, effect, source); }, active: () => player.health.alive,
     })] as const));
     const seated = new Map([...levers].map(([id, { profile }]) => {
       const store = { reserve: profile.reserve };

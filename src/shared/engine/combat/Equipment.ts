@@ -1,5 +1,5 @@
 import type { Scope } from '../app/scope';
-import type { AttributeSet, CueId } from '../../../client/engine/combat/effects/types';
+import type { AttributeSet, CueId } from './effects/types';
 import type { CombatTag } from './pipeline';
 import type { HitStopProfile } from '../../../client/engine/combat/cues';
 import type { Events } from '../events/events';

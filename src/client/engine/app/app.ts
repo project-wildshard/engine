@@ -34,7 +34,7 @@ import { AggressionService } from '../../../shared/engine/ai/director';
 import { EncounterRegistry } from '../../../shared/engine/ai/encounters';
 import { SpeciesService } from '../entities/species/look';
 import type { PlayerHealth } from '../../../shared/engine/combat/health';
-import type { EffectService } from '../combat/effects/EffectService';
+import type { EffectService } from '../../../shared/engine/combat/effects/EffectService';
 
 interface StateHook { state: AppState; run: () => void }
 export type SystemsByPhase = Readonly<Record<Phase, readonly SystemSpec[]>>;

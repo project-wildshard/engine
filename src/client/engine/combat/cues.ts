@@ -3,7 +3,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import type { CueOpts } from '../audio/Cues';
 import type { EquipmentRow, EquipmentId } from '../../../shared/engine/combat/Equipment';
 import type { ImpactSurface } from '../../../shared/engine/combat/Weapon';
-import type { CueId } from './effects/types';
+import type { CueId } from '../../../shared/engine/combat/effects/types';
 
 export interface CombatCueOpts extends CueOpts {
   point?: Vector3; dir?: Vector3 | -1 | 1; speed?: number; heavy?: boolean; killed?: boolean; clang?: 'wood' | 'stone';

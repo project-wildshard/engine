@@ -1,16 +1,14 @@
 import type { Vector3 } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { LevelContext } from '@wildshard/engine/level/context';
-import type { Actor, CombatTag } from '@wildshard/engine/combat/pipeline';
+import type { Actor } from '@wildshard/engine/combat/pipeline';
 import { hudSlots } from '@wildshard/engine/ui/hudSlots';
 import { StatusIcons } from '../systems/effects/view';
-import * as v from 'valibot';
-import starterRows from '../../../shared/game/systems/effects/starterRows.json' with { type: 'json' };
 import { bindPlayerEffects, selectEffectGrants, type EffectService } from '@wildshard/engine/combat/effects/EffectService';
 import type { ShardContext } from '../plugin/context';
 import { installEnteredRuntimeService, installRetainedPlayerEffects, retainsRuntimeServices } from '../shard/retainedHooks';
 import { isOwnedId, isCosmetic } from '../../../shared/game/loot/Owned';
-import type { EffectDef, CueId, EffectId } from '@wildshard/engine/combat/effects/types';
+import type { EffectDef } from '@wildshard/engine/combat/effects/types';
 import { wirePage } from '../shardfile/wirePage';
 
 /** The shared permanent cosmetic grant; authored finish identity and weapon determine its exclusive group. */
@@ -66,17 +64,6 @@ export function installItemEffects(context: ShardContext): void {
   }});
 }
 
-/** Existing starter tuning; only the authored stun is applied by normal play, and importing installs no effects. */
-const starterTag = v.custom<CombatTag>(value => typeof value === 'string' && /^.+\..+$/u.test(value));
-const starterId = v.custom<EffectId>(value => typeof value === 'string' && value.startsWith('effect.'));
-const starterCue = v.custom<CueId>(value => typeof value === 'string' && value.startsWith('cue.'));
-const finite = v.pipe(v.number(), v.finite());
-export const STARTER_EFFECTS: readonly EffectDef[] = v.parse(v.array(v.strictObject({
-  id: starterId, kind: v.literal('timed'), duration: finite, tags: v.array(starterTag), grants: v.array(starterTag),
-  modifiers: v.array(v.strictObject({ attr: v.string(), op: v.picklist(['add', 'mul', 'override']), value: finite })),
-  stacking: v.union([v.literal('refresh'), v.strictObject({ max: v.pipe(finite, v.integer(), v.minValue(1)) })]),
-  cue: starterCue, icon: v.string(), period: v.exactOptional(finite), tickDamage: v.exactOptional(finite),
-})), starterRows);
 
 type StatusMovement = Parameters<typeof bindPlayerEffects>[0]['movement'];
 type StarterContext = Pick<LevelContext, 'app' | 'scope' | 'system' | 'on'> & { hud: Pick<LevelContext['hud'], 'widget'> };

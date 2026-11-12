@@ -1,16 +1,9 @@
-import { PlayerHealth } from '../../../../shared/engine/combat/health';
-import type { Scope } from '../../../../shared/engine/app/scope';
+import { PlayerHealth } from '../health';
+import type { Scope } from '../../app/scope';
 import { Vector3 } from 'three';
-import type { Events } from '../../../../shared/engine/events/events';
-import type { Actor, CombatPipeline, CombatTag } from '../../../../shared/engine/combat/pipeline';
+import type { Events } from '../../events/events';
+import type { Actor, CombatPipeline, CombatTag } from '../pipeline';
 import { harmfulEffect, matchesTag, type ActiveEffect, type AttributeSet, type EffectDef, type EffectId, type EffectTarget } from './types';
-
-declare module '../../events/maps' {
-  interface EventMap {
-    'effect.applied': { target: EffectTarget; id: EffectId };
-    'effect.removed': { target: EffectTarget; id: EffectId };
-  }
-}
 
 const playerBindings = new WeakMap<EffectService, WeakMap<Actor, { movement: object; scope: Scope }>>();
 

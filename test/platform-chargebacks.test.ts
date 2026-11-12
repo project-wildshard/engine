@@ -265,7 +265,7 @@ test('optional chapter dispatch preserves the carried and merged-figure owners',
 
 
 test('optional chapter imports retain the remaining unapproved combat dependency owners', () => {
-  const rows: readonly (readonly [string, readonly string[] | null])[] = [["src/client/engine/combat/effects/types.ts", ["SourceMulDef", "anyTag", "sourceMultiplier"]]];
+  const rows: readonly (readonly [string, readonly string[] | null])[] = [["src/shared/engine/combat/effects/types.ts", ["SourceMulDef", "anyTag", "sourceMultiplier"]]];
   const shared = new Set(['pine-hollow', 'driftwood-isle', 'nalati-grasslands']);
   const modules = new Map(rows.map(([path]) => [path, shared]));
   const bindings = new Map(rows.flatMap(([path, names]) => [...(names ?? []), 'unrelatedShared'].map(name => [`${path}\0${name}`, shared])));
@@ -458,7 +458,7 @@ test('G621 D4 retires only the three already-approved chapter dependency overrid
     }
     expect(approvedG571Host(approvals, path, 'unreviewed')).toBe(false);
   }
-  const combat = 'src/client/engine/combat/effects/types.ts';
+  const combat = 'src/shared/engine/combat/effects/types.ts';
   const native = new Map([[`${combat}\0sourceMultiplier`, shared]]);
   chargePlatformUsers(new Map(), native);
   expect(native.get(`${combat}\0sourceMultiplier`)).toEqual(new Set(['nalati-grasslands']));

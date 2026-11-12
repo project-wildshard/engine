@@ -50,8 +50,8 @@ const reviewedW2Owners = new Map([
   ['src/shared/engine/physics/bodies.ts#BodyLaunchRow', 'C6'],
   ['src/format/nativeItems.ts#BodyLaunchSchema', 'C6'],
   ['src/format/lootEconomy.ts#ClaimedPickupSchema', 'C6'],
-  ['src/client/engine/combat/effects/EffectService.ts#playerBindings', 'C6'],
-  ['src/client/engine/combat/effects/EffectService.ts#bindPlayerEffects', 'C6'],
+  ['src/shared/engine/combat/effects/EffectService.ts#playerBindings', 'C6'],
+  ['src/shared/engine/combat/effects/EffectService.ts#bindPlayerEffects', 'C6'],
   ['src/shared/engine/physics/terrain.ts#EDGE_WALL_INSET', 'C1'],
   ['src/shared/engine/physics/terrain.ts#isStandaloneEdgeWall', 'C1'],
   ['src/shared/game/bag/itemCatalog.ts#isItemId', 'C6'],
@@ -156,7 +156,7 @@ const w3Paths = [
 // Sole-user platform contributions retain their canonical size. These reviewed
 // owners only distribute W3's existing charges into the component table.
 const w3SharedOwners = new Map([
-  ...['src/shared/engine/combat/targets.ts', 'src/client/engine/combat/effects/types.ts',
+  ...['src/shared/engine/combat/targets.ts', 'src/shared/engine/combat/effects/types.ts',
     'src/client/engine/player/firstPersonArms.ts', 'src/client/game/weapons/heldLauncher.ts',
     'src/client/game/systems/viewmodel/armRig.ts'].map(path => [path, 'C6']),
   ...['src/sharddev/crowds.ts',

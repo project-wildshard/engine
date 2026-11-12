@@ -28,7 +28,7 @@ const chapterViewNativeOwners = new Map([
   // Remaining unapproved dependencies retain their actual optional-facet consumer.
   // G621 D4/R13 retires the approved figure, equipment and height-patch overrides.
   ["src/client/game/quest/carriedProp.ts", null],
-  ["src/client/engine/combat/effects/types.ts", ["SourceMulDef", "anyTag", "sourceMultiplier"]],
+  ["src/shared/engine/combat/effects/types.ts", ["SourceMulDef", "anyTag", "sourceMultiplier"]],
 ]);
 
 // Single-shard branches inside otherwise shared declarations. These spans select

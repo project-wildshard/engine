@@ -1,4 +1,4 @@
-import type { EffectDef } from '../../../client/engine/combat/effects/types';
+import type { EffectDef } from '../../../shared/engine/combat/effects/types';
 import type { Action, TouchVerbSpec } from '../../../client/engine/input/InputService';
 import type { Group, Vector3 } from 'three';
 import type { App } from '../../../client/engine/app/app';

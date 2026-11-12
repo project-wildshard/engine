@@ -1,9 +1,9 @@
 import { Vector3 } from 'three';
 import { app } from '../../src/client/engine/app/runtime';
 import type { Scope } from '../../src/shared/engine/app/scope';
-import type { EffectService } from '../../src/client/engine/combat/effects/EffectService';
+import type { EffectService } from '../../src/shared/engine/combat/effects/EffectService';
 import type { PlayerHealth } from '../../src/shared/engine/combat/health';
-import type { EffectTarget } from '../../src/client/engine/combat/effects/types';
+import type { EffectTarget } from '../../src/shared/engine/combat/effects/types';
 import type { ShardContext } from '../../src/client/game/plugin/context';
 import type { Owned } from '../../src/shared/game/loot/Owned';
 import { parseItems } from '@wildshard/format/items';

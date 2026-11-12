@@ -691,7 +691,7 @@
       "rechecked-by": "end of W3"
     },
     {
-      "module": "src/client/engine/combat/effects/EffectService.ts",
+      "module": "src/shared/engine/combat/effects/EffectService.ts",
       "export": "selectEffectGrants",
       "shard": "nalati-grasslands",
       "plan": {
@@ -709,7 +709,7 @@
       }
     },
     {
-      "module": "src/client/engine/combat/effects/EffectService.ts",
+      "module": "src/shared/engine/combat/effects/EffectService.ts",
       "export": "EffectGrantRow",
       "shard": "nalati-grasslands",
       "plan": {
