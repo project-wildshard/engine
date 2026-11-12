@@ -178,7 +178,9 @@ function labelNodes(): Record<string, GraphNode> {
     faceX: { op: 'swizzle', in: ['face'], mask: 'x' },
     faceY: { op: 'swizzle', in: ['face'], mask: 'y' },
     lX0: { op: 'sub', in: ['faceX', 'lMargin'] },
-    lTop0: { op: 'sub', in: ['lH', 'lMargin'] },
+    // the label's top clears a cap laid 0.3 m into the face's top edge (measure.ts famMTop, LF1-1)
+    lTopM: { op: 'max', in: ['lMargin', 0.3] },
+    lTop0: { op: 'sub', in: ['lH', 'lTopM'] },
     lTop: { op: 'sub', in: ['lTop0', 'lGh'] },
     lY0: { op: 'sub', in: ['faceY', 'lTop'] },
     lGhS: { op: 'max', in: ['lGh', 1e-3] },
