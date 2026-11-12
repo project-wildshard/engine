@@ -20,6 +20,25 @@ const HASH = /\/([a-f0-9]{64})\.[a-z0-9]+$/;
 const immutable = url => NAMED.has(url.pathname) || url.pathname.startsWith('/b/') || CONTENT.test(url.pathname)
   || /^[a-f0-9]{8,64}$/.test(url.searchParams.get('v') ?? '');
 const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-type') ?? '');
+/* PAGE-SIZE PZ10 (J276): content on the content base (`https://packs.wildshard.io/content/<set>/`, baked from the boot
+ * bank by serviceWorker.ts; '' when content is on the page) lives in one cross-build cache, keyed by exact URL: every key
+ * there is content-named, so a copy is good for every build that names it, and no activate touches it. Only a CORS 200 is
+ * kept: an opaque body cannot be checked and is padded against quota, and a range never stands for the whole file. */
+/** @type {{ base: string, files: string[] }} one parsed value: the bundler would fold a literal base into its origin */
+const { base: CONTENT_BASE, files: CONTENT_FILES } = JSON.parse('__CONTENT__');
+const CONTENT_CACHE = 'ws-content-v1';
+const CONTENT_ORIGIN = CONTENT_BASE === '' ? '' : new URL(CONTENT_BASE).origin;
+/** A part on the page origin is content-named too (`<hash16>.pack.br`): kept across builds, not in the build's shell. */
+const PAGE_PART = /^\/assets\/spawn\/(?:[^/]+\/)*[a-f0-9]{16}\.pack\.br$/;
+/** The content origin's mutable files (the signed channel objects, the cache clear) always go to the network.
+ * @param {URL} url */
+const isContentRead = url => CONTENT_ORIGIN !== '' && url.origin === CONTENT_ORIGIN
+  && url.pathname !== '/clear-cache.json' && !url.pathname.startsWith('/releases/');
+/** @param {Response} response */
+const keepContent = response => response.type === 'cors' && response.status === 200 && !isHtml(response);
+/** A plain CORS GET with no credentials, as the page's own content reads are (no preflight: at most a single Range).
+ * @param {string} url @param {RequestInit} init */
+const corsRequest = (url, init = {}) => new Request(url, { ...init, mode: 'cors', credentials: 'omit' });
 
 // Keep the current worker's hot handles. WebKit can take a second to reopen
 // a cache during navigation; a rejected open must remain retryable.
@@ -142,7 +161,7 @@ function whilePaused() {
   if (!paused) return Promise.resolve();
   return new Promise(resolve => { const previous = resume; resume = () => { previous(); resolve(); }; });
 }
-async function precacheQueue(cache, urls) {
+async function precacheQueue(cache, urls, content = false) {
   const pending = [...urls];
   const lane = async () => {
     for (;;) {
@@ -155,6 +174,12 @@ async function precacheQueue(cache, urls) {
         const held = await cache.match(key, MATCH);
         if (held !== undefined && !isHtml(held)) continue;
         if (held !== undefined) await cache.delete(key);
+        if (content) {
+          const response = await fetch(corsRequest(key, { cache: 'force-cache', signal: control.signal }));
+          if (!keepContent(response)) throw new Error(`Precache failed: ${path} (${response.type} ${response.status})`);
+          await cache.put(key, response);
+          continue;
+        }
         // DL25: a part's member is kept under its manifest's `?v=`, and no HTTP cache saw it. These names are hashed: same file.
         const kept = await cache.match(key, { ...MATCH, ignoreSearch: true });
         if (kept !== undefined && !isHtml(kept)) { await cache.put(key, kept); continue; }
@@ -174,6 +199,8 @@ function precacheGeneration() {
     try {
       const [assets, books] = await Promise.all([store(ASSETS), caches.open(BOOKS)]);
       await precacheQueue(assets, FILES);
+      // PZ10: this build's books on the content base; a build is a generation (and adoptable) only once they are held
+      if (CONTENT_FILES.length > 0) await precacheQueue(await store(CONTENT_CACHE), CONTENT_FILES, true);
       await books.put(bookKey(BUILD), Response.json({ files: FILES.map(abs) }));
     } catch (error) { precaching = undefined; throw error; }
   })();
@@ -268,6 +295,28 @@ async function cached(request, name, event) {
   return delivery(response);
 }
 
+/** PZ10: a read on the content base's origin, cache-first by exact URL. A miss is fetched in CORS mode and kept only as a
+ *  CORS 200. A no-cors read (an image, a CSS background) the CDN will not answer with CORS still loads, as itself, unkept.
+ * @param {Request} request */
+async function contentRead(request) {
+  const reload = request.cache === 'reload' || request.cache === 'no-store';
+  let cache;
+  try {
+    cache = await store(CONTENT_CACHE);
+    const held = reload ? undefined : await cache.match(request.url, MATCH);
+    if (held !== undefined && !isHtml(held)) return held;
+  } catch { stores.delete(CONTENT_CACHE); /* Storage denial keeps online fetch working. */ }
+  const range = request.headers.get('range');
+  /** @type {RequestInit} */
+  const init = { cache: request.cache === 'only-if-cached' ? 'default' : request.cache, signal: request.signal,
+    ...range === null ? {} : { headers: { range } } };
+  let response;
+  try { response = await fetch(request.mode === 'cors' && request.credentials === 'omit' ? request : corsRequest(request.url, init)); }
+  catch (error) { if (request.mode !== 'no-cors') throw error; return fetch(request); }
+  if (cache !== undefined && keepContent(response)) await cache.put(request.url, response.clone()).catch(() => undefined);
+  return response;
+}
+
 workerScope.listen(self, 'fetch', event => {
   const request = event.request, url = new URL(request.url);
   // A diagnostic document must reach its own host route, not the cached game
@@ -278,12 +327,18 @@ workerScope.listen(self, 'fetch', event => {
   if (request.mode === 'navigate') pausePrecache(event.resultingClientId);
   else if (!controlled.has(event.clientId)) event.waitUntil(pauseForClient(event.clientId));
   else if (paused) event.waitUntil(resumeIfLoadersGone());
-  if (request.method !== 'GET' || url.origin !== self.location.origin || url.searchParams.get('sw') === '0') return;
+  if (request.method !== 'GET' || url.searchParams.get('sw') === '0') return;
+  if (isContentRead(url)) { event.respondWith(contentRead(request)); return; }
+  if (url.origin !== self.location.origin) return;
   if (url.pathname === '/version.json' || url.pathname === '/sw.js' || url.pathname.startsWith('/api/')) return;
   if (request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
     const received=diagnosticNow();
     event.respondWith(new Response(DOCUMENT, { headers: { 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } }));
     bootPublish(event,[{operation:'sw:navigation-handler-and-delivery',url:request.url,start:received,end:diagnosticNow(),result:'complete'}]);
+    return;
+  }
+  if (PAGE_PART.test(url.pathname)) {
+    event.respondWith(cached(request, CONTENT_CACHE, event));
     return;
   }
   if (immutable(url)) {

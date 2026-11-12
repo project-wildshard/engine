@@ -104,3 +104,46 @@ test('worker updates revalidate unchanged bytes and fetch a changed script in fu
     await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 });
   }
 }, 20_000);
+
+/** The worker's baked content value: `{ base, files }` (PAGE-SIZE PZ10). */
+const bakedContent = (core: string): { base: string; files: string[] } => {
+  const literal = /JSON\.parse\(("(?:[^"\\]|\\.)*")\);/u.exec(core.slice(core.indexOf('CONTENT_BASE')))?.[1];
+  if (literal === undefined) throw new Error('Missing baked content');
+  return JSON.parse(JSON.parse(literal) as string) as { base: string; files: string[] };
+};
+const page = (bank: Record<string, unknown>): { type: 'asset'; source: Uint8Array } => ({ type: 'asset', source: new TextEncoder().encode(
+  `<html><head><script type="application/json" id="boot-module-files">${JSON.stringify(bank)}</script></head></html>`) });
+
+test('PZ10: a page with no content base bakes no content origin and precaches as before', async () => {
+  const url = '/assets/spawn/server-fixture.json', bytes = new TextEncoder().encode('{"book":"server"}');
+  const packs = { url: '/assets/spawn/packs-fixture.json', bytes: new TextEncoder().encode('{"book":"packs"}') };
+  for (const bank of [{}, { contentBase: '' }]) {
+    const { core } = await serviceWorkerCore({ 'index.html': page(bank) }, process.cwd(), 'fixture', { url, bytes }, packs);
+    expect(core).not.toContain('__CONTENT__');
+    expect(bakedContent(core)).toEqual({ base: '', files: [] });
+    expect(core).toContain(url); expect(core).not.toContain(packs.url);
+  }
+});
+
+test('PZ10: a stamped content base bakes its origin, and both books and the title art precache at their CDN URLs', async () => {
+  const base = 'https://packs.wildshard.io/content/0123456789abcdef/';
+  const server = { url: '/assets/spawn/server-fixture.json', bytes: new TextEncoder().encode('{"book":"server"}') };
+  const packs = { url: '/assets/spawn/packs-fixture.json', bytes: new TextEncoder().encode('{"book":"packs"}') };
+  const bundle = { 'index.html': page({ contentBase: base }), 'b/c/app-aaaaaaaa.js': { type: 'chunk' as const, code: 'export const value=1;' } };
+  const { core, build } = await serviceWorkerCore(bundle, process.cwd(), 'fixture', server, packs);
+  const content = bakedContent(core);
+  expect(content.base).toBe(base);
+  expect(content.files).toContain(`${base}assets/spawn/server-fixture.json`);
+  expect(content.files).toContain(`${base}assets/spawn/packs-fixture.json`);
+  expect(content.files.every(file => file.startsWith(base))).toBe(true);
+  // nothing the split moved off the page is asked of the page: no content path stays in either page list
+  const lists = [...core.matchAll(/(?:const|var) (?:FILES|SHELL_FILES) = JSON\.parse\(("(?:[^"\\]|\\.)*")\);/gu)].map(match => JSON.parse(JSON.parse(match[1] ?? '""') as string) as string[]);
+  expect(lists).toHaveLength(2);
+  for (const list of lists) for (const path of list) expect(path.startsWith('/assets/') && !path.startsWith('/assets/physics/') && !/\.(?:js|css)$/u.test(path)).toBe(false);
+  expect(lists[0]).toContain('/b/c/app-aaaaaaaa.js');
+  expect(content.files.some(file => file.includes('/assets/title/'))).toBe(true);
+  // another base or another packs book is another worker
+  expect((await serviceWorkerCore({ ...bundle, 'index.html': page({ contentBase: `${base}x/` }) }, process.cwd(), 'fixture', server, packs)).build).not.toBe(build);
+  expect((await serviceWorkerCore(bundle, process.cwd(), 'fixture', server, { ...packs, bytes: new TextEncoder().encode('{}') })).build).not.toBe(build);
+  await expect(serviceWorkerCore({ 'index.html': page({ contentBase: 'packs/' }) }, process.cwd(), 'fixture')).rejects.toThrow(/contentBase/u);
+});

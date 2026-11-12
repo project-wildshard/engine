@@ -3,8 +3,10 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { rolldown } from 'rolldown';
+import { isContentPath, readContentBase } from '../../src/client/engine/boot/contentBase';
 import { ASSET_CACHE_NAME } from '../../src/client/engine/pwa/cacheNames';
 import { serverPackBookPath } from '../../src/shared/game/shardfile/serverPack';
+import { packsBookPath } from '../../src/shared/game/shardfile/spawnManifest';
 import { titleAssetURLs } from '../title-assets.mjs';
 import { writtenBundle, type EmittedFile } from './writtenBundle';
 
@@ -36,8 +38,18 @@ function shellFiles(html: string, root: string, sources: ReadonlyMap<string, str
   return [...files].filter(url => !url.startsWith('/assets/title/launch-')).sort();
 }
 
+/** PAGE-SIZE PZ10: the document's stamped `contentBase` (PZ8 stamps it before the worker bakes), or '' for the page. */
+function documentContentBase(html: string): string {
+  const bank = /<script type="application\/json" id="boot-module-files">([^<]+)<\/script>/u.exec(html)?.[1];
+  if (bank === undefined) return '';
+  const value: unknown = JSON.parse(bank);
+  return readContentBase(typeof value === 'object' && value !== null ? Reflect.get(value, 'contentBase') : undefined);
+}
+
+type Book = { readonly url: string; readonly bytes: Uint8Array };
+
 /** The build owns names. No worker parses boot banks, packs or runtime product metadata. */
-export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>, root: string, buildId: string, serverBook?: { readonly url: string; readonly bytes: Uint8Array }): Promise<{
+export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>, root: string, buildId: string, serverBook?: Book, packsBook?: Book): Promise<{
   core: string; build: string; assets: string; hashed: string[];
 }> {
   const document = bundle['index.html'];
@@ -65,11 +77,24 @@ export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedF
   }
   for (const name of shell) if (name !== '/index.html') digest.update(name).update(readFileSync(join(root, 'public', sources.get(name) ?? name)));
   if (serverBook !== undefined) digest.update(serverBook.url).update(serverBook.bytes);
+  // PZ10: with a content base, every content path (the books, the title art) is read from it, so the worker precaches it
+  // there, into its cross-build content cache; the page keeps code and shell. With none, the lists are today's.
+  const base = documentContentBase(html);
+  // The build's server book with its code: a device that adopts a build and goes offline can still read a server class it holds.
+  let files = [...hashed, ...portraits, ...serverBook === undefined ? [] : [serverBook.url]], shellList = shell.filter(url => !portraits.includes(url));
+  let content: string[] = [];
+  if (base !== '') {
+    if (packsBook !== undefined) digest.update(packsBook.url).update(packsBook.bytes);
+    digest.update(base);
+    const moved = [...files, ...shellList, ...packsBook === undefined ? [] : [packsBook.url]].filter(path => isContentPath(path));
+    content = [...new Set(moved)].map(path => new URL(`.${path}`, base).href);
+    files = files.filter(path => !isContentPath(path)); shellList = shellList.filter(path => !isContentPath(path));
+  }
   const build = `${buildId}-${digest.digest('hex').slice(0, 10)}`;
   const core = source.replaceAll('__BUILD_ID__', build).replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME)
-    // The build's server book with its code: a device that adopts a build and goes offline can still read a server class it holds.
-    .replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify([...hashed, ...portraits, ...serverBook === undefined ? [] : [serverBook.url]])))
-    .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shell.filter(url => !portraits.includes(url)))))
+    .replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
+    .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellList)))
+    .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base, files: content })))
     .replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(html));
   return { core, build, assets: ASSET_CACHE_NAME, hashed };
 }
@@ -93,8 +118,12 @@ export function refreshServiceWorker(outDir: string, before: string): void {
 /** Called after ordinary bundling; previous-deploy chunks are carried by MF2 afterwards. */
 export async function writeServiceWorker(outDir: string, root: string): Promise<void> {
   const { build: buildId } = JSON.parse(readFileSync(join(outDir, 'version.json'), 'utf8')) as { build: string };
-  const book = join(outDir, serverPackBookPath(buildId));
-  const { core, build, hashed } = await serviceWorkerCore(writtenBundle(outDir, root), root, buildId, existsSync(book) ? { url: `/${serverPackBookPath(buildId)}`, bytes: readFileSync(book) } : undefined), scripts = workerScripts(core);
+  // a split output (PAGE-SIZE PZ4) keeps its books beside the page, in `<out>-content/`
+  const book = (path: string): Book | undefined => {
+    const file = [join(outDir, path), join(`${resolve(outDir)}-content`, path)].find(at => existsSync(at));
+    return file === undefined ? undefined : { url: `/${path}`, bytes: readFileSync(file) };
+  };
+  const { core, build, hashed } = await serviceWorkerCore(writtenBundle(outDir, root), root, buildId, book(serverPackBookPath(buildId)), book(packsBookPath(buildId))), scripts = workerScripts(core);
   mkdirSync(dirname(join(outDir, scripts.fileName)), { recursive: true });
   writeFileSync(join(outDir, scripts.fileName), core);
   writeFileSync(join(outDir, 'sw.js'), scripts.bootstrap);

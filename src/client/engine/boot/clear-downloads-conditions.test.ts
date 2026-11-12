@@ -22,7 +22,7 @@ test('clear waits for actual stop, deletion and HTTP completion and retains play
   const calls: string[] = [], remaining = new Set(['downloaded']);
   const saves = new Map([['player.keep', 'retained']]);
   const functions: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replaceAll('export ', '')}\n({clearDownloads,storageUsed})`), {
-    Date, REPORT_KEY: 'clear.report', CLEAR_HTTP_URL: '/clear-cache.json?sw=0',
+    Date, REPORT_KEY: 'clear.report', CLEAR_HTTP_URL: '/clear-cache.json?sw=0', URL, contentBase: () => '',
     navigator: { storage: { estimate: () => Promise.resolve({ usage: 42 }) }, serviceWorker: {
       getRegistrations: () => { calls.push('registrations'); return Promise.resolve([{unregister: () => Promise.resolve(true)}]); },
     } },
@@ -51,4 +51,33 @@ test('clear waits for actual stop, deletion and HTTP completion and retains play
     expect(remaining.size).toBe(0); expect(saves.get('player.keep')).toBe('retained'); expect(saves.has('clear.report')).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   } finally { stop.resolve(true); deleted.resolve(true); response.resolve(new Response(null, {status: 204})); await result; vi.useRealTimers(); }
+});
+
+// PAGE-SIZE PZ10: with a content base, the HTTP cache of the content origin is asked to clear too, by its own file.
+async function clearWith(base: string, answer: (url: string) => Promise<Response>) {
+  const source = readFileSync(new URL('clearDownloads.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('export async function storageUsed('), end = source.indexOf('/** the last clear', start);
+  const asked: { url: string; init: RequestInit | undefined }[] = [];
+  const functions: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replaceAll('export ', '')}\n({clearDownloads})`), {
+    Date, URL, REPORT_KEY: 'clear.report', CLEAR_HTTP_URL: '/clear-cache.json?sw=0', contentBase: () => base,
+    navigator: { storage: { estimate: () => Promise.resolve({ usage: 1 }) } }, window: {},
+    caches: { keys: () => Promise.resolve([]), delete: () => Promise.resolve(true) },
+    fetch: (url: string, init?: RequestInit) => { asked.push({ url, init }); return answer(url); },
+    jsonSlot: () => ({ read: () => ({}), write: () => undefined }), saveStorage: () => ({ setItem: () => undefined }),
+  });
+  const clear: unknown = typeof functions === 'object' && functions !== null ? Reflect.get(functions, 'clearDownloads') : undefined;
+  if (typeof clear !== 'function') throw new Error('Missing clear');
+  const report: unknown = await Reflect.apply(clear, undefined, []);
+  return { report, asked };
+}
+
+test('PZ10: a content base clears the content origin\'s HTTP cache too, with a CORS read of its clear-cache.json', async () => {
+  const both = await clearWith('https://packs.test/content/0123456789abcdef/', () => Promise.resolve(new Response(null, { status: 204 })));
+  expect(both.asked.map(row => row.url)).toEqual(['/clear-cache.json?sw=0', 'https://packs.test/clear-cache.json']);
+  expect(both.asked[1]?.init).toMatchObject({ cache: 'no-store', mode: 'cors', credentials: 'omit' });
+  expect(both.report).toMatchObject({ httpCache: true });
+  const refused = await clearWith('https://packs.test/content/0123456789abcdef/', url => url.startsWith('https:') ? Promise.reject(new TypeError('offline')) : Promise.resolve(new Response(null, { status: 204 })));
+  expect(refused.report).toMatchObject({ httpCache: false });
+  const page = await clearWith('', () => Promise.resolve(new Response(null, { status: 204 })));
+  expect(page.asked.map(row => row.url)).toEqual(['/clear-cache.json?sw=0']);
 });

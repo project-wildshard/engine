@@ -73,6 +73,7 @@ const worker = source
   .replaceAll("__ASSET_CACHE__", "native-doctor-assets")
   .replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(["/held-chunk.js"])))
   .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify("[]"))
+  .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: "", files: [] })))
   .replace(/['"]__DOCUMENT__['"]/u, () =>
     JSON.stringify("<!doctype html><title>cached game fixture</title>"),
   );

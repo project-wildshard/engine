@@ -56,7 +56,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
   const caches = { open, keys: () => Promise.resolve([...books.keys()]), delete: (name: string) => Promise.resolve(books.delete(name)) };
   const fetch = vi.fn((input: Request | string) => read?.(typeof input === 'string' ? new Request(input) : input)
     ?? Promise.resolve(new Response(`body:${typeof input === 'string' ? input : input.url}`)));
-  const load = (build: string, files: string[], shellFiles = shell) => {
+  const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[] } = {}) => {
     const listeners = new Map<string, ((event: WorkerEvent) => void)[]>();
     const claim = vi.fn(() => Promise.resolve()), skipWaiting = vi.fn(() => Promise.resolve());
     const routes = vi.fn<(rules: NativeRoute[]) => Promise<void>>(() => Promise.resolve());
@@ -66,7 +66,8 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
       addEventListener: (kind: string, listener: (event: WorkerEvent) => void) => { listeners.set(kind, [...listeners.get(kind) ?? [], listener]); } };
     const source = bundled.replaceAll('__BUILD_ID__', build)
       .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(document)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
-      .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellFiles)));
+      .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellFiles)))
+      .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: content.base ?? '', files: content.files ?? [] })));
     // Deliberately no crypto, scheduler or accounting ports; timers only for the precache's bounded pause.
     runInNewContext(source, { self, caches, fetch, URL, Request, Response, Set, JSON, encodeURIComponent, AbortController, setTimeout, clearTimeout, performance });
     const dispatch = async (kind: string, payload: Pick<WorkerEvent, 'request' | 'data' | 'ports' | 'source' | 'clientId'> = {}): Promise<Response | undefined> => {
@@ -504,4 +505,114 @@ test('precache never publishes HTML in place of its required code', async () => 
   expect(replies).toEqual([{ type: 'PRECACHE', ok: false, build: 'A' }]);
   expect((await (await f.open('ws-builds-v1')).keys())).toHaveLength(0);
   expect((await (await f.open(ASSET_CACHE_NAME)).keys())).toHaveLength(0);
+});
+
+// PAGE-SIZE PZ10 (J276): the content base's origin is kept in one cross-build cache, ws-content-v1, keyed by exact CDN URL.
+const CONTENT_CACHE = 'ws-content-v1';
+const cdn = 'https://packs.test', base = `${cdn}/content/0123456789abcdef/`;
+const cdnPart = `${base}assets/spawn/parts/0123456789abcdef.pack.br`;
+/** A network answer of the given response type (a constructed Response is always 'default'). */
+const typed = (body: string | null, type: ResponseType, status = 200, headers: Record<string, string> = {}): Response => {
+  const response = new Response(body, { status: status === 0 ? 200 : status, headers });
+  Object.defineProperty(response, 'type', { value: type });
+  if (status === 0) Object.defineProperty(response, 'status', { value: 0 });
+  return response;
+};
+
+test('PZ10: a content-base read is cache-first from ws-content-v1, fetched in CORS mode with no credentials', async () => {
+  const f = fixture(request => Promise.resolve(typed(`cdn:${request.url}`, 'cors'))), worker = f.load('A', [], [], { base });
+  await worker.dispatch('install'); await worker.dispatch('activate');
+  f.fetch.mockClear();
+  const request = new Request(cdnPart);
+  expect(await (await worker.dispatch('fetch', { request }))?.text()).toBe(`cdn:${cdnPart}`);
+  const sent = f.fetch.mock.calls[0]?.[0];
+  if (!(sent instanceof Request)) throw new Error('Missing CORS request');
+  expect(sent.url).toBe(cdnPart); expect(sent.mode).toBe('cors'); expect(sent.credentials).toBe('omit');
+  expect(await (await (await f.open(CONTENT_CACHE)).match(cdnPart))?.text()).toBe(`cdn:${cdnPart}`);
+  expect(await (await f.open(ASSET_CACHE_NAME)).match(cdnPart)).toBeUndefined();
+  f.fetch.mockRejectedValue(new Error('offline'));
+  expect(await (await worker.dispatch('fetch', { request: new Request(cdnPart, { mode: 'no-cors' }) }))?.text()).toBe(`cdn:${cdnPart}`);
+  expect(f.fetch).toHaveBeenCalledOnce();
+});
+
+test('PZ10: the content cache stores only a cors 200, never an opaque answer or a 206', async () => {
+  for (const answer of [() => typed(null, 'opaque', 0), () => typed('part', 'cors', 206), () => typed('basic', 'basic'),
+    () => typed('<html>missing</html>', 'cors', 200, { 'content-type': 'text/html' })]) {
+    const f = fixture(() => Promise.resolve(answer())), worker = f.load('A', [], [], { base });
+    const response = await worker.dispatch('fetch', { request: new Request(cdnPart) });
+    expect(response).toBeDefined();
+    expect(await (await f.open(CONTENT_CACHE)).keys()).toEqual([]);
+  }
+  // A no-cors read the CDN will not answer with CORS still loads (opaque), and is never kept.
+  const f = fixture(request => request.mode === 'cors' ? Promise.reject(new TypeError('CORS refused')) : Promise.resolve(typed(null, 'opaque', 0)));
+  const worker = f.load('A', [], [], { base }), image = `${base}assets/title/hero-0123456789abcdef.jpg`;
+  expect((await worker.dispatch('fetch', { request: new Request(image, { mode: 'no-cors' }) }))?.type).toBe('opaque');
+  expect(await (await f.open(CONTENT_CACHE)).keys()).toEqual([]);
+});
+
+test('PZ10: no activate deletes ws-content-v1', async () => {
+  const f = fixture(request => Promise.resolve(typed(`cdn:${request.url}`, 'cors')));
+  const first = f.load('A', ['/b/A/a-aaaaaaaa.js'], [], { base });
+  await first.dispatch('install'); await first.dispatch('activate'); await first.dispatch('message', precached);
+  await first.dispatch('fetch', { request: new Request(cdnPart) });
+  for (const build of ['B', 'C', 'D']) {
+    const next = f.load(build, [`/b/${build}/a-aaaaaaaa.js`], [], { base });
+    await next.dispatch('install'); await next.dispatch('message', precached); await next.dispatch('activate');
+  }
+  expect(await f.caches.keys()).toContain(CONTENT_CACHE);
+  expect(await (await f.open(CONTENT_CACHE)).match(cdnPart)).toBeDefined();
+});
+
+test('PZ10: the books precache at their CDN URLs, in CORS mode, and adoption waits for them', async () => {
+  const books = [`${base}assets/spawn/packs-A.json`, `${base}assets/spawn/server-A.json`];
+  let refuse = true;
+  const f = fixture(request => Promise.resolve(request.url.startsWith(cdn) ? (refuse ? typed(null, 'opaque', 0) : typed(`cdn:${request.url}`, 'cors')) : new Response(`body:${request.url}`)));
+  const worker = f.load('A', ['/b/A/a-aaaaaaaa.js'], [], { base, files: books });
+  await worker.dispatch('install'); await worker.dispatch('activate');
+  expect(f.fetch).not.toHaveBeenCalled(); // DL1: nothing before control
+  const replies: unknown[] = [], port = { postMessage: (value: unknown) => { replies.push(value); } };
+  await worker.dispatch('message', { ...precached, ports: [port] });
+  expect(replies).toEqual([{ type: 'PRECACHE', ok: false, build: 'A' }]);
+  expect(await (await f.open('ws-builds-v1')).keys()).toHaveLength(0);
+  refuse = false;
+  await worker.dispatch('message', { ...precached, ports: [port] });
+  expect(replies.at(-1)).toEqual({ type: 'PRECACHE', ok: true, build: 'A' });
+  const content = await f.open(CONTENT_CACHE);
+  for (const book of books) expect(await (await content.match(book))?.text()).toBe(`cdn:${book}`);
+  for (const [input] of f.fetch.mock.calls) if (input instanceof Request && input.url.startsWith(cdn)) { expect(input.mode).toBe('cors'); expect(input.credentials).toBe('omit'); }
+  // the build's own record names its page code only, so no activate ever reaches into the content cache
+  const record = await (await f.open('ws-builds-v1')).match(url('/__ws_build__/A'));
+  expect(await record?.json()).toEqual({ files: [url('/b/A/a-aaaaaaaa.js')] });
+});
+
+test('PZ10: the content origin\'s mutable files go to the network untouched', async () => {
+  const f = fixture(), worker = f.load('A', [], [], { base });
+  for (const path of ['/clear-cache.json', '/releases/preview.json', '/content/0123456789abcdef/assets/x.json?sw=0']) {
+    expect(await worker.dispatch('fetch', { request: new Request(`${cdn}${path}`) })).toBeUndefined();
+  }
+  expect(await worker.dispatch('fetch', { request: new Request(cdnPart, { method: 'HEAD' }) })).toBeUndefined();
+  expect(f.fetch).not.toHaveBeenCalled();
+});
+
+test('PZ10: with no content base the worker behaves as today: another origin is never touched', async () => {
+  const f = fixture(), worker = f.load('A', ['/b/A/a-aaaaaaaa.js']);
+  await worker.dispatch('install'); await worker.dispatch('activate'); await worker.dispatch('message', precached);
+  expect(f.fetch.mock.calls.map(([input]) => input instanceof Request ? input.url : input)).toEqual([url('/manifest.webmanifest'), url('/b/A/a-aaaaaaaa.js')]);
+  f.fetch.mockClear();
+  for (const request of [new Request(cdnPart), new Request(`${cdn}/assets/spawn/packs-A.json`)]) expect(await worker.dispatch('fetch', { request })).toBeUndefined();
+  expect(f.fetch).not.toHaveBeenCalled();
+  expect(await f.caches.keys()).not.toContain(CONTENT_CACHE);
+});
+
+test('PZ10: a part on the page origin is content too, so it survives an update', async () => {
+  const f = fixture(), part = url('/assets/spawn/parts/fedcba9876543210.pack.br');
+  const first = f.load('A', [], []); await first.dispatch('install'); await first.dispatch('activate');
+  expect(await (await first.dispatch('fetch', { request: new Request(part) }))?.text()).toBe(`body:${part}`);
+  expect(await (await f.open(CONTENT_CACHE)).match(part)).toBeDefined();
+  expect(await (await f.open('ws-shell-v3-A')).match(part)).toBeUndefined();
+  const next = f.load('B', [], []); await next.dispatch('install'); await next.dispatch('activate');
+  expect(await f.caches.keys()).not.toContain('ws-shell-v3-A');
+  f.fetch.mockClear(); f.fetch.mockRejectedValue(new Error('offline'));
+  expect(await (await next.dispatch('fetch', { request: new Request(part) }))?.text()).toBe(`body:${part}`);
+  expect(f.fetch).not.toHaveBeenCalled();
 });

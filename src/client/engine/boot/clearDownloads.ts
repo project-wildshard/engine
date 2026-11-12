@@ -1,4 +1,5 @@
 import { saveStorage,jsonSlot } from '../saves/slots';
+import { contentBase } from './contentBase';
 // oxlint-disable-next-line import/no-empty-named-blocks, unicorn/require-module-specifiers -- Its ambient Window type is the point.
 import type {} from './shardPrefetch'; // Window.__ws_prefetch, for a program that reaches this file alone.
 /**
@@ -9,7 +10,9 @@ import type {} from './shardPrefetch'; // Window.__ws_prefetch, for a program th
  *          worker's registration, the KTX2 "set complete" markers (`ktx2set:*`, src/client/engine/boot/shardPrefetch.ts — so Auto
  *          boots with images again, E157 B), and the origin's HTTP cache (`/clear-cache.json` answers with
  *          `Clear-Site-Data: "cache"`, vercel.json: the worker's fetches go through the HTTP cache, and the immutable
- *          `/assets/**` year would otherwise answer the "cold" load from disk);
+ *          `/assets/**` year would otherwise answer the "cold" load from disk) and, with a content base (PAGE-SIZE PZ10),
+ *          the content origin's too: its own `/clear-cache.json` carries the same header (a zone rule on
+ *          packs.wildshard.io), since whether the page's header reaches another origin's entries is browser-specific;
  *   kept   localStorage otherwise — saves, quest progress, settings (`ws.settings.v1`), developer mode, the review
  *          login — and IndexedDB (the game keeps none today).
  *
@@ -93,7 +96,12 @@ export async function clearDownloads(): Promise<ClearReport> {
   } catch { /* storage off: no markers were written either */ }
   // 5. the HTTP cache (Clear-Site-Data: "cache"): offline this fails, and the reload is cold for Cache Storage only
   let httpCache = false;
-  try { httpCache = (await fetch(CLEAR_HTTP_URL, { cache: 'no-store' })).ok; } catch { /* offline */ }
+  try {
+    const base = contentBase();
+    const asks = await Promise.allSettled([fetch(CLEAR_HTTP_URL, { cache: 'no-store' }),
+      ...base === '' ? [] : [fetch(new URL('/clear-cache.json', base).href, { cache: 'no-store', mode: 'cors', credentials: 'omit' })]]);
+    httpCache = asks.every(ask => ask.status === 'fulfilled' && ask.value.ok);
+  } catch { /* offline, or a broken bank */ }
   const report: ClearReport = { before, after: await storageUsed(), cached, caches: deleted, workers, markers, httpCache, at: Date.now() };
   try { saveStorage('session').setItem(REPORT_KEY, JSON.stringify(report)); } catch { /* the next page just will not say it */ }
   return report;
