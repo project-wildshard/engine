@@ -55,13 +55,13 @@ try{
  const within=(promise,ms,what)=>Promise.race([promise,pause(ms).then(()=>{throw new Error(`${what}: no grant within ${ms} ms`);})]);
  const alive=(/** @type {number} */ pid)=>{try{process.kill(pid,0);return true;}catch{return false;}};
  const statePath=join(root,'queue.json');
- const sleeper=spawn('sleep',['60'],{stdio:'ignore'});owners.push(sleeper.pid);
+ const sleeper=spawn('sleep',['60'],{stdio:'ignore'}),sleeperPid=Number(sleeper.pid);owners.push(sleeperPid);
  const gone=spawn('true',[],{stdio:'ignore'});await new Promise(resolve=>{gone.once('exit',resolve);});
  const seeded=JSON.parse(readFileSync(statePath,'utf8'));
- seeded.cpuActive.push({token:'dead-holder',pid:sleeper.pid,holder:gone.pid,owner:process.pid,repo:a,slots:2,ticket:-1});
+ seeded.cpuActive.push({token:'dead-holder',pid:sleeperPid,holder:gone.pid,owner:process.pid,repo:a,slots:2,ticket:-1});
  writeFileSync(statePath,JSON.stringify(seeded));
  const pastDead=await within(holdBrokerCpu(reclaimer.environment,'all',b),5000,'dead holder');leases.push(pastDead);await pastDead.release();
- assert.ok(alive(/** @type {number} */ (sleeper.pid)),'a reclaimed row whose pid is not a CPU broker is never signalled');
+ assert.ok(alive(sleeperPid),'a reclaimed row whose pid is not a CPU broker is never signalled');
 
  const ownerFile=join(work,'owner.mjs');
  writeFileSync(ownerFile,`import {writeFileSync} from 'node:fs';import {startCpuBroker,holdBrokerCpu} from ${JSON.stringify(new URL('cpu-broker.mjs',import.meta.url).href)};const broker=await startCpuBroker({root:process.env.ROOT,capacity:2});await holdBrokerCpu(broker.environment,'all',process.env.REPO);writeFileSync(process.env.READY,JSON.stringify({owner:process.pid,broker:broker.pid}));if(process.env.BUSY==='1')for(;;){}setInterval(()=>undefined,1<<30);`);
