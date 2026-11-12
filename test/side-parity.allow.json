@@ -16,12 +16,10 @@
    ]
   },
   "nalati-grasslands": {
-   "row": "SERVER-PARITY SS10 (open: the bake's spruces are a frozen capture, 155 trunks where the page now places 146 at other heights, and its solids carry no owner or material; both need a re-captured, tagged bake, a Nalati upload and re-pin)",
+   "row": "SERVER-PARITY SS10b (trunks closed: the bake's spruce capsules are the page's 146, re-captured by shard-nalati scripts/forest-trunks.mjs; open: its solids carry no owner or material, which needs a tagged bake, a Nalati upload and re-pin)",
    "known": [
-    "(untagged server): 34 server-side match(es) where the server collider has no owner or material",
-    "(untagged server): 413 page-side match(es) where the server collider has no owner or material",
-    "(untagged) (-): 2 server collider(s) near the page's player with no page match, e.g. [-26, 4, 244, -25, 18, 245]",
-    "forest (wood): 113 page collider(s) with no server match, e.g. [-246, 13, 191, -245, 25, 192]"
+    "(untagged server): 35 server-side match(es) where the server collider has no owner or material",
+    "(untagged server): 526 page-side match(es) where the server collider has no owner or material"
    ]
   },
   "nine-dragon-stack": {
