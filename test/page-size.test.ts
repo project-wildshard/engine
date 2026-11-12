@@ -82,6 +82,14 @@ test('a map is a map wherever it sits; a shard folder is named by slug, short na
   expect(classify('assets/music/thin-ice/a.ogg', shards).part).toBe('S7');
   expect(classify('assets/music/pine-hollow-piano/a.ogg', shards).part).toBe('S7');
   expect(classify('assets/music/piano/a.ogg', shards)).toEqual({kind: 'engine art'});
+  expect(classify('assets/sfx/thin-ice/a.ogg', shards).part).toBe('S7');
+  expect(classify('assets/sfx/hit.ogg', shards)).toEqual({kind: 'engine art'});
+  expect(classify('assets/sfx/ui/click.ogg', shards)).toEqual({kind: 'engine art'});
+  expect(classify('assets/gpu/baked/pine-hollow/a.bin', shards).part).toBe('S7');
+  expect(classify('assets/gpu/baked/common.bin', shards)).toEqual({kind: 'engine art'});
+  expect(classify('assets/lut/pine-hollow.bin', shards).part).toBe('S7');
+  expect(classify('assets/horizon/pine-hollow-night-phone.webp', shards).part).toBe('S7');
+  expect(classify('assets/horizon/default.webp', shards)).toEqual({kind: 'engine art'});
   expect(classify('assets/gpu/models/a.glb', shards)).toEqual({kind: 'engine art'});
   expect(classify('assets/models/pine-hollow-hero/a.glb', shards)).toEqual({kind: 'engine art'});
   expect(classify('assets/main-abcdefgh.js', shards)).toEqual({kind: 'engine art'});

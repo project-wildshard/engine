@@ -6,7 +6,7 @@
 //
 // Kinds: code (`b/`), shell (the documents, worker, root JSON, fonts, icons), runtime (what boot needs from the engine:
 // `assets/physics/`, `basis/`), engine art (every other `assets/` file, the trailers, the crossroads rig), shard content
-// (S1 to S7 below) and maps (`*.map`, `.map.br`, `.map.gz`, wherever they sit). MB is 10^6 bytes.
+// (S1 to S7 below; S7 is every `assets/` folder or file named for a shard) and maps (`*.map`, `.map.br`, `.map.gz`, wherever they sit). MB is 10^6 bytes.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -23,8 +23,10 @@ export const SHARD_PARTS = Object.freeze({
 });
 /** Art mounts named for a shard no pin carries any more. */
 const LEGACY_SHARDS = Object.freeze(['practice']);
-/** The `assets/` folders that hold one subfolder per shard. */
-const PER_SHARD = new Set(['gpu', 'baked', 'music']);
+/** The `assets/` folders that hold one subfolder per shard (`gpu/baked/` one level deeper). */
+const PER_SHARD = new Set(['gpu', 'baked', 'music', 'sfx']);
+/** The `assets/` folders that hold one file per shard, named for it (`lut/far-reach.bin`, `horizon/pine-hollow-day.webp`). */
+const PER_SHARD_FILE = new Set(['lut', 'horizon']);
 const MAP = /\.map(?:\.(?:br|gz))?$/u;
 
 /** The shard names a page's paths can carry: its shardfiles, its catalogue's slugs and the legacy mounts.
@@ -70,7 +72,10 @@ export function classify(path, shards) {
     if (third === 'server' || (parts.length === 3 && /^server-/u.test(third ?? ''))) return { kind: 'shard content', part: 'S3' };
     return { kind: 'shard content', part: 'S4' };
   }
-  const owner = PER_SHARD.has(second) && parts.length > 3 ? third ?? '' : second;
+  let owner = second;
+  if (PER_SHARD_FILE.has(second) && parts.length === 3) owner = (third ?? '').replace(/\.[^.]+$/u, '');
+  else if (second === 'gpu' && third === 'baked' && parts.length > 4) owner = parts[3] ?? '';
+  else if (PER_SHARD.has(second) && parts.length > 3) owner = third ?? '';
   return namesShard(owner, shards) ? { kind: 'shard content', part: 'S7' } : { kind: 'engine art' };
 }
 

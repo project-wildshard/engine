@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve owned temporary paths.
 import {join, resolve} from 'node:path';
 import {expect, test} from 'vitest';
-import {sentryEnvironment} from '../scripts/build-vercel-output.mjs';
+import {pageRelease, sentryEnvironment} from '../scripts/build-vercel-output.mjs';
 
 test.each([0, 7])('prebuilt packaging never rebuilds dist and restores config after exit %s', code => {
   mkdirSync('tmp', {recursive:true}); const root=mkdtempSync(resolve('tmp/vercel-package-'));
@@ -40,4 +40,23 @@ test('a release build sends its maps to the channel its release file names, and 
   expect(sentryEnvironment({WS_SENTRY_ENVIRONMENT: 'preview'})).toBe('preview');
   expect(sentryEnvironment({WS_SENTRY_ENVIRONMENT: 'none', WILDSHARD_RELEASE_URL: 'https://x/releases/production.json'})).toBeUndefined();
   expect(() => sentryEnvironment({WS_SENTRY_ENVIRONMENT: 'prod'})).toThrow(/WS_SENTRY_ENVIRONMENT/u);
+  // page-release's package step does not pass the release URL on: the built page's own stamp names the channel
+  const page = (release: string) => `<script>globalThis.__WS_BUILD_ID__="x";globalThis.__WS_WORLD__={"release":"${release}","key":"302a"};</script>`;
+  expect(pageRelease(page('https://packs.wildshard.io/releases/staging.json'))).toBe('https://packs.wildshard.io/releases/staging.json');
+  expect(pageRelease('<script>globalThis.__WS_BUILD_ID__="x";</script>')).toBe('');
+  expect(sentryEnvironment({}, page('https://packs.wildshard.io/releases/production.json'))).toBe('production');
+  expect(sentryEnvironment({}, page('https://packs.wildshard.io/releases/staging.json'))).toBe('staging');
+  expect(sentryEnvironment({}, '<html></html>')).toBeUndefined();
+});
+
+test('a misspelt Sentry environment stops before the build runs', () => {
+  mkdirSync('tmp', {recursive:true}); const root=mkdtempSync(resolve('tmp/vercel-package-'));
+  try {
+    writeFileSync(join(root,'vercel.json'),'{}\n');
+    const result=spawnSync(process.execPath,[resolve('scripts/build-vercel-output.mjs')],{cwd:root,encoding:'utf8',
+      env:{...process.env,PATH:'/nonexistent',WS_SENTRY_ENVIRONMENT:'prod'}});
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('WS_SENTRY_ENVIRONMENT');
+    expect(readFileSync(join(root,'vercel.json'),'utf8')).toBe('{}\n');
+  } finally {rmSync(root,{recursive:true,force:true});}
 });
