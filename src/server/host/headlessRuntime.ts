@@ -49,6 +49,8 @@ export interface HeadlessRuntimeInstallation {
   readonly combat?: NativeCombatFrame;
   /** A net room's world, which also runs the fights a tape leaves out. */
   readonly room?: boolean;
+  /** GC15: a grid cell open onto its worker's road; its baked page walls are left out (`NativeAssemblyContext.road`). */
+  readonly road?: boolean;
   restoring: boolean;
   /** Strictly decoded continuation; reinstall its dynamic actor roster before native restore. Never step here. */
   snapshot?: Readonly<SimSnapshot | SimSnapshotBytes>;
@@ -221,7 +223,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
 }
 /** Install the selected plan into one fresh or strictly restored native host.
  * A failed install disposes its world; installation may emit no gameplay effects. */
-export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly near?: NearColliders; readonly page?: PageProgress }): Promise<TrustedHeadlessResident> {
+export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly road?: boolean; readonly near?: NearColliders; readonly page?: PageProgress }): Promise<TrustedHeadlessResident> {
   // The roster rolls its herds while this installs, so a room opened afterwards is too late: a save from a native-Math boot
   // would hold recipes its restore on the portable table can't reproduce.
   installPortableMath();
@@ -232,7 +234,7 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
   const saved = snapshot === undefined ? undefined : typeof snapshot === 'string' ? decodeSimSnapshotBytes(snapshot) : admitSimSnapshotBytes(snapshot);
   const combat = createNativeCombatFrame();
   const otherCommands = new Map<string, readonly HeadlessCommand[]>();
-  const context: HeadlessRuntimeInstallation = { combat, ...(world?.room === true ? { room: true } : {}), restoring: saved !== undefined, ...(saved === undefined ? {} : { snapshot: saved }), commands: () => commands, playerCommands: id => otherCommands.get(id) ?? [], emit: effect => { effects.push(effect); } };
+  const context: HeadlessRuntimeInstallation = { combat, ...(world?.room === true ? { room: true } : {}), ...(world?.road === true ? { road: true } : {}), restoring: saved !== undefined, ...(saved === undefined ? {} : { snapshot: saved }), commands: () => commands, playerCommands: id => otherCommands.get(id) ?? [], emit: effect => { effects.push(effect); } };
   const ports = { ...plan.ports, rapier: preparation.rapier };
   let installing: SimHost | undefined;
   let host: SimHost;

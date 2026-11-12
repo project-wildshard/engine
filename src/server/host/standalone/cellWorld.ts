@@ -137,7 +137,9 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
   const fact: CellWorld['fact'] = (name, entity, player) => !declared.has(name) ? null : ledger === null ? facts?.(name, entity, player, input) ?? null : ledger(name, entity);
   if (nativeCell(input)) {
     // J68: a native assembly keeps its ground whole and its solids as data. A saved world holds none of them, so a throwaway fresh one lists them.
-    const near = options.wholeSolids !== true && input.product !== undefined && hasNativeAssembly(input.product) ? new NearColliders() : undefined, around = near === undefined ? { room: true } : { room: true, near };
+    const near = options.wholeSolids !== true && input.product !== undefined && hasNativeAssembly(input.product) ? new NearColliders() : undefined;
+    // GC15: a cell that isn't lone opens onto its worker's road, so its baked page walls don't stand at its edge either.
+    const around = { room: true, ...(lone ? {} : { road: true }), ...(near === undefined ? {} : { near }) };
     if (near !== undefined && snapshot !== undefined) (await bootTask('server:restore-collision-inventory', () => createTrustedHeadlessResident(input, undefined, around))).dispose();
     // A world with no save of its own takes the page's: the flags and records its fights read as they install.
     const seeded = snapshot === undefined && options.pageless !== true;
