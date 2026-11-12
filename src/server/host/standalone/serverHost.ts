@@ -20,6 +20,7 @@ import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { StandaloneGrid } from './gridServer';
 import { isHarnessFlag, isHarnessGod, isHarnessHits, isHarnessJoin, isHarnessMove, isHarnessPlace } from '../../../shared/host/standalone/harnessPlace';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
+import { ProgressSaves, ProgressWatch } from './progressWatch';
 
 type Boot = Extract<ShellMessage, { kind: 'boot' }>;
 /** How the composition reaches what a worker and a Node test get differently. */
@@ -51,13 +52,24 @@ function probeRows(host: SimHost): ProbedRow[] {
 /** Run the server half until `dispose`. Anything that ends it reports `failed` on the control port. */
 export function runStandaloneServer(options: StandaloneServerOptions): { dispose: () => void; /** Control messages refused. */ refused: () => number } {
   const { control, game } = options, scope = new Scope('standalone.server');
-  const book = new LedgerBook();
+  const book = new LedgerBook(), watch = new ProgressWatch();
   let grid: StandaloneGrid | undefined, clock: ServerClock | undefined, storage: ForwardedStorage | undefined, probing: number | null = null, booting = false, refused = 0;
   const post = (message: ServerMessage): void => { control.postMessage(v.parse(ServerMessageSchema, message), []); };
   const fail = (error: unknown): void => { clock?.pause(); post({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) }); };
   const stepped = (host: SimHost, tickMs: number): void => {
     options.proof?.ticked?.(tickMs);
     if (probing !== null && host.state.tick % 2 === 0) { post({ kind: 'probed', id: probing, tick: host.state.tick, tickMs, rows: probeRows(host) }); probing = null; }
+  };
+
+  // TE-ENG8: progress is saved as it moves (a flag, a public field, a grant), so a reload a second later keeps it. The save
+  // starts outside the tick, as the page's own `save` does.
+  const changed = new ProgressSaves(() => new Promise<void>(resolve => {
+    scope.timeout(0, () => { void (grid === undefined ? Promise.resolve() : grid.save().then(() => undefined, fail)).finally(resolve); });
+  }));
+  const progress = (server: StandaloneGrid): void => {
+    const now = diagnosticNow();
+    if (watch.look(server.host, book.filed)) changed.moved(now);
+    changed.poll(now);
   };
 
   const boot = async (message: Boot): Promise<void> => {
@@ -76,7 +88,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     server.connect(new WorkerLoopback(game));
     if (options.harness !== undefined) options.harness.onmessage = (event: MessageEvent<unknown>): void => { const [port] = event.ports; if (isHarnessJoin(event.data) && port !== undefined) server.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) server.raise(event.data.flag); else if (isHarnessMove(event.data)) server.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) server.place(event.data); else if (isHarnessHits(event.data)) server.hardHits(event.data.hits); else if (isHarnessGod(event.data)) server.bossGod(); };
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; },
-      step: () => { try { server.tick(); } catch (error) { fail(error); } } });
+      step: () => { try { server.tick(); progress(server); } catch (error) { fail(error); } } });
     options.proof?.booted?.(server);
     bootMark('server:booted-send');
     post({ kind: 'booted', tick: server.host.state.tick, restored: restored !== undefined });
@@ -104,5 +116,5 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     else storage?.acked(message.seq, message.ok);
   };
   control.onmessage = (event: MessageEvent<unknown>): void => { try { handle(event.data); } catch (error) { fail(error); } };
-  return { refused: () => refused, dispose: () => { clock?.pause(); scope.dispose(); grid?.dispose(); control.close(); } };
+  return { refused: () => refused, dispose: () => { clock?.pause(); watch.dispose(); scope.dispose(); grid?.dispose(); control.close(); } };
 }

@@ -26,11 +26,13 @@ export type LedgerBookSave = Readonly<Record<string, { readonly serial: number; 
  */
 export class LedgerBook {
   private readonly books = new Map<string, Book>();
+  /** Grants filed since this book was made: what a save-on-change watch compares (TE-ENG8). */
+  filed = 0;
   /** File one grant; false if this player already has this id. */
   file(filing: LedgerFiling): boolean {
     const { player, ...grant } = filing, book = this.of(player), id = fits(grant.id);
     if (book.ids.has(id)) return false;
-    book.ids.add(id); book.rows.push({ ...grant, id, name: fits(grant.name), kind: 'ledger', serial: ++book.serial });
+    book.ids.add(id); book.rows.push({ ...grant, id, name: fits(grant.name), kind: 'ledger', serial: ++book.serial }); this.filed++;
     if (book.rows.length > KEPT_RECEIPTS) book.rows.splice(0, book.rows.length - KEPT_RECEIPTS);
     return true;
   }

@@ -123,8 +123,10 @@ export class WirePage {
   }
   /** Past this world's first frame. Until then a flag that rises only says where a save stood. */
   get settled(): boolean { const cell = this.client?.latest?.cell; return cell !== undefined && this.seeded === cell; }
+  /** This page's books follow the server's: its quests read where a save stood only from the world's first frame (`settled`). */
+  following = false;
   /** Every flag book this page makes from now on follows the server's. */
-  followBooks(): void { Flags.made = book => { this.books.add(book); book.follow(flag => { if (flag.startsWith('seen:')) { this.send(flag); return; } if (flag.startsWith(TALKED)) this.send(`${flag.slice(TALKED.length)}.talk`); this.send(`${STORY_ACT}${flag}`); }); }; }
+  followBooks(): void { this.following = true; Flags.made = book => { this.books.add(book); book.follow(flag => { if (flag.startsWith('seen:')) { this.send(flag); return; } if (flag.startsWith(TALKED)) this.send(`${flag.slice(TALKED.length)}.talk`); this.send(`${STORY_ACT}${flag}`); }); }; }
   /** The wire is up. `press` sends one `interact`. */
   bind(client: NetClient, press: (id: string) => void, stop: () => void, heads: (body: number, to: Vector3) => boolean, act: (act: NetRoomAct) => void = () => undefined): void {
     this.client = client; this.press = press; this.act = act; this.stop = stop; this.heads = heads; this.encounterRows = netEncounterFeed(client).rows;

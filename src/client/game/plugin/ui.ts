@@ -58,6 +58,7 @@ import { parseBossProfile, parseMarkedBossPresentation, type MarkedBossPresentat
 import { bodyBossFight, type HeldBossBrain } from '../../../shared/game/plugin/bodyBoss';
 import { bossStorm } from './bossStorm';
 import { enterMovers } from './moverViews';
+import { finishedAfterSeen } from '../quest/finishedAfterSeen';
 import { installEnteredRuntimeAttachment, installEnteredRuntimeObserver, installEnteredRuntimeService, retainsRuntimeServices } from '../shard/retainedHooks';
 
 
@@ -555,8 +556,8 @@ export function installQuestPresentation(ctx: QuestPresentationContext, source: 
   const quest = source instanceof QuestState ? source : new QuestState(def ?? source as QuestDef, flags, ctx.app.events, ctx.scope);
   const targetNpcs = source instanceof QuestState ? [] : source.steps.flatMap((s) => 'target' in s && s.target.npc ? [{ ...s.target.npc, step: s.id }] : []);
   const targetPlaces = source instanceof QuestState ? [] : source.steps.flatMap((s) => 'target' in s ? [{ id: `${source.id}.${s.id}`, label: s.target.label, x: s.target.position.x, y: s.target.position.y, z: s.target.position.z, r: 12 }] : []);
-  const alreadyComplete = quest.isComplete;
-  const reward: QuestRewardSpec | false = options.reward ?? { kicker: 'Quest complete', title: quest.def.title, subtitle: '', when: () => !alreadyComplete && quest.isComplete, finish: () => undefined };
+  const finishedHere = finishedAfterSeen(quest, wirePage);
+  const reward: QuestRewardSpec | false = options.reward ?? { kicker: 'Quest complete', title: quest.def.title, subtitle: '', when: finishedHere, finish: () => undefined };
   const presentation = presentQuest({ scope: ctx.scope, player: world.player, toast: (text) => { play.hud.toast(text); }, sting: () => { play.music.sting('chunk'); },
     pin: ctx.hud.pin, fullMap: play.fullMap, minimap: play.minimap ?? null, prompts: runtime.interactables,
     dayNight: world.sky.dayNight ?? null, setViewmodel: (on) => { play.weapons.visible = on; }, stowWeapon: (on) => { play.weapons.stowed = on; } }, quest, { ...options, flags, reward,
