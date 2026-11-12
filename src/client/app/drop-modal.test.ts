@@ -96,12 +96,25 @@ test('a crash with no word from the game (iOS kills the page) restarts onto the 
   expect(modal()).not.toBeNull();
 });
 
-test('a silent replace to the title (no reason, a normal pagehide) still says so', () => {
+test('a reload the game made by itself, with no recorded reason, says so', () => {
   const t = tab(), world = enterWorld(t);
-  // a location.replace('/') with no markUnload: the page ends normally, so its device copies go and the tab's copy stays
-  window.dispatchEvent(new Event('pagehide')); world.notes.pageHidden();
+  world.life.markReload('stale deployment code'); // browserChunkRecovery: the game's own reload, which lands on the title
   const { drop } = title(t, false);
-  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', reason: 'The page reloaded without saying why.' });
+  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', reason: 'The game reloaded by itself: stale deployment code.' });
+});
+
+test('a page the player left normally (Back, a typed address) shows nothing', () => {
+  const t = tab(); enterWorld(t);
+  window.dispatchEvent(new Event('pagehide')); // the page ends normally: lastEnd reads a fresh launch
+  expect(title(t, true).drop).toBeNull();
+});
+
+test("another tab's live breadcrumb never shows on a cold launch", () => {
+  const t = tab(); enterWorld(t);
+  t.session.clear(); // a new tab: its own sessionStorage, the same localStorage
+  t.local.delete('life.alive.once');
+  expect(title(t, true).drop).toBeNull();
+  expect(t.local.has('drop.stepOnce')).toBe(true); // the other tab keeps its copy
 });
 
 test('players see plain words only; developer mode adds the real error', () => {
@@ -139,12 +152,4 @@ test("the player's own exit shows no modal", () => {
   loading.life.markUnload('exit to title from the loading card');
   expect(title(card, true).drop).toBeNull();
   expect(modal()).toBeNull();
-});
-
-test('a cold launch later never shows an old breadcrumb', () => {
-  const t = tab(); enterWorld(t);
-  t.session.clear(); // the tab closed
-  vi.advanceTimersByTime(11 * 60_000);
-  t.local.delete('life.alive.once');
-  expect(title(t, true).drop).toBeNull();
 });

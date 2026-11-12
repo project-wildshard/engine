@@ -2,6 +2,7 @@
 import { RELOAD_PARAM } from '../core/GpuRecovery';
 import { settingsReloadUrl } from './Settings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
+import { leftByPlayer } from '../boot/dropNotice';
 import { showReloading } from './reloadCover';
 import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { terrainDatum } from '../../../shared/engine/world/terrainHeight';
@@ -36,6 +37,6 @@ export function reloadWithPicks(why = 'reload prompt: reload now', control?: HTM
   const online = Reflect.get(globalThis, '__WS_WORLD__') !== undefined;
   leaveSaved(() => { leaveAfterPaint(() => {
     if (pose !== null && online && chunk !== null) setTitleArrival({ slug: chunk, mode: 'enter' }, { tab: true });
-    markReload(why, pose === null ? 'reload' : 'settings'); location.replace(url.toString());
+    leftByPlayer(); markReload(why, pose === null ? 'reload' : 'settings'); location.replace(url.toString());
   }); });
 }

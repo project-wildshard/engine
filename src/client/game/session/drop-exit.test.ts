@@ -16,7 +16,8 @@ test("the pause menu's exit to main menu leaves a quiet title", () => {
   expect(takeDrop(fresh)).toBeNull();
 });
 
-test('the same title without the exit would show the drop', () => {
+test('the same title without the exit, after a reload the game made, would show the drop', () => {
   markDropStep({ world: 'blender-template', name: 'Blender Template', step: 'Playing' });
-  expect(takeDrop(fresh)).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', step: 'Playing' });
+  expect(takeDrop({ ...fresh, kind: 'intentional', reason: 'online seat in another grid cell (driftwood-isle)' }))
+    .toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', step: 'Playing' });
 });

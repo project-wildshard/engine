@@ -1,6 +1,7 @@
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { engineString } from '../../../shared/engine/strings';
 import { leaveSaved, markReload } from '../boot/lastEnd';
+import { leftByPlayer } from '../boot/dropNotice';
 import { RELOAD_FALLBACK_MS, reloadingLine, reloadingShown, showReloading } from './reloadCover';
 import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 
@@ -36,7 +37,7 @@ export function reloadForPlayer(control: HTMLElement | null, { newer = false, wh
     if (gone) return;
     gone = true;
     leaveAfterPaint(() => {
-      markReload(reason);
+      leftByPlayer(); markReload(reason);
       if (title) location.replace('/');
       else location.reload();
     });

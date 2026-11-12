@@ -14,8 +14,8 @@ import type { LastEnd } from './lastEnd';
  *   leftByPlayer()                       the player pressed exit / main menu: the next title shows nothing
  *   takeDrop(lastEnd())                  the title, once: the drop to show, or null (a fresh launch, a player's own exit)
  *
- * The breadcrumb dies with the tab (sessionStorage); its device copy is cleared on a normal pagehide and ignored after
- * BACKUP_MS, so a cold launch later never shows a stale notice.
+ * The breadcrumb dies with the tab (sessionStorage). Its device copy is read only when lastEnd says the page died (a killed
+ * iOS process can lose sessionStorage too), so a cold launch, another tab or a page the player left never shows it.
  */
 
 declare const __BUILD_ID__: string;
@@ -59,8 +59,6 @@ export interface DropStore {
 }
 type DropKey = 'step' | 'stepOnce' | 'pending' | 'pendingOnce';
 
-/** a device copy older than this is a cold launch's leftover, never a drop */
-export const BACKUP_MS: number = 10 * 60_000;
 /** the step a world page names once it is playing */
 export const PLAYING = 'Playing';
 /**
@@ -68,8 +66,10 @@ export const PLAYING = 'Playing';
  * is no surprise. Everything else that lands on the title with a breadcrumb is a drop.
  */
 export const PLAYER_EXITS: readonly string[] = ['exit to main menu', 'exit to title', 'error modal:', 'update at title', 'update tapped',
-  'new game', 'save import', 'debug:', 'tier pick', 'doctor', 'load failure reload'];
+  'new game', 'save import', 'debug:', 'tier pick', 'doctor', 'load failure reload', 'pause settings', 'settings', 'reload prompt', 'loading wait retry'];
 
+/** two worlds that may be the same: an unknown ('') matches either */
+const sameWorld = (a: string, b: string): boolean => a === '' || b === '' || a === b;
 /** the first non-empty text */
 const first = (...texts: readonly (string | undefined)[]): string => texts.find((t) => t !== undefined && t !== '') ?? '';
 const build = (): string => { try { return __BUILD_ID__; } catch { return ''; } };
@@ -100,7 +100,7 @@ export class DropNotes {
   /** where the world stands now, written before the step runs */
   markStep(at: { world?: string; name?: string; step: string }): void {
     // naming the world starts a new page: nothing of the page before it carries over
-    const prior = at.world === undefined ? this.step() : null;
+    const prior = at.world === undefined ? this.step(false) : null;
     if (at.world === undefined && prior?.step === at.step) return;
     const step: DropStep = { world: at.world ?? prior?.world ?? '', name: at.name ?? prior?.name ?? '', step: at.step, t: this.now(), build: build(),
       error: prior?.error ?? '', errorStack: prior?.errorStack ?? '' };
@@ -111,15 +111,16 @@ export class DropNotes {
 
   /** the last error this page saw: it names the cause if the page dies next */
   noteError(error: unknown): void {
-    const prior = this.step();
+    const prior = this.step(false);
     if (prior === null) return;
-    const d = describeDropError(error);
-    this.write('step', 'stepOnce', { ...prior, error: `${d.message}${d.code === '' ? '' : ` (code ${d.code})`}`.slice(0, 300), errorStack: d.stack.slice(0, 2000) });
+    const d = describeDropError(error), said = `${d.message}${d.code === '' ? '' : ` (code ${d.code})`}`.slice(0, 300);
+    if (said === prior.error) return; // an error repeating every frame writes once
+    this.write('step', 'stepOnce', { ...prior, error: said, errorStack: d.stack.slice(0, 2000) });
   }
 
   /** the game leaves for the title by itself: say why, first */
   record(input: DropInput): Drop {
-    const step = this.step(), d = describeDropError(input.error), name = first(step?.name, step?.world);
+    const step = this.step(false), d = describeDropError(input.error), name = first(step?.name, step?.world);
     const drop: Drop = {
       kind: 'error', what: input.what ?? (name === '' ? 'Back at the title' : `Couldn't enter ${name}`), reason: input.reason,
       step: step?.step ?? '', world: step?.world ?? '', name, message: first(d.message, step?.error),
@@ -132,22 +133,24 @@ export class DropNotes {
   /** the player chose to leave: nothing to explain on the next title */
   leftByPlayer(): void { for (const key of ['step', 'stepOnce', 'pending', 'pendingOnce'] as const) this.store.clear(key); }
 
-  /** a page that ends normally drops the device copies; its session copy stays for the page that follows in this tab */
-  pageHidden(): void { this.store.clear('stepOnce'); this.store.clear('pendingOnce'); }
-
   /** what the title shows, once: a recorded drop, else a restart the breadcrumb proves, else null */
   take(end: LastEnd): Drop | null {
-    const pending = this.fresh('pending', 'pendingOnce'), step = this.step();
-    this.leftByPlayer();
+    // the device copies are every tab's: read them only for a page that died (lastEnd's alive beat proves it), and only
+    // the copy of the world that page had; a living tab's copies are its own
+    const unexpected = end.kind === 'unexpected';
+    const pending = this.fresh('pending', 'pendingOnce', unexpected), stepRead = this.step(unexpected);
+    const step = stepRead !== null && unexpected && !sameWorld(stepRead.world, end.slug) ? null : stepRead;
+    for (const key of ['step', 'pending'] as const) this.store.clear(key);
+    if (unexpected) for (const key of ['stepOnce', 'pendingOnce'] as const) this.store.clear(key);
     const said = end.kind === 'fresh' ? '' : end.reason;
     if (pending !== null) {
       return { kind: 'error', what: text(pending, 'what'), reason: text(pending, 'reason'), step: text(pending, 'step'), world: text(pending, 'world'),
         name: text(pending, 'name'), message: text(pending, 'message'), code: text(pending, 'code'), stack: text(pending, 'stack'), end: said,
         at: time(pending, 'at'), build: text(pending, 'build') };
     }
-    if (step === null) return null;
+    // a page that ended normally with no word from the game (Back, a typed address, another site) is the player's
+    if (step === null || end.kind === 'fresh') return null;
     if (end.kind === 'intentional' && PLAYER_EXITS.some((exit) => end.reason.startsWith(exit))) return null;
-    const unexpected = end.kind === 'unexpected';
     return {
       kind: 'restart', what: unexpected ? 'The game restarted unexpectedly' : 'Unexpectedly back at the title',
       reason: unexpected ? `The page stopped${step.name === '' ? '' : ` while ${step.name} was loading or running`}, without an error the game could catch. On a phone this is most often the system closing the page to free memory.`
@@ -156,21 +159,20 @@ export class DropNotes {
     };
   }
 
-  private step(): DropStep | null {
-    const raw = this.fresh('step', 'stepOnce');
+  private step(device: boolean): DropStep | null {
+    const raw = this.fresh('step', 'stepOnce', device);
     if (raw === null || text(raw, 'step') === '') return null;
     return { world: text(raw, 'world'), name: text(raw, 'name'), step: text(raw, 'step'), t: time(raw, 't'), build: text(raw, 'build'),
       error: text(raw, 'error'), errorStack: text(raw, 'errorStack') };
   }
-  /** the session copy, else a recent device copy */
-  private fresh(session: DropKey, device: DropKey): Json {
+  /** the tab's session copy, else (`useDevice`: a page that died, whose sessionStorage may have gone with it) the device copy */
+  private fresh(session: DropKey, device: DropKey, useDevice: boolean): Json {
     let value: Json = null;
     try { value = this.store.read(session); } catch { /* storage blocked */ }
     if (value !== null && typeof value === 'object') return value;
+    if (!useDevice) return null;
     try { value = this.store.read(device); } catch { return null; }
-    if (value === null || typeof value !== 'object') return null;
-    const stamp = time(value, 't') || time(value, 'at');
-    return this.now() - stamp < BACKUP_MS ? value : null;
+    return value !== null && typeof value === 'object' ? value : null;
   }
   private write(session: DropKey, device: DropKey, value: Json): void {
     try { this.store.write(session, value); } catch { /* storage full or blocked */ }
@@ -192,7 +194,7 @@ const PAGE_STORE: DropStore = {
 
 const page = new DropNotes(PAGE_STORE);
 let listening = false;
-/** Note the page's errors and its GPU loss on the breadcrumb, and drop the device copies on a normal pagehide. Idempotent. */
+/** Note the page's errors and its GPU loss on the breadcrumb. Idempotent. */
 export function installDropNotes(scope: Scope = pageScope): void {
   if (listening || typeof window === 'undefined') return;
   listening = true;
@@ -200,7 +202,6 @@ export function installDropNotes(scope: Scope = pageScope): void {
   scope.listen(window, 'unhandledrejection', (e) => { page.noteError(e.reason); });
   // a lost WebGL context fires on its canvas and does not bubble: the document's capture phase still sees it
   scope.listen(document, 'webglcontextlost', () => { page.noteError(new Error('WebGL context lost')); }, { capture: true });
-  scope.listen(window, 'pagehide', () => { page.pageHidden(); });
 }
 export function markDropStep(at: { world?: string; name?: string; step: string }): void { page.markStep(at); }
 export function noteDropError(error: unknown): void { page.noteError(error); }

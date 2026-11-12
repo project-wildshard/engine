@@ -17,3 +17,14 @@ modal … we gotta do fucking something."
   `Loading.ts` was another lane's dirty file.
 - Surprise: in a home-screen app `session.ts` strips `?chunk=` from the URL during load, so any iOS kill reloads to the bare
   title. That is why a crash there looks like "snaps to the main menu".
+
+## Review fixes (claude -p, 6 MUSTs folded)
+
+- A page the player left normally (lastEnd `fresh`: Back, a typed `/`) shows nothing; every game-made path to `/` says
+  why first (`markUnload` / `recordDrop`).
+- Device copies are every tab's: read only when lastEnd says the page died, and only for that page's world. No more
+  10-minute window and no pagehide clearing (an iOS app switch fires pagehide on a live page).
+- A crash that boots straight back into its world (crash resume, grid recovery) shows the modal over the loading card.
+- Every player reload or exit calls `leftByPlayer()` (Loading retry and exit, ReloadPrompt, ErrorModal, playerReload);
+  `PLAYER_EXITS` stays as the backstop.
+- Sentry gets errors and real crashes, not the game's own reloads; a repeating error writes the breadcrumb once.

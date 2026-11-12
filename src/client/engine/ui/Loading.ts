@@ -26,6 +26,7 @@ import { listenTap } from '../input/dom';
 import { withOwner } from '../../../shared/engine/app/ownership';
 import { holdLoadingSwitch } from './devSwitch';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
+import { leftByPlayer } from '../boot/dropNotice';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import './loading.css';
 
@@ -210,7 +211,7 @@ export class Loading {
     }
     this.els.retry.onclick = null; // Adopt the inline retry without keeping its document-only handler.
     set(this.els.retry, engineString('s_loading_retry'));
-    listenTap(this.scope, this.els.retry, () => { if (this.retryWait === null) return; if (this.retryNavigation) markReload('loading wait retry'); this.retryWait(); });
+    listenTap(this.scope, this.els.retry, () => { if (this.retryWait === null) return; if (this.retryNavigation) { leftByPlayer(); markReload('loading wait retry'); } this.retryWait(); });
     // LS6: an adopted card already names the arrival's destination (a grid tap resumes at its last place); keep it.
     if (shell === null || this.els.slug.textContent === '') this.els.slug.textContent = chunk.name;
     const key = 'loadAttempt';
@@ -263,7 +264,7 @@ export class Loading {
     button('settings', engineString('s_loading_settings'), () => { void import('./BootSettings').then(m => { m.openBootSettings(); return undefined; }); });
     const exit = button('exit', engineString('s_loading_exit'), () => {
       exit.disabled = true;
-      leaveSaved(() => { markUnload('exit to title from the loading card'); location.replace(exitTitleUrl(location.href)); });
+      leaveSaved(() => { leftByPlayer(); markUnload('exit to title from the loading card'); location.replace(exitTitleUrl(location.href)); });
     });
     return row;
   }

@@ -150,6 +150,8 @@ async function enterPage(): Promise<unknown> {
   return (gridRecoveryRefused() || (titleOnly && document.getElementById('ws-shardfile') === null)) ? showPageTitle() : (async () => {
     // DL21 (E526): the static card runs its clock from the tap and names the code wait until Loading adopts it.
     const chunk = search.get('chunk'); if (chunk !== null) startShellClock(entryScope, chunk);
+    // a crash that boots straight back into its world (crash resume, grid recovery) says so before its breadcrumb is replaced
+    if (lastEnd().kind === 'unexpected') showDrop(takeDrop(lastEnd()));
     // the drop notice's breadcrumb: a world page, from its first step, so a crash or a silent title names where it stood
     if (chunk !== null) markDropStep({ world: chunk, name: findTitleManifest(chunk)?.name ?? chunk, step: 'Start' });
     const tables = prepareBootImports(bootTask('app:tables-import-and-prepare', () => import('./assetTables').then(module => module.prepareAssetTables())));
@@ -206,19 +208,21 @@ async function showPageTitle(refusal = ''): Promise<void> {
  * The drop modal (Jake, 2026-11-12): a title the player did not ask for says why, once. Plain words for everyone, the real error
  * with Developer on; every drop also goes to Sentry where the page reports there (src/client/engine/boot/dropNotice.ts).
  */
-function showDropOnTitle(): void {
-  const drop = takeDrop(lastEnd());
+function showDropOnTitle(): void { showDrop(takeDrop(lastEnd())); }
+function showDrop(drop: ReturnType<typeof takeDrop>): void {
   if (drop === null) return;
   void (async () => {
-    const [{ showDropModal }, { isDev }, { captureBrowserError }] = await Promise.all([import('./dropModal'), import('@wildshard/engine/core/devMode'),
-      import('@wildshard/engine/telemetry/browserErrors')]);
+    const [{ showDropModal }, { isDev }] = await Promise.all([import('./dropModal'), import('@wildshard/engine/core/devMode')]);
+    const abrupt = previousBootLine();
+    showDropModal(drop, entryScope, { dev: isDev(), ...(abrupt === '' ? {} : { extra: [abrupt] }) });
+    // Sentry gets the errors and the real crashes; a reload the game made on purpose (a new build adopted) is not one
+    if (drop.kind === 'restart' && !drop.end.startsWith('page ended unexpectedly')) return;
+    const { captureBrowserError } = await import('@wildshard/engine/telemetry/browserErrors');
     const error = new Error(`${drop.what}: ${drop.reason}`);
     if (drop.stack !== '') error.stack = drop.stack;
     captureBrowserError(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: true,
       diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end } });
-    const abrupt = previousBootLine();
-    showDropModal(drop, entryScope, { dev: isDev(), ...(abrupt === '' ? {} : { extra: [abrupt] }) });
-  })();
+  })().catch(() => undefined);
 }
 
 export const entered: Promise<unknown> = enterPage();
