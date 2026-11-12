@@ -23,6 +23,7 @@ import { saveStorage } from '../saves/slots';
  *   setAliveSource(() => ({ slug, resident: 'pine-hollow (playing) 178 MB · nalati-grasslands 87 MB', mode: 'shard' }))   // session.ts
  */
 import { inspectPreviousBoot, markBootPlanned, previousBootLine } from './bootTrace';
+import { noteDropRoute } from './dropNotice';
 
 declare const __BUILD_ID__: string;
 
@@ -123,6 +124,7 @@ export class PageLife {
   markUnload(reason: string, reload = false): void {
     this.leftOnPurposeAt = Date.now();
     markBootPlanned();
+    noteDropRoute(reason); // the title's drop modal names the words and the call site of the game's last navigation
     this.alive = false; this.clearAlive();
     const u: Unload = { reason, ...this.stamp(), ...(reload ? { reload: true } : {}) };
     writeJson(this.storage('local'), UNLOAD_KEY, u);

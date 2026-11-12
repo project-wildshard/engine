@@ -153,7 +153,8 @@ async function enterPage(): Promise<unknown> {
     // a crash that boots straight back into its world (crash resume, grid recovery) says so before its breadcrumb is replaced
     if (lastEnd().kind === 'unexpected') showDrop(takeDrop(lastEnd()));
     // the drop notice's breadcrumb: a world page, from its first step, so a crash or a silent title names where it stood
-    if (chunk !== null) markDropStep({ world: chunk, name: findTitleManifest(chunk)?.name ?? chunk, step: 'Start' });
+    const came = lastEnd();
+    if (chunk !== null) markDropStep({ world: chunk, name: findTitleManifest(chunk)?.name ?? chunk, step: 'Start', arrivedBy: came.kind === 'fresh' ? '' : came.reason });
     const tables = prepareBootImports(bootTask('app:tables-import-and-prepare', () => import('./assetTables').then(module => module.prepareAssetTables())));
     try {
       const [tier, menu, spawn] = await bootTask('app:tier-menu-download-imports', () => Promise.all([import('@wildshard/engine/core/tier'),
@@ -215,13 +216,12 @@ function showDrop(drop: ReturnType<typeof takeDrop>): void {
     const [{ showDropModal }, { isDev }] = await Promise.all([import('./dropModal'), import('@wildshard/engine/core/devMode')]);
     const abrupt = previousBootLine();
     showDropModal(drop, entryScope, { dev: isDev(), ...(abrupt === '' ? {} : { extra: [abrupt] }) });
-    // Sentry gets the errors and the real crashes; a reload the game made on purpose (a new build adopted) is not one
-    if (drop.kind === 'restart' && !drop.end.startsWith('page ended unexpectedly')) return;
+    // Jake (17:52): every title nobody asked for is an error, so every drop goes to Sentry
     const { captureBrowserError } = await import('@wildshard/engine/telemetry/browserErrors');
     const error = new Error(`${drop.what}: ${drop.reason}`);
     if (drop.stack !== '') error.stack = drop.stack;
     captureBrowserError(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: true,
-      diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end } });
+      diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end, trail: drop.trail, route: drop.routeStack.slice(0, 1500) } });
   })().catch(() => undefined);
 }
 

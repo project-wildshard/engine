@@ -28,3 +28,17 @@ modal … we gotta do fucking something."
 - Every player reload or exit calls `leftByPlayer()` (Loading retry and exit, ReloadPrompt, ErrorModal, playerReload);
   `PLAYER_EXITS` stays as the backstop.
 - Sentry gets errors and real crashes, not the game's own reloads; a repeating error writes the breadcrumb once.
+
+## Jake's sharpened rule (17:52 Cancún)
+
+"Anything going to the main menu in an uninspected fashion is considered an error … Normal navigation ending on the title
+screen is not normal navigation." The guard is now an invariant at the title, not one handler per failure path:
+
+- A title reached from a world page in this tab needs the player's token (`leftByPlayer()` writes `drop.expect`); without
+  it the title opens the modal and reports to Sentry, even with no error anywhere. This reverses review MUST 1: a browser
+  back or an unmarked `location.replace('/')` from a world is now a drop on purpose.
+- Quiet titles: the token, the first boot of a visit, a title after a title.
+- The breadcrumb keeps a redirect trail (`arrivedBy`, lastEnd's reason, from `entry.ts`), so Brasscap's server `resume` to
+  Driftwood and the shell's "elsewhere" show as "Blender Template at Worker boot → online seat elsewhere (driftwood-isle)".
+- `lastEnd.markUnload` notes every game navigation's words and call-site stack (`noteDropRoute`); developer details and
+  Sentry carry both.

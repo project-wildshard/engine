@@ -100,13 +100,45 @@ test('a reload the game made by itself, with no recorded reason, says so', () =>
   const t = tab(), world = enterWorld(t);
   world.life.markReload('stale deployment code'); // browserChunkRecovery: the game's own reload, which lands on the title
   const { drop } = title(t, false);
-  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', reason: 'The game reloaded by itself: stale deployment code.' });
+  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', reason: 'The game sent you here by itself: stale deployment code.' });
 });
 
-test('a page the player left normally (Back, a typed address) shows nothing', () => {
+test('a plain unexpected title navigation, with no error anywhere, shows the modal (Jake, 17:52)', () => {
   const t = tab(); enterWorld(t);
-  window.dispatchEvent(new Event('pagehide')); // the page ends normally: lastEnd reads a fresh launch
-  expect(title(t, true).drop).toBeNull();
+  // a location.replace('/') or a browser back with no word from the game: the page ends normally, lastEnd reads a fresh launch
+  window.dispatchEvent(new Event('pagehide'));
+  const { drop, end } = title(t, true);
+  expect(end.kind).toBe('fresh');
+  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', step: 'Worker boot' });
+  expect(drop?.reason).toContain('without the game or you asking');
+  expect(modal()).not.toBeNull();
+});
+
+test('a server resume to another shard, then the title, lands on the modal naming the redirect', () => {
+  const t = tab(), brasscap = enterWorld(t);
+  // the world server answers the hello with resume { shard: 'driftwood-isle' }: the online shell's "elsewhere" navigation
+  brasscap.notes.noteRoute('online seat elsewhere (driftwood-isle)', 'Error: route\n    at elsewhere (shell.ts:280:5)');
+  brasscap.life.markUnload('online seat elsewhere (driftwood-isle)');
+  const driftwood = t.page(), came = driftwood.life.lastEnd();
+  driftwood.life.setAliveSource(() => ({ slug: 'driftwood-isle', resident: '', mode: 'shard' }));
+  driftwood.notes.markStep({ world: 'driftwood-isle', name: 'Driftwood Isle', step: 'Start', arrivedBy: came.reason });
+  window.dispatchEvent(new Event('pagehide')); // then the title, with no word from anyone
+  const { drop } = title(t, true);
+  expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', world: 'driftwood-isle',
+    trail: 'Blender Template at Worker boot → online seat elsewhere (driftwood-isle)' });
+  expect(drop?.reason).toContain('redirect: Blender Template at Worker boot → online seat elsewhere (driftwood-isle) → Driftwood Isle at Start');
+  expect(modal()?.querySelector('.reason')?.textContent).toContain('online seat elsewhere (driftwood-isle)');
+  expect(modal()?.querySelector('.dev')?.textContent).toContain('Route');
+});
+
+test('the route the game took names its call site', () => {
+  const t = tab(), world = enterWorld(t);
+  world.notes.noteRoute('online seat in another grid cell (driftwood-isle)', 'Error: route\n    at regrid (shell.ts:279:3)');
+  world.life.markUnload('online seat in another grid cell (driftwood-isle)');
+  const { drop } = title(t, true);
+  expect(drop).toMatchObject({ reason: 'The game sent you here by itself: online seat in another grid cell (driftwood-isle).' });
+  expect(drop?.routeStack).toContain('regrid (shell.ts:279:3)');
+  expect(modal()?.querySelector('.route')?.textContent).toContain('regrid');
 });
 
 test("another tab's live breadcrumb never shows on a cold launch", () => {

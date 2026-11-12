@@ -33,9 +33,11 @@ export function dropDetails(drop: Drop, extra: readonly string[] = []): string {
     drop.message === '' ? '' : `Error: ${drop.message}`,
     drop.code === '' ? '' : `Code: ${drop.code}`,
     drop.end === '' ? '' : `Previous page: ${drop.end}`,
+    drop.trail === '' ? '' : `Route: ${drop.trail}`,
     `World: ${drop.name || drop.world || 'none'} · build ${drop.build || 'unknown'} · ${drop.at > 0 ? new Date(drop.at).toISOString() : 'time unknown'}`,
     ...extra,
     drop.stack === '' ? '' : `\n${drop.stack}`,
+    drop.routeStack === '' ? '' : `\nLast navigation from:\n${drop.routeStack}`,
   ].filter((line) => line !== '').join('\n');
 }
 
@@ -66,10 +68,12 @@ export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev:
     add('Code', drop.code);
     add('World', drop.name || drop.world);
     add('Previous page', drop.end);
+    add('Route', drop.trail);
     add('Build', drop.build);
     for (const line of options.extra ?? []) add('Note', line);
     dev.append(list);
     if (drop.stack !== '') dev.append(make('pre', 'stack', drop.stack));
+    if (drop.routeStack !== '') dev.append(make('pre', 'route', `Last navigation from:\n${drop.routeStack}`));
     box.append(dev);
   }
   const row = make('div', 'row');

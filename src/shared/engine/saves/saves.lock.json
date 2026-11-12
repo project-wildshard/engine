@@ -493,6 +493,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:session/'drop.expect'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:session/'drop.pending'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

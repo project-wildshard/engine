@@ -34,7 +34,7 @@ function page(): { readonly went: string[]; readonly location: object } {
   const went: string[] = [];
   return { went, location: { href: 'https://example.test/?chunk=fixture&v=old', origin: 'https://example.test', replace: (url: string) => { went.push(url); }, reload: () => { went.push('reload'); } } };
 }
-const marks = { markReload: (): void => undefined, markUnload: (): void => undefined };
+const marks = { markReload: (): void => undefined, markUnload: (): void => undefined, leftByPlayer: (): void => undefined };
 // RL3/RL4 (reloadCover.ts): the cover's own calls, as ports. The cover and the one-frame paint wait are not what this file
 // proves; whether the navigation waits for the save is, so the frame wait runs its leave at once.
 const cover = { showReloading: (): void => undefined, reloadingLine: (): void => undefined, leaveAfterPaint: (go: () => void): void => { go(); }, RELOAD_FALLBACK_MS: 3000 };
