@@ -15,6 +15,8 @@ export const CI_NATIVE_GROUPS = {
   'network-rewards': [
     'test/net-fuzz.test.ts',
     'test/pine-rewards.test.ts',
+    // MP1C.4: a real crossing on the real clock, then a reboot; kept off sibling workers like net-fuzz's crossing.
+    'test/grid-crossing-crash.test.ts',
   ],
   'native-direct-worker': ['test/headless-direct-worker.test.ts'],
   'native-host-transport': ['test/sim-transport.test.ts'],
