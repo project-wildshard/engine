@@ -18,13 +18,16 @@ Three things only showed up by measuring:
   `DOCTOR`, and workerd treats every named value export as an entrypoint.
   OV1's dry-run test never ran the Worker; `wrangler dev` does now.
 - **Play answers `?doctor` with 307, not 302** (Vercel's
-  `permanent: false`), and adds `; charset=utf-8` to JSON and the web
+  `permanent: false`), keeps the query as written
+  (`/?x=1&doctor` → `/doctor/?x=1&doctor&sw=0`), and adds `; charset=utf-8` to JSON and the web
   manifest and calls JavaScript `application/javascript`. The Worker and
   `_headers` now say the same, so parity finds no difference.
 
 `scripts/page-parity.mjs <old> <new>` compares status, cache-control,
-content-type, content-encoding and clear-site-data on 30 URLs, hashed
-names found on the old host. Against play and a local `wrangler dev`
+content-type, content-encoding, clear-site-data, location and a digest
+of each 200's decoded body on 30 URLs, hashed names found on the old
+host. Codex's review added the last two: without them a part encoded
+twice, or a redirect elsewhere, passed. Against play and a local `wrangler dev`
 holding play's own files for those URLs: no difference.
 
 Not here: COOP and COEP. PAGE-SIZE PZ12 and OV6 add them on preview

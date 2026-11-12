@@ -1,7 +1,7 @@
 // The game page's Worker (meta OFF-VERCEL-PLAN OV1, J272). Static assets serve everything; `run_worker_first` sends
 // only `/`, `/index.html` and the spawn parts here, where this does what vercel.json did:
-// - `?doctor` (any value) on the page goes 307 to `/doctor/?sw=0` (what Vercel's `permanent: false` answers, OV2's
-//   parity check against play);
+// - `?doctor` (any value) on the page goes 307 to `/doctor/?sw=0`, keeping the rest of the query as written, as Vercel's
+//   `permanent: false` redirect did (`/?x=1&doctor` → `/doctor/?x=1&doctor&sw=0`; OV2's parity check against play);
 // - otherwise the page itself, with `Cache-Control: no-store`;
 // - a `.pack.br` spawn part goes out as its stored q11 bytes with `Content-Encoding: br` (DL15). OV2 measured that
 //   `_headers` can't do it: the runtime brotli-encodes the stored bytes a second time. `encodeBody: "manual"` sends them
@@ -18,7 +18,13 @@ interface Env {
   readonly ASSETS: Fetcher
 }
 
-const DOCTOR = '/doctor/?sw=0'
+const SW = /^sw(?:=|$)/u
+
+/** Vercel's destination: the request's query pairs as written, any `sw` dropped, then `sw=0`. */
+function doctor(search: string): string {
+  const kept = search.replace(/^\?/u, '').split('&').filter((pair): boolean => pair !== '' && !SW.test(pair))
+  return `/doctor/?${[...kept, 'sw=0'].join('&')}`
+}
 const PAGE = new Set(['/', '/index.html'])
 const OK = 200
 const PART = /^\/assets\/spawn\/(?:parts|server)\/[^/]+\.pack\.br$/u
@@ -43,7 +49,7 @@ async function part(request: Request, env: Env): Promise<Response> {
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
 async function page(request: Request, url: URL, env: Env): Promise<Response> {
   if (url.searchParams.has('doctor')) {
-    return new Response(undefined, { status: 307, headers: { location: DOCTOR, 'cache-control': 'public, max-age=0, must-revalidate' } })
+    return new Response(undefined, { status: 307, headers: { location: doctor(url.search), 'cache-control': 'public, max-age=0, must-revalidate' } })
   }
   const asset = await env.ASSETS.fetch(new Request(new URL('/', url), request))
   const response = new Response(asset.body, asset)

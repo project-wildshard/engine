@@ -10,7 +10,6 @@ import { expect, test } from 'vitest';
 import { unstable_readConfig } from 'wrangler';
 import worker, { type Env } from '../pages/worker.ts';
 
-const DOCTOR = '/doctor/?sw=0';
 
 // OFF-VERCEL OV1 (J272): one wrangler.jsonc, three Workers. Production is the top level; staging and preview are envs.
 // Production is always named with `--env ''`: without it wrangler warns that more than one environment is defined.
@@ -74,11 +73,14 @@ function assets(seen: string[]): Env {
 }
 
 test('?doctor on the page goes 307 to the doctor without the service worker, as Vercel did', async () => {
-  for (const path of ['/?doctor', '/?doctor=1', '/index.html?doctor', '/?x=1&doctor']) {
+  // Play's answers, 11-11: the query stays as written, any sw goes, sw=0 comes last.
+  const want: Record<string, string> = { '/?doctor': '/doctor/?doctor&sw=0', '/?doctor=1': '/doctor/?doctor=1&sw=0',
+    '/index.html?doctor': '/doctor/?doctor&sw=0', '/?x=1&doctor': '/doctor/?x=1&doctor&sw=0', '/?doctor&sw=1': '/doctor/?doctor&sw=0' };
+  for (const path of Object.keys(want)) {
     const seen: string[] = [];
     const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), assets(seen));
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(DOCTOR);
+    expect(response.headers.get('location')).toBe(want[path]);
     expect(seen).toEqual([]);
   }
 });

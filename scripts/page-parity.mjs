@@ -5,16 +5,19 @@
 //   node scripts/page-parity.mjs https://play.wildshard.io https://<version>-wildshard-play.<subdomain>.workers.dev
 //
 // It asks both hosts for a fixed list of 30 URLs, one or more for each header rule in public/_headers (and so in
-// vercel.json), and compares status, cache-control, content-type, content-encoding and clear-site-data. Hashed names
+// vercel.json), and compares status, cache-control, content-type, content-encoding, clear-site-data and location, and
+// the decoded body of every 200 (sha256), so a part brotli-encoded twice or a redirect elsewhere is a difference. Hashed names
 // come from the old host's own files (index.html, sw.js, asset-index.json, deploy-chunks.json, the spawn books), so
 // both hosts must serve the same build. Any difference exits 1: J272 answer 3, parity blocks a cutover. `server` and
 // the approved COOP/COEP headers are not compared, so they never block.
 // A redirect's or a 404's content type is not compared (Vercel says text/plain, Workers nothing).
 // `--identity` asks without compression, for a local `wrangler dev`, which never compresses.
 
+import { createHash } from 'node:crypto';
 import process from 'node:process';
 
-const FIELDS = ['status', 'cache-control', 'content-type', 'content-encoding', 'clear-site-data'];
+const FIELDS = ['status', 'cache-control', 'content-type', 'content-encoding', 'clear-site-data', 'location', 'body'];
+const OK = 200;
 
 const args = process.argv.slice(2);
 const identity = args.includes('--identity');
@@ -25,11 +28,15 @@ if (oldBase === undefined || newBase === undefined) {
 }
 const headers = { 'accept-encoding': identity ? 'identity' : 'br, gzip', 'user-agent': 'wildshard-page-parity' };
 
-/** @param {string} base @param {string} path */
+/** One answer as the compared fields: headers as sent, `body` the sha256 of a 200's decoded body.
+ * @param {string} base @param {string} path @returns {Promise<Map<string, string>>} */
 async function get(base, path) {
   const response = await fetch(new URL(path, base), { headers, redirect: 'manual' });
-  await response.body?.cancel();
-  return response;
+  const body = response.status === OK
+    ? createHash('sha256').update(new Uint8Array(await response.arrayBuffer())).digest('hex').slice(0, 16)
+    : (await response.body?.cancel(), '-');
+  return new Map(FIELDS.map(field => [field,
+    field === 'status' ? String(response.status) : field === 'body' ? body : response.headers.get(field) ?? '-']));
 }
 
 /** @param {string} path @returns {Promise<string>} */
@@ -78,10 +85,10 @@ if (list.length !== 30) throw new Error(`expected 30 URLs, built ${String(list.l
 let differences = 0;
 for (const path of list) {
   const [before, after] = await Promise.all([get(oldBase, path), get(newBase, path)]);
-  const value = (/** @type {Response} */ response, /** @type {string} */ field) =>
-    field === 'status' ? String(response.status) : response.headers.get(field) ?? '-';
+  const value = (/** @type {Map<string, string>} */ answer, /** @type {string} */ field) => answer.get(field) ?? '-';
   // A redirect or a 404 has no body to type: Vercel says text/plain, Workers says nothing. Only its content type is skipped.
-  const bodiless = before.status === after.status && (before.status === 404 || (before.status >= 300 && before.status < 400));
+  const status = Number(value(before, 'status'));
+  const bodiless = status === Number(value(after, 'status')) && (status === 404 || (status >= 300 && status < 400));
   const differ = FIELDS.filter(field => !(bodiless && field === 'content-type') && value(before, field) !== value(after, field));
   differences += differ.length;
   console.log(`${differ.length === 0 ? 'same' : 'DIFF'}  ${path}`);

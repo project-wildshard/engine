@@ -154,7 +154,7 @@ test('the page: no-store, ?doctor 307 as Vercel answered, a missing chunk 404 wi
       .toEqual([200, 'no-store', 'text/html; charset=utf-8']);
   }
   const doctor = await wire(new URL('/?doctor', served()));
-  expect([doctor.status, doctor.headers.location]).toEqual([307, '/doctor/?sw=0']);
+  expect([doctor.status, doctor.headers.location]).toEqual([307, '/doctor/?doctor&sw=0']);
   const missing = await wire(new URL('/b/gone/main-x.js', served()));
   expect(missing.status).toBe(404);
   expect(missing.headers['content-type'] ?? '').not.toContain('text/html');
