@@ -18,7 +18,7 @@ WORK="$(cd "$WORK" && pwd -P)" # canonical: /tmp is a symlink on macOS (E432)
 git -C "$REPO" archive "$SHA" | tar -x -C "$WORK/src"
 node "$REPO/scripts/link-node-modules.mjs" "$REPO" "$WORK/src" # E432: @wildshard/* → this export
 cd "$WORK/src"
-VERCEL_GIT_COMMIT_SHA="$SHA" pnpm build >"$WORK/build.log" 2>&1 || { tail -30 "$WORK/build.log"; exit 1; }
+WS_BUILD_ID="${SHA:0:7}-$(node -p 'Date.now().toString(36)')" pnpm build >"$WORK/build.log" 2>&1 || { tail -30 "$WORK/build.log"; exit 1; }
 find dist/assets dist/b -maxdepth 2 -name '*.map' -print0 | xargs -0 rm -f
 # the folder is already built: keep vercel.json's headers, drop its buildCommand (34bacad1 added it for main's prebuilt CI deploys)
 node -e "const c=JSON.parse(require('fs').readFileSync('vercel.json','utf8')); delete c.buildCommand; c.framework=null; c.buildCommand=''; require('fs').writeFileSync('dist/vercel.json', JSON.stringify(c, null, 2))"

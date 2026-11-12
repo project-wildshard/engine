@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameS
 import { join, resolve, relative, sep } from 'node:path';
 import { linkNodeModules } from './link-node-modules.mjs';
 import { assertHeavyLease } from './heavy-lane-lease.mjs';
+import { sourceBuildId } from './app-build/buildIdentity.mjs';
 import { InputHashMemo } from './bake-input-hashes.mjs';
 
 const REPO = resolve(import.meta.dirname, '..');
@@ -376,7 +377,7 @@ if (isMain) {
     }
     mainMirrorRevision(rev);
     const { dir, sha, release } = openMirror(rev, { slot, full });
-    const result = spawnSync(command[0], command.slice(1), { cwd: dir, stdio: 'inherit', env: { ...process.env, VERCEL_GIT_COMMIT_SHA: sha } });
+    const result = spawnSync(command[0], command.slice(1), { cwd: dir, stdio: 'inherit', env: { ...process.env, WS_BUILD_ID: sourceBuildId(sha) } });
     release();
     process.exit(result.status ?? 1);
   } else {

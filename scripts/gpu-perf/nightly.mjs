@@ -1,5 +1,6 @@
 // E357 launchd poller. No GitHub-supplied command or shared-checkout mutation.
 import { shardFolders } from '../shard-folders.mjs';
+import { sourceBuildId } from '../app-build/buildIdentity.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, rmSync, openSync, closeSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -69,7 +70,7 @@ const status = async (context, state, description) => {
 };
 const step = async (name, command, argv, max) => {
   console.log(`gpu-perf: ${name}`);
-  const result = await run(command, argv, { cwd: tree, max, log: join(reports, `${stamp}-${sha.slice(0, 7)}-${name}.log`), env: { VERCEL_GIT_COMMIT_SHA: sha, SERVE_BUILD_DIR: join(cache, `preview-${sha.slice(0, 7)}`), SERVE_MAX_HOURS: '5' } });
+  const result = await run(command, argv, { cwd: tree, max, log: join(reports, `${stamp}-${sha.slice(0, 7)}-${name}.log`), env: { WS_BUILD_ID: sourceBuildId(sha), SERVE_BUILD_DIR: join(cache, `preview-${sha.slice(0, 7)}`), SERVE_MAX_HOURS: '5' } });
   steps.push({ name, code: result.code, verdict: result.code === 0 ? 'success' : 'failure' });
   return result;
 };

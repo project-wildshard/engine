@@ -9,17 +9,23 @@ export const BUILD_ID_EXPRESSION = '(globalThis.__WS_BUILD_ID__ ?? "")';
 export const VALIDATOR_EXPRESSION = 'globalThis.__WS_SHARDFILE_VALIDATOR__';
 export const VERDICTS_EXPRESSION = 'globalThis.__WS_SHARDFILE_VERDICTS__';
 
-/** An explicit WS_BUILD_ID coordinates a page with a dedicated server release. Otherwise mint a short git sha + build
- * time. build-app chooses it first, because the bundler names the folder and version.json serves the same id. */
+/** The id a build of a known source gets: its short sha + build time. A caller that builds an exported tree (no .git)
+ * passes it as WS_BUILD_ID (OFF-VERCEL OV3: no VERCEL_GIT_COMMIT_SHA).
+ * @param {string} sha @param {number} [now] */
+export const sourceBuildId = (sha, now = Date.now()) => `${sha === '' ? 'b' : sha.slice(0, 7)}-${now.toString(36)}`;
+
+/** An explicit WS_BUILD_ID coordinates a page with a dedicated server release, or names an exported tree's source.
+ * Otherwise mint a short git sha + build time. build-app chooses it first, because the bundler names the folder and
+ * version.json serves the same id. WS_BUILD_ID is the only env this reads (OFF-VERCEL OV3). */
 export function newBuildId() {
   const requested = process.env.WS_BUILD_ID;
   if (requested !== undefined) {
     if (!/^\w[\w.-]*$/u.test(requested)) throw new Error('Invalid WS_BUILD_ID');
     return requested;
   }
-  let sha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7);
-  try { if(sha==='')sha=execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { /* not a git checkout */ }
-  return `${sha===''?'b':sha}-${Date.now().toString(36)}`;
+  let sha = '';
+  try { sha = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { /* not a git checkout */ }
+  return sha === '' ? sourceBuildId('') : `${sha}-${Date.now().toString(36)}`;
 }
 
 /** J57, J131: a web build's own folder for code, CSS and wasm, immutable for good. Assets stay under /assets/, and only

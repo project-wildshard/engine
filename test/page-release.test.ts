@@ -102,6 +102,10 @@ test('the build bakes the channel release file from packs.wildshard.io', async (
     await runPhase('build', deps);
     expect(seen[0]?.['WILDSHARD_RELEASE_URL']).toBe(`https://packs.wildshard.io/releases/${channel}.json`);
     expect(seen[0]?.['WS_BUILD_ID']).toBe(build);
+    // OFF-VERCEL OV3: a release build says so, and carries old builds from its own channel's domain.
+    expect(seen[0]?.['WS_RELEASE']).toBe('1');
+    expect(seen[0]?.['WS_CHANNEL']).toBe(channel);
+    expect(seen[0]?.['WS_PREVIOUS_DEPLOY_ORIGIN']).toBe(channel === 'production' ? 'https://play.wildshard.io' : 'https://staging.wildshard.io');
   }
 });
 

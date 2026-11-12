@@ -266,7 +266,7 @@ fi
 OUT="$BASE/$stamp/dist"
 SRC="$REPO"
 if [ $HEAD_ONLY -eq 1 ]; then
-  # the mirror (cwd): build-mirror.mjs synced it to $REV, linked node_modules (E432) and set VERCEL_GIT_COMMIT_SHA
+  # the mirror (cwd): build-mirror.mjs synced it to $REV, linked node_modules (E432) and set WS_BUILD_ID
   SRC="$(pwd -P)"
 fi
 mkdir -p "$BASE/$stamp"

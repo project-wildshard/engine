@@ -26,17 +26,14 @@ class PrebuiltTests(unittest.TestCase):
         self.source, self.target, self.packet = [self.root / name for name in ('source', 'target', 'packet')]
         self.target.mkdir()
         version = json.dumps({'build': SHA[:9] + '-fixture'})
+        # OFF-VERCEL OV3: the archive is dist/, the Workers asset directory: no .vercel, no functions.
         self.files = {
-            '.vercel/output/config.json': '{"version":3}',
-            '.vercel/output/static/index.html': '<html>actual shell</html>',
-            '.vercel/output/static/sw.js': 'const BUILD="fixture";',
-            '.vercel/output/static/version.json': version,
-            **{f'.vercel/output/functions/api/{route}.func/{name}': body
-               for route in ('inbox', 'errors', 'waitlist', 'telemetry')
-               for name, body in {'.vc-config.json': '{"handler":"index.cjs","runtime":"nodejs22.x"}',
-                                  'index.cjs': 'exports.OPTIONS=()=>new Response(null,{status:204});'}.items()},
+            'dist/index.html': '<html>actual shell</html>',
+            'dist/sw.js': 'const BUILD="fixture";',
             'dist/version.json': version,
+            'dist/_headers': '/sw.js\n  Cache-Control: no-cache\n',
             'dist/.vite/chunk-modules.json': '{"chunks":[]}',
+            'dist/assets/main.js': 'export {};',
             'dist/assets/main.js.map': '{"private":true}',
         }
         for name, body in self.files.items():
@@ -54,7 +51,7 @@ class PrebuiltTests(unittest.TestCase):
         change(value)
         path.write_text(json.dumps(value))
 
-    def test_complete_runtime_functions_and_private_maps_restore_exactly(self):
+    def test_complete_page_and_private_maps_restore_exactly(self):
         prebuilt.restore(self.target, self.packet, SHA, '123')
         self.assertEqual({p.relative_to(self.target).as_posix(): p.read_text()
                           for p in self.target.rglob('*') if p.is_file()}, self.files)
@@ -198,7 +195,6 @@ class PrebuiltTests(unittest.TestCase):
         self.assertNotIn('ci2-prebuilt-restore', result.stdout)
 
     def test_stream_retains_the_original_tar_headers_order_and_padding(self):
-        (self.source / '.vercel/output/functions/api/errors.func/alias.cjs').symlink_to('index.cjs')
         long_name = self.source / ('dist/assets/' + 'long-name-' * 14 + 'é.js.map')
         long_name.write_bytes(b'private source map with a PAX header')
         prebuilt.pack(self.source, self.packet, SHA, '123')
@@ -207,13 +203,10 @@ class PrebuiltTests(unittest.TestCase):
         with tarfile.open(fileobj=expected, mode='w', dereference=False) as output:
             for row in proof['files']:
                 path = self.source / row['path']
-                if 'link' in row:
-                    output.add(path, arcname=row['path'], recursive=False)
-                else:
-                    info = output.gettarinfo(str(path.resolve()), arcname=row['path'])
-                    info.type, info.linkname, info.size = tarfile.REGTYPE, '', row['bytes']
-                    with path.open('rb') as content:
-                        output.addfile(info, content)
+                info = output.gettarinfo(str(path.resolve()), arcname=row['path'])
+                info.type, info.linkname, info.size = tarfile.REGTYPE, '', row['bytes']
+                with path.open('rb') as content:
+                    output.addfile(info, content)
         actual = subprocess.check_output(['zstd', '-q', '-dc', str(self.packet / 'prebuilt.tar.zst')])
         self.assertEqual(actual, expected.getvalue())
         self.assertEqual(proof['archiveBytes'], len(actual))
@@ -239,137 +232,74 @@ class PrebuiltTests(unittest.TestCase):
         self.assertFalse((directory / 'prebuilt.tar').exists())
         self.assertFalse((directory / 'proof.json').exists())
 
-    def test_standalone_dependency_and_transitive_bytes_execute_without_source_dependencies(self):
-        function = self.source / '.vercel/output/functions/api/errors.func'
-        packages = function / 'node_modules/.pnpm/fixture/node_modules'
-        for name, body in {
-            '@vercel/blob/package.json': '{"main":"index.cjs"}',
-            '@vercel/blob/index.cjs': 'module.exports=require("prebuilt-transitive");',
-            'prebuilt-transitive/package.json': '{"main":"index.cjs"}',
-            'prebuilt-transitive/index.cjs': 'module.exports=()=>new Response(null,{status:204});',
-        }.items():
-            path = packages / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(body)
-        modules = function / 'node_modules'
-        (modules / '@vercel').mkdir(parents=True)
-        (modules / '@vercel/blob').symlink_to('../.pnpm/fixture/node_modules/@vercel/blob', target_is_directory=True)
-        (function / 'index.cjs').write_text('exports.OPTIONS=require("@vercel/blob");')
-        packet = self.root / 'standalone'
+    def test_links_are_materialized_and_a_link_row_never_restores(self):
+        (self.source / 'dist/assets/alias.js').symlink_to('main.js')
+        shared = self.root / 'shared'
+        shared.mkdir()
+        (shared / 'chunk.js').write_text('shared chunk')
+        (self.source / 'dist/b').symlink_to(shared, target_is_directory=True)
+        packet = self.root / 'links'
         prebuilt.pack(self.source, packet, SHA, '123')
-        shutil.rmtree(self.source)
+        proof = json.loads((packet / 'proof.json').read_text())
+        self.assertFalse(any('link' in row for row in proof['files']))
         prebuilt.restore(self.target, packet, SHA, '123')
-        self.assertFalse((self.target / 'node_modules').exists())
-        restored = self.target / function.relative_to(self.source)
-        self.assertTrue((restored / 'node_modules/@vercel/blob').is_symlink())
-        self.assertTrue((restored / 'node_modules/@vercel/blob/index.cjs').is_file())
-        script = 'const f=require(process.argv[1]);console.log(f.OPTIONS(new Request("https://fixture.invalid",{method:"OPTIONS"})).status);'
-        def invoke():
-            return subprocess.run(['node', '-e', script, str((restored / 'index.cjs').resolve())],
-                cwd=self.target, env={**os.environ, 'NODE_PATH': '', 'NODE_OPTIONS': ''},
-                capture_output=True, text=True)
-        child = invoke()
-        self.assertEqual(child.returncode, 0, child.stderr)
-        self.assertEqual(child.stdout.strip(), '204')
-        # Leaf exists only beside the real pnpm target, never at root.
-        (restored / 'node_modules/.pnpm/fixture/node_modules/prebuilt-transitive/index.cjs').unlink()
-        self.assertNotEqual(invoke().returncode, 0)
-
-    def test_function_symlinks_refuse_external_dangling_and_cyclic_targets(self):
-        function = self.source / '.vercel/output/functions/api/errors.func'
-        link = function / 'dependency'
-        for target in (self.source.resolve(), function / 'missing', link, function):
-            link.symlink_to(target.resolve() if target != link else 'dependency')
-            with self.assertRaises(ValueError):
-                prebuilt.pack(self.source, self.root / 'unsafe', SHA, '123')
-            link.unlink()
-
-    def test_function_link_dotdot_requires_real_intermediate_directories(self):
-        function = self.source / '.vercel/output/functions/api/errors.func'
-        (function / 'alias').symlink_to('missing/../index.cjs')
-        with self.assertRaisesRegex(ValueError, 'Dangling'):
-            prebuilt.pack(self.source, self.root / 'missing-parent', SHA, '123')
-
-    def test_function_link_dotdot_follows_the_pivot_before_checking_the_boundary(self):
-        functions = self.source / '.vercel/output/functions'
-        target = functions / 'target'
-        target.mkdir()
-        (target / 'marker').write_text('captured')
-        (functions / 'api/leaf').write_text('lexical target')
-        (functions.parent / 'leaf').write_text('outside function closure')
-        function = functions / 'api/errors.func'
-        (function / 'pivot').symlink_to('../../target', target_is_directory=True)
-        (function / 'alias').symlink_to('pivot/../../leaf')
-        with self.assertRaisesRegex(ValueError, 'escapes functions root'):
-            prebuilt.pack(self.source, self.root / 'pivot-escape', SHA, '123')
-
-    def test_every_emitted_function_requires_its_captured_handler(self):
-        for route in ('inbox', 'errors', 'waitlist', 'telemetry'):
-            handler = self.source / f'.vercel/output/functions/api/{route}.func/index.cjs'
-            body = handler.read_bytes()
-            handler.unlink()
-            with self.assertRaisesRegex(ValueError, 'Missing prebuilt function handler'):
-                prebuilt.pack(self.source, self.root / 'missing-handler', SHA, '123')
-            handler.write_bytes(body)
-
-    def test_static_dist_alias_is_materialized_but_function_links_are_preserved(self):
-        static = self.source / '.vercel/output/static'
-        for path in static.iterdir():
-            shutil.copyfile(path, self.source / 'dist' / path.name)
-        shutil.rmtree(static)
-        static.symlink_to('../../dist', target_is_directory=True)
-        function = self.source / '.vercel/output/functions/api/errors.func'
-        (function / 'inbox-alias').symlink_to('../inbox.func', target_is_directory=True)
-        packet = self.root / 'aliases'
-        prebuilt.pack(self.source, packet, SHA, '123')
-        shutil.rmtree(self.source)
-        prebuilt.restore(self.target, packet, SHA, '123')
-        self.assertFalse((self.target / '.vercel/output/static').is_symlink())
-        self.assertTrue((self.target / '.vercel/output/functions/api/errors.func/inbox-alias').is_symlink())
-        self.assertEqual((self.target / '.vercel/output/static/index.html').read_text(), '<html>actual shell</html>')
-
-    def test_restore_refuses_link_escape_before_any_write(self):
-        name = '.vercel/output/functions/api/errors.func/dependency'
-        target = '../../../../../../outside'
+        self.assertFalse((self.target / 'dist/assets/alias.js').is_symlink())
+        self.assertEqual((self.target / 'dist/assets/alias.js').read_text(), 'export {};')
+        self.assertEqual((self.target / 'dist/b/chunk.js').read_text(), 'shared chunk')
+        name, target = 'dist/assets/escape.js', '../../../outside'
         member = tarfile.TarInfo(name)
         member.type, member.linkname, member.mode = tarfile.SYMTYPE, target, 0o777
         archive = io.BytesIO()
         with tarfile.open(fileobj=archive, mode='w') as output:
             output.addfile(member)
         archive.seek(0)
-        proof = {'files': [{'path': name, 'link': target, 'bytes': len(target),
-            'mode': member.mode, 'hash': hashlib.sha256(target.encode()).hexdigest()}], 'run': '123'}
-        with self.assertRaisesRegex(ValueError, 'escapes functions root'):
-            prebuilt.extract(self.target, archive, proof, SHA)
-        self.assertEqual(list(self.target.iterdir()), [])
+        rows = {'files': [{'path': name, 'link': target, 'bytes': len(target), 'mode': member.mode,
+                           'hash': hashlib.sha256(target.encode()).hexdigest()}], 'run': '123'}
+        empty = self.root / 'empty'
+        empty.mkdir()
+        with self.assertRaisesRegex(ValueError, 'Invalid prebuilt member'):
+            prebuilt.extract(empty, archive, rows, SHA)
+        self.assertEqual(list(empty.iterdir()), [])
 
-    def test_pack_refuses_repository_relative_function_references(self):
-        config = self.source / '.vercel/output/functions/api/errors.func/.vc-config.json'
-        config.write_text(json.dumps({'filePathMap': {
-            'node_modules/@vercel/blob/index.js': 'node_modules/@vercel/blob/index.js'}}))
-        with self.assertRaisesRegex(ValueError, 'external file references'):
-            prebuilt.pack(self.source, self.root / 'external', SHA, '123')
+    def test_only_dist_is_a_prebuilt_root(self):
+        for name in ('.vercel/output/static/index.html', 'functions/api/errors.js', 'dist/../x'):
+            with self.assertRaises(ValueError):
+                prebuilt.safe(name)
 
-    def test_restore_refuses_external_function_references_before_any_write(self):
-        name = '.vercel/output/functions/api/errors.func/.vc-config.json'
-        content = json.dumps({'filePathMap': {'index.js': 'api/errors.js'}}).encode()
-        member = tarfile.TarInfo(name)
-        member.size, member.mode = len(content), 0o644
-        archive = io.BytesIO()
-        with tarfile.open(fileobj=archive, mode='w') as output:
-            output.addfile(member, io.BytesIO(content))
-        archive.seek(0)
-        proof = {'files': [{'path': name, 'bytes': len(content),
-            'mode': member.mode, 'hash': hashlib.sha256(content).hexdigest()}], 'run': '123'}
-        with self.assertRaisesRegex(ValueError, 'external file references'):
-            prebuilt.extract(self.target, archive, proof, SHA)
-        self.assertEqual(list(self.target.iterdir()), [])
+    def test_the_page_files_a_worker_serves_are_required(self):
+        for name in ('dist/index.html', 'dist/sw.js', 'dist/_headers', 'dist/.vite/chunk-modules.json'):
+            path = self.source / name
+            body = path.read_bytes()
+            path.unlink()
+            with self.assertRaisesRegex(ValueError, 'Incomplete prebuilt output: ' + re.escape(name)):
+                prebuilt.pack(self.source, self.root / 'incomplete', SHA, '123')
+            path.write_bytes(body)
+
+    def test_workers_asset_limits_refuse_the_pack(self):
+        big = self.source / 'dist/assets/huge.bin'
+        with big.open('wb') as stream:
+            stream.truncate(prebuilt.MAX_ASSET_BYTES + 1)
+        with self.assertRaisesRegex(ValueError, 'over 25 MiB: dist/assets/huge.bin'):
+            prebuilt.pack(self.source, self.root / 'huge', SHA, '123')
+        big.unlink()
+        # A private source map is never uploaded, so its size does not count.
+        with (self.source / 'dist/assets/huge.js.map').open('wb') as stream:
+            stream.truncate(prebuilt.MAX_ASSET_BYTES + 1)
+        prebuilt.pack(self.source, self.root / 'big-map', SHA, '123')
+        rows = [{'path': f'dist/f{i}', 'bytes': 1} for i in range(prebuilt.MAX_ASSET_FILES - 4)]
+        with self.assertRaisesRegex(ValueError, 'over 90000'):
+            prebuilt.required(json.loads((self.packet / 'proof.json').read_text())['files'] + rows, SHA, self.source)
+
+    def test_a_release_build_named_by_its_full_sha_binds_the_source(self):
+        (self.source / 'dist/version.json').write_text(json.dumps({'build': SHA}))
+        prebuilt.pack(self.source, self.root / 'release', SHA, '123')
+        with self.assertRaisesRegex(ValueError, 'version differs'):
+            prebuilt.pack(self.source, self.root / 'foreign-release', 'b' * 40, '123')
 
     def test_emitted_seven_character_env_stamp_and_git_abbreviation_both_bind_the_full_source(self):
         for width in (7, 9):
             version = json.dumps({'build': SHA[:width] + '-fixture'})
-            for name in ('dist/version.json', '.vercel/output/static/version.json'):
-                (self.source / name).write_text(version)
+            (self.source / 'dist/version.json').write_text(version)
             packet = self.root / ('stamp-' + str(width))
             target = self.root / ('restored-' + str(width))
             target.mkdir()
@@ -404,13 +334,13 @@ class PrebuiltTests(unittest.TestCase):
             (self.packet / 'proof.json').write_text(original)
 
     def test_destination_symlink_is_never_followed(self):
-        (self.target / '.vercel').symlink_to(self.source / '.vercel', target_is_directory=True)
+        (self.target / 'dist').symlink_to(self.source / 'dist', target_is_directory=True)
         with self.assertRaisesRegex(ValueError, 'destination'):
             prebuilt.restore(self.target, self.packet, SHA, '123')
-        self.assertEqual((self.source / '.vercel/output/static/index.html').read_text(), self.files['.vercel/output/static/index.html'])
+        self.assertEqual((self.source / 'dist/index.html').read_text(), self.files['dist/index.html'])
 
     def test_version_must_belong_to_tested_source(self):
-        (self.source / '.vercel/output/static/version.json').write_text('{"build":"wrong"}')
+        (self.source / 'dist/version.json').write_text('{"build":"wrong"}')
         with self.assertRaisesRegex(ValueError, 'version differs'):
             prebuilt.pack(self.source, self.root / 'bad', SHA, '123')
 

@@ -20,7 +20,8 @@ import {
 } from "./app-build/outputProducts.mjs";
 import { stampBuildDocuments } from "./app-build/buildIdentity.mjs";
 import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
-import { carryPreviousDeploy } from "./app-build/previousDeploy.mjs";
+import { carryPreviousDeploy, channelOrigin } from "./app-build/previousDeploy.mjs";
+import { assertAssetLimits, describeAssetLimits } from "./app-build/assetLimits.mjs";
 import { buildValidationReceipts } from "./app-build/validationReceipts.mjs";
 import { shardfileValidationRevision } from "./shardfile-validation-revision.mjs";
 import { checkBakedTextures } from "./app-build/bakedTextures.mjs";
@@ -245,16 +246,18 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // graph only; old pages demand their old files as needed. CI's main push builds the
   // output production ships (deploy.yml's prepare job), so it carries from production too.
   const previousDirectory = process.env.WS_PREVIOUS_DEPLOY_DIR;
+  // OFF-VERCEL OV3: a release says so with WS_RELEASE=1, and its channel (WS_CHANNEL) names the origin
+  // it carries from: its own domain, never the old host.
   const release =
-    process.env.VERCEL_ENV === "production" ||
+    process.env.WS_RELEASE === "1" ||
     (process.env.GITHUB_EVENT_NAME === "push" && process.env.GITHUB_REF === "refs/heads/main");
   const previousOrigin =
     process.env.WS_PREVIOUS_DEPLOY_ORIGIN ??
-    (release ? "https://wildshard-singleplayer.vercel.app" : undefined);
+    (release ? channelOrigin(process.env.WS_CHANNEL) : undefined);
   // ci.yml's test build opts in: an unreachable production (a 5xx, a network error) is no previous deploy there.
-  // A Vercel production build never does, so a release still refuses rather than ship without the kept graphs.
+  // A release build never does, so it still refuses rather than ship without the kept graphs.
   const optional =
-    process.env.WS_PREVIOUS_DEPLOY_OPTIONAL === "1" && process.env.VERCEL_ENV !== "production";
+    process.env.WS_PREVIOUS_DEPLOY_OPTIONAL === "1" && process.env.WS_RELEASE !== "1";
   console.log(
     "Previous deploy chunks:",
     await carryPreviousDeploy(outDir, {
@@ -263,4 +266,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
       optional,
     }),
   );
+
+  // OFF-VERCEL OV3: dist/ is the Workers asset directory. Refuse what Workers static assets would refuse.
+  if (outDir === resolve("dist")) console.log(`Asset limits: ${describeAssetLimits(assertAssetLimits(outDir))}`);
 }

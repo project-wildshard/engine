@@ -8,6 +8,7 @@ import {createServer} from 'node:http';
 import {homedir} from 'node:os';
 import {join,resolve as resolvePath} from 'node:path';
 import {linkNodeModules} from './link-node-modules.mjs';
+import {sourceBuildId} from './app-build/buildIdentity.mjs';
 import {browserPool} from './parity/pool.mjs';
 import {serve} from './parity/serve.mjs';
 import {bootCase} from './parity/boot-smoke.mjs';
@@ -44,7 +45,7 @@ try {
   const files=join(work,'tree-files.json');
   writeFileSync(files,JSON.stringify({root:realpathSync(tree),files:execFileSync('git',['ls-tree','-r','--name-only','-z','HEAD'],{encoding:'utf8',maxBuffer:16*1024*1024}).split('\0').filter(file=>file!=='')}));
   execFileSync('python3',['scripts/heavy-lane.py','build','--',process.execPath,'scripts/build-app.mjs'],{
-    cwd:tree,env:{...process.env,VERCEL_GIT_COMMIT_SHA:sha,WILDSHARD_CATALOGUE:catalogue,WS_GENERATION_TREE_FILES:files,WS_GENERATION_TREE_ROOT:realpathSync(tree)},stdio:'inherit',timeout:300000});
+    cwd:tree,env:{...process.env,WS_BUILD_ID:sourceBuildId(sha),WILDSHARD_CATALOGUE:catalogue,WS_GENERATION_TREE_FILES:files,WS_GENERATION_TREE_ROOT:realpathSync(tree)},stdio:'inherit',timeout:300000});
   const dist=join(tree,'dist'),{build}=JSON.parse(readFileSync(join(dist,'version.json'),'utf8'));
   const cooked=join(work,'cooked');
   node(['scripts/ring-cook.mjs',`--out=${cooked}`,`--build=${build}`]);

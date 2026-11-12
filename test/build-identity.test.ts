@@ -2,8 +2,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the fixture's declared document entries.
 import { join, resolve } from 'node:path';
-import { expect, test } from 'vitest';
-import { BUILD_ID_EXPRESSION, stampBuildDocuments, stampBuildHtml } from '../scripts/app-build/buildIdentity.mjs';
+import { expect, test, vi } from 'vitest';
+import { BUILD_ID_EXPRESSION, newBuildId, sourceBuildId, stampBuildDocuments, stampBuildHtml } from '../scripts/app-build/buildIdentity.mjs';
 
 test('deploy identities change the document while its module URLs and runtime expression stay stable', () => {
   const html = '<!doctype html><html><head><meta charset="utf-8"><script type="module" src="/assets/main-aaaaaaaa.js"></script></head></html>';
@@ -57,4 +57,15 @@ test('changing exact admission receipts changes the document, not its executable
   const escaped = stampBuildHtml(html, 'valid', {validator: 'a'.repeat(64), verdicts: [{value: '</script><script>unsafe'}]});
   expect(escaped.match(/<\/script>/gu)).toHaveLength(2);
   expect(escaped).toContain(String.raw`\u003c/script>`);
+});
+
+test('the build id comes from WS_BUILD_ID only, never VERCEL_GIT_COMMIT_SHA (OFF-VERCEL OV3)', () => {
+  try {
+    vi.stubEnv('WS_BUILD_ID', 'a'.repeat(40)); vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'b'.repeat(40));
+    expect(newBuildId()).toBe('a'.repeat(40));
+    vi.stubEnv('WS_BUILD_ID', undefined);
+    expect(newBuildId()).not.toMatch(/^bbbbbbb/u);
+    expect(sourceBuildId('c'.repeat(40), 36)).toBe('ccccccc-10');
+    expect(sourceBuildId('', 35)).toBe('b-z');
+  } finally { vi.unstubAllEnvs(); }
 });

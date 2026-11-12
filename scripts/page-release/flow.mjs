@@ -203,7 +203,7 @@ export function buildEnv(channel, deps) {
   return {
     WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: 'test/pins/catalogue.json',
     WILDSHARD_RELEASE_URL: channel.release, WILDSHARD_RELEASE_KEY: deps.releaseKey ?? RELEASE_PUBLIC_KEY,
-    WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin,
+    WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin, WS_RELEASE: '1', WS_CHANNEL: channel.channel,
   };
 }
 

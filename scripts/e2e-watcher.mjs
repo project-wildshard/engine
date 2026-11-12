@@ -35,7 +35,7 @@ mkdirSync(e2e, { recursive: true });
 process.env.WS_BUILD_ID = BUILD_ID;
 process.env.WS_APP_DEFER_PUBLIC_COPY = '1';
 // A local smoke build: never a release that carries the previous production deploy's chunks over the network.
-for (const name of ['VERCEL_ENV', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'WS_PREVIOUS_DEPLOY_DIR', 'WS_PREVIOUS_DEPLOY_ORIGIN']) delete process.env[name];
+for (const name of ['WS_RELEASE', 'WS_CHANNEL', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'WS_PREVIOUS_DEPLOY_DIR', 'WS_PREVIOUS_DEPLOY_ORIGIN']) delete process.env[name];
 const { prepareAppBuild, finishAppBuild } = await import('./app-build-pipeline.mjs');
 const { build } = await import(pathToFileURL(join(root, 'node_modules/vite/dist/node/index.js')).href);
 

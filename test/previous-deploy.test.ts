@@ -5,7 +5,7 @@ import {join, resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the production manifest/body HTTP path locally.
 import {createServer} from 'node:http';
 import {expect, test} from 'vitest';
-import {carryPreviousDeploy} from '../scripts/app-build/previousDeploy.mjs';
+import {carryPreviousDeploy, channelOrigin} from '../scripts/app-build/previousDeploy.mjs';
 import {KEEP_PROMOTED} from '../scripts/prune-deployments.mjs';
 
 test('a deploy carries the kept builds unchanged, but never one past the prune, nor a map', async () => {
@@ -206,4 +206,16 @@ test('a paused production origin (503) stops a release build, but a CI test buil
     await new Promise<void>((resolve, reject) => {server.close(error => {if (error === undefined) resolve(); else reject(error);});});
     rmSync(root, {recursive: true, force: true});
   }
+});
+
+test('a release carries from its own channel, never a vercel.app address (OFF-VERCEL OV3)', () => {
+  expect(channelOrigin('production')).toBe('https://play.wildshard.io');
+  expect(channelOrigin('staging')).toBe('https://staging.wildshard.io');
+  // CI's main push names no channel: it builds what production ships.
+  expect(channelOrigin(undefined)).toBe('https://play.wildshard.io');
+  expect(channelOrigin('')).toBe('https://play.wildshard.io');
+  for (const wrong of ['preview', 'constructor', 'wildshard-singleplayer.vercel.app']) expect(() => channelOrigin(wrong)).toThrow(/WS_CHANNEL/u);
+  const pipeline = readFileSync('scripts/app-build-pipeline.mjs', 'utf8');
+  expect(pipeline).not.toMatch(/vercel\.app|VERCEL_ENV/u);
+  expect(pipeline).toContain('process.env.WS_RELEASE === "1"');
 });

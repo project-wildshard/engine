@@ -102,6 +102,20 @@ function ownBuild(build) {
   try { execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], {stdio: 'ignore'}); return true; } catch { return false; }
 }
 
+/** @type {Readonly<Record<string, string>>} */
+const CHANNEL_ORIGINS = Object.freeze({production: 'https://play.wildshard.io', staging: 'https://staging.wildshard.io'});
+
+/** OFF-VERCEL OV3: a release carries the kept builds from its own channel's domain, never a vercel.app address. A main
+ * push on CI names no channel and builds what production ships, so it carries from production.
+ * @param {string | undefined} channel  WS_CHANNEL
+ * @returns {string} */
+export function channelOrigin(channel) {
+  const name = channel === undefined || channel === '' ? 'production' : channel;
+  const origin = Object.hasOwn(CHANNEL_ORIGINS, name) ? CHANNEL_ORIGINS[name] : undefined;
+  if (origin === undefined) throw new Error(`WS_CHANNEL must be ${Object.keys(CHANNEL_ORIGINS).join(' or ')}, not ${name}`);
+  return origin;
+}
+
 /** Carry files from a built previous output (local --rev proof), or production's published manifest. The new manifest
  * names each graph once; the build's own files stay unchanged, and a carried file is never a source map.
  * A kept graph that collides with a path this build writes is dropped with a warning, unless it is the build live at

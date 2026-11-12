@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { linkNodeModules } from '../link-node-modules.mjs';
+import { sourceBuildId } from '../app-build/buildIdentity.mjs';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -111,7 +112,7 @@ function readJsonNumber(path) {try{return Number(readFileSync(path,'utf8'));}cat
 /** @param {string} tree @param {string} sha */
 function buildTree(tree,sha) {
   /** @type {import('node:child_process').ExecFileSyncOptions} */
-  const options={cwd:tree,env:{...process.env,VERCEL_GIT_COMMIT_SHA:sha},stdio:'pipe',maxBuffer:16*1024**2};
+  const options={cwd:tree,env:{...process.env,WS_BUILD_ID:sourceBuildId(sha)},stdio:'pipe',maxBuffer:16*1024**2};
   // Use this harness's lane even when the historical oracle predates it. One lease owns the whole build pipeline.
   const lane=fileURLToPath(new URL('../heavy-lane.py',import.meta.url));
   execFileSync('python3',[lane,'build','--','bash','-c',
