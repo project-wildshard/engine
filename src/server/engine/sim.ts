@@ -668,6 +668,7 @@ export class SimHost {
   startStrike(sourceId: string, targetId: string): boolean {
     const started = this.beginStrike(sourceId, targetId, this.weapons.get(sourceId)), input = this.tickCommands?.get(sourceId);
     if (started && input !== undefined && 'seq' in input) this.strikeSeqs.set(sourceId, input.seq);
+    if (started) this.players.get(sourceId)?.swung(0, false); // RP6: others see a player's strike start
     return started;
   }
   private beginStrike(sourceId: string, targetId: string, spec: StrikeSpec | undefined): boolean {

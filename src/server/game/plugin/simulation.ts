@@ -1074,7 +1074,7 @@ export function installNativeMelee(host: SimHost, weapon: { readonly id: string;
       const claimed = action.hook === null ? row.mode === 'timed' ? family.swing(action.move) : family.claim(action.move)
         : startMeleeSecondary(family, ports.hook ?? null, { tick: ports.hookTick?.() ?? host.state.tick, dt, action: action.hook, move: action.move }) !== null;
       if (!claimed) return;
-      attackSeq=tickSeq; if (tickSeq !== 0) player.swing.seq = tickSeq;
+      attackSeq=tickSeq; player.swung(tickSeq, family.row(action.move).heavy);
       if (row.mode === 'timed') { aimed.target = command.targetId ?? null; aimed.world = command.world ?? null; }
       else {
         if (action.aim === 'facing') { eye(from); const cos = Math.cos(pitch); direction.set(-Math.sin(player.yaw) * cos, Math.sin(pitch), -Math.cos(player.yaw) * cos); }

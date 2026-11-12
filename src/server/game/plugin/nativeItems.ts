@@ -111,7 +111,7 @@ function lookAlong(player: PlayerSim, frame: NativeCombatFrame, height: number, 
   eye.set(p.x, p.y + height, p.z); dir.set(-Math.sin(player.yaw) * level, Math.sin(frame.pitch), -Math.cos(player.yaw) * level);
 }
 /** A shot left on `seq`: the owner block says so, which is how a client tells a confirmed start from a refused one (P1-E5.3-E5). */
-function noteShot(player: PlayerSim, seq: number): void { if (seq !== 0) player.swing.seq = seq; }
+function noteShot(player: PlayerSim, seq: number): void { player.swung(seq, false); }
 function windAt(frame: NativeCombatFrame, x: number, z: number, out: Vector3): Vector3 | null {
   const wind = frame.wind; if (wind === null) return null;
   const speed = wind.base + wind.scale * fieldGustAt(x, z, wind.clock.time, wind.clock.gust, wind.field);

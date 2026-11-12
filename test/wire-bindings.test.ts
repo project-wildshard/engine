@@ -22,15 +22,23 @@ const columns = (list: NetClass<never>['row']): FrozenColumn[] => list.map(({ na
 
 test('the bound classes hash to the descriptors, which are engine main\'s v0 wire', () => {
   expect(NET_SCHEMA_HASH).toBe(v0SchemaHash(WIRE_CLASSES));
-  expect(NET_SCHEMA_HASH).toBe(516_954_244); // with animal.species (TE-ENG7)
+  expect(NET_SCHEMA_HASH).toBe(2_038_956_392); // with animal.species (TE-ENG7) and player swing, heavy, air (RP6)
 });
 
-test('every compiled column is cfd6681\'s; the player gains only its spawn name, the animal its species', () => {
+/** REMOTE-PLAYERS RP6: the player row others get, after `held`: a swing count, its weight and the airborne bit. */
+const RP6 = ['swing', 'heavy', 'air'];
+
+test('every compiled column is cfd6681\'s; the player gains its spawn name and RP6\'s row fields, the animal its species', () => {
   expect(NET_CLASSES.map(entry => entry.cls)).toEqual(FROZEN.map(entry => entry.cls));
   for (const [index, entry] of NET_CLASSES.entries()) {
     const frozen = FROZEN[index];
     expect(entry.id).toBe(frozen?.id);
-    expect(columns(entry.row)).toEqual(frozen?.row);
+    expect(columns(entry.row).filter(column => entry.cls !== 'player' || !RP6.includes(column.name))).toEqual(frozen?.row);
+    if (entry.cls === 'player') {
+      const names = entry.row.map(column => column.name), held = names.indexOf('held');
+      expect(names.slice(held + 1, held + 4)).toEqual(RP6);
+      expect(columns(entry.row).slice(held + 1, held + 4).map(({ kind, bits }) => [kind, bits])).toEqual([['u8', 8], ['bool', 1], ['bool', 1]]);
+    }
     expect(columns(entry.owner)).toEqual(frozen?.owner);
     expect(columns(entry.initial)).toEqual(frozen?.initial);
     expect(entry.radius).toBe(frozen?.radius);

@@ -100,6 +100,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       actor: player.health, combat, targets, hook: own.get(row.id) ?? null,
       // HS5: a blow's status (the whip heavy's poison) goes to the room's status owner, the page's EffectService on the server.
       effect: (target, effect, source) => { status.apply(target, effect, source); }, active: () => player.health.alive,
+      // RP6: others see a kit strike start; the owner's confirming seq stays the blow's own `attackSeq`.
+      changed: (_item, phase, heavy) => { if (phase === 'fire') player.swung(0, heavy === true); },
     })] as const));
     const seated = new Map([...levers].map(([id, { profile }]) => {
       const store = { reserve: profile.reserve };
@@ -172,7 +174,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
     if (act.phase === 'reload') { act.triggerWhileReloading(); return; }
     if (act.phase !== 'idle') return;
     if (!act.chambered) { seat.sinceEmpty = 0; if (act.tube > 0) act.throwLever(); else act.beginReload(); return; }
-    act.dropHammer();
+    act.dropHammer(); player.swung(0, false);
     hitscan(player, lever.row, lever.profile, direction, seq);
   };
   const near = (player: PlayerSim, scene: string): boolean => {

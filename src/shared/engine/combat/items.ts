@@ -21,7 +21,8 @@ export interface ItemPorts {
   active?: () => boolean;
   actor: Actor; combat: Pick<CombatPipeline, 'hit'>; targets: () => readonly ItemTarget[];
   hook: ItemHook | null; effect: (target: Actor, effect: EffectId, source: Actor) => void;
-  changed?: (item: ItemRuntime, phase: 'fire' | 'hit' | 'light') => void;
+  /** `heavy`: on `fire`, whether the strike was the heavy one. */
+  changed?: (item: ItemRuntime, phase: 'fire' | 'hit' | 'light', heavy?: boolean) => void;
 }
 /** Validated contact presentation; the owning weapon forwards it through normal equipment events. */
 export interface ItemContact { kind: string; headshot: boolean; killed: boolean }
@@ -74,7 +75,7 @@ export class ItemRuntime {
   }
   /** `heavy`: on `fire`, whether the strike that started was the heavy one (a held view swings to match, TE-ENG4). */
   private notify(phase: 'fire' | 'hit' | 'light', contact?: ItemContact, heavy?: boolean): void {
-    this.ports.changed?.(this, phase); for (const observer of this.observers) observer(phase, contact, heavy);
+    this.ports.changed?.(this, phase, heavy); for (const observer of this.observers) observer(phase, contact, heavy);
   }
   get remainingFuel(): number { return this.fuel; }
   get lightOn(): boolean { return this.lit; }

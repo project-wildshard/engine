@@ -100,7 +100,7 @@ export function installNativeSweptMelee(host: SimHost, items: readonly unknown[]
       { start: (move, dash) => {
         state.struck = false; state.opened = false; state.swings++;
         seq.swing = seq.pressing ? current.seq ?? 0 : seq.chained ?? current.seq ?? 0; seq.chained = null;
-        if (seq.swing !== 0) player.swing.seq = seq.swing;
+        player.swung(seq.swing, move === profile.moves.heavy);
         if (blade !== null) { blade.pose.startSwing(); blade.sweep.reset(); blade.struck.length = 0; }
         if (state.aimed) state.target = aimedBody(profile, move);
         if (dash) lunge(profile, move); ports.alarm();

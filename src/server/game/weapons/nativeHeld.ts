@@ -124,7 +124,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
     if (mount === undefined) throw new Error('Weapons require actual native riding');
     // On the wire a start is the command that made it, and what it lands says so: a page lets go of a swing no one owns.
     let seq=0,pressing=false,chained:number|null=null,swing=0;
-    const started=():void=>{if(swing!==0)player.swing.seq=swing;};
+    const started=(heavy:boolean):void=>{player.swung(swing,heavy);};
     // SS4: the page's stealth hears every weapon fire and scales the bow's hits and the javelin's flight by the sneak shot.
     const fired=():void=>{nativeStealthOf(host)?.of(player).noteShot();},sneak=():number=>nativeStealthOf(host)?.of(player).sneakMultiplier()??1;
     let slot=slots.selection.initial??bowSlot.id,queued=false,aim=0,pitch=0,ammo=thrown.carried,bolts=bow.base.quiver,weaponsEnabled=true;
@@ -211,7 +211,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
     }};
     const pose=():void=>{const p=player.position;eye.set(p.x,p.y+1.68,p.z);rotation.setFromEuler(euler.set(pitch,player.yaw,0));forward.set(0,0,-1).applyQuaternion(rotation);};
     const clock=new SweptMeleeCore(bladeMoves,melee,{queue:()=>{queued=true;chained=seq;},consume:()=>{const before=queued;queued=false;return before;}},{
-      start:(move,lunge)=>{swing=pressing?seq:chained??seq;chained=null;started();fired();moves.push(move.name);if(moves.length>64)moves.shift();sweep.reset();retiredContacts.clear();basePose.startSwing();
+      start:(move,lunge)=>{swing=pressing?seq:chained??seq;chained=null;started(move===bladeMoves.heavy);fired();moves.push(move.name);if(moves.length>64)moves.shift();sweep.reset();retiredContacts.clear();basePose.startSwing();
         const heavy=move===bladeMoves.heavy;
         const target=lunge?pickLunge(targets(),player.position,player.yaw,heavy?melee.lunge.heavyRange:melee.lunge.range,melee.lunge.cone):null;
         if(target!==null){const feet=player.position,dash=sweptLunge(melee.lunge,heavy,target.position.x-feet.x,target.position.z-feet.z,targetRadius(target));
@@ -251,7 +251,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
         shotSpread(forward,MathUtils.degToRad(spread),random,bow.base.loose??{radius:'sqrt',axisScale:1},scratch);
         eye.addScaledVector(forward,bowMuzzle(bow.base));velocity.copy(forward).multiplyScalar(bowLaunchSpeed(bow.base,1));
         velocity.x+=saddle.carrier.x;velocity.y+=saddle.carrier.y;velocity.z+=saddle.carrier.z;
-        fired();arrows.launch(eye,velocity,{damageScale:bow.base.damageScale,onHitScale:sneak}).seq=swing=seq;started();bolts--;shots++;
+        fired();arrows.launch(eye,velocity,{damageScale:bow.base.damageScale,onHitScale:sneak}).seq=swing=seq;started(false);bolts--;shots++;
       }
       aimOn=bowAimOn({asked:aim>0,enabled:enabled&&slot===bowSlot.id,running:blocked.running,swimming:player.swim.on});
       aimBlend+=((aimOn?1:0)-aimBlend)*Math.min(1,dt*bow.base.aimIn);if(Math.abs(aimBlend-(aimOn?1:0))<.002)aimBlend=aimOn?1:0;
@@ -282,7 +282,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
             }});
         }
       }else clock.stop();
-      if(pressed&&slot===spearSlot.id&&enabled){polearm.attackPending=true;swing=seq;started();}
+      if(pressed&&slot===spearSlot.id&&enabled){polearm.attackPending=true;swing=seq;started(false);}
       polearm.stow(slot===spearSlot.id,enabled);
       const out=polearm.decide(dt,host.clock.now,{player:player.position,heading:mounted?.yaw??player.yaw,held:slot===spearSlot.id,
         enabled,ads:slot===spearSlot.id&&aim>0,ammo,capacity:thrown.carried,mount:mounted,targets:targets(),

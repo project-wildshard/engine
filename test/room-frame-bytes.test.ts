@@ -73,8 +73,10 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
 
 /** Taken on engine main 2887bd63, before the first change; re-taken for TE-ENG7, whose `animal.species` adds one
  *  initial text to every creature spawn (an empty one for Nalati's native bodies). Re-taken for ENG-18: three far bots
- *  of this bare resident fell through to y -300 for ever; its fall net now puts them back at the spawn. */
-const EXPECTED = '5857ce77a0faf690b61a775431a1750f337cdad285a36846b96d9ba6878c3b2e';
+ *  of this bare resident fell through to y -300 for ever; its fall net now puts them back at the spawn. Re-taken for
+ *  REMOTE-PLAYERS RP6, whose player row for others carries a swing count, its weight and the airborne bit. */
+const EXPECTED = 'ec39f2f4231bbcdc5c45c4f4422eaa042c81d756754255c5e9a5f2eca2753bb5';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
- *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. */
-const EXPECTED_ROOM = '9385d89a7ebaf1d9e37e1fd89270a491a14edf9eab9e0d0a8caa8e3d848c9890';
+ *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
+ *  for RP6 as above. */
+const EXPECTED_ROOM = '68fdb24740c2032364b6fd18861e10be1b5d33841a6fa4e9e62b45e76cb5fc80';

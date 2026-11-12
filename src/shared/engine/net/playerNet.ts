@@ -28,6 +28,11 @@ export const PLAYER_NET: NetSchema<PlayerSim> = bindClass<PlayerSim, typeof PLAY
   maxHp: player => Math.ceil(player.health.attributes.maxHealth),
   statusStun: player => player.health.attributes['statusStun'] ?? 0,
   held: player => player.held,
+  // REMOTE-PLAYERS RP6: what another page animates. The owner has its own swing and ground.
+  swing: player => player.swing.count,
+  heavy: player => player.swing.heavy,
+  // Off the ground under its own motion: a cable, a stun and a boat's deck pin the body with `grounded` false and no vertical speed.
+  air: player => !player.fall.grounded && !player.swim.on && !player.carried && !player.moveLocked && player.velocity.y !== 0,
   px: player => player.position.x,
   py: player => player.position.y,
   pz: player => player.position.z,

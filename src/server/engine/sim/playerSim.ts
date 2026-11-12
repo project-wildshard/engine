@@ -56,8 +56,9 @@ export class PlayerSim implements PlayerMotionState {
   held = 0;
   /** The Name others see over this body (Q89). A world with one player has no one to tell. */
   netName = '';
-  /** For the wire (P1-E5.3-E1): seconds into the running swing, null with none, and the `seq` of the last swing or shot that left. The seats write it each tick and keep the saved truth. */
-  readonly swing: { t: number | null; seq: number } = { t: null, seq: 0 };
+  /** For the wire (P1-E5.3-E1): seconds into the running swing, null with none, and the `seq` of the last swing or shot that left. The seats write it each tick and keep the saved truth.
+   *  For others (REMOTE-PLAYERS RP6): `count` moves by one on each swing or shot, wrapping at 256, and `heavy` says whether that swing was the heavy. Never saved: a restore starts the count again. */
+  readonly swing: { t: number | null; seq: number; count: number; heavy: boolean } = { t: null, seq: 0, count: 0, heavy: false };
   /** Transient world velocity (m/s), the client Player's impulse law (player/impulse.ts). */
   readonly impulse: Vector3 = new Vector3();
   /** The one world velocity (m/s, y negative = falling) through every mode, the client Player's `velocity`. */
@@ -89,6 +90,11 @@ export class PlayerSim implements PlayerMotionState {
   readonly dash: DashState = { t: 0, vx: 0, vz: 0 };
   /** The dodge clocks (cooldown, the burst's i-frames read by its health's `dodging`). */
   readonly dodge: DodgeState = { cd: 0, t: 0 };
+  /** A swing or shot left on the command `seq` (0: none named it): the owner's block confirms it, and others see the count move. */
+  swung(seq: number, heavy: boolean): void {
+    if (seq !== 0) this.swing.seq = seq;
+    this.swing.count = (this.swing.count + 1) & 0xff; this.swing.heavy = heavy;
+  }
   /** The fixed step the swell reads: the host's own. */
   get tick(): number { return this.host.state.tick; }
   /** The board's live speed cap where something rules one (the grid, GridSimulation): the page's `hoverSpeedLimit`. Never saved:
