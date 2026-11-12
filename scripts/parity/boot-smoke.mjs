@@ -406,7 +406,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     const report = bootErrorReport(request.url(), request.method(), request.postData());
     if (bootLifecycleDiagnostic(report, gridNavigationObserved)) { await answerApi(route); return; }
     // Same-origin, the static server answers (the old transport failure); cross-origin it would be the real API.
-    const from = request.headers()['origin'];
+    const from = request.headers().origin;
     if (from === undefined || from === new URL(request.url()).origin) { await route.continue(); return; }
     await answerApi(route, 404);
   });
