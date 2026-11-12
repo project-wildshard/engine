@@ -26,6 +26,7 @@ const option = (name, fallback) => {
   return args.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 };
 const root = resolve(option('root', process.cwd())), outDir = resolve(root, option('outDir', 'dist'));
+const contentDir = `${outDir}-content`;
 const port = Number(option('port', '4173')), host = option('host', '127.0.0.1');
 if (!existsSync(outDir)) throw new Error(`preview-server: no build in ${outDir}`);
 // Local anonymous telemetry is recorded outside every public build, never sent
@@ -108,9 +109,10 @@ async function sendEncoded(encoded, res) {
 /** a file in the build for a URL path, never outside it (`.html` rewrites as the preview server did) */
 function lookup(pathname) {
   const candidates = pathname.endsWith('/') ? [`${pathname}index.html`] : [pathname, ...(extname(pathname) === '' ? [`${pathname}.html`] : [])];
-  for (const candidate of candidates) {
-    const file = resolve(outDir, `.${candidate}`);
-    if (file !== outDir && !file.startsWith(outDir + sep)) continue;
+  // PAGE-SIZE PZ4: a split build:game keeps content in dist-content/ beside the page, at the same paths
+  for (const dir of [outDir, contentDir]) for (const candidate of candidates) {
+    const file = resolve(dir, `.${candidate}`);
+    if (file !== dir && !file.startsWith(dir + sep)) continue;
     try { const stat = statSync(file); if (stat.isFile()) return { file, stat }; } catch { /* not there */ }
   }
   return null;

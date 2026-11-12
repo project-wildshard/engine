@@ -8,3 +8,6 @@ export function classify(path: string, shards: ReadonlySet<string>): {kind: stri
 export function carriedPaths(dir: string): {builds: number; paths: Set<string>} | undefined;
 export function pageSize(dir: string): PageSize;
 export function formatPageSize(report: PageSize): string;
+/** PZ4, D1 yes: a page holds at most 1,000 files and 100 MB, maps left out. */
+export const PAGE_LIMITS: Readonly<{files: number; bytes: number}>;
+export function gatePage(report: PageSize, limits?: {files: number; bytes: number}): string[];

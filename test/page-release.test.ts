@@ -100,7 +100,7 @@ test('the four phases run in order and move the alias last', async () => {
   const {deps, calls, lines} = rig();
   await through(deps, 'go-live');
   expect(fetched(calls)).toEqual([
-    'prepare', 'run pnpm build:game', 'package', 'state build',
+    'prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'packs.publish', 'upload', 'state upload',
     'deployedDigests', 'packs.verify', 'state check',
     'deployedDigests', 'goLive', 'state go-live',
@@ -116,7 +116,7 @@ test('--content publishes the content set before the packs and the page (PAGE-SI
     return Promise.resolve({set: '0123456789abcdef', base: 'https://packs.wildshard.io/content/0123456789abcdef/', files: 5, bytes: 50, uploaded: 2, uploadedBytes: 20, held: 3, cors: context.cors});
   }};
   await through(deps, 'upload');
-  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
+  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
   expect(seen).toEqual([{dir: '/out', cors: CHANNELS.staging.origin, dryRun: false}]);
   deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.staging.origin})};
   await expect(runPhase('upload', deps)).rejects.toThrow(/content: 3 held \+ 1 uploaded is not 5/u);
@@ -256,7 +256,7 @@ test('preview is the solo game: no release file, no packs, no gate, and the alia
   deps.run = (file, args, env) => { seen.push(env); run(file, args, env); };
   await through(deps, 'go-live');
   expect(fetched(calls)).toEqual([
-    'prepare', 'run pnpm build:game', 'package', 'state build',
+    'prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'upload', 'state upload',
     'deployedDigests', 'state check',
     'deployedDigests', 'goLive', 'state go-live',

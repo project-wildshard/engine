@@ -11,11 +11,13 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { contentDirOf } from './app-build/splitOutput.mjs';
 
 export const BASELINE_FILE = 'budgets/shard-size-baseline.json';
 const MB = bytes => `${(bytes / 1e6).toFixed(2)} MB`;
 
-/** Each product's phone download from a built `dist`, or null for a build with no packs book (a native or SDK output). A
+/** Each product's phone download from a built `dist` (its book in `dist-content/` when split), or null for a build with
+ * no packs book (a native or SDK output). A
  * cooked row (`<slug>-whole-phone-`, written by `cook-worker bake`) names only the shard's half, and that page reads the
  * engine half too, so the gate reads both: what a phone gets, not what the row lists.
  * @param {string} dist
@@ -24,11 +26,14 @@ export function readPhoneDownloads(dist) {
   // This build's own book by its id: a deploy carries older builds' files into dist beside it.
   const version = resolve(dist, 'version.json');
   if (!existsSync(version)) return null;
-  const { build } = JSON.parse(readFileSync(version, 'utf8')), book = resolve(dist, `assets/spawn/packs-${build}.json`);
-  if (!existsSync(book)) return null;
-  const { client } = JSON.parse(readFileSync(book, 'utf8'));
+  // PAGE-SIZE PZ4: build:game splits the page, so the books sit in dist-content/; build-app.mjs's own run reads the
+  // whole dist before the split.
+  const { build } = JSON.parse(readFileSync(version, 'utf8'));
+  const books = [contentDirOf(dist), resolve(dist)].find(dir => existsSync(resolve(dir, `assets/spawn/packs-${build}.json`)));
+  if (books === undefined) return null;
+  const { client } = JSON.parse(readFileSync(resolve(books, `assets/spawn/packs-${build}.json`), 'utf8'));
   const cooked = row => /-whole-phone-[a-f0-9]+\.json$/u.test(row.phone.url ?? '');
-  const engine = Object.values(client).some(cooked) ? JSON.parse(readFileSync(resolve(dist, `assets/spawn/engine-${build}.json`), 'utf8')).client.phone.wireBytes : 0;
+  const engine = Object.values(client).some(cooked) ? JSON.parse(readFileSync(resolve(books, `assets/spawn/engine-${build}.json`), 'utf8')).client.phone.wireBytes : 0;
   return Object.fromEntries(Object.entries(client).map(([slug, row]) => [slug, row.phone.wireBytes + (cooked(row) ? engine : 0)]));
 }
 

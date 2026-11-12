@@ -40,6 +40,8 @@ jobs:
       - run: pnpm build:game
         env:
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      # PAGE-SIZE PZ4: build:game splits dist/ from dist-content/; this job serves the whole game from dist.
+      - run: node scripts/app-build/splitOutput.mjs dist --join
       - name: Prove the exact admitted head through the unchanged nightly path
         shell: bash
         run: |

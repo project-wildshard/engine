@@ -6,7 +6,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as the release receipt does.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {classify, formatPageSize, pageSize} from '../scripts/page-size.mjs';
+import {PAGE_LIMITS, classify, formatPageSize, gatePage, pageSize} from '../scripts/page-size.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: true, force: true}); });
@@ -108,4 +108,18 @@ test('the CLI prints the table, or JSON, and refuses a folder that is not a page
   const refused = spawnSync(process.execPath, ['scripts/page-size.mjs', empty], {encoding: 'utf8'});
   expect(refused.status).not.toBe(0);
   expect(refused.stderr).toContain('holds no index.html');
+});
+
+test('the gate (PZ4, D1 yes) refuses content on the page and a page above 1,000 files or 100 MB; maps never count', () => {
+  const report = pageSize(fixture());
+  expect(PAGE_LIMITS).toEqual({files: 1000, bytes: 100_000_000});
+  const errors = gatePage(report);
+  expect(errors).toHaveLength(1);
+  expect(errors[0]).toContain('dist/ holds 26 content files');
+  const zero = {files: 0, bytes: 0, carriedFiles: 0, carriedBytes: 0};
+  const page = (files: number, bytes: number, maps = zero) => ({...report, total: {...zero, files: files + maps.files, bytes: bytes + maps.bytes},
+    kinds: {code: {...zero, files, bytes}, maps, 'shard content': zero, 'engine art': zero}});
+  expect(gatePage(page(1000, 100_000_000, {...zero, files: 500, bytes: 90_000_000}))).toEqual([]);
+  expect(gatePage(page(1001, 10))[0]).toContain('1,001 files, past the 1,000');
+  expect(gatePage(page(10, 100_000_001))[0]).toContain('100.0 MB, past the 100 MB');
 });

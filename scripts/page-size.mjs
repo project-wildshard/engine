@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // PAGE-SIZE PZ1 (meta docs/plans/PAGE-SIZE-PLAN.md, J276): what a built page holds, by kind, and how much of it the
-// carried builds (MF2, deploy-chunks.json) brought in. Report only: the gate is PZ4.
+// carried builds (MF2, deploy-chunks.json) brought in. With --gate (PZ4, build:game runs it on the split page) it refuses a
+// page that holds content, or one past PAGE_LIMITS.
 //
-//   node scripts/page-size.mjs <dist | .vercel/output/static> [--json]
+//   node scripts/page-size.mjs <dist | .vercel/output/static> [--json] [--gate]
 //
 // Kinds: code (`b/`), shell (the documents, worker, root JSON, fonts, icons), runtime (what boot needs from the engine:
 // `assets/physics/`, `basis/`), engine art (every other `assets/` file, the trailers, the crossroads rig), shard content
@@ -142,6 +143,23 @@ const mb = bytes => (bytes / 1e6).toLocaleString('en-US', { minimumFractionDigit
 /** @param {number} count */
 const n = count => count.toLocaleString('en-US');
 
+/** D1 yes (J276): the page is code, shell and runtime, at most 1,000 files and 100 MB (with D1 no it would be 450 MB).
+ * Maps never count: they go to Sentry and are stripped before any upload. */
+export const PAGE_LIMITS = Object.freeze({files: 1000, bytes: 100e6});
+
+/** The gate's refusals, none for a page within its limits.
+ * @param {ReturnType<typeof pageSize>} report @param {{files: number, bytes: number}} [limits] @returns {string[]} */
+export function gatePage(report, limits = PAGE_LIMITS) {
+  const errors = [], zero = tally(), maps = report.kinds.maps ?? zero;
+  const content = [report.kinds['shard content'] ?? zero, report.kinds['engine art'] ?? zero];
+  const contentFiles = content.reduce((sum, row) => sum + row.files, 0), contentBytes = content.reduce((sum, row) => sum + row.bytes, 0);
+  if (contentFiles > 0) errors.push(`page-size gate: dist/ holds ${n(contentFiles)} content files (${mb(contentBytes)} MB); shard content and engine art go to dist-content/ (node scripts/app-build/splitOutput.mjs)`);
+  const pageFiles = report.total.files - maps.files, bytes = report.total.bytes - maps.bytes;
+  if (pageFiles > limits.files) errors.push(`page-size gate: the page holds ${n(pageFiles)} files, past the ${n(limits.files)} a page may hold (PAGE-SIZE D1)`);
+  if (bytes > limits.bytes) errors.push(`page-size gate: the page holds ${mb(bytes)} MB, past the ${limits.bytes / 1e6} MB a page may hold (PAGE-SIZE D1)`);
+  return errors;
+}
+
 /** The report as a Markdown table, as the plan prints it.
  * @param {ReturnType<typeof pageSize>} report @returns {string} */
 export function formatPageSize(report) {
@@ -166,10 +184,15 @@ export function formatPageSize(report) {
 }
 
 function main() {
-  const args = process.argv.slice(2), json = args.includes('--json'), dir = args.find(arg => arg !== '--json');
-  if (dir === undefined) throw new Error('usage: node scripts/page-size.mjs <dist | .vercel/output/static> [--json]');
+  const args = process.argv.slice(2), json = args.includes('--json'), gate = args.includes('--gate'), dir = args.find(arg => !arg.startsWith('--'));
+  if (dir === undefined) throw new Error('usage: node scripts/page-size.mjs <dist | .vercel/output/static> [--json] [--gate]');
   const report = pageSize(dir);
   console.log(json ? JSON.stringify(report, null, 2) : formatPageSize(report));
+  if (!gate) return;
+  const errors = gatePage(report);
+  for (const error of errors) console.error(error);
+  if (errors.length > 0) process.exitCode = 1;
+  else console.log(`page-size gate: pass, ${n(report.total.files - (report.kinds.maps?.files ?? 0))} files and ${mb(report.total.bytes - (report.kinds.maps?.bytes ?? 0))} MB without maps (limits ${n(PAGE_LIMITS.files)} files, ${PAGE_LIMITS.bytes / 1e6} MB)`);
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) main();

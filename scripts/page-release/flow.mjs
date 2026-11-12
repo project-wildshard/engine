@@ -142,6 +142,10 @@ export async function runPhase(phase, deps) {
     if (!dry) await deps.host.prepare(context);
     plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
     if (!dry) deps.run('pnpm', ['build:game'], {...env, ...deps.host.buildEnv(context)});
+    // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). No channel stamps a contentBase
+    // yet, so each page still serves its own content: join the two before packaging, until PZ8 ships the split.
+    plan('join dist-content/ back into dist/ (no channel has a contentBase yet)');
+    if (!dry) deps.run('node', ['scripts/app-build/splitOutput.mjs', 'dist', '--join'], {});
     for (const line of deps.host.describe('package', context)) plan(line);
     if (!dry) await deps.host.package(context);
     plan(`check ${deps.host.outputDir(context)} names ${channel.solo ? 'no release file' : channel.release} and build ${deps.build}`);

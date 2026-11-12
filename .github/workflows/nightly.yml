@@ -90,6 +90,8 @@ jobs:
       - run: pnpm build:game
         env:
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      # PAGE-SIZE PZ4: build:game splits dist/ from dist-content/; this job serves the whole game from dist.
+      - run: node scripts/app-build/splitOutput.mjs dist --join
       - name: Cold cook and real phone UI on each pinned head
         run: scripts/browser-lane.sh node scripts/nightly-heads.ts "${BROWSER}" "${GROUP}"
         env:

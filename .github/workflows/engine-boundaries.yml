@@ -47,6 +47,7 @@ jobs:
         run: |
           node scripts/pins.ts install
           pnpm build:game
+          node scripts/app-build/splitOutput.mjs dist --join
           node --import ./scripts/bake-loader.mjs scripts/catalogue-all-heads.ts dist
       - name: Check the full Nalati server herd tick budget
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

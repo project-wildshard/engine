@@ -22,14 +22,21 @@ const build = JSON.parse(readFileSync(resolvePath(dist, 'version.json'), 'utf8')
 /** @type {Record<string, string>} */
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ktx2': 'image/ktx2', '.glb': 'model/gltf-binary', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg' };
-/** @param {string} path */
-const fileOf = path => {
-  const file = resolvePath(dist, `.${decodeURIComponent(path)}`);
-  if (!file.startsWith(dist + sep)) return null;
+// PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). The content origin serves
+// dist-content/; the page origin serves dist/ alone, or both with --same-origin. A joined dist serves from dist/.
+const contentDist = `${dist}-content`;
+/** @param {string} root @param {string} path */
+const fileIn = (root, path) => {
+  const file = resolvePath(root, `.${decodeURIComponent(path)}`);
+  if (!file.startsWith(root + sep)) return null;
   if (existsSync(file) && statSync(file).isFile()) return file;
   const index = resolvePath(file, 'index.html');
   return existsSync(index) ? index : null;
 };
+/** @param {string} path */
+const pageFileOf = path => fileIn(dist, path) ?? (sameOrigin ? fileIn(contentDist, path) : null);
+/** @param {string} path */
+const contentFileOf = path => fileIn(contentDist, path) ?? fileIn(dist, path);
 /** @param {import('node:http').ServerResponse} response @param {string} file @param {string|undefined} range @param {Record<string,string>} extra */
 function send(response, file, range, extra) {
   const size = statSync(file).size, headers = { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'accept-ranges': 'bytes', 'cache-control': 'no-cache', ...extra,
@@ -56,7 +63,7 @@ const pageServer = createServer((request, response) => {
     response.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store', 'set-cookie': 'pz3=page; Path=/; SameSite=Lax' }).end(stampContentBase(readFileSync(resolvePath(dist, 'index.html'), 'utf8'), sameOrigin ? '' : contentOrigin));
     return;
   }
-  const file = fileOf(path);
+  const file = pageFileOf(path);
   if (file === null) { response.writeHead(404).end(); return; }
   send(response, file, request.headers.range, {});
 });
@@ -67,14 +74,14 @@ const contentServer = createServer((request, response) => {
   /** @type {Record<string, string>} */
   const cors = origin === pageOrigin ? { 'access-control-allow-origin': origin, vary: 'Origin', 'access-control-expose-headers': 'ETag, Content-Length, Content-Range', 'cross-origin-resource-policy': 'cross-origin' } : { 'cross-origin-resource-policy': 'cross-origin' };
   if (request.method === 'OPTIONS') { response.writeHead(204, { ...cors, 'access-control-allow-methods': 'GET, HEAD', 'access-control-allow-headers': 'Range' }).end(); return; }
-  const file = fileOf(path);
+  const file = contentFileOf(path);
   if (file === null) { response.writeHead(404, cors).end(); return; }
   send(response, file, request.headers.range, cors);
 });
 contentOrigin = `${await listen(contentServer)}/`;
 
 // shard content on the page origin: the product, programs, cooked spawn files, and each shard's art mounts (S1 to S7)
-const shards = new Set([...readdirSync(resolvePath(dist, 'shardfiles')), 'nalati', 'far-reach', 'nine-dragon', 'practice']);
+const shards = new Set([...readdirSync(resolvePath(existsSync(resolvePath(contentDist, 'shardfiles')) ? contentDist : dist, 'shardfiles')), 'nalati', 'far-reach', 'nine-dragon', 'practice']);
 const shardPrefixes = ['/shardfiles/', '/programs/', '/assets/spawn/', ...[...shards].flatMap(shard => [`/assets/${shard}/`, `/assets/gpu/${shard}/`, `/assets/baked/${shard}/`])];
 /** @param {string} path */
 const shardContent = path => shardPrefixes.some(prefix => path.startsWith(prefix));

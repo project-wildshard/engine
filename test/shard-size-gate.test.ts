@@ -81,6 +81,16 @@ test('the book read is this build\'s own, never one a deploy carried in, and no 
   expect(readPhoneDownloads(dist)).toEqual({ one: 2 });
 });
 
+test('a split build reads its packs book from dist-content/ beside the page (PAGE-SIZE PZ4)', () => {
+  const parent = mkdtempSync(join(tmpdir(), 'shard-size-')), dist = join(parent, 'dist'), content = join(parent, 'dist-content');
+  mkdirSync(dist); mkdirSync(join(content, 'assets/spawn'), { recursive: true });
+  writeFileSync(join(dist, 'version.json'), JSON.stringify({ build: 'dddd' }));
+  writeFileSync(join(content, 'assets/spawn/packs-dddd.json'), JSON.stringify({ client: {
+    cooked: { phone: { url: '/assets/spawn/cooked-whole-phone-0123abcd.json', wireBytes: 5 } } } }));
+  writeFileSync(join(content, 'assets/spawn/engine-dddd.json'), JSON.stringify({ client: { phone: { wireBytes: 7 } } }));
+  expect(readPhoneDownloads(dist)).toEqual({ cooked: 12 });
+});
+
 test('a cooked row is read with the engine half its page also downloads', () => {
   const dist = mkdtempSync(join(tmpdir(), 'shard-size-'));
   mkdirSync(join(dist, 'assets/spawn'), { recursive: true });
