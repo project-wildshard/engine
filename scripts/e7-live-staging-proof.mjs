@@ -33,7 +33,9 @@ try{
    // browser transport, TLS and protocol; no relay or fake frames are installed.
    globalThis.WebSocket=new Proxy(Native,{construct(target,args,newTarget){
     const url=new URL(String(args[0]),location.href);
-    if(url.origin!==allowed||url.pathname!=='/'||url.search||url.hash)throw new Error('J205 refused a non-staging socket');
+    // GO7: a page Shard select sent to a cell dials the same door with `?chunk=<cell>` (shell.ts gotoSocket); nothing else.
+    const search=[...url.searchParams.keys()];
+    if(url.origin!==allowed||url.pathname!=='/'||url.hash||!(search.length===0||(search.length===1&&/^[a-z0-9_-]+$/u.test(url.searchParams.get('chunk')??''))))throw new Error(`J205 refused a non-staging socket ${url.origin}${url.pathname}${url.search}`);
     return Reflect.construct(target,args,newTarget);
    }});
   },socket);
