@@ -1,5 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise real compiler cache/input evidence in owned scratch.
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine cache fixtures to this checkout.
 import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- A foreign writer must bypass the compiler's declared writes.
@@ -77,4 +77,27 @@ test('separates build-time environment while ignoring run metadata',async()=>{
   expect((await f.run()).reused).toBe(true);
   vi.stubEnv('VITE_COMPILER_FIXTURE','changed');
   expect((await f.run()).reused).toBe(false);
+});
+
+// ENG-19: a J196 linked checkout lives outside the root, where receipts never look; its contents key the cache.
+function linkedFixture(git:boolean) {
+  const f=fixture(),linked=mkdtempSync(resolve('tmp/author-bundle-linked-'));owned.push(linked);
+  const file=resolve(linked,'src/index.ts');
+  mkdirSync(resolve(linked,'src'),{recursive:true});writeFileSync(file,'export const sdk=1;');
+  if(git){
+    const run=(...args:string[])=>execFileSync('git',['-C',linked,...args],{stdio:'ignore'});
+    run('init','-q');run('add','-A');run('-c','user.name=t','-c','user.email=t@t','commit','-qm','init','--no-verify');
+  }
+  mkdirSync(resolve(f.root,'node_modules/@wildshard'),{recursive:true});
+  symlinkSync(linked,resolve(f.root,'node_modules/@wildshard/sharddev'));
+  return {...f,file};
+}
+
+test.each([['a git checkout',true],['a plain directory',false]])('an edit in a linked package (%s) rebuilds without a VITE_ nudge',async(_name,git)=>{
+  const f=linkedFixture(git);
+  expect((await f.run()).reused).toBe(false);
+  expect((await f.run()).reused).toBe(true);
+  writeFileSync(f.file,'export const sdk=22;');
+  expect((await f.run()).reused).toBe(false);expect(f.calls()).toBe(2);
+  expect((await f.run()).reused).toBe(true);
 });
