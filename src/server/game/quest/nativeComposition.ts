@@ -33,7 +33,8 @@ import { installNativeChapterDirector } from './nativeChapter';
 import { takeNativeBossReward } from '../boss/native';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { installNativeQuestSecret, type NativeQuestSecret } from './nativeSecret';
-import { questBooks } from '@wildshard/engine/quest/players';
+import { questBooks, type QuestBook } from '@wildshard/engine/quest/players';
+import { AchievementCounterBook } from '../../../shared/game/achievements';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
 import { boardLines, OWNED_ROW } from '../../../shared/game/loot/ownedRows';
@@ -347,8 +348,31 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   if (reward !== null) leadParts.part(`reward:${rows.step}`, { read: () => JSON.stringify(reward.snapshot()), write: saved => { reward.restore(JSON.parse(saved)); } });
   if (ammunition !== null) leadParts.part(`ammo:${rows.step}`, { read: () => JSON.stringify(ammunition.snapshot()), write: saved => { ammunition.restoreSeat(v.parse(NativeAmmunitionSavedSchema, JSON.parse(saved))); } });
   leadParts.part(`pack:${rows.step}`, { read: () => JSON.stringify(pack.snapshot()), write: saved => { pack.restore(JSON.parse(saved)); } });
+  // SS13: feat counts travel with the player whichever seat they hold, as the other seats' `feats:` parts do
+  leadParts.part(`feats:${rows.step}`, { read: () => JSON.stringify(counterBook.snapshot()), write: saved => {
+    const counts = v.parse(countsSaved, JSON.parse(saved));
+    counterBook.restore(rows.counts === 'declared' ? Object.fromEntries(ports.counters.feats.map(feat => [feat.id, counts[feat.id] ?? 0])) : counts);
+  } });
   if (dialogue !== null) leadParts.part(`reading:${rows.step}`, { read: () => JSON.stringify(dialogue.active ? dialogue.snapshot() : null), write: saved => { dialogue.prepareRestore(JSON.parse(saved))(); } });
+  /** SS13: every other player's flag feats (Pine's three secrets, its lanterns, tokens and resin), counted over that player's own
+   *  book, not the world's, and filed under their name (`ledgerFilings` pays a `player:` fact to that player). A changed flag marks
+   *  the seat; the quest's step counts it, so a player who left is dropped, not counted. */
+  const seatFeats = new Map<string, { readonly book: QuestBook; readonly feats: AchievementCounterBook; dirty: boolean; readonly off: () => void }>();
+  const countSeatFeats = (): void => {
+    for (const [player, seat] of seatFeats) {
+      if (!host.players.has(player)) continue; // its book may outlive this tick; a rejoin's new book replaces the seat
+      if (!seat.dirty) continue;
+      seat.dirty = false; seat.feats.counters.syncFlags(seat.book.flags);
+      for (const row of seat.feats.takeFacts()) input.ledger.fact(row.fact, `${player}:${row.entity}`);
+    }
+  };
+  host.scope.onDispose(() => { for (const seat of seatFeats.values()) seat.off(); seatFeats.clear(); });
   books.install(book => {
+    seatFeats.get(book.player)?.off();
+    const feated = { book, feats: new AchievementCounterBook(ports.counters), dirty: true,
+      off: book.flags.onChange((flag, on) => { if (on && !flag.startsWith('plate:') && !flag.startsWith('lever:')) feated.dirty = true; }) };
+    seatFeats.set(book.player, feated);
+    book.part(`feats:${rows.step}`, { read: () => JSON.stringify(feated.feats.snapshot()), write: saved => { feated.feats.restore(v.parse(countsSaved, JSON.parse(saved))); } });
     const body = need(host.players.get(book.player), 'seated body'), seat = entry.seat(book.player, rows.transitions);
     const ride = cables.seat(cableId, body, seat.flags);
     if (rider !== null && body.hasMotor) holdCarried(body, ride, seat.flags);
@@ -432,7 +456,7 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     value => ammunition.prepareRestore(v.parse(v.optional(NativeAmmunitionSavedSchema), value)));
   const keys = new Set<string>(rows.saved.snapshot);
   if (rows.saved.snapshot.some(key => !parts.has(key))) throw new Error('Native saved role has no mechanic');
-  host.onStep(rows.step, dt => { for (const phase of rows.phases) need(phases.get(phase), 'phase')(dt); secret?.(dt); }, {
+  host.onStep(rows.step, dt => { for (const phase of rows.phases) need(phases.get(phase), 'phase')(dt); secret?.(dt); countSeatFeats(); }, {
     snapshot: () => entry.saved.encode(Object.fromEntries(rows.saved.snapshot.flatMap(key => {
       const value = need(parts.get(key), 'saved role').capture(); return value === undefined ? [] : [[key, value]];
     }))),

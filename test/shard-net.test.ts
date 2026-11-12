@@ -43,15 +43,16 @@ test('a client sees a mover, its flags and public shared state as the server hol
     const midway = motion.pose(row.id).position, seen = wired();
     expect(Math.abs(seen.x - midway.x)).toBeLessThan(0.1); expect(Math.abs(seen.z - midway.z)).toBeLessThan(0.1);
     expect(seen.enabled).toBe(motion.pose(row.id).enabled);
-    expect(client.flags().has('secret:islet')).toBe(false);
+    expect(client.phased.has('secret:islet')).toBe(false);
     for (let tick = 0; tick < 550 && motion.riding(row.id); tick++) { room.tick(); link.pump(); }
     room.tick(); room.tick(); link.pump();
-    expect(client.flags().has('secret:islet')).toBe(true);
+    // SS13: an arrival is its rider's own find, so it reaches that player on their own flags, not as a world flag
+    expect(client.phased.has('secret:islet')).toBe(true); expect(client.flags().has('secret:islet')).toBe(false);
     const frame = client.latest; if (frame === null) throw new Error('Missing frame');
     expect(client.stateField(frame, 'tide')).toBe(1.5);
     expect(client.stateField(frame, 'secret')).toBeUndefined();
     host.flags.clear('secret:islet'); room.tick(); room.tick(); link.pump();
-    expect(client.flags().has('secret:islet')).toBe(false);
+    expect(client.phased.has('secret:islet')).toBe(false);
     expect(client.dropped).toBe(0);
   } finally { host.dispose(); }
 });

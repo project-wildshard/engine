@@ -12,6 +12,7 @@ import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { MoverScriptDriver,playerGrounds,type MoverRuntime } from '../src/server/game/plugin/mover';
+import { questBooks } from '../src/shared/engine/quest/players';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
@@ -48,7 +49,8 @@ test('the bot that calls a canoe rides it, and the lead stays on foot and free',
     expect(motion.riding(row.id)).toBe(false); expect(motion.carrying(BOT)).toBe(false);
     expect(bot.position.distanceTo(landing(1))).toBeLessThan(1e-6);
     expect(lead.position.distanceTo(landing(1))).toBeGreaterThan(1);
-    expect(host.flags.has('secret:islet')).toBe(true);
+    // SS13: the islet is the rider's own find; the lead, who stayed ashore, hasn't found it
+    expect(questBooks(host).of(BOT).flags.has('secret:islet')).toBe(true); expect(host.flags.has('secret:islet')).toBe(false);
   } finally { host.dispose(); }
 });
 
@@ -114,10 +116,10 @@ test('built Pine: a bot rides the canoe on a scripted tape and a client sees the
     expect(ticks).toBeLessThan(545);
     expect(led).toBeGreaterThan(ticks / 2); // the owner block says the boat has them (P1-E5.3-C2)
     expect(lead.position.distanceTo(standing)).toBeLessThan(1);
-    expect(host.flags.has('secret:islet')).toBe(true);
+    expect(questBooks(host).of(BOT).flags.has('secret:islet')).toBe(true); expect(host.flags.has('secret:islet')).toBe(false);
     room.tick(); room.tick(); link.pump();
     expect(bot.led).toBe(false); expect(lead.led).toBe(false);
-    expect(client.flags().has('secret:islet')).toBe(true);
+    expect(client.phased.has('secret:islet')).toBe(true); // the rider's own flag, on their own channel (SS13)
     expect([...client.entities.values()].some(entity => entity.id === `script:${canoe.id}`)).toBe(true);
     expect(client.dropped).toBe(0);
   } finally { resident.dispose(); }

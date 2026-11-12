@@ -25,6 +25,7 @@ import { parseMovers, type MoverData } from "@wildshard/format/movers";
 import { carryPrompt } from "../../../shared/game/shardfile/wirePrompts";
 import { actRoutes } from "@wildshard/engine/sim/actRoutes";
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { questBooks } from '@wildshard/engine/quest/players';
 import { publishScriptBody } from '@wildshard/engine/sim/shardRows';
 
 /** One declared entryway as the shardfile states it (a midpoint opening on an edge). */
@@ -181,7 +182,9 @@ export interface MoverActivationPorts {
   shared?: (field: number) => number | boolean | undefined;
 }
 /** The shared script host already owns modules, entity handles and one beginTick per fixed step. */
-export interface MoverPorts { lane?: ScriptLanePort; flags?: Pick<Flags, 'has' | 'set'>; physics: Physics | (() => Physics); host: ScriptHost; scope: Scope; adopt?: (id: string) => MoverView | undefined; restoring?: boolean; activation?: MoverActivationPorts; restoreFlags?: ReadonlySet<string> }
+export interface MoverPorts { lane?: ScriptLanePort; flags?: Pick<Flags, 'has' | 'set'>;
+  /** SS13: the book a carry's arrival lands in, by its rider (the lead when absent); undefined when the rider left. */
+  riderFlags?: (rider: string | undefined) => Pick<Flags, 'has' | 'set'> | undefined; physics: Physics | (() => Physics); host: ScriptHost; scope: Scope; adopt?: (id: string) => MoverView | undefined; restoring?: boolean; activation?: MoverActivationPorts; restoreFlags?: ReadonlySet<string> }
 function nativeMotion(row: MoverData[number]): NativeMoverMotion {
   if (row.driver === undefined || row.trigger === undefined) throw new Error('Missing admitted native mover motion');
   return { driver: row.driver, trigger: row.trigger, at: row.at, euler: row.euler, ...(row.track === undefined ? {} : { track: row.track }), ...(row.carry === undefined ? {} : { carry: row.carry }) };
@@ -207,6 +210,7 @@ export class MoverRuntime {
   private readonly riders = new Map<string, string>();
   private readonly previousRides = new Map<string, boolean>();
   private readonly flags: Pick<Flags, 'has' | 'set'> | undefined;
+  private readonly riderFlags: MoverPorts['riderFlags'];
   readonly chains: Map<string, RopeChain> = new Map<string, RopeChain>();
   private readonly sinks = new Map<string, (pose: MoverPose) => void>();
   /** the presentation-only views (adopted rows), for {@link showRest} */
@@ -226,7 +230,7 @@ export class MoverRuntime {
   private readonly activation: MoverActivationPorts;
   private readonly mechanics = new Map<string, MoverMechanic>();
   constructor(data: MoverData, ports: MoverPorts) {
-    this.data = parseMovers(data); this.flags = ports.flags;
+    this.data = parseMovers(data); this.flags = ports.flags; this.riderFlags = ports.riderFlags;
     for (const row of this.data) if (row.carry?.arrival !== undefined && this.flags === undefined) throw new Error('Mover arrival requires the actual flags owner');
     this.host = ports.host; this.composed = ports.lane; this.activation = ports.activation ?? {};
     for (const row of this.data) if (row.execution === 'native') this.mechanics.set(row.id, new MoverMechanic(nativeMotion(row)));
@@ -304,8 +308,9 @@ export class MoverRuntime {
     const active = entity.fields[6] ?? 0, riding = active === 1 || active === 0.5, was = this.previousRides.get(row.id) ?? false;
     this.previousRides.set(row.id, riding);
     if (!riding && !was) return;
-    const arrived = active === 0.25 ? 1 : -1, hint = !riding && arrived === 1 && carry.arrival !== undefined && this.flags?.has(carry.arrival.flag) === false ? carry.arrival.hint : undefined;
-    if (!riding && arrived === 1 && carry.arrival !== undefined) this.flags?.set(carry.arrival.flag);
+    const flags = this.riderFlags === undefined ? this.flags : this.riderFlags(this.riders.get(row.id));
+    const arrived = active === 0.25 ? 1 : -1, hint = !riding && arrived === 1 && carry.arrival !== undefined && flags?.has(carry.arrival.flag) === false ? carry.arrival.hint : undefined;
+    if (!riding && arrived === 1 && carry.arrival !== undefined) flags?.set(carry.arrival.flag);
     this.carryPoses.set(row.id, { riding, at: riding ? [entity.position[0], entity.position[1] + carry.seat, entity.position[2]] : carry.landings[arrived === 1 ? 1 : 0], yaw: (entity.fields[2] ?? 0) + carry.yaw });
     if (was !== riding) {
       const queue = this.rideEvents.get(row.id); if ((queue?.length ?? 0) >= 2) throw new Error('Mover ride transitions were not consumed');
@@ -537,7 +542,15 @@ export class MoverScriptDriver {
     const lane = 'host' in input ? input : this.compose({ ...input.content, sim: { ...input.content.sim, scripts: [...input.assets.keys()] } }, input.assets,
       { rules: input.rules, entities: [], actors: new Map(), query: () => [] }, undefined, options.permissions,
       { roles: [], ...(input.declarations === undefined ? {} : { declarations: input.declarations }) });
-    const runtime = new MoverRuntime(this.data, { lane, flags: sim.flags, host: lane.host, physics: () => sim.physics, scope: sim.scope,
+    // SS13: a carry's arrival (Pine's islet secret) is the rider's own find, in a room as alone; a player elsewhere hasn't found it
+    const arrivals = this.data.flatMap(row => row.carry?.arrival === undefined ? [] : [row.carry.arrival.flag]);
+    if (arrivals.length > 0 && sim.players.size > 0) questBooks(sim).claim(arrivals);
+    const riderFlags = arrivals.length === 0 ? undefined : (rider: string | undefined): Flags | undefined => {
+      if (sim.players.size === 0) return sim.flags;
+      const books = questBooks(sim); books.claim(arrivals);
+      return rider === undefined ? books.lead.flags : sim.players.has(rider) ? books.of(rider).flags : undefined;
+    };
+    const runtime = new MoverRuntime(this.data, { lane, flags: sim.flags, ...(riderFlags === undefined ? {} : { riderFlags }), host: lane.host, physics: () => sim.physics, scope: sim.scope,
       ...(options.restoring === undefined ? {} : { restoring: options.restoring }),
       ...(options.restoreFlags === undefined ? {} : { restoreFlags: options.restoreFlags }),
       activation: { ground: () => playerGrounds(sim), ...options.activation } });
