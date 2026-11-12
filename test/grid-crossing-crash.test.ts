@@ -139,15 +139,15 @@ test('a page killed half way through the crossing\'s own save comes back on the 
 test('a page killed once its crossing saved comes back inside the cell it crossed into', { timeout: 60_000 }, async () => {
   const storage = new PageStorage(), first = await taped(storage), grid = first.grid();
   await walk(first, () => first.travels.length > 0);
-  const crossed = standing(grid);
-  if (crossed.site === null) throw new Error('The crossing landed on the road');
-  expect(storage.says(crossed.site)).toBe(false);
+  const { site } = standing(grid);
+  if (site === null) throw new Error('The crossing landed on the road');
+  expect(storage.says(site)).toBe(false);
   first.shell.resume();
-  await expect.poll(() => storage.says(crossed.site), { timeout: 10_000, interval: 5 }).toBe(true);
+  await expect.poll(() => storage.says(site), { timeout: 10_000, interval: 5 }).toBe(true);
   first.shell.pause(); await turn();
   const last = standing(grid);
   first.crash();
   const back = await reboot(storage);
-  expect(back.site).toBe(crossed.site);
+  expect(back.site).toBe(site);
   expect(Math.hypot(back.x - last.x, back.z - last.z)).toBeLessThan(2);
 });
