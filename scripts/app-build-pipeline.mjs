@@ -256,12 +256,16 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     (release ? channelOrigin(process.env.WS_CHANNEL) : undefined);
   // ci.yml's test build and the solo preview may meet an unreachable origin; a staging or production release refuses.
   const optional = previousDeployOptional(process.env);
+  // PAGE-SIZE PZ5: a build that reads its content from a content base (WS_CONTENT_BASE, stamped by PZ8) names its code
+  // only, so a later release carries its code only. A kept build without that mark still carries its content.
+  const contentBase = (process.env.WS_CONTENT_BASE ?? "") !== "";
   console.log(
     "Previous deploy chunks:",
     await carryPreviousDeploy(outDir, {
       ...(previousDirectory === undefined ? {} : { previousDirectory }),
       ...(previousOrigin === undefined ? {} : { previousOrigin }),
       optional,
+      contentBase,
     }),
   );
 

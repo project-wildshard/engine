@@ -2,7 +2,11 @@
  * finds every file it names. The production alias serves only the live deployment, so a kept old deployment cannot do
  * this: the files must sit inside the live one. As many builds as the prune keeps, this one included. A build whose
  * files production no longer has drops out whole, and chunk recovery moves its tabs on.
- * This is a plain output step, never a bundler plugin or a runtime prefetch. */
+ * This is a plain output step, never a bundler plugin or a runtime prefetch.
+ * PAGE-SIZE PZ5 (J276): a build that reads its content from a content base (packs.wildshard.io) says so in its graph
+ * (`content: true`) and names its code only, so a later release carries its code only. Its content is on R2, keyed by
+ * hash, and `cook-worker gc` keeps every build a channel's live deploy-chunks.json names. A graph without the mark is a
+ * build whose tabs read content from the page, so its content is carried as before until it ages out. */
 import {execFileSync} from 'node:child_process';
 import {copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
@@ -10,15 +14,22 @@ import {KEEP_PROMOTED} from '../prune-deployments.mjs';
 import {SHARED_CODE_DIRECTORY, codeDirectory} from './buildIdentity.mjs';
 
 const MANIFEST = 'deploy-chunks.json', LANES = 16;
-const CHUNK = /^(?:assets\/(?:[\w.-]+\/)*[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm|json|bin|woff2?|png|webp|jpg|svg)|b\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html))$/u;
+/** A row an older manifest may name: code, and the content-named content the carry took before PZ5. */
+const ROW = /^(?:assets\/(?:[\w.-]+\/)*[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm|json|bin|woff2?|png|webp|jpg|svg)|b\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html|json))$/u;
+/** PZ5: what a carried build carries once its content is on R2. A build's code and its per-build JSON under `b/`, and the
+ * content-named code an older build left at the top of `assets/` (format 1). Never `assets/spawn/`, a grid file or other content. */
+export const CHUNK = /^(?:b\/[\w.-]+\/(?:[\w.-]+\/)*[\w.-]+\.(?:js|css|wasm|html|json)|assets\/[\w.-]+-[\w-]{8,64}\.(?:js|css|wasm))$/u;
+/** What a graph names and carries: code only for a build that reads its content from a content base, else content too.
+ * @param {boolean | undefined} contentBase */
+const carryOf = contentBase => (contentBase === true ? CHUNK : ROW);
 /** @typedef {{path: string, bytes: number}} Row */
-/** @typedef {{build: string, files: Row[]}} Graph */
+/** @typedef {{build: string, files: Row[], content?: true}} Graph  `content`: the build reads its content from a content base */
 /** @param {unknown} files @returns {Row[]} */
 function readRows(files) {
   if (!Array.isArray(files)) throw new Error('Invalid previous deploy chunk manifest');
   const seen = new Set();
   return files.map(row => {
-    if (typeof row !== 'object' || row === null || typeof row.path !== 'string' || !CHUNK.test(row.path)
+    if (typeof row !== 'object' || row === null || typeof row.path !== 'string' || !ROW.test(row.path)
       || row.path.split('/').includes('..') || !Number.isSafeInteger(row.bytes) || row.bytes < 0 || seen.has(row.path)) throw new Error('Invalid previous deploy chunk row');
     seen.add(row.path);
     return {path: row.path, bytes: row.bytes};
@@ -32,11 +43,13 @@ function readManifest(value) {
   if (value.format !== 2 || !('builds' in value) || !Array.isArray(value.builds)) throw new Error('Invalid previous deploy chunk manifest');
   return value.builds.map(row => {
     if (typeof row !== 'object' || row === null || typeof row.build !== 'string') throw new Error('Invalid previous deploy chunk manifest');
-    return {build: row.build, files: readRows(row.files)};
+    if ('content' in row && row.content !== true) throw new Error('Invalid previous deploy chunk manifest');
+    return {build: row.build, files: readRows(row.files), ...(row.content === true ? {content: /** @type {const} */ (true)} : {})};
   });
 }
-/** @param {string} directory @returns {Graph} */
-function currentManifest(directory) {
+/** @param {string} directory @param {boolean} contentBase @returns {Graph} */
+function currentManifest(directory, contentBase) {
+  const carry = carryOf(contentBase);
   const version = JSON.parse(readFileSync(join(directory, 'version.json'), 'utf8'));
   if (typeof version.build !== 'string') throw new Error('Missing deploy build identity');
   const files = [];
@@ -47,11 +60,11 @@ function currentManifest(directory) {
     for (const entry of readdirSync(root, {recursive: true, withFileTypes: true})) {
       if (!entry.isFile()) continue;
       const path = relative(directory, join(entry.parentPath, entry.name));
-      if (CHUNK.test(path)) files.push({path, bytes: statSync(join(directory, path)).size});
+      if (carry.test(path)) files.push({path, bytes: statSync(join(directory, path)).size});
     }
   }
   files.sort((a, b) => a.path.localeCompare(b.path));
-  return {build: version.build, files};
+  return {build: version.build, files, ...(contentBase ? {content: /** @type {const} */ (true)} : {})};
 }
 /** Production has moved past this build, or its bytes never arrived: not a reason to refuse this one. */
 class GoneError extends Error { name = 'GoneError'; }
@@ -105,6 +118,24 @@ function ownBuild(build) {
 /** @type {Readonly<Record<string, string>>} */
 const CHANNEL_ORIGINS = Object.freeze({production: 'https://play.wildshard.io', staging: 'https://staging.wildshard.io', preview: 'https://preview.wildshard.io'});
 
+/** PZ5: every build a channel's live deploy-chunks.json names. Garbage collection keeps them all, so a carried build's
+ * book, parts and content stay on R2. A channel that does not answer with a manifest refuses: a collection that can't see
+ * a channel's builds must not run.
+ * @param {typeof fetch} [get] @param {Readonly<Record<string, string>>} [origins]
+ * @returns {Promise<{channel: string, builds: string[]}[]>} */
+export function liveDeployBuilds(get = fetch, origins = CHANNEL_ORIGINS) {
+  return Promise.all(Object.entries(origins).map(async ([channel, origin]) => {
+    const response = await get(new URL(`/${MANIFEST}`, origin), {cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000)});
+    if (!response.ok || response.headers.get('content-type')?.includes('text/html') === true) {
+      await response.body?.cancel();
+      throw new Error(`${channel} ${origin}/${MANIFEST} answered ${response.status}: no garbage collection without every channel's builds`);
+    }
+    const builds = readManifest(await response.json()).map(graph => graph.build);
+    if (builds.length === 0) throw new Error(`${channel} ${origin}/${MANIFEST} names no build: no garbage collection without every channel's builds`);
+    return {channel, builds};
+  }));
+}
+
 /** Whether a 5xx or a network failure at the carried origin may mean "no previous builds" instead of failing the build.
  * ci.yml's test build opts in (WS_PREVIOUS_DEPLOY_OPTIONAL=1); a staging or production release (WS_RELEASE=1) never
  * does, so it never ships without the kept graphs. The hourly solo preview (OFF-VERCEL OV6) always does: its first
@@ -133,10 +164,12 @@ export function channelOrigin(channel) {
  * one this deploy replaces, so its clash is a warning.
  * @param {string} directory
  * A test build (`optional`) treats a 5xx or network failure fetching the origin's manifest as no previous builds.
- * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean, optional?: boolean}} [options]
+ * PZ5: `contentBase` says this build reads its content from a content base: its graph names its code only and is marked,
+ * and a marked kept graph carries its code only (`CHUNK`). An unmarked one keeps its content, since its tabs read the page.
+ * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean, optional?: boolean, contentBase?: boolean}} [options]
  */
 export async function carryPreviousDeploy(directory, options = {}) {
-  const current = currentManifest(directory);
+  const current = currentManifest(directory, options.contentBase === true);
   /** @type {readonly string[] | undefined} */
   let live = options.live;
   const ours = options.ours ?? ownBuild;
@@ -166,7 +199,8 @@ export async function carryPreviousDeploy(directory, options = {}) {
   }
   const held = new Map(current.files.map(row => [row.path, row.bytes])), kept = [current];
   let carried = 0, bytes = 0;
-  for (const graph of previous.filter(row => row.build !== current.build).slice(0, KEEP_PROMOTED - 1)) {
+  for (const whole of previous.filter(row => row.build !== current.build).slice(0, KEEP_PROMOTED - 1)) {
+    const carry = carryOf(whole.content), graph = {...whole, files: whole.files.filter(row => carry.test(row.path))};
     const fresh = [];
     // A path this build writes with other bytes than a kept build's: a chunk hash that doesn't cover what Vite adds after
     // hashing (`__vite__mapDeps`), seen across checkouts (main ci 43064007268). This build's bytes win and that kept build

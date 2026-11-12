@@ -5,7 +5,7 @@ import {join, resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the production manifest/body HTTP path locally.
 import {createServer} from 'node:http';
 import {expect, test} from 'vitest';
-import {carryPreviousDeploy, channelOrigin, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
+import {CHUNK, carryPreviousDeploy, channelOrigin, liveDeployBuilds, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
 import {KEEP_PROMOTED} from '../scripts/prune-deployments.mjs';
 
 test('a deploy carries the kept builds unchanged, but never one past the prune, nor a map', async () => {
@@ -38,6 +38,83 @@ test('a deploy carries the kept builds unchanged, but never one past the prune, 
     expect(existsSync(join(previous, 'b/a/main-aaaaaaaa.js'))).toBe(false);
     expect(readFileSync(join(previous, 'b/f/main-ffffffff.js'), 'utf8')).toBe('export const title="f";');
   } finally {rmSync(root, {recursive: true, force: true});}
+});
+
+test('PZ5: a carried build carries its code only, never assets/spawn/, a grid file or other content', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-code-'));
+  // What staging's and play's live deploy-chunks.json name today, one of each kind, beside the build's code.
+  const content = ['assets/spawn/_template-client-desktop-54ce6c8d049d9b8c.json', 'assets/spawn/server-aaaaaaaa.json',
+    'assets/grid-strip-mesh-46c94ae4.bin', 'assets/boot-far-reach-ea97d653.json', 'assets/world-map-b44497c7518e2f3f.webp',
+    'assets/baked/pine-hollow/far-impostor.png', 'assets/title/driftwood-isle-portrait-e9d5c9aedd5c5920.jpg'];
+  const code = ['b/old/main-aaaaaaaa.js', 'b/old/base-aaaaaaaa.css', 'b/old/standalone/basis-aaaaaaaa.wasm', 'b/c/shared-aaaaaaaa.js', 'b/old/flags.json'];
+  const output = (name: string, paths: readonly string[]): string => {
+    const dir = join(root, name); mkdirSync(dir, {recursive: true}); writeFileSync(join(dir, 'version.json'), JSON.stringify({build: name}));
+    for (const path of paths) { mkdirSync(join(dir, path, '..'), {recursive: true}); writeFileSync(join(dir, path), path); }
+    return dir;
+  };
+  const isContent = (path: string): boolean => path.startsWith('assets/spawn/') || /^assets\/grid-/u.test(path) || !CHUNK.test(path);
+  try {
+    // A build that reads its content from a content base marks its graph and names its code only.
+    const old = output('old', [...code, ...content]); await carryPreviousDeploy(old, {contentBase: true});
+    const oldGraph = (JSON.parse(readFileSync(join(old, 'deploy-chunks.json'), 'utf8')) as {builds: {content?: boolean; files: {path: string}[]}[]}).builds[0];
+    expect(oldGraph).toMatchObject({content: true});
+    expect(oldGraph?.files.map(row => row.path).sort()).toEqual([...code].sort());
+    for (const path of content) expect(CHUNK.test(path), path).toBe(false);
+    for (const path of code) expect(CHUNK.test(path), path).toBe(true);
+
+    const carriedOnce = async (name: string): Promise<{build: string; content?: boolean; files: {path: string}[]}[]> => {
+      const next = output(name, [`b/${name}/main-bbbbbbbb.js`, 'assets/spawn/server-bbbbbbbb.json', 'assets/grid-strip-mesh-bbbbbbbb.bin']);
+      expect(await carryPreviousDeploy(next, {previousDirectory: old, contentBase: true})).toMatchObject({current: 1, builds: 2, carried: code.length});
+      for (const path of code) expect(readFileSync(join(next, path), 'utf8')).toBe(path);
+      for (const path of content) expect(existsSync(join(next, path)), path).toBe(false);
+      return (JSON.parse(readFileSync(join(next, 'deploy-chunks.json'), 'utf8')) as {builds: {build: string; content?: boolean; files: {path: string}[]}[]}).builds;
+    };
+    // Neither graph names content, so the next release never asks the page for it.
+    const builds = await carriedOnce('next');
+    expect(builds.map(row => row.build)).toEqual(['next', 'old']);
+    expect(builds.flatMap(row => row.files.map(file => file.path)).filter(isContent)).toEqual([]);
+    expect(builds.every(row => row.content === true)).toBe(true);
+    // A marked graph that names content anyway (an older writer) still carries its code only, and is written back as code.
+    writeFileSync(join(old, 'deploy-chunks.json'), JSON.stringify({format: 2, builds: [{build: 'old', content: true, files: [...code, ...content].map(path => ({path, bytes: path.length}))}]}));
+    expect((await carriedOnce('again'))[1]?.files.map(row => row.path).sort()).toEqual([...code].sort());
+  } finally {rmSync(root, {recursive: true, force: true});}
+});
+
+test('PZ5: a kept build whose tabs read content from the page still carries its content, until it ages out', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-page-'));
+  const paths = ['b/pre/main-aaaaaaaa.js', 'assets/spawn/pine-hollow-client-phone-54ce6c8d049d9b8c.json', 'assets/grid-strip-mesh-46c94ae4.bin'];
+  try {
+    const pre = join(root, 'pre'); mkdirSync(pre); writeFileSync(join(pre, 'version.json'), '{"build":"pre"}');
+    for (const path of paths) { mkdirSync(join(pre, path, '..'), {recursive: true}); writeFileSync(join(pre, path), path); }
+    // A build from before the content base: no mark, and it names its content.
+    await carryPreviousDeploy(pre);
+    const first = join(root, 'first'); mkdirSync(first); writeFileSync(join(first, 'version.json'), '{"build":"first"}');
+    expect(await carryPreviousDeploy(first, {previousDirectory: pre, contentBase: true})).toMatchObject({builds: 2, carried: paths.length});
+    for (const path of paths) expect(readFileSync(join(first, path), 'utf8')).toBe(path);
+    const manifest = JSON.parse(readFileSync(join(first, 'deploy-chunks.json'), 'utf8')) as {builds: {build: string; content?: boolean}[]};
+    expect(manifest.builds).toMatchObject([{build: 'first', content: true}, {build: 'pre'}]);
+    expect(manifest.builds[1]).not.toHaveProperty('content');
+    writeFileSync(join(pre, 'deploy-chunks.json'), JSON.stringify({format: 2, builds: [{build: 'pre', content: 'yes', files: []}]}));
+    await expect(carryPreviousDeploy(first, {previousDirectory: pre})).rejects.toThrow('Invalid previous deploy chunk manifest');
+  } finally {rmSync(root, {recursive: true, force: true});}
+});
+
+test('PZ5: gc reads every channel\'s live builds, and refuses when a channel shows none', async () => {
+  const manifests: Record<string, unknown> = {
+    'https://play.test': {format: 2, builds: [{build: 'p1', files: []}, {build: 'p2', files: [{path: 'b/p2/main-aaaaaaaa.js', bytes: 1}]}]},
+    'https://staging.test': {format: 1, build: 's1', files: []},
+  };
+  const get = (async (url: URL | string): Promise<Response> => {
+    const at = new URL(url);
+    expect(at.pathname).toBe('/deploy-chunks.json');
+    const body = manifests[at.origin];
+    return body === undefined ? new Response('<html>', {status: 200, headers: {'content-type': 'text/html'}}) : Response.json(body);
+  }) as typeof fetch;
+  expect(await liveDeployBuilds(get, {production: 'https://play.test', staging: 'https://staging.test'}))
+    .toEqual([{channel: 'production', builds: ['p1', 'p2']}, {channel: 'staging', builds: ['s1']}]);
+  await expect(liveDeployBuilds(get, {production: 'https://play.test', preview: 'https://preview.test'})).rejects.toThrow(/preview .* no garbage collection/u);
+  manifests['https://staging.test'] = {format: 2, builds: []};
+  await expect(liveDeployBuilds(get, {staging: 'https://staging.test'})).rejects.toThrow(/staging .* names no build/u);
 });
 
 test('the format production published before the pointer still carries', async () => {

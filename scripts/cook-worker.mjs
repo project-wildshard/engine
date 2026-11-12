@@ -3,7 +3,8 @@
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs serve     notify endpoint; lists the catalogue at boot
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs recook    every live and preview head, then exit; a deploy's step
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs bake <dist> <origin>   the live heads this build cooked, onto its built client
-//   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs gc <build>...   keep those builds, delete the rest, print usage
+//   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs gc <build>...   keep those builds and every build a channel's
+//     live deploy-chunks.json names (PAGE-SIZE PZ5: 5 a channel), delete the rest, print usage
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs report    print usage against the budget (J89)
 // Environment: WILDSHARD_API_URL, WILDSHARD_BUILD; R2_ACCOUNT_ID, R2_BUCKET_PACKS, R2_PACKS_ACCESS_KEY_ID,
 // R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
@@ -19,6 +20,7 @@ const { addStoredShards } = await import('./app-build/catalogue.ts');
 const { refreshServiceWorker } = await import('./app-build/serviceWorker.ts');
 const { folderStore, r2Store } = await import('../src/cook/game/packStore.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
+const { liveDeployBuilds } = await import('./app-build/previousDeploy.mjs');
 
 const env = process.env;
 /** @param {string} name */
@@ -65,7 +67,10 @@ if (command === 'serve') {
   if (added.length > 0) refreshServiceWorker(out, page);
   console.log(JSON.stringify(added));
 } else if (command === 'gc') {
-  console.log(JSON.stringify(await collectGarbage(store, rest, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now())));
+  // PZ5: a carried build's book, parts and content stay on R2, so a build any channel still carries is never collected.
+  const channels = await liveDeployBuilds();
+  const builds = [...new Set([...rest, ...channels.flatMap(row => row.builds)])];
+  console.log(JSON.stringify({ channels, ...await collectGarbage(store, builds, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now()) }));
 } else if (command === 'report') {
   console.log(JSON.stringify(await storeUsage(store, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES))));
 } else {

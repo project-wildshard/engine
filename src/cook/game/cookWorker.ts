@@ -28,6 +28,7 @@ import {MAX_SHARDFILE_BYTES, type CookJobReport} from './cookJob';
 import {stalePreparationLine} from './shardCook';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
+import {readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
 
 export interface CatalogueRow {readonly slug: string; readonly revision: number; readonly hash: string}
 /** The shape `api-server` POSTs (its `ShardfileNoticeSchema`, J30). */
@@ -229,7 +230,13 @@ function usageOf(rows: readonly StoredObject[], budget: number): StoreUsage {
 
 export async function storeUsage(store: PackStore, budget: number): Promise<StoreUsage> { return usageOf(await store.list(''), budget); }
 
-/** J83: keep what a kept build's index names, and delete the rest, indexes of other builds included. */
+/** PAGE-SIZE PZ2's content sets (`content/<set>/…`, page-release content.mjs). They are content-named and name no build,
+ * so garbage collection never takes one; a set's own retention waits for a build-to-set record. */
+const CONTENT_SETS = 'content/';
+
+/** J83: keep what a kept build's index names, and delete the rest, indexes of other builds included.
+ * PAGE-SIZE PZ5: a kept build's server book (`assets/spawn/server-<build>.json`, page-release packs.mjs) and every part it
+ * names are kept too, so a carried build's solo server still finds them; the content sets are never collected. */
 export async function collectGarbage(store: PackStore, builds: readonly string[], budget: number, now: number, grace: number = GC_GRACE_MS): Promise<GcReport> {
   if (builds.length === 0) throw new Error('Garbage collection needs the builds to keep: an empty list would delete everything');
   const kept = new Set<string>();
@@ -240,10 +247,17 @@ export async function collectGarbage(store: PackStore, builds: readonly string[]
       if (body === undefined) throw new Error('Index left mid-collection');
       for (const key of (JSON.parse(new TextDecoder().decode(body)) as CookIndex).keys) kept.add(key);
     }
+    const bookKey = serverPackBookPath(build), book = await store.get(bookKey);
+    if (book === undefined) continue;
+    kept.add(bookKey);
+    const {shards, grid} = readServerPackBook(JSON.parse(new TextDecoder().decode(book)));
+    for (const pack of [...Object.values(shards), ...(grid === undefined ? [] : [grid])]) {
+      for (const part of [pack, ...pack.more ?? []]) kept.add(part.url.replace(/^\//u, ''));
+    }
   }
   let deleted = 0, freedBytes = 0;
   for (const row of await store.list('')) {
-    if (kept.has(row.key) || now - row.modified < grace) continue;
+    if (kept.has(row.key) || row.key.startsWith(CONTENT_SETS) || now - row.modified < grace) continue;
     await store.remove(row.key); deleted++; freedBytes += row.bytes;
   }
   return {kept: kept.size, deleted, freedBytes, usage: await storeUsage(store, budget)};
