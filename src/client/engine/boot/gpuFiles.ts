@@ -56,6 +56,19 @@ export function isRegisteredGpuFile(url: string): boolean {
   return registered[TIER].has(url.replace(/[?#].*$/u, ''));
 }
 
+/** WILDSHARD-GAME-89: stand-ins a table names but the host does not serve (a shardfile that left them out). Never
+ *  asked for again on this page: `standIn` answers undefined, so the tier's own file loads. */
+const retired = new Set<string>();
+/** Retire a registered stand-in that answered 404 (an absolute URL or a path; query and origin are ignored). True when
+ *  it was a registered stand-in not retired before: the caller retries the served file and reports it once. */
+export function retireGpuFile(url: string): boolean {
+  let path = url.replace(/[?#].*$/u, '');
+  try { path = new URL(path, 'http://page.invalid').pathname; } catch { /* keep the path as given */ }
+  if (retired.has(path) || !isRegisteredGpuFile(path)) return false;
+  retired.add(path);
+  return true;
+}
+
 export type TexMode = 'ktx2' | 'img';
 
 /** the one level selected for this page (core/config's PAGE_LEVEL: captured by the registry's first apply) */
@@ -151,7 +164,8 @@ export function textureReport(): { mode: TexMode; why: string; probe: Ktx2Probe 
 
 /** the KTX2 stand-in of `served` (a path, after tierUrl) in mode `tex`, or undefined */
 export function standIn(served: string, tex: TexMode): string | undefined {
-  return tex === 'ktx2' ? GPU_FILES[TIER][served] : undefined;
+  const file = tex === 'ktx2' ? GPU_FILES[TIER][served] : undefined;
+  return file === undefined || retired.has(file) ? undefined : file;
 }
 /** the KTX2 stand-in of a file this tier fetches, when this page loads KTX2 */
 export function gpuFile(served: string): string | undefined {

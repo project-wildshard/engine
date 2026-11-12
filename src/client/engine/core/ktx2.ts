@@ -22,7 +22,8 @@ import { pageScope } from '../../../shared/engine/app/resources';
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { texMode, gpuFile, standIn } from '../boot/gpuFiles';
+import { texMode, gpuFile, standIn, retireGpuFile } from '../boot/gpuFiles';
+import { emitFault } from '../../../shared/engine/core/faults';
 import { markGpuOnly } from './gpuOnly';
 import { type Renderer, probeRenderer } from '../render/renderer';
 import { labelAsset } from '../render/gpuLabels';
@@ -242,8 +243,37 @@ export function installGltfKtx2(type: typeof GLTFLoader): void {
         Reflect.apply(parse, this, [data, path, release, onError]);
       },
     });
-    configuredGltfLoaders.add(type);
   }
+  // WILDSHARD-GAME-89: a stand-in the host does not serve (Pine Hollow rev 1 names desktop NPC GLBs it left out) must not
+  // end the entry: retire it for the page, report it once and load the tier's own file (embedded images) instead.
+  const fetchGltf: unknown = Object.getOwnPropertyDescriptor(type.prototype, 'load')?.value;
+  if (typeof fetchGltf === 'function') {
+    Object.defineProperty(type.prototype, 'load', {
+      configurable: true, writable: true,
+      value(this: GLTFLoader, ...args: Parameters<GLTFLoader['load']>): void {
+        const [url, onLoad, onProgress, onError] = args;
+        Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, (error: unknown): void => {
+          const missing = missingStandIn(error);
+          if (missing === undefined || !retireGpuFile(missing)) {
+            if (onError !== undefined) onError(error); else console.error(error);
+            return;
+          }
+          console.warn(`[ktx2] stand-in ${missing} answered 404; loading ${url} instead`);
+          emitFault({ system: 'assets.gpu', error: new Error(`KTX2 stand-in not served: ${missing} (for ${url})`), verdict: 'retry' });
+          Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, onError]);
+        }]);
+      },
+    });
+  }
+  configuredGltfLoaders.add(type);
+}
+/** The URL of a three HttpError's 404 (FileLoader passes the failed Response as `response`), else undefined. */
+function missingStandIn(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('response' in error)) return undefined;
+  const response: unknown = error.response;
+  if (typeof response !== 'object' || response === null || !('status' in response) || response.status !== 404) return undefined;
+  if ('url' in response && typeof response.url === 'string' && response.url !== '') return response.url;
+  return error instanceof Error ? /fetch for "([^"]+)" responded with 404/u.exec(error.message)?.[1] : undefined;
 }
 
 /**
