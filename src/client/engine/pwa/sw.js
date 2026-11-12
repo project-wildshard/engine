@@ -27,18 +27,23 @@ const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-
 /** @type {{ base: string, files: string[] }} one parsed value: the bundler would fold a literal base into its origin */
 const { base: CONTENT_BASE, files: CONTENT_FILES } = JSON.parse('__CONTENT__');
 const CONTENT_CACHE = 'ws-content-v1';
-const CONTENT_ORIGIN = CONTENT_BASE === '' ? '' : new URL(CONTENT_BASE).origin;
+const CONTENT_URL = CONTENT_BASE === '' ? undefined : new URL(CONTENT_BASE);
+/** A base on the page's own origin (contentBase.ts allows one) owns its folder only; the rest of the origin is the page's. */
+const SAME_ORIGIN_BASE = CONTENT_URL?.origin === self.location.origin;
 /** A part on the page origin is content-named too (`<hash16>.pack.br`): kept across builds, not in the build's shell. */
 const PAGE_PART = /^\/assets\/spawn\/(?:[^/]+\/)*[a-f0-9]{16}\.pack\.br$/;
 /** The content origin's mutable files (the signed channel objects, the cache clear) always go to the network.
  * @param {URL} url */
-const isContentRead = url => CONTENT_ORIGIN !== '' && url.origin === CONTENT_ORIGIN
-  && url.pathname !== '/clear-cache.json' && !url.pathname.startsWith('/releases/');
-/** @param {Response} response */
-const keepContent = response => response.type === 'cors' && response.status === 200 && !isHtml(response);
-/** A plain CORS GET with no credentials, as the page's own content reads are (no preflight: at most a single Range).
- * @param {string} url @param {RequestInit} init */
-const corsRequest = (url, init = {}) => new Request(url, { ...init, mode: 'cors', credentials: 'omit' });
+const isContentRead = url => CONTENT_URL !== undefined && url.origin === CONTENT_URL.origin && (SAME_ORIGIN_BASE
+  ? CONTENT_URL.pathname !== '/' && url.pathname.startsWith(CONTENT_URL.pathname)
+  : url.pathname !== '/clear-cache.json' && !url.pathname.startsWith('/releases/'));
+/** A readable 200: CORS from the CDN (`basic` only from a base on the page's own origin), never opaque, never a range.
+ * @param {Response} response */
+const keepContent = response => (response.type === 'cors' || SAME_ORIGIN_BASE && response.type === 'basic') && response.status === 200 && !isHtml(response);
+/** The same request as a plain CORS GET with no credentials, as the page's own content reads are (no preflight: at most a
+ * single Range); its headers, redirect mode, cache mode and signal are kept.
+ * @param {Request | string} input @param {RequestInit} init */
+const corsRequest = (input, init = {}) => new Request(input, { ...init, mode: 'cors', credentials: 'omit' });
 
 // Keep the current worker's hot handles. WebKit can take a second to reopen
 // a cache during navigation; a rejected open must remain retryable.
@@ -295,8 +300,9 @@ async function cached(request, name, event) {
   return delivery(response);
 }
 
-/** PZ10: a read on the content base's origin, cache-first by exact URL. A miss is fetched in CORS mode and kept only as a
- *  CORS 200. A no-cors read (an image, a CSS background) the CDN will not answer with CORS still loads, as itself, unkept.
+/** PZ10: a read on the content base's origin, cache-first by exact URL. A miss is fetched as asked and kept only as a CORS
+ *  200. A no-cors read (an image, a CSS background) is asked again in CORS mode, so it can be kept; if the CDN will not answer
+ *  that, it still loads, as itself, unkept. Any other mode (cors, same-origin, an only-if-cached probe) goes as it came.
  * @param {Request} request */
 async function contentRead(request) {
   const reload = request.cache === 'reload' || request.cache === 'no-store';
@@ -306,13 +312,12 @@ async function contentRead(request) {
     const held = reload ? undefined : await cache.match(request.url, MATCH);
     if (held !== undefined && !isHtml(held)) return held;
   } catch { stores.delete(CONTENT_CACHE); /* Storage denial keeps online fetch working. */ }
-  const range = request.headers.get('range');
-  /** @type {RequestInit} */
-  const init = { cache: request.cache === 'only-if-cached' ? 'default' : request.cache, signal: request.signal,
-    ...range === null ? {} : { headers: { range } } };
   let response;
-  try { response = await fetch(request.mode === 'cors' && request.credentials === 'omit' ? request : corsRequest(request.url, init)); }
-  catch (error) { if (request.mode !== 'no-cors') throw error; return fetch(request); }
+  if (request.mode !== 'no-cors') response = await fetch(request);
+  else {
+    try { response = await fetch(corsRequest(request)); }
+    catch { return fetch(request); }
+  }
   if (cache !== undefined && keepContent(response)) await cache.put(request.url, response.clone()).catch(() => undefined);
   return response;
 }

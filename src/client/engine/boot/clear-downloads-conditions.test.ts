@@ -71,10 +71,12 @@ async function clearWith(base: string, answer: (url: string) => Promise<Response
   return { report, asked };
 }
 
-test('PZ10: a content base clears the content origin\'s HTTP cache too, with a CORS read of its clear-cache.json', async () => {
-  const both = await clearWith('https://packs.test/content/0123456789abcdef/', () => Promise.resolve(new Response(null, { status: 204 })));
+test('PZ10: a content base clears the content origin\'s HTTP cache too, with a credentialed read of its clear-cache.json', async () => {
+  const opaque = (): Response => { const response = new Response(null, { status: 200 }); Object.defineProperty(response, 'type', { value: 'opaque' }); Object.defineProperty(response, 'ok', { value: false }); return response; };
+  const both = await clearWith('https://packs.test/content/0123456789abcdef/', url => Promise.resolve(url.startsWith('https:') ? opaque() : new Response(null, { status: 204 })));
   expect(both.asked.map(row => row.url)).toEqual(['/clear-cache.json?sw=0', 'https://packs.test/clear-cache.json']);
-  expect(both.asked[1]?.init).toMatchObject({ cache: 'no-store', mode: 'cors', credentials: 'omit' });
+  // Chromium honours Clear-Site-Data only on a request that includes credentials; the CDN allows none in CORS
+  expect(both.asked[1]?.init).toMatchObject({ cache: 'no-store', mode: 'no-cors', credentials: 'include' });
   expect(both.report).toMatchObject({ httpCache: true });
   const refused = await clearWith('https://packs.test/content/0123456789abcdef/', url => url.startsWith('https:') ? Promise.reject(new TypeError('offline')) : Promise.resolve(new Response(null, { status: 204 })));
   expect(refused.report).toMatchObject({ httpCache: false });

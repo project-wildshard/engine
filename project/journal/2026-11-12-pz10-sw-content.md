@@ -10,3 +10,11 @@
 - The bundler folds a literal `'__X__'` base into `new URL(...)` at bundle time, so base and files bake as one JSON.
 - Clear downloads also fetches `packs.wildshard.io/clear-cache.json` (zone rule `packs_cdn_clear_cache`: `Clear-Site-Data:
   "cache"`, `no-store`; the R2 object holds `{"clear":"cache"}`).
+- Review (one `codex exec`, five MUST, all fixed): Clear downloads' CDN read was `credentials: 'omit'`, and Chromium
+  ignores `Clear-Site-Data` then (the journey showed it: 49 of 167 CDN files still came from the HTTP cache; with a
+  credentialed no-cors read, 0). A no-cors read is rebuilt with `new Request(request, …)` so headers and redirect stay;
+  a cors, same-origin or only-if-cached read goes as it came. A content base on the page's own origin owns its folder
+  only. A bake of a split output sees the hashed `assets/` the split moved.
+- `scripts/content-sw-proof.mjs` (split build of this branch, Driftwood): books precached at CDN URLs; after a no-shard
+  rebuild adopted, 0 CDN reads and 0 of 563 `ws-content-v1` entries lost; Clear downloads leaves `caches.keys()` empty;
+  the cold reload reads all 167 CDN files from the network.

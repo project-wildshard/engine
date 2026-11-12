@@ -523,11 +523,12 @@ test('PZ10: a content-base read is cache-first from ws-content-v1, fetched in CO
   const f = fixture(request => Promise.resolve(typed(`cdn:${request.url}`, 'cors'))), worker = f.load('A', [], [], { base });
   await worker.dispatch('install'); await worker.dispatch('activate');
   f.fetch.mockClear();
-  const request = new Request(cdnPart);
+  // a no-cors read (an image) is asked again in CORS mode with no credentials, keeping the rest of the request
+  const request = new Request(cdnPart, { mode: 'no-cors', redirect: 'manual' });
   expect(await (await worker.dispatch('fetch', { request }))?.text()).toBe(`cdn:${cdnPart}`);
   const sent = f.fetch.mock.calls[0]?.[0];
   if (!(sent instanceof Request)) throw new Error('Missing CORS request');
-  expect(sent.url).toBe(cdnPart); expect(sent.mode).toBe('cors'); expect(sent.credentials).toBe('omit');
+  expect(sent.url).toBe(cdnPart); expect(sent.mode).toBe('cors'); expect(sent.credentials).toBe('omit'); expect(sent.redirect).toBe('manual');
   expect(await (await (await f.open(CONTENT_CACHE)).match(cdnPart))?.text()).toBe(`cdn:${cdnPart}`);
   expect(await (await f.open(ASSET_CACHE_NAME)).match(cdnPart)).toBeUndefined();
   f.fetch.mockRejectedValue(new Error('offline'));
@@ -615,4 +616,24 @@ test('PZ10: a part on the page origin is content too, so it survives an update',
   f.fetch.mockClear(); f.fetch.mockRejectedValue(new Error('offline'));
   expect(await (await next.dispatch('fetch', { request: new Request(part) }))?.text()).toBe(`body:${part}`);
   expect(f.fetch).not.toHaveBeenCalled();
+});
+
+test('PZ10: a CORS or same-origin-mode read on the CDN goes exactly as it came', async () => {
+  const f = fixture(request => Promise.resolve(typed(`cdn:${request.url}`, 'cors'))), worker = f.load('A', [], [], { base });
+  const asked = [new Request(`${base}assets/spawn/a.json`, { headers: { range: 'bytes=0-9', 'if-range': '"tag"' } }), new Request(`${base}assets/spawn/b.json`, { mode: 'same-origin' })];
+  for (const request of asked) await worker.dispatch('fetch', { request });
+  expect(f.fetch.mock.calls.map(([input]) => input)).toEqual(asked);
+});
+
+test('PZ10: a content base on the page\'s own origin owns its folder only, and keeps its same-origin answers', async () => {
+  const local = url('/content/0123456789abcdef/'), book = `${local}assets/spawn/packs-A.json`;
+  const f = fixture(request => Promise.resolve(typed(`body:${request.url}`, 'basic'))), worker = f.load('A', [], [], { base: local, files: [book] });
+  await worker.dispatch('install'); await worker.dispatch('activate');
+  const replies: unknown[] = [];
+  await worker.dispatch('message', { ...precached, ports: [{ postMessage: (value: unknown) => { replies.push(value); } }] });
+  expect(replies).toEqual([{ type: 'PRECACHE', ok: true, build: 'A' }]);
+  expect(await (await worker.dispatch('fetch', { request: new Request(url('/')) }))?.text()).toBe(document);
+  for (const path of ['/version.json', '/api/telemetry']) expect(await worker.dispatch('fetch', { request: new Request(url(path)) })).toBeUndefined();
+  f.fetch.mockClear(); f.fetch.mockRejectedValue(new Error('offline'));
+  expect(await (await worker.dispatch('fetch', { request: new Request(book) }))?.text()).toBe(`body:${book}`);
 });

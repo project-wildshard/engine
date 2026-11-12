@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned static HTTP fixture.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { serviceWorkerCore, workerScripts } from '../scripts/app-build/serviceWorker';
+import { serviceWorkerCore, workerScripts, writeServiceWorker } from '../scripts/app-build/serviceWorker';
 import { previewServer } from './fixtures/preview-server';
 
 test('worker bootstrap names exact core bytes and changes for same-length edits', () => {
@@ -146,4 +146,20 @@ test('PZ10: a stamped content base bakes its origin, and both books and the titl
   expect((await serviceWorkerCore({ ...bundle, 'index.html': page({ contentBase: `${base}x/` }) }, process.cwd(), 'fixture', server, packs)).build).not.toBe(build);
   expect((await serviceWorkerCore(bundle, process.cwd(), 'fixture', server, { ...packs, bytes: new TextEncoder().encode('{}') })).build).not.toBe(build);
   await expect(serviceWorkerCore({ 'index.html': page({ contentBase: 'packs/' }) }, process.cwd(), 'fixture')).rejects.toThrow(/contentBase/u);
+});
+
+test('PZ10: a split output bakes the books and the hashed assets the split moved, at their CDN URLs', async () => {
+  mkdirSync(resolve('tmp'), { recursive: true });
+  const root = mkdtempSync(resolve('tmp/pwa-split-')), out = join(root, 'dist'), base = 'https://packs.wildshard.io/content/0123456789abcdef/';
+  const put = (path: string, text: string): void => { mkdirSync(join(path, '..'), { recursive: true }); writeFileSync(path, text); };
+  try {
+    put(join(out, 'index.html'), new TextDecoder().decode(page({ contentBase: base }).source));
+    put(join(out, 'version.json'), '{"build":"split"}'); put(join(out, '.vite/manifest.json'), '{}');
+    put(join(`${out}-content`, 'assets/boot-tables-abcdefgh.json'), '{}');
+    put(join(`${out}-content`, 'assets/spawn/packs-split.json'), '{"book":"packs"}'); put(join(`${out}-content`, 'assets/spawn/server-split.json'), '{"book":"server"}');
+    await writeServiceWorker(out, process.cwd());
+    const name = /importScripts\("\/(sw-core\/[a-f0-9]+\.js)"\)/u.exec(readFileSync(join(out, 'sw.js'), 'utf8'))?.[1] ?? '';
+    const { files } = bakedContent(readFileSync(join(out, name), 'utf8'));
+    for (const path of ['assets/boot-tables-abcdefgh.json', 'assets/spawn/packs-split.json', 'assets/spawn/server-split.json']) expect(files).toContain(`${base}${path}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

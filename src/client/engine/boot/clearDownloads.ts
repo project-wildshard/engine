@@ -98,9 +98,11 @@ export async function clearDownloads(): Promise<ClearReport> {
   let httpCache = false;
   try {
     const base = contentBase();
+    // the content origin's: Chromium ignores Clear-Site-Data on a request whose credentials mode is not `include`, and the
+    // CDN's CORS rule allows no credentials, so it is a credentialed no-cors read; an opaque answer is an answer
     const asks = await Promise.allSettled([fetch(CLEAR_HTTP_URL, { cache: 'no-store' }),
-      ...base === '' ? [] : [fetch(new URL('/clear-cache.json', base).href, { cache: 'no-store', mode: 'cors', credentials: 'omit' })]]);
-    httpCache = asks.every(ask => ask.status === 'fulfilled' && ask.value.ok);
+      ...base === '' ? [] : [fetch(new URL('/clear-cache.json', base).href, { cache: 'no-store', mode: 'no-cors', credentials: 'include' })]]);
+    httpCache = asks.every(ask => ask.status === 'fulfilled' && (ask.value.ok || ask.value.type === 'opaque'));
   } catch { /* offline, or a broken bank */ }
   const report: ClearReport = { before, after: await storageUsed(), cached, caches: deleted, workers, markers, httpCache, at: Date.now() };
   try { saveStorage('session').setItem(REPORT_KEY, JSON.stringify(report)); } catch { /* the next page just will not say it */ }

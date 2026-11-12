@@ -115,6 +115,20 @@ export function refreshServiceWorker(outDir: string, before: string): void {
   console.log(`sw.js refreshed (${buildId}-${digest})`);
 }
 
+/** PZ10: a bake of a split output (PZ4) sees the hashed top-level `assets/` files the split moved to `<out>-content/` (the
+ *  boot tables, engine art), so they reach the content precache as they would from the whole output. Only those: the
+ *  content tree is gigabytes, and nothing deeper is in the precache. */
+function splitBundle(outDir: string, bundle: Record<string, EmittedFile>): Record<string, EmittedFile> {
+  const moved = join(`${resolve(outDir)}-content`, 'assets');
+  if (!existsSync(moved)) return bundle;
+  const joined = { ...bundle };
+  for (const entry of readdirSync(moved, { withFileTypes: true })) {
+    const name = `assets/${entry.name}`;
+    if (entry.isFile() && /-[\w-]{8}\.\w+$/u.test(entry.name) && joined[name] === undefined) joined[name] = { type: 'asset', source: new Uint8Array(readFileSync(join(moved, entry.name))) };
+  }
+  return joined;
+}
+
 /** Called after ordinary bundling; previous-deploy chunks are carried by MF2 afterwards. */
 export async function writeServiceWorker(outDir: string, root: string): Promise<void> {
   const { build: buildId } = JSON.parse(readFileSync(join(outDir, 'version.json'), 'utf8')) as { build: string };
@@ -123,7 +137,7 @@ export async function writeServiceWorker(outDir: string, root: string): Promise<
     const file = [join(outDir, path), join(`${resolve(outDir)}-content`, path)].find(at => existsSync(at));
     return file === undefined ? undefined : { url: `/${path}`, bytes: readFileSync(file) };
   };
-  const { core, build, hashed } = await serviceWorkerCore(writtenBundle(outDir, root), root, buildId, book(serverPackBookPath(buildId)), book(packsBookPath(buildId))), scripts = workerScripts(core);
+  const { core, build, hashed } = await serviceWorkerCore(splitBundle(outDir, writtenBundle(outDir, root)), root, buildId, book(serverPackBookPath(buildId)), book(packsBookPath(buildId))), scripts = workerScripts(core);
   mkdirSync(dirname(join(outDir, scripts.fileName)), { recursive: true });
   writeFileSync(join(outDir, scripts.fileName), core);
   writeFileSync(join(outDir, 'sw.js'), scripts.bootstrap);

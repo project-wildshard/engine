@@ -124,6 +124,13 @@ const precache = page => page.evaluate(() => new Promise(done => {
   channel.port1.onmessage = event => { done(event.data); };
   worker.postMessage({ type: 'PRECACHE' }, [channel.port2]);
 })).catch(error => String(error));
+/** The controlling worker's build. @param {import('playwright').Page} page @returns {Promise<unknown>} */
+const buildOf = page => page.evaluate(() => new Promise(done => {
+  const worker = navigator.serviceWorker.controller, channel = new MessageChannel();
+  if (worker === null) { done(null); return; }
+  channel.port1.onmessage = event => { done(event.data?.build ?? null); };
+  worker.postMessage({ type: 'BUILD' }, [channel.port2]);
+}));
 /** @param {string} name */
 const parts = name => log.filter(row => row.phase === name && row.origin === 'content' && row.path.endsWith('.pack.br'));
 try {
@@ -148,13 +155,22 @@ try {
     const before = readFileSync(join(pageDir, 'index.html'), 'utf8');
     writeFileSync(join(pageDir, 'index.html'), before.replace('</body>', '<!-- pz10 rebuild --></body>'));
     refreshServiceWorker(pageDir, before);
-    const oldBuild = await page.evaluate(() => window.__ws_sw?.version().then(value => value?.build));
+    const oldBuild = await buildOf(page);
     await page.goto(address, { waitUntil: 'load', timeout }); await booted(page);
     await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())?.update(); });
-    await until(page, () => page.evaluate(() => window.__ws_sw?.waiting != null), 'the new worker waiting');
-    await Promise.all([page.waitForNavigation({ timeout }), page.evaluate(() => { void window.__ws_sw?.adopt(); })]);
-    await booted(page);
-    const newBuild = await page.evaluate(() => window.__ws_sw?.version().then(value => value?.build));
+    await until(page, () => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.waiting?.state === 'installed'), 'the new worker waiting');
+    // adoption as src/client/engine/boot/sw.ts does it: the new build's precache answers, then SKIP_WAITING
+    const adopted = await page.evaluate(async () => {
+      const waiting = (await navigator.serviceWorker.getRegistration())?.waiting;
+      if (!waiting) return 'no waiting worker';
+      const reply = await new Promise(done => { const channel = new MessageChannel(); channel.port1.onmessage = event => { done(event.data); }; waiting.postMessage({ type: 'PRECACHE' }, [channel.port2]); });
+      const changed = new Promise(done => { navigator.serviceWorker.addEventListener('controllerchange', () => { done(true); }, { once: true }); });
+      waiting.postMessage({ type: 'SKIP_WAITING' }); await changed;
+      return reply;
+    });
+    result.adopted = adopted;
+    await page.goto(address, { waitUntil: 'load', timeout }); await booted(page);
+    const newBuild = await buildOf(page);
     const kept = await contentKeys(page);
     result.update = { oldBuild, newBuild, cdnPartReads: parts('update').length, cdnReads: log.filter(row => row.phase === 'update' && row.origin === 'content').length,
       contentCache: kept.length, lost: held.filter(key => !kept.includes(key)).length };
@@ -176,8 +192,11 @@ try {
     await page.goto(address, { waitUntil: 'load', timeout }); await booted(page);
     const timings = await page.evaluate(origin => performance.getEntriesByType('resource').filter(entry => entry.name.startsWith(origin))
       .map(entry => ({ name: entry.name, transferSize: /** @type {PerformanceResourceTiming} */ (entry).transferSize })), contentOrigin);
-    const cached = timings.filter(entry => entry.transferSize === 0);
-    result.cold = { cdnEntries: timings.length, fromCache: cached.length, cdnReads: log.filter(row => row.phase === 'cold' && row.origin === 'content').length, controlled: await page.evaluate(() => navigator.serviceWorker.controller !== null) };
+    // per file: a later read of a file this load already fetched may come from this load's own HTTP cache entry
+    const served = new Set(log.filter(row => row.phase === 'cold' && row.origin === 'content' && row.status === 200).map(row => `${contentOrigin}${row.path}`));
+    const fetched = new Set(timings.filter(entry => entry.transferSize > 0).map(entry => entry.name));
+    const files = [...new Set(timings.map(entry => entry.name))], cached = files.filter(name => !fetched.has(name) && !served.has(name)).map(name => ({ name }));
+    result.cold = { cdnEntries: timings.length, cdnFiles: files.length, fromNetwork: files.length - cached.length, fromCache: cached.length, repeatReads: timings.filter(entry => entry.transferSize === 0).length, cdnReads: log.filter(row => row.phase === 'cold' && row.origin === 'content').length, controlled: await page.evaluate(() => navigator.serviceWorker.controller !== null) };
     if (timings.length === 0) failures.push('cold: no CDN file was read');
     if (cached.length > 0) failures.push(`cold: ${cached.length} CDN files came from a cache: ${cached.slice(0, 5).map(entry => entry.name).join(', ')}`);
   } catch (error) {
