@@ -1,4 +1,4 @@
-// E7.3: one cell of the world (J178). C5: no road and no crossing yet. C3: the first human takes the host's own seat, and a vacant lead
+// E7.3: one cell of the world (J178). C5: no road yet; GC15's `handOver` moves a seat to a cell on the same worker. C3: the first human takes the host's own seat, and a vacant lead
 // seat is refilled first. C6: every solid stays in memory. It holds no socket: a seat's `Transport` comes from the world's door.
 import type { ChatReports } from '@wildshard/engine/net/chat';
 import { LedgerBook, type LedgerFiling } from '@wildshard/engine/net/ledgerBook';
@@ -36,6 +36,8 @@ const DEBOUNCE_MS = 1000, EVERY_MS = 60_000;
 interface Seat {
   readonly device: string; readonly name: string; readonly body: string; readonly store: PlayerStore; readonly fall: FallFloor;
   transport: Transport | null;
+  /** The link's client in this room's `NetRoom`, and how to stop hearing its close, while it stands. */
+  client: number | null; closeOff: (() => void) | null;
   /** When an open hold ends, or null while the link stands. */
   holdEnds: number | null;
   /** The last `seq` written: a read seeds it, so a restart's writes land on what is there (E7.4). */
@@ -163,6 +165,18 @@ export class DedicatedRoom {
     const held = this.seats.get(entry.device);
     if (held !== undefined) { this.rejoin(held, transport, hello); return; }
     if (entry.held === true) { transport.close('stalled'); return; } // its hold ended on the way here, and its save is what it comes back to
+    const placed = this.place(entry, transport);
+    if (typeof placed === 'string') { this.refused(entry, transport, hello, placed); return; }
+    this.settle(placed);
+    this.link(placed, transport, hello);
+    this.flushRefusals();
+    if (this.seats.get(entry.device) === placed) this.options.post({ kind: 'seated', device: entry.device, body: placed.body, seats: this.seats.size });
+  }
+  /**
+   * A body for this entry: its doc checked and recovered, its seat in the maps, its body in the world, at `at` if given (a crossing's
+   * arrival) else where its doc stood. No link yet. The reason, with nothing left behind, when it can't.
+   */
+  private place(entry: SeatEntry, transport: Transport, at?: ResumeAt): Seat | string {
     const lead = !this.bodies.has(LEAD_SEAT), body = lead ? LEAD_SEAT : entry.body, { spawn, host, book } = this, now = this.options.now();
     let doc = entry.doc;
     try { if (doc !== null) {
@@ -171,30 +185,57 @@ export class DedicatedRoom {
       if (doc.at.x < (bounds?.x0 ?? -reach) - slack || doc.at.x > (bounds?.x1 ?? reach) + slack || doc.at.z < (bounds?.z0 ?? -reach) - slack || doc.at.z > (bounds?.z1 ?? reach) + slack) throw new Error('Player position is outside the world');
       doc = recoverPlayer(doc, entry.recovery ?? [], this.options.input, this.options.slug);
     } }
-    catch (error) { this.refused(entry, transport, hello, `recovery: ${String(error)}`); return; }
+    catch (error) { return `recovery: ${String(error)}`; }
     const store = new PlayerStore(doc?.store ?? {}, () => { const own = this.seats.get(entry.device); if (own !== undefined) this.dirty(own); });
-    const seat: Seat = { device: entry.device, name: entry.name, read: entry.doc, body, store, fall: this.cell.fallFloor(), transport, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
+    const seat: Seat = { device: entry.device, name: entry.name, read: entry.doc, body, store, fall: this.cell.fallFloor(), transport, client: null, closeOff: null, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
     this.seats.set(entry.device, seat); this.bodies.set(body, seat);
     if (lead) this.unparkLead();
     // Two who join together would otherwise stand inside each other.
     const aside = SPAWN_ASIDE[(this.joined++) % SPAWN_ASIDE.length] ?? 0, stand = { ...spawn, x: spawn.x + aside };
-    const player = lead ? this.lead : host.addPlayer(body, doc?.at ?? stand, doc?.at.yaw ?? spawn.yaw);
+    const player = lead ? this.lead : host.addPlayer(body, at ?? doc?.at ?? stand, at?.yaw ?? doc?.at.yaw ?? spawn.yaw);
     player.netName = entry.name;
     if (lead) player.resetPose(stand, spawn.yaw);
     book.seat(body, doc?.ledger ?? { serial: 0, rows: [] });
     // Bind owned modifiers to the fresh body baseline before restoring its already modified health.
-    try { this.cell.owned.of(body); if (doc !== null) importPlayer(this.host, player, doc); }
+    try { this.cell.owned.of(body); if (doc !== null) importPlayer(this.host, player, doc); if (at !== undefined) player.resetPose(at, at.yaw); }
     catch (error) {
       // No save or live link is installed on a failed continuation. Keep the durable copies intact.
       this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.seat(body, { serial: 0, rows: [] });
       if (lead) this.clearLead(); else host.removePlayer(body);
-      this.refused(entry, transport, hello, `doc: ${String(error)}`);
-      return;
+      return `doc: ${String(error)}`;
     }
-    this.settle(seat);
-    this.link(seat, transport, hello);
-    this.flushRefusals();
-    if (this.seats.get(entry.device) === seat) this.options.post({ kind: 'seated', device: entry.device, body, seats: this.seats.size });
+    return seat;
+  }
+  /** GC15: this seat's feet left for cell `to`, standing at `at` in that cell's own frame. The door reads their save there and orders `handOver`. */
+  crossing(device: string, to: string, at: ResumeAt): void {
+    if ((this.seats.get(device)?.transport ?? null) !== null) this.options.post({ kind: 'crossing', device, to, at });
+  }
+  /**
+   * GC15 (MP1.6 inside a worker): this seat walks into `target`, a cell on the same worker. A body is made there first, from `entry` (the
+   * door's read of their save on that shard) standing at `at`; only then is their save here written, their body here let go and their
+   * link handed over with `NetRoom.handOff` (`travel`, then the target's welcome and full frame), so the seat is held throughout and the
+   * socket never closes. False: nothing moved, and they stand here still.
+   */
+  handOver(device: string, target: DedicatedRoom, entry: SeatEntry, at: ResumeAt): boolean {
+    const seat = this.seats.get(device), transport = seat?.transport ?? null;
+    if (seat === undefined || transport === null || seat.client === null || target === this || target.seats.has(device)) return false;
+    const { previous, ...current } = entry;
+    let arrived = target.place(current, transport, at);
+    if (typeof arrived === 'string' && previous !== undefined) arrived = target.place({ ...current, doc: previous.doc, recovery: previous.recovery }, transport, at);
+    if (typeof arrived === 'string') return false;
+    mountedPlayerOf(this.host, seat.body)?.dismount();
+    this.write(seat, 'cross');
+    seat.closeOff?.(); seat.closeOff = null; seat.transport = null;
+    const client = this.net.handOff(seat.client, target.net, target.sim.playerOf(arrived.body));
+    seat.client = null;
+    this.release(seat);
+    target.settle(arrived);
+    // A link that dropped on the way is a link that dropped there: the seat holds, as any closed link's does.
+    if (client === null) target.closed(arrived, transport, 'crossed');
+    else target.bind(arrived, transport, client);
+    target.write(arrived, 'cross');
+    target.flushRefusals();
+    return target.seats.get(device) === arrived;
   }
   private refused(entry: SeatEntry, transport: Transport, hello: () => void, reason: string): void {
     const { previous, ...current } = entry;
@@ -228,13 +269,17 @@ export class DedicatedRoom {
     if (this.seats.get(seat.device) === seat) this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size });
   }
   private link(seat: Seat, transport: Transport, hello: () => void): void {
-    this.net.join(transport, this.sim.playerOf(seat.body));
-    transport.onClose(reason => { this.closed(seat, transport, reason); });
+    this.bind(seat, transport, this.net.join(transport, this.sim.playerOf(seat.body)));
     hello();
+  }
+  private bind(seat: Seat, transport: Transport, client: number): void {
+    seat.closeOff?.();
+    seat.transport = transport; seat.client = client;
+    seat.closeOff = transport.onClose(reason => { this.closed(seat, transport, reason); });
   }
   private closed(seat: Seat, transport: Transport, reason: string): void {
     if (seat.transport !== transport) return; // a newer link has this seat
-    seat.transport = null;
+    seat.transport = null; seat.client = null; seat.closeOff?.(); seat.closeOff = null;
     if (reason === LEFT) { this.leave(seat, 'leave'); return; }
     const silent = 'silentMs' in transport && typeof transport.silentMs === 'number' ? transport.silentMs : 0;
     seat.holdEnds = this.options.now() + (this.options.holdMs ?? HOLD_MS) - silent;

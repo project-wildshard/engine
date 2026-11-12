@@ -150,6 +150,8 @@ export class World {
   private readonly voiceBodies = new Map<string, (body: string) => void>();
   private readonly finds = new Map<number, (found: { held: boolean; spawn: ResumeAt }) => void>();
   private readonly drains = new Map<number, () => void>();
+  /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered. */
+  private readonly crossings = new Set<string>();
   private asked = 0;
   private draining = false;
   private grace: { readonly endsAt: number; readonly build: string } | null = null;
@@ -191,6 +193,13 @@ export class World {
     else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
     else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
+    else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
+    else if (news.kind === 'crossed') {
+      this.crossings.delete(news.device);
+      // The source's `left` came first and let the device go; a moved seat now stands in the target, on the same link.
+      if (news.moved && !this.seated.has(news.device)) { this.seated.set(news.device, news.to); this.names.set(news.device, news.name); }
+      this.options.log({ at: 'cell.crossed', index, device: news.device, from: news.from, to: news.to, moved: news.moved });
+    }
   }
   private refuse(reason: string): void { this.refusals[reason] = (this.refusals[reason] ?? 0) + 1; }
   private async recover(device: string, slug: string, seq: number): Promise<void> {
@@ -320,6 +329,21 @@ export class World {
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     this.pending.delete(device);
     this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) }, bytes);
+  }
+  /**
+   * GC15: a seat's feet left cell `from` for `to`. On the same worker the door reads their save on `to`'s shard and orders the move, which
+   * keeps the seat and the socket. Between workers nothing moves yet (GC15 (3): `exportPlayer`/`importPlayer` and re-pointing the socket).
+   */
+  private async crossing(from: string, device: string, to: string, at: ResumeAt): Promise<void> {
+    const link = this.links.get(to), name = this.names.get(device);
+    if (link === undefined || link !== this.links.get(from) || this.seated.get(device) !== from || name === undefined || this.draining || this.crossings.has(device)) return;
+    this.crossings.add(device);
+    try {
+      const saved = await this.options.saves.read(device, cellShard(to));
+      if (this.seated.get(device) !== from || this.draining) { this.crossings.delete(device); return; }
+      link.send({ kind: 'cross', from, to, at, device, name, body: bodyId(this.options.secret, device), doc: saved.doc, seq: saved.seq,
+        ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) });
+    } catch (error) { this.crossings.delete(device); this.options.log({ at: 'cell.cross-refused', device, from, to, reason: String(error) }); }
   }
   /** GO7: a page Shard select sent to a cell this world opens is seated there; otherwise where the player last stood, else the first. */
   private cellFor(last: string | null, goto: string | null = null): string {

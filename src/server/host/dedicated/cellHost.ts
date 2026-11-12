@@ -95,12 +95,22 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const transport = new SeatTransport(order.port);
     cell.room.seat(order, transport, () => { transport.deliver('reliable', order.hello); });
   };
+  /** GC15: a seat walks from one of this worker's cells into another, the target woken first if it slept long enough to start over. */
+  const cross = async (order: Extract<CellOrder, { kind: 'cross' }>): Promise<void> => {
+    const { kind: _kind, from: fromSlug, to: toSlug, at, ...entry } = order, from = cells.get(fromSlug), to = cells.get(toSlug);
+    if (from === undefined || to === undefined) throw new Error(`${from === undefined ? fromSlug : toSlug} is not on this worker`);
+    await wake(to);
+    if (from.waking !== null) await from.waking;
+    const moved = from.room.handOver(entry.device, to.room, entry, at);
+    post({ kind: 'crossed', device: entry.device, name: entry.name, from: fromSlug, to: toSlug, moved });
+  };
   const handle = (order: CellOrder): void => {
     if (order.kind === 'close') { dispose(); return; }
     // MP4.1: a line from the world reaches each awake cell here but the one that said it. A cell asleep or starting over hears nothing.
     if (order.kind === 'chat') { const source = cells.get(order.from); if (ready) for (const cell of cells.values()) if (cell !== source && cell.waking === null && cell.room.taken > 0) cell.room.net.hear(order.line); return; }
     if (!ready) { fail(new Error('A worker was told something before it booted')); return; }
     if (order.kind === 'drain') { clock?.pause(); for (const { room } of cells.values()) room.drain(); post({ kind: 'drained' }); return; }
+    if (order.kind === 'cross') { cross(order).catch(fail); return; }
     const cell = cells.get(order.slug);
     if (cell === undefined) { fail(new Error(`${order.slug} is not on this worker`)); return; }
     (order.kind === 'find' ? find(cell, order.id, order.device) : seat(cell, order)).catch(fail);

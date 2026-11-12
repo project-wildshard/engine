@@ -28,6 +28,8 @@ export type CellOrder =
   | { readonly kind: 'drain' }
   /** MP4.1: a `room` line said in cell `from`, for every other awake cell on this worker. */
   | { readonly kind: 'chat'; readonly from: string; readonly line: WorldLine }
+  /** GC15: a seat in cell `from` walks into `to` on the same worker. The entry is the door's read of their save on `to`'s shard. */
+  | ({ readonly kind: 'cross'; readonly from: string; readonly to: string; readonly at: ResumeAt } & SeatEntry)
   | { readonly kind: 'close' };
 /** One 10 s reading of a worker (E7.8). */
 export interface WorkerReading {
@@ -45,7 +47,9 @@ export type RoomNews =
   | { readonly kind: 'recovered'; readonly device: string; readonly seq: number }
   | { readonly kind: 'save'; readonly write: SaveWrite }
   /** MP4.1: a `room` line said here, for the rest of the world. */
-  | { readonly kind: 'chat'; readonly line: WorldLine };
+  | { readonly kind: 'chat'; readonly line: WorldLine }
+  /** GC15: this seat's feet left for cell `to`, standing at `at` in its frame: the door reads their save there and orders the `cross`. */
+  | { readonly kind: 'crossing'; readonly device: string; readonly to: string; readonly at: ResumeAt };
 /** What a worker says to the door. */
 export type WorkerNews =
   | { readonly kind: 'booted'; readonly ms: number }
@@ -55,4 +59,6 @@ export type WorkerNews =
   | { readonly kind: 'reading'; readonly reading: WorkerReading }
   | { readonly kind: 'cell'; readonly slug: string; readonly ms: number }
   | { readonly kind: 'drained' }
+  /** GC15: a `cross` order's end. Moved, the seat and its link are in `to` and `from` has let it go; else it stands in `from` still. */
+  | { readonly kind: 'crossed'; readonly device: string; readonly name: string; readonly from: string; readonly to: string; readonly moved: boolean }
   | (RoomNews & { readonly slug: string });
