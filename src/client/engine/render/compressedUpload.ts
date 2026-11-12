@@ -5,6 +5,7 @@ import { presenting } from '../../../shared/engine/core/framePacing';
 import type { Renderer } from './renderer';
 import { retainCompressedMipmaps, assertCompressedMipmapsUnchanged, compressedTextureKey } from './compressedMipmaps';
 import { installCompressedTextureRetirement } from './compressedTextureRetirement';
+import { clearCreationErrors } from './contextErrors';
 
 /** The actual renderer operations needed to isolate a compressed texture upload. */
 type UploadTarget = Pick<Renderer, 'initTexture' | 'getContext' | 'properties' | 'renderBufferDirect'>;
@@ -15,6 +16,7 @@ interface UploadState {
   failed: WeakMap<THREE.Texture, { allocation: unknown; error: Error }>;
 }
 const states = new WeakMap<UploadTarget, UploadState>();
+const OUT_OF_MEMORY = 0x0505, CONTEXT_LOST_WEBGL = 0x9242;
 // A painted frame between uploads belongs to no shard: the page's (SF57: never an ambient owner read mid-build).
 const frame = (): Promise<void> => new Promise(resolve => {
   pageScope.raf(() => { pageScope.timeout(0, resolve); });
@@ -83,8 +85,13 @@ export function uploadCompressedTexture(renderer: UploadTarget, texture: THREE.T
       queue.failed.set(texture, { allocation: allocation(), error: fault });
       return fault;
     };
-    const prior = checked ? gl.getError() : gl.NO_ERROR;
-    if (prior !== gl.NO_ERROR) throw fail(prior, 'before');
+    // ES 3.0 §2.5: a command that raised any error but OUT_OF_MEMORY had no effect, so a flag an earlier call left queued
+    // touched nothing this upload uses (opus-tex1): drain and name it. Out of memory or a lost context still fails.
+    const prior = checked ? clearCreationErrors(gl) : [];
+    if (prior.length > 0) recordBootCheckpoint('texture:stale-gl-error', { id: texture.id, errors: prior.join(',') });
+    const fatal = prior.find(code => code === OUT_OF_MEMORY || code === CONTEXT_LOST_WEBGL);
+    if (fatal !== undefined) throw fail(fatal, 'before');
+    if (prior.length > 0) console.warn(`Graphics error ${prior.join(', ')} left queued before compressed texture ${label} by an earlier call; drained, upload continues`);
     renderer.initTexture(texture);
     const error = checked ? gl.getError() : gl.NO_ERROR;
     if (error !== gl.NO_ERROR) throw fail(error, 'after');

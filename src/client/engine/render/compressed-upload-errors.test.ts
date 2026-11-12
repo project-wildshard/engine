@@ -27,10 +27,26 @@ const frames = (): void => {
   vi.spyOn(pageScope, 'timeout').mockImplementation((_ms, run) => { queueMicrotask(run); return 0; });
 };
 
-test('a GL error queued before a loading upload fails it and names that stage', async () => {
+test('a side-effect-free GL error an earlier call left queued is drained and named, never fails the upload', async () => {
+  // opus-tex1: headless Chromium's 'glGetProgramiv: Program object expected' (1281) failed Driftwood's first KTX2
+  frames();
+  const upload = texture(), warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  await expect(uploadCompressedTexture(renderer([1281, 1282], 0), upload, () => true, false)).resolves.toBeUndefined();
+  expect(warn).toHaveBeenCalledWith(`Graphics error 1281, 1282 left queued before compressed texture ${String(RGBA_S3TC_DXT5_Format)} (#${String(upload.id)}, 4x4, 1 mips) by an earlier call; drained, upload continues`);
+  upload.dispose();
+});
+
+test('out of memory queued before a loading upload still fails it and names that stage', async () => {
   frames();
   const upload = texture();
-  await expect(uploadCompressedTexture(renderer([1282], 0), upload)).rejects.toThrow(`Graphics error 1282 before compressed texture ${String(RGBA_S3TC_DXT5_Format)} (#${String(upload.id)}, 4x4, 1 mips)`);
+  await expect(uploadCompressedTexture(renderer([1281, 1285], 0), upload)).rejects.toThrow(`Graphics error 1285 before compressed texture ${String(RGBA_S3TC_DXT5_Format)} (#${String(upload.id)}, 4x4, 1 mips)`);
+  upload.dispose();
+});
+
+test('a lost context queued before a loading upload fails it', async () => {
+  frames();
+  const upload = texture();
+  await expect(uploadCompressedTexture(renderer([0x9242], 0), upload)).rejects.toThrow(`Graphics error ${String(0x9242)} before compressed texture`);
   upload.dispose();
 });
 
