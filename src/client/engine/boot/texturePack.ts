@@ -1,5 +1,6 @@
 import { ASSET_CACHE_NAME } from '../pwa/cacheNames';
 import { publishBootResponse } from './bootCache';
+import { contentURL, isContentOrigin } from './contentBase';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { PackDef, PackPart, PackFile } from '../../../shared/engine/boot/tables';
 
@@ -104,7 +105,7 @@ export class TexturePackReads {
         check();
         const path = envelope ? part.url : entry.path, expected = envelope ? part.bytes : entry.member.row[2];
         const bypassed = typeof navigator === 'undefined' || !('serviceWorker' in navigator) || navigator.serviceWorker.controller === null;
-        const wire = await readBody(await entry.net(path, {signal: group.controller.signal}), expected, group.controller.signal);
+        const wire = await readBody(await entry.net(contentURL(path), {signal: group.controller.signal}), expected, group.controller.signal);
         check();
         if (bypassed) await this.publish(path, new Response(wire, {headers: {'content-type': envelope ? 'application/octet-stream' : entry.member.row[3]}})).catch(() => undefined);
         check(); return wire;
@@ -171,7 +172,8 @@ export function demandTextureResponse(input: RequestInfo | URL, init: RequestIni
     || request !== undefined && (request.credentials !== 'same-origin' || request.cache !== 'default' || request.integrity !== ''
       || request.mode !== 'cors' || request.redirect !== 'follow' || request.referrerPolicy !== '')) return undefined;
   let url: URL; try { url = new URL(value, location.href); } catch { return undefined; }
-  if (url.origin !== location.origin || url.search !== '' || url.hash !== '') return undefined;
+  // PZ3: a read of the content base's copy is the same packed member
+  if (!isContentOrigin(url.origin) || url.search !== '' || url.hash !== '') return undefined;
   for (const reader of readers) {
     const response = reader.read(url.pathname, net, init?.signal ?? request?.signal);
     if (response !== undefined) return response;

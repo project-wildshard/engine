@@ -73,6 +73,7 @@
     "src/client/engine/boot/catalog.ts": "client",
     "src/client/engine/boot/chunkRecovery.ts": "client",
     "src/client/engine/boot/clearDownloads.ts": "client",
+    "src/client/engine/boot/contentBase.ts": "client",
     "src/client/engine/boot/contentRead.ts": "client",
     "src/client/engine/boot/download.ts": "client",
     "src/client/engine/boot/earlyPrograms.ts": "client",

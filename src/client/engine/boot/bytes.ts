@@ -24,6 +24,7 @@ import { presenting } from '../../../shared/engine/core/framePacing';
 import { workSlice } from '../../../shared/engine/core/workSlice';
 import { demandTextureResponse } from './texturePack';
 import { readContent } from './contentRead';
+import { contentURL } from './contentBase';
 
 export type ChunkFiles = Readonly<Record<ByteKey, readonly string[]>>;
 type Bytes = Record<string, number>;
@@ -86,9 +87,10 @@ const pathOf = (url: string): string => { try { return new URL(url, location.hre
  * query. A content-named file (a pack, the audio), any other URL, or one that already carries a query: as is.
  */
 export function versionedUrl(url: string): string {
-  if (!url.includes('/assets/') || url.includes('?')) return url;
+  if (!url.includes('/assets/') || url.includes('?')) return contentURL(url);
   const v = assetVersions()[pathOf(url)];
-  return v === undefined ? url : `${url}?v=${v}`;
+  // PZ3 (D1): engine and shard art come from the content base when the boot bank names one
+  return contentURL(v === undefined ? url : `${url}?v=${v}`);
 }
 /** `fetch` with `versionedUrl` applied (three's FileLoader hands fetch a Request) */
 function versionedFetch(net: typeof window.fetch): typeof window.fetch {

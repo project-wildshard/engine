@@ -5,6 +5,7 @@ import { timeClientPreparation } from '../shardfile/preparationTiming';
 import { prefetchEntryReads } from './entryReadPrefetch';
 import { boundedResponse } from '../shardfile/product';
 import { TIER } from '@wildshard/engine/core/tier';
+import { contentURL } from '@wildshard/engine/boot/contentBase';
 
 let readGeneration = 0;
 type InputBorrow = Pick<GridProduct, 'releaseInputs' | 'release'>;
@@ -45,7 +46,7 @@ export function prepareApproachProductInputs(slug: string, owner: GridProductOwn
         reserve: read => owner.allocator.reserveIfFits({ id: `entry-read:${slug}:${generation}:${++readId}`, owner: 'grid', category: 'product',
           bytes: 2 * read.bytes, distance: 0, needed: true }),
         fetchAsset: async (read, abort) => {
-          const response = await fetch(read.url, { signal: abort, priority: 'low' });
+          const response = await fetch(contentURL(read.url), { signal: abort, priority: 'low' });
           if (!response.ok) throw new Error(`Entry asset refused: ${String(response.status)}`);
           const bytes = await boundedResponse(response, read.bytes);
           if (bytes.length !== read.bytes || await product.options.hash(bytes) !== read.hash) throw new Error('Entry asset hash or size differs');

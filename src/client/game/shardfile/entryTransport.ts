@@ -1,3 +1,5 @@
+import { contentURL } from '@wildshard/engine/boot/contentBase';
+
 /** Build-produced read-ahead only. The ordinary product readers still admit
  * every size, hash and schema; this loan never writes a persistent cache. */
 export interface EntryTransport {
@@ -45,7 +47,7 @@ export function startEntryDownload(slug: string, flow: 'client' | 'grid' = 'clie
           size += part.value.length; if (size > 2_000_000) { await reader.cancel(); break; }
         }
       };
-      void fetch(url, {keepalive: true, priority: 'high'}).then(consume).catch(() => undefined);
+      void fetch(contentURL(url), {keepalive: true, priority: 'high'}).then(consume).catch(() => undefined);
     }
   } catch { /* Read-ahead never blocks a player navigation. */ }
 }
@@ -92,6 +94,10 @@ export function installEntryTransport(): void {
   const table: unknown = JSON.parse(bank);
   if (typeof table !== 'object' || table === null) return;
   const entries: unknown = Reflect.get(table, 'entryDownloads');
+  // PZ3: content reads go to the bank's content base, an origin (same origin when empty); jobs keep their page URLs (J138)
+  const named: unknown = Reflect.get(table, 'contentBase'), content = typeof named === 'string' && named !== '' ? new URL(named).origin : location.origin;
+  const onContent = (path: string): string => content === location.origin ? path : new URL(path, content).href;
+  const pageName = (url: string): string => { const at = new URL(url, location.href); return at.origin === content ? new URL(at.pathname + at.search, location.href).href : at.href; };
   if (typeof entries !== 'object' || entries === null) return;
   const tier = /iPhone|iPad|Android/iu.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 ? 'phone' : 'desktop';
   const pair: unknown = Reflect.get(entries, selected);
@@ -103,9 +109,9 @@ export function installEntryTransport(): void {
   let stopped = false;
   const stop = (): void => { stopped = true; controller.abort(); jobs.clear(); expand(); };
   Reflect.set(globalThis, key, {
-    has: (url: string): boolean => jobs.has(new URL(url, location.href).href),
+    has: (url: string): boolean => jobs.has(pageName(url)),
     take: async (url: string, signal?: AbortSignal): Promise<Response | null> => {
-      const name = new URL(url, location.href).href, job = jobs.get(name);
+      const name = pageName(url), job = jobs.get(name);
       if (job === undefined) return null;
       // Actual admission demand must never wait behind its own read-ahead fence.
       expand();
@@ -119,7 +125,7 @@ export function installEntryTransport(): void {
   // Before imports, this document owns the fetches (navigation cancels them).
   // Once admission starts its normal page Scope binds explicit stop/cleanup.
   const run = async (): Promise<void> => {
-    const schedule = await fetch(address, {signal: controller.signal});
+    const schedule = await fetch(onContent(address), {signal: controller.signal});
     if (!schedule.ok) return;
     const boundedJson = async (response: Response, cap: number): Promise<unknown> => {
       if (response.body === null) return null;
@@ -170,7 +176,7 @@ export function installEntryTransport(): void {
     let next = 0;
     const read = async (row: EntryDownloadRow): Promise<Response | null> => {
       try {
-        const response = await fetch(row.path, {signal: controller.signal, priority: 'low'});
+        const response = await fetch(onContent(row.path), {signal: controller.signal, priority: 'low'});
         if (!response.ok || response.status === 206 || response.body === null) { await response.body?.cancel(); return null; }
         const reader = response.body.getReader(), chunks: Uint8Array<ArrayBuffer>[] = [];
         let size = 0;

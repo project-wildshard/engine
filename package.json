@@ -323,6 +323,7 @@
     "./boot/browserChunkRecovery": "./src/client/engine/boot/browserChunkRecovery.ts",
     "./boot/bytes": "./src/client/engine/boot/bytes.ts",
     "./boot/catalog": "./src/client/engine/boot/catalog.ts",
+    "./boot/contentBase": "./src/client/engine/boot/contentBase.ts",
     "./boot/extras": "./src/client/engine/boot/extras.ts",
     "./boot/filePolicy": "./src/client/engine/boot/filePolicy.ts",
     "./boot/gpuFiles": "./src/client/engine/boot/gpuFiles.ts",

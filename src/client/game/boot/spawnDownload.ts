@@ -1,6 +1,7 @@
 import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming } from '@wildshard/engine/boot/timing';
+import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -103,20 +104,28 @@ const TYPES: Readonly<Record<string, string>> = {json: 'application/json', glb: 
   ktx2: 'image/ktx2', bin: 'application/octet-stream', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
   gif: 'image/gif', avif: 'image/avif', svg: 'image/svg+xml'};
 const typeOf = (url: string): string => TYPES[/\.([a-z0-9]+)(?:\?|$)/u.exec(url)?.[1] ?? ''] ?? 'application/octet-stream';
+/** PZ3: a GET of page content, sent to the content base (as is with no base, or for anything else). */
+function toContent(input: RequestInfo | URL): RequestInfo | URL {
+  const raw = input instanceof Request ? input.url : input instanceof URL ? input.href : input, url = contentURL(new URL(raw, location.href).href);
+  if (url === new URL(raw, location.href).href) return input;
+  return input instanceof Request ? new Request(url, input) : url;
+}
 /** A GET of a member URL waits for its bytes, of a listed file for its download, and of a stored URL reads the store;
  *  anything else, a retry, a failed member or a store miss goes to the network. */
 function installMemberLayer(): boolean {
   // Installed once per page, and again only if something replaced it (tests do); a page without fetch gets none.
   if (typeof window === 'undefined' || typeof window.fetch !== 'function') return false;
   if (layer !== null && window.fetch === layer) return true;
-  const network = window.fetch.bind(window);
-  beneath ??= network;
+  const native = window.fetch.bind(window);
+  // PZ3: a content read the store does not answer goes to the content base; a page URL is the store's key (J138)
+  const network: typeof fetch = (input, init) => native(toContent(input), init);
+  beneath ??= native;
   layer = async (input, init) => {
     const request = input instanceof Request ? input : undefined;
     const method = (init?.method ?? request?.method ?? 'GET').toUpperCase(), cache = init?.cache ?? request?.cache;
     const signal = init?.signal ?? request?.signal, own = signal !== undefined && signal !== null && ownSignals.has(signal);
     if ((members.size > 0 || storedUrls.size > 0 || jobWaits !== null || unlistedWait !== null) && !own && method === 'GET' && cache !== 'reload' && cache !== 'no-store') {
-      const address = new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input, location.href);
+      const address = new URL(pageURL(new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input, location.href).href), location.href);
       const url = (address.search === '' ? jobPaths?.get(address.origin + address.pathname) : undefined) ?? address.href;
       // the file's download first: a packed member's bytes are keyed only once its part starts (sp-x2's review)
       const pending = jobWaits?.get(url);
@@ -141,7 +150,7 @@ function installMemberLayer(): boolean {
     }
     if (method !== 'GET' || own) return network(input, init);
     const url = new URL(input instanceof Request ? input.url : input instanceof URL ? input.href : input, location.href);
-    if (url.origin !== location.origin || !url.pathname.startsWith('/shardfiles/')) return network(input, init);
+    if (!isContentOrigin(url.origin) || !url.pathname.startsWith('/shardfiles/')) return network(input, init);
     const held = await heldPartMember(url);
     if (held !== null) return held;
     const response = await network(input, init);
@@ -167,7 +176,7 @@ async function partTable(slug: string): Promise<PartMembers | null> {
   const address = bookSelection(await readPacksBook(), slug, 'client', partTier, '000');
   if (address === null) return null;
   const [response, code] = await Promise.all([downloadFetch()(new URL(address.url, selected.base)),
-    address.code === undefined ? undefined : downloadFetch()(new URL(address.code.url, document.baseURI))]);
+    address.code === undefined ? undefined : downloadFetch()(contentURL(new URL(address.code.url, document.baseURI).href))]);
   if (!response.ok || code?.ok === false) { void response.body?.cancel().catch(() => undefined); void code?.body?.cancel().catch(() => undefined); return null; }
   const manifest = joinSpawnManifest(readSpawnManifest(await response.json()), code === undefined ? undefined : readSpawnCodeList(await code.json())), files = new Map<string, {file: SpawnManifest['files'][number]; part: SpawnPart; offset: number}>();
   for (const part of manifest.parts ?? []) for (const [index, offset] of part.members) {
@@ -238,7 +247,7 @@ async function exactCopy(file: HeldFile): Promise<Uint8Array<ArrayBuffer> | null
 /** DL25: the server worker's ask. A file this page's download lists: its bytes once they land, moved to the front of the job
  *  as any page read is, whether they sit in the part or the page's store. Null is 'not here': the worker reads the network. */
 export async function spawnHeldBytes(url: string): Promise<ArrayBuffer | null> {
-  const address = new URL(url, location.href), file = pageFiles.get(address.origin + address.pathname);
+  const address = new URL(pageURL(new URL(url, location.href).href), location.href), file = pageFiles.get(address.origin + address.pathname);
   if (file === undefined) return null;
   const pending = jobWaits?.get(file.url);
   if (pending !== undefined) { jobDemand?.(file.url); await pending; }
@@ -360,9 +369,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   const stopped = new Promise<never>((_resolve, reject) => { markStopped = reject; });
   const work = (async () => {
     try {
-      // OVERNIGHT 6e: the manifest and its code list, read together. The list is the build's own, so it is read from the
-      // document's origin; the content may live on the packs home.
-      const manifestURL = new URL(address.url, packs).href, codeURL = address.code === undefined ? undefined : new URL(address.code.url, base).href;
+      // OVERNIGHT 6e: the manifest and its code list, read together. The list is the build's own, read from the content base
+      // (PZ3) or else the document's origin; the content may live on the packs home.
+      const manifestURL = new URL(address.url, packs).href, codeURL = address.code === undefined ? undefined : contentURL(new URL(address.code.url, base).href);
       const readOne = async (url: string, expected: number): Promise<{bytes: Uint8Array; copy: Response | undefined}> => {
         const held = await ports.cached(url);
         controller.signal.throwIfAborted();
@@ -770,7 +779,9 @@ function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tie
  * page URLs: a part delivers them, and the product reads them by those. */
 function packBase(home: unknown, slug: string): string {
   const shards = get(home, 'shards'), base = get(home, 'base');
-  return Array.isArray(shards) && shards.includes(slug) && typeof base === 'string' ? base : document.baseURI;
+  if (Array.isArray(shards) && shards.includes(slug) && typeof base === 'string') return base;
+  // PZ3: the content base, an origin, when the boot bank names one; else this page
+  return contentBase() || document.baseURI;
 }
 /** Optional recorded programs use the cook's actual inventory. Null means the cook published no such file. */
 export function shardPackBase(slug: string): string | null {
@@ -791,7 +802,7 @@ declare const __BUILD_ID__: string;
 let packsBook: {readonly url: string; readonly book: Promise<unknown>} | undefined;
 const PACKS_BOOK_MS = 20_000;
 function readPacksBook(): Promise<unknown> {
-  const url = new URL(`/${packsBookPath(__BUILD_ID__)}`, document.baseURI).href;
+  const url = contentURL(new URL(`/${packsBookPath(__BUILD_ID__)}`, document.baseURI).href);
   if (packsBook?.url === url) return packsBook.book;
   const book = (async () => {
     try {

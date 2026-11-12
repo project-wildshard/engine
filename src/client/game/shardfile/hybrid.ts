@@ -18,7 +18,7 @@ import { shardfileSource } from './clientSource';
 import type { ProductOptions } from './product';
 import { configureLevel, selectedLevel } from '@wildshard/engine/level/selection';
 import { reserveMapImage } from './mapImage';
-import { browserShardfileOptions, provideHybridDeclaration } from './runtimeProduct';
+import { browserShardfileOptions, productBase, provideHybridDeclaration } from './runtimeProduct';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 import type { ShardfileClientBindings } from './client';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -303,8 +303,7 @@ export async function prepareHybridShard(product: ShardProduct, options: Product
     readonly stagesOwner?: 'declared' | 'runtime';
   }): Promise<ShardPlugin> {
   // Every entry passes the product already loaded before its hooks.
-  const productOptions = 'base' in options ? options : browserShardfileOptions(
-    new URL(`shardfiles/${product.slug}/`, document.baseURI || location.href).href, options.firstParty);
+  const productOptions = 'base' in options ? options : browserShardfileOptions(productBase(product.slug), options.firstParty);
   const source = product.shardfile;
   if (source.runtime === null) throw new Error('Hybrid requires a compiled client-plan runtime declaration');
   provideHybridDeclaration(source);

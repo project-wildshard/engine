@@ -1,6 +1,7 @@
 import { parseEntryReadSet, nearestEntryReads, type EntryRead, type EntryReadSet, type RegionEntryReads } from '@wildshard/format/entryReads';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
+import { contentURL } from '@wildshard/engine/boot/contentBase';
 
 /** A region's recorded entry reads: `public/assets/<slug>/entry-reads.json` (the T7.14 runtime slice: one real entry's
  *  first-demand reads, committed as data; the bake-time crawl replaces the file). */
@@ -43,7 +44,7 @@ export function entryReadPlan(rows: EntryReadSet, tier: RegionEntryReads['tier']
 export async function prefetchEntryReads(slug: string, tier: RegionEntryReads['tier'], ports: EntryReadPorts, signal: AbortSignal, at?: { readonly x: number; readonly z: number }): Promise<number> {
   if (signal.aborted) return 0;
   let rows: EntryReadSet;
-  try { rows = parseEntryReadSet(await ports.fetchJson(entryReadsUrl(slug), signal)); } catch { return 0; }
+  try { rows = parseEntryReadSet(await ports.fetchJson(contentURL(entryReadsUrl(slug)), signal)); } catch { return 0; }
   const plan = entryReadPlan(rows, tier, slug, ports.source, at), blobs = `/shardfiles/${slug}/blobs/`;
   let next = 0, done = 0;
   const lane = async (): Promise<void> => {

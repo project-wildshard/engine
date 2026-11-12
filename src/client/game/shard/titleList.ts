@@ -1,6 +1,7 @@
 import type { ShardManifest } from './manifest';
 import { shards } from './list';
 import { bareSlug, installedCatalogue } from '../../../shared/game/grid/catalogueSlot';
+import { contentBase, contentURL } from '@wildshard/engine/boot/contentBase';
 
 /** Cold-title metadata contains no executable shard bindings. */
 export type TitleManifest = Pick<ShardManifest, 'slug' | 'name' | 'biome' | 'status' | 'card' | 'shardSelect' | 'shardfile' | 'gridShardfile'> & Pick<Partial<ShardManifest>, 'order' | 'bag'> & {
@@ -26,7 +27,12 @@ export function readTitleRows(page: Pick<Document, 'getElementById'>): readonly 
   if (text === undefined || text === null || text === '') return [];
   const rows: unknown = JSON.parse(text);
   if (!isRows(rows)) throw new Error('Invalid title rows');
-  return rows;
+  // PZ3: card art is shard content, read from the content base when the boot bank names one
+  return contentBase() === '' ? rows : rows.map(cardOnContent);
+}
+function cardOnContent(row: TitleManifest): TitleManifest {
+  const card = Object.fromEntries(Object.entries(row.card).map(([key, url]) => [key, typeof url === 'string' ? contentURL(url) : url])) as TitleManifest['card'];
+  return { ...row, card };
 }
 /** The composition root installs generated data before recovery or title navigation.
  * Publish the same scalar rows for built-page catalogue inspection without loading worlds. */

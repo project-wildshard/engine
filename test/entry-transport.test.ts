@@ -121,3 +121,16 @@ test('a real tap starts the versioned index request across navigation', () => {
   const read = setup([]); startEntryDownload('example');
   expect(read).toHaveBeenCalledWith('/shardfiles/example/shard.json?v=12345678', {keepalive: true, priority: 'high'});
 });
+
+test('PZ3: with a content base the read-ahead reads there, and a loan answers its page or content URL', async () => {
+  const path = '/shardfiles/example/blobs/bin/body.bin', cdn = 'https://packs.example.test', read = setup([{path, bytes: 3, members: [hash]}]);
+  vi.stubGlobal('document', {getElementById: () => ({textContent: JSON.stringify({contentBase: `${cdn}/`, entryDownloads: {example: {phone: schedule}}})})});
+  read.mockImplementation(url => Promise.resolve(address(url) === `${cdn}${schedule}` ? Response.json([{path, bytes: 3, members: [hash]}]) : new Response(new Uint8Array([1, 2, 3]))));
+  installEntryTransport();
+  await vi.waitFor(() => expect(entryTransport()?.has(`${cdn}${path}`)).toBe(true));
+  expect(entryTransport()?.has(path)).toBe(true);
+  entryTransport()?.expand();
+  const response = await entryTransport()?.take(`${cdn}${path}`);
+  expect(response).toBeInstanceOf(Response);
+  expect(read.mock.calls.map(row => address(row[0]))).toEqual([`${cdn}${schedule}`, `${cdn}${path}`]);
+});

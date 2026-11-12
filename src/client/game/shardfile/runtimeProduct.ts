@@ -33,6 +33,7 @@ import { legacyAsset } from './legacyAsset';
 import { productResourceRole } from '../../../shared/game/shardfile/resourceRole';
 import { entryTransport } from './entryTransport';
 import { currentSpawnDownload, releaseSpawnMembers } from '../boot/spawnDownload';
+import { contentURL } from '@wildshard/engine/boot/contentBase';
 
 /**
  * The trusted runtime's product reader (SHARD-PLATFORM M3 tiles-swap, G227, E435): the same `ClientAssets` in both modes,
@@ -105,7 +106,7 @@ export function browserShardfileOptions(base: string, firstParty = false): Produ
           const early = await entryTransport()?.take(path, init.signal ?? undefined);
           if (early !== null && early !== undefined) return early;
         }
-        return fetch(path, { ...init, ...(priority === undefined ? {} : { priority }) });
+        return fetch(contentURL(path), { ...init, ...(priority === undefined ? {} : { priority }) });
       },
       ...(storage === undefined || hash === undefined ? {} : { legacy: { read: () => legacyAsset(storage, address, hash), store: storage } }),
     }, navigator.serviceWorker?.controller === null || navigator.serviceWorker?.controller === undefined ? storage : undefined), 'file', address);
@@ -113,13 +114,13 @@ export function browserShardfileOptions(base: string, firstParty = false): Produ
   };
   return { ...(parseJson === undefined ? {} : { parseJson }), base, firstParty, ...(spawn === undefined ? {} : {directFiles: true}), tier: TIER, splatTier: splatDrawTier, quality, textures: ktx2TranscodeSupport(), offline: !navigator.onLine, hash: verifiedHash,
     ...(firstParty ? { firstPartyRead } : {}),
-    backgroundFetch: (url, signal) => fetch(resolve(url), { priority: 'low', ...(signal === undefined ? {} : { signal }) }),
+    backgroundFetch: (url, signal) => fetch(contentURL(resolve(url)), { priority: 'low', ...(signal === undefined ? {} : { signal }) }),
     fetch: (url, signal) => waitFor(`Read ${productResourceRole(url, base)}`, (async () => {
-      if (spawn !== undefined) return fetch(resolve(url), signal === undefined ? {} : {signal});
+      if (spawn !== undefined) return fetch(contentURL(resolve(url)), signal === undefined ? {} : {signal});
       signal?.throwIfAborted();
       const early = await entryTransport()?.take(url, signal);
       if (early !== null && early !== undefined) return early;
-      return fetch(url, signal === undefined ? {} : { signal });
+      return fetch(contentURL(url), signal === undefined ? {} : { signal });
     })(), 'file', url),
     revalidateAfterControl: run => {
       if (typeof document === 'undefined') return;
@@ -127,7 +128,7 @@ export function browserShardfileOptions(base: string, firstParty = false): Produ
       if (productControlsReady) void refresh();
       else pageScope.listen(document, 'ws:control-ready', () => { void refresh(); }, { once: true });
     },
-    ...(firstParty ? { fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(url, { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file') } : {}),
+    ...(firstParty ? { fetchRange: (url: string, start: number, end: number, priority?: 'low') => waitFor(`Fetch pack range ${start}-${end}`, fetch(contentURL(url), { headers: { Range: `bytes=${start}-${end}` }, ...(priority === undefined ? {} : { priority }) }), 'file') } : {}),
     pause, cacheBatch: true,
     ...(firstParty && builtIndexes !== null ? { built: { indexes: builtIndexes, stale: staleRecovery } } : {}),
     ...(firstParty || typeof caches === 'undefined' ? {} : { cache: browserProductCache(caches, { pause, ...(parseJson === undefined ? {} : { parseJson }) }) }),
@@ -153,9 +154,10 @@ function pauseDescriptor(): () => Promise<void> {
 
 const provided = new Map<string, RuntimeProduct[]>();
 
-/** The canonical product base for a first-party shard (`/shardfiles/<slug>/`), relative to the page. */
-function productBase(slug: string): string {
-  return new URL(`shardfiles/${slug}/`, typeof document === 'undefined' ? location.href : document.baseURI || location.href).href;
+/** The canonical product base for a first-party shard (`/shardfiles/<slug>/`), relative to the page, on the content base
+ *  when the boot bank names one (PZ3). */
+export function productBase(slug: string): string {
+  return contentURL(new URL(`shardfiles/${slug}/`, typeof document === 'undefined' ? location.href : document.baseURI || location.href).href);
 }
 
 /** A grid cell's admitted product, read by its resident runtime while `scope` lives (the cell's resident scope). */

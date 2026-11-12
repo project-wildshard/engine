@@ -14,6 +14,7 @@ import { syncPageRewards } from '../../../shared/game/saves';
 import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
 import { countedWait } from '@wildshard/engine/boot/waits';
+import { contentURL } from '@wildshard/engine/boot/contentBase';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import type { NetClient } from '@wildshard/engine/net/client';
 import type { NetCombatEvent } from '@wildshard/engine/net/messages';
@@ -252,7 +253,8 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   const saves = await bootTask('server:indexed-saves-open', () => openIndexedSaves(serverSaveDatabase()));
   if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
   // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
-  return startStandalone({ slug, base: `/shardfiles/${slug}/`, build, savePrefix, ...lone ? { lone: true as const } : {}, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
+  // PZ3: its book, server parts, road part and loose reads follow the content base; rapier stays in the page
+  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...lone ? { lone: true as const } : {}, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
  *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the Worker boot
