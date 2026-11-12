@@ -164,7 +164,7 @@ function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map
     if (info.cls.cls !== ANIMAL_CLASS.cls || bodies.has(handle)) continue; // the shell's bundle has its own copy of the class
     const { x = 0, y = 0, z = 0, yaw = 0 } = client.interpolator.fields(handle, Number.MAX_SAFE_INTEGER) ?? {};
     if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number' || typeof yaw !== 'number') continue;
-    const kind = String(info.initial['kind']), at = diagnosticNow(), body = animals.spawn(kind, x, z, yaw, String(info.initial['variant']), { y, body: { seed: Number(info.initial['seed']), scale: Number(info.initial['scale']) } });
+    const kind = wirePage.rowKind(info.initial['species'], String(info.initial['kind'])), at = diagnosticNow(), body = animals.spawn(kind, x, z, yaw, String(info.initial['variant']), { y, body: { seed: Number(info.initial['seed']), scale: Number(info.initial['scale']) } });
     spawnMs.set(kind, Math.max(spawnMs.get(kind) ?? 0, diagnosticNow() - at));
     body.rowDriven = true;
     wirePage.dress(animals, body);

@@ -38,4 +38,6 @@ export const ANIMAL_NET: NetSchema<AnimalNetView> = bindClass<AnimalNetView, typ
   rarity: view => view.sim.rarity,
   scale: view => view.sim.scale,
   seed: view => view.sim.seed,
+  // TE-ENG7: two declared species may share a kind; a remote page draws each by its own id.
+  species: view => view.sim.species,
 });

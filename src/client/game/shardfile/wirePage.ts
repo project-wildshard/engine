@@ -65,6 +65,8 @@ export class WirePage {
   /** A row's body on this page, by the name the server gave it. */
   namedBody: (id: string) => Animal | null = () => null;
   private readonly dressers = new Map<object, (body: Animal) => void>();
+  /** A declared species' kind on this page, by its id: its own id when it shares a native kind (TE-ENG7). */
+  private speciesKinds: ReadonlyMap<string, string> = new Map<string, string>();
   /** The head over a row's body, into `to`: what an elite's bar stands on. */
   readonly head: (body: number, to: Vector3) => boolean = (body, to) => this.heads(body, to);
   /** How many poses rows have set: what a proof reads. */
@@ -101,6 +103,12 @@ export class WirePage {
   dressRows(manager: object, scope: Scope, dress: (body: Animal) => void): void { this.dressers.set(manager, dress); scope.onDispose(() => { if (this.dressers.get(manager) === dress) this.dressers.delete(manager); }); }
   /** A row's new body, in `manager`. */
   dress(manager: object, body: Animal): void { this.dressers.get(manager)?.(body); }
+  /** The page's kinds for declared species (`speciesViewKinds`), until `scope` ends. */
+  declareSpecies(kinds: ReadonlyMap<string, string>, scope: Scope): void {
+    this.speciesKinds = kinds; scope.onDispose(() => { if (this.speciesKinds === kinds) this.speciesKinds = new Map(); });
+  }
+  /** The kind a row spawns as here: its declared species' page kind, else the wire's `kind` (a native body, an older server). */
+  rowKind(species: unknown, kind: string): string { return typeof species === 'string' && species !== '' ? this.speciesKinds.get(species) ?? kind : kind; }
   /** Count one thing drawn. */
   drew(what: string): void { this.drawn[what] = (this.drawn[what] ?? 0) + 1; }
 

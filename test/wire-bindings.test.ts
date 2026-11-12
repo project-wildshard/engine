@@ -22,10 +22,10 @@ const columns = (list: NetClass<never>['row']): FrozenColumn[] => list.map(({ na
 
 test('the bound classes hash to the descriptors, which are engine main\'s v0 wire', () => {
   expect(NET_SCHEMA_HASH).toBe(v0SchemaHash(WIRE_CLASSES));
-  expect(NET_SCHEMA_HASH).toBe(3_494_901_458);
+  expect(NET_SCHEMA_HASH).toBe(516_954_244); // with animal.species (TE-ENG7)
 });
 
-test('every compiled column is cfd6681\'s, and the player gains only its spawn name', () => {
+test('every compiled column is cfd6681\'s; the player gains only its spawn name, the animal its species', () => {
   expect(NET_CLASSES.map(entry => entry.cls)).toEqual(FROZEN.map(entry => entry.cls));
   for (const [index, entry] of NET_CLASSES.entries()) {
     const frozen = FROZEN[index];
@@ -35,7 +35,7 @@ test('every compiled column is cfd6681\'s, and the player gains only its spawn n
     expect(columns(entry.initial)).toEqual(frozen?.initial);
     expect(entry.radius).toBe(frozen?.radius);
     expect(entry.position).toEqual(frozen?.position);
-    expect(entry.text.map(field => field.name)).toEqual(entry.cls === 'player' ? ['name'] : frozen?.text);
+    expect(entry.text.map(field => field.name)).toEqual(entry.cls === 'player' ? ['name'] : entry.cls === 'animal' ? [...frozen?.text ?? [], 'species'] : frozen?.text);
   }
 });
 

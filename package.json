@@ -59,7 +59,7 @@
     "@sentry/core": "11.0.0",
     "@valibot/to-json-schema": "1.8.0",
     "@wildshard/format": "github:project-wildshard/shardfile#563d6800c9ed5093b1882086489ce20c5f245184",
-    "@wildshard/wire": "github:project-wildshard/shardfile#a51f56fbe54197b879fa309a1b1946df7384d576&path:/packages/wire",
+    "@wildshard/wire": "github:project-wildshard/shardfile#9382d50c92566b65fa758aec19b216201e4c4d8d&path:/packages/wire",
     "ajv": "6.15.0",
     "fflate": "0.8.3",
     "hono": "4.13.13",

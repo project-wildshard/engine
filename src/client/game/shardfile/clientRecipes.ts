@@ -51,3 +51,14 @@ export function clientSpeciesLooks(rows: ShardRows, recipes: ReadonlyMap<string,
     return { ...look, id: row.id, species: species.id, kind: species.kind, material: () => material };
   });
 }
+
+/**
+ * Each declared species' kind on the page, by species id (TE-ENG7). A species that shares its native kind with another
+ * declared species, and has its own look, registers under its own id, so the page resolves its own rig, name and
+ * measures; the rest keep their native kind. The server still runs every body by its native kind.
+ */
+export function speciesViewKinds(rows: Pick<ShardRows, 'species' | 'looks'>): ReadonlyMap<string, string> {
+  const counts = new Map<string, number>();
+  for (const row of rows.species) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
+  return new Map(rows.species.map((row) => [row.id, (counts.get(row.kind) ?? 0) > 1 && rows.looks.some((look) => look.species === row.id) ? row.id : row.kind]));
+}
