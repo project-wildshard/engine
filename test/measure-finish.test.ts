@@ -38,10 +38,12 @@ test('tint: each role mixes the surface colour into its role colour by its share
   const plain = compiled(MEASURE), finished = compiled({ ...MEASURE, tint: FINISH.tint });
   expect(vec(plain.uniforms['famMTint'])).toEqual([0, 0, 0]);
   expect(vec(finished.uniforms['famMTint'])).toEqual([0.85, 0.7, 0]);
-  // the surface colour is diffuseColor after three's color_fragment: the vertex colour × the material colour
+  // the surface colour is diffuseColor after three's color_fragment (`diffuseColor *= vColor`): vertex × material colour
   const mixAt = finished.fragment.indexOf('famMBase = mix( famMBase, diffuseColor.rgb, dot( famMTint, famMSel ) )');
-  expect(mixAt).toBeGreaterThan(finished.fragment.indexOf('diffuseColor.rgb *= vColor'));
-  expect(mixAt).toBeLessThan(finished.fragment.indexOf('diffuseColor.rgb = famMOut'));
+  const colourAt = finished.fragment.indexOf('diffuseColor *= vColor'), outAt = finished.fragment.indexOf('diffuseColor.rgb = famMOut');
+  expect(colourAt).toBeGreaterThanOrEqual(0);
+  expect(mixAt).toBeGreaterThan(colourAt);
+  expect(outAt).toBeGreaterThan(mixAt);
 });
 
 test('grain: an amount per role and one size, value noise in world metres, off by default', () => {
