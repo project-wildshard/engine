@@ -51,8 +51,11 @@ Landing from a worktree (mode 2; J290, LAND-SIMPLIFY J249/J258; meta `docs/plans
    `--rounds=N` (tries at the main push, 5), `--poll=S` (30), `--keep` (keep the worktree and branch). Don't commit
    while it runs.
  - The flow, in 8 steps:
-   1. One land per worktree (its lock); worktrees never wait on each other.
-   2. Rebase first if main is already ahead, then push `plan/<slug>`. Land rewrites it only when this branch's
+   1. One land per worktree (its lock); worktrees never wait on each other. The tree must be clean but for the
+      boot stamps (`src/client/game/boot/{audio,bytes,versions}.generated.ts`) and this tree's own pin outputs;
+      anything else stops land in seconds, naming each path and its fix (DS22).
+   2. Rebase first if main is already ahead, run `gen:inputs` and commit the stamps it rewrote on `plan/<slug>`
+      (`chore(gen): regenerate boot stamps`, DS22), then push `plan/<slug>`. Land rewrites it only when this branch's
       reflog reached origin's tip, under a lease (LS4); the split pre-push runs (static checks, related tests).
    3. Wait for that exact SHA's `ci` to go green.
    4. If main moved during CI, rebase. Any conflict stops, and the resolved commit needs its own branch CI.
@@ -65,7 +68,7 @@ Landing from a worktree (mode 2; J290, LAND-SIMPLIFY J249/J258; meta `docs/plans
       worktree with uncommitted or untracked files is kept.
  - The renderer and validation revisions are computed live from source, in a checkout and in an installed engine
    alike; nothing stamps them into git (LS1, J250).
- - Output: `land HH:MM:SS <state> <detail>`, states `start`, `rebased`, `pushing`, `ci`, `moved`,
+ - Output: `land HH:MM:SS <state> <detail>`, states `start`, `rebased`, `stamps`, `pushing`, `ci`, `moved`,
    `carried`, `merging`, `landed`, `canonical`, `watch`, `rule`, `cleaned`; a stop is one `land STOP …` line.
    Exit 0: landed or nothing to land. Exit 1: stopped; if a `landed` line came first, only the cleanup failed.
  - Landings, CI reds, refusals, conflicts and give-ups append a line to `~/.cache/wildshard/lane-receipts.log`
@@ -89,8 +92,10 @@ When land stops (each seen on 2026-11-10/11):
  - `push of plan/<slug> … failed` (pre-push red): the failing check is printed above it. Seen: lint, an HTTPS
    remote using another GitHub login (403: use the SSH remote), a fresh clone with no pins exclude block (run
    `pnpm pins` in the canonical checkout). Fix forward, commit, run land again.
- - `Push target requires a clean checked tree` with only pin outputs untracked (`public/programs/` and the like):
-   run `pnpm pins` in the worktree. The pins manifest is keyed by the validation revision, which LS1 moved once.
+ - `this worktree is not clean before the gate` (DS22): each path is listed with its fix. Commit it, move it under
+   `tmp/`, or drop it. Untracked pin output (`public/assets/gpu/<shard>/`, `public/programs/`): run `pnpm pins` in
+   the worktree, or ignore that pin folder in `.gitignore`. The receipt is `STOP tree not clean …`.
+ - `push of plan/<slug> … failed`: the receipt names the pre-push's own cause (`refused by the pre-push: …`).
  - `origin plan/<slug> is at X, which this worktree's branch never reached`: someone else pushed your branch.
    Fetch, rebase your commits onto `origin/plan/<slug>` and run land again; or start a new worktree with a new slug
    and cherry-pick your commits. Never force over it.

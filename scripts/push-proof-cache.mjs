@@ -40,6 +40,15 @@ function exclusionScope(root){
   return {files:[...state.excluded].sort(),deadline:state.deadline};
 }
 
+/** The porcelain lines that make `cwd` an unclean checked tree: every change and untracked file, minus the pins
+ * outputs this tree's own install published (verifiedPinsOutputs). Land's preflight (DS22) uses the same list, so it
+ * stops on exactly what this check would refuse, before the gate instead of minutes into it.
+ * @param {string} cwd @param {ReadonlySet<string>} [pinned] @returns {string[]} */
+export function checkedTreeDirt(cwd,pinned=verifiedPinsOutputs(cwd).paths){
+  return execFileSync('git',['status','--porcelain','-z','--untracked-files=all'],{cwd,encoding:'utf8',maxBuffer:64<<20}).split('\0').filter(Boolean)
+    .filter(line=>!(line.startsWith('?? ')&&pinned.has(line.slice(3))));
+}
+
 /** Never cache dirty bytes or use local receipts to skip CI.
  * @param {string} profile @param {NodeJS.ProcessEnv} env @param {string} [cwd] */
 export function capturePushTree(profile,env,cwd=process.cwd()){
@@ -62,7 +71,7 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   // never wrote the exclude block lists them untracked. Only mounts that hash to this tree's current pins manifest are
   // passed over, and that manifest's key joins the proof identity below (pins-reuse.mjs verifiedPinsOutputs).
   const pinned=verifiedPinsOutputs(cwd);
-  const dirty=git(['status','--porcelain','-z','--untracked-files=all']).split('\0').filter(Boolean).filter(line=>!(line.startsWith('?? ')&&pinned.paths.has(line.slice(3))));
+  const dirty=checkedTreeDirt(cwd,pinned.paths);
   if(dirty.length>0){
     if(publishes)throw new Error('Push target requires a clean checked tree; enqueue a committed immutable checkout');
     return null;

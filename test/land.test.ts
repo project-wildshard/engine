@@ -14,8 +14,7 @@ import { runInNewContext } from 'node:vm';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
-import { failedJobs, flakyFiles, mainPushArgs, parseArgs, quarantineFile, shaVerdict, strikePlans } from '../scripts/land.mjs';
-
+import { failedJobs, flakyFiles, mainPushArgs, parseArgs, prePushCause, quarantineFile, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -175,6 +174,13 @@ function fixture() {
   return { root, remote, repo, peer, env, files, git, worktree, commit, edit, peerScript, state, land, landAsync, remoteMain, read };
 }
 
+// DS22: a stand-in for gen:inputs. It writes the bytes stamp from the tree's own src/*.ts files, so a commit or a rebase
+// that adds one makes the committed stamp stale, as a new public/assets file does for the real one.
+const STAMP = 'src/client/game/boot/bytes.generated.ts';
+const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from 'node:fs';"
+  + "const rows=readdirSync('src').filter(name=>name.endsWith('.ts')).sort().map(name=>name+':'+statSync('src/'+name).size);"
+  + "mkdirSync('src/client/game/boot',{recursive:true});writeFileSync('src/client/game/boot/bytes.generated.ts','export const bytes = '+JSON.stringify(rows)+';\\n');";
+
 const prepushLines = (f: Fixture) => f.read(f.files.prepush).trim().split('\n').filter(Boolean);
 
 describe('land (J240): fast-forward main from a plan worktree after its branch CI is green', () => {
@@ -232,7 +238,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
-    writeFileSync(join(wt, 'notes.txt'), 'mine');
+    // Written while hosted CI runs: an untracked file before the gate stops land up front (DS22).
+    f.state({ once: { marker: join(f.root, 'once'), command: ['sh', '-c', `printf mine > '${join(wt, 'notes.txt')}'`] } });
     const result = f.land(wt, []);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/origin plan\/foo deleted; worktree kept: 1 uncommitted or untracked path/u);
@@ -426,7 +433,71 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('push of plan/foo');
     expect(f.read(f.files.gh)).toBe('');
+    // DS22: the receipt names the pre-push's own cause, not a bare "pre-push red".
+    expect(f.read(f.files.receipts)).toMatch(/STOP plan push [0-9a-f]{10} refused by the pre-push: pre-push: planted red check$/mu);
   }, 60_000);
+
+  test('DS22: a dirty bytes.generated.ts is regenerated after the rebase, committed on the plan branch, and lands', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'scripts/gen.mjs', GEN_STAMPS, 'build: a stamp generator');
+    const gen = () => execFileSync(process.execPath, ['scripts/gen.mjs', '--inputs-only'], { cwd: wt, env: f.env });
+    gen();
+    f.git(wt, ['add', STAMP]);
+    f.git(wt, ['commit', '--quiet', '-m', 'chore: stamps']);
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;\n', 'feat: add feature');
+    gen();
+    expect(f.git(wt, ['status', '--porcelain'])).toBe(`M ${STAMP}`);
+    // Main moves before land starts, so the stamp land commits must count main's new file as well as the plan's.
+    execFileSync('sh', [f.peerScript('src/other.ts', null, 'export const other = 2;')], { env: f.env });
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/rebased .*\n.*stamps +committed src\/client\/game\/boot\/bytes\.generated\.ts/u);
+    const [subject = '', ...rest] = f.git(f.remote, ['log', '--format=%B', '-1', 'main']).split('\n');
+    expect(subject).toBe('chore(gen): regenerate boot stamps');
+    // The real commit-msg rule passes it, so land's commit goes through engine's own hook.
+    const verdict = execFileSync(process.execPath, ['--input-type=module', '-e',
+      `import {validate} from ${JSON.stringify(resolve('.githooks/check-commit-message.mjs'))};process.stdout.write(String(validate(${JSON.stringify([subject, ...rest].join('\n'))})));`], { encoding: 'utf8' });
+    expect(verdict).toBe('null');
+    expect(f.git(f.remote, ['diff', '--name-only', 'main^', 'main'])).toBe(STAMP);
+    const stamp = f.git(f.remote, ['show', `main:${STAMP}`]);
+    expect(stamp).toContain('feature.ts:');
+    expect(stamp).toContain('other.ts:');
+    expect(f.git(wt, ['status', '--porcelain'])).toBe('');
+    // One plan push and one main push: no refusal on the way.
+    expect(prepushLines(f)).toHaveLength(2);
+    expect(f.read(f.files.receipts)).toMatch(/plan\/foo stamps committed [0-9a-f]{10}: src\/client\/game\/boot\/bytes\.generated\.ts/u);
+    expect(STAMPS).toContain(STAMP);
+  }, 60_000);
+
+  test('DS22: an untracked file outside the pin set stops land before the gate, naming each path and its fix', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    writeFileSync(join(wt, 'stray.txt'), 'mine');
+    writeFileSync(join(wt, 'src/a.ts'), 'export const a = 2;\n');
+    const began = Date.now();
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(1);
+    expect(Date.now() - began).toBeLessThan(15_000);
+    expect(result.stdout).toMatch(/land STOP .*not clean/u);
+    expect(result.stdout).toMatch(/\?\? stray\.txt: untracked: commit it/u);
+    expect(result.stdout).toMatch(/ M src\/a\.ts: uncommitted change: commit it/u);
+    // The gate never ran and nothing left this machine.
+    expect(f.read(f.files.prepush)).toBe('');
+    expect(f.read(f.files.gh)).toBe('');
+    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.remote, env: f.env }).status).not.toBe(0);
+    expect(f.read(f.files.receipts)).toMatch(/STOP tree not clean before the gate: src\/a\.ts, stray\.txt$/mu);
+    expect(readFileSync(join(wt, 'stray.txt'), 'utf8')).toBe('mine');
+  }, 60_000);
+
+  test('DS22: the pre-push cause, read from its output', () => {
+    expect(prePushCause('  - lint RED in 3.0 s\nerror: failed to push some refs to \'x\'\n')).toBe('lint RED in 3.0 s');
+    expect(prePushCause('file:///x/run-checks.mjs:63\nError: Push target requires a clean checked tree; enqueue a committed immutable checkout\n    at capturePushTree (x)\nerror: failed to push some refs to \'x\'\n'))
+      .toBe('Push target requires a clean checked tree; enqueue a committed immutable checkout');
+    expect(prePushCause('To /remote.git\n ! [remote rejected] x\nerror: failed to push some refs to \'x\'\n')).toBe('! [remote rejected] x');
+    expect(prePushCause('')).toBe('no output');
+  });
 
   test('refuses the canonical checkout and non-plan branches', () => {
     const f = fixture();
@@ -543,8 +614,10 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
   test('LS1: land runs no generator after the rebase, so a plan\'s gen.mjs can\'t slip a commit onto main', () => {
     const f = fixture();
     const wt = f.worktree('foo');
-    // Before LS1 land ran this plan's gen.mjs after the rebase to regenerate the stamps; this one would commit a file.
-    f.commit(wt, 'scripts/gen.mjs', "import {execSync} from 'node:child_process';import {writeFileSync} from 'node:fs';writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');", 'build: a generator');
+    // Before LS1 land ran this plan's gen.mjs after the rebase to regenerate the stamps; this one would commit a file. It
+    // sneaks only once hosted CI has been asked (the marker), so DS22's up-front gen:inputs, before the gate, is clean.
+    const marker = join(f.root, 'once');
+    f.commit(wt, 'scripts/gen.mjs', `import {execSync} from 'node:child_process';import {existsSync,writeFileSync} from 'node:fs';if(existsSync(${JSON.stringify(marker)})){writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');}`, 'build: a generator');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('src/other.ts', null, 'export const other = 2;')] } });
     const result = f.land(wt);
@@ -552,6 +625,18 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const main = f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/']).split('\n');
     expect(main).toEqual(expect.arrayContaining(['src/other.ts', 'src/feature.ts']));
     expect(main).not.toContain('src/sneak.ts');
+  }, 60_000);
+
+  test('DS22: a gen:inputs that commits on its own stops land before the gate; land commits only the stamps', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'scripts/gen.mjs', "import {execSync} from 'node:child_process';import {writeFileSync} from 'node:fs';writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');", 'build: a generator');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(1);
+    expect(result.stdout).toMatch(/land STOP scripts\/gen\.mjs --inputs-only made a commit/u);
+    expect(f.read(f.files.prepush)).toBe('');
+    expect(f.git(f.remote, ['ls-tree', '--name-only', 'main', 'src/'])).not.toMatch(/sneak|feature/u);
   }, 60_000);
 
   test('J206 review: a commit that slips in during the rebase never rides to main (verifyReplay)', () => {
@@ -642,6 +727,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const linked = h.worktree('baz');
     h.commit(linked, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     mkdirSync(join(h.root, 'canonical-modules'));
+    // Ignored as engine's .gitignore does (no trailing slash, so the link matches too): DS22's preflight passes it.
+    writeFileSync(join(h.repo, '.git/info/exclude'), 'node_modules\n');
     symlinkSync(join(h.root, 'canonical-modules'), join(linked, 'node_modules'));
     h.state({ once: { marker: join(h.root, 'once'), command: ['sh', h.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
     const refused = h.land(linked);

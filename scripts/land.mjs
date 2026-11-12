@@ -1,7 +1,8 @@
 // LAND-SIMPLIFY (J240, J249, J250, J258): land a plan worktree on main by fast-forward, then get out of the way.
-//   1. From .worktrees/<slug> on plan/<slug> (scripts/worktree.mjs new): one land per worktree (its lock).
-//   2. Rebase first if main is already ahead, then push plan/<slug> under a lease its own reflog vouches for; the
-//      split pre-push runs (DS9).
+//   1. From .worktrees/<slug> on plan/<slug> (scripts/worktree.mjs new): one land per worktree (its lock). The tree
+//      must be clean but for the boot stamps; anything else stops land at once, naming each path and its fix (DS22).
+//   2. Rebase first if main is already ahead, run gen:inputs and commit a stamps-only diff on plan/<slug> (DS22), then
+//      push plan/<slug> under a lease its own reflog vouches for; the split pre-push runs (DS9).
 //   3. Wait for that exact SHA's `ci` to go green.
 //   4. Rebase onto origin/main if it moved during CI. Any conflict stops (no stamps are tracked since LS1, J250). A rebase
 //      that changes the lockfile or a package.json runs `pnpm install --frozen-lockfile` before any push.
@@ -18,6 +19,7 @@ import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readF
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 
@@ -28,6 +30,52 @@ const PLAN_BRANCH=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
 const SHA=/^[a-f0-9]{40}$/u;
 
 class StopError extends Error{name='StopError';}
+
+/** DEV-SPEED DS22: the boot stamps the pre-push's gen:inputs rewrites from the tree (scripts/app-build/gen.ts). After a
+ * rebase they go stale whenever main changed public/assets, and the pre-push's clean-tree check then refused the push
+ * minutes in (58 `pre-push red` receipts in a day). Land runs the same generator first and commits these, and only
+ * these, on the plan branch, so branch CI checks them like any commit. */
+export const STAMPS=Object.freeze(['src/client/game/boot/audio.generated.ts','src/client/game/boot/bytes.generated.ts','src/client/game/boot/versions.generated.ts']);
+/** package.json `gen:inputs`, run directly: pnpm adds nothing here and a fixture's pnpm is a stub. */
+const GEN=Object.freeze(['scripts/gen.mjs','--inputs-only']);
+const STAMPS_MESSAGE='chore(gen): regenerate boot stamps\n\nDEV-SPEED DS22: land ran gen:inputs after its rebase and commits the\nboot stamps it rewrote, so the pre-push sees a clean tree.\n\nAssisted-by: land:ds22-stamps';
+
+/** What to do about one porcelain line that keeps the tree from being clean.
+ * @param {string} code @param {string} path @param {string} branch */
+function dirtFix(code,path,branch){
+ if(code==='??'){
+  if(/^public\/(?:assets\/gpu|programs)\//u.test(path))return `untracked pin output: run \`pnpm pins\` here (its manifest no longer matches this tree), or ignore that pin folder in .gitignore as engine 2fa94a78 did`;
+  return `untracked: commit it on ${branch} (git add ${path}, then git commit -- ${path}), move it under tmp/, or delete it`;
+ }
+ return `uncommitted change: commit it on ${branch} (git commit -- ${path}), or drop it (git restore --staged --worktree ${path})`;
+}
+
+/** The pre-push's own reason for refusing a push, from git's output (under --porcelain a hook's stdout is git's): a thrown error's message, a check's `RED` line, a
+ * remote's rejection, else its last line. Git's own `failed to push` summary is never the cause.
+ * @param {string} stderr @returns {string} */
+export function prePushCause(stderr){
+ // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
+ const lines=stderr.split('\n').map(line=>line.replaceAll(/\u001B\[[0-9;]*m/gu,'').trim()).filter(line=>line!==''&&!/^error: failed to push some refs|^To \S+$|^hint: |^Done$/u.test(line));
+ const pick=lines.find(line=>/^(?:[A-Z]\w*)?Error: /u.test(line))?.replace(/^(?:[A-Z]\w*)?Error: /u,'')
+  ??lines.find(line=>/(?:^|\s)RED(?:\s|$)/u.test(line))?.replace(/^- /u,'')
+  ??lines.find(line=>/^! \[(?:remote )?rejected\]/u.test(line))
+  ??lines.at(-1);
+ return pick===undefined?'no output':pick.slice(0,300);
+}
+
+/** Run git with its stderr shown live (the pre-push's progress) and kept, for the receipt's cause.
+ * @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} env
+ * @returns {Promise<{status:number,stdout:string,stderr:string}>} */
+function gitTee(cwd,args,env){
+ return new Promise(_resolve=>{
+  const child=spawn('git',args,{cwd,env,stdio:['ignore','pipe','pipe']});
+  let stdout='',stderr='';
+  child.stdout.on('data',chunk=>{stdout+=String(chunk);});
+  child.stderr.on('data',chunk=>{process.stderr.write(chunk);stderr=`${stderr}${String(chunk)}`.slice(-(1<<16));});
+  child.once('error',error=>{_resolve({status:1,stdout,stderr:`${stderr}\n${error.message}`});});
+  child.once('close',code=>{_resolve({status:code??1,stdout,stderr});});
+ });
+}
 
 /** @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} [env] */
 const git=(cwd,args,env=process.env)=>execFileSync('git',args,{cwd,env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:64<<20}).trim();
@@ -296,8 +344,57 @@ class Landing{
   for(const name of ['rebase-merge','rebase-apply','MERGE_HEAD','CHERRY_PICK_HEAD']){
    if(existsSync(resolve(this.root,git(this.root,['rev-parse','--git-path',name]))))throw new StopError(`a ${name} is in progress in this worktree; finish or abort it first`);
   }
-  const dirty=git(this.root,['status','--porcelain','--untracked-files=no']);
-  if(dirty!=='')throw new StopError(`commit or drop tracked changes first:\n${dirty}`);
+  return this.preflight('before the gate');
+ }
+
+ /** DS22: the same list push-proof-cache.mjs's clean-tree check refuses (pins outputs this tree's install published
+  * pass), checked in seconds instead of minutes into the pre-push. Modified boot stamps pass when this tree has the
+  * generator that rewrites them; anything else stops land, naming each path and its fix.
+  * @param {string} when @returns {string[]} the modified stamps */
+ preflight(when){
+  const generates=existsSync(join(this.root,GEN[0]));
+  /** @type {string[]} */const stamps=[];
+  /** @type {{code:string,path:string}[]} */const foreign=[];
+  for(const line of checkedTreeDirt(this.root)){
+   const code=line.slice(0,2),path=line.slice(3);
+   if(generates&&/^(?:M[ M]| M)$/u.test(code)&&STAMPS.includes(path))stamps.push(path);
+   else foreign.push({code,path});
+  }
+  if(foreign.length===0)return stamps;
+  foreign.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
+  this.receipt(`STOP tree not clean ${when}: ${foreign.map(row=>row.path).join(', ')}`);
+  throw new StopError(`this worktree is not clean ${when}; the pre-push would refuse it ("Push target requires a clean checked tree"). Each path and its fix:\n${foreign.map(({code,path})=>`  ${code} ${path}: ${dirtFix(code,path,this.branch)}`).join('\n')}\nThen run land again.`);
+ }
+
+ /** DS22: before the gate, run gen:inputs (the pre-push's own first step) and commit the boot stamps it rewrote, on
+  * the plan branch, so branch CI checks them. The generator may not commit, and may not touch anything else. */
+ regenerate(){
+  if(!existsSync(join(this.root,GEN[0])))return;
+  const before=this.holds('before gen:inputs');
+  const ran=spawnSync(process.execPath,[...GEN],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:300_000,maxBuffer:64<<20});
+  const head=this.head();
+  if(head!==before){
+   this.receipt(`STOP ${GEN.join(' ')} moved HEAD ${short(before)} -> ${short(head)}`);
+   throw new StopError(`${GEN.join(' ')} made a commit (${short(before)} -> ${short(head)}): land runs it only to rewrite the boot stamps. Fix the generator, reset ${this.branch} to ${short(before)} if that commit is unwanted, and run land again.`);
+  }
+  if(ran.status!==0){
+   const why=`${ran.stderr}${ran.stdout}${ran.error?.message??''}`.trim().split('\n').slice(-3).join(' ');
+   this.receipt(`STOP ${GEN.join(' ')} failed: ${why}`);
+   throw new StopError(`${GEN.join(' ')} failed before the gate (the pre-push would fail on it too): ${why}\nFix it and run land again.`);
+  }
+  const stamps=this.preflight(`after ${GEN.join(' ')}`);
+  if(stamps.length===0)return;
+  const committed=spawnSync('git',['commit','--quiet','-m',STAMPS_MESSAGE,'--',...stamps],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+  const sha=this.head();
+  const changed=tryGit(this.root,['diff','--name-only',before,sha]).stdout.trim().split('\n').filter(Boolean);
+  if(committed.status!==0||tryGit(this.root,['rev-parse',`${sha}^`]).stdout.trim()!==before||changed.some(path=>!STAMPS.includes(path))){
+   this.receipt(`STOP stamps commit on ${short(before)} failed or changed more than the stamps`);
+   throw new StopError(`committing the regenerated stamps (${stamps.join(', ')}) failed or changed more than them: ${`${committed.stderr}${committed.stdout}`.trim()}\nInspect: git status, git log -2. Then run land again.`);
+  }
+  this.preflight(`after the stamps commit`);
+  this.expected=sha;
+  this.say('stamps',`committed ${stamps.join(', ')} rewritten by gen:inputs (${short(sha)})`);
+  this.receipt(`stamps committed ${short(sha)}: ${stamps.join(', ')}`);
  }
 
  /** Rebase onto origin/main; a conflict aborts and stops with the paths.
@@ -386,7 +483,7 @@ class Landing{
   * push landing in between is refused by git. This is `--force-if-includes`'s rule without its timestamp window,
   * which made git refuse a fresh fetch of the worktree's own tip (J206 review). No record files.
   * @param {string} sha */
- pushPlan(sha){
+ async pushPlan(sha){
   const ref=`refs/heads/${this.branch}`,tracking=`refs/remotes/origin/${this.branch}`;
   if(git(this.root,['rev-parse',ref])!==sha)throw new StopError(`${this.branch} is not at ${short(sha)}; run land again`);
   if(tryGit(this.root,['fetch','--quiet','origin',`+${ref}:${tracking}`]).status!==0)tryGit(this.root,['update-ref','-d',tracking]);
@@ -399,10 +496,10 @@ class Landing{
   }
   const args=['push','--porcelain',`--force-with-lease=${ref}:${tip??''}`,'origin',`${ref}:${ref}`];
   this.say('pushing',`${this.branch} ${short(sha)}${rewrite?` (rebased; replaces its own ${short(tip)} under a lease)`:''}; the pre-push runs`);
-  const result=spawnSync('git',args,{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','inherit']});
+  const result=await gitTee(this.root,args,this.env);
   if(result.status!==0){
    const leased=/\[rejected\].*\((?:stale info|fetch first)\)/u.test(result.stdout);
-   this.receipt(`STOP plan push ${short(sha)} refused (${leased?'origin moved during the push':'pre-push red'})`);
+   this.receipt(`STOP plan push ${short(sha)} ${leased?'refused (origin moved during the push)':`refused by the pre-push: ${prePushCause(`${result.stderr}\n${result.stdout}`)}`}`);
    throw new StopError(leased
     ?`origin ${this.branch} moved while land pushed, so git refused the lease: someone else pushed it. Fetch and integrate their commits, then run land again. Never force over it.`
     :`push of ${this.branch} ${short(sha)} failed: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
@@ -578,23 +675,29 @@ class Landing{
  }
 
  async run(){
-  this.clean();
+  const stamps=this.clean();
   const start=this.head();this.expected=start;
   let main=this.fetchMain();
   if(start===main||isAncestor(this.root,start,main)){this.say('nothing',`${this.branch} ${short(start)} has nothing main lacks`);return 0;}
   this.say('start',`${this.branch} ${short(start)} -> main ${short(main)} (repo ${this.repo})`);
   // An install a stopped land owed (its rebase had already moved HEAD) runs before anything else (J206 review).
   if(existsSync(this.installMarker()))this.install(['an earlier land\'s rebase']);
+  // DS22: gen:inputs rewrites the stamps from the tree after the rebase, so their stale bytes never block it.
+  if(stamps.length>0&&!isAncestor(this.root,main,start)){
+   git(this.root,['restore','--staged','--worktree','--',...stamps]);
+   this.say('stamps',`set aside ${stamps.join(', ')} for the rebase; gen:inputs rewrites them after it`);
+  }
   if(!isAncestor(this.root,main,start)){
    this.rebase(main);
    if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return 0;}
   }
+  this.regenerate();
   /** @type {{sha:string,base:string}|null} */let tested=null;
   let needHosted=true,rule='exact',why='main had not moved since the hosted run';
   for(let round=1;round<=this.options.rounds;round++){
    if(needHosted){
     const sha=this.holds('before the branch push');
-    this.pushPlan(sha);
+    await this.pushPlan(sha);
     let verdict=await this.waitCI(sha,this.branch);
     this.holds('while hosted CI ran');
     if(verdict.state==='red'){
