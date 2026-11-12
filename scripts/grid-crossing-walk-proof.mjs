@@ -70,11 +70,11 @@ try {
     const W = /** @type {any} */ (window), q = W.__gc15c = { frames: /** @type {number[][]} */ ([]), samples: /** @type {unknown[]} */ ([]), sentinel: 1 }, t0 = performance.now();
     let last = t0;
     /** @param {number} now */
-    const raf = now => { q.frames.push([Math.round(now - t0), +(now - last).toFixed(1)]); last = now; requestAnimationFrame(raf); };
+    const raf = now => { q.frames.push([Math.round(now - t0), Number((now - last).toFixed(1))]); last = now; requestAnimationFrame(raf); };
     requestAnimationFrame(raf);
     setInterval(() => { try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player, lv = st.live, wire = W.__workerClient?.();
-      q.samples.push({ t: Math.round(performance.now() - t0), x: +p.position.x.toFixed(2), y: +p.position.y.toFixed(2), z: +p.position.z.toFixed(2), inside: st.inside, phase: lv?.crossing?.phase, target: lv?.crossing?.target, issue: lv?.crossing?.issue, site: W.__workerClient?.().site,
+      q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside, phase: lv?.crossing?.phase, target: lv?.crossing?.target, issue: lv?.crossing?.issue, site: W.__workerClient?.().site,
         ready: lv?.live?.gameplayReady, loading: st.cellLoading, closed: st.softWalls?.closed, feet: st.feet, frames: wire?.frames, own: wire?.own });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 100);
   });
@@ -82,9 +82,9 @@ try {
   const broken = await page.evaluate(() => /** @type {any} */ (window).__gc15c.samples.find((/** @type {any} */ row) => row.err !== undefined));
   if (broken !== undefined) throw new Error(`The sampler: ${String(broken.err)}`);
   /** @returns {Promise<any>} */
-  const sample = () => page.evaluate(() => /** @type {any[]} */ (/** @type {any} */ (window).__gc15c.samples).filter((/** @type {any} */ row) => row.err === undefined).at(-1));
+  const sample = () => page.evaluate(() => /** @type {any[]} */ (/** @type {any} */ (window).__gc15c.samples).toReversed().find((/** @type {any} */ row) => row.err === undefined));
   /** @param {number} yaw */
-  const face = yaw => page.evaluate(to => { const player = /** @type {any} */ (window).__wildshard.world.player; player.yaw = to; }, yaw);
+  const face = yaw => page.evaluate(wanted => { const player = /** @type {any} */ (window).__wildshard.world.player; player.yaw = wanted; }, yaw);
   /** Face the point (x, z) in this frame: the page's motor faces atan2(own - target) (ui.ts faceToward). */
   const toward = async (/** @type {number} */ x, /** @type {number} */ z) => { const at = await sample(); await face(Math.atan2(at.x - x, at.z - z)); return Math.hypot(at.x - x, at.z - z); };
   const approached = Date.now();

@@ -20,3 +20,5 @@ Sunscar: the page's own preparation of Sunscar is blocked by `Compressed texture
 
 The rig commit: `server-origin.mjs` takes `--grid=<root>` (default the checkout, where the bake leaves
 `out/.app/grid-collision`), and `test/server-origin-grid.test.ts` reads the strips back through a dedicated room's pack reader.
+
+Lint fold: the proof script keeps to the scripts lint (no shadowed names, `Number()` over unary plus).
