@@ -1,6 +1,4 @@
 // @vitest-environment node
-// oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp; the fake bucket hashes it.
-import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under tmp.
@@ -143,7 +141,7 @@ test('a read-back with other bytes, or without the game CORS, fails the publish 
 });
 
 test('the real store reads through packs.wildshard.io cache-busted with the Origin, and never puts the token in argv', async () => {
-  const token = ['cf', 'secret', 'marker'].join('-'), seen: {url: string, init?: RequestInit}[] = [], runs: {args: string[], secrets: string[], list: unknown}[] = [];
+  const token = ['cf', 'secret', 'marker'].join('-'), seen: {url: string, init?: RequestInit | undefined}[] = [], runs: {args: string[], secrets: string[], list: unknown}[] = [];
   const store = r2Content({
     root: '/repo', scratch: join(scratchRoot, 'store'), token,
     fetch: ((url: URL, init?: RequestInit) => { seen.push({url: url.href, init}); return Promise.resolve(new Response('x', {status: 200, headers: {'access-control-allow-origin': ORIGIN}})); }) as typeof fetch,
