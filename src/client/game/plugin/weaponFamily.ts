@@ -84,7 +84,7 @@ function lanternMesh(ports: ItemFamilyPorts): Group {
   const model = new Group();
   const part = (geometry: BufferGeometry, x: number, y: number, z: number): BufferGeometry => geometry.translate(x, y, z);
   const pieces = [part(new BoxGeometry(0.12, 0.022, 0.12), 0, -0.075, 0), part(new BoxGeometry(0.11, 0.02, 0.11), 0, 0.07, 0),
-    part(new ConeGeometry(0.08, 0.045, 4).rotateY(Math.PI / 4), 0, 0.1025, 0), part(new TorusGeometry(0.035, 0.005, 4, 10, Math.PI), 0, 0.125, 0),
+    part(new ConeGeometry(0.08, 0.045, 4).rotateY(Math.PI / 4), 0, 0.1025, 0), part(new TorusGeometry(0.035, 0.005, 4, 10, Math.PI), 0, 0.097, 0),
     ...[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx = 0, sz = 0]) => part(new BoxGeometry(0.016, 0.13, 0.016), sx * 0.048, 0, sz * 0.048))];
   const frame = mergeGeometries(pieces, false); for (const piece of pieces) piece.dispose();
   const pane = new BoxGeometry(0.08, 0.12, 0.08);
