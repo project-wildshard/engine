@@ -84,6 +84,9 @@ Landing from a worktree (mode 2; J290, LAND-SIMPLIFY J249/J258; meta `docs/plans
    `node scripts/main-watch.mjs`.
  - Docs and release pushes from the canonical checkout are a plain `git push origin main` through the normal
    pre-push (its docs-only path skips the suite). There is no shared push queue (LS7).
+ - Docs-only fast path (EV9): a push of only AGENTS.md or `docs/**` Markdown runs lint, format, the asks,
+   `check:parity` and any Vitest file naming the doc as a string, locally and on `ci`, which skips its shards once an
+   ancestor's code run is green. A doc code reads (CHANGELOG.md, via the build) still runs full: `scripts/push-selection.mjs`.
  - Abandoned worktrees: `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an unlanded, dirty
    or busy one.
 
