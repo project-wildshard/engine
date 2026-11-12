@@ -21,3 +21,6 @@
 - Review folds (one-shot `claude -p`, no MUST): one owner per rope deck or
   refuse (a saved chain is found by owner); the room that came back from a
   save walks the bridge; comments on the sections path and the test span.
+- Ring 1 step: Driftwood's 240-tick digest chain moves (the planks are
+  bodies in the room now). Darwin measured bdfee5c41ac2be02, the prefix
+  Linux CI reported; both platforms recorded, other shards unchanged.
