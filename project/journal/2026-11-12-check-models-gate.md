@@ -18,3 +18,6 @@ fails, as before.
 
 Red first: the real-tree case failed with all 39. A planted `InstancedMesh` in `CoinMotion.ts` and a planted
 `defineModel` in `Impacts.ts` each fail it.
+
+It earned its keep at once: the land's rebase onto TE-ENG10 (`2a95dd80`) went red on the merge `skinPlayback.ts` added
+for a GLB creature's primitives. That one is a creature's own skin, so it is declared too (14 draws now).

@@ -95,6 +95,7 @@ export const DONE = {
     'src/client/game/population/projection.ts': { why: "a population's projectile volley: an effect", counts: { InstancedMesh: 1 } },
     'src/client/game/quest/figures.ts': { why: "G571: a quest page's placed kit figures, built from admitted kit rows; the still part registers once as world", counts: { 'registry add with object': 1 } },
     'src/client/game/shardfile/sceneInstances.ts': { why: "a shard's admitted instanced scene rows, one draw per row: world drawn from data, like bakedKinds", counts: { InstancedMesh: 1 } },
+    'src/client/game/shardfile/skinPlayback.ts': { why: "TE-ENG10: one loaded GLB creature's primitives merged onto its one skeleton, grouped by mapped part; the creature stays its model's, no new world thing", counts: { mergeGeometries: 1 } },
     'src/client/game/shardfile/slabLibrary.ts': { why: "an admitted storage chunk's one-instance draw, kept in the chunk's channel layout: world drawn from data", counts: { InstancedMesh: 1 } },
     'src/client/game/shardfile/clientForestPage.ts': { why: "G571: a forest page's cave lights (the interior's shaft and drips) added as world, without colliders, as Pine's landmarks did", counts: { 'registry add with object': 1 } },
     'src/client/game/weather/forest.ts': { why: 'Weather particles and puddles are effects; the retained instance draw follows the prepared weather rows.', counts: { InstancedMesh: 1 } },
