@@ -8,7 +8,11 @@
 //      verified clone, hashed against its blob afterwards); git writes the rest, so other lanes' edits never enter;
 //   2. build state, cloned whole (copy-on-write, no new blocks): node_modules, .bin-deps/node_modules, .tsc-layers (the
 //      tsc -b cache) and out/ with the pins mounts this checkout's install published (pins-reuse.mjs);
-//   3. `pnpm install --offline` in the copy when the pushed lockfile is not the installed one; if the copy is still unclean (a commit that moves the pins key), `pnpm pins` in the copy, once;
+//   3. `pnpm install --offline` in the copy when the pushed lockfile is not the installed one or a cloned package link
+//      does not resolve (pnpm's links are relative, and the copy sits deeper than the checkout); `pnpm pins` in the
+//      copy, once, when the copy is unclean (a commit that moves the pins key) or holds no verified pins outputs (the
+//      checkout's own pins manifest is missing or stale): gen:inputs stamps those outputs, so a copy without them
+//      rewrites the boot stamps (GATEFIX, 2026-11-12);
 //   4. the gate runs there; then the copy and its worktree entry are removed, green or red. A copy whose gate was
 //      killed is swept by the next one (its pid is gone).
 // Each step's seconds print as one `push-gate copy` line. Turn it off in one commit: CLEAN_COPY below.
@@ -59,6 +63,20 @@ export function copyReason(root,sha,env,enabled=CLEAN_COPY){
  if(git(root,['rev-parse','HEAD^{tree}'])!==git(root,['rev-parse',`${sha}^{tree}`]))return 'pushed commit is not the checked-out tree';
  const dirt=checkedTreeDirt(root);
  return dirt.length===0?null:`${dirt.length} uncommitted path(s) in the checkout, e.g. ${dirt[0]}`;
+}
+
+/** Whether any top-level package link under `modules` (one level into @scopes) fails to resolve.
+ * @param {string} modules @returns {boolean} */
+export function brokenLink(modules){
+ /** @param {string} dir */
+ const names=dir=>{try{return readdirSync(dir);}catch{return [];}};
+ for(const name of names(modules)){
+  if(name.startsWith('.'))continue;
+  for(const entry of name.startsWith('@')?names(join(modules,name)).map(inner=>join(name,inner)):[name]){
+   try{if(lstatSync(join(modules,entry)).isSymbolicLink()&&!existsSync(join(modules,entry)))return true;}catch{return true;}
+  }
+ }
+ return false;
 }
 
 /** Remove copies a killed gate left behind: their pid (the name's suffix) is gone. A live gate's copy is never touched.
@@ -122,19 +140,24 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   // The cloned packages are the checkout's install, which another lane's uncommitted `pnpm add` may have changed: the
   // copy installs its own (offline, from the store) whenever the pushed lockfile is not the one installed (J206 review).
   const lock=join(path,'pnpm-lock.yaml'),installed=join(path,'node_modules/.pnpm/lock.yaml');
-  if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(!existsSync(installed)||!readFileSync(lock).equals(readFileSync(installed)))){
+  const lockMoved=existsSync(lock)&&(!existsSync(installed)||!readFileSync(lock).equals(readFileSync(installed)));
+  if(existsSync(lock)&&existsSync(join(path,'node_modules'))&&(lockMoved||brokenLink(join(path,'node_modules')))){
    timed('install',()=>{
     const child=spawnSync('pnpm',['install','--frozen-lockfile','--offline'],{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
     if(child.status!==0)throw new Error(`pnpm install in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);
-    return 'pushed lockfile differs from the checkout\'s install';
+    return lockMoved?'pushed lockfile differs from the checkout\'s install':'cloned package links do not resolve';
    });
   }
   let dirt=checkedTreeDirt(path);
-  if(dirt.length>0&&existsSync(join(path,'node_modules'))){
-   // A commit that moves the pins key leaves the cloned mounts unverified: publish this tree's own, once.
+  // Only a tree that pins shards (test/pins/shardfiles.json) has outputs to publish.
+  const unpinned=existsSync(join(path,'test/pins/shardfiles.json'))&&verifiedPinsOutputs(path).key==='';
+  if((dirt.length>0||unpinned)&&existsSync(join(path,'node_modules'))){
+   // A commit that moves the pins key leaves the cloned mounts unverified, and a checkout with no current pins manifest
+   // lends none: publish this tree's own, once, or gen:inputs stamps the missing mounts out of the boot tables.
    timed('pins',()=>{
     const child=spawnSync('pnpm',['--silent','pins'],{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
     if(child.status!==0)throw new Error(`pnpm pins in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);
+    return dirt.length>0?`${dirt.length} unclean path(s)`:'no verified pins outputs cloned';
    });
    dirt=checkedTreeDirt(path);
   }

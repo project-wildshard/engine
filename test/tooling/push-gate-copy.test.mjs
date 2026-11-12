@@ -3,10 +3,10 @@
 // a canonical checkout where lane A has a type-broken tracked edit and a type-broken untracked file, and lane B
 // commits one file by pathspec. The "gate" here is `node --check` over every .mjs file in the gated tree.
 import {spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {GATE_DIR, copyReason, makeGateCopy, pushedCommit, sweepDeadCopies} from '../../scripts/push-gate-copy.mjs';
+import {GATE_DIR, brokenLink, copyReason, makeGateCopy, pushedCommit, sweepDeadCopies} from '../../scripts/push-gate-copy.mjs';
 import {mainPull} from '../../scripts/main-pull.mjs';
 import {capturePushTree} from '../../scripts/push-proof-cache.mjs';
 
@@ -177,5 +177,22 @@ describe('push gate copy (EV1)', () => {
     writeFileSync(join(root, 'shared.mjs'), 'export const shared = ;\n');
     expect(git(root, ['rev-parse', 'HEAD'])).toBe(head);
     expect(readFileSync(join(root, 'shared.mjs'), 'utf8')).toBe('export const shared = ;\n');
+  });
+
+  test('GATEFIX: a relative package link that no longer resolves at the copy\'s depth makes the copy reinstall', () => {
+    const root = canonical();
+    const modules = join(root, 'node_modules');
+    mkdirSync(join(root, 'store/pkg'), {recursive: true});
+    mkdirSync(join(modules, '@scope'), {recursive: true});
+    symlinkSync('../store/pkg', join(modules, 'pkg'));
+    symlinkSync('../../store/pkg', join(modules, '@scope/pkg'));
+    expect(brokenLink(modules)).toBe(false);
+    // The same relative links one folder deeper, as a cloned node_modules sits in tmp/push-gate/<sha>-<pid>.
+    const deep = join(root, 'deeper/node_modules');
+    mkdirSync(join(deep, '@scope'), {recursive: true});
+    symlinkSync('../../../store/pkg', join(deep, '@scope/pkg'));
+    expect(brokenLink(deep)).toBe(false);
+    symlinkSync('../store/pkg', join(deep, 'pkg'));
+    expect(brokenLink(deep)).toBe(true);
   });
 });
