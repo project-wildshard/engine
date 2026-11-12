@@ -15,7 +15,7 @@ With `PLAYTEST=1`, E7.8a writes `playtest-<date>.jsonl` there, inside its
 existing writable sandbox; it does not use `/var/log/wildshard`.
 
 Run `bash scripts/vps/setup.sh --check` first. It inspects listeners,
-private Serve, both Funnel ports, the public pin and both env files even
+the tailnet-only Serve routes, the public pin and both env files even
 after a failed probe. An unprivileged check says `cannot verify` for
 protected env files and PostgreSQL, rather than inventing missing state.
 Unknown is not a green privileged verification.
@@ -43,13 +43,17 @@ Only exactly blank rows are filled, atomically as `640 root:wildshard`:
 No seat secret or credential is printed or regenerated in an existing
 file. No manual env editing is needed for these three settings.
 
-Funnel maps production HTTPS 443 to loopback 8790, and staging HTTPS
-8443 to loopback 8791. The script prints the stable `wss://` addresses
-from the node's tailnet DNS name. Private HTTP Serve on port 8790 stays
-tailnet-only. Before every route change, all paths on either public
-host:port must be absent or exactly ours; foreign TCP, foreground or
-AllowFunnel configuration refuses. A completed rerun is accepted.
-No Serve/Funnel reset, off command or Tailscale identity change occurs.
+The Funnel is retired (MMO-SERVER-PLAN MS8, 2026-11-12): the public
+sockets are `wss://rooms.wildshard.io` and `wss://rooms-staging.wildshard.io`
+through Caddy (harden.sh). Setup makes three tailnet-only Serve routes for
+`/health` and agent reads: HTTPS 443 to loopback 8790 (production), HTTPS
+8443 to loopback 8791 (staging) and HTTP 8790 to loopback 8790. Before
+every route change, all paths on those host:ports must be absent or
+exactly ours; foreign TCP or foreground configuration refuses. A Funnel
+route (`AllowFunnel` true) is drift: `--check` fails and names the
+`tailscale funnel --https=<port> off` command that removes it, which the
+agent sudo allowlist holds; rerun setup.sh after it. A completed rerun is
+accepted. No Serve reset or Tailscale identity change occurs.
 The old quick-tunnel unit is left untouched and reported if still active.
 
 ## Rebuild from nothing (MMO-PLAN MP0.1)
@@ -187,8 +191,8 @@ dressed as the audited box; `test/vps-harden.test.ts` pins its parsing.
 
 **Proxy trust (VH10).** The server reads a forwarded address only from a
 loopback peer, and only the header `TRUST_PROXY` names: `caddy` (the
-default) takes the last `X-Forwarded-For` hop, which Tailscale Funnel and
-Caddy both write themselves; `cloudflare` takes `CF-Connecting-IP`; `none`
+default) takes the last `X-Forwarded-For` hop, which Caddy (and the retired
+Funnel) write themselves; `cloudflare` takes `CF-Connecting-IP`; `none`
 reads no header. A browser's `Origin` must be in `ALLOWED_ORIGINS` (the
 game's own hosts by default; `*` allows any) or the upgrade gets 403.
 `setup.sh` sets both in `wildshard-server@.service`; an env-file line
@@ -197,7 +201,7 @@ overrides them.
 ## J205: live agent traffic is staging only
 
 Production serves humans only. Every live agent proof, bot and soak uses
-`wss://wildshard.tailb41b20.ts.net:8443`, the staging channel and
+`wss://rooms-staging.wildshard.io`, the staging channel and
 `saves_staging`. Build its separate client origin for the exact signed
 staging SHA and `releases/staging.json`; never repurpose the human
 production page or join the production socket from a proof.
@@ -230,7 +234,7 @@ own commit, so build and wire match the server's.
   RSS) join the report.
 - `staging` (default 2 bots, 60 s) joins the staging socket only after
   `/health` shows the release's build and enough free seats: it leaves
-  4 of staging's 16 for people. Through Funnel every bot is this Mac's
+  4 of staging's 16 for people. Through Caddy every bot is this Mac's
   one address and no header says otherwise, so at most 4 join. Staging's
   2 workers are its own setting.
 
@@ -265,7 +269,7 @@ game skips this first-release pull. Check the actual release and book
 on the configured pack origin before the sitting; the setup candidate
 does not publish either of them.
 
-The CLI references are [Tailscale Funnel](https://tailscale.com/docs/reference/tailscale-cli/funnel),
+The CLI references are [Tailscale Funnel](https://tailscale.com/docs/reference/tailscale-cli/funnel) (retired),
 [Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) and
 [systemd OnSuccess](https://www.freedesktop.org/software/systemd/man/255/systemd.unit.html#OnSuccess=).
 

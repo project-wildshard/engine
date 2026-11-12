@@ -119,7 +119,7 @@ for file in "$CERT" "$KEY"; do if [ -f "$file" ]; then chown root:caddy "$file";
 install -d -m 750 -o caddy -g caddy /var/log/caddy
 # A log a root run of `caddy validate` opened would shut Caddy out of its own file.
 find /var/log/caddy -maxdepth 1 -type f ! -user caddy -exec chown caddy:caddy {} +
-# Bind the box's public addresses only: tailscaled holds 443 on the tailnet address while the Funnel lives (until MS8.3).
+# Bind the box's public addresses only: tailscaled holds 443 on the tailnet address for the tailnet-only health Serve (the Funnel is gone, MS8).
 PUBLIC=$(ip -o addr show scope global | awk '$2 !~ /^tailscale/ {sub(/\/.*/, "", $4); print $4}' | tr '\n' ' ' | sed 's/ $//')
 if [ -z "$PUBLIC" ]; then say stop VH9 'cannot read the public addresses'; exit 1; fi
 

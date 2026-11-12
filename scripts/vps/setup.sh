@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # E7 Phase 2, on the existing Phase 1 VPS only (J203). No packages, users,
 # PostgreSQL settings, Docker objects or unrelated services are changed.
-# sudo bash setup.sh       install our settings/units and add owned Funnel routes
+# sudo bash setup.sh       install our settings/units and add owned tailnet-only Serve routes (no Funnel: MS8)
 # bash setup.sh --check    run every read-only probe; unreadable state is unknown
 # Keep this script beside the other scripts/vps files. A fresh VPS needs Phase 1.
 set -euo pipefail
@@ -157,11 +157,11 @@ done
 if check_listeners; then say ok 'no public game or database TCP listener'
 else fail 'Unexpected game or database TCP listener (ss -ltnH)'; fi
 
-# Private health Serve and both public host:ports are inspected together.
+# The three tailnet-only Serve routes are inspected together; a Funnel route is drift (MS8.2).
 NODE_NAME=$({ tailscale status --json | "$NODE" -e 'let s="";for await(const b of process.stdin)s+=b;const n=JSON.parse(s).Self.DNSName;if(typeof n!=="string")process.exit(1);process.stdout.write(n.replace(/\.$/,""));' --input-type=module; } 2>/dev/null) || NODE_NAME=
 SERVE_STATE=$(tailscale serve status --json 2>/dev/null) || SERVE_STATE=
-if [ -z "$NODE_NAME" ] || [ -z "$SERVE_STATE" ]; then fail 'Cannot verify Tailscale identity, private Serve or Funnel state'
-elif ! "$NODE" "$HERE/setup-state.mjs" network "$NODE_NAME" <<< "$SERVE_STATE"; then fail 'Serve/Funnel ownership conflict; inspect tailscale serve status --json'; fi
+if [ -z "$NODE_NAME" ] || [ -z "$SERVE_STATE" ]; then fail 'Cannot verify Tailscale identity or Serve state'
+elif ! "$NODE" "$HERE/setup-state.mjs" network "$NODE_NAME" <<< "$SERVE_STATE"; then fail 'Serve ownership conflict or Funnel drift; inspect tailscale serve status --json'; fi
 if ! "$NODE" "$HERE/setup-state.mjs" pin "$KEY_FILE" "$EXPECTED_RELEASE_PUBLIC_KEY" "$RAYNOS_UID"; then fail 'Cannot verify the staged release public key'; fi
 
 for channel in production staging; do
@@ -259,7 +259,7 @@ Environment=PACK_CACHE=$HOME_DIR/%i/packs
 Environment=RELEASE_CHANNEL=%i
 Environment=PULL_SCRIPT=$LIB/pull.mjs
 Environment=PLAYTEST_DIR=$HOME_DIR/%i/logs
-# VH10: Funnel (and later Caddy) set one X-Forwarded-For hop and pass CF-Connecting-IP through, so trust only the last XFF hop.
+# VH10: Caddy (and the Funnel before MS8) set one X-Forwarded-For hop and pass CF-Connecting-IP through, so trust only the last XFF hop.
 # Only a browser on these pages may open a socket. An env-file line overrides either.
 Environment=TRUST_PROXY=caddy
 Environment="ALLOWED_ORIGINS=https://play.wildshard.io https://staging.wildshard.io https://preview.wildshard.io https://wildshard-singleplayer.vercel.app"
@@ -423,7 +423,7 @@ for channel in production staging; do
   fi
 done
 for port in "$PROD_PORT" "$STAGING_PORT"; do
-  if ! wait_health "$port"; then say stop "Our loopback health owner on $port is not ready after 20 bounded probes; no new Funnel was added"; exit 1; fi
+  if ! wait_health "$port"; then say stop "Our loopback health owner on $port is not ready after 20 bounded probes; no new Serve route was added"; exit 1; fi
 done
 network_guard() {
   tailscale serve status --json | "$NODE" "$HERE/setup-state.mjs" network "$NODE_NAME" "${1:-}"
@@ -431,13 +431,12 @@ network_guard() {
 network_guard
 tailscale serve --bg --yes --http="$PROD_PORT" "http://127.0.0.1:$PROD_PORT"
 network_guard
-tailscale funnel --bg --yes --https=443 "http://127.0.0.1:$PROD_PORT"
+tailscale serve --bg --yes --https=443 "http://127.0.0.1:$PROD_PORT"
 network_guard
-tailscale funnel --bg --yes --https=8443 "http://127.0.0.1:$STAGING_PORT"
+tailscale serve --bg --yes --https=8443 "http://127.0.0.1:$STAGING_PORT"
 network_guard --complete
 if ! check_listeners; then say stop 'Unexpected game or database TCP listener after setup'; exit 1; fi
 systemctl enable --now wildshard-dump.timer wildshard-uptime.timer wildshard-pull@production.timer wildshard-pull@staging.timer
-say socket "production wss://$NODE_NAME"
-say socket "staging wss://$NODE_NAME:8443"
-say health "tailnet-only Serve: http://$NODE_NAME:$PROD_PORT/health"
+say socket "production wss://rooms.wildshard.io, staging wss://rooms-staging.wildshard.io (Caddy, harden.sh)"
+say health "tailnet-only Serve: https://$NODE_NAME/health, https://$NODE_NAME:8443/health, http://$NODE_NAME:$PROD_PORT/health"
 say ok 'Phase 2 complete; signed release timers will start the owned game units'

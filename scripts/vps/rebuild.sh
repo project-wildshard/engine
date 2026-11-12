@@ -3,7 +3,7 @@
 #   1. Phase 1: packages (Node 24, apt PostgreSQL 16 (J180), rclone, Tailscale, Caddy left off), the users, PostgreSQL's
 #      local-socket settings, role and saves databases, ops.env and the staged release public key.
 #   2. harden.sh (VPS-HARDENING-PLAN). Its --check reads every row (VH1); its apply step comes with VH3 to VH15, so today it skips.
-#   3. setup.sh, Phase 2: env files, units, health stubs and the Funnel routes. It needs the box on the tailnet.
+#   3. setup.sh, Phase 2: env files, units, health stubs and the tailnet-only Serve routes (no Funnel, MS8). It needs the box on the tailnet.
 #   4. The cook worker (C4): an engine checkout at a tag, its user, its AppArmor allowance and its unit. It needs cook.env.
 #      sudo bash rebuild.sh        do what is missing. Exit 0 is done; exit 2 is waiting for one of Jake's inputs
 #      bash rebuild.sh --check     change nothing and say what it would do; protected state says `cannot verify`
@@ -191,7 +191,7 @@ if installed caddy && caddy_default; then
   else say ok 'caddy is off'; fi
 elif installed caddy; then say ok 'caddy has its VH9 file; left as it is'; fi
 
-# Joining the tailnet is Jake's (J175). Phase 2 reads the node's name and owns its Serve and Funnel routes.
+# Joining the tailnet is Jake's (J175). Phase 2 reads the node's name and owns its tailnet-only Serve routes.
 tailnet_up() { tailscale status --json 2>/dev/null | "$NODE" -e 'let s="";for await(const b of process.stdin)s+=b;const j=JSON.parse(s);process.exit(j.BackendState==="Running"&&typeof j.Self?.DNSName==="string"?0:1)' --input-type=module 2>/dev/null; }
 if [ "$CHECK" = 0 ] && installed tailscale; then systemctl enable --now --quiet tailscaled.service; fi
 

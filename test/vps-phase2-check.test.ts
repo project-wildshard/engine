@@ -29,13 +29,17 @@ test('complete unprivileged check reports all probes after a conflict and change
   chmodSync(etc, 0o000);
   try {
     const checked = spawnSync('bash', [entry, '--check'], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, WS_CHECK_SS: ss, WS_CHECK_SERVE: serve, WS_CHECK_CALLS: calls, RELEASE_PUBLIC_KEY: key } });
-    expect(checked.status).not.toBe(0); expect(checked.stdout).toContain('Serve/Funnel ownership conflict');
+    expect(checked.status).not.toBe(0); expect(checked.stdout).toContain('Serve ownership conflict'); expect(checked.stderr).not.toContain('funnel --https');
     expect(checked.stdout).toContain('no public game or database TCP listener');
     expect(checked.stdout).toContain('trusted release public key');
     expect(checked.stdout).toContain('cannot verify production env'); expect(checked.stdout).toContain('cannot verify staging env');
     expect(checked.stdout).toContain('PostgreSQL role, saves databases, hardening');
     expect(checked.stdout).toContain('All read-only probes completed'); expect(checked.stdout).not.toContain('would create');
     expect(checked.stdout).not.toContain('check-only-value'); expect(readFileSync(calls, 'utf8')).not.toContain('MUTATION');
+    // MS8.2: the Funnel is retired; a box that still has one reports drift and changes nothing.
+    writeFileSync(serve, JSON.stringify({ TCP: { '443': { HTTPS: true } }, Web: { 'wildshard.tailb41b20.ts.net:443': { Handlers: { '/': { Proxy: 'http://127.0.0.1:8790' } } } }, AllowFunnel: { 'wildshard.tailb41b20.ts.net:443': true } }));
+    const drifted = spawnSync('bash', [entry, '--check'], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, WS_CHECK_SS: ss, WS_CHECK_SERVE: serve, WS_CHECK_CALLS: calls, RELEASE_PUBLIC_KEY: key } });
+    expect(drifted.status).not.toBe(0); expect(drifted.stdout).toContain('Funnel drift'); expect(drifted.stderr).toContain('tailscale funnel --https=443 off'); expect(readFileSync(calls, 'utf8')).not.toContain('MUTATION');
   } finally {
     chmodSync(etc, 0o700);
     expect(readFileSync(join(etc, 'production.env'), 'utf8')).toBe(env); expect(readFileSync(join(etc, 'staging.env'), 'utf8')).toBe(env);

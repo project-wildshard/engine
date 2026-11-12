@@ -15,15 +15,31 @@ function run(args: string[], input?: unknown): ReturnType<typeof spawnSync> {
 function root(): string { mkdirSync('tmp', { recursive: true }); return mkdtempSync(resolve('tmp/vps-phase2-')); }
 function route(port: string): { Handlers: Record<string, { Proxy: string }> } { return { Handlers: { '/': { Proxy: `http://127.0.0.1:${port}` } } }; }
 
-test('Serve inspection accepts absent and exactly owned routes, including a completed rerun', () => {
+test('Serve inspection accepts absent and exactly owned tailnet-only routes, including a completed rerun', () => {
   expect(run(['network', host], {}).status).toBe(0);
   const owned = {
     TCP: { '443': { HTTPS: true }, '8443': { HTTPS: true }, '8790': { HTTP: true } },
     Web: { [`${host}:443`]: route('8790'), [`${host}:8443`]: route('8791'), [`${host}:8790`]: route('8790') },
-    AllowFunnel: { [`${host}:443`]: true, [`${host}:8443`]: true },
   };
-  expect(run(['network', host, '--complete'], owned).status).toBe(0);
+  const complete = run(['network', host, '--complete'], owned);
+  expect(complete.status, String(complete.stderr)).toBe(0);
+  expect(String(complete.stdout)).not.toContain('Funnel');
+  expect(run(['network', host, '--complete'], { ...owned, AllowFunnel: { [`${host}:443`]: false, [`${host}:8443`]: false } }).status).toBe(0);
   expect(run(['network', host, '--complete'], {}).status).not.toBe(0);
+});
+
+test('MS8.2: a Funnel route is drift, named with the command that retires it', () => {
+  const owned = {
+    TCP: { '443': { HTTPS: true }, '8443': { HTTPS: true }, '8790': { HTTP: true } },
+    Web: { [`${host}:443`]: route('8790'), [`${host}:8443`]: route('8791'), [`${host}:8790`]: route('8790') },
+  };
+  for (const port of ['443', '8443']) {
+    for (const complete of [[], ['--complete']]) {
+      const result = run(['network', host, ...complete], { ...owned, AllowFunnel: { [`${host}:${port}`]: true } });
+      expect(result.status).not.toBe(0);
+      expect(String(result.stderr)).toContain(`tailscale funnel --https=${port} off`);
+    }
+  }
 });
 
 test('Funnel refuses foreign paths, forwarding, hosts and public ports without printing their private targets', () => {

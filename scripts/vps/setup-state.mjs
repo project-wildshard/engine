@@ -16,7 +16,8 @@ function soleTrue(value, key) {
   const row = object(value);
   return Object.keys(row).length === 1 && row[key] === true;
 }
-/** Inspect every path on a host:port: Funnel exposes all of them.
+/** Inspect every path on a host:port. All three routes are tailnet-only: the Funnel is retired (MMO-SERVER-PLAN MS8, D3),
+ * so a public route is drift, and the rooms addresses behind Caddy are the only public sockets.
  * @param {unknown} value @param {string} host @param {boolean} complete */
 function network(value, host, complete) {
   if (!/^[a-z0-9.-]+\.ts\.net$/u.test(host)) throw new Error('Invalid tailnet DNS name');
@@ -25,9 +26,9 @@ function network(value, host, complete) {
   for (const [key, allowed] of Object.entries(funnel)) {
     if ((allowed !== true && allowed !== false) || ![`${host}:443`, `${host}:8443`].includes(key)) throw new Error('Refuse a foreign AllowFunnel host:port');
   }
-  /** @type {readonly [string, string, string, boolean][]} */
-  const routes = [['443', '8790', 'HTTPS', true], ['8443', '8791', 'HTTPS', true], ['8790', '8790', 'HTTP', false]];
-  for (const [port, target, protocol, published] of routes) {
+  /** @type {readonly [string, string, string][]} */
+  const routes = [['443', '8790', 'HTTPS'], ['8443', '8791', 'HTTPS'], ['8790', '8790', 'HTTP']];
+  for (const [port, target, protocol] of routes) {
     const key = `${host}:${port}`;
     for (const other of Object.keys(web)) if (other.endsWith(`:${port}`) && other !== key) throw new Error(`Refuse another Serve host on port ${port}`);
     if (tcp[port] !== undefined && !soleTrue(tcp[port], protocol)) throw new Error(`Refuse a foreign TCP handler on port ${port}`);
@@ -36,10 +37,9 @@ function network(value, host, complete) {
       if (Object.keys(entry).length !== 1 || Object.keys(handlers).length !== 1 || Object.keys(root).length !== 1 || root.Proxy !== `http://127.0.0.1:${target}`) throw new Error(`Refuse foreign Serve paths on port ${port}`);
     }
     if ((tcp[port] === undefined) !== (web[key] === undefined)) throw new Error(`Refuse an incomplete Serve route on port ${port}`);
-    if (funnel[key] === true && web[key] === undefined) throw new Error(`Refuse an unowned public port ${port}`);
-    if (!published && funnel[key] === true) throw new Error('The health Serve port must remain tailnet-only');
-    if (complete && (web[key] === undefined || (published && funnel[key] !== true))) throw new Error(`Missing expected route on port ${port}`);
-    console.info(`${web[key] === undefined ? 'would' : 'ok'} ${published ? 'Funnel' : 'private Serve'} port ${port} to loopback ${target}`);
+    if (funnel[key] === true) throw new Error(`Funnel drift: port ${port} is public, and the Funnel is retired (MS8); run tailscale funnel --https=${port} off, then rerun setup.sh`);
+    if (complete && web[key] === undefined) throw new Error(`Missing expected route on port ${port}`);
+    console.info(`${web[key] === undefined ? 'would' : 'ok'} tailnet-only Serve port ${port} to loopback ${target}`);
   }
 }
 
