@@ -1,0 +1,44 @@
+{
+ "note": "SERVER-PARITY SS1 (test/side-parity.test.ts). owners: an owner that may differ between the page and the room, with its reason. shards.<slug>.known: the exact finding lines a shard has open today, each owned by a meta SERVER-PARITY row; CI fails if they change, so closing one means deleting its line. Review every change.",
+ "owners": {
+  "actor": "players, creatures and people: bodies the wire carries, whose poses NET-LAG checks, not built world",
+  "actor.player": "the server's player bodies: the page's own player is an actor object",
+  "platform.grid": "the grid's entry strips and walls: the room's grid server and road world build them (GRID-CROSSING), outside openCellWorld"
+ },
+ "shards": {
+  "driftwood-isle": {
+   "row": "SERVER-PARITY HS2 (boat) and SS10 (castaway; pier tiles split on the page)",
+   "known": [
+    "boat (planks): 5 page collider(s) with no server match, e.g. [-5, -1, -206, -5, 1, -200]",
+    "npc-castaway (wood): 1 page collider(s) with no server match, e.g. [0, 0, 0, 0, 2, 0]",
+    "pier (planks): 7 page collider(s) more than the server holds in the same place"
+   ]
+  },
+  "nalati-grasslands": {
+   "row": "SERVER-PARITY SS10",
+   "known": [
+    "(untagged server): 34 server-side match(es) where the server collider has no owner or material",
+    "(untagged server): 413 page-side match(es) where the server collider has no owner or material",
+    "(untagged) (-): 1 server collider(s) the page holds as (untagged) (edge), same shape",
+    "(untagged) (-): 2 server collider(s) near the page's player with no page match, e.g. [-26, 4, 244, -25, 18, 245]",
+    "forest (wood): 113 page collider(s) with no server match, e.g. [-246, 13, 191, -245, 25, 192]"
+   ]
+  },
+  "nine-dragon-stack": {
+   "row": "SERVER-PARITY SS10",
+   "known": [
+    "nds-floors (stone): 16 page collider(s) with no server match, e.g. [-250, 0, -5, -249, 3, -4]"
+   ]
+  },
+  "pine-hollow": {
+   "row": "SERVER-PARITY SS10 (owner names only; the solids agree)",
+   "known": [
+    "(untagged) (edge): 1 server collider(s) more than the page holds in the same place",
+    "mill-door-bar (wood): 1 page collider(s) the server holds as cabin-7-door (wood), same shape",
+    "pine.forest:cave (rock): 2 page collider(s) the server holds as pine-cave (rock), same shape",
+    "props (rock): 14 page collider(s) the server holds as props-2 (rock), same shape",
+    "props-2 (rock): 2 server collider(s) the page holds as props (rock), same shape"
+   ]
+  }
+ }
+}
