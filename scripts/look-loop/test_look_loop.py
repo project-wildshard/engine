@@ -17,10 +17,17 @@ def load(name, file):
     return mod
 
 
-PD = load('palette_delta', 'palette-delta.py')
+try:  # palette-delta.py needs numpy and Pillow; hosted CI's Python has neither, so its checks run where they exist
+    import numpy, PIL  # noqa: F401
+    PD = load('palette_delta', 'palette-delta.py')
+except ImportError:
+    PD = None
 TG = load('targets', 'targets.py')
+SCRATCH = HERE.parent.parent / 'tmp' if (HERE.parent.parent / 'tmp').is_dir() else None  # the repo's tmp/, not /tmp
+NEEDS = unittest.skipUnless(PD, 'numpy and Pillow are not installed')
 
 
+@NEEDS
 class DeltaE(unittest.TestCase):
     def test_sharma_pairs(self):
         pairs = [
@@ -42,13 +49,19 @@ class DeltaE(unittest.TestCase):
 
 
 class Files(unittest.TestCase):
-    def test_frame_path_and_captures(self):
-        with tempfile.TemporaryDirectory(dir=HERE.parent.parent / 'tmp' if (HERE.parent.parent / 'tmp').is_dir() else None) as d:
-            for name in ['capture-1-fp-front.jpg', 'capture-5-top.jpg', 'r2-capture-1-fp-front.jpg', 'mockup-1-fp-front.jpg']:
+    @NEEDS
+    def test_frame_path(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            for name in ['capture-1-fp-front.jpg', 'r2-capture-1-fp-front.jpg']:
                 (Path(d) / name).write_bytes(b'x')
             self.assertEqual(PD.frame_path(f'{d}/capture-{{n}}-*.jpg', 1).name, 'capture-1-fp-front.jpg')
             self.assertIsNone(PD.frame_path(f'{d}/capture-{{n}}-*.jpg', 2))
             self.assertEqual(PD.frame_path(f'{d}/r2-capture-{{n}}-*.jpg', 1).name, 'r2-capture-1-fp-front.jpg')
+
+    def test_captures(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            for name in ['capture-1-fp-front.jpg', 'capture-5-top.jpg', 'r2-capture-1-fp-front.jpg', 'mockup-1-fp-front.jpg']:
+                (Path(d) / name).write_bytes(b'x')
             self.assertEqual(sorted(TG.find_captures(d)), [1, 5])
             self.assertEqual(sorted(TG.find_captures(d, 'r2')), [1])
 
