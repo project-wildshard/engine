@@ -8,7 +8,9 @@ import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { expect, test } from 'vitest';
 import { unstable_readConfig } from 'wrangler';
-import worker, { DOCTOR, type Env } from '../pages/worker.ts';
+import worker, { type Env } from '../pages/worker.ts';
+
+const DOCTOR = '/doctor/?sw=0';
 
 // OFF-VERCEL OV1 (J272): one wrangler.jsonc, three Workers. Production is the top level; staging and preview are envs.
 // Production is always named with `--env ''`: without it wrangler warns that more than one environment is defined.
@@ -33,7 +35,7 @@ test('every channel serves dist with 404s, version URLs and no workers.dev or cu
   for (const channel of ENVS) {
     const config = read(channel);
     expect(config.main).toBe(resolve('pages/worker.ts'));
-    expect(config.assets).toMatchObject({ directory: '../dist', binding: 'ASSETS', not_found_handling: 'none', run_worker_first: ['/', '/index.html'] });
+    expect(config.assets).toMatchObject({ directory: '../dist', binding: 'ASSETS', not_found_handling: 'none', run_worker_first: ['/', '/index.html', '/assets/spawn/parts/*', '/assets/spawn/server/*'] });
     expect(config.workers_dev).toBe(false);
     expect(config.preview_urls).toBe(true);
     expect(config.routes ?? []).toEqual([]);
@@ -71,13 +73,12 @@ function assets(seen: string[]): Env {
   } } };
 }
 
-test('?doctor on the page goes 302 to the doctor without the service worker', async () => {
+test('?doctor on the page goes 307 to the doctor without the service worker, as Vercel did', async () => {
   for (const path of ['/?doctor', '/?doctor=1', '/index.html?doctor', '/?x=1&doctor']) {
     const seen: string[] = [];
     const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), assets(seen));
-    expect(response.status).toBe(302);
+    expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(DOCTOR);
-    expect(DOCTOR).toBe('/doctor/?sw=0');
     expect(seen).toEqual([]);
   }
 });
@@ -106,5 +107,26 @@ test('a missing file reaches the Worker but goes back to the assets untouched, ?
     expect(response.status).toBe(404);
     expect(response.headers.get('cache-control')).toBeNull();
     expect(seen).toEqual([new URL(path, 'https://x').pathname]);
+  }
+});
+
+// OV2: `_headers` can't send a stored .pack.br as is (the runtime brotlis it again), so the Worker adds the encoding.
+test('a spawn part keeps the assets\' headers and gains Content-Encoding: br; anything else under spawn is untouched', async () => {
+  const stored = new Uint8Array([11, 22, 33]);
+  const env = (status: number): Env => ({ ASSETS: { fetch: () => Promise.resolve(new Response(status === 200 ? stored : null,
+    { status, headers: { 'content-type': 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable', etag: '"p"' } })) } });
+  for (const path of ['/assets/spawn/parts/0123456789abcdef.pack.br', '/assets/spawn/server/0123456789abcdef.pack.br']) {
+    const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), env(200));
+    expect([response.status, response.headers.get('content-encoding'), response.headers.get('cache-control'), response.headers.get('etag')])
+      .toEqual([200, 'br', 'public, max-age=31536000, immutable', '"p"']);
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(stored);
+    for (const status of [304, 404]) {
+      const other = await worker.fetch(new Request(`https://play.wildshard.io${path}`), env(status));
+      expect([other.status, other.headers.get('content-encoding')]).toEqual([status, null]);
+    }
+  }
+  for (const path of ['/assets/spawn/parts/readme.txt', '/assets/spawn/server/0123.json']) {
+    const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), env(200));
+    expect(response.headers.get('content-encoding'), path).toBeNull();
   }
 });

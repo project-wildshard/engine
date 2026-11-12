@@ -609,7 +609,7 @@
  "test/tooling/soak/boundary.test.mjs",
  "test/tooling/soak/inspector.test.mjs",
  "test/trade-handoff.test.ts",
- "test/vercel-cache-headers.test.ts",
+ "test/page-headers.test.ts",
  "test/vitest-plan.test.ts",
  "test/webkit-memory-categories.test.ts",
  "test/whole-strided-channels.test.ts",

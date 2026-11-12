@@ -1,0 +1,125 @@
+# Workers static assets headers (meta OFF-VERCEL-PLAN OV2, J272): one rule for each vercel.json header rule, in order,
+# plus the version-URL noindex and two content types Vercel added by itself.
+# Cloudflare applies every matching rule and joins a repeated header with a comma, so a rule that overrides a broader
+# one first detaches it (`! Name`). Vercel let the later rule win; the detach gives the same result.
+# pages/worker.ts answers / and /index.html itself and sets their no-store; the two rules below keep the list whole.
+# test/page-headers.test.ts serves this file with wrangler dev and checks every rule.
+
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
+/b/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/physics/*
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/tex/*
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000
+
+/assets/models/*
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000
+
+/assets/hdri/*
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000
+
+/assets/music/*.json
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/sfx/*.json
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/baked/*
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
+
+/basis/*
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000
+
+/*.hdr
+  Content-Type: image/vnd.radiance
+
+/*.glb
+  Content-Type: model/gltf-binary
+
+/*.gltf
+  Content-Type: model/gltf+json
+
+/*.ktx2
+  Content-Type: image/ktx2
+
+/*.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+
+# Not in vercel.json: what Vercel sent on its own, so page-parity.mjs finds no difference (OV2). Wrangler would say
+# `application/json` and `text/javascript; charset=utf-8`.
+/*.json
+  Content-Type: application/json; charset=utf-8
+
+/*.js
+  Content-Type: application/javascript; charset=utf-8
+
+/
+  ! Cache-Control
+  Cache-Control: no-store
+
+/index.html
+  ! Cache-Control
+  Cache-Control: no-store
+
+/sw-core/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
+/sw.js
+  ! Cache-Control
+  Cache-Control: no-cache
+
+/version.json
+  ! Cache-Control
+  Cache-Control: no-store
+
+/asset-index.json
+  ! Cache-Control
+  Cache-Control: no-store
+
+/asset-manifest.json
+  ! Cache-Control
+  Cache-Control: no-store
+
+/manifest.webmanifest
+  ! Cache-Control
+  Cache-Control: no-store
+
+/clear-cache.json
+  ! Cache-Control
+  Cache-Control: no-store
+  Clear-Site-Data: "cache"
+
+/shardfiles/:shard/blobs/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
+
+# vercel.json also sent Content-Encoding: br here. pages/worker.ts adds it: from this file the runtime would brotli the
+# stored bytes a second time (OV2 measured it).
+/assets/spawn/parts/*.pack.br
+  Content-Type: application/octet-stream
+
+/assets/spawn/server/*.pack.br
+  Content-Type: application/octet-stream
+
+# Version URLs are public (J272 answer 2) and stay out of search results.
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex

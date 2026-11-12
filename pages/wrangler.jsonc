@@ -15,8 +15,9 @@
     "binding": "ASSETS",
     // A missing chunk must 404, never return HTML: previousDeploy.mjs treats text/html as gone.
     "not_found_handling": "none",
-    // Only the page itself runs worker.ts (the ?doctor 302 and no-store); everything else is a free asset request.
-    "run_worker_first": ["/", "/index.html"]
+    // Only the page itself (the ?doctor 302 and no-store) and the spawn parts (stored brotli sent as is, OV2) run
+    // worker.ts; everything else is a free asset request.
+    "run_worker_first": ["/", "/index.html", "/assets/spawn/parts/*", "/assets/spawn/server/*"]
   },
   "observability": { "enabled": true },
   "env": {
