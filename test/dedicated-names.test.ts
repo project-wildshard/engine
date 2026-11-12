@@ -17,13 +17,18 @@ let bench: RoomBench | undefined;
 afterEach(async () => { for (const bot of bots.splice(0)) bot.drop(); await bench?.close(); bench = undefined; for (const close of closers.splice(0)) await close(); });
 async function fresh(): Promise<Database> { const db = await openPglite(); closers.push(db.close); await migrate(db); return db; }
 const tagOf = (shown: string): number => Number(shown.split('#')[1]);
-/** A die that rolls `rolls` in turn, as fractions of the tag range. */
-const dice = (...tags: number[]): (() => number) => { let at = 0; return () => ((tags[at++ % tags.length] ?? TAG_MIN) - TAG_MIN) / (TAG_MAX - TAG_MIN + 1); };
+/**
+ * A die that rolls `tags` in turn, as fractions of the tag range. Each roll aims at the middle of its tag's slice: aimed at the
+ * slice's edge, `(tag - TAG_MIN) / 9000 * 9000` floors to the tag below for 323 of the 9000 tags (6980 among them), so a roll meant
+ * for a taken tag landed on a free one.
+ */
+const dice = (...tags: number[]): (() => number) => { let at = 0; return () => ((tags[at++ % tags.length] ?? TAG_MIN) - TAG_MIN + 0.5) / (TAG_MAX - TAG_MIN + 1); };
 
 test('a Name gets a tag, keeps it while the Name stays, and a second player with the same Name reads differently', async () => {
   const db = await fresh();
-  const ann = await claimName(db, 'device:a', 'Ann');
-  expect(ann).toMatch(/^Ann#\d{4}$/u);
+  // 6980 is the tag CI drew when the old die rolled 6979 for it (main ci 43114882127): pinned, so every run reads the same.
+  const ann = await claimName(db, 'device:a', 'Ann', dice(6980));
+  expect(ann).toBe('Ann#6980');
   expect(tagOf(ann)).toBeGreaterThanOrEqual(TAG_MIN); expect(tagOf(ann)).toBeLessThanOrEqual(TAG_MAX);
   expect(await claimName(db, 'device:a', 'Ann'), 'rejoining keeps the tag').toBe(ann);
   expect(await claimName(db, 'device:a', 'ANN'), 'a new case keeps it too').toBe(`ANN#${String(tagOf(ann))}`);
@@ -32,6 +37,12 @@ test('a Name gets a tag, keeps it while the Name stays, and a second player with
   const renamed = await claimName(db, 'device:a', 'Bea', dice(4242));
   expect(renamed, 'a new Name draws its own tag; 4242 is free for Bea').toBe('Bea#4242');
   expect((await db.query('select id, name, tag from player order by id')).rows).toEqual([{ id: 'device:a', name: 'Bea', tag: 4242 }, { id: 'device:b', name: 'ann', tag: 4242 }]);
+});
+
+test('the die lands every roll on the tag it names', () => {
+  const missed: number[] = [];
+  for (let tag = TAG_MIN; tag <= TAG_MAX; tag++) if (TAG_MIN + Math.floor(dice(tag)() * (TAG_MAX - TAG_MIN + 1)) !== tag) missed.push(tag);
+  expect(missed).toEqual([]);
 });
 
 test('a crowded Name reads which tags are left, and a full one is refused loudly', async () => {
