@@ -82,7 +82,11 @@ try {
   const broken = await page.evaluate(() => /** @type {any} */ (window).__gc15c.samples.find((/** @type {any} */ row) => row.err !== undefined));
   if (broken !== undefined) throw new Error(`The sampler: ${String(broken.err)}`);
   /** @returns {Promise<any>} */
-  const sample = () => page.evaluate(() => /** @type {any[]} */ (/** @type {any} */ (window).__gc15c.samples).toReversed().find((/** @type {any} */ row) => row.err === undefined));
+  const sample = () => page.evaluate(() => {
+    const rows = /** @type {any[]} */ (/** @type {any} */ (window).__gc15c.samples);
+    for (let at = rows.length - 1; at >= 0; at--) if (rows[at].err === undefined) return rows[at];
+    return undefined;
+  });
   /** @param {number} yaw */
   const face = yaw => page.evaluate(wanted => { const player = /** @type {any} */ (window).__wildshard.world.player; player.yaw = wanted; }, yaw);
   /** Face the point (x, z) in this frame: the page's motor faces atan2(own - target) (ui.ts faceToward). */
