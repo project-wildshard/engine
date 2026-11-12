@@ -127,6 +127,9 @@ export interface InstalledProps { tiles: ReadonlyMap<string, Object3D>; panels: 
  * never draws a guess). A family base draws as a shared variant carrying the GLB's factors and the slots; a graph's node
  * material, and a `compiled` surface (a splat terrain tile's, its `channels` renamed onto the mesh first), are shared as
  * compiled. A name the port answers null for draws with the family as before (a splat terrain beside family props, G227).
+ * An emissive base (unlit: lamps, flames, crystals) keeps its declared colour, intensity and program under any props look,
+ * the dev-map measure layer included, and reads the mesh's vertex colours only if it declares `vertexColours` (LF1-2).
+ * Each extra material in a tile is one more draw there (two if it casts a shadow), charged by the tile's GLB cost.
  * Without `surfaces` nothing changes.
  */
 export async function installDeclaredProps(props: DeclaredProps, ports: {
@@ -183,7 +186,10 @@ export async function installDeclaredProps(props: DeclaredProps, ports: {
           source?.dispose(); return material;
         }
         const glb = source === undefined ? null : surfaceOf(source), standard = source instanceof MeshStandardMaterial ? source : null, base = binding.material;
-        const m = acquireVariant(base, { colour: glb?.color ?? null, roughness: standard?.roughness ?? null, metalness: standard?.metalness ?? null, map: undefined, vertexColours, flat,
+        // TEMPLATE-E2E LF1-2: an unlit (emissive) surface is its declared colour × intensity, so it takes the mesh's
+        // vertex colours only when it declares them: a lamp baked grey beside measure stone still glows its own amber
+        const unlit = base instanceof MeshBasicMaterial;
+        const m = acquireVariant(base, { colour: glb?.color ?? null, roughness: standard?.roughness ?? null, metalness: standard?.metalness ?? null, map: undefined, vertexColours: unlit ? base.vertexColors && vertexColours : vertexColours, flat,
           side: source?.side ?? base.side, transparent: source?.transparent ?? base.transparent, opacity: source?.opacity ?? base.opacity,
           named: { maps: binding.maps, emissive: glb?.emissive ?? null } });
         source?.dispose(); held.push(m); bases.set(m, base); return m;
