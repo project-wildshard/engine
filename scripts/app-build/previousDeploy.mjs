@@ -1,6 +1,6 @@
 /** MF2, J79: publish this build's files and carry the graphs of the builds before it, so a tab still running one of them
  * finds every file it names. The production alias serves only the live deployment, so a kept old deployment cannot do
- * this: the files must sit inside the live one. As many builds as the prune keeps, this one included. A build whose
+ * this: the files must sit inside the live one. KEEP_PROMOTED builds, this one included. A build whose
  * files production no longer has drops out whole, and chunk recovery moves its tabs on.
  * This is a plain output step, never a bundler plugin or a runtime prefetch.
  * PAGE-SIZE PZ5 (J276): a build that reads its content from a content base (packs.wildshard.io) says so in its graph
@@ -10,8 +10,11 @@
 import {execFileSync} from 'node:child_process';
 import {copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
-import {KEEP_PROMOTED} from '../prune-deployments.mjs';
 import {SHARED_CODE_DIRECTORY, codeDirectory} from './buildIdentity.mjs';
+
+/** OFF-VERCEL OV5: how many builds a release carries, this one included. A Worker serves only its deployed version's
+ * files, so the kept builds' files must sit inside it; it was the old host's prune window. */
+export const KEEP_PROMOTED = 5;
 
 const MANIFEST = 'deploy-chunks.json', LANES = 16;
 /** A row an older manifest may name: code, and the content-named content the carry took before PZ5. */

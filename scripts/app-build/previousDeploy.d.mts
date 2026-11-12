@@ -1,4 +1,6 @@
-/** Carry the graphs of the builds the prune keeps, so a tab on one of them finds its files in the live deployment. */
+/** How many builds a release carries, this one included (OFF-VERCEL OV5: was the old host's prune window). */
+export const KEEP_PROMOTED: number;
+/** Carry the graphs of the KEEP_PROMOTED builds, so a tab on one of them finds its files in the live deployment. */
 export function carryPreviousDeploy(directory: string, options?: {
   readonly previousDirectory?: string;
   readonly previousOrigin?: string;

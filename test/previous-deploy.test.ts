@@ -5,8 +5,7 @@ import {join, resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the production manifest/body HTTP path locally.
 import {createServer} from 'node:http';
 import {expect, test} from 'vitest';
-import {CHUNK, carryPreviousDeploy, channelOrigin, liveDeployBuilds, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
-import {KEEP_PROMOTED} from '../scripts/prune-deployments.mjs';
+import {CHUNK, KEEP_PROMOTED, carryPreviousDeploy, channelOrigin, liveDeployBuilds, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
 
 test('a deploy carries the kept builds unchanged, but never one past the prune, nor a map', async () => {
   mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-'));
