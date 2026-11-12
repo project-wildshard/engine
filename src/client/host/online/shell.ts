@@ -4,7 +4,7 @@
 import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
-import { GUEST, type NetIdentity } from '@wildshard/engine/net/identity';
+import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
 import { decodeCountdown, type Countdown } from '@wildshard/engine/net/socketFrames';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
@@ -16,7 +16,6 @@ import { dropTabArrival, setTitleArrival } from '@wildshard/engine/boot/titleArr
 import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
-import { askName } from './nameBox';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { fetchSignedRelease } from './release';
 import { newBuildPanel } from './reconnectStrip';
@@ -250,7 +249,8 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   if (release.engineBuild !== link.build) await stale();
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
-  const held = identity(), named = held.name === GUEST.name ? identity(await askName(scope, () => { doctor('join'); })) : held;
+  // MP2.4: the page asked for the Name before it got here (namePrompt.ts, once per device); Skip keeps the device's own (Guest)
+  const named = identity();
   let shellNow: OnlineShell | null = null, waitingForSeat = false;
   scope.interval(SEAT_WAIT_BEAT_MS, () => { if (waitingForSeat) seatWaitBeat(); });
   // FM4: the banner, the Reconnected notice, the cards and the hold cards (meta MMO-FAILURE-MODES-PLAN)

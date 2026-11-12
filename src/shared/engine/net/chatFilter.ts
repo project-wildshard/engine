@@ -1,9 +1,10 @@
-import { fitText } from '../../../shared/engine/net/bits';
+import { fitText } from './bits';
 import { CHAT_WORDS } from './chatWords';
-import { GUEST, MAX_NAME_LENGTH } from '../../../shared/engine/net/identity';
+import { GUEST, MAX_NAME_LENGTH } from './identity';
 
 // P1-E5.2c (J110, M5): everything a player writes is plain text, and it passes here on the server before anyone reads it.
-// A client's own filter would be a suggestion; this one is the rule.
+// A client's own filter would be a suggestion; this one is the rule. It is shared so the Name prompt (namePrompt.ts) can say
+// at once what the server would refuse, by the server's own rule.
 
 /** Cap a chat line in bytes, so it always fits the wire's one-byte text length. */
 export const MAX_CHAT_BYTES = 240;
@@ -29,4 +30,11 @@ export function plainLine(text: string, maxBytes: number): string {
 export function cleanName(name: string): string {
   const plain = plainLine(name, MAX_NAME_LENGTH * 3).slice(0, MAX_NAME_LENGTH).trim();
   return plain === '' || filterWords(plain) !== plain ? GUEST.name : plain;
+}
+/** Why the server would not seat `name` as typed: nothing left once it is plain text, or a listed word (it would read as Guest).
+ *  Null when it passes. The prompt's friendly line; `cleanName` stays the rule. */
+export function nameRefusal(name: string): 'empty' | 'word' | null {
+  const plain = plainLine(name, MAX_NAME_LENGTH * 3).slice(0, MAX_NAME_LENGTH).trim();
+  if (plain === '') return 'empty';
+  return filterWords(plain) === plain ? null : 'word';
 }

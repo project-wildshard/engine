@@ -1,0 +1,27 @@
+/* ─── MMO-PLAN MP2.4: the Name prompt between PLAY and the world (src/client/engine/ui/namePrompt.ts) ─── prefix ws-name- ───
+   The title's own glass card: square corners, the cyan line and its corner ticks, a Rajdhani head and mono data. namePrompt.ts
+   sizes the overlay to the visible viewport, so a phone's keyboard shrinks the space and the card stays centred above it. */
+.ws-name { position: fixed; left: 0; top: 0; z-index: calc(var(--ws-layer-modal) + 10); box-sizing: border-box; width: 100%; height: var(--ws-vh, 100%); margin: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5, 8, 16, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--ws-text); font-family: var(--ws-mono); pointer-events: auto; touch-action: manipulation; }
+.ws-name * { box-sizing: border-box; }
+.ws-name .ws-name-card { position: relative; width: min(100%, 360px); display: grid; gap: 12px; padding: 22px 18px 16px; background: rgba(9, 22, 36, 0.92); border: 1px solid rgba(143, 227, 255, 0.4); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.ws-name .ws-name-card::before, .ws-name .ws-name-card::after { content: ''; position: absolute; width: 14px; height: 14px; pointer-events: none; border: 2px solid var(--ws-cyan); }
+.ws-name .ws-name-card::before { left: -3px; top: -3px; border-right: 0; border-bottom: 0; }
+.ws-name .ws-name-card::after { right: -3px; bottom: -3px; border-left: 0; border-top: 0; }
+.ws-name .ws-name-ask { margin: 0; font-family: var(--ws-display); font-weight: 700; font-size: 24px; line-height: 1.15; letter-spacing: 0.04em; color: #eaf8ff; text-shadow: 0 0 14px rgba(143, 227, 255, 0.35); }
+.ws-name-field { width: 100%; min-height: 48px; padding: 10px 12px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan-line); border-radius: 0; background: rgba(6, 10, 18, 0.85); color: #fff; font-family: var(--ws-mono); font-size: 16px; letter-spacing: 0.04em; outline: none; user-select: text; -webkit-user-select: text; }
+.ws-name-field:focus { border-color: var(--ws-cyan); box-shadow: 0 0 0 1px rgba(143, 227, 255, 0.25), 0 0 16px rgba(143, 227, 255, 0.2); }
+.ws-name-field[aria-invalid='true'] { border-color: var(--ws-amber); }
+.ws-name .ws-name-error { margin: -4px 0 0; color: #ffe2b0; font-size: 12px; line-height: 1.4; }
+.ws-name .ws-name-error[hidden] { display: none; }
+.ws-name .ws-name-row { display: flex; gap: 10px; }
+.ws-name .ws-name-go, .ws-name .ws-name-skip { min-height: 48px; padding: 10px 14px; appearance: none; -webkit-appearance: none; border-radius: 0; font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.ws-name .ws-name-go { flex: 2 1 0; border: 1px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.16); color: var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.18); }
+.ws-name .ws-name-skip { flex: 1 1 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(6, 10, 18, 0.5); color: var(--ws-text-dim); }
+.ws-name .ws-name-later { margin: 0; color: var(--ws-text-dim); font-size: 10.5px; line-height: 1.4; letter-spacing: 0.02em; }
+.ws-name .ws-name-check { justify-self: center; min-height: 40px; padding: 6px 12px; appearance: none; -webkit-appearance: none; border: 0; background: none; color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* Settings ▸ System ▸ Name (namePrompt.ts nameSettingRows): the menu's own row, a field and Save */
+.ws-name-setting { flex-wrap: nowrap; }
+.ws-name-setting .ws-name-field { flex: 1 1 auto; min-width: 0; min-height: 40px; font-size: 16px; text-transform: none; }
+.ws-name-save { flex: none; min-height: 40px; padding: 6px 14px; appearance: none; -webkit-appearance: none; border: 1px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.12); color: var(--ws-cyan); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; }
+.ws-name-note[data-tone='refused'] { color: #ffe2b0; }

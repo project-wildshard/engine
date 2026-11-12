@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { BitWriter } from '../src/shared/engine/net/bits';
-import { cleanName, filterWords, MAX_CHAT_BYTES, plainLine } from '../src/server/engine/net/chatFilter';
+import { cleanName, filterWords, MAX_CHAT_BYTES, plainLine } from '../src/shared/engine/net/chatFilter';
 import { NetClient } from '../src/client/engine/net/client';
 import { deviceIdentity, GUEST } from '../src/shared/engine/net/identity';
 import { decodeHello, encodeHello } from '../src/shared/engine/net/messages';

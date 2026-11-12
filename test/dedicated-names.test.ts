@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import type { NetChat } from '../src/shared/engine/net/chatWire';
-import { cleanName } from '../src/server/engine/net/chatFilter';
+import { cleanName } from '../src/shared/engine/net/chatFilter';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
 import { claimName, NameFullError, TAG_MAX, TAG_MIN } from '../src/server/host/dedicated/saves/names';
 import { playerSavesOver } from '../src/server/host/dedicated/playerSaves';

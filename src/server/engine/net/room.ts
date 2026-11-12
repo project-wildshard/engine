@@ -5,7 +5,7 @@ import * as v from 'valibot';
 import { installPortableMath } from '../../../shared/engine/core/portableMath';
 import { NetRoomActSchema, type NetChatReport, type NetChatSay, type NetTickAct } from '../../../shared/engine/net/acts';
 import { CHAT_RADIUS, RoomChat, type ChatLine, type ChatReports, type WorldLine } from './chat';
-import { cleanName } from './chatFilter';
+import { cleanName } from '../../../shared/engine/net/chatFilter';
 import type { CombatEvent } from './combatWire';
 import type { QuestProgress } from '../../../shared/engine/quest/progress';
 import { seqAfter } from '../../../shared/engine/net/command';

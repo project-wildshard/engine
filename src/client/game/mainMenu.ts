@@ -16,6 +16,7 @@ import { titleAssetURL } from './titleAssets';
 import { mobileDevice } from '@wildshard/engine/boot/titleArrival';
 import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
+import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type TitleCard, type TitleDeck, type TitleDeckOptions } from './titleDeck';
@@ -183,7 +184,18 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // SHARD SELECT as before
   // The deck's own entry decides (its admission rules: a draft, a locked or unavailable card enters nothing); when it enters
   // nothing, SHARD SELECT opens as usual
-  const play = (): void => {
+  // MMO-PLAN MP2.4 (Jake, 2026-11-11: "Ask the user for their name… after they hit play but before we pop them into the world"):
+  // a device's first PLAY (or INFINITE WILDSHARD) asks for the Name once, then goes on; every later one goes straight through
+  let naming = false;
+  const named = async (next: () => void): Promise<void> => {
+    if (naming) return;
+    if (!nameAskDue()) { next(); return; }
+    naming = true;
+    const answered = await askNameOnce(owner);
+    naming = false;
+    if (answered && !owner.disposed) next();
+  };
+  const enterPlay = (): void => {
     if (phone && !firstPlayDone()) {
       deck.select(0, false);
       const entered = deck.activate();
@@ -191,9 +203,10 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     }
     show('select'); deck.start();
   };
+  const play = (): void => { void named(enterPlay); };
   deck.onTap(selectCard, play);
   const gridCard = main.querySelector('.ws-main-grid');
-  if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode(), undefined, hosted)) { dropFirstPlay(); onGrid(); leaveTitle(); } });
+  if (gridCard instanceof HTMLButtonElement) deck.onTap(gridCard, () => { if (gridEntryShown(mode(), undefined, hosted)) void named(() => { dropFirstPlay(); onGrid(); leaveTitle(); }); });
   if (!grid && world !== undefined && gridCard instanceof HTMLButtonElement) {
     void (async (): Promise<void> => {
       if (!await worldHosted(world) || owner.disposed) return;

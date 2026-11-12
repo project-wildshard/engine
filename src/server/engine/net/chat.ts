@@ -1,5 +1,5 @@
 import type { ChatChannel } from '../../../shared/engine/net/acts';
-import { filterWords, MAX_CHAT_BYTES, plainLine } from './chatFilter';
+import { filterWords, MAX_CHAT_BYTES, plainLine } from '../../../shared/engine/net/chatFilter';
 
 // P1-E5.2c (J110, M5): chat on the server. A line is cleaned and filtered here before anyone hears it, its speaker's flood is
 // capped, and the room keeps what was really typed for a while, so a report can show it.

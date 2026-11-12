@@ -36,7 +36,8 @@ const FILES = [
   { file: join(ROOT, 'src/client/engine/ui/styles/base.css'), prefix: null, strict: true },
   { file: join(ROOT, 'src/client/engine/ui/styles/game.css'), prefix: 'ws-game-', strict: true },
   { file: join(ROOT, 'src/client/engine/ui/styles/menu.css'), prefix: 'ws-menu-', strict: true },
-  { file: join(ROOT, 'src/client/engine/ui/styles/gmenu.css'), prefix: 'ws-gmenu-', strict: true }, // the in-game menu (src/client/engine/ui/Menu.ts): map / inventory / achievements / settings
+  { file: join(ROOT, 'src/client/engine/ui/styles/gmenu.css'), prefix: 'ws-gmenu-', strict: true },
+  { file: join(ROOT, 'src/client/engine/ui/styles/namePrompt.css'), prefix: 'ws-name-', strict: true }, // MP2.4: the Name prompt between PLAY and the world, and Settings ▸ System ▸ Name (src/client/engine/ui/namePrompt.ts) // the in-game menu (src/client/engine/ui/Menu.ts): map / inventory / achievements / settings
   { file: join(ROOT, 'src/client/engine/ui/styles/touch.css'), prefix: 'ws-touch-', strict: true },
   { file: join(ROOT, 'src/client/engine/ui/styles/update.css'), prefix: 'ws-update-', strict: true },
   { file: join(ROOT, 'src/client/engine/ui/styles/minimap.css'), prefix: 'ws-minimap-', strict: true },

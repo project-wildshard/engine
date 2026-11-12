@@ -25,10 +25,15 @@ function stored(raw: string | null): NetIdentity | null {
   if (raw === null) return null;
   try { return v.parse(NetIdentitySchema, v.parse(Stored, JSON.parse(raw))); } catch { return null; }
 }
+const identityKey = (prefix: string): string => {
+  const app = installedIdentity();
+  return deviceKey(app?.savePrefix === prefix ? app.identityPrefix ?? prefix : prefix);
+};
+/** The Name this device keeps, or null before one is kept. It mints nothing (the Name prompt and Settings read it). */
+export function heldName(storage: SaveStorage, prefix: string): string | null { return stored(storage.getItem(identityKey(prefix)))?.name ?? null; }
 /** This device's identity, minted once and kept in the page's storage. A Name typed later replaces the Name, never the id. */
 export function deviceIdentity(storage: SaveStorage, prefix: string, name?: string): NetIdentity {
-  const app = installedIdentity(), stable = app?.savePrefix === prefix ? app.identityPrefix ?? prefix : prefix;
-  const key = deviceKey(stable), held = stored(storage.getItem(key)), typed = name?.slice(0, MAX_NAME_LENGTH) ?? '';
+  const key = identityKey(prefix), held = stored(storage.getItem(key)), typed = name?.slice(0, MAX_NAME_LENGTH) ?? '';
   const identity: NetIdentity = { player: held?.player ?? `device:${crypto.randomUUID()}`, name: typed === '' ? held?.name ?? GUEST.name : typed };
   if (held?.player !== identity.player || held.name !== identity.name) storage.setItem(key, JSON.stringify(identity));
   return identity;

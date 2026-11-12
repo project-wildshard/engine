@@ -32,6 +32,8 @@ export interface StandaloneConfig {
   readonly write?: (key: string, value: string | null) => Promise<boolean>;
   /** Who this player is (J111); absent, this device's own id. */
   readonly identity?: NetIdentity;
+  /** MP2.4: the Name the page keeps (the Name prompt), sent with this device's own id. Solo shows it only on this page. */
+  readonly name?: string;
   /** A one-shard page: the server runs this cell alone, inside its own walls and with no road. */
   readonly lone?: true;
   /** A page with a download: what it holds, which the server asks for before it reads the network (DL25). */
@@ -109,7 +111,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
   };
   control.onmessage = (event: MessageEvent<unknown>): void => {
     const message = v.parse(ServerMessageSchema, event.data);
-    if (message.kind === 'booted') { bootMark('server:booted-receive'); booted({ tick: message.tick, restored: message.restored }); bootMark('server:hello-send'); client.hello(config.build, config.identity ?? deviceIdentity(config.storage, config.savePrefix)); }
+    if (message.kind === 'booted') { bootMark('server:booted-receive'); booted({ tick: message.tick, restored: message.restored }); bootMark('server:hello-send'); client.hello(config.build, config.identity ?? deviceIdentity(config.storage, config.savePrefix, config.name)); }
     else if (message.kind === 'write') void write(message.seq, message.key, message.value);
     else if (message.kind === 'failed') { failed(new Error(message.reason)); client.closed ??= message.reason; }
     else waits.get(message.id)?.(message);

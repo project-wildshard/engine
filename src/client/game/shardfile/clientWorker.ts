@@ -19,7 +19,8 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import type { NetClient } from '@wildshard/engine/net/client';
 import type { NetCombatEvent } from '@wildshard/engine/net/messages';
 import type { DeathCause } from '@wildshard/engine/combat/pipeline';
-import { deviceIdentity, type NetIdentity } from '@wildshard/engine/net/identity';
+import { deviceIdentity, heldName, type NetIdentity } from '@wildshard/engine/net/identity';
+import { askNameOnce } from '@wildshard/engine/ui/namePrompt';
 import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
 import type { PredictedRow } from '@wildshard/engine/net/predictionWorld';
 import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
@@ -102,7 +103,7 @@ export interface WorkerClientPorts {
   /** Link what the first rows' bodies draw, under the card. A page that reveals nothing yet has no such step. */
   readonly linkBodies?: () => Promise<void>;
 }
-interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell }
+interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell }
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
@@ -254,7 +255,9 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   if (page !== null) { await bootTask('server:page-save-carry', () => importPageSaves(saves, page, savePrefix)); await bootTask('server:reward-reconcile', () => syncPageRewards(saves, page, savePrefix)); }
   // DL21: the card counts what the server has read. DL25: it reads what this page holds first.
   // PZ3: its book, server parts, road part and loose reads follow the content base; rapier stays in the page
-  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...lone ? { lone: true as const } : {}, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
+  // MP2.4: the Name the page keeps (the Name prompt) goes with the server's own device id; solo shows it on this page only
+  const name = page === null ? null : heldName(page, savePrefix);
+  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
  *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the Worker boot
@@ -311,6 +314,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const onlineModule = (): Promise<OnlineModule> => bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as Promise<OnlineModule>;
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { startOnline } = await onlineModule();
+    // MP2.4: a page that came in without the title's PLAY (a link, a reload) asks for the Name here, once per device, before it joins
+    await askNameOnce(scope, { doctor: () => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'join' })); } });
     const { grid } = ports, booted = grid?.booted;
     return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
       ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, cells: grid.cells.map(cell => cell.instance), placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); },

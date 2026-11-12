@@ -23,14 +23,14 @@ import { GRAPHICS_SECTIONS, graphicsControls, onGraphicsControls, type GraphicsC
 export const SETTINGS_TABS = ['graphics', 'sound', 'controls', 'saves', 'system', 'dev'] as const;
 export type SettingsTab = typeof SETTINGS_TABS[number];
 export type SettingsGroup = `graphics.${GraphicsSection}` | 'sound.volume' | 'sound.music' | 'sound.voice' | 'controls.camera' | 'controls.lock' | 'controls.aim' | 'controls.touch' | 'controls.keys'
-  | 'saves.game' | 'saves.file' | 'system.link' | 'system.review' | 'system.developer' | 'system.credits' | 'dev.tools';
+  | 'saves.game' | 'saves.file' | 'system.name' | 'system.link' | 'system.review' | 'system.developer' | 'system.credits' | 'dev.tools';
 /** every group, in screen order within its tab; `head` is its section label */
 const GROUPS: readonly { id: SettingsGroup; head: EngineStringKey | null }[] = [
   { id: 'graphics.main', head: null }, { id: 'graphics.effects', head: 's_st_g_effects' }, { id: 'graphics.advanced', head: 's_st_g_advanced' }, { id: 'graphics.setup', head: null },
   { id: 'sound.volume', head: 's_st_g_volume' }, { id: 'sound.music', head: 's_st_g_music' }, { id: 'sound.voice', head: 's_st_g_voice' },
   { id: 'controls.camera', head: 's_st_g_camera' }, { id: 'controls.lock', head: 's_st_g_lock' }, { id: 'controls.aim', head: 's_st_g_aim' }, { id: 'controls.touch', head: 's_st_g_touch' }, { id: 'controls.keys', head: null },
   { id: 'saves.game', head: null }, { id: 'saves.file', head: null },
-  { id: 'system.link', head: null }, { id: 'system.review', head: null }, { id: 'system.developer', head: null }, { id: 'system.credits', head: 's_2a6b24ad2872' },
+  { id: 'system.name', head: 's_st_g_name' }, { id: 'system.link', head: null }, { id: 'system.review', head: null }, { id: 'system.developer', head: null }, { id: 'system.credits', head: 's_2a6b24ad2872' },
   { id: 'dev.tools', head: null },
 ];
 

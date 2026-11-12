@@ -443,6 +443,11 @@
       "shape": "f221da58340f9bc6",
       "migrations": []
     },
+    "json:device/'nameAsked'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/'storage.persisted'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

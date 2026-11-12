@@ -18,6 +18,7 @@ import { buildMusicStyleRow } from './musicStyleRow';
 import { buildSettingsTabs, touchRows, type SettingsGroup, type SettingsTabsView } from './settingsTabs';
 import type { GraphicsControl } from './graphicsControls';
 import { voiceSettingsRows } from './voiceSettings';
+import { nameSettingRows } from './namePrompt';
 
 export interface SettingsCtx { weapons: ReadonlySet<string>; melee: boolean; tracers: boolean; huntersEye: boolean; chunk: LevelSpec }
 /** a gated row's test: what you hold (no row reads the shard, so the title can ask it too) */
@@ -116,6 +117,7 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
 
     // ── SYSTEM: the link, the build, offline play; Review (E140: not debug, playtesters unlock notes with it); the Developer
     //    switch; the model credit ──
+    put('system.name', ...nameSettingRows(host.scope)); // MP2.4: the Name the prompt asked for, changed any time
     put('system.link', ...state.savePanel.system);
     if (host.title !== true) put('system.review', buildReview(host.scope, host.openFeedback));
     put('system.developer', ...devSwitchRows());
