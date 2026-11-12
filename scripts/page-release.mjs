@@ -5,7 +5,7 @@
 //
 //   phases: build, upload, check, go-live, in that order; a comma list runs them one after another and stops at the first
 //   failure (preview.yml: `preview build,upload,check,go-live`)
-//   --host=workers|vercel    the page host (default per channel, DEFAULT_HOSTS); OV6, OV7 and OV8 flip it to workers
+//   --host=workers           the page host, Cloudflare Workers, the only one since OFF-VERCEL OV9 (the default)
 //   --root=<dir>             the release clone (default: this checkout's top level); one clean clone per channel
 //   --dry-run                print every step and read the live gate; build, upload and alias nothing
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
@@ -20,7 +20,6 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {RefusedError, runPhase} from './page-release/flow.mjs';
-import {vercelHost, vercelToken} from './page-release/hosts/vercel.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content} from './page-release/content.mjs';
@@ -28,17 +27,11 @@ import {publishContent, r2Content} from './page-release/content.mjs';
 const args = process.argv.slice(2);
 const flag = (/** @type {string} */ name) => args.find(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
 const value = (/** @type {string} */ name) => flag(name)?.split('=').slice(1).join('=');
-/** Each channel stays on Vercel until its cutover row flips it (OFF-VERCEL OV6 preview, OV7 staging, OV8 production).
- * Preview was never on this script's Vercel host, so it has only workers (preview.yml runs it hourly since OV6). */
-const DEFAULT_HOSTS = /** @type {const} */ ({preview: 'workers', staging: 'vercel', production: 'vercel'});
+/** Every channel is on Cloudflare Workers (OFF-VERCEL OV6 preview, OV7 staging, OV8 production), so `--host` has one value. */
 const [channel, phaseList] = args.filter(arg => !arg.startsWith('--'));
-const hostName = value('host') ?? (channel !== undefined && Object.hasOwn(DEFAULT_HOSTS, channel) ? DEFAULT_HOSTS[/** @type {keyof typeof DEFAULT_HOSTS} */ (channel)] : undefined);
-if (channel === undefined || phaseList === undefined || (hostName !== 'workers' && hostName !== 'vercel')) {
-  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers|vercel] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--content]');
-  process.exit(2);
-}
-if (channel === 'preview' && hostName === 'vercel') {
-  console.error('preview has no Vercel host: use --host=workers');
+const hostName = value('host') ?? 'workers';
+if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
+  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--content]');
   process.exit(2);
 }
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -46,8 +39,7 @@ const root = resolve(value('root') ?? git(['rev-parse', '--show-toplevel'], proc
 const build = git(['rev-parse', 'HEAD'], root);
 /** @type {string[]} */
 const secrets = [];
-let token = '';
-/** The Vercel token is read on first use; Cloudflare's comes only from CLOUDFLARE_API_TOKEN (else wrangler's login). */
+/** Cloudflare's token comes only from CLOUDFLARE_API_TOKEN (else wrangler's login). */
 const cloudflareToken = process.env.CLOUDFLARE_API_TOKEN;
 if (cloudflareToken !== undefined && cloudflareToken !== '') secrets.push(cloudflareToken);
 const redact = (/** @type {string} */ text) => secrets.reduce((out, secret) => secret === '' ? out : out.split(secret).join('<token>'), text);
@@ -61,9 +53,7 @@ async function fetch200(url) {
   return response;
 }
 
-const host = hostName === 'workers'
-  ? workersHost({token: () => cloudflareToken, log})
-  : vercelHost({token: () => { if (token === '') { token = vercelToken(); secrets.push(token); } return token; }});
+const host = workersHost({token: () => cloudflareToken, log});
 
 let phase = '';
 try {

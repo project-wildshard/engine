@@ -5,9 +5,10 @@ import {createHash, generateKeyPairSync, sign} from 'node:crypto';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine the scratch root to this checkout.
 import {join, resolve} from 'node:path';
+// oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
+import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
 import {CHANNELS, CHECKED_DOCUMENTS, PHASES, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
-import {PROJECTS} from '../scripts/page-release/hosts/vercel.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
@@ -244,10 +245,12 @@ test('child output reaches the terminal with the token replaced', () => {
   expect(() => runRedacted(process.execPath, ['-e', 'process.exit(3)'], {cwd: '.', env: {SECRET: token}}, [token])).toThrow(/exited 3/);
 });
 
-test('the Vercel host tells production deployments from staging ones', () => {
-  expect(PROJECTS.production.host.test('https://wildshard-e7-g9ykhchce-raynos-projects.vercel.app')).toBe(true);
-  expect(PROJECTS.production.host.test('https://wildshard-e7-staging-q82kfzcen-raynos-projects.vercel.app')).toBe(false);
-  expect(PROJECTS.staging.host.test('https://wildshard-e7-staging-q82kfzcen-raynos-projects.vercel.app')).toBe(true);
+test('every channel has one page host, workers: any other --host is a usage error (OFF-VERCEL OV9)', () => {
+  for (const channel of ['preview', 'staging', 'production']) {
+    const old = spawnSync(process.execPath, ['scripts/page-release.mjs', channel, 'build', '--host=old', '--dry-run'], {encoding: 'utf8', timeout: 20_000});
+    expect(old.status, old.stderr).toBe(2);
+    expect(old.stderr).toContain('[--host=workers]');
+  }
 });
 
 test('preview is the solo game: no release file, no packs, no gate, and the alias still moves last', async () => {

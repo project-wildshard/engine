@@ -11,7 +11,7 @@
 // Preview (the solo build of green main, J274: hourly) has no world: no release file, no packs and no gate. Its check
 // and go-live compare bytes and move the alias.
 //
-// The flow owns order and gates; the host (hosts/vercel.mjs or hosts/workers.mjs, page-release.mjs --host) owns how a
+// The flow owns order and gates; the host (hosts/workers.mjs, page-release.mjs --host) owns how a
 // page is packaged, uploaded, read back and aliased. Every dependency comes in through `deps`, so the tests drive a fake host.
 // J205: the flow opens no socket. Nothing here ever joins a channel; production proofs are static.
 import {createHash, createPublicKey, verify} from 'node:crypto';

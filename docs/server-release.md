@@ -42,15 +42,15 @@ one clean release clone per channel at the exact SHA (never a worktree
 with untracked pins, never the canonical checkout):
 
 ```
-node scripts/page-release.mjs staging build|upload|check|go-live [--host=workers|vercel]
-node scripts/page-release.mjs production build|upload|check|go-live --after-staging-proofs [--host=workers|vercel]
+node scripts/page-release.mjs staging build|upload|check|go-live
+node scripts/page-release.mjs production build|upload|check|go-live --after-staging-proofs
 node scripts/page-release.mjs preview build,upload,check,go-live
 ```
 
 A comma list runs the phases in order and stops at the first failure.
-`--host` picks the page host. Staging and production stay on `vercel`
-until their cutover (OFF-VERCEL OV7, OV8); preview is `workers` only,
-and `preview.yml` runs it hourly for the newest green main (OV6).
+Every channel's page is a Cloudflare Worker (OFF-VERCEL OV6 preview,
+OV7 staging, OV8 production), so `--host` has one value, `workers`, the
+default. `preview.yml` runs preview hourly for the newest green main (OV6).
 Preview is the solo game: no release file, no packs and no gate, so
 its `check` compares bytes and its `go-live` moves the alias.
 
@@ -69,8 +69,8 @@ SHA and `staging.wildshard.io` already serving it; `go-live` needs
 `e7-doctor-proof.mjs` 7/7 and `e7-live-staging-proof.mjs` on Chromium
 and WebKit. J205: the script opens no socket; production's own proof is
 `e7-doctor-proof.mjs <origin> <sha> <key> --human-static`. The scratch
-scripts' `/api/*` 401 checks are gone: play's `/api` is moving to
-`api.wildshard.io` (API-CLOUDFLARE AC11) and is 503 on Vercel today.
+scripts' `/api/*` 401 checks are gone: the page's API is
+`api.wildshard.io` (API-CLOUDFLARE AC11), not the page host.
 If go-live fails after an `ALIAS MOVED` line, the alias did move; fix
 forward (J179).
 
@@ -86,16 +86,10 @@ production), `production build` and `upload` (any time after the
 build is green), `production check`, `production go-live
 --after-staging-proofs`, then `--human-static`.
 
-The host sits behind `scripts/page-release/hosts/vercel.mjs` (prepare,
-package, upload, deployed digests, go-live). Today that is Vercel:
-`vercel pull`, `build-vercel-output.mjs`, `e7-page-routes.mjs`,
-`vercel deploy --prebuilt --skip-domain`, the deployment's file index
-(a file's `uid` is its SHA-1) and `vercel promote`. The token is
-`~/.config/vercel/api-token`, else the CLI's own login, passed in
-`VERCEL_TOKEN`; child output is captured and printed redacted. Pack writes use `wrangler r2 object put` with wrangler's login.
+Pack writes use `wrangler r2 object put` with wrangler's login.
 
-`scripts/page-release/hosts/workers.mjs` (OFF-VERCEL OV4) is the
-Cloudflare host, three Workers from `pages/wrangler.jsonc` (production
+The host is `scripts/page-release/hosts/workers.mjs` (OFF-VERCEL OV4), the
+Cloudflare host: three Workers from `pages/wrangler.jsonc` (production
 is `--env ''`, then `--env staging` and `--env preview`). `package`
 sends the source maps to Sentry, strips them from `dist/` and checks
 the asset limits. `upload` is `wrangler versions upload --tag <sha>
