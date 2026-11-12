@@ -13,6 +13,7 @@ import { perfDockAlert, perfDockSection } from './perfDock';
 import { ToastStack, type ToastTone } from './ToastStack';
 import { ItemCardPop, type ItemCardSpec } from './ItemCard';
 import { ROW, hudSlots } from './hudSlots';
+import { listenReloadChip } from './reloadChip';
 
 /**
  * HUD — DOM overlay in `#hud`, styled by `src/client/engine/ui/styles/game.css` / `menu.css` (the in-game menu is src/client/engine/ui/Menu.ts + gmenu.css) on top of `base.css` (Wildshard glass identity; one class prefix per screen, see scripts/check-css.mjs).
@@ -426,10 +427,7 @@ export class HUD {
     q(bolts, '.ws-game-weapon').textContent = L.weaponName ?? this.opts.weaponUi.name;
     q(bolts, '.ws-game-tiny .l').textContent = L.ammoLabel ?? this.opts.weaponUi.ammo?.label ?? '';
     bolts.type = 'button'; bolts.disabled = true;
-    // Keep chip gestures out of the look/fire layer. The input service owns the same reload action as desktop R.
-    this.scope.listen(bolts, 'pointerdown', (event) => { event.stopPropagation(); });
-    this.scope.listen(bolts, 'click', (event) => {
-      event.preventDefault(); event.stopPropagation();
+    listenReloadChip(this.scope, bolts, () => {
       if (this.canReloadChip && this.entered && !this.paused && !app.ui.blocking) app.input.pressGesture('reload');
     });
     hudSlots.widget('band.2', vitals, ROW.vitals, this.scope); hudSlots.widget('band.2', bolts, ROW.ammo, this.scope);
