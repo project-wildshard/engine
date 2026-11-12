@@ -106,6 +106,17 @@ test('publish skips present keys, puts the rest with the index last, and a secon
   expect(bucket.puts).toEqual([]);
 });
 
+test('a key that exists with other bytes is uploaded again, not skipped', async () => {
+  const dir = page(), set = contentSet(scanContent(dir)), bucket = fakeBucket();
+  const short = contentKey(set, 'assets/spawn/parts/0123456789abcdef.pack.br'), good = contentKey(set, 'assets/tex/rock.ktx2');
+  bucket.objects.set(short, {body: brotliCompressSync(Buffer.from('part')), headers: contentHeaders(short)});
+  bucket.objects.set(good, {body: readFileSync(join(dir, 'assets/tex/rock.ktx2')), headers: contentHeaders(good)});
+  expect(await run(dir, bucket.store)).toMatchObject({uploaded: 9, held: 1});
+  expect(bucket.puts).toContain(short);
+  expect(bucket.puts).not.toContain(good);
+  expect(brotliDecompressSync(bucket.objects.get(short)?.body ?? new Uint8Array()).toString()).toBe('part bytes');
+});
+
 test('a failed bulk put is retried with only the keys still missing', async () => {
   const dir = page(), bucket = fakeBucket(), put = bucket.store.put, batches: string[][] = [];
   let failed = false;

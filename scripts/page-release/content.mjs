@@ -11,11 +11,12 @@
 // with the same bytes means the set is complete. (A new set re-uploads files an older set already holds: cross-set
 // dedupe is a follow-up, with PZ10's content cache.)
 //
-// Each key that already answers is skipped (a cache-busted HEAD on packs.wildshard.io). The rest go up through
+// A key that already answers (a cache-busted HEAD on packs.wildshard.io) is skipped only when it reads back with the
+// same decoded bytes and CORS; one with other bytes is uploaded again. The rest go up through
 // `wrangler r2 bulk put` (CLOUDFLARE_API_TOKEN from the environment, else wrangler's own login), headers from the cook's
 // `objectHeaders()` with `immutable` for every key. Every uploaded key is then read back, cache-busted, with the game's
 // Origin: 200, that Origin in Access-Control-Allow-Origin, and the same decoded bytes, or the publish fails.
-// --sample=<n> instead reads back n random keys of each kind from a published set (no upload).
+// --sample=<n|all> instead reads back n random keys (or every key) of each kind from a published set (no upload).
 import {createHash, randomInt} from 'node:crypto';
 import {mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
@@ -146,10 +147,21 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
     return summary(0, 0);
   }
   /** @type {ContentFile[]} */ const missing = [];
-  await pool(files, 32, async file => { if (!await store.exists(contentKey(set, file.path))) missing.push(file); });
+  let wrong = 0;
+  // A present key is held only when it reads back with this file's bytes and the game's CORS; anything else (a wrong or
+  // short object left by an earlier run, say) is uploaded again over it. Set keys are content-named, so that is safe.
+  await pool(files, 32, async file => {
+    const key = contentKey(set, file.path);
+    if (!await store.exists(key)) { missing.push(file); return; }
+    const read = await store.read(key, origin);
+    if (read.status === 200 && read.cors === origin && sha256(read.bytes) === file.decoded) return;
+    wrong++;
+    log(`content ${set}: ${key} is present but reads back ${read.status}, ${read.bytes.length} bytes, CORS ${read.cors}: uploading it again`);
+    missing.push(file);
+  });
   missing.sort((a, b) => (a.path < b.path ? -1 : 1));
   const uploadedBytes = missing.reduce((sum, file) => sum + file.bytes, 0);
-  log(`content ${set}: ${files.length} files (${mb(bytes)} MB), ${files.length - missing.length} held, ${missing.length} to upload (${mb(uploadedBytes)} MB)`);
+  log(`content ${set}: ${files.length} files (${mb(bytes)} MB), ${files.length - missing.length} held (read back equal), ${missing.length} to upload (${mb(uploadedBytes)} MB, ${wrong} present with other bytes)`);
   if (missing.length > 0) {
     // `wrangler r2 bulk put` stops at the first failed object (a 502 was seen); what landed answers a HEAD, so a retry
     // puts only the rest.
@@ -272,7 +284,7 @@ async function main() {
   try {
     if (sample !== undefined) {
       const origins = (value('origin') ?? GAME_ORIGIN).split(',');
-      await sampleContent({dir, store, count: Number(sample), origins, log});
+      await sampleContent({dir, store, count: sample === 'all' ? Number.POSITIVE_INFINITY : Number(sample), origins, log});
       return;
     }
     const result = await publishContent({dir, store, scratch, origin: value('origin') ?? GAME_ORIGIN, dryRun: args.includes('--dry-run'), log});
