@@ -190,6 +190,7 @@ export class NetClient {
   /** Once per render frame: the tick rows are drawn at, with every event and field change that tick has reached delivered. */
   present(): number {
     const renderTick = this.clock.renderTick(this.now());
+    this.interpolator.cover(renderTick);
     this.delivery.update(renderTick);
     return renderTick;
   }

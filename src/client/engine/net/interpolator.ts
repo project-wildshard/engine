@@ -5,8 +5,8 @@ import { FIXED_STEP } from '../../../shared/engine/core/fixedStep';
 import type { DecodedFrame } from '../../../shared/engine/net/frame';
 import type { NetClass, NetColumn, NetValue } from '../../../shared/engine/net/schema';
 
-/** Frames kept per entity (§6.1). */
-export const INTERP_SAMPLES = 8;
+/** Frames kept per entity (§6.1): the deepest delay, INTERP_MAX_MS, and two frames more (NL2). */
+export const INTERP_SAMPLES = 10;
 /** Past the newest sample a row runs on along its last delta this long, then holds: 50 ms (§6.1). */
 export const EXTRAPOLATE_TICKS: number = 0.05 / FIXED_STEP;
 
@@ -40,6 +40,14 @@ export class Interpolator {
   private readonly blends = new Map<NetClass<never>, Blend>();
   private readonly classOf: (handle: number) => NetClass<never> | undefined;
   private newest = -1;
+  /** The ticks of the newest INTERP_SAMPLES frames heard, oldest first, and whether an older one has been let go. */
+  private readonly kept = new Float64Array(INTERP_SAMPLES);
+  private keptCount = 0;
+  private full = false;
+  /** Render frames drawn older than the buffer's oldest frame (NL2): the delay outran the buffer, so rows held. */
+  held = 0;
+  /** Render frames drawn past the newest frame and its 50 ms run-on: nothing new arrived in time, so rows held. */
+  starved = 0;
   /** The handle not to buffer: this client's own character is predicted. */
   own: number | null = null;
   constructor(classOf: (handle: number) => NetClass<never> | undefined) { this.classOf = classOf; }
@@ -51,12 +59,19 @@ export class Interpolator {
       const row = frame.rows.get(handle), track = row === undefined ? undefined : this.track(handle);
       if (row !== undefined && track !== undefined) add(track, frame.tick, row);
     }
+    this.keep(frame.tick);
     if (frame.tick < this.newest) return;
     this.newest = frame.tick;
     for (const handle of this.tracks.keys()) if (!frame.rows.has(handle)) this.tracks.delete(handle); // out of relevance, or gone
   }
   /** Forget everything: the client changed cells. */
-  clear(): void { this.tracks.clear(); this.newest = -1; }
+  clear(): void { this.tracks.clear(); this.newest = -1; this.keptCount = 0; this.full = false; }
+  /** Once per render frame: count a render tick the buffer does not cover (`held`, `starved`). */
+  cover(tick: number): void {
+    if (this.keptCount === 0) return;
+    if (this.full && tick < (this.kept[0] ?? 0)) this.held++;
+    else if (tick > (this.kept[this.keptCount - 1] ?? 0) + EXTRAPOLATE_TICKS) this.starved++;
+  }
   /** Handles with a track. */
   handles(): IterableIterator<number> { return this.tracks.keys(); }
   /** The columns `sample` writes for `handle`. */
@@ -115,6 +130,19 @@ export class Interpolator {
     if (reach === undefined) this.sample(handle, tick, out); else this.project(handle, tick, out, reach);
     columns.forEach((column, index) => { fields[column.name] = BLENDED.has(column.kind) ? out[index] ?? 0 : column.value(out[index] ?? 0); });
     return fields;
+  }
+
+  /** Sort a frame's tick into the kept ticks, letting the oldest go once full. */
+  private keep(tick: number): void {
+    const { kept } = this;
+    let at = this.keptCount;
+    while (at > 0 && (kept[at - 1] ?? 0) > tick) at--;
+    if (at > 0 && kept[at - 1] === tick) return;
+    if (this.keptCount === INTERP_SAMPLES) {
+      if (at === 0) return;
+      kept.copyWithin(0, 1); this.keptCount--; at--; this.full = true;
+    }
+    kept.copyWithin(at + 1, at, this.keptCount); kept[at] = tick; this.keptCount++;
   }
 
   private track(handle: number): Track | undefined {
