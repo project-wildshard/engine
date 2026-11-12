@@ -676,7 +676,7 @@ await test(
         try {
           const folder = join(
             work,
-            String(host ?? 'default').replaceAll(':', '_'),
+            (host ?? 'default').replaceAll(':', '_'),
           )
           const taken = spawnSync(
             process.execPath,
