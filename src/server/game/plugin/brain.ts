@@ -303,7 +303,7 @@ export function speciesResolver(rows: ShardRows): (speciesId: string, variantId:
   return (speciesId, variantId) => {
     const row = catalogue.get(speciesId), selected = row?.variants.find((variantRow) => variantRow.id === variantId);
     if (row === undefined || selected === undefined) throw new Error('Unresolved declared species/variant');
-    return { kind: row.kind, species: row.id, label: selected.label, variant: selected.id, rarity: selected.rarity, hp: selected.hp, aggressive: row.aggressive, lockable: row.lockable,
+    return { kind: row.kind, label: selected.label, variant: selected.id, rarity: selected.rarity, hp: selected.hp, aggressive: row.aggressive, lockable: row.lockable,
       dims: { ...row.dims, feet: row.dims.feet.map(([x, z]) => [x, z]) }, mods: { ...selected.mods }, ...(row.flight === undefined ? {} : { flight: { ...row.flight } }) };
   };
 }

@@ -417,6 +417,9 @@ function observationValue(entry: [string, unknown], value: boolean): asserts ent
 /** Reinstall matching adapters into a fresh standalone restore host; restoring skips collider allocation and stepping. */
 export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): ShardfileSimulation {
   const seats = scriptSeats(host), { first } = seats;
+  // TE-ENG7: each declared body names its species on the wire. Set here, on create and on restore alike, and never in
+  // the level's spec, so a save keeps its level fingerprint.
+  for (const spawn of shard.creatures.spawns) { const body = host.entities.get(spawn.id); if (body !== undefined) body.species = spawn.species; }
   if (shard.nativeGround !== null) throw new Error('Native ground retains its trusted runtime simulation; a flat declared proxy is forbidden');
   const levelId = shard.identity.slug;
   if (host.level.id !== levelId || host.level.seed !== shard.identity.seed || host.entities.size !== shard.creatures.spawns.length || shard.creatures.spawns.some((row) => !host.entities.has(row.id))) throw new Error('Shardfile simulation host mismatch');

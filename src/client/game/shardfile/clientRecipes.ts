@@ -62,3 +62,15 @@ export function speciesViewKinds(rows: Pick<ShardRows, 'species' | 'looks'>): Re
   for (const row of rows.species) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
   return new Map(rows.species.map((row) => [row.id, (counts.get(row.kind) ?? 0) > 1 && rows.looks.some((look) => look.species === row.id) ? row.id : row.kind]));
 }
+
+/**
+ * Species rows or looks as a page registers them (TE-ENG7): each under its page kind (`speciesViewKinds`), and one that
+ * moved also under its native kind with an id of its own, so a row from an older server, which names no species, still
+ * draws as before rather than finding no kind.
+ */
+export function pageSpecies<T extends { readonly id: string; readonly kind: string }>(entries: readonly T[], kinds: ReadonlyMap<string, string>, speciesOf: (entry: T) => string = (entry) => ('species' in entry && typeof entry.species === 'string' ? entry.species : entry.id)): T[] {
+  return entries.flatMap((entry) => {
+    const kind = kinds.get(speciesOf(entry)) ?? entry.kind;
+    return kind === entry.kind ? [entry] : [{ ...entry, kind }, { ...entry, id: `${entry.id}@${entry.kind}` }];
+  });
+}

@@ -12,8 +12,6 @@ export type AnimalState = typeof ANIMAL_STATES[number];
 export interface AnimalSimSpec {
   kind: string; label: string; variant: string; rarity: Rarity; hp: number; aggressive: boolean;
   dims: AnimalDims; mods: VariantMods; flight?: SpeciesFlight; lockable?: boolean;
-  /** A declared shard's species id: two species may share one native `kind` (TE-ENG7). Absent for a native body. */
-  species?: string;
 }
 /** Collision-only displacement port; the creature retains its own feet position. */
 export interface AnimalMotor {
@@ -101,6 +99,9 @@ export class AnimalSim {
   motionConstraint: ((from: Readonly<{ x: number; y: number; z: number }>, to: { x: number; y: number; z: number }) => void) | null = null;
   private readonly motionFrom = { x: 0, y: 0, z: 0 };
   readonly entityId: string;
+  /** A declared body's species id, or '' for a native one: what a remote page draws it by, since two declared species
+   *  may share one native `kind` (TE-ENG7). Its installer sets it; it is not in the spec, so a level keeps its fingerprint. */
+  species = '';
   protected readonly simSpec: AnimalSimSpec;
   protected readonly simPorts: AnimalSimPorts;
   private volumePort: AnimalVolumePort | null = null;
@@ -115,8 +116,6 @@ export class AnimalSim {
     this.flight = spec.flight === undefined ? null : new FlightMotion(spec.flight);
   }
   get dims(): AnimalDims { return this.simSpec.dims; }
-  /** The declared species id, or '' for a native body: what a remote page draws it by (TE-ENG7). */
-  get species(): string { return this.simSpec.species ?? ''; }
   /** Copy just pose inputs into a reused view buffer, without allocating a snapshot. */
   samplePose(out: AnimalPoseSample): void {
     out.attackT = this.attackT; out.attackDur = this.attackDur; out.groundY = this.groundY;

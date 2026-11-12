@@ -58,7 +58,7 @@ import type { GraphSources } from './clientGraphs';
 import { clientPostStack, type ClientPost } from './clientPost';
 import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBackend';
 import { frameLookOf } from '../grid/frameLook';
-import { clientSpeciesLooks, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
+import { clientSpeciesLooks, pageSpecies, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
 import { loadItemModels } from './itemModels';
 import { loadClientSkins, type ClientSkin } from './clientSkins';
 import { clientViews } from './clientViews';
@@ -350,8 +350,8 @@ export class ShardfileClient {
     // TE-ENG7: two declared species on one native kind each register under a page kind of their own; rows find it by species id
     const kinds = speciesViewKinds(source.rows), pageKind = (species: string, kind: string): string => kinds.get(species) ?? kind;
     wirePage.declareSpecies(kinds, ctx.scope);
-    ctx.rows.species(source.rows.species.map((row) => ({ ...row, kind: pageKind(row.id, row.kind), variants: row.variants.map((variant) => ({ ...variant, scale: [...variant.scale] })) })));
-    ctx.rows.speciesLook(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins).map((look) => Object.assign(look, { kind: pageKind(look.species, look.kind) })));
+    ctx.rows.species(pageSpecies(source.rows.species.map((row) => ({ ...row, variants: row.variants.map((variant) => ({ ...variant, scale: [...variant.scale] })) })), kinds));
+    ctx.rows.speciesLook(pageSpecies(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins), kinds));
     const sketches = compendiumSketches(source.rows, this.assets.retained);
     for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredProductCompendium(ctx.product, row.id, sketches) });
     ctx.rows.lootTable(source.rows.loot);
