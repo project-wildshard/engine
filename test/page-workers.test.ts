@@ -98,16 +98,18 @@ test('the page comes from the assets with no-store, /index.html as /', async () 
   }
 });
 
-test('a missing file reaches the Worker but goes back to the assets untouched, ?doctor or not', async () => {
+// AUDIO AU4 (J299): the miss keeps the assets' status and body, but never their long cache: it leaves no-store.
+test('a missing file reaches the Worker and goes back as the assets\' 404 with no-store, ?doctor or not', async () => {
   for (const path of ['/b/gone/main-x.js', '/b/gone/main-x.js?doctor', '/doctor']) {
     const seen: string[] = [];
     const env: Env = { ASSETS: { fetch: request => {
       seen.push(new URL(request.url).pathname);
-      return Promise.resolve(new Response('', { status: 404 }));
+      return Promise.resolve(new Response('gone', { status: 404, headers: { 'cache-control': 'public, max-age=31536000, immutable' } }));
     } } };
     const response = await worker.fetch(new Request(`https://play.wildshard.io${path}`), env);
     expect(response.status).toBe(404);
-    expect(response.headers.get('cache-control')).toBeNull();
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).toBe('gone');
     expect(seen).toEqual([new URL(path, 'https://x').pathname]);
   }
 });
@@ -124,7 +126,9 @@ test('a spawn part keeps the assets\' headers and gains Content-Encoding: br; an
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(stored);
     for (const status of [304, 404]) {
       const other = await worker.fetch(new Request(`https://play.wildshard.io${path}`), env(status));
-      expect([other.status, other.headers.get('content-encoding')]).toEqual([status, null]);
+      // AU4: a 304 keeps the part's long cache; a 404 leaves no-store.
+      expect([other.status, other.headers.get('content-encoding'), other.headers.get('cache-control')])
+        .toEqual([status, null, status === 304 ? 'public, max-age=31536000, immutable' : 'no-store']);
     }
   }
   for (const path of ['/assets/spawn/parts/readme.txt', '/assets/spawn/server/0123.json']) {
