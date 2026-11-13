@@ -6,7 +6,7 @@
 // its in-page server, which hosts the whole grid: a Shard select tap enters the solo grid at the shard's cell (`entry.ts` asks only
 // for a tap, so a bare `?chunk=` link, a harness or an author's embedded product still opens the shard alone).
 import { pageScope } from '@wildshard/engine/app/resources';
-import { jsonSlot } from '@wildshard/engine/saves/slots';
+import { jsonSlot, type Json } from '@wildshard/engine/saves/slots';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
 import { hostsGrid } from '../shardfile/serverRoute';
 import { pageGridIntents } from './intent';
@@ -53,7 +53,26 @@ export function oneWayIn(page: OneWayIn, assembly?: GridAssembly): GridCell | nu
 }
 
 /** The online module's gate, as `clientWorker.ts` reads it; a page with no world never asks. */
-interface OnlineGate { readonly worldWord: (world: { readonly release: string; readonly key: string }, waitMs?: number) => Promise<unknown> }
+export interface OnlineGate { readonly worldWord: (world: { readonly release: string; readonly key: string }, waitMs?: number, keep?: WordKeep) => Promise<unknown> }
+/** opus-wordkeep: the word the door said, which release and when (`online.js`'s `KeptWord`). */
+interface KeptWord { readonly of: string; readonly at: number; readonly word: unknown }
+interface WordKeep { readonly read: () => KeptWord | null; readonly write: (kept: KeptWord) => void }
+/** opus-wordkeep: the tab's kept word, in the page's own session saves. `online.js` keeps the word a minute (so the title, a `?chunk=`
+ *  page and the grid page share one socket), but its own store has no storage (OF4's finding for `release.kept`), so the page lends
+ *  this one. The release is under `of`, not `release`: an older build in the same tab kept only a yes there. */
+export function tabWordKeep(): WordKeep {
+  const slot = (): ReturnType<typeof jsonSlot> => jsonSlot('gridGate', 'session');
+  return {
+    read: () => {
+      const kept = slot().read();
+      if (typeof kept !== 'object' || kept === null || Array.isArray(kept)) return null;
+      const { of, at, word } = kept;
+      return typeof of === 'string' && typeof at === 'number' && word !== undefined ? { of, at, word } : null;
+    },
+    // a word is parsed JSON, so it keeps as it came
+    write: kept => { slot().write({ of: kept.of, at: kept.at, word: kept.word as Json }); },
+  };
+}
 
 /** QA 11-12 row 36 (Jake on bad LTE: Driftwood sat 34 s on "Read audio 7 / 91"): the last answer this device got from its world, grid
  *  or one-shard, kept across sessions. A check that misses its deadline uses it, so a cached player stays on the route they downloaded
@@ -125,15 +144,18 @@ export async function worldHosted(world: unknown, waitMs: number = HOSTED_MS, me
   if (heard !== null) return heard.grid;
   return memory.read(release) ?? true;
 }
+/** This build's `online.js`, a bundle of its own. */
+async function onlineGate(): Promise<OnlineGate> {
+  const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
+  return await import(/* @vite-ignore */ `/b/${build}/standalone/online.js`) as OnlineGate;
+}
 /** The door's word read as grid or not and the shards it opens, or null when no word came (unreachable, stalled, closed before its word). */
-async function readHosted(world: unknown, waitMs: number): Promise<WorldHeard | null> {
+export async function readHosted(world: unknown, waitMs: number, gate: () => Promise<OnlineGate> = onlineGate): Promise<WorldHeard | null> {
   if (typeof world !== 'object' || world === null || !('release' in world) || !('key' in world)) return null;
   const { release, key } = world;
   if (typeof release !== 'string' || typeof key !== 'string') return null;
   try {
-    const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
-    const gate = await import(/* @vite-ignore */ `/b/${build}/standalone/online.js`) as OnlineGate;
-    const word = await gate.worldWord({ release, key }, waitMs);
+    const word = await (await gate()).worldWord({ release, key }, waitMs, tabWordKeep());
     return word === null ? null : { grid: hostsGrid(word), shards: wordShards(word) };
   } catch { return null; }
 }
