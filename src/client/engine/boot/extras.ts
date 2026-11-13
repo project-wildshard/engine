@@ -25,6 +25,7 @@
  *                           shard's sound is fetched after the bar (E44).
  *  - `startDeferredAudioPreload()`  the same selected counted downloads and offline cache, with selected
  *                           decoding serialized after the loader fades and the world starts (E246 memory A/B).
+ *  - `useDownloadAudio()`   AUDIO AU2: the audio the spawn download lists is read from its copy, never fetched again.
  */
 import { publicBytes, bootPacks } from '../../../shared/engine/boot/tables';
 import { audioPackReader } from './audioPack';
@@ -115,11 +116,21 @@ export function hasLateAudio(files: ChunkFiles): boolean { return (heldAudio.get
  *  decode); undefined when nothing was held back or no preload started for `files` */
 export function startLateAudio(files: ChunkFiles): Promise<AudioBanks> | undefined { return lateLoads.get(files)?.(); }
 
-/** the art and the audio for the prefetch queue: the selected style + set (decoded in the bar) ahead of the others (downloaded only) */
+/** AUDIO AU2 (J299, QA 11-12 row 36: Jake on bad LTE sat 34 s on LOAD's audio reads, which went back to the network on a
+ *  warm visit): the spawn download's copy of the audio it lists (src/client/game/boot/spawnDownload.ts `spawnListed` and
+ *  `spawnHeldBytes`, lent by the session, as this leaf imports no game code). `read` waits for the download's own file and
+ *  returns its verified bytes from its part, memory or the page's store; null when it has none. */
+export interface DownloadAudio { listed: (url: string) => boolean; read: (url: string) => Promise<ArrayBuffer | null> }
+let downloadAudio: DownloadAudio | null = null;
+/** Lend (or, with null, withdraw) the download's audio: LOAD and the prefetch queue then leave its files to DOWNLOAD. */
+export function useDownloadAudio(source: DownloadAudio | null): void { downloadAudio = source; }
+
+/** the art and the audio for the prefetch queue: the selected style + set (decoded in the bar) ahead of the others (downloaded
+ *  only). Audio the spawn download lists is DOWNLOAD's (AU2): the queue never fetches it a second time. */
 export function extraFetches(files: ChunkFiles): string[] {
   const own = audioPriority.get(files);
   const mine = (url: string): boolean => url.startsWith(musicDir(ENGINE_MUSIC_STYLE)) || url.startsWith(sfxDir(getSfxSet())) || own?.has(url) === true;
-  const audio = [...files.music, ...files.sfx];
+  const audio = [...files.music, ...files.sfx].filter(url => downloadAudio?.listed(url) !== true);
   return [...files.art, ...audio.filter(mine), ...audio.filter((p) => !mine(p))];
 }
 
@@ -224,18 +235,25 @@ export function startDeferredAudioPreload(files: ChunkFiles, def: BootLevel, pro
   const selectedBytes = new Map<string, ArrayBuffer>();
   const lifetime = new AbortController();
   onOwnerDispose(() => { lifetime.abort(); selectedBytes.clear(); });
-  const downloads = urls.map((url, index) => waitFor(`Read audio ${index + 1} / ${urls.length}`, (async () => {
+  const downloads = urls.map((url, index) => {
+    // AU2: a file the spawn download lists is read from its copy (a warm visit with no link, or a slow one, reads nothing
+    // here); only a file it doesn't list (an older product) is fetched, and a copy that fails its check is fetched again.
+    const held = downloadAudio?.listed(url) === true ? downloadAudio : null;
+    return waitFor(held === null ? `Read unlisted audio ${index + 1} / ${urls.length}` : `Await downloaded audio ${url}`, (async () => {
     try {
       // QA 11-12 row 36: a read the network can't answer retries once, then waits on RETRY with the file named, never in flight
       // for good; a file the server doesn't have keeps its synth fallback, as before.
-      const bytes = (await readContent(url, AUDIO_FILE_CAP, { signal: lifetime.signal, missingThrows: true,
+      const copy = held === null ? null : await held.read(url).catch(() => null);
+      lifetime.signal.throwIfAborted();
+      const bytes = copy ?? (await readContent(url, AUDIO_FILE_CAP, { signal: lifetime.signal, missingThrows: true,
         fetch: async (address, init) => { await whenPrefetched(address); return fetch(address, init); } })).buffer;
       if (selected.has(url)) selectedBytes.set(url, bytes);
       downloaded.add(url);
     } catch { downloaded.delete(url); /* a missing sound, or a page that left, keeps its synth fallback */ }
     c.tick();
     fileProgress(++completedFiles, url);
-  })(), 'file'));
+  })(), 'file');
+  });
   // Observe the existing parallel reads without changing their queue or decode
   // boundary. Their row ends with the reads, not when a later waiter attaches.
   void Promise.all(downloads).then(() => { reading?.end(); return undefined; }, () => { reading?.end(); return undefined; });

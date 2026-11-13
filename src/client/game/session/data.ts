@@ -15,7 +15,8 @@ import type { SessionContext, StagedBoot, SessionState, KitPorts } from './conte
 import { currentOwner } from '@wildshard/engine/app/ownership';
 import { app } from '@wildshard/engine/app/runtime';
 import { declareTotals, installByteCounter } from '@wildshard/engine/boot/bytes';
-import { bootFiles, extraFetches, startAudioPreload, startDeferredAudioPreload, startMenuPreload, type Preload, type AudioBanks } from '@wildshard/engine/boot/extras';
+import { bootFiles, extraFetches, startAudioPreload, startDeferredAudioPreload, startMenuPreload, useDownloadAudio, type Preload, type AudioBanks } from '@wildshard/engine/boot/extras';
+import { spawnHeldBytes, spawnListed } from '../boot/spawnDownload';
 import { registerGpuFiles, setTexturePolicy } from '@wildshard/engine/boot/gpuFiles';
 import { demandPack, packFor, streamPack } from '@wildshard/engine/boot/pack';
 import { bootFetches, prefetch, prefetchAfter, whenPrefetched } from '@wildshard/engine/boot/prefetch';
@@ -80,6 +81,10 @@ async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audi
   // A level may hold extras behind its complete world file queue.
   const extrasBarrier = manifest.boot?.barrier === true
     ? Promise.all([packStreamed, ...worldFetches.map(whenPrefetched)]) : packStreamed;
+  // AUDIO AU2: the audio the spawn download lists is read from its copy; neither the queue nor LOAD fetches it again. LOAD
+  // never demands it ahead of the world's files, and its music and sfx byte sources close with the `audio` step, as before.
+  // The same page-wide pair is lent again by each build (the download's listed files are the page's, DL25).
+  useDownloadAudio({ listed: spawnListed, read: url => spawnHeldBytes(url, false) });
   prefetchAfter(extraFetches(files), extrasBarrier);
   // High-peak builds may defer extras decoding until their later loading steps.
   const deferExtras = manifest.boot?.phone?.deferExtras === true && TIER === 'phone';
