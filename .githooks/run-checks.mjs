@@ -127,7 +127,8 @@ if (lane === 'commit') {
   if (scripts['format:check'] && format.length) {
     jobs.push({ name: 'format:check', args: ['format:check', '--no-error-on-unmatched-pattern', ...format] });
   }
-  if (scripts.typecheck && format.length) jobs.push({ name: 'typecheck', args: ['typecheck'] });
+  // WL20: tracked and staged files only; another lane's untracked scratch is not in this commit.
+  if (scripts.typecheck && format.length) jobs.push({ name: 'typecheck', command: [process.execPath, join(root, '.githooks', 'commit-typecheck.mjs')] });
   if (!jobs.length) {
     if (Object.keys(scripts).length) console.error('  - no code staged: commit lane skipped');
     process.exit(0);
@@ -145,8 +146,8 @@ if (!existsSync(join(pkgDir, 'node_modules'))) {
 // Hooks export GIT_INDEX_FILE and friends; tools that shell out to git
 // (knip, tests that build repos) must see a normal environment.
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-const run = ({ name, args }) => new Promise((done) => {
-  const child = spawn('pnpm', ['run', '--silent', ...args], { cwd: pkgDir, env });
+const run = ({ name, args = [], command = ['pnpm', 'run', '--silent', ...args] }) => new Promise((done) => {
+  const child = spawn(command[0], command.slice(1), { cwd: pkgDir, env });
   let output = '';
   child.stdout.on('data', (chunk) => (output += chunk));
   child.stderr.on('data', (chunk) => (output += chunk));
