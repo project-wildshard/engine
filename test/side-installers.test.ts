@@ -18,12 +18,12 @@ import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 // and goes red when the gap changes or closes unrecorded.
 
 // SS4 to SS6 (stealth, the Pine secret, the fall floor) landed before SS3, so none of their lines is open here; SS3b closed
-// Driftwood's keepsakes (loot/keepsakeProgression.ts) and Nalati's adventure saves (serverChapters.ts, chapterRecords.ts).
+// Driftwood's keepsakes (loot/keepsakeProgression.ts), Nalati's adventure saves (serverChapters.ts, chapterRecords.ts) and
+// Nine Dragon's places (shard-format v0.4.9 sides `world.sets` and `world.bind-sets` as `view`: they only list placed models).
 const KNOWN: Readonly<Record<string, { readonly row: string; readonly lines: readonly string[] }>> = {
   'driftwood-isle': { row: 'HS6: `bridge-sway` is a page-only pose view, and SS2 sides every view.program `both` for the slots and open arena',
     lines: ['client/plan view.program (poseViews)'] },
-  'nine-dragon-stack': { row: 'SS3b: `world.sets` only lists placed models for the sets explorer, so shard-format `2515bdb` sides it `view`; the line leaves at the format bump past v0.4.8. HS6: `movers` is a page-only pose view',
-    lines: ['client/plan world.sets (places)', 'client/plan view.program (poseViews)'] },
+  'nine-dragon-stack': { row: 'HS6: `movers` is a page-only pose view', lines: ['client/plan view.program (poseViews)'] },
 };
 
 /** The pins whose products declare a `both` or `server` kind today: one that loses them in a re-cook fails, not skips. */

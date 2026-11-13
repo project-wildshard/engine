@@ -30,8 +30,8 @@ importers:
         specifier: 1.8.0
         version: 1.8.0(valibot@1.5.0(typescript@6.0.3))
       '@wildshard/format':
-        specifier: github:project-wildshard/shard-format#v0.4.8
-        version: '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/629b9442dd9ec2298be041b322664af41c00dcd8(typescript@6.0.3)'
+        specifier: github:project-wildshard/shard-format#v0.4.9
+        version: '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/8c506e15b03635237c1962bbd380f66db9985b47(typescript@6.0.3)'
       '@wildshard/wire':
         specifier: github:project-wildshard/shard-format#203e4fa89f0c5f3804b6b254363d7597008a9389&path:/packages/wire
         version: https://codeload.github.com/project-wildshard/shard-format/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389#path:/packages/wire(typescript@6.0.3)
@@ -775,9 +775,9 @@ packages:
   '@vitest/spy@5.0.1':
     resolution: {integrity: sha512-rbto/mF/SGERxEgYOek7Xm6B9b+y+mVoo+f4b2LymYO8zM1b7uB5nHuhVMTP2hxdzgxvGiZYGxGIaMvL5y180Q==}
 
-  '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/629b9442dd9ec2298be041b322664af41c00dcd8':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/629b9442dd9ec2298be041b322664af41c00dcd8}
-    version: 0.4.8
+  '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/8c506e15b03635237c1962bbd380f66db9985b47':
+    resolution: {gitHosted: true, integrity: sha512-kFOEFZVKohd7EvK3Va2vZKMJIZatH/SUbWEr0/11UWOJzamI24S+LROEmO60VO3HO4IKLm+KRJPIoIMLYqOvZg==, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/8c506e15b03635237c1962bbd380f66db9985b47}
+    version: 0.4.9
     engines: {node: '>=24.18.0'}
     hasBin: true
 
@@ -2016,7 +2016,7 @@ snapshots:
 
   '@vitest/spy@5.0.1': {}
 
-  '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/629b9442dd9ec2298be041b322664af41c00dcd8(typescript@6.0.3)':
+  '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/8c506e15b03635237c1962bbd380f66db9985b47(typescript@6.0.3)':
     dependencies:
       meshoptimizer: 1.2.0
       valibot: 1.5.0(typescript@6.0.3)
