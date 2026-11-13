@@ -10,7 +10,8 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
 import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placementsURL, type PlacementFile } from '../../../shared/game/grid/placementRows';
 import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
-import { findTitleManifest } from '../shard/titleList';
+import { findTitleManifest, installTitleManifests, titleManifests } from '../shard/titleList';
+import { catalogueCards } from './placedCards';
 import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
 
 /** How long a page's boot waits for the file: GO4's 3 s, the world word's own deadline. A slower answer leaves the build's grid. */
@@ -43,7 +44,7 @@ export interface Placed { readonly document: CatalogueDocument; readonly added: 
  * The catalogue with the file's cells after the build's own. A cell is left out as the MMO's `placeCell` (`gridCells.ts`) refuses it, rule
  * for rule: an instance placed elsewhere, off the 7 × 7, a slug that already has a cell (or names a cell), an instance that is a placed
  * shard's slug, a taken spot. A cell the build already places the same way is kept once. A slug this build has no card or product for
- * (`known` false: an upload after the build) is left out too, as today: the page can't load it. `placed` names the slugs the file
+ * (`known` false: an upload after the build the API's catalogue does not card, SA46) is left out too. `placed` names the slugs the file
  * added, which Shard Select cards (`titleDeck.ts`).
  */
 export function addPlacedCells(document: CatalogueDocument, file: PlacementFile, known: (slug: string) => boolean = () => true): Placed {
@@ -70,8 +71,9 @@ export function addPlacedCells(document: CatalogueDocument, file: PlacementFile,
   return { document: { ...document, grid, placed: [...document.placed ?? [], ...added.map(row => row.slug)] }, added, left };
 }
 
-/** What a page's read of its placement file did, for the console and the tests. */
-export type PlacedRead = { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number } | { readonly kept: string };
+/** What a page's read of its placement file did, for the console and the tests: `carded` names the added slugs whose card came
+ *  from the API's catalogue (SA46). */
+export type PlacedRead = { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number; readonly carded: readonly string[] } | { readonly kept: string };
 export interface PlacedPorts {
   readonly fetch?: typeof fetch;
   readonly publicKey?: string;
@@ -79,9 +81,16 @@ export interface PlacedPorts {
   /** The page's own deadline: once it fires the boot has gone on, so a late answer installs nothing (the deck and the one way in read
    *  the grid once). */
   readonly signal?: AbortSignal;
-  /** Whether this build can show and load a slug (default: it has a title row, `titleList.ts`). */
+  /** Whether this build cards a slug (default: it has a title row, `titleList.ts`). A slug it lacks may be carded from the API's
+   *  catalogue (SA46); whether its product loads is the product's own question. */
   readonly known?: (slug: string) => boolean;
+  /** The API origin a slug the build lacks is carded from (SA46, `placedCards.ts`; default `VITE_API_ORIGIN`). */
+  readonly api?: string;
+  /** The catalogue lookups' own deadline (`placedCards.ts` `CARD_DEADLINE_MS`). */
+  readonly cardDeadlineMs?: number;
 }
+/** After every row's `order`, so a carded shard is last in the deck. */
+const nextOrder = (rows: readonly { readonly order?: number }[]): number => rows.reduce((top, row) => Math.max(top, row.order ?? 0), rows.length) + 1;
 /** Read the file at `url` and install the build's catalogue with its cells. Never throws: anything but a believed file keeps the build's
  *  grid and says why (a 404 is a channel the API has placed nothing on). */
 export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Promise<PlacedRead> {
@@ -99,9 +108,24 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     const file = await readSignedPlacement(await response.text(), ports.publicKey);
     const channel = /\/releases\/(staging|production)-placements\.json$/u.exec(new URL(url).pathname)?.[1];
     if (channel !== undefined && file.channel !== channel) return { kept: `a ${file.channel} placement file at the ${channel} address` };
-    const placed = addPlacedCells(document, file, ports.known ?? (slug => findTitleManifest(slug) !== undefined));
-    if (ports.signal?.aborted === true) return { kept: 'the page went on before the placement file was read' };
+    const known = ports.known ?? (slug => findTitleManifest(slug) !== undefined);
+    // the page's own deadline, read afresh after each wait: once it fires the boot has gone on
+    const wentOn = (): boolean => ports.signal?.aborted === true;
+    const placed = addPlacedCells(document, file, known);
+    if (wentOn()) return { kept: 'the page went on before the placement file was read' };
     if (placed.added.length > 0) installCatalogue(placed.document);
-    return { added: placed.added, left: placed.left, serial: file.serial };
+    // SA46: a cell the box would open whose slug this build has no card for (an upload after the build) is carded from its catalogue
+    // entry, after the build's own cells are in, so a slow or absent API costs them nothing; a slug it does not card stays out
+    const unknown = addPlacedCells(placed.document, file).added.map(cell => cell.slug);
+    const built = { added: placed.added, left: placed.left, serial: file.serial, carded: [] };
+    if (unknown.length === 0) return built;
+    const cards = await catalogueCards(unknown, { fetch: ports.fetch ?? fetch, signal: abort.signal, order: nextOrder(titleManifests()), ...(ports.api === undefined ? {} : { api: ports.api }),
+      ...(ports.cardDeadlineMs === undefined ? {} : { deadlineMs: ports.cardDeadlineMs }) });
+    if (cards.length === 0 || wentOn()) return built;
+    const carded = new Set(cards.map(row => row.slug)), more = addPlacedCells(placed.document, file, slug => carded.has(slug));
+    const opened = new Set(more.added.map(cell => cell.slug)), rows = cards.filter(row => opened.has(row.slug));
+    if (more.added.length > 0) installCatalogue(more.document);
+    if (rows.length > 0) installTitleManifests([...titleManifests(), ...rows]);
+    return { added: [...placed.added, ...more.added], left: more.left, serial: file.serial, carded: rows.map(row => row.slug) };
   } catch (error) { return { kept: error instanceof Error ? error.message : String(error) }; } finally { scope.dispose(); }
 }

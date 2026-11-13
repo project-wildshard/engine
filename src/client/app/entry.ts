@@ -115,7 +115,7 @@ function learnPlacedCellsOnce(): Promise<void> {
       if (url === null || late.signal.aborted) return;
       const answer = await bootTask('app:placed-cells', () => learnPlacedCells(url, { signal: late.signal }));
       if ('kept' in answer) console.info(`[grid] build's grid kept: ${answer.kept}`);
-      else console.info(`[grid] placement serial ${String(answer.serial)}: ${answer.added.map(cell => `${cell.instance} at (${cell.cell.join(',')})`).join(', ') || 'no new cell'}${answer.left.length === 0 ? '' : `; left out ${answer.left.join('; ')}`}`);
+      else console.info(`[grid] placement serial ${String(answer.serial)}: ${answer.added.map(cell => `${cell.instance} at (${cell.cell.join(',')})`).join(', ') || 'no new cell'}${answer.carded.length === 0 ? '' : `; carded from the catalogue ${answer.carded.join(', ')}`}${answer.left.length === 0 ? '' : `; left out ${answer.left.join('; ')}`}`);
     } catch (error) { console.warn('[grid] placement file not read:', error); }
   })();
   const deadline = new Promise<void>(resolve => { entryScope.timeout(PLACED_DEADLINE_MS, () => { late.abort(); resolve(); }); });

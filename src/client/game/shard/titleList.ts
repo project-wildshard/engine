@@ -58,6 +58,11 @@ export function catalogueManifests():readonly (ShardManifest|TitleManifest)[]{
   return [...rows.values()];
 }
 const NO_ART = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 4"%3E%3Crect width="3" height="4" fill="%23273340"/%3E%3C/svg%3E';
+/** C3, SA46: the plain row of a shard this build has no card for, from what the catalogue says of it (its name). Its art is the
+ *  plain card until its product is admitted: the API hosts no uploaded shard's images. */
+export function catalogueTitleRow(slug: string, name: string, order: number): TitleManifest {
+  return { slug, name, biome: '', status: 'live', order, shardfile: `/shardfiles/${slug}/shard.json`, card: { thumb: NO_ART, portrait: NO_ART, landscape: NO_ART } };
+}
 /** C3: a head with a placement and no card in this build: a shard added to the catalogue after the build. Its name is all
  * the catalogue says, so it wears a plain card until its product is admitted. */
 export function withCatalogueHeads(rows: readonly TitleManifest[]): readonly TitleManifest[] {
@@ -68,8 +73,7 @@ export function withCatalogueHeads(rows: readonly TitleManifest[]): readonly Tit
   const added = heads.filter(head => !known.has(head.slug)).flatMap(head => {
     const placement = placed.get(head.slug);
     if (placement === undefined) return [];
-    const row: TitleManifest = { slug: placement.slug, name: head.name, biome: '', status: 'live', order: placement.order ?? rows.length, shardfile: `/shardfiles/${placement.slug}/shard.json`, card: { thumb: NO_ART, portrait: NO_ART, landscape: NO_ART } };
-    return [row];
+    return [catalogueTitleRow(placement.slug, head.name, placement.order ?? rows.length)];
   });
   return added.length === 0 ? rows : [...rows, ...added];
 }

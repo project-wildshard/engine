@@ -662,6 +662,7 @@
     "src/client/game/grid/neighbourRows.ts": "client",
     "src/client/game/grid/oneWayIn.ts": "client",
     "src/client/game/grid/placedCells.ts": "client",
+    "src/client/game/grid/placedCards.ts": "client",
     "src/client/game/grid/pageEntry.ts": "client",
     "src/client/game/grid/pageResidency.ts": "client",
     "src/client/game/grid/pageShell.ts": "client",
