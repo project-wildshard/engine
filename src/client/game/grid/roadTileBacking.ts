@@ -53,6 +53,18 @@ function archiveScratch(mesh: Mesh, indices: number): number {
   const bytes = 4 * (indices * (stride + 8) + header) + 2 * (indices * (stride + 64) + header);
   return Number.isSafeInteger(bytes) ? bytes : Infinity;
 }
+/** Retire a whole-road mesh once its tile pool (a child) draws instead; returns the geometry it drew, for disposal. It stays
+ *  as the pool's parent but draws in no view (no camera's layers, shadow pass included). RP4: three links a program in
+ *  `setProgram` before it reads the draw count, so the empty mesh linked a flat-shaded, position-less variant of each road
+ *  material the first frame it drew (Driftwood's west edge, 3 links, 386 ms in Chromium) and again at every light-count move. */
+export function retireWholeRoadMesh(mesh: Mesh): BufferGeometry {
+  const previous = mesh.geometry;
+  mesh.geometry = new BufferGeometry(); mesh.geometry.setDrawRange(0, 0);
+  mesh.onBeforeRender = () => { /* Original cull buffers are retired. */ };
+  mesh.layers.disableAll();
+  return previous;
+}
+
 export class RoadTileBacking {
   private readonly sources = new Map<Mesh, Source>();
   private readonly pending: PendingArchive[] = [];
@@ -284,9 +296,7 @@ export class RoadTileBacking {
       // hidden. Geometry disposal precedes each corresponding lease shrink.
       for (const source of this.sources.values()) if (source.pool !== null) source.pool.root.visible = true;
       for (const source of this.sources.values()) {
-        const previous = source.mesh.geometry;
-        source.mesh.geometry = new BufferGeometry(); source.mesh.geometry.setDrawRange(0, 0);
-        source.mesh.onBeforeRender = () => { /* Original cull buffers are retired. */ };
+        const previous = retireWholeRoadMesh(source.mesh);
         this.culler.plans.delete(source.mesh); previous.dispose(); source.retire?.();
       }
       this.committed = true;

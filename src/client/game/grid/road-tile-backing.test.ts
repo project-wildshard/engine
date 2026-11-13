@@ -1,11 +1,11 @@
 import { expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, Sphere } from 'three';
+import { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Sphere } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import { noteFrameDrawn } from '@wildshard/engine/core/framePacing';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
 import { finishRoadSteps, type CullPlan } from './roadCull';
 import { decodeRoadTile, encodeRoadTile, type RoadTileStore } from './roadTileArchive';
-import { RoadTileBacking } from './roadTileBacking';
+import { RoadTileBacking, retireWholeRoadMesh } from './roadTileBacking';
 import { compactRoadTileSteps } from './roadTileGeometry';
 import { coarseRoadTileSteps } from './roadTileCoarse';
 
@@ -238,4 +238,20 @@ test('presenting pages keep the original six active archives', async () => {
     finally { scope.dispose(); f.close(); noteFrameDrawn(Number.NEGATIVE_INFINITY); clock.mockRestore(); }
   }
   expect(store.counts.peak).toBe(6); expect(store.counts.active).toBe(0); expect(store.counts.reads).toBe(16);
+});
+
+test('a retired whole-road mesh draws in no view, its tile pool still does (RP4)', () => {
+  // three links a program in setProgram before it reads the draw count: the retired whole mesh (no attributes, an empty
+  // range) linked a flat-shaded, position-less variant of each road material on the first frame it was drawn, and again
+  // whenever the light count moved (Driftwood's west edge: 3 links, 386 ms in Chromium)
+  const f = fixture(), child = new Mesh(new BufferGeometry(), f.mesh.material);
+  f.mesh.add(child);
+  const previous = retireWholeRoadMesh(f.mesh);
+  expect(previous.getAttribute('position')).toBeDefined();
+  expect(f.mesh.geometry.drawRange.count).toBe(0);
+  expect(f.mesh.layers.test(new PerspectiveCamera().layers)).toBe(false);
+  expect(f.mesh.layers.test(new OrthographicCamera().layers)).toBe(false);
+  expect(child.layers.test(new PerspectiveCamera().layers)).toBe(true);
+  expect(child.parent).toBe(f.mesh);
+  previous.dispose(); f.close();
 });
