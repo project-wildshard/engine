@@ -20,3 +20,7 @@ the bytes back, and checks that the first red `test.step` is the one the fault a
   `changed` line in `tmp/e2e/watcher.log` for either), so its ready answered with an old generation. The drill now stops
   the watcher before each plant and after each restore, about 25 s a fault. The same miss could serve a stale client to a
   normal smoke run after a quick edit-and-revert; not chased here.
+- **Stopping it never leaves a plant.** A `claude -p` review found the SIGINT handler dead: `spawnSync` blocks the
+  event loop, and Ctrl-C reached only the child, so the drill skipped to the next fault. It now stops when its child dies
+  on a signal, and writes `tmp/e2e/faults-planted.json` before each plant, so a killed drill is put right by the next
+  one; the restore happens only while the file still holds the plant (an edit made meanwhile is kept and named).
