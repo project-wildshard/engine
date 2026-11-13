@@ -329,7 +329,7 @@ async function enter(run) {
         }
       }
       tappedAt = at();
-      if (phase === 'title') phase = 'none';
+      if (phase === 'title' && entry === 'deck') phase = 'none';
       const limit = mode === 'slow' || mode === 'warm' ? 300_000 : 150_000;
       let key = '', changed = Date.now(), cardSeen = false;
       for (;;) {
