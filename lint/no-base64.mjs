@@ -1,6 +1,7 @@
 // G649 B3: syntactic calls only; no TypeScript program or import-graph walk.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { lintFile } from './shard-source.mjs';
 
 const unwrap = node => ['TSAsExpression', 'TSTypeAssertion', 'TSNonNullExpression', 'ChainExpression', 'ParenthesizedExpression'].includes(node?.type)
   ? unwrap(node.expression) : node;
@@ -98,7 +99,8 @@ export function noBase64Rule(policyFile) {
     meta: { type: 'problem', docs: { description: 'Keep binary content binary; never encode or decode base64 (G649)' },
       schema: [{ type: 'object', properties: { count: { type: 'boolean' } }, additionalProperties: false }] },
     create(context) {
-      const file = base64Path(context.filename);
+      // SA24 / SA45: shard source is keyed by its source path (src/shards/<slug>/<local>) in either layout, as the other shard rules read it
+      const shard = lintFile(context.filename, process.cwd()), file = shard.shard === null ? base64Path(context.filename) : shard.path;
       if (!/^(?:src|scripts)\//u.test(file)) return {};
       const limit = context.options[0]?.count === true ? 0 : Object.hasOwn(policy.files, file) ? policy.files[file] : 0;
       let found = 0;

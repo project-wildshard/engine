@@ -66,3 +66,25 @@ test('the real rule refuses new source/tool calls and permits only shrinking exa
     expect(run('scripts/generators/new.mjs',"const {from:make}=Buffer;make('AA==','base64');").status).toBe(1);
   }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+// SA24 / SA45: the allowance follows the shard, not its folder. A single-shard repo keeps its shard at src/, and its debt keys read
+// as src/shards/<slug>/ (lint/shard-source.mjs), as every other shard rule reads them; before, shard-nine-dragon needed its own
+// debt file at the src/ path (WILDSHARD_BASE64_FILE).
+test('a shard file allowance is keyed by its source path in both layouts',()=>{
+  mkdirSync('tmp',{recursive:true});const root=mkdtempSync(resolve('tmp/no-base64-layouts-'));
+  const policy=resolve(root,'debt.json'),config=resolve(root,'lint.json'),plugin=resolve(root,'rule.mjs');
+  const helper=fileURLToPath(new URL('../lint/no-base64.mjs',import.meta.url));
+  writeFileSync(plugin,`import {noBase64Rule} from ${JSON.stringify(helper)};export default {meta:{name:'wildshard'},rules:{'no-base64':noBase64Rule(${JSON.stringify(policy)})}};`);
+  writeFileSync(config,JSON.stringify({jsPlugins:[plugin],categories:{correctness:'off'},rules:{'wildshard/no-base64':'error'}}));
+  writeFileSync(policy,JSON.stringify({files:{'src/shards/sample-isle/generators/glyphs.mjs':1}}));
+  const put=(file:string,source:string)=>{const target=resolve(root,file);mkdirSync(resolve(target,'..'),{recursive:true});writeFileSync(target,source);return target;};
+  const run=(target:string)=>spawnSync(execPath,[resolve('node_modules/oxlint/bin/oxlint'),'-c',config,'--no-ignore',target],{encoding:'utf8'}).status;
+  try{
+    put('single/src/shard.config.ts','export default {};');put('single/src/manifest.json','{"slug":"sample-isle"}');
+    for(const base of ['multi/src/shards/sample-isle','single/src']){
+      expect(run(put(`${base}/generators/glyphs.mjs`,"atob('AA==');")),base).toBe(0);
+      expect(run(put(`${base}/generators/glyphs.mjs`,"atob('AA==');btoa('x');")),`${base} grows`).toBe(1);
+      expect(run(put(`${base}/generators/other.mjs`,"atob('AA==');")),`${base} other file`).toBe(1);
+    }
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
