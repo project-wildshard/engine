@@ -4,7 +4,9 @@
 // ONE Driftwood room on the rig of `online-rig.mjs`, Jake's and Jimmy's phones (402×874, headless, on the GPU). Each check is the
 // row's exported `prove…` from its `remote-*-proof.mjs`; between checks both walk back to where they spawned and face the way
 // they spawned, as each check expects. RP3 starts with Jake alone and ends with Jimmy's page closed, so it runs first and Jimmy
-// comes back for the rest; RP2 brings Ana in for its check and sends her off; RP11 runs next, on fresh creatures. RP6 (the wire
+// comes back for the rest; RP2 brings Ana in for its check and sends her off. The checks that need no creature run next, before
+// any creature is struck: a struck bear hunts whoever struck it for the rest of the run, and a bite or its knock spoils a check
+// that reads a still or a walking body. Then the three that fight one, RP11 first on a fresh bear, then RP1 and RP10. RP6 (the wire
 // fields) is its own test, `test/net-remote-actions.test.ts`, run here; RP7's tap and heavy and RP9's air read those fields in
 // the room. The captures land on one labelled board (`--board=`, default
 // ~/.cache/wildshard/plan-artifacts/remote-players/board.png). PASS only if every check passes.
@@ -56,6 +58,13 @@ const home = async (entered, spot) => {
   const at = await where(page);
   return Math.hypot(at.x - spot.x, at.z - spot.z) < 0.6 && Math.abs(at.y - spot.y) < 0.5;
 };
+/** The live creatures within 40 m of a page's player: kind, metres, state. @param {import('playwright').Page} page */
+const near = page => page.evaluate(() => {
+  const { world } = /** @type {any} */ (window).__wildshard, { player } = world;
+  return /** @type {any[]} */ (world.animals?.animals ?? []).filter(body => body.alive && body.rowDriven && !body.hidden)
+    .map(body => ({ kind: String(body.kind), m: Math.round(Math.hypot(body.position.x - player.position.x, body.position.z - player.position.z)), state: String(body.state) }))
+    .filter(body => body.m < 40).sort((a, b) => a.m - b.m);
+});
 /** Walk a page to a spot on the ground. @param {import('playwright').Page} page @param {{ x: number, z: number }} spot */
 async function walkTo(page, spot) {
   let last = await where(page), stuck = 0;
@@ -169,11 +178,10 @@ try {
   const check = async (row, title, prove) => {
     [jake, jimmy] = await Promise.all([reset(jake, 'Jake'), reset(jimmy, 'Jimmy')]);
     await jake.page.waitForTimeout(1000);
+    console.log(`creatures within 40 m of Jimmy before ${row}: ${JSON.stringify(await near(jimmy.page))}`);
     const inRoom = { jake, jimmy, note, enter: room.enter };
     await run(row, title, shots => prove({ ...inRoom, shots }));
   };
-  // RP11 first, on fresh creatures, as its own proof runs: in this room a later bear, worn down, never bit Jimmy to death
-  await check('RP11', 'death and respawn', proveDeath);
   await check('RP2', 'castaway body', proveBody);
   // A fresh Jimmy doesn't own Driftwood's iron sword (the wreck's quest gives it), so the room's switch is skipped as the row's
   // proof skips it; HS8's own test earns the sword and swaps it, and back.
@@ -187,6 +195,8 @@ try {
   await check('RP4', 'walk and run', proveGait);
   await check('RP8', 'hoverboard bank', proveBoard);
   await check('RP12', 'Name at 3, 15, 40 m', proveName);
+  // The creature checks last. RP11 first, on a bear nobody has struck: a bear RP1 and RP10 wore down never bit Jimmy to death.
+  await check('RP11', 'death and respawn', proveDeath);
   await check('RP1', 'bear bar for everyone', proveBar);
   await check('RP10', 'hit number, hurt flash', proveHurt);
   const faults = room.faults();
