@@ -16,3 +16,11 @@ bare resident 7 pins failed (Nalati had no king, patrols, stealth or story chapt
 Left: a runtime plan sent as sections with no product still ticks the bare resident (Far Reach's and Dunes' proof
 witnesses build their checkpoints that way). `createTrustedHeadlessAdapter` is deprecated; shard CI moves to
 `@wildshard/engine/host/openWorld` once it pins this engine.
+
+## SS1's owed Driftwood lines (HS7)
+
+Two Driftwood `known` lines in `test/side-parity.allow.json` had no open row. `sideParityDiff` now takes a `same` entry's
+material (`sameMaterial`: the boat is `boat` planks on the page and `driftwood.boat` wood in the room, the same five solids
+since HS2) and `chunked` owners, whose page copies of one piece under another chunk's owner are that one piece (the pier deck
+is registered in four chunks, its landings in two). Two copies in one chunk stay two, and a stale material or chunked owner
+fails. Driftwood's only `known` line left is the castaway (SS10b).

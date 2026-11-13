@@ -5,7 +5,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
-import { colliderInventory, MEASURED_SHAPES, ownerGroup, sideParityDiff, SIDE_PARITY_SHARDS } from '../scripts/side-parity.mjs';
+import { chunkCopyKey, colliderInventory, MEASURED_SHAPES, ownerGroup, sideParityDiff, SIDE_PARITY_SHARDS } from '../scripts/side-parity.mjs';
 import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 
 // SERVER-PARITY SS1 (meta docs/plans/SERVER-PARITY-PLAN.md). The page stands the player on colliders it builds live from the
@@ -16,8 +16,8 @@ import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 // test/side-parity.allow.json; a shard with a known open gap lists it under `known` with its plan row, so CI stays green while
 // the row is open and goes red if the gap changes or closes unrecorded.
 
-interface Same { readonly page: string; readonly why: string }
-interface Allow { readonly owners: Readonly<Record<string, string>>; readonly shards: Readonly<Record<string, { readonly row?: string; readonly owners?: Readonly<Record<string, string>>; readonly same?: Readonly<Record<string, Same>>; readonly known?: readonly string[] }>> }
+interface Same { readonly page: string; readonly why: string; readonly material?: { readonly server: string; readonly page: string } }
+interface Allow { readonly owners: Readonly<Record<string, string>>; readonly shards: Readonly<Record<string, { readonly row?: string; readonly owners?: Readonly<Record<string, string>>; readonly same?: Readonly<Record<string, Same>>; readonly chunked?: Readonly<Record<string, string>>; readonly known?: readonly string[] }>> }
 const page = JSON.parse(readFileSync('test/side-parity.page.json', 'utf8')) as { at: Record<string, readonly number[] | null>; shards: Record<string, Parameters<typeof sideParityDiff>[0]> };
 const allow = JSON.parse(readFileSync('test/side-parity.allow.json', 'utf8')) as Allow;
 
@@ -40,6 +40,18 @@ test('a server name the shard declares the same as the page\'s still needs its s
   // the name is the same; the material and the shape still have to agree
   expect(sideParityDiff([door], [box('cabin-7-door-bar', 'stone', [1, 0, 1, 2, 2, 2])], at, {}, { same: { 'cabin-7-door-bar': 'mill-door-bar' } })).not.toEqual([]);
   expect(sideParityDiff([door], [box('cabin-7-door-bar', 'wood', [5, 0, 1, 6, 2, 2])], at, {}, { same: { 'cabin-7-door-bar': 'mill-door-bar' } })).not.toEqual([]);
+  // HS7's owed SS1 lines: a server name whose material is also named otherwise (Driftwood's boat) matches only under both names
+  const boat = box('boat', 'planks', [1, 0, 1, 2, 2, 2]), hull = box('driftwood.boat', 'wood', [1, 0, 1, 2, 2, 2]);
+  expect(sideParityDiff([boat], [hull], at, {}, { same: { 'driftwood.boat': 'boat' } })).toHaveLength(2);
+  expect(sideParityDiff([boat], [hull], at, {}, { same: { 'driftwood.boat': 'boat' }, sameMaterial: { 'driftwood.boat': { server: 'wood', page: 'planks' } } })).toEqual([]);
+  expect(sideParityDiff([boat], [box('driftwood.boat', 'stone', [1, 0, 1, 2, 2, 2])], at, {}, { same: { 'driftwood.boat': 'boat' }, sameMaterial: { 'driftwood.boat': { server: 'wood', page: 'planks' } } })).not.toEqual([]);
+  // a page piece that spans chunks is registered once per chunk (Driftwood's pier deck): a declared owner's exact copies are one solid
+  const deck = box('pier.c3', 'planks', [-2, 1, -226, 2, 1, -155]), copy = box('pier.c4', 'planks', [-2, 1, -226, 2, 1, -155]), server = [box('pier', 'planks', [-2, 1, -226, 2, 1, -155])];
+  expect(sideParityDiff([deck, copy], server, at)).toHaveLength(1);
+  expect(sideParityDiff([deck, copy], server, at, {}, { chunked: ['pier'] })).toEqual([]);
+  // still one to one: a copy somewhere else is its own solid, and two in one chunk are two
+  expect(sideParityDiff([deck, box('pier.c3', 'planks', [-2, 1, -226, 2, 1, -155])], server, at, {}, { chunked: ['pier'] })).toHaveLength(1);
+  expect(sideParityDiff([deck, box('pier.c4', 'planks', [-2, 1, -126, 2, 1, -55])], server, at, {}, { chunked: ['pier'] })).not.toEqual([]);
   // a deck's sill inside the server's edge wall, and one that pokes out of it
   expect(sideParityDiff([wall, box('deck', 'stone', [249, 0, -4, 250, 3, 4])], [wall], at)).toEqual([]);
   expect(sideParityDiff([wall, box('deck', 'stone', [245, 0, -4, 250, 3, 4])], [wall], at)).not.toEqual([]);
@@ -60,7 +72,13 @@ describe('side parity: the page and the room build the same gameplay colliders',
       const same = Object.fromEntries(Object.entries(own?.same ?? {}).map(([server, row]) => [server, row.page]));
       // a declared name stands only while both sides still use it: a renamed piece drops its line from the allow file
       expect(Object.entries(same).filter(([name, as]) => !server.some(row => ownerGroup(row.owner) === name) || !rows.some(row => ownerGroup(row.owner) === as)), `${slug}: stale same names`).toEqual([]);
-      const findings = sideParityDiff(rows, server, page.at[slug] ?? null, { ...allow.owners, ...own?.owners }, { same });
+      const sameMaterial = Object.fromEntries(Object.entries(own?.same ?? {}).flatMap(([server, row]) => row.material === undefined ? [] : [[server, row.material]]));
+      const chunked = Object.keys(own?.chunked ?? {});
+      // a declared chunked owner stands only while the page still repeats one of its pieces
+      expect(chunked.filter(name => { const keys = rows.filter(row => ownerGroup(row.owner) === name).map(chunkCopyKey); return new Set(keys).size === keys.length; }), `${slug}: stale chunked owners`).toEqual([]);
+      // and a declared material only while each side still names it so
+      expect(Object.entries(sameMaterial).filter(([name, as]) => !server.some(row => ownerGroup(row.owner) === name && row.material === as.server) || !rows.some(row => ownerGroup(row.owner) === same[name] && row.material === as.page)), `${slug}: stale same materials`).toEqual([]);
+      const findings = sideParityDiff(rows, server, page.at[slug] ?? null, { ...allow.owners, ...own?.owners }, { same, sameMaterial, chunked });
       // WS_SIDE_PARITY_REPORT=<folder>: keep each shard's findings and server rows there, to read beside the page half
       const report = process.env['WS_SIDE_PARITY_REPORT'];
       if (report !== undefined) { mkdirSync(report, { recursive: true }); writeFileSync(`${report}/${slug}.json`, JSON.stringify({ findings, server }, null, 1)); }

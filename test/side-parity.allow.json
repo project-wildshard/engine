@@ -7,12 +7,22 @@
  },
  "shards": {
   "driftwood-isle": {
-   "row": "SERVER-PARITY SS10 (open: Wendell's page body follows his scene root, which stays at the origin while his rig places the figure part, a Driftwood figure-row fix and upload; pier tiles split on the page; the boat's owner and material names only, its solids agree since HS2)",
+   "row": "SERVER-PARITY SS1 and SS10b (SS1: the boat's owner and material names are declared the same below, its solids agree since HS2; the pier's chunk copies are declared. Open, SS10b: Wendell's page body follows his scene root, which stays at the origin while his rig places the figure part, a Driftwood figure-row fix and upload)",
+   "same": {
+    "driftwood.boat": {
+     "page": "boat",
+     "material": {
+      "server": "wood",
+      "page": "planks"
+     },
+     "why": "the page registers the moored boat's hull as `boat` (planks); the room's moored mover (HS2) builds the same five solids as `driftwood.boat` (wood)"
+    }
+   },
+   "chunked": {
+    "pier": "the page registers a pier piece once in every chunk it spans (`pier.c3`, `pier.c4`, `pier.c11`, `pier.c12`): the deck four times, the two landings twice; the room builds each piece once"
+   },
    "known": [
-    "boat (planks): 5 page collider(s) the server holds as driftwood.boat (wood), same shape",
-    "driftwood.boat (wood): 5 server collider(s) the page holds as boat (planks), same shape",
-    "npc-castaway (wood): 1 page collider(s) with no server match, e.g. [0, 0, 0, 0, 2, 0]",
-    "pier (planks): 7 page collider(s) more than the server holds in the same place"
+    "npc-castaway (wood): 1 page collider(s) with no server match, e.g. [0, 0, 0, 0, 2, 0]"
    ]
   },
   "nalati-grasslands": {

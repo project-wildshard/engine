@@ -83,7 +83,7 @@ export function ownerGroup(owner) {
 const groupOf = row => row.material === 'flesh' ? 'actor' : ownerGroup(row.owner);
 /** The key two colliders must share to match: owner group, material, sensor or solid. */
 /** The match key `row` would have under the owner group `group`. */
-const keyAs = (row, group) => `${row.sensor ? 'sensor:' : ''}${group}|${row.material ?? '-'}`;
+const keyAs = (row, group, material = row.material) => `${row.sensor ? 'sensor:' : ''}${group}|${material ?? '-'}`;
 const matchKey = row => keyAs(row, groupOf(row));
 /** The allow key: owner group, sensors apart. */
 const allowKey = row => `${row.sensor ? 'sensor:' : ''}${groupOf(row)}`;
@@ -119,12 +119,33 @@ export const MEASURED_SHAPES = Object.freeze([0, 1, 2, 4, 6, 7, 9, 10, 11, 12, 1
  * `allow` maps an allow key (owner, `sensor:` prefixed for a sensor) to why it may differ; it is skipped both ways.
  * `same` (SS10) maps a server owner group to the page owner group that may name the same pieces (a gate named for its door,
  * a bake's 150-collider chunk): a collider with no match under its own name may match one under that name, still one to
- * one and by material and shape.
+ * one and by material and shape. `sameMaterial` (HS7's owed SS1 line) maps such a server owner group to `{ server, page }`, the
+ * material each side names it by (Driftwood's boat: `wood` on the server, `planks` on the page); any other material still differs.
+ * `chunked` lists page owner groups a chunked page registers once per chunk a piece spans (Driftwood's pier deck): exact
+ * copies of one of their pieces (owner group, material, kind, box) are that one solid.
  * A static page solid with no server match that lies inside a server edge wall (`edge`) is no finding: the wall stands there.
  */
-export function sideParityDiff(page, server, at, allow = {}, { slack = 1, same = {} } = {}) {
+/** A `chunked` page piece's identity: one solid whatever chunk registered it (boxes are whole metres, so two thin pieces in one
+ *  metre cell of different chunks would read as one; none do today). */
+export const chunkCopyKey = row => `${matchKey(row)}|${row.dynamic}|${row.shape}|${row.box.join(',')}`;
+/** The material `row` goes by under the other side's name for it: `named` is a `sameMaterial` entry, `{ server, page }`. */
+function materialAs(row, side, named) {
+  if (named === undefined) return row.material;
+  const [mine, theirs] = side === 'page' ? [named.page, named.server] : [named.server, named.page];
+  return row.material === mine ? theirs : row.material;
+}
+
+export function sideParityDiff(paged, server, at, allow = {}, { slack = 1, same = {}, sameMaterial = {}, chunked = [] } = {}) {
   // without the page's player, the server-to-page half would check nothing and pass
   if (at === null || at.length !== 3) throw new Error('Side parity needs the page player position its half was recorded at');
+  // a copy is the same piece under another chunk's owner; two in one chunk are still two
+  const copies = new Map(), page = paged.filter(row => {
+    if (!chunked.includes(groupOf(row))) return true;
+    const key = chunkCopyKey(row), owners = copies.get(key);
+    if (owners === undefined) { copies.set(key, new Set([row.owner])); return true; }
+    if (owners.has(row.owner)) return true;
+    owners.add(row.owner); return false;
+  });
   const index = rows => { const map = new Map(); for (const row of rows) { const key = matchKey(row); let list = map.get(key); if (list === undefined) map.set(key, list = []); list.push(row); } return map; };
   const pages = index(page), servers = index(server), findings = new Map();
   // the example is the smallest box, so a line does not change with the order a world lists its colliders
@@ -139,7 +160,7 @@ export function sideParityDiff(page, server, at, allow = {}, { slack = 1, same =
     let best = null;
     // its own name first; then the other side's name for it that `same` declares (a page owner may have several server names)
     const names = side === 'page' ? Object.keys(same).filter(name => same[name] === groupOf(row)) : Object.hasOwn(same, groupOf(row)) ? [same[groupOf(row)]] : [];
-    for (const key of [matchKey(row), ...names.map(name => keyAs(row, name))]) {
+    for (const key of [matchKey(row), ...names.map(name => keyAs(row, name, materialAs(row, side, side === 'page' ? sameMaterial[name] : sameMaterial[groupOf(row)])))]) {
       for (const other of others.get(key) ?? []) if (!used.has(other) && close(row, other) && (best === null || spread(row, other) < spread(row, best))) best = other;
       if (best !== null) break;
     }
