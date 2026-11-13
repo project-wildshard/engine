@@ -18,6 +18,9 @@ import {contentNamed} from './contentNamed';
 import {homedir} from 'node:os';
 import {productTarball} from './productTarball';
 import {BrotliSizeCache} from './brotliSizeCache.mjs';
+import {defaultBootAudio} from '@wildshard/engine/audio/bootAudio';
+import {installAssetTables, type AssetTables} from '@wildshard/engine/boot/tables';
+import type {AudioData} from '@wildshard/format/audio';
 
 const size = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const files = v.array(v.tuple([v.string(), size]));
@@ -27,6 +30,18 @@ const schema = v.object({common: files, client: files, grid: files,
   extras: v.record(v.string(), v.tuple([v.string(), size, size, v.string()])),
 });
 interface Address {readonly url: string; readonly bytes: number}
+const AUDIO_URL = /^\/assets\/(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)(?:\?|$)/u;
+/** AUDIO AU1 (J299): the recordings a shard's LOAD reads, so DOWNLOAD fetches, counts and caches them: a new player's
+ *  boot set (the default music style and sound-effect set, through the client's own selection) and the audio its
+ *  recorded fence names. `tables` is the build's common boot table, the one the page installs. */
+export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: AssetTables, fenceMounts: readonly string[]): readonly string[] {
+  installAssetTables(tables);
+  const row = sections.get('audio/audio'), data = typeof row === 'object' && row !== null && 'audio' in row ? row.audio as AudioData : undefined;
+  // A level with no music or sample rows boots with no recordings (NO_AUDIO); anything else must select, as on the page.
+  const boot = data === undefined || data.music === undefined || data.samples === undefined ? [] : defaultBootAudio(data);
+  const shipped = (url: string): boolean => Object.hasOwn(tables.bytes, url.split('?')[0] ?? url);
+  return [...new Set([...boot, ...fenceMounts.filter(url => AUDIO_URL.test(url)).map(url => url.split('?')[0] ?? url)])].filter(shipped);
+}
 /** What a build's half of the manifests needs from the app: the page's own tables and names, which no cook owns. */
 export interface BuildHalf {
   readonly preparationOnly?: boolean;
@@ -161,6 +176,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     for (const row of pickups.geometries) if ('file' in row && !packed.has(row.file)) common.push(asset(row.file));
   }
   const tables = existsSync(join(root, 'out/.app/boot-tables.json')) ? build.tableAddresses(root) : undefined;
+  const assetTables = tables === undefined ? undefined : JSON.parse(build.tables(root).common.source) as AssetTables;
   const seams = existsSync(join(root, 'out/.app/grid-seams.json')) ? build.seams(root) : undefined;
   const client: Record<string, Record<'phone' | 'desktop', SpawnManifestAddress>> = {}, grid: Record<string, Record<string, Record<'phone' | 'desktop', SpawnManifestAddress>>> = {};
   mkdirSync(join(output, 'assets/spawn'), {recursive: true});
@@ -221,9 +237,12 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
       if (unresolved.length > 0) throw new Error(`${fencePath} lists ${unresolved.length} files this build no longer has `
         + `(${unresolved.slice(0, 3).join(', ')}); re-record with scripts/record-fence-reads.mjs`);
     }
+    // AUDIO AU1: the same recordings on every tier and flow: LOAD reads them before control on all of them.
+    const bootAudio = assetTables === undefined ? [] : shardBootAudio(sections, assetTables, half.mountRows('phone', 'entry').map(row => row.url));
     const write = (tier: 'phone' | 'desktop', flow: 'client' | 'grid', addresses: readonly Address[] = [], mode = '000', whole = false): number => {
       const selected = new Map<string, SpawnFile>(), add = (row: SpawnFile): void => {selected.set(row.url, row);};
       for (const row of shardRows[tier][whole ? 'whole' : 'entry']) add(row);
+      for (const url of bootAudio) add(asset(url));
       for (const url of tier === 'phone' ? fenceAssets : desktopFence(fenceAssets, publicAssets())) add(asset(url));
       // S3: the desktop's own packs. A one-file pack is read by its member's URL (texturePack.ts), so that member is the row.
       if (whole && tier === 'desktop' && tables !== undefined) for (const [url, part] of packParts()) {

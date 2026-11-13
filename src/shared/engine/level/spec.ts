@@ -12,7 +12,7 @@ import type { Tier } from '../../../client/engine/core/tier';
 import type { HuntTuning } from '../../../server/engine/ai/hunt';
 import type { RosterEntry } from '../../../client/engine/models/live';
 import type { InputContextDef } from '../../../server/engine/level/context';
-import type { SfxDecodePolicy } from '../../../client/engine/audio/preload';
+import type { SfxDecodePolicy } from '../audio/bootAudio';
 import type { LevelAudioProfile } from '../../../client/engine/audio/levelAudio';
 import type { AtmosphereSpec, ExploreSpec, ForestSpec, GradeSpec, GradeLook, HerdPlan, HorizonSpec, HudSpec, LevelAssets, MinimapSpec, PoiSpec, RGB, SkySpec, SpawnPose, TerrainField, TreeSpec } from './data';
 import type { EngineTierKnobs } from '../../../client/engine/render/tiers';

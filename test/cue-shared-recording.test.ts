@@ -1,7 +1,8 @@
 import { expect, test, vi } from 'vitest';
 import * as tables from '@wildshard/engine/boot/tables';
-import { cueFile, cueFiles, CueCatalogue } from '@wildshard/engine/audio/Cues';
+import { CueCatalogue } from '@wildshard/engine/audio/Cues';
 import { pcmBuffer } from './engine/audio/pcm-buffer';
+import { cueFile, cueFiles } from '@wildshard/engine/audio/bootAudio';
 
 test('a shared loop reads the canonical shipped recording once with native metadata', async () => {
   const reference = { set: 'coastal', file: 'surf.m4a' };

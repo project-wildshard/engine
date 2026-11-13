@@ -27,14 +27,11 @@ import { saveStorage } from '../saves/slots';
 //
 // A listener a resident shard adds while it builds or runs is removed when that shard is evicted (src/shared/engine/app/ownership.ts).
 import { onOwnerDispose } from '../../../shared/engine/app/ownership';
+import { MUSIC_STYLES, type MusicStyle, type SfxSet } from '../../../shared/engine/audio/bootAudio';
 import { isDev, onDev } from '../core/devMode';
 
 export type SettingKey = 'aimAssist' | 'tracers' | 'haptics' | 'autoLock' | 'huntersEye' | 'holdLoading';
 export type NumberKey = 'volume' | 'music' | 'look' | 'swingLook' | 'lockCam';
-export const MUSIC_STYLES = ['piano', 'orchestral', 'folk', 'synth'] as const;
-export type MusicStyle = (typeof MUSIC_STYLES)[number];
-export const SFX_SETS = ['best'] as const;
-export type SfxSet = 'best' | 'synth';
 
 const STORE = 'settings';
 // autoLock: a kill re-locks the next enemy (E50); huntersEye: the bow's dotted drop arc while drawing (Nalati, src/engine/player/Bow.ts) — on by default on touch, off with a mouse

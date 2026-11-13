@@ -694,6 +694,7 @@
     "./physics/terrainTiles": "./src/shared/engine/physics/terrainTiles.ts",
     "./ai/phases": "./src/server/engine/ai/phases.ts",
     "./audio/audioProfiles": "./src/shared/engine/audio/audioProfiles.ts",
+    "./audio/bootAudio": "./src/shared/engine/audio/bootAudio.ts",
     "./audio/scoreSelection": "./src/client/engine/audio/scoreSelection.ts",
     "./audio/cueRouting": "./src/client/engine/audio/cueRouting.ts",
     "./audio/declared": "./src/client/engine/audio/declared.ts",

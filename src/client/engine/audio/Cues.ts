@@ -1,6 +1,5 @@
-import { sfxManifests } from '../../../shared/engine/boot/tables';
+import { cueFamilyNames, cueFile, cueFiles, cueManifest, cueShotFiles, cueSprite, type CueSprite } from '../../../shared/engine/audio/bootAudio';
 import { compactSampleLoop } from './preload';
-import { shipped } from './Stems';
 import type { SampleLoop } from './Audio';
 import type { AudioMixer } from './levelAudio';
 import type { AudioRead, AudioDecode } from './SetScore';
@@ -17,41 +16,7 @@ export interface CueOpts {
 export type CueMap = (id: string, opts: CueOpts) => boolean;
 const obj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown, d: number): number => typeof v === 'number' && Number.isFinite(v) ? v : d;
-const file = (dir: string, v: unknown): string | undefined => typeof v === 'string' && !v.includes('..') && !v.includes('/') && shipped(`${dir}${v}`) ? `${dir}${v}` : undefined;
 
-/** One shipped sprite and its original take offsets; no PCM is copied. */
-export interface CueSprite { url:string;clips:ReadonlyMap<string,Readonly<{offset:number;duration:number}>> }
-/** The installed recording catalogue, shared by eager banks and lazy family players. */
-export function cueManifest(key:string):Record<string,unknown>|undefined {const raw=sfxManifests()[key];return obj(raw)?raw:undefined;}
-/** Resolve a confined shipped filename, or an explicit recording in another
- * shipped catalogue. References are one hop; paths and nested aliases refuse. */
-export function cueFile(key:string,value:unknown):string|undefined {
-  if(typeof value==='string')return file(`/assets/sfx/${key}/`,value);
-  if(!obj(value)||Object.keys(value).length!==2||typeof value['set']!=='string'
-    ||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(value['set'])||cueManifest(value['set'])===undefined)return undefined;
-  const target=cueManifest(value['set']);
-  const known=['beds','hums'].some(section=>{
-    const rows=target?.[section];return obj(rows)&&Object.values(rows).some(row=>obj(row)&&typeof row['file']==='string'&&row['file']===value['file']);
-  });
-  return known?file(`/assets/sfx/${value['set']}/`,value['file']):undefined;
-}
-/** Original family order for array and object-form manifests. */
-export function cueFamilyNames(manifest:Record<string,unknown>|undefined,family:string):string[] {
-  const rows=manifest?.['oneshots'],value=obj(rows)?rows[family]:undefined;
-  const list:unknown[]=Array.isArray(value)?value:obj(value)&&Array.isArray(value['files'])?value['files']:[];
-  return list.filter((name):name is string=>typeof name==='string');
-}
-/** Admit a sprite's shipped file and positive slice bounds without decoding it. */
-export function cueSprite(key:string,manifest:Record<string,unknown>|undefined):CueSprite|undefined {
-  const sprite=manifest?.['sprite'],url=obj(sprite)?cueFile(key,sprite['file']):undefined,raw=obj(sprite)?sprite['clips']:undefined;
-  if(url===undefined||!obj(raw))return undefined;
-  const clips=new Map<string,{offset:number;duration:number}>();
-  for(const [name,value]of Object.entries(raw)){
-    const pair:unknown[]=Array.isArray(value)?value:[],offset=pair[0],duration=pair[1];
-    if(typeof offset==='number'&&typeof duration==='number'&&offset>=0&&duration>0)clips.set(name,{offset,duration});
-  }
-  return {url,clips};
-}
 /** Cut named slices on one buffer, retaining each caller's end tolerance and gain policy. */
 export function cutCueSprite(manifest:Record<string,unknown>|undefined,sprite:CueSprite,buffer:AudioBuffer,
   into:Map<string,SampleClip[]>,policy:{tolerance:number;arrayFamilies:boolean;familyGain:boolean}):void {
@@ -67,25 +32,6 @@ export function cutCueSprite(manifest:Record<string,unknown>|undefined,sprite:Cu
   }
 }
 
-/** An own set uses one sprite for shots, plus its beds and positional loops. */
-export function cueFiles(key: string): string[] {
-  const raw = sfxManifests()[key];
-  if (!obj(raw)) return [];
-  const files: string[] = [];
-  for (const section of ['beds', 'hums']) {
-    const entries = raw[section];
-    if (obj(entries)) for (const value of Object.values(entries)) if (obj(value)) {
-      const url = cueFile(key, value['file']); if (url) files.push(url);
-    }
-  }
-  const sprite = raw['sprite'];
-  if (obj(sprite)) { const url = cueFile(key, sprite['file']); if (url) files.push(url); }
-  else if (obj(raw['oneshots'])) for (const value of Object.values(raw['oneshots'])) {
-    const takes = Array.isArray(value) ? value : obj(value) && Array.isArray(value['files']) ? value['files'] : [];
-    for (const take of takes) { const url = cueFile(key, take); if (url) files.push(url); }
-  }
-  return [...new Set(files)];
-}
 /** Decoded loop metadata; the native emitter decides whether its declared zone is live. */
 export interface CatalogueLoop extends SampleLoop {zone:string|undefined;live:boolean}
 /** One catalogue's decoding/cache policies, retaining eager bank and lazy family semantics. */
@@ -145,7 +91,7 @@ export class CueCatalogue {
       this.loading.delete(family);if(this.live()&&clips.length>0)this.shots.set(family,clips);
     })();
   }
-  shotFiles():string[] {const sprite=cueSprite(this.key,this.manifest);if(sprite!==undefined)return [sprite.url];const rows=this.manifest?.['oneshots'];return obj(rows)?[...new Set(Object.keys(rows).flatMap(id=>this.files(id)))]:[];}
+  shotFiles():string[] {return cueShotFiles(this.key);}
   async decodeShots(onFile?:()=>void):Promise<void> {
     const rows=this.manifest?.['oneshots'];if(!this.live()||!obj(rows))return;
     const sprite=cueSprite(this.key,this.manifest),into=this.policy.shared??this.shots;

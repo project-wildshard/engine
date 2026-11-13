@@ -15,7 +15,7 @@ import type { Player } from '@wildshard/engine/player/Player';
 import type { RowBodiesView } from '@wildshard/engine/entities/RowBodies';
 import { SampledAmbience, PositionalLoops } from '@wildshard/engine/audio/AmbienceBeds';
 import { installSfxCredit } from '@wildshard/engine/audio/credits';
-import { CuePlayer, cueManifest } from '@wildshard/engine/audio/Cues';
+import { CuePlayer } from '@wildshard/engine/audio/Cues';
 import { castRay } from '@wildshard/engine/physics/query';
 import { ambientTick, tap } from '@wildshard/engine/core/harnessTap';
 import { windUniforms } from '@wildshard/engine/world/TreeFactory';
@@ -27,6 +27,7 @@ import { CombatCues, type CombatCueOpts } from '@wildshard/engine/combat/cues';
 import type { ShardContext } from '../plugin/context';
 import { installEnteredRuntimeService } from '../shard/retainedHooks';
 import { AudioVoicePatches } from './voicePatches';
+import { cueManifest } from '@wildshard/engine/audio/bootAudio';
 
 /** Native polyline observation; returns distance and the direction toward its closest point. */
 export function audioPathProbe(points:readonly (readonly [number,number])[],x:number,z:number):{distance:number;x:number;z:number}{

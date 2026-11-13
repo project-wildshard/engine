@@ -10,7 +10,7 @@ import { ownAudioSource } from './ownership';
 import { currentOwner } from '../../../shared/engine/app/ownership';
 import { tap, ambientTick } from '../../../shared/engine/core/harnessTap';
 import type { Vector3 } from 'three';
-import { getSfxSet, type SfxSet } from '../ui/Settings';
+import { getSfxSet } from '../ui/Settings';
 import { setSfxCredit } from './credits';
 import type { SfxBank } from './preload';
 import { Voices } from './Voices';
@@ -19,6 +19,7 @@ import type { CueMap, CueOpts } from './Cues';
 import type { Music } from './Music';
 import type { LevelAudioBank } from './levelAudio';
 import { audioUnlocked, claimPageAudioContext, releasePageAudioContext, resumePageAudioContext, whenAudioUnlocked } from './unlock';
+import type { SfxSet } from '../../../shared/engine/audio/bootAudio';
 
 /**
  * Audio — every sound is synthesised with WebAudio (no files).

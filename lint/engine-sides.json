@@ -1354,6 +1354,7 @@
     "src/shared/engine/app/scopedProperty.ts": "shared",
     "src/shared/engine/app/scopeEnvironment.ts": "shared",
     "src/shared/engine/audio/audioProfiles.ts": "shared",
+    "src/shared/engine/audio/bootAudio.ts": "shared",
     "src/shared/engine/boot/loadingWaits.ts": "shared",
     "src/shared/engine/boot/steps.ts": "shared",
     "src/shared/engine/boot/tables.ts": "shared",

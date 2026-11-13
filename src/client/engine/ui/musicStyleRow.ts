@@ -2,7 +2,8 @@ import { listenTap } from '../input/dom';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { onAudioBusy } from '../audio/preload';
 import { engineString } from '../../../shared/engine/strings';
-import { getMusicStyle, MUSIC_STYLES, onMusicStyle, setMusicStyle, type MusicStyle } from './Settings';
+import { getMusicStyle, onMusicStyle, setMusicStyle } from './Settings';
+import { MUSIC_STYLES, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
 
 /** E5's player music preference belongs in Audio settings, independent of Developer or comparison flags. */
 export function buildMusicStyleRow(scope: Scope): HTMLElement {

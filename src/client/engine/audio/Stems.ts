@@ -1,9 +1,7 @@
-import { musicManifests, publicBytes } from '../../../shared/engine/boot/tables';
 import { resourceScope } from '../../../shared/engine/app/resources';
 import { withOwner } from '../../../shared/engine/app/ownership';
 import { ownAudioSource } from './ownership';
 import { tap } from '../../../shared/engine/core/harnessTap';
-import type { MusicStyle as MusicGenre } from '../ui/Settings';
 import { AacTrack } from './aacTrack';
 import { AacSource } from './aacSource';
 // src/client/engine/audio/Stems.ts — the MiniMax-Music3 stem player behind src/client/engine/audio/Music.ts (project/archive/2026-09-23-music.md v3, row 7).
@@ -25,50 +23,7 @@ import { AacSource } from './aacSource';
 // carries `layers` (bass, drums) and `phases` (each boss phase's layer gains). `decodeStyle(genre, slots, …, set)` reads it.
 // A deck of the boss plays its layers at the current phase's gains (Deck.setPhase), moved on the bar like the tension stem.
 
-/** the build's file table (vite.config.ts writes it from public/assets): a file the build does not have is never fetched —
- *  no 404 in the console, no request at all while the generated music has not landed */
-export const shipped = (path: string): boolean => path in publicBytes();
-
-/** Score-source slot names are content data, including sets registered by a level. */
-export type SlotName = string;
-export type StemSting = 'pickup' | 'death' | 'chunk' | 'dawn';
-/** a music set: 'base' = the genre's own folder (`<genre>/`), any other id = a level's set folder (`<set>-<genre>/`) */
-export type MusicSet = string;
-export type BossPhase = 1 | 2 | 3;
-export interface SlotSpec {
-  /** the calm stem (a theme slot), the full mix (title) or the base (boss) — file names relative to the manifest */
-  calm: string; tension: string | undefined;
-  /** the boss's extra layers (bass, drums), each gained per phase by `phases` */
-  layers: string[];
-  phases: Partial<Record<BossPhase, number[]>>;
-  bpm: number; beatsPerBar: number; loopStart: number; loopEnd: number; duration: number;
-}
-export interface MusicManifest { genre: string; credit: string; slots: Partial<Record<string, SlotSpec>>; stings: Partial<Record<StemSting, string>> }
-
-const STINGS: StemSting[] = ['pickup', 'death', 'chunk', 'dawn'];
-const PHASES: BossPhase[] = [1, 2, 3];
-const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v.length > 0 && !v.includes('..') ? v : undefined);
-
-function parseSlot(v: unknown): SlotSpec | undefined {
-  if (!isObj(v)) return undefined;
-  const calm = str(v['calm']) ?? str(v['full']), bpm = num(v['bpm']), loopStart = num(v['loopStart']) ?? 0, loopEnd = num(v['loopEnd']);
-  if (calm === undefined || bpm === undefined || bpm < 30 || bpm > 260 || loopEnd === undefined || loopEnd <= loopStart + 0.5) return undefined;
-  const lv = v['layers'], layers = Array.isArray(lv) ? lv.map(str).filter((f): f is string => f !== undefined) : [];
-  const phases: Partial<Record<BossPhase, number[]>> = {}, pv = v['phases'];
-  if (isObj(pv)) for (const k of PHASES) { const g = pv[String(k)]; if (Array.isArray(g) && g.length === layers.length) phases[k] = g.map((x) => Math.min(1.5, Math.max(0, num(x) ?? 0))); }
-  return { calm, tension: str(v['tension']), layers, phases, bpm, beatsPerBar: num(v['beatsPerBar']) ?? 4, loopStart, loopEnd, duration: num(v['duration']) ?? loopEnd };
-}
-/** the manifest, validated field by field — anything malformed is dropped (a slot without its files is a slot the synth keeps) */
-export function parseManifest(raw: unknown): MusicManifest | undefined {
-  if (!isObj(raw) || !isObj(raw['slots'])) return undefined;
-  const slots: Partial<Record<SlotName, SlotSpec>> = {}, stings: Partial<Record<StemSting, string>> = {};
-  for (const [k, value] of Object.entries(raw['slots'])) { const s = parseSlot(value); if (s && str(k) !== undefined) slots[k] = s; }
-  const st = raw['stings'];
-  if (isObj(st)) for (const k of STINGS) { const f = str(st[k]); if (f !== undefined) stings[k] = f; }
-  return { genre: str(raw['style']) ?? '', credit: str(raw['credit']) ?? 'Music: MiniMax-Music3', slots, stings };
-}
+import { STINGS, musicManifest, musicSetDir, shipped, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
 
 /** a decoded slot: its spec and the stems (tension absent for the title cut; layers only on the boss) */
 export interface SlotAudio { genre: MusicGenre; slot: SlotName; spec: SlotSpec; calm: AudioBuffer | AacTrack; tension: AudioBuffer | AacTrack | undefined; layers: AudioBuffer[] }
@@ -82,22 +37,6 @@ export interface GenreBank {
   stings: Map<StemSting, AudioBuffer>;
   /** diagnostics: read → decoded wall time per file, and its bytes */
   log: { file: string; bytes: number; ms: number }[];
-}
-
-/** the folder a set of `genre` lives in: public/assets/music/<genre>/ or public/assets/music/<set>-<genre>/ */
-export const musicSetDir = (genre: MusicGenre, set: MusicSet = 'base'): string => (set === 'base' ? genre : `${set}-${genre}`);
-/** this build's manifest for `genre` (compiled in from public/assets/music/<dir>/music.json), or undefined */
-export function musicManifest(genre: MusicGenre, set: MusicSet = 'base'): MusicManifest | undefined { return parseManifest(musicManifests()[musicSetDir(genre, set)]); }
-
-/** the files `decodeStyle(genre, slots)` reads (URLs), so the loading bar can tell them from the files it only downloads;
- *  `withStings: false` lists the slots' stems alone */
-export function styleFiles(genre: MusicGenre, slots: readonly SlotName[], withStings = true, withTension = true): string[] {
-  const m = musicManifest(genre);
-  if (!m) return [];
-  const files: string[] = [];
-  for (const k of slots) { const sp = m.slots[k]; if (sp) files.push(sp.calm, ...(!withTension || sp.tension === undefined ? [] : [sp.tension])); }
-  if (withStings) for (const k of STINGS) { const f = m.stings[k]; if (f !== undefined) files.push(f); }
-  return [...new Set(files.map((f) => `/assets/music/${genre}/${f}`))].filter(shipped);
 }
 
 /**

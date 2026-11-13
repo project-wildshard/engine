@@ -1,9 +1,8 @@
-import { musicManifests } from '../../../shared/engine/boot/tables';
-import { parseManifest, shipped, type MusicManifest, type SlotAudio, type StemSting, type BossPhase, type StyleBank } from './Stems';
+import { scoreManifest, shipped, type ScoreSet, type StemSting, type BossPhase, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
+import type { SlotAudio, StyleBank } from './Stems';
 import type { Audio } from './Audio';
 import type { Music, MusicState } from './Music';
 import type { Scope } from '../../../shared/engine/app/scope';
-import type { MusicStyle } from '../ui/Settings';
 import type { AudioMusicProfile } from '../../../shared/engine/audio/audioProfiles';
 import { selectScoreSlots } from './scoreSelection';
 
@@ -32,21 +31,7 @@ export interface ScoreSource {
   useBank: (bank: ScoreBank) => void;
   readonly stings: Map<StemSting, AudioBuffer>;
 }
-export interface ScoreSet { dir: string; manifestKey: string }
 const STINGS: readonly StemSting[] = ['pickup', 'death', 'chunk'];
-/** the music manifest of a score set (its slots, stems and stings), or undefined when the build has none */
-export function scoreManifest(set: ScoreSet): MusicManifest | undefined { return parseManifest(musicManifests()[set.manifestKey]); }
-/** the files a score set plays: the given slots' stems (every slot by default) and its stings */
-export function scoreFiles(set: ScoreSet, slots?: readonly string[], withStings = true): string[] {
-  const m = scoreManifest(set);
-  if (!m) return [];
-  const stems = (slots ?? Object.keys(m.slots)).flatMap((key) => {
-    const s = m.slots[key];
-    return s ? [s.calm].concat(s.tension === undefined ? [] : [s.tension], s.layers) : [];
-  });
-  const files = [...stems, ...(withStings ? STINGS.flatMap((key) => m.stings[key] ?? []) : [])];
-  return [...new Set(files.map((file) => `${set.dir}${file}`))].filter(shipped);
-}
 /** Decode the requested stems only; absent or invalid files keep the next fallback or synth. */
 export async function decodeScore(set: ScoreSet, slots: readonly string[], read: AudioRead, decode: AudioDecode,
   withStings: boolean, onFile?: () => void): Promise<ScoreBank> {

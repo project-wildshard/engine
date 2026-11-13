@@ -1,4 +1,4 @@
-import { publicBytes, sfxManifests } from '../../../shared/engine/boot/tables';
+import { sfxManifests } from '../../../shared/engine/boot/tables';
 import { resourceScope } from '../../../shared/engine/app/resources';
 // src/client/engine/audio/preload.ts — audio decoded at the loading bar, not after it (project/archive/2026-09-23-preload-offline.md rows 3–4).
 //
@@ -17,7 +17,7 @@ import { resourceScope } from '../../../shared/engine/app/resources';
 // so a 44.1 kHz live context still plays these 48 kHz buffers at pitch. The context is made at 48 kHz because every file is
 // 48 kHz AAC: decodeAudioData resamples to its context's rate, and at the files' own rate it resamples nothing.
 import type { AmbientBed, LoopName, SampleLoop } from './Audio';
-import { sfxDir } from '../boot/audioFiles';
+import { sfxEntries, type SfxDecodePolicy } from '../../../shared/engine/audio/bootAudio';
 import { currentOwner, onOwnerDispose } from '../../../shared/engine/app/ownership';
 import { observeAudioMemory } from '../../../shared/engine/core/memoryResources';
 import { compactLoopWindow } from './loopWindow';
@@ -131,45 +131,23 @@ const LOOP_GAIN: Record<LoopName, number> = {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
-/** Sample selection belongs to the level, independently of its bed id. */
-export interface SfxDecodePolicy {
-  omitLoops?: readonly string[]; omitShots?: readonly string[]; loopGains?: Readonly<Record<string, number>>;
-}
-
-/** the files `decodeSfxSet(set, bed)` reads (URLs), so the loading bar can tell them from the files it only downloads */
-export function sfxFiles(set: string, bed: AmbientBed, policy: SfxDecodePolicy = {}): string[] { return [...new Set(sfxJobs(set, bed, policy).map((j) => j.url))]; }
-/** the selected bed's file of `set` (empty when the set has none): the one sample the first seconds of play loop */
-export function sfxBedFiles(set: string, bed: AmbientBed, policy: SfxDecodePolicy = {}): string[] { return sfxJobs(set, bed, policy).filter((j) => j.bed).map((j) => j.url); }
-
 interface Job { url: string; bed?: true; apply: (buf: AudioBuffer, bank: SfxBank) => void }
+/** AUDIO AU1: the files and their order are the shared selection's (`sfxEntries`, which the cook also reads). */
 function sfxJobs(set: string, bed: AmbientBed, policy: SfxDecodePolicy): Job[] {
-  const j = sfxManifests()[set];
-  if (!isObj(j)) return [];
-  const dir = sfxDir(set), jobs: Job[] = [];
-  const url = (f: unknown): string | undefined => (typeof f === 'string' && !f.includes('..') && `${dir}${f}` in publicBytes() ? `${dir}${f}` : undefined);
-  const loop = (name: LoopName, v: unknown): void => {
-    if (policy.omitLoops?.includes(name) || !isObj(v)) return;
-    const u = url(v['file']);
-    if (u === undefined) return;
-    jobs.push({ url: u, ...(name === bed ? { bed: true } : {}), apply: (buffer, bank) => {
-      const loopEnd = Math.min(buffer.duration, num(v['loopEnd'], buffer.duration)), loopStart = Math.max(0, Math.min(loopEnd - 0.05, num(v['loopStart'], 0)));
-      const packed = compactSampleLoop(buffer, { loopStart, loopEnd }, u);
-      bank.loops.set(name, { ...packed, gain: (policy.loopGains?.[name] ?? LOOP_GAIN[name] ?? 1) * num(v['gain'], 1) });
-    } });
-  };
-  const beds = isObj(j['beds']) ? j['beds'] : {}, hums = isObj(j['hums']) ? j['hums'] : {}, shots = isObj(j['oneshots']) ? j['oneshots'] : {};
-  // The selected bed first, then the common loops, in the existing decode order.
-  loop(bed, beds[bed]); loop('underwater', beds['underwater']); loop('pickup', hums['pickup']); loop('shrine', hums['shrine']);
-  for (const [family, v] of Object.entries(shots)) {
-    if (policy.omitShots?.includes(family)) continue;
-    const files = Array.isArray(v) ? v : isObj(v) && Array.isArray(v['files']) ? v['files'] : [];
-    const gain = isObj(v) ? num(v['gain'], 1) : 1;
-    for (const f of files) {
-      const u = url(f);
-      if (u !== undefined) jobs.push({ url: u, apply: (buf, bank) => { const s = bank.shots.get(family); if (s) s.bufs.push(buf); else bank.shots.set(family, { bufs: [buf], gain }); } });
+  return sfxEntries(set, bed, policy).map((entry): Job => {
+    const u = entry.url;
+    if ('loop' in entry) {
+      const name = entry.loop, v = entry.row;
+      const apply = (buffer: AudioBuffer, bank: SfxBank): void => {
+        const loopEnd = Math.min(buffer.duration, num(v['loopEnd'], buffer.duration)), loopStart = Math.max(0, Math.min(loopEnd - 0.05, num(v['loopStart'], 0)));
+        const packed = compactSampleLoop(buffer, { loopStart, loopEnd }, u);
+        bank.loops.set(name, { ...packed, gain: (policy.loopGains?.[name] ?? LOOP_GAIN[name] ?? 1) * num(v['gain'], 1) });
+      };
+      return entry.bed ? { url: u, bed: true, apply } : { url: u, apply };
     }
-  }
-  return jobs;
+    const family = entry.family, gain = entry.gain;
+    return { url: u, apply: (buf, bank) => { const s = bank.shots.get(family); if (s) s.bufs.push(buf); else bank.shots.set(family, { bufs: [buf], gain }); } };
+  });
 }
 
 /**

@@ -41,13 +41,14 @@ import { tap, ambientTick } from '../../../shared/engine/core/harnessTap';
 import type { Audio } from './Audio';
 import { audioUnlocked, whenAudioUnlocked } from './unlock';
 import type { Scope } from '../../../shared/engine/app/scope';
-import { getNumber, setNumber, onNumber, getMusicStyle, onMusicStyle, type MusicStyle as MusicGenre } from '../ui/Settings';
-import { Deck, decodeStyle, type BossPhase, type SlotAudio, type SlotName, type StyleBank } from './Stems';
+import { getNumber, setNumber, onNumber, getMusicStyle, onMusicStyle } from '../ui/Settings';
+import { Deck, decodeStyle, type SlotAudio, type StyleBank } from './Stems';
 import { AacTrack } from './aacTrack';
 import { cachedBytes, decodeBytes, trackBusy } from './preload';
 import { audioLog } from './audioLog';
 import type { ScoreSource } from './SetScore';
 import { score, type Arrangement, type ChordName, type LayerId, type MixKey, type NoteEv, type Segment } from './score/score';
+import type { MusicStyle as MusicGenre, BossPhase, SlotName } from '../../../shared/engine/audio/bootAudio';
 
 /** an arrangement's name in the installed score (the game's: theme, trailer30, trailer15) */
 type ArrangementName = string;

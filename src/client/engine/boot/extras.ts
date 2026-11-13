@@ -34,7 +34,7 @@ import { bootCatalog, type BootLevel } from './catalog';
 import { chunkFiles } from './manifest';
 import { addBytes, type ChunkFiles } from './bytes';
 import { macrotask, type StepProgress } from './plan';
-import { audioFiles, musicDir, sfxDir } from './audioFiles';
+import { audioFiles } from './audioFiles';
 import { whenPrefetched } from './prefetch';
 import { readContent } from './contentRead';
 import { decodeBytes, type SfxBank } from '../audio/preload';
@@ -45,6 +45,7 @@ import { NO_AUDIO, type LevelAudioProfile, type LevelAudioBank } from '../audio/
 import { bootAudioFiles } from './audioInventory';
 import { loadingUnits, waitFor } from '../../../shared/engine/boot/waits';
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
+import { musicDir, sfxDir } from '../../../shared/engine/audio/bootAudio';
 
 
 const pathOf = (url: string): string => { try { return new URL(url, location.href).pathname; } catch { return url; } };

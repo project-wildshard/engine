@@ -1,7 +1,7 @@
 import type { AudioData } from '@wildshard/format/audio';
 import type { SfxBank } from './preload';
 import type { VoicePool } from './Voices';
-import type { MusicStyle } from '../ui/Settings';
+import type { MusicStyle } from '../../../shared/engine/audio/bootAudio';
 import type { StyleBank } from './Stems';
 import type { AudioRead, AudioDecode, ScoreBank } from './SetScore';
 import type { CueBank } from './Cues';
@@ -57,18 +57,12 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
   }
   const samples = data.samples, music = data.music, policy = samples?.catalogue;
   if (samples === undefined || music === undefined || policy === undefined) throw new Error('Missing declared audio catalogue');
-  const [{ audioFiles, musicDir, sfxDir }, { musicManifests, sfxManifests }, { getMusicStyle, getSfxSet }, { styleFiles, decodeStyle }, { sfxFiles, sfxBedFiles, decodeSfxSet }] = await Promise.all([
-    import('../boot/audioFiles'), import('../../../shared/engine/boot/tables'), import('../ui/Settings'), import('./Stems'), import('./preload'),
+  const [{ audioSelection }, { getMusicStyle, getSfxSet }, { decodeStyle }, { decodeSfxSet }] = await Promise.all([
+    import('../../../shared/engine/audio/bootAudio'), import('../ui/Settings'), import('./Stems'), import('./preload'),
   ]);
   const levels = { loopGains: samples.loopGains };
-  const ownMusic = (): string[] => {
-    const genre = getMusicStyle(), key = `${samples.set}-${genre}`;
-    return policy.ownMusic && genre !== 'synth' && Object.hasOwn(musicManifests(), key) ? [key] : [];
-  };
-  const ownSfx = (): string[] => Object.hasOwn(sfxManifests(), samples.set) ? [samples.set] : [];
-  const selectedSfx = (): string[] => [...sfxFiles(getSfxSet(), samples.bed, levels),
-    ...(policy.overlaySamples && getSfxSet() !== 'synth' ? sfxFiles(samples.set, samples.bed, levels) : []),
-    ...(getSfxSet() === 'synth' ? [] : catalogueExtras?.files() ?? [])];
+  // AUDIO AU1: which files each list holds is the shared selection's, the one the cook puts in DOWNLOAD.
+  const selection = audioSelection(data, getMusicStyle, getSfxSet, catalogueExtras === undefined ? undefined : () => catalogueExtras.files());
   const decodeSamples = async (read: AudioRead, decode: AudioDecode, onFile?: () => void): Promise<SfxBank> => {
     if (!policy.overlaySamples) return decodeSfxSet(getSfxSet(), samples.bed, read, onFile, decode, levels);
     const set = getSfxSet(), [base, own] = await Promise.all([
@@ -82,18 +76,11 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
     return base;
   };
   return {
-    files: () => audioFiles({ omitSlots: policy.inventoryOmitSlots, musicSets: ownMusic(), sfxSets: ownSfx() }),
-    ...(policy.priorityOwn ? { priorityFiles: () => {
-      const files = audioFiles({ musicSets: ownMusic(), sfxSets: ownSfx() }), dirs = [...ownMusic().map(musicDir), ...ownSfx().map(sfxDir)];
-      return [...files.music, ...files.sfx].filter(url => dirs.some(dir => url.startsWith(dir)));
-    } } : {}),
-    bootFiles: style => [...styleFiles(style, music.bootSlots), ...selectedSfx()],
-    titleFiles: style => {
-      const played = new Set(styleFiles(style, music.bootSlots.filter(slot => slot !== 'title'), false));
-      return styleFiles(style, ['title'], false).filter(url => !played.has(url));
-    },
-    controlFiles: style => [...styleFiles(style, music.bootSlots, false, music.controlTension !== 'late'), ...sfxBedFiles(getSfxSet(), samples.bed, levels),
-      ...(policy.overlaySamples && getSfxSet() !== 'synth' ? sfxBedFiles(samples.set, samples.bed, levels) : [])],
+    files: selection.files,
+    ...(selection.priorityFiles === undefined ? {} : { priorityFiles: selection.priorityFiles }),
+    bootFiles: selection.bootFiles,
+    titleFiles: selection.titleFiles,
+    controlFiles: selection.controlFiles,
     ...(music.controlTension === 'late' ? { controlDecode: async (style: MusicStyle, read: AudioRead, decode: AudioDecode, onFile?: () => void): Promise<LevelAudioBank> => {
       const [title, bank] = await Promise.all([
         decodeStyle(style, music.bootSlots, read, decode, onFile, 'base', [], false).catch(() => undefined), decodeSamples(read, decode, onFile),
@@ -114,26 +101,20 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
 async function createScoreSetAudio(data:AudioData):Promise<LevelAudioProfile> {
   const music=data.music,samples=data.samples,policy=music?.setCatalogue,set=music?.source;
   if(music===undefined||samples===undefined||policy===undefined||set===undefined||set===null)throw new Error('Missing score set catalogue');
-  const [{audioFiles},{musicManifest,shipped,styleFiles,decodeStyle},{scoreFiles,decodeScore},{cueFiles,decodeCueSet},{sfxFiles,sfxBedFiles,decodeSfxSet},{MUSIC_STYLES,getSfxSet}]=await Promise.all([
-    import('../boot/audioFiles'),import('./Stems'),import('./SetScore'),import('./Cues'),import('./preload'),import('../ui/Settings'),
+  const [{audioSelection},{decodeStyle},{decodeScore},{decodeCueSet},{decodeSfxSet},{getMusicStyle,getSfxSet}]=await Promise.all([
+    import('../../../shared/engine/audio/bootAudio'),import('./Stems'),import('./SetScore'),import('./Cues'),import('./preload'),import('../ui/Settings'),
   ]);
   const slots=music.bootSlots.filter(slot=>slot!=='title');
-  const titleFiles=(genre:MusicStyle):string[]=>{
-    if(policy.inventory==='base')return styleFiles(genre,['title']);
-    const title=musicManifest(genre)?.slots['title'];return title?[`/assets/music/${genre}/${title.calm}`].filter(shipped):[];
-  };
   const scoreSlots=(genre:MusicStyle):readonly string[]=>genre==='synth'&&!policy.bootSynth?[]:slots;
-  const bootScore=(genre:MusicStyle):string[]=>genre==='synth'&&!policy.bootSynth?[]:scoreFiles(set,slots);
   const useCues=():boolean=>!policy.cueOverlay||getSfxSet()!=='synth';
+  // AUDIO AU1: which files each list holds is the shared selection's, the one the cook puts in DOWNLOAD.
+  const selection=audioSelection(data,getMusicStyle,getSfxSet);
   return {
-    files:()=>{const base=policy.inventory==='base'?audioFiles():{music:MUSIC_STYLES.flatMap(titleFiles),sfx:[]};return {music:[...base.music,...scoreFiles(set)],sfx:[...base.sfx,...cueFiles(samples.set)]};},
-    ...(policy.priority?{priorityFiles:()=>[...scoreFiles(set),...cueFiles(samples.set)]}:{}),
-    bootFiles:style=>[...titleFiles(style),...(policy.baseSamples?sfxFiles(getSfxSet(),samples.bed):[]),
-      ...(policy.cueOverlay?(useCues()?cueFiles(samples.set):[]):bootScore(style)),
-      ...(policy.cueOverlay?bootScore(style):cueFiles(samples.set))],
-    titleFiles,
-    controlFiles:style=>[...(policy.inventory==='base'?styleFiles(style,['title'],false):titleFiles(style)),
-      ...scoreFiles(set,scoreSlots(style),false),...(policy.baseSamples?sfxBedFiles(getSfxSet(),samples.bed):[])],
+    files:selection.files,
+    ...(selection.priorityFiles===undefined?{}:{priorityFiles:selection.priorityFiles}),
+    bootFiles:selection.bootFiles,
+    titleFiles:selection.titleFiles,
+    controlFiles:selection.controlFiles,
     decode:async(genre,read,decode,onFile)=>{
       const [title,score,cues,bank]=await Promise.all([
         decodeStyle(genre,['title'],read,decode,onFile,'base',policy.titleStings?undefined:[]).catch(()=>undefined),

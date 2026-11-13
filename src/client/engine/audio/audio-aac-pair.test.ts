@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { AacTrack } from './aacTrack';
 import { indexRecordingAac } from '@wildshard/format/aacIndex';
-import { parseManifest } from './Stems';
+import { parseManifest } from '../../../shared/engine/audio/bootAudio';
 import type { AacCodecFactory } from './aacPull';
 import { Scope } from '../../../shared/engine/app/scope';
 

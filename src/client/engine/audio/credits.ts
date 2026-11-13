@@ -8,8 +8,7 @@ import { engineString } from '../../../shared/engine/strings';
 //
 //   sfxCredit(getSfxSet())   → 'Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 Medium — Powered by Stability AI' ('' for synth, or a set not shipped)
 //   onSfxCredit(fn)          → a set's sfx.json credit arrived (Audio.ts calls setSfxCredit)
-import type { SfxSet } from '../ui/Settings';
-import { shipped } from './Stems';
+import { type SfxSet, shipped } from '../../../shared/engine/audio/bootAudio';
 import { onOwnerDispose } from '../../../shared/engine/app/ownership';
 
 export const MUSIC_CREDIT: string = engineString('s_7fc7e56bbd7f');
