@@ -265,12 +265,13 @@ async function checkBrowser(config: DoctorConfig, scope: Scope, ms: number): Pro
   } catch { ed25519 = false; }
   parts.push(ed25519 ? 'Ed25519' : 'no Ed25519');
   if (!ed25519) { failed = true; problems.push(`Update ${chrome === undefined ? 'this browser' : `Chrome (${chrome})`} to Chrome 137+ or Safari 17+.`); }
-  let gpu = '';
-  const webgpu = (navigator as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
-  if (webgpu !== undefined) { try { if (await limited(scope, Math.min(ms, 3000), () => webgpu.requestAdapter()) !== null) gpu = 'WebGPU'; } catch { gpu = ''; } }
-  if (gpu === '') { const canvas = document.createElement('canvas'); gpu = canvas.getContext('webgl2') !== null ? 'WebGL2' : canvas.getContext('webgl') !== null ? 'WebGL' : ''; }
-  parts.push(gpu === '' ? 'no 3D' : gpu);
-  if (gpu === '') { failed = true; problems.push('This browser has no WebGPU or WebGL: turn on hardware acceleration, or use Chrome or Safari.'); }
+  // J322 (Jake, 2026-11-13): the game draws with WebGL2 only (core/webglStartup.ts), so the doctor asks for exactly that;
+  // a WebGPU adapter or a WebGL1 context is no pass, since neither draws the game
+  const probe = document.createElement('canvas').getContext('webgl2');
+  const gpu = probe === null ? '' : 'WebGL2';
+  probe?.getExtension('WEBGL_lose_context')?.loseContext();
+  parts.push(gpu === '' ? 'no WebGL2' : gpu);
+  if (gpu === '') { failed = true; problems.push('This browser has no WebGL2: turn on hardware acceleration, or use Chrome or Safari.'); }
   try {
     const estimate = await limited(scope, Math.min(ms, 3000), () => navigator.storage.estimate());
     const free = (estimate.quota ?? 0) - (estimate.usage ?? 0);

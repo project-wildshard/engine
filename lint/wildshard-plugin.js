@@ -545,6 +545,24 @@ const noRendererType = rule('Renderer types stay inside rendering (E357)', (cont
   if (/^src\/(?:client|cook|server|shared)\/engine\/(?:render\/|core\/(?:Game|bootstrap)\.ts$)/u.test(pathOf(context))) return {};
   return { Identifier(node) { if (node.name === 'WebGLRenderer') report(context, node, 'Renderer types belong in engine/render'); } };
 });
+// J322 (Jake, 2026-11-13): "Let's only do WebGL renderer. Let's not do any WebGPU renderer." Nothing imports three's
+// WebGPU or TSL builds, names WebGPURenderer, or asks the browser for a WebGPU adapter; renderer.ts makes the one
+// WebGLRenderer on a WebGL2 context (core/webglStartup.ts).
+const WEBGPU_SOURCE = /^three\/(?:webgpu|tsl)(?:$|\/)|^three\/(?:examples\/jsm|addons)\/(?:renderers\/webgpu|nodes|tsl)(?:$|\/)|^three\/(?:examples\/jsm|addons)\/capabilities\/WebGPU(?:\.js)?$|three\.webgpu/u;
+const WEBGPU_MESSAGE = 'WebGL renderer only, no WebGPU (J322)';
+const isNavigator = (node) => { const x = unwrap(node); return (x?.type === 'Identifier' && x.name === 'navigator') || (x?.type === 'MemberExpression' && propName(x) === 'navigator'); };
+const noWebgpu = rule('WebGL renderer only, no WebGPU (J322)', (context) => ({
+  ...importsVisitor((node) => { const source = importPrefix(node.source); if (typeof source === 'string' && WEBGPU_SOURCE.test(source)) report(context, node, WEBGPU_MESSAGE); }),
+  Identifier(node) { if (node.name === 'WebGPURenderer') report(context, node, WEBGPU_MESSAGE); },
+  MemberExpression(node) {
+    if ((propName(node) === 'gpu' || stringOf(node.property) === 'gpu') && isNavigator(node.object)) report(context, node, WEBGPU_MESSAGE);
+    else if (propName(node) === 'requestAdapter') report(context, node, WEBGPU_MESSAGE);
+  },
+  BinaryExpression(node) { if (node.operator === 'in' && stringOf(node.left) === 'gpu' && isNavigator(node.right)) report(context, node, WEBGPU_MESSAGE); },
+  VariableDeclarator(node) {
+    if (node.id?.type === 'ObjectPattern' && isNavigator(node.init) && node.id.properties.some((p) => p.type === 'Property' && (p.key?.name === 'gpu' || stringOf(p.key) === 'gpu'))) report(context, node, WEBGPU_MESSAGE);
+  },
+}));
 const SHADER_HOOKS = new Set(['onBeforeCompile', 'customProgramCacheKey']);
 const noRawShaderPatch = rule('Shader patches go through the one registry (E357 X6)', (context) => {
   if (pathOf(context).startsWith('src/client/engine/render/')) return {};
@@ -1165,7 +1183,7 @@ const plugin = {
     'runtime-performance': runtimePerformance,
     'no-url-switch': noUrlSwitch, layer, 'public-index': publicIndex, 'engine-words': engineWordsRule, 'no-shard-branch': noShardBranch, 'no-raw-save': noRawSave,
     'no-raw-random-time': noRawRandomTime, 'no-raw-input': noRawInput,
-    'no-renderer-type': noRendererType, 'no-raw-shader-patch': noRawShaderPatch, 'sim-no-render': simNoRender,
+    'no-renderer-type': noRendererType, 'no-webgpu': noWebgpu, 'no-raw-shader-patch': noRawShaderPatch, 'sim-no-render': simNoRender,
     'no-runtime-generator': noRuntimeGenerator,
     'no-hook-chain': noHookChain,
     'no-active-singleton': noActiveSingleton, 'no-active-chunk': noActiveChunk,
