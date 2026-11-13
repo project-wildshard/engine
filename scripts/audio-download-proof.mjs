@@ -9,6 +9,10 @@
 // one-shard page, the deep link `?chunk=<slug>&skipintro` with Developer on (the `-client-phone` manifest). Open Plots have no deck
 // card, so they take `client`. The warm visit must fetch its route's own phone manifest; a later visit may read it from the
 // page's store and fetch none, so it is judged against the manifest its warm visit fetched.
+// `cross` (preview only) is a player's way into an Open Plot: Shard select, its deck neighbour (CROSS_IN), ENTER WORLD, then a
+// walk across the road into the plot through the in-page server. Staging can't cross (`WORLD_CROSSING` is unset there) and the
+// local build's world door refuses it, so only preview runs it. Its sound window is the first 10 s after the crossing, and the
+// plot's own score must become the music's score in it; its manifest is the neighbour's grid one.
 //
 // The link: WebKit has no CDP, so `Network.emulateNetworkConditions` (the offline audits' shaping, scripts/offline-proof.mjs)
 // can't run. Every byte instead goes through this script's own forward proxy (Playwright's `proxy`, loopback included):
@@ -31,6 +35,9 @@
 //                   for the first 10 s of play; the proof walks and jumps in that window so footsteps play
 //                   (not on a `&skipintro` deep link: that bench path never runs ENTER WORLD, so it never starts the music
 //                   or unhushes the world; its peaks are in the receipt, the bar is the deck entries')
+//   no-cross        a `cross` visit that reached play never stood inside the plot
+//   plot-score      a `cross` visit crossed in, but the music's score never became the plot's own in the 10 s after
+//   cross-audio     a `cross` visit fetched audio from the network during the crossing (the download should hold it all)
 //   no-play         the warm visit doesn't reach play (a slow visit or a bench deep link that stops short of play is reported,
 //                   not red: its LOAD is still judged).
 //                   On the local build rooms-staging refuses the loopback origin's socket, so its load ends at the seat (LOAD
@@ -40,7 +47,7 @@
 // later input to the master is music (Music.ts's duck gain, or `bus('music')`). Each gets an AnalyserNode beside it.
 //
 //   scripts/browser-lane.sh node scripts/audio-download-proof.mjs [--target=staging|local|preview|both|all] [--base=<served build>]
-//       [--entry=<slug>:<grid|client>[,…]] [--jobs=<n>] [--out=<dir>]
+//       [--entry=<slug>:<grid|client|cross>[,…]] [--jobs=<n>] [--out=<dir>]
 // `preview` is the same served build with no world (the solo page): its deep links take the one-shard `client` manifest,
 // which a world build no longer uses (OF2), and reach play. `both` is staging and local, `all` adds preview.
 // `--target=local` or `preview` with no `--base` builds this working tree with scripts/serve-build.sh and stops that server at the end.
@@ -66,13 +73,25 @@ if (!['staging', 'local', 'preview', 'both', 'all'].includes(targetArg)) throw n
 const AU6_AUDIO_MB = /** @type {Record<string, number>} */ ({ 'driftwood-isle': 3.62, 'pine-hollow': 4.73, 'nalati-grasslands': 5.47, 'nine-dragon-stack': 2.60, 'open-plot-*': 1.22 });
 /** Deck card names (scripts/offline-proof-rules.mjs DECK_SHARDS). */
 const CARDS = /** @type {Record<string, string>} */ ({ 'driftwood-isle': 'Driftwood Isle', 'nalati-grasslands': 'Nalati Grasslands', 'pine-hollow': 'Pine Hollow', 'nine-dragon-stack': 'Nine Dragon Stack' });
+/**
+ * The Open Plots a `cross` entry walks into: the deck neighbour it starts in, the cell's instance in the pinned catalogue
+ * (test/pins/catalogue.json grid.cells), the plot's music id (its `audio.music.id`), and the walk (world frame, metres; the
+ * last legs are inside the plot). opus-sa34b's and opus-rel16's Pine → (0, 2) walk.
+ * @type {Record<string, { from: string, instance: string, musicId: string, legs: [number, number][] }>}
+ */
+const CROSS_IN = {
+  'open-plot-saltwind-lighthouse': { from: 'pine-hollow', instance: 'open-plot-2-4', musicId: 'saltwind-lighthouse',
+    legs: [[0, 761], [0, 852], [0, 924], [-149, 975], [-150, 1022], [-0.5, 1300]] },
+};
 const DEFAULT_ENTRIES = 'driftwood-isle:grid,driftwood-isle:client,nalati-grasslands:grid,nine-dragon-stack:grid,pine-hollow:grid,open-plot-thin-ice:client';
-/** @type {{ slug: string, route: 'grid' | 'client' }[]} */
+/** @typedef {'grid' | 'client' | 'cross'} Route */
+/** @type {{ slug: string, route: Route }[]} */
 const entries = (option('entry') ?? DEFAULT_ENTRIES).split(',').map(spec => {
   const [slug = '', route = 'grid'] = spec.split(':');
-  if (route !== 'grid' && route !== 'client') throw new Error(`route is grid or client, not ${route}`);
+  if (route !== 'grid' && route !== 'client' && route !== 'cross') throw new Error(`route is grid, client or cross, not ${route}`);
   if (route === 'grid' && CARDS[slug] === undefined) throw new Error(`${slug} has no deck card: use ${slug}:client`);
-  return { slug, route: route === 'grid' ? 'grid' : 'client' };
+  if (route === 'cross' && CROSS_IN[slug] === undefined) throw new Error(`${slug} has no cross-in walk (CROSS_IN: ${Object.keys(CROSS_IN).join(', ')})`);
+  return { slug, route: route === 'grid' ? 'grid' : route === 'cross' ? 'cross' : 'client' };
 });
 const jobs = Number(option('jobs') ?? 2);
 if (!Number.isInteger(jobs) || jobs < 1) throw new Error(`--jobs is a whole number from 1, not ${String(option('jobs'))}`);
@@ -85,11 +104,15 @@ const SPAWN = /\/assets\/spawn\/([^/]+)-(grid|client)-(phone|desktop)-[0-9a-f]+\
 /** -60 dBFS: a bus whose peak stays under it in the window is silent. */
 const AUDIBLE_PEAK = 0.001;
 const PLAY_WINDOW_MS = 10_000;
+/** A crossing is watched this long (its verdict is on the first PLAY_WINDOW_MS). */
+const CROSS_WATCH_MS = 30_000;
 /** A deep link takes the bench path `&skipintro`, except preview's deep link to a shard with a deck card. Without the flag a
  *  world build's deep link stops at the title, and a solo page loads the shard and then lands on the title, where the proof
  *  goes on by Shard select (checked 2026-11-13); an Open Plot has no card to go on by.
- * @param {string} target @param {'grid' | 'client'} route @param {string} slug */
+ * @param {string} target @param {Route} route @param {string} slug */
 const benchEntry = (target, route, slug) => route === 'client' && (target !== 'preview' || CARDS[slug] === undefined);
+/** The deck shard a visit picks: a `cross` entry starts in its neighbour. @param {string} slug @param {Route} route */
+const deckShard = (slug, route) => route === 'cross' ? CROSS_IN[slug]?.from ?? slug : slug;
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 /** @template T @param {Promise<T>} work @param {number} ms @returns {Promise<T | undefined>} */
@@ -391,9 +414,82 @@ async function pickFromDeck(page, slug, mode) {
   await page.locator('.ws-menu-play').click();
 }
 
+/** One reading of the grid and the music: the cell the feet stand in (and its slug), the cell whose runtime plays (the live
+ *  grid's `current`) and whether its gameplay is ready, the music's score and slot. */
+const readCrossing = () => {
+  const handle = /** @type {{ shard?: { grid?: { state(): { inside?: string | null, feet?: { x: number, z: number }, cells?: { instance: string, slug: string }[],
+    live?: { live?: { current?: string | null, gameplayReady?: boolean, issues?: Record<string, unknown> } } | null } } },
+    world?: { player?: { yaw: number, position: { y: number } }, music?: { scoreId?: string, isPlaying?: boolean, stems?: { slot?: string, source?: string } } } } | undefined} */ (Reflect.get(globalThis, '__wildshard'));
+  const grid = handle?.shard?.grid?.state(), music = handle?.world?.music;
+  const inside = grid?.inside ?? null;
+  return { t: performance.now(), x: grid?.feet?.x ?? Number.NaN, z: grid?.feet?.z ?? Number.NaN, inside,
+    slug: grid?.cells?.find(cell => cell.instance === inside)?.slug ?? null, score: music?.scoreId ?? null, slot: music?.stems?.slot ?? null,
+    source: music?.stems?.source ?? null, playing: music?.isPlaying ?? null, current: grid?.live?.live?.current ?? null,
+    ready: grid?.live?.live?.gameplayReady ?? null, issues: JSON.stringify(grid?.live?.live?.issues ?? {}).slice(0, 300) };
+};
+
+/**
+ * Walk from the neighbour's spawn across the road into the plot (CROSS_IN's legs: sprint, the yaw set toward each point, a jump
+ * when stuck), then on inside it until 30 s after the crossing (the verdict is on the first 10 s; the rest says when, or
+ * whether, a late score starts). `at` is the page clock's ms when the feet first stood in the
+ * plot's cell, `ts` the proof's, `leftTs` when the feet first left the neighbour's cell; `track` holds every reading at which the cell or the music's score or slot changed.
+ * @param {import('playwright').Page} page @param {(typeof CROSS_IN)[string]} plan
+ */
+async function crossIn(page, plan) {
+  /** @type {ReturnType<typeof readCrossing>[]} */
+  const track = [];
+  /** @type {number | undefined} */
+  let at;
+  /** @type {number | undefined} */
+  let ts;
+  /** @type {number | undefined} */
+  let leftTs;
+  /** @type {string | null | undefined} the cell the walk starts in */
+  let from;
+  let last = '';
+  const read = async () => {
+    const now = await bounded(page.evaluate(readCrossing), 5000);
+    if (now === undefined) return undefined;
+    const key = JSON.stringify([now.inside, now.current, now.ready, now.issues, now.score, now.slot, now.source, now.playing]);
+    if (key !== last) { last = key; track.push(now); }
+    // the start cell is the first one the feet stand in (a resumed visit can start on the road)
+    if (from === undefined || from === null) from = now.inside;
+    else if (leftTs === undefined && now.inside !== from) leftTs = Date.now();
+    // a visit that resumes inside the plot never crossed: it stays `no-cross`
+    if (at === undefined && from !== plan.instance && now.inside === plan.instance) { at = now.t; ts = Date.now(); }
+    return now;
+  };
+  // one deadline for the whole walk (each leg also stops at 120 s)
+  const startTs = Date.now(), walkEnds = startTs + 300_000;
+  await page.keyboard.down('ShiftLeft');
+  try {
+    for (const [x, z] of plan.legs) {
+      if (ts !== undefined && Date.now() - ts > CROSS_WATCH_MS) break;
+      await page.keyboard.down('KeyW');
+      let near = Number.POSITIVE_INFINITY, stuck = 0, before = await read();
+      for (const ends = Math.min(Date.now() + 120_000, walkEnds); Date.now() < ends && near > 4; await sleep(250)) {
+        const now = await read();
+        if (now === undefined) continue;
+        near = Math.hypot(now.x - x, now.z - z);
+        await bounded(page.evaluate(yaw => { const player = /** @type {{ world?: { player?: { yaw: number } } } | undefined} */ (Reflect.get(globalThis, '__wildshard'))?.world?.player; if (player !== undefined) player.yaw = yaw; }, Math.atan2(now.x - x, now.z - z)), 5000);
+        if (before !== undefined && Math.hypot(now.x - before.x, now.z - before.z) >= 0.15) stuck = 0; else if (++stuck % 6 === 0) await page.keyboard.press('Space');
+        before = now;
+        if (ts !== undefined && Date.now() - ts > CROSS_WATCH_MS) break;
+      }
+      await page.keyboard.up('KeyW');
+    }
+    // the legs ran out before 10 s inside: keep walking and jumping in place
+    for (const ends = ts === undefined ? 0 : ts + CROSS_WATCH_MS; Date.now() <= ends; await sleep(400)) { await page.keyboard.press('Space'); await read(); }
+  } finally {
+    await page.keyboard.up('KeyW').catch(() => undefined); await page.keyboard.up('ShiftLeft').catch(() => undefined);
+  }
+  await read();
+  return { at, ts, leftTs, startTs, track };
+}
+
 /**
  * One visit in one browser.
- * @param {{ origin: string, target: string, profile: string, slug: string, route: 'grid' | 'client', mode: 'warm' | 'slow', label: string }} run
+ * @param {{ origin: string, target: string, profile: string, slug: string, route: Route, mode: 'warm' | 'slow', label: string }} run
  */
 async function visit(run) {
   const { profile } = run;
@@ -435,6 +531,10 @@ async function drive(run, context, link) {
   /** @type {Record<string, number>} */
   let firstHeard = {};
   let taps = /** @type {string[]} */ ([]);
+  /** @type {Awaited<ReturnType<typeof crossIn>> | null} */
+  let crossing = null;
+  /** @type {Record<string, number>} on a crossing: ms after the plot's score took over that each bus was first over the floor */
+  let afterScore = {};
   {
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     await saveFixture(context, { scope: 'device', key: 'nameAsked', data: true });
@@ -469,7 +569,11 @@ async function drive(run, context, link) {
     }, 200);
     const timeout = mode === 'slow' ? 240_000 : 120_000;
     try {
-      if (route === 'client') {
+      if (route === 'cross') {
+        await page.goto(new URL('/', origin).href, { waitUntil: 'commit', timeout: 120_000 });
+        await pickFromDeck(page, deckShard(slug, route), mode);
+        phase = 'none';
+      } else if (route === 'client') {
         phase = 'none';
         // `&skipintro` (offline-proof.mjs's Open Plot entry) is the bench path (play.ts `markEntered`): it never runs ENTER
         // WORLD, so the music never starts on a one-shard page and the world bus stays hushed on a grid page. Its LOAD and
@@ -515,21 +619,39 @@ async function drive(run, context, link) {
           }
           await sleep(Math.max(0, until + 600 - Date.now()));
         };
-        const heard = () => bounded(page.evaluate(([from, floor]) => {
+        const heard = (start = playAt, scoreStart = Number.POSITIVE_INFINITY) => bounded(page.evaluate(([from, floor, scoreAt]) => {
           const state = /** @type {{ samples: { t: number, peaks: Record<string, number> }[], taps: string[] } | undefined} */ (Reflect.get(globalThis, '__au14'));
           /** @type {Record<string, number>} the loudest peak in the first 10 s */
           const peaks = {};
           /** @type {Record<string, number>} ms after play that each bus was first over the floor */
           const first = {};
+          /** @type {Record<string, number>} ms after `scoreAt` (a crossing's score change) that each bus was first over the floor */
+          const heardAfterScore = {};
           for (const sample of state?.samples ?? []) {
             if (sample.t < from) continue;
             for (const [kind, peak] of Object.entries(sample.peaks)) {
               if (sample.t <= from + 10_000) peaks[kind] = Math.max(peaks[kind] ?? 0, peak);
               if (peak >= floor && first[kind] === undefined) first[kind] = Math.round(sample.t - from);
+              if (peak >= floor && sample.t >= scoreAt && heardAfterScore[kind] === undefined) heardAfterScore[kind] = Math.round(sample.t - scoreAt);
             }
           }
-          return { peaks, first, taps: state?.taps ?? [] };
-        }, [playAt, AUDIBLE_PEAK]), 10_000);
+          return { peaks, first, afterScore: heardAfterScore, taps: state?.taps ?? [] };
+        }, [start, AUDIBLE_PEAK, scoreStart]), 10_000);
+        if (route === 'cross') {
+          // the walk into the plot; the window is the first 10 s after the crossing
+          const plan = CROSS_IN[slug];
+          if (plan === undefined) throw new Error(`${slug} has no cross-in walk`);
+          crossing = await crossIn(page, plan);
+          await page.screenshot({ path: join(out, `${label}-crossed.png`), timeout: 10_000 }).catch(() => undefined);
+          if (crossing.at !== undefined) {
+            const crossedAt = crossing.at;
+            const scoreAt = crossing.track.find(reading => reading.t >= crossedAt - 1000 && reading.score === plan.musicId)?.t ?? Number.POSITIVE_INFINITY;
+            const audio = await heard(crossedAt, scoreAt);
+            windowPeaks = audio?.peaks ?? {}; firstHeard = audio?.first ?? {}; afterScore = audio?.afterScore ?? {}; taps = audio?.taps ?? [];
+          }
+          clearInterval(poller);
+          return { rows, phases, pagePhases, consoleLines, outcome, ms: at(), playAt, downloadCardMB, windowPeaks, firstHeard, taps, proofError, network: link.seen, crossing, afterScore };
+        }
         await walk(PLAY_WINDOW_MS);
         let audio = await heard();
         await page.screenshot({ path: join(out, `${label}-after-10s.png`), timeout: 10_000 }).catch(() => undefined);
@@ -542,7 +664,7 @@ async function drive(run, context, link) {
       await page.screenshot({ path: join(out, `${label}-error.png`), timeout: 10_000 }).catch(() => undefined);
     }
     clearInterval(poller);
-    return { rows, phases, pagePhases, consoleLines, outcome, ms: at(), playAt, downloadCardMB, windowPeaks, firstHeard, taps, proofError, network: link.seen };
+    return { rows, phases, pagePhases, consoleLines, outcome, ms: at(), playAt, downloadCardMB, windowPeaks, firstHeard, taps, proofError, network: link.seen, crossing, afterScore };
   }
 }
 
@@ -566,7 +688,7 @@ function phaseAt(changes, t, fallback) {
 
 /**
  * Judge one visit and keep its logs.
- * @param {string} target @param {{ slug: string, route: 'grid' | 'client' }} entry @param {'warm' | 'slow'} mode
+ * @param {string} target @param {{ slug: string, route: Route }} entry @param {'warm' | 'slow'} mode
  * @param {Awaited<ReturnType<typeof visit>>} result @param {string | undefined} earlier the warm visit's manifest URL
  */
 async function judge(target, entry, mode, result, earlier) {
@@ -580,11 +702,13 @@ async function judge(target, entry, mode, result, earlier) {
   const failures = [];
   // the route's own manifest; a later visit can read it from the page's store and fetch none, so it falls back to the
   // manifest the profile's earlier visit fetched for this route
-  const read = result.rows.map(row => ({ url: row.url, match: SPAWN.exec(new URL(row.url).pathname) })).filter(row => row.match?.[1] === entry.slug);
+  // a crossing starts in its deck neighbour, so its manifest is the neighbour's grid one
+  const shard = deckShard(entry.slug, entry.route), route = entry.route === 'cross' ? 'grid' : entry.route;
+  const read = result.rows.map(row => ({ url: row.url, match: SPAWN.exec(new URL(row.url).pathname) })).filter(row => row.match?.[1] === shard);
   // a world build sends a deep link the grid way too (OFFLINE OF2: world builds never take the solo route), so a deep link's
   // manifest is whichever phone manifest it fetched, the one-shard `client` one first
   const phone = read.filter(row => row.match?.[3] === 'phone');
-  const own = (phone.find(row => row.match?.[2] === entry.route) ?? (entry.route === 'client' ? phone[0] : undefined))?.url;
+  const own = (phone.find(row => row.match?.[2] === route) ?? (route === 'client' ? phone[0] : undefined))?.url;
   const spawnUrl = own ?? earlier;
   const manifest = spawnUrl === undefined ? undefined : await manifestOf(spawnUrl).catch(() => undefined);
   const isAudio = (/** @type {string} */ url) => { const path = new URL(url).pathname; return AUDIO.test(path) || manifest?.audioParts.has(path) === true; };
@@ -601,10 +725,10 @@ async function judge(target, entry, mode, result, earlier) {
   for (const row of audioRows) audioByPhase[row.phase] = (audioByPhase[row.phase] ?? 0) + 1;
   // the local build's reads must reach the link, or its network check proves nothing
   if (target === 'local' && !network.some(row => row.url.startsWith('http://127.0.0.1'))) failures.push({ rule: 'link-blind', detail: 'no local http read went through the proxy' });
-  if (mode === 'warm' && own === undefined) failures.push({ rule: 'route', detail: `no ${entry.slug} ${entry.route === 'grid' ? 'grid' : ''} phone manifest fetched (fetched: ${read.map(row => row.match?.[0] ?? '').join(', ') || 'none'})` });
+  if (mode === 'warm' && own === undefined) failures.push({ rule: 'route', detail: `no ${shard} ${route === 'grid' ? 'grid' : ''} phone manifest fetched (fetched: ${read.map(row => row.match?.[0] ?? '').join(', ') || 'none'})` });
   if (!result.pagePhases.some(row => row.phase === 'load')) failures.push({ rule: 'no-load', detail: `the card never reached LOAD (${result.outcome})` });
-  const au6 = AU6_AUDIO_MB[entry.slug] ?? (entry.slug.startsWith('open-plot-') ? AU6_AUDIO_MB['open-plot-*'] ?? 0 : 0);
-  if (manifest === undefined) failures.push({ rule: 'download-short', detail: `no ${entry.slug}-${entry.route}-phone spawn manifest to read` });
+  const au6 = AU6_AUDIO_MB[shard] ?? (shard.startsWith('open-plot-') ? AU6_AUDIO_MB['open-plot-*'] ?? 0 : 0);
+  if (manifest === undefined) failures.push({ rule: 'download-short', detail: `no ${shard}-${route}-phone spawn manifest to read` });
   else {
     if (!(manifest.downloadMB >= au6)) failures.push({ rule: 'download-short', detail: `DOWNLOAD ${manifest.downloadMB.toFixed(2)} MB < AU6 audio ${au6.toFixed(2)} MB` });
     // the download's own audio, not only its total: AU6 measured the same manifests' audio rows (2 decimals)
@@ -613,23 +737,52 @@ async function judge(target, entry, mode, result, earlier) {
   const peaks = result.windowPeaks;
   const audible = { music: (peaks.music ?? 0) >= AUDIBLE_PEAK, sfx: (peaks.sfx ?? 0) >= AUDIBLE_PEAK };
   const bench = benchEntry(target, entry.route, entry.slug);
-  if (result.outcome === 'play' && !bench && !(audible.music && audible.sfx)) failures.push({ rule: 'silent', detail: `first 10 s of play: ${JSON.stringify(peaks)}, first heard (ms after play, 30 s watched) ${JSON.stringify(result.firstHeard)} (taps ${result.taps.join(',') || 'none'})` });
+  // a crossing: the plot's cell, its score, and the audio the page read on the way (from the walk's start)
+  const crossing = result.crossing, plan = CROSS_IN[entry.slug];
+  const crossed = crossing?.at !== undefined;
+  const scoreRow = crossing === null || crossing.at === undefined ? undefined : crossing.track.find(row => row.t >= (crossing.at ?? 0) - 1000 && row.score === plan?.musicId);
+  // the crossing starts where the feet leave the neighbour's cell; reads before it are the neighbour's own play
+  const leftAt = crossing?.leftTs ?? crossing?.startTs ?? Number.POSITIVE_INFINITY;
+  const crossAudio = crossing === null ? [] : audioRows.filter(row => row.ts >= leftAt);
+  const crossNetAudio = crossing === null ? [] : netAudio.filter(row => row.t >= leftAt);
+  const walkNetAudio = crossing === null ? [] : netAudio.filter(row => row.t >= crossing.startTs && row.t < leftAt);
+  /** @type {Record<string, number>} the crossing's audio reads by who served them */
+  const bySource = {};
+  for (const row of crossAudio) { const key = served(row.fromSW); bySource[key] = (bySource[key] ?? 0) + 1; }
+  if (entry.route === 'cross' && result.outcome === 'play') {
+    if (!crossed) failures.push({ rule: 'no-cross', detail: `never inside ${plan?.instance ?? ''}; last ${JSON.stringify(crossing?.track.at(-1) ?? null)}` });
+    else if (scoreRow === undefined || scoreRow.t > (crossing?.at ?? 0) + PLAY_WINDOW_MS) failures.push({ rule: 'plot-score', detail: `the score never became ${plan?.musicId ?? ''} in 10 s: ${JSON.stringify(crossing?.track.map(row => [Math.round(row.t - (crossing.at ?? 0)), row.inside, row.score, row.slot, row.source]))}` });
+    for (const row of crossNetAudio.slice(0, 5)) failures.push({ rule: 'cross-audio', detail: `network fetch on the crossing ${row.url}` });
+    if (crossNetAudio.length > 5) failures.push({ rule: 'cross-audio', detail: `… ${String(crossNetAudio.length - 5)} more` });
+  }
+  if (result.outcome === 'play' && !bench && (entry.route !== 'cross' || crossed) && !(audible.music && audible.sfx)) failures.push({ rule: 'silent', detail: `first 10 s of ${entry.route === 'cross' ? 'the plot' : 'play'}: ${JSON.stringify(peaks)}, first heard (ms after ${entry.route === 'cross' ? 'the crossing' : 'play, 30 s watched'}) ${JSON.stringify(result.firstHeard)} (taps ${result.taps.join(',') || 'none'})` });
   // the bench deep link is not a player's entry: on a world build Driftwood's lands on the title after its LOAD (seen on staging
   // 6d11b137), so it needs LOAD (no-load) but not play
   if (result.outcome !== 'play' && !(target === 'local' && result.outcome === 'seat-wait') && !bench && mode === 'warm') failures.push({ rule: 'no-play', detail: `${result.outcome} at ${result.phases.at(-1)?.phase ?? ''}/${result.phases.at(-1)?.step ?? ''} ${result.proofError}` });
   const row = {
-    entry: bench ? 'deep link, skipintro (bench path: sound not judged)' : entry.route === 'grid' ? 'Shard select, ENTER WORLD' : 'deep link, ENTER WORLD',
+    entry: bench ? 'deep link, skipintro (bench path: sound not judged)' : entry.route === 'grid' ? 'Shard select, ENTER WORLD'
+      : entry.route === 'cross' ? `Shard select, ${CARDS[shard] ?? shard}, ENTER WORLD, walked into ${plan?.instance ?? ''}` : 'deep link, ENTER WORLD',
     target, shard: entry.slug, route: entry.route, flowRead: manifest?.flow ?? '', manifest: spawnUrl === undefined ? null : new URL(spawnUrl).pathname,
     manifestsFetched: read.map(one => new URL(one.url).pathname.split('/').pop() ?? ''), mode, outcome: result.outcome, seconds: Math.round(result.ms / 100) / 10,
     loadAudioRequests: loadAudio.length, loadAudioNetworkFetches: netLoadAudio.length, audioRequestsByPhase: audioByPhase, networkAudioFetches: netAudio.length,
     linkSeen: network.filter(one => !one.url.startsWith('connect://')).length,
     downloadMB: manifest === undefined ? null : Number(manifest.downloadMB.toFixed(2)), downloadCardMB: result.downloadCardMB || null,
     manifestAudioMB: manifest === undefined ? null : Number(manifest.audioMB.toFixed(2)), manifestAudioRows: manifest?.audioRows ?? 0, au6AudioMB: au6,
-    peaksFirst10s: Object.fromEntries(Object.entries(peaks).map(([kind, peak]) => [kind, Number(peak.toFixed(4))])), firstHeardMs: result.firstHeard, audible, failures,
+    peaksFirst10s: Object.fromEntries(Object.entries(peaks).map(([kind, peak]) => [kind, Number(peak.toFixed(4))])), firstHeardMs: result.firstHeard, audible,
+    crossing: crossing === null ? null : {
+      crossedMsAfterPlay: crossing.at === undefined ? null : Math.round(crossing.at - result.playAt), walkSeconds: crossing.at === undefined || crossing.ts === undefined ? null : Math.round((crossing.ts - crossing.startTs) / 100) / 10,
+      plotScore: plan?.musicId ?? null, scoreMsAfterCrossing: scoreRow === undefined || crossing.at === undefined ? null : Math.round(scoreRow.t - crossing.at), heardMsAfterScore: result.afterScore,
+      audioRequests: crossAudio.length, audioBySource: bySource,
+      networkAudioFetches: crossNetAudio.length, audioUrls: crossAudio.map(one => new URL(one.url).pathname).slice(0, 30),
+      neighbourPlayNetworkAudio: walkNetAudio.map(one => new URL(one.url).pathname),
+      track: crossing.track.map(({ t, ...reading }) => Object.assign(reading, { ms: Math.round(t - (crossing.at ?? result.playAt)) })),
+    },
+    failures,
   };
   log(`${failures.length === 0 ? 'ok ' : 'RED'} ${label}: ${result.outcome} in ${String(row.seconds)} s, flow ${row.flowRead}, LOAD audio ${String(row.loadAudioRequests)}, `
     + `DOWNLOAD ${String(row.downloadMB)} MB (audio ${String(row.manifestAudioMB)} MB, AU6 ${String(au6)}), peaks ${JSON.stringify(row.peaksFirst10s)}`);
   for (const failure of failures) log(`      ${failure.rule} ${failure.detail}`);
+  if (row.crossing !== null) log(`      crossing ${JSON.stringify({ ...row.crossing, track: row.crossing.track.length })}`);
   return row;
 }
 
@@ -648,8 +801,9 @@ try {
   for (const { target, origin } of targets) {
     builds[target] = /** @type {{ build: string }} */ (await (await fetch(new URL('/version.json', origin))).json()).build;
     log(target, origin, 'build', builds[target]);
-    // preview has no world and no deck route to judge: only the deep links
-    const queue = entries.filter(entry => target !== 'preview' || entry.route === 'client');
+    // preview has no world and no deck route to judge: only the deep links and the crossings
+    // a crossing needs the in-page server, so it runs on preview alone
+    const queue = entries.filter(entry => target === 'preview' ? entry.route !== 'grid' : entry.route !== 'cross');
     const worker = async () => {
       for (let entry = queue.shift(); entry !== undefined; entry = queue.shift()) {
         const profile = join(out, `profile-${target}-${entry.slug}-${entry.route}`);
@@ -664,7 +818,7 @@ try {
             if (row.manifest !== null) earlier = new URL(row.manifest, origin).href;
             results.push(row);
           }
-          catch (error) { log(`${label} broke: ${String(error)}`); results.push({ entry: 'proof error', target, shard: entry.slug, route: entry.route, flowRead: '', manifest: null, manifestsFetched: [], mode, outcome: 'error', seconds: 0, loadAudioRequests: 0, loadAudioNetworkFetches: 0, audioRequestsByPhase: {}, networkAudioFetches: 0, linkSeen: 0, downloadMB: null, downloadCardMB: null, manifestAudioMB: null, manifestAudioRows: 0, au6AudioMB: 0, peaksFirst10s: {}, firstHeardMs: {}, audible: { music: false, sfx: false }, failures: [{ rule: 'proof-error', detail: String(error).slice(0, 300) }] }); }
+          catch (error) { log(`${label} broke: ${String(error)}`); results.push({ entry: 'proof error', target, shard: entry.slug, route: entry.route, flowRead: '', manifest: null, manifestsFetched: [], mode, outcome: 'error', seconds: 0, loadAudioRequests: 0, loadAudioNetworkFetches: 0, audioRequestsByPhase: {}, networkAudioFetches: 0, linkSeen: 0, downloadMB: null, downloadCardMB: null, manifestAudioMB: null, manifestAudioRows: 0, au6AudioMB: 0, peaksFirst10s: {}, firstHeardMs: {}, audible: { music: false, sfx: false }, crossing: null, failures: [{ rule: 'proof-error', detail: String(error).slice(0, 300) }] }); }
         }
         rmSync(profile, { recursive: true, force: true });
       }
