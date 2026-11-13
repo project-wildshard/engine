@@ -96,7 +96,7 @@ mkdirSync(tree, { recursive: true });
 const source = serverFrom ?? release.engineBuild;
 if (serverFrom !== undefined) try { git(['merge-base', '--is-ancestor', release.engineBuild, serverFrom]); } catch { throw new Error(`--server-from ${serverFrom} does not descend from the release's ${release.engineBuild}`); }
 execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', source]) });
-for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts']) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
+for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts']) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
 // CI=1 keeps the install non-interactive; --config.ci=false keeps the global store on, which pnpm drops under ci (GVS G9)
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
@@ -232,7 +232,7 @@ const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code, 
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
 writeFileSync(join(work, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-note({ step: 'done', exit: code, seated: report.seated, steady: report.steady, walked: report.walked, sawEveryone: report.sawEveryone, server: report.server ?? null, report: join(work, 'report.json') });
+note({ step: 'done', exit: code, seated: report.seated, steady: report.steady, walked: report.walked, sawEveryone: report.sawEveryone, interArrivalMs: report.interArrivalMs ?? null, server: report.server ?? null, report: join(work, 'report.json') });
 process.exitCode = Number(code);
 } finally {
   await stopRoom();

@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
 import { botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS } from './fixtures/dedicated/mmoBotsGuard';
+import { interArrival } from './fixtures/dedicated/mmoBotsStats';
 
 const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('scripts/mmo-bots.mjs', 'utf8');
 
@@ -25,7 +26,7 @@ test('the bots accept loopback and the staging socket only', () => {
   // The guard runs before any bot is made, and the driver copies it beside the entry it builds.
   expect(entry.indexOf('botTarget(url, addresses, bots)')).toBeGreaterThan(0);
   expect(entry.indexOf('botTarget(url, addresses, bots)')).toBeLessThan(entry.indexOf('new RoomBot('));
-  expect(driver).toContain("['mmoBotsEntry.ts', 'mmoBotsGuard.ts']");
+  expect(driver).toContain("['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts']");
   // Production's Funnel port (443, no port in the URL), the future address, and the human release file appear nowhere.
   for (const text of [entry, driver]) {
     expect(text).not.toMatch(/wss:\/\/wildshard\.tailb41b20\.ts\.net(?!:8443)/u);
@@ -109,4 +110,14 @@ test('bots on the host need --remote, dial its loopback with no tunnel, and are 
   expect(driver).toContain("ssh(`${hostBots}pkill -TERM -f '[/]${away}/server/main.mjs';");
   // Their report comes back before remoteStop removes the host directory.
   expect(driver.indexOf('hostSsh(`cat ${away}/bots.json`)')).toBeLessThan(driver.indexOf('await stopRoom();\nconst full'));
+});
+
+// NET-LAG NL3: each bot's frame inter-arrival over the play window (p50, p95, max), and all bots' together, so one run says whether
+// frames came evenly (a clean 30 Hz server reads p95 near 33 ms) or bunched, and a loopback, a Cloudflare and a tailnet run compare.
+test('the report carries frame inter-arrival per bot and over all bots', () => {
+  expect(interArrival([])).toBeNull();
+  expect(interArrival([33, 34, 33, 32, 33, 120, 33, 33, 34, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 66])).toEqual({ gaps: 20, p50: 33, p95: 66, max: 120 });
+  expect(interArrival([33.333, 33.333])).toEqual({ gaps: 2, p50: 33.3, p95: 33.3, max: 33.3 });
+  expect(entry).toContain('interArrival: interArrival(walker.gaps)');
+  expect(entry).toContain('interArrivalMs: interArrival(walkers.flatMap(walker => walker.gaps))');
 });
