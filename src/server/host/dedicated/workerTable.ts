@@ -25,5 +25,7 @@ export function workerTable(cells: readonly string[], workers: number): readonly
   const room = Math.max(1, workers - rows.length), share = Array.from({ length: room }, (): string[] => []);
   rest.forEach((slug, index) => { share[index % room]?.push(slug); });
   const table = [...rows, ...share.filter(row => row.length > 0)], kept = table.slice(0, Math.max(1, workers - 1)), over = table.slice(kept.length).flat();
-  return table.length <= workers ? table : [...kept, over];
+  if (table.length <= workers) return table;
+  // GC31: one worker is one row, so a crossing reaches every cell (`kept` keeps a first row whenever it can).
+  return workers <= 1 ? [table.flat()] : [...kept, over];
 }

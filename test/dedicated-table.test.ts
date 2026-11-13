@@ -27,6 +27,14 @@ test('production\'s 4 and staging\'s 2 hold every cell, and the last row takes w
   expect(workerTable(ALL, 4)[3]?.[0]).toBe('driftwood-isle');
 });
 
+// GRID-CROSSING GC31: a crossing runs only between cells on one worker, so staging's `WORLD_WORKERS=1` must open one worker. It opened
+// two (Nalati alone), which walled Nalati off Driftwood's road.
+test('one worker holds every cell', () => {
+  const table = workerTable(ALL, 1);
+  expect(table).toHaveLength(1);
+  expect(sorted(table[0] ?? [])).toEqual(sorted(ALL));
+});
+
 test('the same cells give the same table, whatever order they were listed in', () => {
   expect(workerTable([...ALL].reverse(), 8)).toEqual(workerTable(ALL, 8));
 });

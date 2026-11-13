@@ -4,7 +4,7 @@
 // from the deck's card, then walks into a same-worker neighbour (Sunscar, or Pine Hollow), boosts back into Driftwood and boosts out again, by
 // real input. Each leg passes with no stop (no 1.5 s under 0.15 m a sample while the key is held), no page reload, and control in the
 // target cell (the page inside it, gameplay ready, the player moving). It writes time-to-control per leg beside GC1's baseline.
-//   scripts/browser-lane.sh node scripts/grid-crossing-walk-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine] [--out=<dir>]
+//   scripts/browser-lane.sh node scripts/grid-crossing-walk-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--workers=2] [--base=<staging url>] [--out=<dir>]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from 'playwright';
@@ -13,7 +13,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { openRig, WORLD_PORT } from './online-rig.mjs';
 
 const [dist = '', relativeWork = '', keyFile = ''] = process.argv.slice(2).filter(arg => !arg.startsWith('--')), work = relativeWork === '' ? '' : absolute(relativeWork);
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-crossing-walk-proof.mjs <dist> <work> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine] [--out=<dir>]');
+if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-crossing-walk-proof.mjs <dist> <work> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--out=<dir>]');
 const engineName = process.argv.find(arg => arg.startsWith('--engine='))?.slice(9) ?? 'chromium', out = absolute(process.argv.find(arg => arg.startsWith('--out='))?.slice(6) ?? join(work, 'shots'));
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
 mkdirSync(out, { recursive: true });
@@ -23,7 +23,9 @@ mkdirSync(out, { recursive: true });
 // (`sections/world/edge.json`), so a crossing goes through it: `approach` are waypoints in Driftwood's frame, boosted and not scored,
 // that end in front of it; the legs then walk straight through it.
 const NEIGHBOURS = /** @type {Record<string, { slug: string, axis: 'x' | 'z', sign: number, approach: [number, number][] }>} */ ({
-  pine: { slug: 'pine-hollow', axis: 'z', sign: 1, approach: [[-235, -194], [-235, 235], [0, 235]] }, sunscar: { slug: 'sunscar-dunes', axis: 'x', sign: -1, approach: [[-235, -194], [-235, 0]] } });
+  pine: { slug: 'pine-hollow', axis: 'z', sign: 1, approach: [[-235, -194], [-235, 235], [0, 235]] }, sunscar: { slug: 'sunscar-dunes', axis: 'x', sign: -1, approach: [[-235, -194], [-235, 0]] },
+  // GC29 (Jake 11-13): his walk off the south dock toward Far Reach, and east into Nalati (staging: another worker).
+  farreach: { slug: 'far-reach', axis: 'z', sign: -1, approach: [[0, -235]] }, nalati: { slug: 'nalati-grasslands', axis: 'x', sign: 1, approach: [[235, -194], [235, 0]] } });
 const toName = process.argv.find(arg => arg.startsWith('--to='))?.slice(5) ?? 'sunscar', to = NEIGHBOURS[toName];
 if (to === undefined) throw new Error(`No neighbour ${toName}: ${Object.keys(NEIGHBOURS).join(', ')}`);
 const HOME = 'driftwood-isle', NEXT = to.slug, STUCK_MS = 1500, LEG_MS = 100_000;
@@ -35,14 +37,20 @@ const note = (step, ok, detail) => { steps.push({ step, ok, ...detail === undefi
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: HOME, more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', crossing: true, workers: 2 });
+// `--base=<url>`: a served site instead of the rig (staging only, J205: a read-only join; never production). dist and key.json are unused.
+const served = process.argv.find(arg => arg.startsWith('--base='))?.slice(7) ?? '';
+if (served !== '' && !/^https:\/\/(staging|preview)\.wildshard\.io\/?$|^http:\/\/127\.0\.0\.1:\d+\/?$/.test(served)) throw new Error('--base takes staging, preview or a loopback page only: never production (J205)');
+const workers = Number(process.argv.find(arg => arg.startsWith('--workers='))?.slice(10) ?? 2);
+if (!Number.isInteger(workers) || workers < 1) throw new Error('--workers takes a whole number from 1');
+const rig = served !== '' ? { base: served.replace(/\/$/, ''), close: () => Promise.resolve() }
+  : await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: HOME, more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', crossing: true, workers });
 let code = 1, browser = /** @type {import('playwright').Browser | null} */ (null);
 /** @type {Record<string, unknown>} */
-const result = { lane: 'opus-gc15c', engine: engineName, layout: 'desktop 1440x900', site: 'local rig, WORLD_CELLS=grid, WORLD_CROSSING=worker, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
+const result = { lane: 'opus-gc15c', engine: engineName, layout: 'desktop 1440x900', site: served !== '' ? served : 'local rig, WORLD_CELLS=grid, WORLD_CROSSING=worker, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
 try {
-  let open = null;
+  let open = served !== '' ? { cells: 25 } : null;
   for (let tries = 0; tries < 300 && open === null; tries++) { open = await fetch(`http://127.0.0.1:${String(WORLD_PORT)}/health`).then(found => found.ok ? found.json() : null).catch(() => null); if (open === null) await sleep(200); }
-  note('the world runs the grid', open !== null && open.cells > 1, { cells: open?.cells });
+  note('the world runs the grid', open !== null && open.cells > 1, served !== '' ? { skipped: 'a served site: not read' } : { cells: open?.cells });
   if (open === null) throw new Error(`The world did not start: see ${join(work, 'server.log')}`);
   browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } }), page = await context.newPage(), errors = /** @type {string[]} */ ([]);
@@ -162,7 +170,7 @@ try {
   code = steps.every(step => step.ok) ? 0 : 1;
 } catch (error) { note('the run', false, String(error).slice(0, 400)); }
 finally {
-  const log = readFileSync(join(work, 'server.log'), 'utf8').split('\n');
+  const log = served !== '' ? [] : readFileSync(join(work, 'server.log'), 'utf8').split('\n');
   result.server = { road: log.filter(line => line.includes('road.pack')).slice(0, 2), booted: log.filter(line => line.includes('cell.booted')).length };
   result.steps = steps; result.code = code;
   writeFileSync(join(out, `${engineName}-gc15c-walk.json`), `${JSON.stringify(result, null, 2)}\n`);
