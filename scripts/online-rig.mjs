@@ -10,7 +10,11 @@ import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 
 const ROOT = absolute(import.meta.dirname, '..');
-export const RELEASE_PORT = 18799, WORLD_PORT = 18797, PAGE_PORT = 18798, PG_PORT = 18796;
+/** The rig's four loopback ports, from 18796 (a lane beside another rig names its own: WS_RIG_PORTS=18856; its dist is stamped
+ *  with http://127.0.0.1:<that + 3>/release.json). */
+const PORTS = Number(process.env.WS_RIG_PORTS ?? 18796);
+if (!Number.isInteger(PORTS) || PORTS < 1024 || PORTS > 65532) throw new Error(`WS_RIG_PORTS must be a port from 1024 to 65532, not ${String(process.env.WS_RIG_PORTS)}`);
+export const RELEASE_PORT = PORTS + 3, WORLD_PORT = PORTS + 1, PAGE_PORT = PORTS + 2, PG_PORT = PORTS;
 /** @param {string} name */
 const database = name => { const url = new URL(`postgresql://127.0.0.1:${String(PG_PORT)}/${name}`); url.username = 'postgres'; url.searchParams.set('sslmode', 'disable'); return url.href; };
 /** @param {string} folder */

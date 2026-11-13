@@ -10,6 +10,7 @@ import { AnimMachine } from '../anim/machine';
 import { gaitMix, gaitOf, STRIDE_JOINTS, stridePose, stridePoseAtRest } from './remoteGait';
 import { AirPose, type AirPhase } from './remoteAir';
 import { BoardUnder, DECK_LIFT } from './remoteBoard';
+import { RemoteStrike } from './remoteStrike';
 import { NameTag, type NameTagShown } from './nameTag';
 import { HeldInHand } from './heldOnOthers';
 import type { NetClient } from './client';
@@ -60,7 +61,9 @@ export interface OtherShown { readonly name: string; readonly x: number; readonl
   /** RP9: its jump, fall or landing ('jump', 'fall', 'land'), or '' on the ground. */
   readonly air: AirPhase;
   /** RP5: the item drawn in the hand for `held` (its row), or '' for an empty hand. */
-  readonly item: string }
+  readonly item: string;
+  /** RP7: the strike playing on its arms ('tap', 'heavy', a bow's 'draw'), or ''. */
+  readonly attack: string }
 
 /** One other player on screen. */
 class OtherBody {
@@ -86,9 +89,11 @@ class OtherBody {
   private readonly stride = stridePoseAtRest();
   /** RP9: its jump, fall and landing, over the gait (remoteAir.ts). */
   private readonly air = new AirPose();
+  /** RP7: its swings, on its arms and spine over the gait. */
+  private readonly strike = new RemoteStrike();
   /** Whether a row has put it anywhere yet. */
   placed = false;
-  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '' };
+  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '', attack: '' };
   /** Its player row's id, which voice names its talker by. */
   readonly id: string;
   constructor(name: string, id: string) {
@@ -127,11 +132,12 @@ class OtherBody {
     const drop = this.pose(onFoot, dt);
     if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : -drop);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
+    this.strike.show(row, !riding && !mounted && row[SWIM] !== 1, dt, this.joints, this.rest); // RP7: after the gait and air poses
     this.board.show(riding, row[YAW] ?? 0, this.speed, dt, this.figure, this.joints); // RP8: the deck, banked, the rider side-on on it
     const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
     this.ring.visible = talking;
     if (talking) { this.talkPhase = (this.talkPhase + dt * TALK_PULSE) % (Math.PI * 2); this.ring.scale.setScalar(TALK_SIZE * (1 + TALK_SWELL * Math.sin(this.talkPhase))); }
-    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held, hp: row[HP] ?? 0, talking, item: this.hand?.row ?? '' };
+    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held, hp: row[HP] ?? 0, talking, item: this.hand?.row ?? '', attack: this.strike.playing };
   }
   private bend(joint: DummyJoint, angle: number): void {
     const bone = this.joints[joint], rest = this.rest.get(joint);

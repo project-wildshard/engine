@@ -265,6 +265,7 @@
     "src/client/engine/net/remoteAir.ts": "client",
     "src/client/engine/net/remoteBoard.ts": "client",
     "src/client/engine/net/remoteGait.ts": "client",
+    "src/client/engine/net/remoteStrike.ts": "client",
     "src/client/engine/net/webSocketTransport.ts": "client",
     "src/client/engine/physics/active.ts": "client",
     "src/client/engine/physics/boxFrame.ts": "client",
