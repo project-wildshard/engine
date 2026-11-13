@@ -26,7 +26,7 @@ import { QUEST_OWNED } from '@wildshard/engine/game/quest/nativeComposition';
 import { shardRows } from '@wildshard/engine/sim/shardRows';
 import { createQuestLedger } from '@wildshard/engine/game/quest/ledger';
 import { serverDiscoveries } from '@wildshard/engine/game/quest/serverPlaces';
-import { STORY_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
+import { RESPAWN_NOW_ACT, STORY_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
 import { installServerChapters } from '@wildshard/engine/game/quest/serverChapters';
 import { installServerDoors } from '@wildshard/engine/game/quest/serverDoors';
 import { pageOpenDoors } from '@wildshard/engine/game/shardfile/buildingDoor';
@@ -185,6 +185,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
       if (act.kind === 'interact' && act.id.startsWith('seen:') && routes.seen !== null) routes.seen(player, act.id);
       else if (act.kind === 'interact' && act.id.startsWith(STORY_ACT)) routes.story?.(player, act.id.slice(STORY_ACT.length));
       else if (act.kind === 'interact' && act.id === UNSTUCK_ACT && routes.unstuck !== null) routes.unstuck(player);
+      else if (act.kind === 'interact' && act.id === RESPAWN_NOW_ACT && routes.respawnNow !== undefined) routes.respawnNow(player);
       else if (claim !== undefined) claim(player);
       else if (act.kind === 'interact' && sim()?.selectedInteraction(player) === act.id) sim()?.interact(act.id, player);
       else if (act.kind !== 'climate' && act.kind !== 'buy' && act.kind !== 'board' && act.kind !== 'wear') routes.refused++;

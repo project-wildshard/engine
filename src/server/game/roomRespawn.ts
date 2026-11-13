@@ -57,4 +57,8 @@ export function installRoomRespawn(host: SimHost, places: readonly PlaceArea[]):
     lastUnstuck.set(id, tick);
     place(player);
   };
+  // QA 11-13 (Jake: "It needs a button, a Respawn now button"): the death card's button. The fall already placed the player;
+  // this only ends their own fade early, so their commands move them again. It moves nobody and gives no cover: the fade is
+  // the fallen player's only shield, and they are the only one who can end it.
+  actRoutes(host).respawnNow = id => { if (host.players.has(id)) book.skipFade(id); };
 }

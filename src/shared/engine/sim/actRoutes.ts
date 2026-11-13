@@ -40,6 +40,8 @@ export interface ActRoutes {
   wear: ((player: string, id: string) => void) | null;
   /** A player's Unstuck (UNSTUCK_ACT): back to their last place or the spawn, as a fall would put them, with no fall. */
   unstuck: ((player: string) => void) | null;
+  /** A fallen player's Respawn now (RESPAWN_NOW_ACT): their fade ends at once. Absent where no room respawn is installed. */
+  respawnNow?: (player: string) => void;
   /** A boss's intro holds whoever stands in its arena. Only a page's session asks: a tape's steps run on through one. */
   introLocks?: boolean;
   /** A Developer asked that a fight's blows not land: a lair's script sees it, as a page's did. */

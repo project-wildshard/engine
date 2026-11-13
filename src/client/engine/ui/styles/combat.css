@@ -98,3 +98,15 @@
 }
 .ws-combat-death-rule { width: 56px; height: 1px; margin: 11px auto 10px; background: var(--ws-cyan-line); }
 .ws-combat-death-where { font-size: 10px; line-height: 1.5; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-cyan); }
+/* Respawn now (QA 11-13): a tap on a phone, Enter / Space on a keyboard; the overlay takes no touches, the button does */
+.ws-combat-death-now {
+  display: block; width: 100%; min-height: 44px; margin: 14px 0 0; padding: 0 16px; box-sizing: border-box; cursor: pointer; pointer-events: auto;
+  font-family: var(--ws-mono); font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ws-text);
+  background: rgba(143, 227, 255, 0.08); border: 1px solid var(--ws-cyan-line); border-radius: 0;
+  -webkit-appearance: none; appearance: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.ws-combat-death-now:hover, .ws-combat-death-now:focus-visible { background: rgba(143, 227, 255, 0.16); border-color: var(--ws-cyan); outline: none; }
+.ws-combat-death-now:active { background: rgba(143, 227, 255, 0.24); }
+.ws-combat-death-now.waiting { color: var(--ws-cyan); animation: ws-death-now-wait 0.9s ease-in-out infinite; }
+.ws-combat-death-now:disabled { cursor: default; }
+@keyframes ws-death-now-wait { 50% { opacity: 0.55; } }

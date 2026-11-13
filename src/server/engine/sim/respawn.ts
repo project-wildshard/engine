@@ -2,7 +2,7 @@ import { LastPlace, type Feet, type LastPlaceSaved, type PlaceArea, type Stand }
 import type { PlayerHealth } from '../../../shared/engine/combat/health';
 
 /** The page's death fade (ui/DeathFade: dark, then the fade back): no blow lands on the fallen until then. */
-export const FALL_FADE = 1.8;
+export const FALL_FADE = 1.35;
 /** One player's record. A save holds a player only once they have one. */
 export type RespawnRow = readonly [id: string, last: LastPlaceSaved, fade: number, falls: number];
 
@@ -35,6 +35,11 @@ export class RespawnBook {
   falls(id: string): number { return this.seats.get(id)?.falls ?? 0; }
   /** True while `id`'s return is still fading in. */
   fading(id: string): boolean { return (this.seats.get(id)?.fade ?? 0) > 0; }
+  /** Respawn now (QA 11-13): `id`'s fade ends at once, so their commands move them again. Nothing else changes. */
+  skipFade(id: string): void {
+    const seat = this.seats.get(id);
+    if (seat !== undefined) seat.fade = 0;
+  }
   /** Count a fall and start the fade its owner's health reads. */
   fell(id: string, health: PlayerHealth): void {
     const seat = this.seat(id);

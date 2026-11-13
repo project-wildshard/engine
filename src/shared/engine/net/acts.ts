@@ -15,6 +15,9 @@ export interface NetChatReport { readonly kind: 'report'; readonly seq: number; 
 export const STORY_ACT = 'story:';
 /** The `interact` a page's DEV tab Unstuck sends (Jake, 2026-11-12): the server puts its player back where a fall would, with no fall. */
 export const UNSTUCK_ACT = 'unstuck';
+/** The `interact` the death card's Respawn now sends (QA 11-13, Jake: "It needs a button, a Respawn now button"): the server
+ *  has already placed its fallen player, and ends that player's fade so their commands move them again. */
+export const RESPAWN_NOW_ACT = 'respawn-now';
 export interface NetClimateAct { readonly kind: 'climate'; readonly seq: number; readonly op: typeof CLIMATE_OPS[number]; readonly name: string; readonly at: number }
 /** Buy one of the shard's goods, by its place in the shard's exchange. The server checks it and takes the price. */
 export interface NetBuyAct { readonly kind: 'buy'; readonly seq: number; readonly good: number }

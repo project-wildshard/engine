@@ -106,7 +106,7 @@ import { HAPTIC, buzz } from '@wildshard/engine/ui/haptics';
 import { hudSlots } from '@wildshard/engine/ui/hudSlots';
 import { installPlayerDeath } from '@wildshard/engine/ui/playerDeath';
 import { installUnstuck } from '@wildshard/engine/ui/unstuck';
-import { UNSTUCK_ACT } from '@wildshard/engine/net/acts';
+import { RESPAWN_NOW_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
 import { PlayerHurt } from '@wildshard/engine/ui/playerHurt';
 import { onReview, queuedCount, quickNote } from '@wildshard/engine/ui/review';
 import { installBounds, playBounds } from '@wildshard/engine/world/bounds';
@@ -446,7 +446,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // ── death (E295): a fade to dark with a "Mauled by a brown bear / respawning at Wreck Cove" card (src/client/engine/ui/DeathFade.ts),
   // the respawn under the dark at the last named place you reached (src/game/LastPlace.ts; Driftwood's places, the spawn
   // when none), input frozen and no hit taken until the view is back. A boss fight's death keeps its own checkpoint. ──
-  const deathFade = new DeathFade();
+  // QA 11-13 (Jake: "It needs a button, a Respawn now button"): its words live here, in the session, not in the engine table the title carries
+  const deathFade = new DeathFade({ now: 'Respawn now', waiting: 'Respawning…' });
   const placePts = boot.runtime.hooks.places;
   const lastPlace = placePts !== undefined ? new LastPlace(placePts) : null;
   if (lastPlace !== null) {
@@ -481,6 +482,11 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
         else if (stand !== null) player.spawn(stand.x, stand.z, stand.yaw, stand.y); else toSpawn();
       }, // a server owns its return; a local player uses the last place (the pier is the spawn)
       done: () => { player.carried = false; weapons.setEnabled(!player.swimming); },
+      // Respawn now (QA 11-13) and the timer wait for the respawn point: a server has placed the player already (its reconcile
+      // carries the move: SERVER-PARITY); a local last place waits for its ground in the page's physics (DeathFade's READY_WAIT caps it)
+      ready: () => serverRespawn !== null || stand === null || app.physics === null || floorBelow(app.physics, stand.x, stand.z, stand.y + 0.6, 1.2) !== undefined,
+      // a server's world holds the fallen player's commands for its own fade: Respawn now asks it to end it (roomRespawn.ts)
+      skipped: () => { if (player.link !== null) weapons.interact(RESPAWN_NOW_ACT); },
     });
   };
   playerHealth.bindLifecycle({ fading: () => deathFade.active, updateFade: (dt) => deathFade.update(dt) });

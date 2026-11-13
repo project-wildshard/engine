@@ -10,6 +10,9 @@ import { DARK_UNTIL, FADE_IN } from '../src/client/engine/ui/DeathFade';
 import { LastPlace } from '../src/shared/engine/quest/lastPlace';
 import { installRoomRespawn } from '../src/server/game/roomRespawn';
 import { serverPlaces } from '../src/server/game/quest/serverPlaces';
+import { actRoutes } from '../src/shared/engine/sim/actRoutes';
+import { RESPAWN_NOW_ACT } from '../src/shared/engine/net/acts';
+import { netInteractCommands } from '../src/shared/host/standalone/netInput';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -101,4 +104,29 @@ test('Pine: a bot falls on the real shard, comes back, and a save carries its pl
   const saved = serializeSimSnapshot(snapshotSimHostBytes(host));
   expect(saved).toContain('"gate"');
   live.dispose();
+});
+
+test('QA 11-13 Respawn now: the fallen player asks the server, which ends their fade at once and moves nobody', () => {
+  const { host } = room(), lead = [...host.players.values()][0];
+  if (lead === undefined) throw new Error('No lead');
+  host.respawn.served = true;
+  const other = host.addPlayer('bot:1', { x: 8, y: lead.position.y, z: 8 });
+  host.step();
+  const respawnNow = (id: string): void => { expect(netInteractCommands(actRoutes(host), [{ kind: 'interact', seq: 1, id: RESPAWN_NOW_ACT }], id)).toEqual([]); };
+  // standing: the act does nothing (no move, no heal, no fade)
+  const stood = lead.position.clone(); lead.health.attributes.health -= 10; const hurt = lead.health.attributes.health;
+  respawnNow(lead.id); host.step();
+  expect(lead.position.distanceTo(stood)).toBeLessThan(0.2); expect(lead.health.attributes.health).toBe(hurt); expect(actRoutes(host).refused).toBe(0);
+  // fallen: the server has placed them and holds their commands for the fade; Respawn now hands them back on the next tick
+  kill(host, lead.id); host.step();
+  expect(host.respawn.fading(lead.id)).toBe(true); expect(lead.led).toBe(true);
+  const placed = lead.position.clone(), otherAt = other.position.clone();
+  respawnNow(lead.id); host.step();
+  expect(host.respawn.fading(lead.id)).toBe(false); expect(lead.led).toBe(false);
+  expect(lead.position.distanceTo(placed)).toBeLessThan(0.2); expect(other.position.distanceTo(otherAt)).toBeLessThan(0.2);
+  expect(host.respawn.falls(lead.id)).toBe(1);
+  // one player's press never ends another's fade
+  kill(host, other.id); host.step();
+  respawnNow(lead.id); host.step();
+  expect(host.respawn.fading(other.id)).toBe(true);
 });
