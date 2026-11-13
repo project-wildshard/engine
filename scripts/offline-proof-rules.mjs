@@ -125,8 +125,8 @@ export function judge(run) {
     const last = samples.at(-1);
     out.push({ shard, rule: 'stalled', detail: `${last?.phase ?? '?'}/${last?.step ?? '?'}` });
   }
-  // 7. OF20: an offline entry reads the grid layout from the cache, and reads it at all.
-  if (run.layout === true) {
+  // 7. OF20: an offline entry reads the grid layout from the cache, and reads it at all (a shard the world doesn't open loads none).
+  if (run.layout === true && run.outcome !== 'outside-world') {
     const layout = rows.filter(row => row.origin === 'page' && GRID_LAYOUT.test(pathOf(row.url)));
     if (layout.length === 0) out.push({ shard, rule: 'grid-layout-not-read', detail: 'the entry read no grid layout (a one-shard route, or none)' });
     for (const row of layout) if (row.servedBy !== 'service-worker') out.push({ shard, rule: 'grid-layout-not-cached', url: row.url, detail: row.servedBy });

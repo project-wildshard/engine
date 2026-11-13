@@ -80,6 +80,8 @@ describe('offline proof rules (OF1)', () => {
     expect(gridPlaces('open-plot-thin-ice', catalogue)).toBe(false);
     expect(gridPlaces('open-plot-night-market', catalogue)).toBe(true);
     expect(end({ placed: false })).toEqual([]);
+    // a page that never left the title loads no grid layout (OF20's rule is for entries that load)
+    expect(end({ placed: false, layout: true })).toEqual([]);
     expect(end({ placed: false, requireWorld: true })).toEqual([]);
     expect(end({ placed: true })).toEqual(['outside-world']);
     expect(end({ placed: false, channel: 'preview' })).toEqual(['outside-world']);
