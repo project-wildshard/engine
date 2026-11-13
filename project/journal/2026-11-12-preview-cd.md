@@ -20,3 +20,4 @@
   concurrency `preview` no longer cancels a run mid-release; the checkout
   fetches tags so `git describe` sees v0.1.x.
 - The plan (PCD1 to PCD5) is docs/plans/opus-2026-11-12-preview-cd.md; PCD3 (a 75-minute lag watchdog), PCD4 (proof) and PCD5 (meta architecture) stay open.
+- PCD3: scripts/preview-lag.mjs finds the oldest green main past the live preview that changes a client input (preview.yml's list); over 75 min it checks in error to Sentry Crons preview-lag and dispatches preview.yml. First run 22:57 Cancún: BEHIND 240 min (243820b7), the hand run was already going.
