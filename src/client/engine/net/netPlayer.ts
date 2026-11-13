@@ -13,12 +13,15 @@ import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import type { Physics } from '../../../shared/engine/physics/Physics';
 import type { Player, PlayerLink, PlayerWireInput } from '../player/Player';
 import { AttackPrediction } from './attackPrediction';
+import { heldOnOthers, slotKit, type HeldLook } from './heldOnOthers';
 import type { NetClient } from './client';
 import { predictedPlayer, PredictionWorld } from './predictionWorld';
 import { Predictor } from './predictor';
 
 /** Where this player's attacks are drawn: `EquipmentService`, on a page. */
-export interface NetWeapons { readonly bindWire: (wire: WeaponWire | null) => void; readonly serverHit: (hit: OwnHit) => void; readonly attackRefused: () => void; readonly heldByServer: (row: string) => void; readonly mirrorArrows: (count: number) => void }
+export interface NetWeapons { readonly bindWire: (wire: WeaponWire | null) => void; readonly serverHit: (hit: OwnHit) => void; readonly attackRefused: () => void; readonly heldByServer: (row: string) => void; readonly mirrorArrows: (count: number) => void;
+  /** RP5: an item as other players' bodies draw it, by row or (a kit with no slot map) by its place in the kit. */
+  readonly heldLook?: (which: string | number) => HeldLook | null }
 
 /** A traversal tool's line to the server. `lock` is a LOCK press naming its hook by index, and answers the `seq` that carries it. */
 export interface NetHookWire { readonly lock: (hook: number | undefined) => number; readonly fire: () => void }
@@ -127,9 +130,17 @@ export class NetPlayer implements PlayerLink {
     client.onRejoin(() => { this.seen = null; this.seq = 0; this.heard.length = 0; this.attacks.clear(); })];
   }
   /** Draw this player's attacks on `weapons`: they stop settling their own contact and take the server's word. */
-  bindWeapons(weapons: NetWeapons, slots: ReadonlyMap<string, number>): void { this.weapons = weapons; this.slots = slots; weapons.bindWire(this.wire); }
+  bindWeapons(weapons: NetWeapons, slots: ReadonlyMap<string, number>): void {
+    this.weapons = weapons; this.slots = slots; weapons.bindWire(this.wire);
+    // RP5: other players' bodies draw what their slot holds as this page's kit does
+    this.unlend(); this.unlend = heldOnOthers.lend(slotKit(() => this.slots, which => this.weapons?.heldLook?.(which) ?? null));
+  }
+  private unlend: () => void = () => undefined;
   /** A world has its own items, and so its own slots. */
-  bindSlots(slots: ReadonlyMap<string, number>): void { this.slots = slots; }
+  bindSlots(slots: ReadonlyMap<string, number>): void {
+    this.slots = slots;
+    if (this.weapons !== null) { this.unlend(); this.unlend = heldOnOthers.lend(slotKit(() => this.slots, which => this.weapons?.heldLook?.(which) ?? null)); } // RP5: its items too
+  }
   /** Where this player's ride lands. A page with none takes no ride's words. */
   bindRide(seat: NetRideSeat | null): void { this.seat = seat; }
   /** The slot the server says this player holds. */
@@ -246,5 +257,5 @@ export class NetPlayer implements PlayerLink {
     this.predictor.update(dt);
     this.worstOffset = Math.max(this.worstOffset, this.player.renderOffset.length());
   }
-  dispose(): void { for (const off of this.off) off(); this.weapons?.bindWire(null); this.world.dispose(); }
+  dispose(): void { for (const off of this.off) off(); this.weapons?.bindWire(null); this.unlend(); this.world.dispose(); }
 }

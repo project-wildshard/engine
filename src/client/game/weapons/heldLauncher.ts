@@ -432,8 +432,9 @@ export function heldBowProfile(base: HeldBowBase, rows: HeldBowRows, model: Held
     arrow: (sky): ProjectileKind => ({ geometry: part(model, rows.parts.arrow), material: bowMaterial(sky, rows.materials.arrow), length: arrowLength(rows),
       gravity: a.gravity, drag: a.drag, windCoupling: a.windCoupling, bury: a.bury, recover: a.recover, maxFlying: a.maxFlying, maxStuck: a.maxStuck }),
     build: sky => {
-      const mat = bowMaterial(sky, rows.materials.bow), rWristDir = vec(b.rWristDir), mesh = (id: string) => new THREE.Mesh(part(model, id), mat);
-      return { mat, mesh: staveMesh(rows, model), nocked: mesh(rows.parts.nocked), rHand: mesh(rows.parts.rightFist), lSleeve: mesh(rows.parts.leftSleeve), rSleeve: mesh(rows.parts.rightSleeve),
+      const mat = bowMaterial(sky, rows.materials.bow), rWristDir = vec(b.rWristDir), mesh = (id: string, name: string) => Object.assign(new THREE.Mesh(part(model, id), mat), { name });
+      // Named, so another player's copy of the bow (net/heldOnOthers.ts) leaves this player's fist, sleeves and nocked arrow off it.
+      return { mat, mesh: staveMesh(rows, model), nocked: mesh(rows.parts.nocked, 'nocked-arrow'), rHand: mesh(rows.parts.rightFist, 'hand-right'), lSleeve: mesh(rows.parts.leftSleeve, 'sleeve-left'), rSleeve: mesh(rows.parts.rightSleeve, 'sleeve-right'),
         lWrist: vec(b.lWrist), rWrist: vec(b.rWrist), rHook: vec(b.rHook), rWristDir, roll: new THREE.Quaternion().setFromAxisAngle(rWristDir, look.rightRoll) };
     } };
 }

@@ -7,13 +7,14 @@ import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import type { DummyJoint, DummyJoints } from '../practice/TrainingDummy';
 import { castawayBody, groundContact, type CastawayBody } from '../models/castawayBody';
 import { AnimMachine } from '../anim/machine';
+import { HeldInHand } from './heldOnOthers';
 import { BoardUnder, DECK_LIFT } from './remoteBoard';
 import type { NetClient } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
-const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp');
+const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
 /** Over this a row's body is walking, and over this it runs, in m/s. */
 const WALKS = 0.4, RUNS = 5;
 /** Metres a whole stride covers, walking and running. */
@@ -29,8 +30,6 @@ const TALK_HEIGHT = 2.62, TALK_SIZE = 0.5, TALK_PULSE = 9, TALK_SWELL = 0.1;
 const BOARD_LIFT = DECK_LIFT;
 /** How high a rider's feet sit over the row, which stands at the horse's own feet. */
 const SADDLE_LIFT = 0.85;
-/** A blade's length and where it sits along the hand. */
-const BLADE = 0.8;
 /** A rider's knees, in radians. The row it rides moves the body. */
 const SEAT = 1.2;
 const SWUNG: readonly DummyJoint[] = ['leftThigh', 'rightThigh', 'leftShin', 'rightShin', 'leftUpperArm', 'rightUpperArm', 'spine'];
@@ -69,7 +68,9 @@ function talkRing(): THREE.Sprite {
 }
 
 /** What a page drew of another player. */
-export interface OtherShown { readonly name: string; readonly x: number; readonly y: number; readonly z: number; readonly speed: number; readonly gait: string; readonly board: boolean; readonly mounted: boolean; readonly held: number; readonly hp: number; readonly modelled: boolean; readonly model: string; readonly talking: boolean }
+export interface OtherShown { readonly name: string; readonly x: number; readonly y: number; readonly z: number; readonly speed: number; readonly gait: string; readonly board: boolean; readonly mounted: boolean; readonly held: number; readonly hp: number; readonly modelled: boolean; readonly model: string; readonly talking: boolean;
+  /** RP5: the item drawn in the hand for `held` (its row), or '' for an empty hand. */
+  readonly item: string }
 
 /** One other player on screen. */
 class OtherBody {
@@ -82,7 +83,8 @@ class OtherBody {
   private readonly rest = new Map<DummyJoint, THREE.Quaternion>();
   private joints: DummyJoints = {};
   private figure: THREE.Group | null = null;
-  private blade: THREE.Mesh | null = null;
+  /** RP5: the item in its hand, the page's own first-person model of what its row holds. */
+  private hand: HeldInHand | null = null;
   /** Plays the body's idle slot on the chest and head, which no pose here drives. */
   private anim: AnimMachine | null = null;
   /** Where the figure stands so its soles are on the ground. */
@@ -91,7 +93,7 @@ class OtherBody {
   private phase = 0;
   /** Whether a row has put it anywhere yet. */
   placed = false;
-  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false };
+  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '' };
   /** Its player row's id, which voice names its talker by. */
   readonly id: string;
   constructor(name: string, id: string) {
@@ -101,14 +103,13 @@ class OtherBody {
     this.group.name = `Player · ${name}`;
     this.group.add(this.tag, this.ring, this.board.deck);
   }
-  /** Stops its idle, when the body goes. */
-  undress(): void { this.anim?.dispose(); this.anim = null; }
-  /** RP2: the castaway's body, standing on the ground (its soles are at its root), the blade in its right grip, its idle playing. */
+  /** Stops its idle and lets go of its item (the page's own, never freed with the body), when the body goes. */
+  undress(): void { this.anim?.dispose(); this.anim = null; this.hand?.drop(); }
+  /** RP2: the castaway's body, standing on the ground (its soles are at its root), its hands ready for the held item (RP5), its idle playing. */
   dress(model: CastawayBody): void {
     this.figure = model.root; this.joints = model.joints; this.feet = 0; model.root.position.y = 0;
     this.group.add(model.root, groundContact()); this.shown = { ...this.shown, modelled: true, model: model.id };
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, BLADE, 0.015), new THREE.MeshStandardMaterial({ color: 0xb8c0c8, metalness: 0.7, roughness: 0.4 }));
-    this.blade = blade; blade.position.y = BLADE / 2; blade.visible = false; model.mounts.rightHand.add(blade);
+    this.hand = new HeldInHand({ right: model.mounts.rightHand, left: model.mounts.leftHand });
     for (const joint of SWUNG) { const bone = model.joints[joint]; if (bone !== undefined) this.rest.set(joint, bone.quaternion.clone()); }
     this.anim = new AnimMachine({ states: {}, loops: ['idle'] }, model.rig); this.anim.base('idle');
     this.board.fit(model.joints);
@@ -122,7 +123,8 @@ class OtherBody {
     // A row's yaw is where a player looks, down -z at 0, and the figure faces +z.
     group.position.set(x, y, z); group.rotation.y = (row[YAW] ?? 0) + Math.PI;
     const riding = row[BOARD] === 1, gait = this.speed < WALKS || riding || mounted ? 'idle' : this.speed < RUNS ? 'walk' : 'run';
-    if (this.blade !== null) this.blade.visible = !riding && !mounted;
+    const held = row[HELD] ?? 0;
+    this.hand?.show(held, !riding && !mounted && row[SWIM] !== 1, dt); // RP5: nothing in hand on a board, in a saddle or swimming
     if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : 0);
     this.anim?.update(dt);
     this.pose(gait, this.speed, dt);
@@ -131,7 +133,7 @@ class OtherBody {
     const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
     this.ring.visible = talking;
     if (talking) { this.talkPhase = (this.talkPhase + dt * TALK_PULSE) % (Math.PI * 2); this.ring.scale.setScalar(TALK_SIZE * (1 + TALK_SWELL * Math.sin(this.talkPhase))); }
-    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held: row[HELD] ?? 0, hp: row[HP] ?? 0, talking };
+    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held, hp: row[HP] ?? 0, talking, item: this.hand?.row ?? '' };
   }
   private bend(joint: DummyJoint, angle: number): void {
     const bone = this.joints[joint], rest = this.rest.get(joint);

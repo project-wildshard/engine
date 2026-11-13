@@ -7,6 +7,7 @@ import { Tool } from '../../../shared/engine/combat/Tool';
 import type { EquipmentInput } from '../input/equipmentInput';
 import type { Events } from '../../../shared/engine/events/events';
 import type { EquipmentPickup, EquipmentPickupHost, PickupLoadout } from '../../../server/engine/combat/EquipmentPickup';
+import type { HeldLook } from '../net/heldOnOthers';
 
 const SWAP_TIME = 0.25, STOW_TIME = 0.25;
 interface PendingSelection { readonly to: Weapon; instant: boolean; waiting: boolean; pending: Promise<void>; readonly supersede: () => void }
@@ -362,6 +363,13 @@ export class EquipmentService implements WeaponHooks {
     const weapon = this.list.find(w => w.row.id === row);
     if (weapon === undefined) return;
     this.unlock(weapon.id); this.choose(weapon.id, false);
+  }
+  /** RP5: an item as other players' bodies draw it (net/heldOnOthers.ts): its first-person model, by row, or by its place in the
+   *  kit's order (a native kit's slots: Nalati's bow, sabre, spear), which is the list's where the kit names none (Driftwood). */
+  heldLook(which: string | number): HeldLook | null {
+    const id = typeof which === 'number' ? (this.order ?? this.list.map(w => w.id))[which] : undefined;
+    const weapon = typeof which === 'number' ? this.list.find(w => w.id === id) : this.list.find(w => w.row.id === which);
+    return weapon === undefined ? null : { row: weapon.row.id, model: weapon.model, bow: weapon.row.ui.touch === 'bow' };
   }
   /** The server settled a blow of ours: the weapon in hand plays it. */
   serverHit(hit: OwnHit): void { this.current.serverHit(hit); }
