@@ -160,3 +160,31 @@ test('MK8: a hardware keyboard (0 px inset) with the chat field in focus leaves 
     expect(resized).toBe(0);
   } finally { window.removeEventListener('resize', count); }
 });
+
+// MK7 (meta MOBILE-KEYBOARD, the landscape dock; iOS 26 Simulator, iPhone 17 Pro, Mobile Safari with its toolbar and tab bar,
+// 2026-11-13): the landscape page is 750×292; with the chat's keyboard up innerHeight drops to 36 and visualViewport is 16
+// tall at offsetTop 256, and the open chat reserves 14 (half the band, plus its gap). No dock holds a line there. The game
+// keeps its 80 px floor, the band is still marked, and the input stays in view over a strip of world
+// (plan-artifacts/mobile-keyboard/mk7/mk7-landscape-keyboard.png). Phones are portrait-only in the game anyway (RotateGate,
+// E38), so this is the harness's page, not one a player reaches.
+test('MK7: a landscape phone keyboard leaves a 16 px band; the game keeps its floor and the marks follow', () => {
+  const view = { height: 292, offsetTop: 0, scale: 1 };
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 750 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 292 });
+  syncKeyboardView(view);
+  typeIn(); root.dataset['wsKbReserve'] = '14';
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 36 });
+  view.height = 16; view.offsetTop = 256;
+  expect(syncKeyboardView(view)).toBe(true);
+  expect(root.dataset['wsKeyboard']).toBe('');
+  expect(root.style.getPropertyValue('--ws-kb-top')).toBe('256px');
+  expect(root.style.getPropertyValue('--ws-kb-bottom')).toBe('272px');
+  expect(viewportHeight()).toBe(80); // the floor, never the band less the reserve (2 px)
+  expect(root.style.getPropertyValue('--ws-vh')).toBe('80px');
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 292 });
+  view.height = 292; view.offsetTop = 0;
+  (document.activeElement as HTMLElement | null)?.blur();
+  expect(syncKeyboardView(view)).toBe(true);
+  expect(root.dataset['wsKeyboard']).toBeUndefined();
+  expect(viewportHeight()).toBe(292);
+});
