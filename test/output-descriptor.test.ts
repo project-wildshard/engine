@@ -21,6 +21,9 @@ import { installShards, shards } from '../src/client/game/shard/list';
 import { findShard, game, setActiveChunk } from '../src/client/game/shard/registry';
 import { Scope } from '../src/shared/engine/app/scope';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
+import { ProductLeases } from '../src/client/game/grid/productLeases';
+import { accountTransportRelease } from '../src/client/game/grid/products';
+import type { AdmittedProduct } from '../src/client/game/shardfile/product';
 import { leaseClientLibrary } from '../src/client/game/shardfile/clientLibrary';
 import { entryReadPlan } from '../src/client/game/grid/entryReadPrefetch';
 import { parseEntryReadSet } from '@wildshard/format/entryReads';
@@ -1287,6 +1290,34 @@ test('built product residency is the emitted value without another source walk',
     expect(productPostCost(source,()=>{throw new Error('No entry-time graph validation');})).toStrictEqual(postCost);
     const steps=productResidentBytesSteps(source,1);expect(steps.next()).toEqual({done:true,value:expected});
   }finally{if(previous===undefined)Reflect.deleteProperty(globalThis,'__SHARDFILE_VERDICTS__');else Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',previous);}
+});
+
+// QA-FEEDBACK-2026-11-12 (v0.1.14 staging proof): Brasscap rev 3's receipt stamps 2,930,740 resident bytes over 4,670,827 bytes of wire (its
+// repack kept an older receipt's cost fields). As a grid neighbour, the transport release shrank the product claim by every
+// released file's wire, past zero: "RangeError: Invalid residency shrink", and the cell stayed closed.
+test('a built product stamped below its own wire still releases all of its transport',async()=>{
+  const f=fixture(true),wire=f.source.files.reduce((sum,file)=>sum+file.compressed,0),stale=1;
+  expect(wire).toBeGreaterThan(stale);
+  const previous=Object.getOwnPropertyDescriptor(globalThis,'__SHARDFILE_VERDICTS__');
+  const postCost={passes:1,instructions:7,inputs:{colour:true,depth:false,normal:false}};
+  Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',{configurable:true,value:[{sourceHash:f.index.build.sourceHash,residentBytes:stale,postCost}]});
+  const allocator=new ResidencyAllocator(),leases=new ProductLeases<string>(allocator,'grid');
+  try{
+    const source=await resolveOutputDescriptor(f.index,{firstParty:true,offline:false,hash:()=>{throw new Error('No client hash');},read:()=>{throw new Error('No checked fallback');},
+      built:{indexHash:'compiled',read:path=>{const bytes=f.wires.get(path);if(bytes===undefined)throw new Error('Missing section');return Promise.resolve(bytes);}}});
+    if(!isBuildValidatedOutput(source))throw new Error('Missing built source');
+    const lease=await leases.acquire('blender-template',async(reserve,releaseBytes)=>{
+      await reserve(source);
+      const admitted:AdmittedProduct={source,assets:new Map(),cached:false,releaseTransport:refs=>Promise.resolve([...refs])};
+      accountTransportRelease(admitted,releaseBytes);
+      await admitted.releaseTransport?.(source.files.map(file=>file.hash),'cache-or-fetch');
+      return 'admitted';
+    });
+    expect(lease.value).toBe('admitted');
+    expect(allocator.entries().find(row=>row.id==='product:grid:blender-template')?.bytes).toBe(0);
+    expect(productResidentBytes(source)).toBe(wire);expect(productResidentBytesSteps(source,1).next()).toEqual({done:true,value:wire});
+    lease.release();
+  }finally{leases.dispose();if(previous===undefined)Reflect.deleteProperty(globalThis,'__SHARDFILE_VERDICTS__');else Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',previous);}
 });
 
 test('the browser cannot fall back to Node admission when its native build reader is missing',async()=>{

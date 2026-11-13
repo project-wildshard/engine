@@ -313,16 +313,23 @@ export function productPostCost(source:Shardfile,bytes:(hash:string)=>Uint8Array
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned post cost');
   return postStackCost(source,bytes).cost;
 }
+/** The wire a product claim holds: every file's and common's compressed bytes. The grid's transport release
+ * (`accountTransportRelease`) shrinks the claim by each released file's `compressed`, so a claim below this would
+ * shrink past zero. A build-stamped residency is static evidence that a repack can carry stale (Brasscap rev 3's
+ * receipt says 2.93 MB over 4.67 MB of wire), so it never claims less than this floor. */
+function productWireBytes(source: Shardfile): number {
+  return source.files.reduce((sum, file) => sum + file.compressed, 0)
+    + source.requires.commons.reduce((sum, hash) => sum + (source.requires.commonsWire[hash] ?? 0), 0);
+}
 /** Conservative transport/source heap claim: two parsed-source copies, owned asset buffers and map/object overhead. */
 export function productResidentBytes(source: Shardfile): number {
   const emitted=outputDescriptor(source);
-  if(emitted?.built===true){if(emitted.residentBytes===undefined)throw new Error('Build must publish source residency');return emitted.residentBytes;}
+  if(emitted?.built===true){if(emitted.residentBytes===undefined)throw new Error('Build must publish source residency');return Math.max(emitted.residentBytes,productWireBytes(source));}
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned residency');
   const accounting = { heapBytes: 0 };
   preflightShardfile(source, accounting);
   // File/common aliases are copied into separate owned buffers by admitProduct, so count each actual Map entry.
-  const wire = source.files.reduce((sum, file) => sum + file.compressed, 0)
-    + source.requires.commons.reduce((sum, hash) => sum + (source.requires.commonsWire[hash] ?? 0), 0);
+  const wire = productWireBytes(source);
   // The source-size walk already counted this exact tree. Reuse that
   // accounting without another residency-only traversal.
   return wire + accounting.heapBytes * 2 + (source.files.length + source.requires.commons.length) * 128 + 1024;
@@ -332,12 +339,11 @@ export function productResidentBytes(source: Shardfile): number {
  *  whole source in one drawn frame of a drive, 23-34 ms at phone 4x). The source must not change between steps. */
 export function* productResidentBytesSteps(source: Shardfile, every = 4096): Generator<void, number> {
   const emitted=outputDescriptor(source);
-  if(emitted?.built===true){if(emitted.residentBytes===undefined)throw new Error('Build must publish source residency');return emitted.residentBytes;}
+  if(emitted?.built===true){if(emitted.residentBytes===undefined)throw new Error('Build must publish source residency');return Math.max(emitted.residentBytes,productWireBytes(source));}
   if(!(import.meta.env?.SSR??true))throw new Error('Client product needs its build-owned residency');
   const accounting = { heapBytes: 0 };
   yield* preflightShardfileSteps(source, every, accounting);
-  const wire = source.files.reduce((sum, file) => sum + file.compressed, 0)
-    + source.requires.commons.reduce((sum, hash) => sum + (source.requires.commonsWire[hash] ?? 0), 0);
+  const wire = productWireBytes(source);
   return wire + accounting.heapBytes * 2 + (source.files.length + source.requires.commons.length) * 128 + 1024;
 }
 /** Files read only through the asynchronous runtime product API. Inventory membership is not a use:
