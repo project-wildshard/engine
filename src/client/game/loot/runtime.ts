@@ -22,6 +22,7 @@ import type { CreatureDeathSource } from '../../../shared/game/loot/deaths';
 import type { ShardContext } from "../plugin/context";
 import { installEnteredRuntimeService } from '../shard/retainedHooks';
 import { DynamicBodySlots } from '@wildshard/engine/physics/bodies';
+import { framedPoint } from '@wildshard/engine/ui/hudAdapters';
 
 export interface LootShop { readonly isOpen: boolean; render: () => void; dispose: () => void }
 export interface LootPresentation {
@@ -78,7 +79,8 @@ export function installLoot<A extends LootBody>(h: ScopedLootHost<A>): ScopedLoo
   const offPayouts = feed.onPayout(({ at, coins: n }) => {
     if (!live) return;
     burst.spawn(fell.set(at.x, at.y, at.z), n, () => undefined, () => { flush(); view.chime(); });
-    projected.set(at.x, at.y + 1.5, at.z).project(h.camera);
+    // the payout point is frame-local: at the grid frame's offset like the HUD pins (QA 2026-11-13 row 28)
+    framedPoint(projected.set(at.x, at.y + 1.5, at.z), projected).project(h.camera);
     if (chip !== null && projected.z < 1 && Math.abs(projected.x) < 1.1 && Math.abs(projected.y) < 1.1) chip.pop((projected.x + 1) * 0.5 * window.innerWidth, (1 - projected.y) * 0.5 * window.innerHeight, n);
   });
   lifetime.onDispose(offPayouts);

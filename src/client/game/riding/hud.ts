@@ -2,6 +2,7 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import type { TouchVerbSpec } from '@wildshard/engine/input/InputService';
 import type { LevelContext } from '@wildshard/engine/level/context';
 import { hudSlots, type DiscOpts } from '@wildshard/engine/ui/hudSlots';
+import { frameEye, framedPoint } from '@wildshard/engine/ui/hudAdapters';
 import { uiScope } from '@wildshard/engine/ui/ownership';
 import * as THREE from 'three';
 import './ride.css';
@@ -36,7 +37,7 @@ const arcPath = (cx: number, cy: number, r: number, a0: number, a1: number): str
   return `M${p0x.toFixed(1)} ${p0y.toFixed(1)} A${r} ${r} 0 0 1 ${p1x.toFixed(1)} ${p1y.toFixed(1)}`;
 };
 
-const _p = new THREE.Vector3();
+const _p = new THREE.Vector3(), _eye = new THREE.Vector3();
 
 export class RideHUD {
   readonly scope: ReturnType<typeof uiScope> = uiScope('RideHUD');
@@ -236,7 +237,8 @@ export class RideHUD {
       }
       if (tg.name.textContent !== mt.name) tg.name.textContent = mt.name;
       const tag = tg.el;
-      const d = _p.fromArray(mt.position).distanceTo(this.camera.position);
+      // a horse stands in the frame's own coordinates; the eye there is the camera less the grid frame's offset (QA 11-13 row 28)
+      const d = _p.fromArray(mt.position).distanceTo(frameEye(this.camera, _eye));
       _p.fromArray(mt.position); _p.y += this.profile.tagHeight * mt.scale;
       const vis = m.horse !== mt.id && !mt.hidden && d < this.profile.tagRange && d > 2 && this.project(_p);
       if (vis) tag.style.transform = `translate(${_p.x.toFixed(1)}px, ${_p.y.toFixed(1)}px) translate(-50%, -100%)`;
@@ -244,9 +246,9 @@ export class RideHUD {
     }
   }
 
-  /** world → CSS px in `_p` (in place); false when behind the camera */
+  /** a frame-local point → CSS px in `_p` (in place), at the grid frame's offset like the HUD pins; false when behind the camera */
   private project(w: THREE.Vector3): boolean {
-    _p.copy(w).project(this.camera);
+    framedPoint(w, _p).project(this.camera);
     if (_p.z > 1 || _p.z < -1) return false;
     const r = this.root.getBoundingClientRect();
     _p.set((_p.x * 0.5 + 0.5) * r.width, (-_p.y * 0.5 + 0.5) * r.height, 0);

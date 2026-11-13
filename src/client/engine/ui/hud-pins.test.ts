@@ -6,7 +6,7 @@ import type {SystemSpec} from '../app/systems';
 import {Scope} from '../../../shared/engine/app/scope';
 import {installBrowserScopeEnvironment} from '../app/view/scopeEnvironment';
 import {legacyDouble} from '../../../test/engine/FakeGame';
-import {hudAdapters,pinFrameOffset} from './hudAdapters';
+import {frameEye,framedPoint,hudAdapters,pinFrameOffset} from './hudAdapters';
 import {hudSlots} from './hudSlots';
 
 const originalWidth=Object.getOwnPropertyDescriptor(globalThis,'innerWidth');
@@ -91,4 +91,24 @@ test('in a grid frame a pin projects its frame-local point at the frame\'s rende
   face(f.camera,-PITCH,Math.PI);f.step();expect(el.style.display).toBe('none');
   face(f.camera,-PITCH,0);f.step();expect(el.style.display).toBe('block');expect(el.style.transform).toMatch(/^translate3d\(201px, 4\d\dpx, 0\)/u);
  }finally{f.close();}
+});
+// QA 2026-11-13 row 28: the grapple's in-view test, riding's name tags and the loot chip project with the page camera too
+test('framedPoint and frameEye put a frame-local point and the eye in one frame at the grid offset',()=>{
+ const camera=new PerspectiveCamera(72,402/874,.1,100);
+ face(camera,-PITCH,0);pinFrameOffset.set(0,0,-PITCH);
+ const ahead=(point:Vector3)=>point.clone().applyMatrix4(camera.matrixWorldInverse).z<0;
+ // the frame-local point straight, as those three did: 474.5 m behind the eye, though the Keeper stands ahead
+ expect(ahead(KEEPER)).toBe(false);
+ const seen=framedPoint(KEEPER,new Vector3());
+ expect(seen.toArray()).toEqual([0,30,-88-PITCH]);
+ expect(ahead(seen)).toBe(true);
+ const ndc=seen.clone().project(camera);
+ expect(Math.abs(ndc.x)).toBeLessThan(.01);expect(ndc.z).toBeGreaterThan(-1);expect(ndc.z).toBeLessThan(1);
+ const eye=frameEye(camera,new Vector3());
+ expect(eye.toArray()).toEqual([0,31.7,0]);
+ expect(eye.distanceTo(KEEPER)).toBeCloseTo(88.016,2);
+ expect(camera.position.toArray()).toEqual([0,31.7,-PITCH]); // the camera itself is never moved
+ pinFrameOffset.set(0,0,0);
+ expect(framedPoint(KEEPER,new Vector3()).toArray()).toEqual(KEEPER.toArray());
+ expect(frameEye(camera,new Vector3()).toArray()).toEqual(camera.position.toArray());
 });

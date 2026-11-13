@@ -1,4 +1,4 @@
-import { Vector2, Vector3 } from 'three';
+import { Vector2, Vector3, type Vector3Like } from 'three';
 import type { Game } from '../core/Game';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { LevelAdapters } from '../../../server/engine/level/context';
@@ -12,6 +12,14 @@ import { controlRects, placePin, type PinRect } from './pinKeepOut';
  * enteredInteract.ts), so the pass adds it before projecting. Zero on a standalone page and in the home frame.
  */
 export const pinFrameOffset: Vector3 = new Vector3();
+/**
+ * A frame-local point where the page camera sees it (`point` + pinFrameOffset), into `out`. Every overlay that projects
+ * content with the page camera goes through this: the pins, the grapple's in-view test, riding's name tags and the loot
+ * chip (QA 2026-11-13 row 28).
+ */
+export function framedPoint(point: Readonly<Vector3Like>, out: Vector3): Vector3 { return out.copy(point).add(pinFrameOffset); }
+/** The camera's eye in the frame content stands in (its position less pinFrameOffset), into `out`: distances and sight lines to frame-local points. */
+export function frameEye(camera: Readonly<{ position: Vector3 }>, out: Vector3): Vector3 { return out.copy(camera.position).sub(pinFrameOffset); }
 
 /** Scope-owned projection and relabels; content supplies only world positions and elements. */
 export function hudAdapters(game: Game, scope: Scope, root: HTMLElement,
@@ -39,7 +47,7 @@ export function hudAdapters(game: Game, scope: Scope, root: HTMLElement,
       // ahead or behind, the projected depth only the far plane. No edge mode: the quest chip's arrow carries a target behind.
       let ahead = false;
       if (at !== null) {
-        point.copy(at).add(pinFrameOffset);
+        framedPoint(at, point);
         ahead = depth.copy(point).applyMatrix4(game.camera.matrixWorldInverse).z < 0;
         point.project(game.camera);
       }

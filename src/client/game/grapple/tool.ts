@@ -16,6 +16,7 @@ import type { EquipmentHost } from '@wildshard/engine/combat/view/EquipmentHost'
 import type { InputContextDef } from '@wildshard/engine/level/context';
 import { playerModes } from '@wildshard/engine/player/modes';
 import type { DiscSpot, TouchRelabel } from '@wildshard/engine/ui/hudSlots';
+import { frameEye, framedPoint } from '@wildshard/engine/ui/hudAdapters';
 import type { ShardContext } from '@wildshard/engine/game/plugin/context';
 import { Filament, Rope } from './ribbon';
 import { effectField } from '@wildshard/engine/fx/effectField';
@@ -125,11 +126,13 @@ function installGrappleAim(ctx: EquipmentHost, shard: ShardContext, scope: Scope
   const MARKS = row.marks, H = v.parse(hints, row.hints);
   prepareGrappleFonts(row);
   let hooks = fragment.hooks;
-  // the camera as the aim (read live, as the Tool always did)
+  // the camera as the aim (read live, as the Tool always did). Hooks, colliders and the feet are frame-local; in a grid frame
+  // the camera stands at the frame's render offset, so the eye takes it off and a projection adds it (QA 2026-11-13 row 28)
+  const viewEye = new Vector3();
   const view: GrappleView = {
-    get eye() { return ctx.game.camera.position; },
+    get eye() { return frameEye(ctx.game.camera, viewEye); },
     update: () => { ctx.game.camera.updateMatrixWorld(true); },
-    project: (point, out) => out.copy(point).project(ctx.game.camera),
+    project: (point, out) => framedPoint(point, out).project(ctx.game.camera),
     forward: (out) => ctx.game.camera.getWorldDirection(out),
   };
   const tracer = makeTracer(ctx, row, profile, scope);
@@ -248,7 +251,7 @@ function installGrappleAim(ctx: EquipmentHost, shard: ShardContext, scope: Scope
   const pickCandidate = (): GrappleTarget | null => {
     if (candidate < 0) return null;
     const hook = hooks[candidate];
-    if (hook === undefined || !rules.visible(sim.course, ctx.game.camera.position, hook)) return null;
+    if (hook === undefined || !rules.visible(sim.course, view.eye, hook)) return null;
     const landing = new Vector3();
     const side = rules.landing(ctx.player.position, hook, landing);
     return side === rules.none ? null : rules.target(sim.course, hook, landing, side);
@@ -313,7 +316,7 @@ function installGrappleAim(ctx: EquipmentHost, shard: ShardContext, scope: Scope
   const scan = (): number => {
     const camera = ctx.game.camera;
     camera.updateMatrixWorld(true);
-    const eye = camera.position;
+    const eye = view.eye;
     for (let i = 0; i < n; i++) {
       const hook = hooks[i];
       if (hook === undefined) continue;
@@ -321,7 +324,7 @@ function installGrappleAim(ctx: EquipmentHost, shard: ShardContext, scope: Scope
       dist[i] = d;
       let on = 0;
       if (d >= MIN_RANGE && d <= MAX_RANGE) {
-        ndc.copy(hook).project(camera);
+        framedPoint(hook, ndc).project(camera);
         if (ndc.z >= -1 && ndc.z <= 1 && Math.abs(ndc.x) <= 1.05 && Math.abs(ndc.y) <= 1.05) { on = 1; ndcX[i] = ndc.x; ndcY[i] = ndc.y; }
       }
       inView[i] = on;
@@ -388,7 +391,7 @@ function installGrappleAim(ctx: EquipmentHost, shard: ShardContext, scope: Scope
       for (const m of marks) m.show(false);
       if (target === null) chip.show(false);
       else {
-        ndc.copy(target.hook).project(ctx.game.camera);
+        framedPoint(target.hook, ndc).project(ctx.game.camera);
         chip.show(ndc.z >= -1 && ndc.z <= 1);
         chip.label(touchUi ? row.chip.lockedTouch : row.chip.lockedDesk, 'locked', row.chip.lockedColor);
         chip.at(target.hook);
