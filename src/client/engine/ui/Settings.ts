@@ -7,8 +7,8 @@ import { saveStorage } from '../saves/slots';
 //   getNumber('volume') / setNumber('volume', 0.8) / onNumber('volume', fn)   → the sliders, clamped to NUM_RANGE: 0..1 volumes
 //   (master, 'music' = the score's bus) and the 0.5..2× look multipliers ('look' = touch drag + mouse, 'swingLook' = extra
 //   factor while a sword swing is running — TouchControls / Player.ts read them per event, nothing to subscribe)
-//   getMusicStyle() / setMusicStyle('orchestral') / onMusicStyle(fn)   → the score's source (project/archive/2026-09-23-music.md v3):
-//   'piano' | 'orchestral' | 'folk' (MiniMax-Music3 stems) | 'synth' (the v1 WebAudio score); default 'piano'.
+//   The music style is not a setting (J304, AUDIO AU16): the engine plays its one style, piano, and the synth score only
+//   where a recording fails. A save from before still holding `musicStyle` is ignored on load and dropped on the next save.
 //   getSfxSet() → Best samples; missing samples retain the synth fallback (G221).
 //
 //
@@ -27,7 +27,7 @@ import { saveStorage } from '../saves/slots';
 //
 // A listener a resident shard adds while it builds or runs is removed when that shard is evicted (src/shared/engine/app/ownership.ts).
 import { onOwnerDispose } from '../../../shared/engine/app/ownership';
-import { MUSIC_STYLES, type MusicStyle, type SfxSet } from '../../../shared/engine/audio/bootAudio';
+import type { SfxSet } from '../../../shared/engine/audio/bootAudio';
 import { isDev, onDev } from '../core/devMode';
 
 export type SettingKey = 'aimAssist' | 'tracers' | 'haptics' | 'autoLock' | 'huntersEye' | 'holdLoading';
@@ -55,7 +55,7 @@ function load(savedStorage: Pick<Storage, 'getItem'>): { bools: Record<SettingKe
   return { bools, nums, parsed };
 }
 
-/** a pick among fixed strings (the music style, the sfx set, the OPTIONS): saved under `key`, overridable by the URL for the
+/** a pick among fixed strings (the OPTIONS): saved under `key`, overridable by the URL for the
  *  page's life — the URL value wins until the player picks in the menu, and is never persisted on its own. A `boot` pick
  *  only changes what is saved: `value` stays what the page was built with until the reload. */
 class Choice<T extends string> {
@@ -141,7 +141,7 @@ export function settingsReloadUrl(href: string, extra: readonly string[] = []): 
   return u.toString();
 }
 
-/** a page's settings (createSettings): the options, the toggles, the numbers and the music / sfx picks */
+/** a page's settings (createSettings): the options, the toggles, the numbers and the sfx set */
 export interface Settings {
   setting: <K extends OptionKey>(k: K) => OptionValue<K>;
   savedSetting: <K extends OptionKey>(k: K) => OptionValue<K>;
@@ -156,9 +156,6 @@ export interface Settings {
   setNumber: (k: NumberKey, raw: number) => void;
   onNumber: (k: NumberKey, fn: (v: number) => void) => () => void;
   onSetting: (k: SettingKey, fn: (v: boolean) => void) => () => void;
-  getMusicStyle: () => MusicStyle;
-  setMusicStyle: (v: MusicStyle) => void;
-  onMusicStyle: (fn: (v: MusicStyle) => void) => () => void;
   getSfxSet: () => SfxSet;
 }
 
@@ -175,8 +172,6 @@ export function createSettings(savedStorage: Pick<Storage, 'getItem' | 'setItem'
   // the choices persist through this, bound once they exist (they and the save record need each other)
   const writer = { persist: (): void => undefined };
   const ctx = { saved, persist: (): void => { writer.persist(); }, search };
-  // Music style is a player preference; SFX comparison stays in the registry. Neither has a URL override (E162).
-  const musicStyle = new Choice<MusicStyle>('musicStyle', MUSIC_STYLES, 'piano', () => null, false, ctx);
   const defaultOption = <K extends OptionKey>(k: K): OptionValue<K> => {
     const value = OPTION_SPECS[k].def ?? OPTION_VALUES[k][0];
     if (value === undefined) throw new Error(`Settings: option ${k} has no default`);
@@ -194,7 +189,7 @@ export function createSettings(savedStorage: Pick<Storage, 'getItem' | 'setItem'
   const persist = (): void => {
     const picks: Partial<Record<string, string>> = {};
     for (const k of OPTION_KEYS) picks[k] = options[k].stored;
-    try { savedStorage.setItem(STORE, JSON.stringify({ ...state, ...nums, musicStyle: musicStyle.stored, ...picks })); } catch { /* not persisted this session */ }
+    try { savedStorage.setItem(STORE, JSON.stringify({ ...state, ...nums, ...picks })); } catch { /* not persisted this session */ }
   };
   writer.persist = persist;
   const readOption = <K extends OptionKey>(key: K): OptionValue<K> => {
@@ -250,9 +245,6 @@ export function createSettings(savedStorage: Pick<Storage, 'getItem' | 'setItem'
     },
     onNumber: (k: NumberKey, fn: (v: number) => void): (() => void) => subscribe(numListeners, k, fn),
     onSetting: (k: SettingKey, fn: (v: boolean) => void): (() => void) => subscribe(listeners, k, fn),
-    getMusicStyle: (): MusicStyle => musicStyle.value,
-    setMusicStyle: (v: MusicStyle): void => { musicStyle.set(v); },
-    onMusicStyle: (fn: (v: MusicStyle) => void): (() => void) => musicStyle.on(fn),
     getSfxSet: (): SfxSet => 'best',
   };
 }
@@ -282,7 +274,4 @@ export function getNumber(k: NumberKey): number { return page.getNumber(k); }
 export function setNumber(k: NumberKey, raw: number): void { page.setNumber(k, raw); }
 export function onNumber(k: NumberKey, fn: (v: number) => void): () => void { return page.onNumber(k, fn); }
 export function onSetting(k: SettingKey, fn: (v: boolean) => void): () => void { return page.onSetting(k, fn); }
-export function getMusicStyle(): MusicStyle { return page.getMusicStyle(); }
-export function setMusicStyle(v: MusicStyle): void { page.setMusicStyle(v); }
-export function onMusicStyle(fn: (v: MusicStyle) => void): () => void { return page.onMusicStyle(fn); }
 export function getSfxSet(): SfxSet { return page.getSfxSet(); }

@@ -12,3 +12,4 @@
   never match the engine style's bank, the behaviour piano players had.
 - Commit 2: bootAudio.ts and the cook's pack list read ENGINE_MUSIC_STYLE; the per-style lists go.
 - Commit 3: Music, the level profiles, boot extras and the session read the one style; synth is the failure fallback only.
+- Commit 4: Settings drops musicStyle; musicStyleRow.ts and the five style strings go.

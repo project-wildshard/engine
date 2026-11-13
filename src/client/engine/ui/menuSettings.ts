@@ -14,7 +14,6 @@ import { isDev, onDev } from '../core/devMode';
 import { devSwitchRows } from './devSwitch';
 import { foldCard } from './cards';
 import { buildDebugMenu, type DebugMenu } from './DebugMenu';
-import { buildMusicStyleRow } from './musicStyleRow';
 import { buildSettingsTabs, touchRows, type SettingsGroup, type SettingsTabsView } from './settingsTabs';
 import type { GraphicsControl } from './graphicsControls';
 import { voiceSettingsRows } from './voiceSettings';
@@ -93,7 +92,7 @@ export function buildMenuSettings(host: MenuSettingsHost, state: MenuSettingsSta
     const paintCredit = (): void => { const c = sfxCredit(getSfxSet()); sfxNote.textContent = c; sfxNote.hidden = c === ''; };
     paintCredit(); onSfxCredit(paintCredit);
     put('sound.volume', slider('volume', engineString('s_31a1802e19b8'), false), slider('music', engineString('s_4db5c63706fd'), false));
-    put('sound.music', buildMusicStyleRow(host.scope), el('ws-gmenu-note', MUSIC_CREDIT), sfxNote);
+    put('sound.music', el('ws-gmenu-note', MUSIC_CREDIT), sfxNote);
     // VOICE-POLISH V10: Voice, only in a build of the online world (single player has no voice); re-read on every tap into Sound
     if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined) {
       const voice = voiceSettingsRows(host.scope); put('sound.voice', ...voice.rows);

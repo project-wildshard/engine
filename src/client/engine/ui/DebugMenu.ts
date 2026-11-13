@@ -15,7 +15,7 @@ import { saveStorage } from '../saves/slots';
  *   const dm = buildDebugMenu(card, { onPick: (id) => … });
  *   dm.applies(ctx)          // every menu open: re-read which rows apply and their choices (the shard may have changed)
  *   dm.paint()               // re-read the readouts (DEBUG_READOUTS: Shards in memory) that can be seen — the caller's timer
- *   dm.row('musicStyle')     // a row's element (the audio pickers' busy spinner)
+ *   dm.row('volume')         // a row's element
  *
  * A button row (debugOptions.ts action()) with a `confirm` takes two taps (E172: Clear downloads); its `status` is a line
  * under the row.
